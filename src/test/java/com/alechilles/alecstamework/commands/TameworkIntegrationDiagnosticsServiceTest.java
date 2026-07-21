@@ -22,6 +22,8 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(lines.size() <= TameworkIntegrationDiagnosticsService.MAX_LINES);
         assertTrue(contains(lines, "API=0.9.0"));
         assertTrue(contains(lines, "capturePolicy=true"));
+        assertTrue(contains(lines, "Capture attempts: prepared=2"));
+        assertTrue(contains(lines, "duplicateCallbacksSinceBoot=4"));
         assertTrue(contains(lines, "bindings=7"));
         assertTrue(contains(lines, "openOperations=3"));
         assertTrue(contains(lines, "classified=21"));
@@ -29,6 +31,27 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "configs=[hydragon:miniwyvern->HyDragon_Miniwyvern]"));
         assertTrue(contains(lines, "Provisioning: readiness=READY"));
         assertTrue(contains(lines, "activeQuarantines=2"));
+    }
+
+    @Test
+    void captureAttemptLookupIsBoundedCorrelatedAndRedactsIdentityAndEntropy() {
+        List<String> lines = new TameworkIntegrationDiagnosticsService(new FakeSource())
+                .captureAttempt("attempt-7");
+
+        assertEquals(5, lines.size());
+        assertTrue(lines.size() <= TameworkIntegrationDiagnosticsService.MAX_LINES);
+        assertTrue(contains(lines, "id=attempt-7"));
+        assertTrue(contains(lines, "state=QUARANTINED"));
+        assertTrue(contains(lines, "spawner=hydragon:stone@12"));
+        assertTrue(contains(lines, "target=hydragon:dragon-policy@8"));
+        assertTrue(contains(lines, "effectiveChance=0.65"));
+        assertTrue(contains(lines, "entropy=<redacted>"));
+        assertTrue(contains(lines, "populationJournalOperation=population-journal-7"));
+        assertTrue(contains(lines, "correlation=population-correlation-7"));
+        assertTrue(contains(lines, "cooldown=active-until-5000"));
+        assertTrue(contains(lines, "incident=incident-7"));
+        assertFalse(contains(lines, "11111111-1111-1111-1111-111111111111"));
+        assertFalse(contains(lines, "0.617283"));
     }
 
     @Test
@@ -84,6 +107,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         FakeSource source = new FakeSource();
         source.vessel = null;
         source.provisioning = null;
+        source.captureAttempt = null;
         TameworkIntegrationDiagnosticsService service =
                 new TameworkIntegrationDiagnosticsService(source);
 
@@ -91,6 +115,8 @@ class TameworkIntegrationDiagnosticsServiceTest {
                 service.vessel("missing"));
         assertEquals(List.of("Provisioning operation not found for origin 'hydragon/missing'."),
                 service.provisioning("hydragon", "missing"));
+        assertEquals(List.of("Capture attempt not found for id 'missing'."),
+                service.captureAttempt("missing"));
     }
 
     private static boolean contains(List<String> lines, String text) {
@@ -115,6 +141,17 @@ class TameworkIntegrationDiagnosticsServiceTest {
                         "profile-7", "HyDragon_Miniwyvern", 900L, 12L,
                         List.of("hydragon:miniwyvern"), "dormant-pop-7", "active-pop-7",
                         "PARTIAL_DORMANT", "projection-runtime-unavailable", 950L, 960L);
+        private TameworkIntegrationDiagnosticsService.CaptureAttemptDetail captureAttempt =
+                new TameworkIntegrationDiagnosticsService.CaptureAttemptDetail(
+                        "attempt-7", "QUARANTINED", "CAPTURED", "capture-apply-quarantined",
+                        "RECOVERED_QUARANTINED", 1_200L,
+                        "hydragon:stone", 12L, "hydragon:dragon-policy", 8L,
+                        false, "HyDragon_Draconic_Stone", "Dragon_Fire", true,
+                        4.0D, 2.0D, 20.0D, 100.0D, 0.8D, 0.25D, 0.65D,
+                        "capture-operation-7", "population-operation-7",
+                        "population-journal-7", "population-correlation-7", "profile-7",
+                        "active-until-5000", true, true, true,
+                        "incident-7", "OPEN", "capture-projection-failed");
 
         @Override public String apiVersion() { return "0.9.0"; }
         @Override public String capabilities() {
@@ -156,6 +193,13 @@ class TameworkIntegrationDiagnosticsServiceTest {
         @Override public TameworkIntegrationDiagnosticsService.PersistenceSummary persistenceSummary() {
             return new TameworkIntegrationDiagnosticsService.PersistenceSummary(
                     "HEALTHY", null, 1, 2, "[PROFILE=READY,POPULATION=READY]");
+        }
+        @Override public TameworkIntegrationDiagnosticsService.CaptureSummary captureSummary() {
+            return new TameworkIntegrationDiagnosticsService.CaptureSummary(2L, 3L, 1L, 1L, 2L, 4L);
+        }
+        @Override public TameworkIntegrationDiagnosticsService.CaptureAttemptDetail findCaptureAttempt(
+                String ignoredAttemptId) {
+            return captureAttempt;
         }
         @Override public TameworkIntegrationDiagnosticsService.VesselDetail findVessel(String ignored) {
             return vessel;

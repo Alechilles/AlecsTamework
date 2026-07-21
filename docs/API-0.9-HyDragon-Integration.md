@@ -144,10 +144,16 @@ boundary denial, dormant and active provisioning, and restart-style lookup of
 one failed projection retained as `PARTIAL_DORMANT`.
 
 For focused read-only inspection, use `/tw diagnose population`,
+`/tw diagnose capture-attempt <id>`,
 `/tw diagnose vessel <binding-or-profile>`, or
 `/tw diagnose provisioning <caller-namespace> <idempotency-key>`. These views
 are bounded and sanitized; they do not retry, repair, or expose raw item JSON or
-owner UUIDs.
+owner UUIDs. Capture-attempt detail is at most five lines and reports the pinned
+item/target policy revisions, formula inputs with entropy redacted, capture and
+population operation correlation, cooldown state, and quarantine/incident
+evidence. The overview remains capped at eight lines and includes prepared,
+resolved-failure, applying, quarantined, recovered, and since-boot duplicate-
+callback counters.
 
 ## Public documentation
 

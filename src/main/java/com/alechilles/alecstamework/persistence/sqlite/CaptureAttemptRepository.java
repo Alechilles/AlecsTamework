@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -20,6 +21,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptSqlS
 public final class CaptureAttemptRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    private final AtomicLong duplicateCallbacksSinceBoot = new AtomicLong();
 
     public CaptureAttemptRepository(@Nonnull SqliteConnectionManager connectionManager,
                                     @Nonnull PersistenceWriteQueue writeQueue) {
@@ -122,6 +124,38 @@ public final class CaptureAttemptRepository {
         }
     }
 
+    /** Bounded aggregate evidence for read-only operator diagnostics. */
+    @Nonnull
+    public DiagnosticsSummary summarizeDiagnostics() throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT
+                         SUM(CASE WHEN state = 'PREPARED' THEN 1 ELSE 0 END) AS prepared,
+                         SUM(CASE WHEN state = 'RESOLVED_FAILURE' THEN 1 ELSE 0 END) AS resolved_failure,
+                         SUM(CASE WHEN state = 'APPLYING' THEN 1 ELSE 0 END) AS applying,
+                         SUM(CASE WHEN state = 'QUARANTINED' THEN 1 ELSE 0 END) AS quarantined,
+                         SUM(CASE WHEN recovery_status NOT IN ('NONE', 'READY')
+                                      OR reason_code LIKE 'capture-recovery-%'
+                                      OR reason_code = 'capture-attempt-expired'
+                                  THEN 1 ELSE 0 END) AS recovered
+                     FROM capture_attempts
+                     """)) {
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    return new DiagnosticsSummary(0L, 0L, 0L, 0L, 0L,
+                            duplicateCallbacksSinceBoot.get());
+                }
+                return new DiagnosticsSummary(
+                        result.getLong("prepared"),
+                        result.getLong("resolved_failure"),
+                        result.getLong("applying"),
+                        result.getLong("quarantined"),
+                        result.getLong("recovered"),
+                        duplicateCallbacksSinceBoot.get());
+            }
+        }
+    }
+
     @Nullable
     private FailureCooldown findFailureCooldownInTransaction(
             @Nonnull Connection connection,
@@ -172,15 +206,19 @@ public final class CaptureAttemptRepository {
                                                @Nonnull CaptureAttemptRecord attempt) throws Exception {
         CaptureAttemptRecord existing = findInTransaction(connection, attempt.identity().attemptId());
         if (existing != null) {
-            return samePreparation(existing, attempt)
-                    ? new PrepareResult(PrepareStatus.IDEMPOTENT, existing, "attempt_exists")
-                    : new PrepareResult(PrepareStatus.CONFLICT, existing, "attempt_id_in_use");
+            if (samePreparation(existing, attempt)) {
+                recordDuplicateCallback(existing);
+                return new PrepareResult(PrepareStatus.IDEMPOTENT, existing, "attempt_exists");
+            }
+            return new PrepareResult(PrepareStatus.CONFLICT, existing, "attempt_id_in_use");
         }
         CaptureAttemptRecord byCaller = findByCallerKeyInTransaction(connection, attempt.identity());
         if (byCaller != null) {
-            return samePreparation(byCaller, attempt)
-                    ? new PrepareResult(PrepareStatus.IDEMPOTENT, byCaller, "caller_key_exists")
-                    : new PrepareResult(PrepareStatus.CONFLICT, byCaller, "caller_key_in_use");
+            if (samePreparation(byCaller, attempt)) {
+                recordDuplicateCallback(byCaller);
+                return new PrepareResult(PrepareStatus.IDEMPOTENT, byCaller, "caller_key_exists");
+            }
+            return new PrepareResult(PrepareStatus.CONFLICT, byCaller, "caller_key_in_use");
         }
         insert(connection, attempt);
         return new PrepareResult(PrepareStatus.PREPARED, attempt, null);
@@ -417,6 +455,12 @@ public final class CaptureAttemptRepository {
                 && existing.config().equals(requested.config());
     }
 
+    private void recordDuplicateCallback(@Nonnull CaptureAttemptRecord existing) {
+        if (existing.state() != CaptureAttemptRecord.State.PREPARED) {
+            duplicateCallbacksSinceBoot.incrementAndGet();
+        }
+    }
+
     @Nonnull
     private static String requireText(@Nonnull String value, @Nonnull String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
@@ -467,6 +511,15 @@ public final class CaptureAttemptRepository {
                                   long cooldownUntilMs,
                                   long generation,
                                   long updatedAtMs) {
+    }
+
+    /** Aggregate counters; duplicate callbacks are intentionally scoped to the current boot. */
+    public record DiagnosticsSummary(long prepared,
+                                     long resolvedFailure,
+                                     long applying,
+                                     long quarantined,
+                                     long recovered,
+                                     long duplicateCallbacksSinceBoot) {
     }
 
 }

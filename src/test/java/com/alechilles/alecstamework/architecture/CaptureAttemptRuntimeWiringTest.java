@@ -44,11 +44,15 @@ class CaptureAttemptRuntimeWiringTest {
                         + "TameworkIntegrationDiagnosticsService.java"));
         assertTrue(root.contains("new TameworkDiagnoseCommand()"));
         assertTrue(diagnose.contains("diagnostics.overview()"));
+        assertTrue(diagnose.contains("case \"capture-attempt\""));
+        assertTrue(diagnose.contains("diagnostics.captureAttempt(arguments.get(1))"));
         assertTrue(diagnostics.contains("Integration readiness:"));
         assertTrue(diagnostics.contains("capturePolicy="));
         assertTrue(diagnostics.contains("bondedVessels="));
         assertTrue(diagnostics.contains("populationGroups="));
         assertTrue(diagnostics.contains("provisioning="));
+        assertTrue(diagnostics.contains("Capture attempts:"));
+        assertTrue(diagnostics.contains("entropy=<redacted>"));
 
         String selfTest = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/selftest/ApiSelfTestRunner.java"));

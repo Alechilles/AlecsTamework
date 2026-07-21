@@ -45,6 +45,8 @@ class CaptureAttemptRepositoryTest {
                     await(repository.resolveAsync(resolution)).status());
             assertEquals(CaptureAttemptRepository.MutationStatus.IDEMPOTENT,
                     await(repository.resolveAsync(resolution)).status());
+            assertEquals(CaptureAttemptRepository.PrepareStatus.IDEMPOTENT,
+                    await(repository.prepareAsync(prepared)).status());
 
             CaptureAttemptRepository.FailureCooldown cooldown = repository.findFailureCooldown(
                     actor, "stone-config");
@@ -54,6 +56,15 @@ class CaptureAttemptRepositoryTest {
             assertTrue(await(repository.markEventEmittedAsync("attempt-a", -400L)));
             assertFalse(await(repository.markEventEmittedAsync("attempt-a", -300L)));
             assertEquals(-400L, repository.find("attempt-a").eventEmittedAtMs());
+
+            CaptureAttemptRepository.DiagnosticsSummary summary =
+                    repository.summarizeDiagnostics();
+            assertEquals(0L, summary.prepared());
+            assertEquals(1L, summary.resolvedFailure());
+            assertEquals(0L, summary.applying());
+            assertEquals(0L, summary.quarantined());
+            assertEquals(0L, summary.recovered());
+            assertEquals(1L, summary.duplicateCallbacksSinceBoot());
         }
     }
 

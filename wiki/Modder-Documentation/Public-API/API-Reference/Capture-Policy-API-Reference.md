@@ -71,6 +71,17 @@ as a failed roll.
 - Treat a missing capability, missing handler, unavailable persistence, or
   invalid live evidence as denial.
 
+## Operator diagnostics
+
+`/tw diagnose capture-attempt <id>` performs one exact, read-only journal
+lookup. It emits at most five bounded lines: state/outcome/recovery, pinned
+config revisions, formula inputs, operation/population correlation, and
+cooldown/quarantine/incident evidence. Entropy and actor/owner UUIDs are never
+printed. The base `/tw diagnose` overview is capped at eight lines and includes
+capture-attempt state counters plus the duplicate callbacks observed since the
+current server boot. Neither command retries, repairs, or otherwise mutates an
+attempt.
+
 ## Related pages
 
 - [TwCapturePolicyConfig Reference](/mod/alecs-tamework/twcapturepolicyconfig-reference)

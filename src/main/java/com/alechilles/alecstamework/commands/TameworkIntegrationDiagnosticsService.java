@@ -7,8 +7,11 @@ import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceIncident;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
@@ -53,11 +56,66 @@ final class TameworkIntegrationDiagnosticsService {
                 + ", bondedVessels=" + source.hasCapability(TameworkApiCapability.BONDED_VESSELS)
                 + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS)
                 + ", provisioning=" + source.hasCapability(TameworkApiCapability.COMPANION_PROVISIONING));
+        appendCaptureSummary(lines);
         appendVesselSummary(lines);
         appendPopulationSummary(lines);
         appendProvisioningSummary(lines);
         appendPersistenceSummary(lines);
         return List.copyOf(lines.subList(0, Math.min(lines.size(), MAX_LINES)));
+    }
+
+    @Nonnull
+    List<String> captureAttempt(@Nonnull String attemptId) {
+        String key = bounded(attemptId);
+        CaptureAttemptDetail detail;
+        try {
+            detail = source.findCaptureAttempt(attemptId);
+        } catch (Exception failure) {
+            return List.of("Capture-attempt diagnostic unavailable: " + failureCode(failure));
+        }
+        if (detail == null) {
+            return List.of("Capture attempt not found for id '" + key + "'.");
+        }
+        List<String> lines = new ArrayList<>(5);
+        lines.add("Capture attempt: id=" + bounded(detail.attemptId())
+                + ", state=" + detail.state()
+                + ", outcome=" + boundedOrNone(detail.outcome())
+                + ", reason=" + boundedOrNone(detail.reasonCode())
+                + ", recovery=" + bounded(detail.recoveryStatus())
+                + ", updatedAtMs=" + detail.updatedAtMs());
+        lines.add("Pinned capture policy: spawner=" + bounded(detail.spawnerConfigId())
+                + "@" + detail.spawnerConfigRevision()
+                + ", target=" + (detail.targetPolicyConfigId() == null
+                ? "<bypassed>" : bounded(detail.targetPolicyConfigId())
+                + "@" + detail.targetPolicyConfigRevision())
+                + ", guaranteed=" + detail.guaranteed()
+                + ", sourceItem=" + bounded(detail.sourceItemId())
+                + ", sourceRole=" + boundedOrNone(detail.sourceRoleId()));
+        if (detail.hasResolution()) {
+            lines.add("Capture formula: power=" + detail.power()
+                    + ", minimumPower=" + detail.minimumPower()
+                    + ", health=" + detail.currentHealth() + "/" + detail.maximumHealth()
+                    + ", missingHealth=" + detail.missingHealthFraction()
+                    + ", conditionBonus=" + detail.conditionBonus()
+                    + ", effectiveChance=" + detail.effectiveChance()
+                    + ", entropy=<redacted>");
+        } else {
+            lines.add("Capture formula: unresolved; entropy=<redacted>");
+        }
+        lines.add("Capture linkage: operation=" + boundedOrNone(detail.captureOperationId())
+                + ", populationOperation=" + boundedOrNone(detail.populationOperationId())
+                + ", populationJournalOperation="
+                + boundedOrNone(detail.populationJournalOperationId())
+                + ", correlation=" + boundedOrNone(detail.correlationId())
+                + ", profile=" + boundedOrNone(detail.profileId()));
+        lines.add("Capture durability: cooldown=" + bounded(detail.cooldownStatus())
+                + ", eventEmitted=" + detail.eventEmitted()
+                + ", quarantine=" + detail.quarantined()
+                + ", quarantineEvidence=" + (detail.hasQuarantineEvidence() ? "present" : "absent")
+                + ", incident=" + boundedOrNone(detail.incidentId())
+                + ", incidentStatus=" + boundedOrNone(detail.incidentStatus())
+                + ", incidentReason=" + boundedOrNone(detail.incidentReason()));
+        return List.copyOf(lines);
     }
 
     @Nonnull
@@ -176,6 +234,20 @@ final class TameworkIntegrationDiagnosticsService {
                 + ", updatedAtMs=" + view.updatedAtMs());
     }
 
+    private void appendCaptureSummary(List<String> lines) {
+        CaptureSummary summary = safe(source::captureSummary, null);
+        if (summary == null) {
+            lines.add("Capture attempts: diagnostics=UNAVAILABLE");
+            return;
+        }
+        lines.add("Capture attempts: prepared=" + summary.prepared()
+                + ", resolvedFailure=" + summary.resolvedFailure()
+                + ", applying=" + summary.applying()
+                + ", quarantined=" + summary.quarantined()
+                + ", recovered=" + summary.recovered()
+                + ", duplicateCallbacksSinceBoot=" + summary.duplicateCallbacksSinceBoot());
+    }
+
     private void appendPopulationSummary(List<String> lines) {
         PopulationGroupReconciliationView view = safe(source::groupReadiness, null);
         GroupOperationSummary operations = safe(source::groupOperationSummary, null);
@@ -266,6 +338,8 @@ final class TameworkIntegrationDiagnosticsService {
         @Nonnull GroupOperationSummary groupOperationSummary() throws Exception;
         @Nonnull GroupConfigSummary groupConfigSummary() throws Exception;
         @Nonnull PersistenceSummary persistenceSummary() throws Exception;
+        @Nonnull CaptureSummary captureSummary() throws Exception;
+        @Nullable CaptureAttemptDetail findCaptureAttempt(@Nonnull String attemptId) throws Exception;
         @Nullable VesselDetail findVessel(@Nonnull String bindingOrProfile) throws Exception;
         @Nullable ProvisioningDetail findProvisioning(
                 @Nonnull String callerNamespace, @Nonnull String idempotencyKey) throws Exception;
@@ -385,6 +459,77 @@ final class TameworkIntegrationDiagnosticsService {
                     resilience.activeIncidentCount(), resilience.activeQuarantineCount(), coverage);
         }
 
+        @Override public CaptureSummary captureSummary() throws Exception {
+            CaptureAttemptRepository.DiagnosticsSummary summary = persistence
+                    .getCaptureAttemptRepository().summarizeDiagnostics();
+            return new CaptureSummary(summary.prepared(), summary.resolvedFailure(),
+                    summary.applying(), summary.quarantined(), summary.recovered(),
+                    summary.duplicateCallbacksSinceBoot());
+        }
+
+        @Override public CaptureAttemptDetail findCaptureAttempt(String attemptId) throws Exception {
+            CaptureAttemptRecord attempt = persistence.getCaptureAttemptRepository().find(attemptId);
+            if (attempt == null) return null;
+            CaptureAttemptRecord.Resolution resolution = attempt.resolution();
+            PopulationGroupOperationRecord population = attempt.populationOperationId() == null
+                    ? null : persistence.getPopulationGroupRepository()
+                    .findOperation(attempt.populationOperationId());
+            CaptureAttemptRepository.FailureCooldown cooldown = resolution == null
+                    || resolution.failureCooldownUntilMs() == 0L ? null
+                    : persistence.getCaptureAttemptRepository().findFailureCooldown(
+                    attempt.identity().actorUuid(), attempt.config().spawnerConfigId());
+            long nowMs = System.currentTimeMillis();
+            String cooldownStatus = cooldown == null
+                    || !attempt.identity().attemptId().equals(cooldown.attemptId())
+                    ? "none"
+                    : (cooldown.cooldownUntilMs() > nowMs ? "active-until-" : "expired-at-")
+                    + cooldown.cooldownUntilMs();
+            PersistenceIncident incident = findRelatedIncident(attempt, population);
+            boolean quarantined = attempt.state() == CaptureAttemptRecord.State.QUARANTINED;
+            return new CaptureAttemptDetail(
+                    attempt.identity().attemptId(), attempt.state().name(),
+                    resolution == null ? null : resolution.outcome(),
+                    resolution == null ? attempt.lastError() : resolution.reasonCode(),
+                    attempt.recoveryStatus(), attempt.updatedAtMs(),
+                    attempt.config().spawnerConfigId(), attempt.config().spawnerConfigRevision(),
+                    attempt.config().targetPolicyConfigId(),
+                    attempt.config().targetPolicyConfigRevision(), attempt.config().guaranteed(),
+                    attempt.identity().sourceItemId(), attempt.identity().sourceRoleId(),
+                    resolution != null,
+                    resolution == null ? 0.0D : resolution.power(),
+                    resolution == null ? 0.0D : resolution.minimumPower(),
+                    resolution == null ? 0.0D : resolution.currentHealth(),
+                    resolution == null ? 0.0D : resolution.maximumHealth(),
+                    resolution == null ? 0.0D : resolution.missingHealthFraction(),
+                    resolution == null ? 0.0D : resolution.conditionBonus(),
+                    resolution == null ? 0.0D : resolution.effectiveChance(),
+                    attempt.captureOperationId(), attempt.populationOperationId(),
+                    population == null ? null : population.operationId(),
+                    population == null ? attempt.populationOperationId()
+                            : population.populationOperationId(),
+                    attempt.identity().profileId(), cooldownStatus,
+                    attempt.eventEmittedAtMs() != 0L, quarantined,
+                    attempt.lastError() != null || incident != null,
+                    incident == null ? null : incident.incidentId(),
+                    incident == null ? null : incident.status().name(),
+                    incident == null ? null : incident.reasonCode());
+        }
+
+        @Nullable
+        private PersistenceIncident findRelatedIncident(
+                CaptureAttemptRecord attempt,
+                @Nullable PopulationGroupOperationRecord population) throws Exception {
+            List<String> operationIds = new ArrayList<>(4);
+            operationIds.add(attempt.identity().attemptId());
+            if (attempt.captureOperationId() != null) operationIds.add(attempt.captureOperationId());
+            if (attempt.populationOperationId() != null) operationIds.add(attempt.populationOperationId());
+            if (population != null) operationIds.add(population.operationId());
+            return persistence.getIncidentRepository().listRecent(false, 100).stream()
+                    .filter(incident -> incident.operationId() != null
+                            && operationIds.contains(incident.operationId()))
+                    .findFirst().orElse(null);
+        }
+
         @Override public VesselDetail findVessel(String bindingOrProfile) throws Exception {
             BondedVesselBindingRecord binding =
                     persistence.getBondedVesselRepository().findBinding(bindingOrProfile);
@@ -450,6 +595,25 @@ final class TameworkIntegrationDiagnosticsService {
     record PersistenceSummary(@Nonnull String storageState, @Nullable String storageReason,
                               int activeIncidents, int activeQuarantines,
                               @Nonnull String coverage) { }
+    record CaptureSummary(long prepared, long resolvedFailure, long applying,
+                          long quarantined, long recovered,
+                          long duplicateCallbacksSinceBoot) { }
+    record CaptureAttemptDetail(
+            @Nonnull String attemptId, @Nonnull String state,
+            @Nullable String outcome, @Nullable String reasonCode,
+            @Nonnull String recoveryStatus, long updatedAtMs,
+            @Nonnull String spawnerConfigId, long spawnerConfigRevision,
+            @Nullable String targetPolicyConfigId, @Nullable Long targetPolicyConfigRevision,
+            boolean guaranteed, @Nonnull String sourceItemId, @Nullable String sourceRoleId,
+            boolean hasResolution, double power, double minimumPower,
+            double currentHealth, double maximumHealth, double missingHealthFraction,
+            double conditionBonus, double effectiveChance,
+            @Nullable String captureOperationId, @Nullable String populationOperationId,
+            @Nullable String populationJournalOperationId, @Nullable String correlationId,
+            @Nullable String profileId, @Nonnull String cooldownStatus,
+            boolean eventEmitted, boolean quarantined, boolean hasQuarantineEvidence,
+            @Nullable String incidentId, @Nullable String incidentStatus,
+            @Nullable String incidentReason) { }
     record VesselDetail(@Nonnull String bindingId, @Nonnull String profileId,
                         @Nonnull String lifecycle, long generation, long profileRevision,
                         @Nonnull String configId, long configRevision,

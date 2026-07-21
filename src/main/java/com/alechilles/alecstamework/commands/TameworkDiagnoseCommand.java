@@ -49,6 +49,8 @@ public final class TameworkDiagnoseCommand extends AbstractPlayerCommand {
             lines = switch (arguments.getFirst().toLowerCase(Locale.ROOT)) {
                 case "population" -> arguments.size() == 1
                         ? diagnostics.population() : usage();
+                case "capture-attempt" -> arguments.size() == 2
+                        ? diagnostics.captureAttempt(arguments.get(1)) : usage();
                 case "vessel" -> arguments.size() == 2
                         ? diagnostics.vessel(arguments.get(1)) : usage();
                 case "provisioning" -> arguments.size() == 3
@@ -62,7 +64,8 @@ public final class TameworkDiagnoseCommand extends AbstractPlayerCommand {
     }
 
     private static List<String> usage() {
-        return List.of("Usage: /tw diagnose [population|vessel <binding-or-profile>"
+        return List.of("Usage: /tw diagnose [population|capture-attempt <id>"
+                + "|vessel <binding-or-profile>"
                 + "|provisioning <caller-namespace> <idempotency-key>]");
     }
 
