@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.api.CaptureChanceMode;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +60,37 @@ class TwSpawnerWildCaptureConfigTest {
         assertEquals("Required", runtime.getCaptureRequiredEffectId());
         assertEquals("Aura", runtime.getCaptureChannelAuraEffectId());
         assertEquals(Map.of("Wild", "Tamed"), runtime.getCaptureTamedRoleOverrides());
+    }
+
+    @Test
+    void chanceMechanicsDefaultGuaranteedAndNestedFieldsInheritExactly() throws Exception {
+        TwSpawnerConfig parent = new TwSpawnerConfig();
+        TwSpawnerConfig child = new TwSpawnerConfig();
+        TwSpawnerConfig.CaptureSettings parentCapture = new TwSpawnerConfig.CaptureSettings();
+        TwSpawnerConfig.CaptureSettings childCapture = new TwSpawnerConfig.CaptureSettings();
+        setField(parentCapture, "chanceMode", CaptureChanceMode.PROBABILITY);
+        setField(parentCapture, "power", 5);
+        setField(parentCapture, "baseChance", 0.4D);
+        setField(parentCapture, "chancePerPower", 0.1D);
+        setField(parentCapture, "minimumChance", 0.05D);
+        setField(parentCapture, "maximumChance", 0.95D);
+        setField(parentCapture, "failureCooldownMs", 2500);
+        setField(childCapture, "power", 0);
+        setField(childCapture, "chanceMode", CaptureChanceMode.GUARANTEED);
+        setField(parent, "capture", parentCapture);
+        setField(child, "capture", childCapture);
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Capture"),
+                Map.of("Capture", Set.of("Power", "ChanceMode")));
+        ItemFeatureConfig.CaptureItemMechanics mechanics = child.toItemFeatureConfig().getCaptureMechanics();
+
+        assertEquals(CaptureChanceMode.GUARANTEED, mechanics.chanceMode());
+        assertEquals(0, mechanics.power());
+        assertEquals(0.4D, mechanics.baseChance());
+        assertEquals(0.1D, mechanics.chancePerPower());
+        assertEquals(2500, mechanics.failureCooldownMs());
+        assertEquals(CaptureChanceMode.GUARANTEED,
+                new TwSpawnerConfig().toItemFeatureConfig().getCaptureMechanics().chanceMode());
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {

@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.CaptureRequirementContext;
+import com.alechilles.alecstamework.api.CaptureRequirementDecision;
+import com.alechilles.alecstamework.api.CaptureRequirementHandler;
+import com.alechilles.alecstamework.api.CaptureRequirementSpec;
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectHandler;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
@@ -15,18 +19,23 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public final class InteractionExtensionRegistry implements InteractionExtensionApi, InteractionExtensionRuntime {
+public final class InteractionExtensionRegistry
+        implements InteractionExtensionApi, InteractionExtensionRuntime, CaptureRequirementRuntime {
     @Nullable
     private final HytaleLogger logger;
     private final ConcurrentHashMap<String, InteractionRequirementHandler> requirementHandlers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionEffectHandler> effectHandlers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CaptureRequirementHandler> captureRequirementHandlers =
+            new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionRequirementHandler> builtInRequirementHandlers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionEffectHandler> builtInEffectHandlers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionPresetDefinition> presets = new ConcurrentHashMap<>();
+    private final AtomicLong captureRequirementGeneration = new AtomicLong();
 
     public InteractionExtensionRegistry(@Nullable HytaleLogger logger) {
         this.logger = logger;
@@ -84,6 +93,73 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     @Nonnull
     public Set<String> listPresetIds() {
         return Set.copyOf(presets.keySet());
+    }
+
+    @Override
+    @Nonnull
+    public AutoCloseable registerCaptureRequirement(@Nonnull String id,
+                                                     @Nonnull CaptureRequirementHandler handler) {
+        String normalizedId = requireNormalizedId(id, "capture requirement");
+        rejectReservedId(normalizedId, "capture requirement");
+        if (normalizedId.indexOf(':') <= 0 || normalizedId.endsWith(":")) {
+            throw new IllegalArgumentException("capture requirement id must be namespaced.");
+        }
+        CaptureRequirementHandler normalizedHandler = Objects.requireNonNull(handler, "handler");
+        if (captureRequirementHandlers.putIfAbsent(normalizedId, normalizedHandler) != null) {
+            throw new IllegalArgumentException("capture requirement id is already registered: " + normalizedId);
+        }
+        captureRequirementGeneration.incrementAndGet();
+        return () -> {
+            if (captureRequirementHandlers.remove(normalizedId, normalizedHandler)) {
+                captureRequirementGeneration.incrementAndGet();
+            }
+        };
+    }
+
+    @Override
+    @Nonnull
+    public Set<String> listCaptureRequirementIds() {
+        return Set.copyOf(captureRequirementHandlers.keySet());
+    }
+
+    @Override
+    public long captureRequirementGeneration() {
+        return captureRequirementGeneration.get();
+    }
+
+    @Override
+    @Nonnull
+    public CaptureRequirementDecision evaluateCaptureRequirement(
+            @Nonnull CaptureRequirementSpec spec,
+            @Nonnull CaptureRequirementContext context,
+            long expectedGeneration
+    ) {
+        CaptureRequirementSpec normalizedSpec = Objects.requireNonNull(spec, "spec");
+        CaptureRequirementContext normalizedContext = Objects.requireNonNull(context, "context");
+        long startGeneration = captureRequirementGeneration.get();
+        if (expectedGeneration != startGeneration) {
+            return CaptureRequirementDecision.deny("capture-requirement-generation-changed");
+        }
+        String normalizedId = normalizeId(normalizedSpec.id());
+        CaptureRequirementHandler handler = normalizedId == null
+                ? null : captureRequirementHandlers.get(normalizedId);
+        if (handler == null) {
+            return CaptureRequirementDecision.deny("capture-requirement-handler-missing");
+        }
+        CaptureRequirementDecision decision;
+        try {
+            decision = Objects.requireNonNull(
+                    handler.test(normalizedContext, normalizedSpec),
+                    "capture requirement decision"
+            );
+        } catch (Throwable error) {
+            logExtensionFailure("capture requirement", normalizedId, error);
+            return CaptureRequirementDecision.deny("capture-requirement-handler-failed");
+        }
+        if (captureRequirementGeneration.get() != startGeneration) {
+            return CaptureRequirementDecision.deny("capture-requirement-generation-changed");
+        }
+        return decision;
     }
 
     @Override

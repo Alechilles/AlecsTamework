@@ -14,7 +14,10 @@ public final class ItemFeatureRegistry {
     public void register(String itemId, ItemFeatureConfig config) {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(config, "config");
-        configsByItemId.put(itemId, config);
+        ItemFeatureConfig existing = configsByItemId.putIfAbsent(itemId, config);
+        if (existing != null) {
+            throw new IllegalArgumentException("Duplicate item feature binding for item ID: " + itemId);
+        }
     }
 
     public ItemFeatureConfig get(String itemId) {

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.config;
 
+import com.alechilles.alecstamework.api.CaptureChanceMode;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +82,7 @@ public final class ItemFeatureConfig {
     private final Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole;
     private final List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups;
     private final SpawnerTooltipMode spawnerTooltipMode;
+    private final CaptureItemMechanics captureMechanics;
 
     private ItemFeatureConfig(Builder builder) {
         this.spawnerEnabled = builder.spawnerEnabled;
@@ -114,6 +117,7 @@ public final class ItemFeatureConfig {
         this.spawnerIconOverridesByRole = builder.spawnerIconOverridesByRole;
         this.spawnerIconOverrideGroups = builder.spawnerIconOverrideGroups;
         this.spawnerTooltipMode = builder.spawnerTooltipMode;
+        this.captureMechanics = builder.captureMechanics;
     }
 
     public static Builder builder() {
@@ -263,6 +267,53 @@ public final class ItemFeatureConfig {
         return spawnerTooltipMode;
     }
 
+    public CaptureItemMechanics getCaptureMechanics() {
+        return captureMechanics;
+    }
+
+    /** Immutable compiled item-side capture chance mechanics. */
+    public record CaptureItemMechanics(CaptureChanceMode chanceMode,
+                                       int power,
+                                       double baseChance,
+                                       double chancePerPower,
+                                       double minimumChance,
+                                       double maximumChance,
+                                       int failureCooldownMs,
+                                       String failureParticleSystem,
+                                       String failureSoundEvent) {
+        public static final CaptureItemMechanics GUARANTEED_DEFAULT = new CaptureItemMechanics(
+                CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null
+        );
+
+        public CaptureItemMechanics {
+            chanceMode = chanceMode == null ? CaptureChanceMode.GUARANTEED : chanceMode;
+            failureParticleSystem = normalizeBlank(failureParticleSystem);
+            failureSoundEvent = normalizeBlank(failureSoundEvent);
+            if (power < 0 || failureCooldownMs < 0) {
+                throw new IllegalArgumentException("Capture power and failure cooldown cannot be negative.");
+            }
+            requireProbability(baseChance, "BaseChance");
+            requireProbability(minimumChance, "MinimumChance");
+            requireProbability(maximumChance, "MaximumChance");
+            if (!Double.isFinite(chancePerPower) || chancePerPower < 0.0D) {
+                throw new IllegalArgumentException("ChancePerPower must be finite and non-negative.");
+            }
+            if (minimumChance > maximumChance) {
+                throw new IllegalArgumentException("MinimumChance cannot exceed MaximumChance.");
+            }
+        }
+
+        private static void requireProbability(double value, String field) {
+            if (!Double.isFinite(value) || value < 0.0D || value > 1.0D) {
+                throw new IllegalArgumentException(field + " must be finite and between zero and one.");
+            }
+        }
+
+        private static String normalizeBlank(String value) {
+            return value == null || value.isBlank() ? null : value.trim();
+        }
+    }
+
     public static final class SpawnerIconOverride {
         // Attachment keys must match the NPC attachment map for a given capture.
 
@@ -356,6 +407,7 @@ public final class ItemFeatureConfig {
         private Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole = Collections.emptyMap();
         private List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups = Collections.emptyList();
         private SpawnerTooltipMode spawnerTooltipMode = SpawnerTooltipMode.ADDITIVE;
+        private CaptureItemMechanics captureMechanics = CaptureItemMechanics.GUARANTEED_DEFAULT;
 
         private Builder() {
         }
@@ -581,6 +633,12 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        public Builder captureMechanics(CaptureItemMechanics captureMechanics) {
+            this.captureMechanics = captureMechanics == null
+                    ? CaptureItemMechanics.GUARANTEED_DEFAULT : captureMechanics;
+            return this;
+        }
+
         public ItemFeatureConfig build() {
             return new ItemFeatureConfig(this);
         }
@@ -626,7 +684,8 @@ public final class ItemFeatureConfig {
                 && Objects.equals(spawnerIconOverrides, other.spawnerIconOverrides)
                 && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole)
                 && Objects.equals(spawnerIconOverrideGroups, other.spawnerIconOverrideGroups)
-                && spawnerTooltipMode == other.spawnerTooltipMode;
+                && spawnerTooltipMode == other.spawnerTooltipMode
+                && Objects.equals(captureMechanics, other.captureMechanics);
     }
 
     @Override
@@ -663,7 +722,8 @@ public final class ItemFeatureConfig {
                 spawnerIconOverrides,
                 spawnerIconOverridesByRole,
                 spawnerIconOverrideGroups,
-                spawnerTooltipMode
+                spawnerTooltipMode,
+                captureMechanics
         );
     }
 }

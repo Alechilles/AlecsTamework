@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
+
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
@@ -299,6 +302,37 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         )
         .documentation("Maximum capture distance.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("ChanceMode", Codec.STRING),
+            (settings, value) -> settings.chanceMode = parseChanceMode(value),
+            settings -> settings.chanceMode == CaptureChanceMode.PROBABILITY ? "Probability" : "Guaranteed"
+        )
+        .documentation("Guaranteed preserves deterministic legacy capture and bypasses role policies; Probability opts in.")
+        .add()
+        .<Integer>append(new KeyedCodec<>("Power", Codec.INTEGER),
+            (settings, value) -> settings.power = value, settings -> settings.power)
+        .documentation("Generic non-negative capture power.").add()
+        .<Double>append(new KeyedCodec<>("BaseChance", Codec.DOUBLE),
+            (settings, value) -> settings.baseChance = value, settings -> settings.baseChance)
+        .documentation("Base success probability in [0,1].").add()
+        .<Double>append(new KeyedCodec<>("ChancePerPower", Codec.DOUBLE),
+            (settings, value) -> settings.chancePerPower = value, settings -> settings.chancePerPower)
+        .documentation("Finite non-negative chance added per power above the target minimum.").add()
+        .<Double>append(new KeyedCodec<>("MinimumChance", Codec.DOUBLE),
+            (settings, value) -> settings.minimumChance = value, settings -> settings.minimumChance)
+        .documentation("Inclusive lower probability clamp in [0,1].").add()
+        .<Double>append(new KeyedCodec<>("MaximumChance", Codec.DOUBLE),
+            (settings, value) -> settings.maximumChance = value, settings -> settings.maximumChance)
+        .documentation("Inclusive upper probability clamp in [0,1], not below MinimumChance.").add()
+        .<Integer>append(new KeyedCodec<>("FailureCooldownMs", Codec.INTEGER),
+            (settings, value) -> settings.failureCooldownMs = value, settings -> settings.failureCooldownMs)
+        .documentation("Non-negative cooldown applied only after a resolved failed probability roll.").add()
+        .<String>append(new KeyedCodec<>("FailureParticleSystem", Codec.STRING),
+            (settings, value) -> settings.failureParticleSystem = value, settings -> settings.failureParticleSystem)
+        .documentation("Optional failed-roll particle system.").add()
+        .<String>append(new KeyedCodec<>("FailureSoundEvent", Codec.STRING),
+            (settings, value) -> settings.failureSoundEvent = value, settings -> settings.failureSoundEvent)
+        .documentation("Optional failed-roll sound event.").add()
         .build();
 
     public static final BuilderCodec<SpawnSettings> SPAWN_CODEC = BuilderCodec.builder(
@@ -595,6 +629,15 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("SoundEvent")) capture.soundEvent = parent.capture.soundEvent;
         if (!nestedExplicitKeys.contains("CooldownMs")) capture.cooldownMs = parent.capture.cooldownMs;
         if (!nestedExplicitKeys.contains("MaxDistance")) capture.maxDistance = parent.capture.maxDistance;
+        if (!nestedExplicitKeys.contains("ChanceMode")) capture.chanceMode = parent.capture.chanceMode;
+        if (!nestedExplicitKeys.contains("Power")) capture.power = parent.capture.power;
+        if (!nestedExplicitKeys.contains("BaseChance")) capture.baseChance = parent.capture.baseChance;
+        if (!nestedExplicitKeys.contains("ChancePerPower")) capture.chancePerPower = parent.capture.chancePerPower;
+        if (!nestedExplicitKeys.contains("MinimumChance")) capture.minimumChance = parent.capture.minimumChance;
+        if (!nestedExplicitKeys.contains("MaximumChance")) capture.maximumChance = parent.capture.maximumChance;
+        if (!nestedExplicitKeys.contains("FailureCooldownMs")) capture.failureCooldownMs = parent.capture.failureCooldownMs;
+        if (!nestedExplicitKeys.contains("FailureParticleSystem")) capture.failureParticleSystem = parent.capture.failureParticleSystem;
+        if (!nestedExplicitKeys.contains("FailureSoundEvent")) capture.failureSoundEvent = parent.capture.failureSoundEvent;
     }
 
     private void inheritSpawnSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -679,7 +722,29 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnerIconOverridesByRole(toOverridesByRole(iconOverridesByRole))
             .spawnerIconOverrideGroups(toOverrideGroups(iconOverrideGroups))
             .spawnerTooltipMode(tooltipMode)
+            .captureMechanics(captureSettings.toMechanics())
             .build();
+    }
+
+    public SpawnerCaptureMechanicsView toCaptureMechanicsView(long revision) {
+        ItemFeatureConfig.CaptureItemMechanics mechanics =
+                (capture == null ? new CaptureSettings() : capture).toMechanics();
+        if (id == null || id.isBlank() || emptyItemId == null || emptyItemId.isBlank()) {
+            throw new IllegalArgumentException("Spawner config ID and EmptyItemId are required for capture mechanics.");
+        }
+        return new SpawnerCaptureMechanicsView(
+                id, revision, emptyItemId, mechanics.chanceMode(), mechanics.power(), mechanics.baseChance(),
+                mechanics.chancePerPower(), mechanics.minimumChance(), mechanics.maximumChance(),
+                mechanics.failureCooldownMs(), mechanics.failureParticleSystem(), mechanics.failureSoundEvent()
+        );
+    }
+
+    private static CaptureChanceMode parseChanceMode(@Nullable String value) {
+        if (value == null || value.isBlank() || value.equalsIgnoreCase("Guaranteed")) {
+            return CaptureChanceMode.GUARANTEED;
+        }
+        if (value.equalsIgnoreCase("Probability")) return CaptureChanceMode.PROBABILITY;
+        throw new IllegalArgumentException("Unknown capture ChanceMode: " + value);
     }
 
     private static List<String> toList(String[] values) {
@@ -812,6 +877,22 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         private String soundEvent;
         private int cooldownMs;
         private double maxDistance;
+        private CaptureChanceMode chanceMode = CaptureChanceMode.GUARANTEED;
+        private int power;
+        private double baseChance = 1.0D;
+        private double chancePerPower;
+        private double minimumChance;
+        private double maximumChance = 1.0D;
+        private int failureCooldownMs;
+        private String failureParticleSystem;
+        private String failureSoundEvent;
+
+        public ItemFeatureConfig.CaptureItemMechanics toMechanics() {
+            return new ItemFeatureConfig.CaptureItemMechanics(
+                    chanceMode, power, baseChance, chancePerPower, minimumChance, maximumChance,
+                    failureCooldownMs, failureParticleSystem, failureSoundEvent
+            );
+        }
     }
 
     public static final class SpawnSettings {
