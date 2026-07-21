@@ -80,6 +80,37 @@ class PopulationGroupOwnerAdmissionExtensionTest {
         }
     }
 
+    @Test
+    void emptyGroupPolicyDoesNotDisableOrdinaryTameworkOwnership() throws Exception {
+        SqliteConnectionManager connections = new SqliteConnectionManager(
+                tempDir.resolve("empty-population-groups.sqlite"));
+        try (Connection connection = connections.openConnection()) {
+            connection.setAutoCommit(false);
+            new SqliteSchemaMigrator().migrate(connection);
+            connection.commit();
+        }
+        PersistenceHealthService health = new PersistenceHealthService();
+        try (PersistenceWriteQueue queue = new PersistenceWriteQueue(connections, health, null)) {
+            CompanionPopulationRepository population = new CompanionPopulationRepository(connections, queue);
+            PopulationGroupRepository groups = new PopulationGroupRepository(connections, queue);
+            OwnerPopulationIndex index = new OwnerPopulationIndex();
+            index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.READY);
+            OwnerPopulationAdmissionCoordinator coordinator =
+                    new OwnerPopulationAdmissionCoordinator(index, population, health);
+            PopulationGroupRegistry registry = new PopulationGroupRegistry();
+            assertTrue(registry.replace(List.of(), 1L).applied());
+            coordinator.installPopulationGroups(new PopulationGroupOwnerAdmissionExtension(
+                    coordinator, registry, groups, new NpcProfileRepository(connections, queue)));
+
+            OwnerPopulationPreparationResult result = coordinator.prepareAsync(
+                    plan(UUID.randomUUID().toString(), UUID.randomUUID(), "Ordinary_Companion"))
+                    .get(2, TimeUnit.SECONDS);
+            assertTrue(result.allowed());
+            assertTrue(coordinator.cancelAsync(result.preparedAdmission(), "test-cleanup")
+                    .get(2, TimeUnit.SECONDS));
+        }
+    }
+
     private Harness harness() throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(
                 tempDir.resolve("population-groups.sqlite"));

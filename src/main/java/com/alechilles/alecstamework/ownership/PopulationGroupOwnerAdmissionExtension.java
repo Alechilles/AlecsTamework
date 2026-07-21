@@ -187,16 +187,14 @@ public final class PopulationGroupOwnerAdmissionExtension {
         OwnerPopulationAdmissionPlan plan = reserved.plan();
         var transition = plan.transition();
         var index = registry.snapshot();
-        if (index.definitions().isEmpty()) {
-            throw new IllegalStateException("population-group-policy-unavailable");
-        }
         PopulationGroupClassificationRecord existing = classification(transition.profileId());
         PopulationGroupRoleContext context = plan.populationGroupRoleContext();
         String profileRole = profileRole(transition.profileId());
         String oldRole = first(context == null ? null : context.oldRoleId(),
                 existing == null ? null : existing.roleId(), profileRole);
         String newRole = first(context == null ? null : context.newRoleId(), oldRole, profileRole);
-        if (transition.newOwnerId() != null && newRole == null) {
+        if (!index.definitions().isEmpty()
+                && transition.newOwnerId() != null && newRole == null) {
             throw new IllegalStateException("population-group-target-role-unresolved");
         }
         List<String> oldGroups = existing == null
