@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionLiveEvidenceRevision;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationProgress;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationRuntime;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationStartupReconciler;
 import com.alechilles.alecstamework.ownership.reconciliation.ReconciliationEvidenceRecoveryProofRegistry;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
@@ -458,6 +459,12 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     @Nonnull
     public CustomContainerReconciliationRegistry customContainerReconciliationRegistry() {
         return reconciliationRuntime.customContainers();
+    }
+
+    /** Installs a feature observer at the complete post-seal inventory evidence boundary. */
+    public void installSealedProjectionObserver(
+            @Nonnull CompanionPopulationStartupReconciler.SealedProjectionObserver observer) {
+        reconciliationRuntime.installSealedProjectionObserver(observer);
     }
 
     @Nonnull
