@@ -78,6 +78,57 @@ class BondedVesselRepositoryTest {
         }
     }
 
+    @Test
+    void terminalDenialRequiresStateSpecificProofAndRestoresClaimedLifecycle() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("terminal-denial.sqlite")) {
+            UUID owner = UUID.randomUUID();
+            String profileId = harness.insertProfile(owner, "dragon-role", "CAPTURED", "default", 5L);
+            BondedVesselRepository repository = new BondedVesselRepository(
+                    harness.connections, harness.queue);
+            String bindingId = UUID.randomUUID().toString();
+            assertEquals(BondedVesselRepository.Status.APPLIED,
+                    await(repository.createInitialBindingAsync(
+                            initialBinding(bindingId, profileId, owner),
+                            initialOperation(bindingId, profileId))).status());
+            assertEquals(BondedVesselRepository.Status.COMMITTED,
+                    await(repository.commitAsync("bind-op", 20L)).status());
+
+            assertEquals(BondedVesselRepository.Status.PREPARED,
+                    await(repository.prepareTransitionAsync(
+                            summonOperation(bindingId, profileId))).status());
+            assertEquals(BondedVesselRepository.Status.INVALID_STATE,
+                    await(repository.denyBeforeApplyAsync(
+                            "summon-op", "wrong-proof",
+                            BondedVesselRepository.ApplyAbsenceProof
+                                    .APPLYING_SOURCE_REVALIDATION_FAILED_BEFORE_MUTATION,
+                            30L)).status());
+            assertEquals(BondedVesselRepository.Status.APPLYING,
+                    await(repository.claimForApplyAsync("summon-op", 31L)).status());
+            assertEquals(BondedVesselBindingRecord.LifecycleState.SUMMONING,
+                    repository.findBinding(bindingId).lifecycleState());
+
+            BondedVesselRepository.MutationResult denied = await(
+                    repository.denyBeforeApplyAsync(
+                            "summon-op", "source-fingerprint-changed",
+                            BondedVesselRepository.ApplyAbsenceProof
+                                    .APPLYING_SOURCE_REVALIDATION_FAILED_BEFORE_MUTATION,
+                            32L));
+            assertEquals(BondedVesselRepository.Status.TERMINAL_DENIED, denied.status());
+            assertEquals(BondedVesselOperationRecord.State.TERMINAL_DENIED,
+                    denied.operation().state());
+            assertEquals("source-fingerprint-changed", denied.operation().reasonCode());
+            assertEquals(BondedVesselBindingRecord.LifecycleState.STORED,
+                    denied.binding().lifecycleState());
+            assertNull(denied.binding().activeOperationId());
+            assertEquals(BondedVesselRepository.Status.IDEMPOTENT,
+                    await(repository.denyBeforeApplyAsync(
+                            "summon-op", "source-fingerprint-changed",
+                            BondedVesselRepository.ApplyAbsenceProof
+                                    .APPLYING_SOURCE_REVALIDATION_FAILED_BEFORE_MUTATION,
+                            33L)).status());
+        }
+    }
+
     private BondedVesselBindingRecord initialBinding(String bindingId, String profileId, UUID owner) {
         return new BondedVesselBindingRecord(
                 bindingId, profileId, 1L, "dragon-stone", 2L,

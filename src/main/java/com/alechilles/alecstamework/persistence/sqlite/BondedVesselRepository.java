@@ -104,6 +104,24 @@ public final class BondedVesselRepository {
         );
     }
 
+    /**
+     * Closes a prepared or claimed operation only when the caller supplies state-specific proof
+     * that Tamework's authoritative apply boundary was never entered.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> denyBeforeApplyAsync(
+            @Nonnull String operationId,
+            @Nonnull String reason,
+            @Nonnull ApplyAbsenceProof proof,
+            long nowMs) {
+        return writeQueue.submitTracked(
+                "bonded_vessel_terminal_deny",
+                connection -> denyBeforeApplyInTransaction(
+                        connection, operationId, reason, proof, nowMs),
+                null
+        );
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> quarantineAsync(
             @Nonnull String operationId,
@@ -333,6 +351,74 @@ public final class BondedVesselRepository {
     }
 
     @Nonnull
+    private MutationResult denyBeforeApplyInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String operationId,
+            @Nonnull String reason,
+            @Nonnull ApplyAbsenceProof proof,
+            long nowMs) throws Exception {
+        BondedVesselOperationRecord operation = findOperation(connection, operationId);
+        if (operation == null) {
+            return result(Status.NOT_FOUND, null, null, "operation_not_found");
+        }
+        BondedVesselBindingRecord binding = findBinding(connection, operation.bindingId());
+        if (operation.state() == BondedVesselOperationRecord.State.TERMINAL_DENIED) {
+            return result(Status.IDEMPOTENT, binding, operation, "already_terminal_denied");
+        }
+        BondedVesselOperationRecord.State expectedState = switch (proof) {
+            case PREPARED_NOT_CLAIMED -> BondedVesselOperationRecord.State.PREPARED;
+            case APPLYING_SOURCE_REVALIDATION_FAILED_BEFORE_MUTATION ->
+                    BondedVesselOperationRecord.State.APPLYING;
+        };
+        if (operation.state() != expectedState) {
+            return result(Status.INVALID_STATE, binding, operation,
+                    "apply_absence_proof_does_not_match_state");
+        }
+        if (binding == null
+                || binding.generation() != operation.priorGeneration()
+                || !operation.operationId().equals(binding.activeOperationId())) {
+            return result(Status.CONFLICT, binding, operation, "binding_reservation_changed");
+        }
+        BondedVesselBindingRecord.LifecycleState expectedLifecycle =
+                expectedState == BondedVesselOperationRecord.State.PREPARED
+                        ? operation.priorLifecycleState() : operation.applyingLifecycleState();
+        if (binding.lifecycleState() != expectedLifecycle) {
+            return result(Status.CONFLICT, binding, operation, "binding_lifecycle_changed");
+        }
+        Savepoint savepoint = connection.setSavepoint();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_vessel_bindings
+                SET lifecycle_state = ?, active_operation_id = NULL,
+                    row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE binding_id = ? AND generation = ? AND active_operation_id = ?
+                  AND lifecycle_state = ?
+                """)) {
+            statement.setString(1, operation.priorLifecycleState().name());
+            statement.setLong(2, nowMs);
+            statement.setString(3, operation.bindingId());
+            statement.setLong(4, operation.priorGeneration());
+            statement.setString(5, operation.operationId());
+            statement.setString(6, expectedLifecycle.name());
+            if (statement.executeUpdate() != 1) {
+                connection.rollback(savepoint);
+                connection.releaseSavepoint(savepoint);
+                return result(Status.CONFLICT, findBinding(connection, operation.bindingId()),
+                        operation, "binding_changed_before_terminal_denial");
+            }
+            updateOperationState(connection, operation.operationId(), expectedState,
+                    BondedVesselOperationRecord.State.TERMINAL_DENIED,
+                    requireText(reason, "reason"), nowMs, nowMs);
+            connection.releaseSavepoint(savepoint);
+        } catch (Exception failure) {
+            connection.rollback(savepoint);
+            connection.releaseSavepoint(savepoint);
+            throw failure;
+        }
+        return result(Status.TERMINAL_DENIED, findBinding(connection, operation.bindingId()),
+                findOperation(connection, operation.operationId()), null);
+    }
+
+    @Nonnull
     private MutationResult quarantineInTransaction(@Nonnull Connection connection,
                                                    @Nonnull String operationId,
                                                    @Nonnull String reason,
@@ -487,12 +573,19 @@ public final class BondedVesselRepository {
         APPLIED,
         COMMITTED,
         CANCELED,
+        TERMINAL_DENIED,
         QUARANTINED,
         IDEMPOTENT,
         DENIED,
         NOT_FOUND,
         INVALID_STATE,
         CONFLICT
+    }
+
+    /** Evidence class constraining terminal denial to a pre-authoritative-mutation boundary. */
+    public enum ApplyAbsenceProof {
+        PREPARED_NOT_CLAIMED,
+        APPLYING_SOURCE_REVALIDATION_FAILED_BEFORE_MUTATION
     }
 
     public record MutationResult(@Nonnull Status status,
