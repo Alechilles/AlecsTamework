@@ -95,13 +95,13 @@ public final class CaptureAttemptCoordinator {
                         request.attemptId(), "capture-attempt-conflict", false, result.attempt()));
             }
             CaptureAttemptRecord active = result.attempt();
+            if (active.state() != CaptureAttemptRecord.State.PREPARED) {
+                return CompletableFuture.completedFuture(fromExisting(active));
+            }
             if (!active.identity().attemptId().equals(request.attemptId().toString())) {
                 return CompletableFuture.completedFuture(ResolutionResult.denied(
                         request.attemptId(), "capture-attempt-canonical-identity-mismatch",
                         false, active));
-            }
-            if (active.state() != CaptureAttemptRecord.State.PREPARED) {
-                return CompletableFuture.completedFuture(fromExisting(active));
             }
             return resolvePrepared(request, policy, active);
         });

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,6 +55,59 @@ class CaptureAttemptCoordinatorTest {
         assertEquals(1, entropyCalls.get());
         assertEquals(1, events.get());
         assertTrue(first.attempt().resolution().failureCooldownUntilMs() > NOW);
+    }
+
+    @Test
+    void terminalCallbackWithNewAttemptIdReturnsCanonicalFailureWithoutRerolling() {
+        FakeJournal journal = new FakeJournal();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        AtomicInteger events = new AtomicInteger();
+        CaptureAttemptCoordinator coordinator = coordinator(
+                journal,
+                ignored -> {
+                    entropyCalls.incrementAndGet();
+                    return 0.9D;
+                },
+                ignored -> events.incrementAndGet());
+        CaptureAttemptCoordinator.AttemptRequest original = request(
+                new ItemFeatureConfig.CaptureItemMechanics(
+                        CaptureChanceMode.PROBABILITY, 1, 0.5D, 0.0D,
+                        0.0D, 1.0D, 2_000, null, null));
+        CaptureAttemptCoordinator.AttemptRequest callback = reissuedRequest(original);
+
+        CaptureAttemptCoordinator.ResolutionResult first = coordinator.resolve(original).join();
+        CaptureAttemptCoordinator.ResolutionResult duplicate = coordinator.resolve(callback).join();
+
+        assertEquals(CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL, first.status());
+        assertEquals(CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL, duplicate.status());
+        assertEquals(original.attemptId(), duplicate.attemptId());
+        assertEquals(first.attempt(), duplicate.attempt());
+        assertEquals(1, entropyCalls.get());
+        assertEquals(1, events.get());
+    }
+
+    @Test
+    void preparedCallbackWithNewAttemptIdRemainsDeniedByCanonicalIdentityFence() {
+        FakeJournal journal = new FakeJournal();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        CaptureAttemptCoordinator coordinator = coordinator(
+                journal, ignored -> {
+                    entropyCalls.incrementAndGet();
+                    return 0.5D;
+                }, ignored -> { });
+        CaptureAttemptCoordinator.AttemptRequest original = request(
+                ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT);
+        CaptureAttemptCoordinator.AttemptRequest callback = reissuedRequest(original);
+        journal.prepare(prepared(original, NOW + 30_000L)).join();
+
+        CaptureAttemptCoordinator.ResolutionResult duplicate = coordinator.resolve(callback).join();
+
+        assertEquals(CaptureAttemptCoordinator.ResultStatus.DENIED, duplicate.status());
+        assertEquals("capture-attempt-canonical-identity-mismatch", duplicate.reason());
+        assertEquals(callback.attemptId(), duplicate.attemptId());
+        assertEquals(original.attemptId().toString(), duplicate.attempt().identity().attemptId());
+        assertEquals(CaptureAttemptRecord.State.PREPARED, duplicate.attempt().state());
+        assertEquals(0, entropyCalls.get());
     }
 
     @Test
@@ -248,6 +302,26 @@ class CaptureAttemptCoordinatorTest {
                 0L, null, NOW + 30_000L);
     }
 
+    private static CaptureAttemptCoordinator.AttemptRequest reissuedRequest(
+            CaptureAttemptCoordinator.AttemptRequest original) {
+        UUID attemptId = UUID.randomUUID();
+        return new CaptureAttemptCoordinator.AttemptRequest(
+                attemptId, UUID.randomUUID(), original.callerNamespace(),
+                original.idempotencyKey(), original.actorUuid(), original.targetNpcUuid(),
+                original.profileId(), original.expectedProfileRevision(), original.sourceItemId(),
+                original.roleId(), original.sourceContextJson(), original.spawnerConfigId(),
+                original.spawnerConfigRevision(), original.itemMechanics(),
+                original.currentHealth(), original.maximumHealth(),
+                new CaptureRequirementContext(
+                        attemptId, CaptureRequirementPhase.FINAL_REVALIDATION,
+                        original.actorUuid(), original.targetNpcUuid(), original.profileId(),
+                        original.roleId(), original.requirementContext().worldName(),
+                        original.sourceItemId(), original.requirementContext().healthFraction(),
+                        original.requirementContext().expectedProfileRevision()),
+                original.expectedRequirementGeneration(), original.populationOperationId(),
+                original.expiresAtMs());
+    }
+
     private static CaptureAttemptRecord prepared(
             CaptureAttemptCoordinator.AttemptRequest request, long expiresAt) {
         return new CaptureAttemptRecord(
@@ -290,7 +364,21 @@ class CaptureAttemptCoordinatorTest {
 
         @Override
         public CompletableFuture<CaptureAttemptRepository.PrepareResult> prepare(CaptureAttemptRecord attempt) {
-            CaptureAttemptRecord existing = rows.putIfAbsent(attempt.identity().attemptId(), attempt);
+            CaptureAttemptRecord existing = rows.get(attempt.identity().attemptId());
+            if (existing == null && attempt.identity().callerNamespace() != null) {
+                existing = rows.values().stream()
+                        .filter(candidate -> Objects.equals(
+                                candidate.identity().callerNamespace(),
+                                attempt.identity().callerNamespace()))
+                        .filter(candidate -> Objects.equals(
+                                candidate.identity().idempotencyKey(),
+                                attempt.identity().idempotencyKey()))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (existing == null) {
+                rows.put(attempt.identity().attemptId(), attempt);
+            }
             return CompletableFuture.completedFuture(new CaptureAttemptRepository.PrepareResult(
                     existing == null ? CaptureAttemptRepository.PrepareStatus.PREPARED
                             : CaptureAttemptRepository.PrepareStatus.IDEMPOTENT,
