@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.vessels.runtime;
 
 import com.alechilles.alecstamework.api.BondedVesselSourceItemEvidence;
+import com.alechilles.alecstamework.api.BondedVesselBindingInvalidatedEvent;
+import com.alechilles.alecstamework.api.BondedVesselProjectionStatus;
 import com.alechilles.alecstamework.api.BondedVesselState;
 import com.alechilles.alecstamework.api.BondedVesselStateChangedEvent;
 import com.alechilles.alecstamework.api.BondedVesselTransitionContext;
@@ -328,15 +330,32 @@ public final class BondedVesselLifecycleObserver {
     private void emit(BondedVesselOperationRecord operation, boolean recovered) {
         if (!emitted.add(operation.operationId())) return;
         try {
+            BondedVesselBindingRecord binding = repository.findBinding(operation.bindingId());
+            if (binding == null) return;
             events.emit(new BondedVesselStateChangedEvent(
                     UUID.fromString(operation.operationId()), UUID.fromString(operation.bindingId()),
-                    operation.profileId(), repository.findBinding(operation.bindingId()).ownerUuid(),
+                    operation.profileId(), binding.ownerUuid(),
                     operation.configId(), operation.priorGeneration(), operation.candidateGeneration(),
                     BondedVesselState.ACTIVE,
                     BondedVesselState.valueOf(operation.targetLifecycleState().name()),
-                    operation.expectedProfileRevision() + 1L, operation.targetCooldownUntilMs(),
+                    binding.expectedProfileRevision(), operation.targetCooldownUntilMs(),
                     reason(operation, "bonded-lifecycle-committed"), recovered,
                     operation.appliedAtMs(), now()));
+            if (binding.itemProjectionStatus()
+                    == BondedVesselBindingRecord.ItemProjectionStatus.MISSING
+                    || binding.itemProjectionStatus()
+                    == BondedVesselBindingRecord.ItemProjectionStatus.AMBIGUOUS) {
+                events.emit(new BondedVesselBindingInvalidatedEvent(
+                        UUID.fromString(operation.operationId()),
+                        UUID.fromString(operation.bindingId()), operation.profileId(),
+                        binding.ownerUuid(), operation.configId(), operation.priorGeneration(),
+                        operation.candidateGeneration(),
+                        BondedVesselState.valueOf(operation.targetLifecycleState().name()),
+                        BondedVesselProjectionStatus.valueOf(
+                                binding.itemProjectionStatus().name()),
+                        reason(operation, "bonded-lifecycle-item-projection-invalidated"),
+                        recovered, operation.appliedAtMs(), now()));
+            }
         } catch (Exception | LinkageError ignored) {
             // Listener/read failure cannot change a committed lifecycle transition.
         }

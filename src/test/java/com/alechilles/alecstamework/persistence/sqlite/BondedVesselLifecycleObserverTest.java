@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.BondedVesselProjectionValidationRequest;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationView;
 import com.alechilles.alecstamework.api.BondedVesselSourceItemEvidence;
 import com.alechilles.alecstamework.api.BondedVesselState;
+import com.alechilles.alecstamework.api.BondedVesselBindingInvalidatedEvent;
 import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
 import com.alechilles.alecstamework.vessels.BondedVesselEvidenceAuthority;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselLifecycleObserver;
@@ -50,7 +51,9 @@ class BondedVesselLifecycleObserverTest {
             assertEquals(BondedVesselBindingRecord.ItemProjectionStatus.MISSING,
                     binding.itemProjectionStatus());
             assertNull(binding.activeNpcUuid());
-            assertEquals(1, events.size());
+            assertEquals(2, events.size());
+            assertEquals(1L, events.stream()
+                    .filter(BondedVesselBindingInvalidatedEvent.class::isInstance).count());
             long operations = fixture.repository().loadRecoverableOperations().stream()
                     .filter(operation -> operation.action()
                             == BondedVesselOperationRecord.Action.MARK_DEAD).count();
