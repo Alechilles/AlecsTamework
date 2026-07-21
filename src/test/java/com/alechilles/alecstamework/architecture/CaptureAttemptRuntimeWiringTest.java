@@ -39,12 +39,16 @@ class CaptureAttemptRuntimeWiringTest {
                 "src/main/java/com/alechilles/alecstamework/commands/TameworkCommandRoot.java"));
         String diagnose = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/commands/TameworkDiagnoseCommand.java"));
+        String diagnostics = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/commands/"
+                        + "TameworkIntegrationDiagnosticsService.java"));
         assertTrue(root.contains("new TameworkDiagnoseCommand()"));
-        assertTrue(diagnose.contains("Integration readiness:"));
-        assertTrue(diagnose.contains("capturePolicy="));
-        assertTrue(diagnose.contains("bondedVessels="));
-        assertTrue(diagnose.contains("populationGroups="));
-        assertTrue(diagnose.contains("provisioning="));
+        assertTrue(diagnose.contains("diagnostics.overview()"));
+        assertTrue(diagnostics.contains("Integration readiness:"));
+        assertTrue(diagnostics.contains("capturePolicy="));
+        assertTrue(diagnostics.contains("bondedVessels="));
+        assertTrue(diagnostics.contains("populationGroups="));
+        assertTrue(diagnostics.contains("provisioning="));
 
         String selfTest = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/selftest/ApiSelfTestRunner.java"));
@@ -63,6 +67,27 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("backend.recover().toCompletableFuture().join()"));
         assertTrue(plugin.contains("coordinator.recover().toCompletableFuture().join()"));
         assertTrue(plugin.contains("companionProvisioningBackend.recoveryReady()"));
+        assertTrue(plugin.contains("new HytaleProvisionedCompanionProjectionPort("));
+        assertTrue(plugin.contains("companionProvisioningBackend.activeProjectionReady()"));
+        assertTrue(plugin.contains("apiEventBus::emitCompanionProvisioned"));
+        assertTrue(plugin.contains("ownerPopulationRuntime.installPopulationGroups("));
+        assertTrue(plugin.contains("apiEventBus::emitPopulationGroupEvent"));
+        assertTrue(plugin.contains("ownerPopulationRuntime.reconcilePopulationGroups().join()"));
+        assertTrue(plugin.contains("ownerPopulationRuntime.publishPopulationGroupLimitChanges("));
+        assertTrue(plugin.contains("activatePopulationGroupsIfReady()"));
+        assertTrue(plugin.contains(".whenComplete(this::onPopulationRecoveryFinished)"));
+        assertTrue(plugin.contains("ProductionBondedVesselRuntime.compose("));
+        assertTrue(plugin.contains("new BondedVesselUnifiedPopulationPort(ownerPopulationRuntime)"));
+        assertTrue(plugin.contains("new LoadedNpcBondedVesselProjectionEvidencePort("));
+        assertTrue(plugin.contains("new HytaleBondedVesselWorldProjectionPort("));
+        assertTrue(plugin.contains("runtime.bootstrap().recoverAndActivate()"));
+        assertTrue(plugin.contains("apiEventBus::emitBondedVesselEvent"));
+        int reviveBootstrap = plugin.indexOf("reviveEligibility.bootstrap(");
+        int reviveEvents = plugin.indexOf(
+                "reviveEligibility.setEventSink(apiEventBus::emitCanonicalCompanionLifecycleEvent)");
+        int deathSystems = plugin.indexOf("TameworkPopulationRuntimeLifecycle.registerSystems(");
+        assertTrue(reviveBootstrap >= 0 && deathSystems > reviveBootstrap);
+        assertTrue(reviveEvents > reviveBootstrap && deathSystems > reviveEvents);
         assertTrue(api.contains("activateCompanionProvisioningRuntime("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING)"));
         assertTrue(api.contains("boolean exactEvidenceAuthorityReady"));

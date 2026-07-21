@@ -112,16 +112,16 @@ public final class TameworkPopulationRuntimeLifecycle {
         );
     }
 
-    public static void start(@Nonnull OwnerPopulationRuntime runtime,
-                             @Nonnull Universe universe,
-                             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-                             @Nonnull ItemFeatureRegistry itemFeatures,
-                             @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>>
-                                     loadedIdentitiesReady) {
+    public static CompletableFuture<CompanionPopulationReconciliationProgress> start(
+            @Nonnull OwnerPopulationRuntime runtime,
+            @Nonnull Universe universe,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady) {
         runtime.customContainerReconciliationRegistry().seal(
                 "tamework-builtins:no-additional-custom-persisted-item-containers:v1"
         );
-        runtime.startReconciliation(
+        return runtime.startReconciliation(
                 universe, ownerType, itemFeatures, loadedIdentitiesReady
         );
     }
