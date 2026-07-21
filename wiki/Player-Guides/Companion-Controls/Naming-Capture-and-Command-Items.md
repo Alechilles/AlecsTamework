@@ -29,6 +29,11 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Can limit how many linked companions stay active at once
 - Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
 
+Tamework's bundled example command whistle is a development/reference item and
+has no recipe. Servers may give it directly for testing, while production mods
+are expected to provide their own player-facing command item and acquisition
+method.
+
 ## Tooltips and icons
 - Some spawner items show captured `Name` and `Role` lines in the tooltip.
 - Some capture items can swap icons based on the captured NPC's role or attachment set.

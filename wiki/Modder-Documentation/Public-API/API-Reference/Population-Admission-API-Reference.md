@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This API reserves owner and destination-claim capacity for a specific mutation. It is intentionally more explicit than the legacy owner-only cap query.
 
 Capability: `POLICY`
@@ -39,6 +39,7 @@ Every reserved token must end in `commit` or `cancel`. Do not persist, fabricate
 ## Methods
 
 - `CompletionStage<PopulationAdmissionDecision> tryAdmit(PopulationAdmissionRequest request)`
+- `CompletionStage<PopulationAdmissionDecision> tryAdmitV2(PopulationAdmissionRequestV2 request)`
 - `CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(PopulationBatchAdmissionRequest request)`
 - `PopulationAdmissionDecision claimForApply(PopulationAdmissionToken token)`
 - `CompletionStage<PopulationAdmissionDecision> commit(PopulationAdmissionToken token)`
@@ -46,6 +47,11 @@ Every reserved token must end in `commit` or `cancel`. Do not persist, fabricate
 - `CompletionStage<Integer> cleanupExpired()`
 
 Preparation, commit, cancellation, and cleanup may perform durable SQLite work. Never block a Hytale world thread waiting for their stages.
+
+`tryAdmitV2` adds an exact target role and ownership world so Tamework can
+resolve every applicable population group. It requires
+`POPULATION_GROUPS`; the API 0.8-compatible default denies rather than silently
+bypassing group capacity. Callers never supply their own group list.
 
 ## `PopulationAdmissionRequest`
 
@@ -118,3 +124,4 @@ Claim limits gate explicit placement. Natural movement is observed and counted b
 - [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
+- [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)

@@ -42,6 +42,17 @@ Each fixture is marked with an internal self-test component, linked to the gener
 ## What `run` validates
 `run core` checks API availability, versioning, capabilities including `COMPANION_XP_EVENTS`, global config reads, and persistence diagnostics.
 
+For API 0.9 builds, `run core` proves only the capabilities it explicitly
+requires in the packaged runner. It does not exercise the probabilistic
+capture journal or make an unadvertised `BONDED_VESSELS`, `POPULATION_GROUPS`,
+`COMPANION_PROVISIONING`, or `PROFILE_DATA_TRANSACTIONS` authority available.
+Check the command usage and verbose report for the suites present in that
+exact build.
+
+Use `/tw diagnose` alongside the self-tests. It reports the API version and
+advertised capabilities, capture-policy recovery readiness, the current
+bonded-vessel/group/provisioning availability, and persistence health.
+
 `run profile` checks:
 - profile id resolution
 - profile reads by NPC UUID and profile id
@@ -108,6 +119,8 @@ If you want to repro a clean setup, always run `reset` before `prepare` again.
 - `run` is read-only. Only `prepare` and `reset` mutate state.
 - The suite is intentionally narrow and is meant to validate the public API contract, not replace the Maven/JUnit test suite.
 - The fixture content is bundled with Tamework, so the self-tests do not depend on downstream mods like Animal Husbandry.
+- Maven tests for schema/config/API records are source-level evidence; they do
+  not replace a live packaged capability advertisement and runtime self-test.
 
 
 

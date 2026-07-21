@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `events()` contract in `TameworkApi`.
 
 Capabilities: `EVENTS`, `COMPANION_XP_EVENTS`
@@ -34,6 +34,13 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `NpcLostRecordedEvent`
 - `ConfigReloadedEvent`
 - `CompanionXpAwardedEvent`
+- `CaptureAttemptResolvedEvent` when `CAPTURE_POLICY` is advertised
+- `BondedVesselBoundEvent`, `BondedVesselStateChangedEvent`, and
+  `BondedVesselBindingInvalidatedEvent` when `BONDED_VESSELS` is advertised
+- `PopulationGroupMembershipChangedEvent` and
+  `PopulationGroupLimitChangedEvent` when `POPULATION_GROUPS` is advertised
+- `CompanionProvisionedEvent`, `ProvisionedCompanionDeathRecordedEvent`, and
+  `ProvisionedCompanionRevivedEvent` when `COMPANION_PROVISIONING` is advertised
 
 ## Event Semantics
 - Dispatch is synchronous on the thread that emits the event.
@@ -42,6 +49,9 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - Payloads are immutable snapshots (`record` + defensive copies).
 - `CompanionXpAwardedEvent` is emitted only after Tamework accepts an XP award and applies or queues the component write.
 - Companion XP does not require a command-tool link; command links only add optional tool id context.
+- API 0.9 lifecycle events are post-commit immutable snapshots. They are not
+  cancelable policy hooks. Consumers must remain idempotent by operation or
+  attempt ID, because replay/recovery can repeat notification delivery.
 
 ## `CompanionXpAwardedEvent`
 Use this successful-only event when an integration wants to credit external player progression from companion activity.
@@ -82,6 +92,9 @@ Payload fields:
 - `BREEDING`
 - `TRAIT`
 - `DEBUG`
+- `PERSISTENCE`
+- `CAPTURE_POLICY`
+- `POPULATION_GROUP`
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

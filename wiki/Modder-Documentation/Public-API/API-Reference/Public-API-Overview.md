@@ -10,7 +10,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`, Tamework 3.0.0)**
 > The API is named **Public API** in docs and packages, but the contract is still experimental. Keep capability checks and plan for additive changes.
 
 ## Dependency and access pattern
@@ -18,7 +18,7 @@ Add Tamework as a dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.16.1"
+  "Alechilles:Alec's Tamework!": ">=3.0.0 <4.0.0"
 }
 ```
 
@@ -49,8 +49,10 @@ Root API entrypoints:
 - `events()`
 - `configs()`
 - `diagnostics()`
+- `bondedVessels()` (capability-gated; unavailable facade by default)
+- `companionProvisioning()` (capability-gated; unavailable facade by default)
 
-Current capability set:
+Always-advertised baseline capability set:
 - `PROFILES`
 - `COMMAND_LINKS`
 - `PROGRESSION`
@@ -63,6 +65,26 @@ Current capability set:
 - `COMPANION_XP_EVENTS`
 - `CONFIG_READ`
 - `DIAGNOSTICS`
+- `PERSISTENCE_RESILIENCE`
+
+API 0.9 also declares independently gated capabilities:
+
+- `CAPTURE_POLICY`
+- `BONDED_VESSELS`
+- `POPULATION_GROUPS`
+- `COMPANION_PROVISIONING`
+- `PROFILE_DATA_TRANSACTIONS`
+
+In the current Tamework 3.0.0 runtime, `CAPTURE_POLICY` is added only after its
+bounded capture-journal recovery reports ready. The other four API 0.9
+capabilities are not advertised yet and their default accessors/results remain
+fail closed. Use `/tw diagnose` to inspect the exact packaged runtime rather
+than copying a capability list from documentation.
+
+The Java enum, DTO, or default accessor may exist even when a capability is not
+advertised. This is intentional binary compatibility, not partial success.
+Treat an absent capability as unavailable and keep the related mutation
+disabled. Never infer runtime authority from the API version alone.
 
 ## Family references
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
@@ -76,6 +98,10 @@ Current capability set:
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
+- [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
+- [Bonded Vessels API Reference](/mod/alecs-tamework/bonded-vessels-api-reference)
+- [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
+- [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 
 ## Recipes
 - [Increase Mob Happiness from Custom Interaction Recipe](/mod/alecs-tamework/increase-mob-happiness-from-custom-interaction-recipe)
@@ -114,13 +140,16 @@ See:
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
 - Do not mutate or cache internal `Tw*Config` instances.
-- Do not assume API version `0.8.0` will match the mod version.
+- Do not assume API version `0.9.0` will match the mod version.
+- Do not call a new default accessor because its class linked successfully;
+  require its feature capability first.
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)
 - [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+- [HyDragon Integration Guide](/mod/alecs-tamework/hydragon-integration-guide)
 
 
 

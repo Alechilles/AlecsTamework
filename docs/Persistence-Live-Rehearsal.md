@@ -1,6 +1,6 @@
 # Persistence Live Rehearsal Evidence
 
-The schema-v7 single cutover has two different evidence stages:
+The schema-v8 single cutover has two different evidence stages:
 
 1. `verify-persistence-release-candidate.ps1` proves source, automated, package, privacy, and isolated-runtime prerequisites for one exact candidate.
 2. `verify-persistence-live-rehearsal.ps1` validates the operator-observed client, copied-world, performance, and rollback gates that automation cannot honestly infer.
@@ -66,12 +66,12 @@ This prevents an unexplained warning from disappearing into prose. The verifier 
 The manifest must prove all of the following:
 
 - Tamework did not create a whole-save backup.
-- The pre-v7 migration artifact is a verified `tamework_sqlite_only` snapshot.
+- The pre-v8 migration artifact is a verified `tamework_sqlite_only` snapshot.
 - The snapshot opens with SQLite integrity `ok`.
 - The rollback used an operator-selected Hytale/host backup reference.
-- The restored Tamework SQLite hash is the same verified pre-v7 snapshot hash.
-- The restored copy boots the exact prior JAR without schema v7.
-- The operator acknowledges that post-v7 progress is intentionally absent after rollback.
+- The restored Tamework SQLite hash is the same verified pre-v8 snapshot hash.
+- The restored copy boots the exact prior JAR without schema v8.
+- The operator acknowledges that post-v8 progress is intentionally absent after rollback.
 
 The verifier never creates or validates the contents of a Hytale backup. It verifies only the operator's bounded evidence contract. Do not put a save path, archive, database, player name, or raw UUID into the manifest.
 

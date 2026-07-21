@@ -1,6 +1,6 @@
 # Persistence Resilience Performance Budgets
 
-These budgets are release gates for the schema-v7 persistence resilience system. They protect the
+These budgets are release gates for the schema-v8 persistence integration system. They protect the
 world thread from diagnostic, telemetry, and recovery work while keeping scoped admission independent
 of the total number of unrelated incidents.
 
@@ -33,7 +33,7 @@ suite result from the exact source commit.
 
 ## Live rehearsal budgets
 
-The exact candidate's copied-world rehearsal records both the existing-world baseline and schema-v7
+The exact candidate's copied-world rehearsal records both the existing-world baseline and schema-v8
 candidate values. The candidate must satisfy all of the following:
 
 - no player-visible login warm-up or time-based admission delay;
@@ -52,5 +52,5 @@ timeout.
 ## Backup boundary
 
 Performance collection never copies or archives a Hytale world. Hytale/server operators own whole-save
-backups. Tamework creates only its verified SQLite snapshot when an actual pre-v7 database migration
+backups. Tamework creates only its verified SQLite snapshot when an actual pre-v8 database migration
 requires one.

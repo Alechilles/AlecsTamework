@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `interactionExtensions()` contract in `TameworkApi`.
 
 Capability: `INTERACTION_EXTENSIONS`
@@ -24,6 +24,13 @@ Capability: `INTERACTION_EXTENSIONS`
 - `Set<String> listRequirementIds()`
 - `Set<String> listEffectIds()`
 - `Set<String> listPresetIds()`
+- `AutoCloseable registerCaptureRequirement(String id, CaptureRequirementHandler handler)`
+- `Set<String> listCaptureRequirementIds()`
+
+Capture-requirement methods require `CAPTURE_POLICY` in addition to the base
+`INTERACTION_EXTENSIONS` capability. Older/unwired implementations inherit a
+fail-closed default: registration throws `UnsupportedOperationException` and
+the ID set is empty.
 
 ## ID Rules
 - IDs must be nonblank.
@@ -47,6 +54,9 @@ The exchange requirement and effect must use identical bijective mappings. Stack
 - Requirement handlers return `boolean` pass/fail.
 - Effect handlers return `boolean` success/failure.
 - Handler exceptions are caught and logged as warnings; failed handler calls return `false`.
+- Capture requirement handlers are side-effect-free and may be evaluated more
+  than once. A missing handler, thrown exception, or registration-generation
+  change denies capture.
 
 ## Related Types
 - `InteractionRequirementSpec`
@@ -54,6 +64,9 @@ The exchange requirement and effect must use identical bijective mappings. Stack
 - `InteractionRequirementContext`
 - `InteractionEffectContext`
 - `InteractionPresetDefinition`
+- `CaptureRequirementSpec`
+- `CaptureRequirementContext`
+- `CaptureRequirementDecision`
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

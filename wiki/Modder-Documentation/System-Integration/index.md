@@ -19,5 +19,6 @@ This subsection covers feature-system implementation guides for core Tamework ga
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
 - [Coop and Feed Trough Guide](/mod/alecs-tamework/coop-and-feed-trough-guide)
 - [Projectile Combat and Hazard Interactions Guide](/mod/alecs-tamework/projectile-combat-and-hazard-interactions-guide)
+- [HyDragon Integration Guide](/mod/alecs-tamework/hydragon-integration-guide)
 
 

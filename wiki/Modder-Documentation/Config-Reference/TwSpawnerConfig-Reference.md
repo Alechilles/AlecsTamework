@@ -66,13 +66,37 @@ Fields:
 - `Denylist`
 
 ### `Capture`
+- `ClearsOwner`: legacy/configurable owner-clear behavior; server runtime
+  policy may own the effective value.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
+- `TamesTarget`: allows an eligible wild, unowned target to become the actor's
+  owned tamed companion on successful capture.
+- `MaxHealthPercent`: optional health threshold rechecked at start and
+  completion.
+- `RequiredEffectId`: optional entity effect required at start and completion.
+- `ChannelAuraEffectId`: optional effect applied for a capture channel.
+- `TamedRoleOverrides`: source-role to stored/tamed-role map used with
+  `TamesTarget`.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
 - `MaxDistance`
+- `ChanceMode`: `Guaranteed` by default; `Probability` opts into the API 0.9
+  role capture policy.
+- `Power`: non-negative capture-item power.
+- `BaseChance`: probability in `[0,1]`.
+- `ChancePerPower`: non-negative additive chance per power above the role
+  minimum.
+- `MinimumChance` / `MaximumChance`: inclusive probability clamps.
+- `FailureCooldownMs`: cooldown applied after a resolved failed roll.
+- `FailureParticleSystem` / `FailureSoundEvent`: optional failure feedback.
+
+`ChanceMode: Guaranteed` preserves deterministic capture and bypasses
+`TwCapturePolicyConfig`, including its custom requirements. `Probability`
+requires the `CAPTURE_POLICY` capability before an integration treats the flow
+as available.
 
 ### `Spawn`
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
@@ -149,6 +173,7 @@ Accepted values:
   },
   "Capture": {
     "RequireTamed": true,
+    "ChanceMode": "Guaranteed",
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
@@ -173,12 +198,16 @@ Accepted values:
 - Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
 - `IconOverrides`, `IconOverridesByRole`, and `IconOverrideGroups` are explicit array/map values and replace the parent content when authored in a child asset.
 - `/tw reloadconfig` is required after editing spawner configs during development.
+- Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied
+  into every capture item.
 
 ## Related Pages
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
 - [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+- [TwCapturePolicyConfig Reference](/mod/alecs-tamework/twcapturepolicyconfig-reference)
+- [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
 
 
 

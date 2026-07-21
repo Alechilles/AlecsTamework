@@ -27,6 +27,7 @@ Tamework does not add a full gameplay expansion by itself. Players usually exper
 - [Config Reference](/mod/alecs-tamework/config-reference)
 - [Testing and Diagnostics](/mod/alecs-tamework/testing-and-diagnostics)
 - [Optional Integrations](/mod/alecs-tamework/optional-integrations)
+- [HyDragon Integration Guide](/mod/alecs-tamework/hydragon-integration-guide)
 
 ## 3) Developer Documentation
 - [Developer Documentation](/mod/alecs-tamework/developer-documentation)

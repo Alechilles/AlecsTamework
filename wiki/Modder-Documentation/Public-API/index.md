@@ -10,7 +10,7 @@ Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation) | [Alec
 
 This subsection is the parent category for all public Java API docs.
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`, Tamework 3.0.0)**
 > This is a public integration surface, but the contract is still experimental. Keep capability checks in downstream mods.
 
 ## Child Pages

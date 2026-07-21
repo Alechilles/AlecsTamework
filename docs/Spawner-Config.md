@@ -46,6 +46,23 @@ Fields:
 - `SoundEvent` (optional). Sound event to play on capture.
 - `CooldownMs` (optional). Per item capture cooldown.
 - `MaxDistance` (optional). Max distance for capture.
+- `ChanceMode` (default `Guaranteed`). `Guaranteed` preserves deterministic
+  capture and bypasses role capture policy; `Probability` opts into API 0.9
+  capture-policy resolution.
+- `Power` (default `0`). Non-negative generic capture-item power.
+- `BaseChance` (default `1.0`). Base probability in `[0,1]`.
+- `ChancePerPower` (default `0.0`). Non-negative additive chance for each power
+  point above the role's minimum.
+- `MinimumChance` / `MaximumChance` (defaults `0.0` / `1.0`). Inclusive
+  probability clamps.
+- `FailureCooldownMs` (default `0`). Cooldown applied after one resolved failed
+  probability roll.
+- `FailureParticleSystem` / `FailureSoundEvent` (optional). Failure feedback.
+
+Role-side minimum power, resistance, multiplier, missing-health bonus,
+guaranteed power, and custom requirements live in
+`Server/Tamework/CapturePolicies/*.json`. See the
+[TwCapturePolicyConfig reference](../wiki/Modder-Documentation/Config-Reference/TwCapturePolicyConfig-Reference.md).
 
 ## Spawn settings
 Fields:
@@ -107,6 +124,7 @@ The current spawner icon tooling guide lives in the wiki:
     "Allowlist": [ "Mob_Tamework_Interact_Test" ]
   },
   "Capture": {
+    "ChanceMode": "Guaranteed",
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
@@ -126,3 +144,7 @@ The current spawner icon tooling guide lives in the wiki:
 ## Reloading
 Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
 Captured spawner display text is written into base Hytale `ItemDisplay` metadata when the NPC is captured.
+
+The API 0.9 `CAPTURE_POLICY` capability is a separate runtime gate. Loading the
+fields or resolving their immutable config views does not prove that the
+authoritative probabilistic capture path is active.

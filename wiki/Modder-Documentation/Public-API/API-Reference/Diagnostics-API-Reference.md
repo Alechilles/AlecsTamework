@@ -8,10 +8,11 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `diagnostics()` contract in `TameworkApi`.
 
-Capabilities: `DIAGNOSTICS`, with the additive `PERSISTENCE_RESILIENCE` contract in API `0.8.0`.
+Capabilities: `DIAGNOSTICS`, with the additive `PERSISTENCE_RESILIENCE`
+contract introduced in API `0.8.0` and retained in `0.9.0`.
 
 ## Entry Point
 `TameworkApi.diagnostics() -> DiagnosticsApi`
@@ -32,6 +33,37 @@ Capabilities: `DIAGNOSTICS`, with the additive `PERSISTENCE_RESILIENCE` contract
 `findPersistenceIncident(...)` accepts an exact incident id or a unique prefix and returns a bounded, sanitized occurrence. Scope keys are never exposed; only installation-local scope hashes and authority dimensions are returned. This method may read SQLite and must not be called from a world tick callback.
 
 Older implementations retain binary compatibility through default methods: the resilience snapshot and availability query fail closed, and incident lookup returns empty.
+
+## API 0.9 and schema-v8 diagnostics
+
+The bounded persistence snapshot and integrity audit include operation rows for
+capture policy, bonded vessels, population groups, and companion provisioning.
+Integrity checks detect duplicate capture/provisioning origins, duplicate
+active vessel profiles, duplicate nonterminal vessel generations, and duplicate
+nonterminal population-group operations for one profile.
+
+This persistence visibility does not advertise a gameplay capability. A schema
+table or diagnostic row may exist while its feature authority remains
+recovering or unavailable. Check `getCapabilities()` and the feature-specific
+readiness/result before mutation.
+
+Operator commands remain:
+
+- `/tw diagnose`
+- `/tw debugdb health`
+- `/tw debugdb incidents [open|all]`
+- `/tw debugdb incident <incident-id-or-unique-prefix>`
+- `/tw debugdb retry <incident-id>`
+- `/tw debugdb integrity`
+- `/tw debugdb export [recent|incident <incident-id>]`
+
+`retry` requests an evidence verifier; it cannot force-clear a quarantine or
+manufacture missing source evidence. Support exports are redacted and do not
+include the SQLite database or complete Hytale save.
+
+`/tw diagnose` prints the API version and advertised capabilities, capture
+recovery readiness, bonded-vessel/group/provisioning availability, and storage
+health. It is a concise operator check, not a mutation or recovery command.
 
 ## `PersistenceDiagnosticsView`
 - `databasePath`

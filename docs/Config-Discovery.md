@@ -20,6 +20,8 @@ This document explains where Tamework config assets live and how each family res
 - `TwAttachmentDisplayConfig`: `<ModRoot>/Server/Tamework/AttachmentDisplays/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
+- `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
+- `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 
 ## Resolution patterns
 ### Single active global config
@@ -37,6 +39,7 @@ Resolved by role id + `Priority`:
 - `TwAttachmentMigrationConfig`
 - `TwDynamicAttachmentsConfig`
 - `TwTraitConfig`
+- `TwCapturePolicyConfig`
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
@@ -59,6 +62,15 @@ Resolved by bound item ids:
 
 ### Coop-scoped family
 - `TwCoopConfig` by `CoopId`
+
+### Population-group family
+
+- `TwPopulationGroupConfig` resolves one winning asset per namespaced
+  `GroupId`; a role may belong to several winning groups.
+- Duplicate group definitions use `Priority` descending, then deterministic
+  case-insensitive/case-sensitive asset-ID ordering.
+- Group-aware admissions remain unavailable unless the Public API advertises
+  `POPULATION_GROUPS`; indexed config is not mutation authority by itself.
 
 ## Priority and ties
 - Higher `Priority` wins.
@@ -98,6 +110,10 @@ Recipe visibility reconciliation removes disabled gated tranquilizer recipes fro
 - `TwCommandItemConfig`
 
 Other families are asset-registry driven and update through normal loaded/removed asset events.
+
+This includes `TwCapturePolicyConfig` and `TwPopulationGroupConfig`. A failed
+rebuild retains the last valid compiled index and does not publish the invalid
+revision.
 
 ## Player-facing text
 Player-facing string fields such as talent names/descriptions/branches, trait display names, command labels/messages, interaction messages, and happiness labels may be raw text or `server.lang` keys. Prefer language keys for built-in packs and public integrations so translations can be provided under `Server/Languages/*/server.lang` without editing behavior assets.

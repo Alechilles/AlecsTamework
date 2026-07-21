@@ -47,6 +47,13 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Managed coop integrity**: configured coops use one Tamework-owned resident lifecycle with stable profile identity, durable capture/release operations, and explicit legacy-resident reconciliation; unmanaged coops remain vanilla.
 - **Capacity-safe breeding**: manual and passive pairing share idempotent birth jobs, pending-litter population reservations, execution-time cap checks, and parent-capture cancellation while preserving intentional zero-to-four litters.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
+- **3.0.0 integration foundations**: experimental API 0.9 adds capability-gated
+  contracts and schema-v8 durability for generic probabilistic capture, bonded
+  companion vessels, population groups, and idempotent companion provisioning.
+  Each authority remains fail-closed unless its capability is advertised by the
+  packaged runtime. In the current 3.0.0 runtime, only `CAPTURE_POLICY` becomes
+  available after its bounded recovery succeeds; the other new authorities
+  remain contract-only and unavailable.
 
 ## What Integration Looks Like
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
@@ -64,6 +71,11 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 
 In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 
+Advanced integrations that create companions, bind one profile to a durable
+item, or coordinate their own transaction must use the experimental Public API
+instead of writing Tamework metadata or SQLite rows directly. API 0.9 types are
+binary-compatible defaults; always check the feature capability before use.
+
 Player-facing Tamework config strings support `server.lang` keys. Built-in talents, traits, command labels, interaction messages, happiness labels, and major UI labels use language keys so translation packs can override copy without changing behavior assets.
 
 ## Documentation
@@ -71,6 +83,7 @@ Player-facing Tamework config strings support `server.lang` keys. Built-in talen
 - [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
+- [HyDragon / API 0.9 Integration Guide](https://wiki.hytalemodding.dev/mod/alecs-tamework/hydragon-integration-guide)
 
 ## Licensing
 Tamework is source-available under [Alec's Tamework Source Available License 1.0](LICENSE.txt). Unmodified dependency use and example/template reuse are allowed under the public license.

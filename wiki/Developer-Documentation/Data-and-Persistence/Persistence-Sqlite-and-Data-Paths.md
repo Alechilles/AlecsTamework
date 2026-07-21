@@ -55,13 +55,60 @@ Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence) | [Deve
 - Prepared/applying/compensating mutation journals in `companion_population_operations`; breeding-only `RETRYABLE` rows release readiness while retaining deterministic child replay evidence and are not generic pruning candidates
 - Resumable coverage cursors and source evidence for population reconciliation
 
-## Schema v7 resilience migration
+## Schema v7 resilience data
 
-Before schema v7 is applied to an existing database, Tamework creates a transactionally consistent snapshot of **only its own SQLite database** with `VACUUM INTO`. The snapshot is stored beside the live database as `tamework_pre_v7_YYYYMMDD-HHMMSS.sqlite.bak` (with a numeric suffix if needed). A companion manifest records its size, SHA-256 hash, source and target schema versions, and the explicit scope `tamework_sqlite_only`. Tamework opens the snapshot and runs SQLite integrity verification before migration begins.
+The schema-v7 migration is additive. It seeds population rows from existing
+profile, capture, coop, death, and lost state without deleting companions. A
+legacy profile may be over the newly configured cap; reconciliation adopts it
+and reports over-cap state, while later positive admissions remain blocked. Do
+not delete rows to make counts fit.
 
-Tamework does not copy or archive the Hytale save, and it does not invoke Hytale's universe-backup operation. Whole-save backups remain the responsibility of Hytale, the host, and the server operator. The SQLite snapshot is a migration safeguard for Tamework-owned data; it is not a complete-world backup and cannot restore world/entity files by itself. No snapshot is created on an ordinary startup when schema v7 is already applied.
+## Schema v8 integration authorities
 
-The migration is additive. It seeds population rows from existing profile, capture, coop, death, and lost state without deleting companions. A legacy profile may be over the newly configured cap; reconciliation adopts it and reports over-cap state, while later positive admissions remain blocked. Do not delete rows to make counts fit.
+Tamework 3.0.0 applies the additive, idempotent
+`schema_v8_hydragon_integration_foundations` migration. It creates durable
+authority for:
+
+- `capture_attempts` and `capture_failure_cooldowns`;
+- `bonded_vessel_bindings` and `bonded_vessel_operations`;
+- population-group classifications, assignments, operations, and count
+  evidence; and
+- `companion_provisioning_operations`.
+
+Before schema v8 is applied to an existing database, Tamework creates a
+transactionally consistent snapshot of **only its own SQLite database** with
+`VACUUM INTO`. The snapshot is stored beside the live database as
+`tamework_pre_v8_YYYYMMDD-HHMMSS.sqlite.bak` (with a numeric suffix if needed).
+A companion manifest records its size, SHA-256 hash, source and target schema
+versions, and the explicit scope `tamework_sqlite_only`. Tamework opens the
+snapshot and runs SQLite integrity verification before migration begins.
+
+Tamework does not copy or archive the Hytale save, and it does not invoke
+Hytale's universe-backup operation. Whole-save backups remain the
+responsibility of Hytale, the host, and the server operator. The SQLite
+snapshot is a migration safeguard for Tamework-owned data; it is not a
+complete-world backup and cannot restore world/entity files by itself. No
+snapshot is created on an ordinary startup when schema v8 is already applied.
+
+Unique indexes fence one caller/idempotency origin, one active vessel per
+profile, one nonterminal vessel generation, one nonterminal group operation per
+profile, and one canonical profile per provisioning origin. Operation rows
+retain config/policy revisions and exact recovery evidence so restart handling
+does not re-resolve changed live config or invent a second attempt.
+
+The storage recovery probe requires the schema-v8 migration marker and performs
+a real transactional write/readback before returning storage to healthy state.
+It then runs integrity checks, reloads durable quarantines/circuit states, and
+publishes recovery indexes. Failure retains read-only/fail-closed storage.
+
+Schema presence does not advertise a Public API 0.9 gameplay capability. A
+feature remains unavailable until its concrete runtime authority and bounded
+recovery path are wired and `TameworkApi.getCapabilities()` advertises it.
+
+Do not edit schema-v8 operation rows or count evidence manually. Use
+`/tw debugdb health`, incident inspection/retry, `/tw debugdb integrity`, and a
+redacted support export. `retry` requests evidence-based recovery; it cannot
+force an ambiguous operation to success or denial.
 
 ## Population readiness
 
@@ -135,11 +182,11 @@ Saved-world reconciliation records a physical entity with `DeathComponent` as de
 
 1. Close the world session before replacing the JAR. The complete Hytale client does not need to be closed.
 2. If your hosting policy requires a whole-save recovery point, create it with Hytale's or the host's own backup tooling. Tamework does not create one.
-3. Start the new build. When migration is required, verify that the log reports a valid pre-v7 Tamework SQLite snapshot and manifest before schema v7 is applied.
+3. Start the new build. When migration is required, verify that the log reports a valid pre-v8 Tamework SQLite snapshot and manifest before schema v8 is applied.
 4. Healthy, verified scopes are usable immediately after login; there is no warm-up timer. Investigate only the specific authority dimension or incident reported by diagnostics.
 5. Verify owned active, unloaded, captured, cooped, dead, and lost companions remain represented once each, then test the persistence-backed operations relevant to the server.
 
-Do not treat `tamework_pre_v7_*.sqlite.bak` as a full rollback. A code downgrade that cannot understand schema v7 requires a reviewed operator-managed rollback of mutually consistent Hytale world data and Tamework persistence state. Tamework deliberately does not automate that restoration or force-clear unresolved identity and occupancy evidence.
+Do not treat `tamework_pre_v8_*.sqlite.bak` as a full rollback. A code downgrade that cannot understand schema v8 requires a reviewed operator-managed rollback of mutually consistent Hytale world data and Tamework persistence state. Tamework deliberately does not automate that restoration or force-clear unresolved identity and occupancy evidence.
 
 ## Maintenance advice
 - Treat persistence health degradation as a first-class runtime signal

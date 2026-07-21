@@ -175,6 +175,19 @@ Fields:
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 - `RequireOwner` can be left unset to inherit global linking-owner policy.
 
+## Bundled Example Is Not a Player Acquisition Flow
+
+`Tamework_Command_Whistle_Example` and `TwCommandExample` are development and
+configuration examples. The example covers the HyDragon-relevant `Follow`,
+`Hold`, `Recall`, and `AttackTarget` command path, but Tamework ships no recipe
+or other polished acquisition path for that item. It must be given by an
+operator or development workflow.
+
+A production downstream mod should provide its own item identity, localized
+presentation, command config, and recipe or other explicit acquisition
+mechanic. Treat the bundled example as reference material, not as a finished
+player-facing tool.
+
 ## Minimal Example
 ```json
 {

@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `configs()` contract in `TameworkApi`.
 
 Capability: `CONFIG_READ`
@@ -34,6 +34,17 @@ Item-scoped config families:
 - `getNameItemConfigById(...)` / `resolveNameItemConfigForItemId(...)`
 - `getCommandItemConfigById(...)` / `resolveCommandItemConfigForItemId(...)`
 
+API 0.9 capture and bonded-vessel views:
+
+- `getSpawnerCaptureMechanicsById(...)` / `resolveSpawnerCaptureMechanicsForItemId(...)`
+- `getCapturePolicyById(...)` / `resolveCapturePolicyForRole(...)`
+- `getSpawnerVesselConfigById(...)` / `resolveSpawnerVesselConfigForItemId(...)`
+
+API 0.9 population-group views:
+
+- `getPopulationGroupById(...)`
+- `resolvePopulationGroupsForRole(...)`
+
 ## View Types
 - `GlobalConfigView`
 - `InteractionConfigView`
@@ -41,11 +52,18 @@ Item-scoped config families:
 - `SpawnerConfigView`
 - `NameItemConfigView`
 - `CommandItemConfigView`
+- `SpawnerCaptureMechanicsView`
+- `CapturePolicyConfigView`
+- `SpawnerVesselConfigView`
+- `PopulationGroupDefinitionView`
 
 ## Notes
 - Returned views are detached immutable DTOs.
 - `detailsJson` fields provide a compact JSON representation of resolved config details.
 - Config reload events are emitted through `events()` as `ConfigReloadedEvent`.
+- API 0.9 default methods return empty views for older/unwired
+  implementations. Require the corresponding feature capability before using
+  a view to enable gameplay.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
