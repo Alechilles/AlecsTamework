@@ -301,10 +301,9 @@ another group slot.
   fail-closed methods and new data uses new/V2 immutable types.
 - HyDragon raises its manifest dependency to `>=3.0.0 <4.0.0` before shipping
   configs or code that reference the new capabilities.
-- HyDragon has no released spawner/profile/item data to adopt. Its configs use
-  `LegacyFilledItemMode: Reject`, and HyDragon MUST NOT call or expose a legacy
-  adoption flow. Generic Tamework adoption support remains available only to
-  other already-released consumers under the subsystem evidence rules.
+- The integration contract exposes no filled-item conversion setting or
+  adoption operation. A HyDragon bonded generation originates only from a
+  successful first-release bonded capture using an eligible unbound source item.
 - Tamework completes its own schema migration and population/binding
   reconciliation before HyDragon enables positive mutations. This upgrades
   Tamework-owned data only; HyDragon has no pre-release data migration step.

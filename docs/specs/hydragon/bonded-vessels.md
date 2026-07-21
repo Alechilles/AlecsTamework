@@ -46,12 +46,6 @@ Add a top-level `Vessel` object to `TwSpawnerConfig` at:
 | `StoreSoundEvent` | string/null | Successful store sound. |
 | `RequireOwner` | boolean `true` | Only the profile owner may use or store the vessel. |
 | `AllowStoreInCombat` | boolean `false` | Whether an active companion with combat state may be stored. |
-| `LegacyFilledItemMode` | `Reject` | `Reject` or guarded `AdoptOnFirstUse`; see migration. |
-
-HyDragon MUST use `LegacyFilledItemMode: Reject`. HyDragon has never shipped, so
-no HyDragon item/profile adoption or compatibility flow exists; the guarded
-`AdoptOnFirstUse` option is a generic Tamework facility for other already-released
-consumers only.
 
 `EmptyItemId` remains the unbound item. `FilledItemId` is the default stored
 projection. Missing state item IDs fall back to `FilledItemId`; metadata and the
@@ -87,8 +81,7 @@ same-config state aliases are valid.
     "StoreParticleSystem": "HyDragon_Dragon_Store",
     "StoreSoundEvent": "SFX_HyDragon_Dragon_Store",
     "RequireOwner": true,
-    "AllowStoreInCombat": false,
-    "LegacyFilledItemMode": "Reject"
+    "AllowStoreInCombat": false
   }
 }
 ```
@@ -368,11 +361,10 @@ indistinguishable second success.
 - Schema v8 adds binding and vessel-operation tables, constraints, indexes, and
   recovery readers without modifying legacy item metadata in place.
 - `Mode: Disposable` is the default, so existing configs/items retain behavior.
-- Existing filled items are not silently bonded. `LegacyFilledItemMode: Reject`
-  shows a bounded admin/player explanation.
-- `AdoptOnFirstUse` is permitted only when a canonical profile ID exists and
-  authoritative saved-world/container reconciliation proves there is no other
-  active projection or competing filled item. Incomplete evidence fails closed.
+- Bonded dispatch never converts an unbound filled item into a vessel. It leaves
+  the item unchanged and returns a bounded admin/player explanation. A new
+  binding originates only from a successful bonded capture using an eligible
+  unbound source item.
 - Schema migration is idempotent, backed up before v7-to-v8 migration, rolls
   back its marker and DDL together, and preserves all v7 data.
 - `/tw diagnose vessel <binding-or-profile>` reports lifecycle and item-
@@ -478,9 +470,10 @@ the implementation must not expand either into a larger multi-domain class.
 
 37. Schema v8 migration is idempotent, rollback-safe, and preserves every v7
     profile, command link, population row, and legacy filled item.
-38. `Reject` leaves a legacy unbound filled item unchanged with clear feedback.
-39. `AdoptOnFirstUse` succeeds only after uniqueness/profile evidence and is
-    itself idempotent under concurrency/restart.
+38. Bonded dispatch leaves an unbound filled item unchanged with clear feedback.
+39. No config, public API, or ordinary interaction can convert an unbound filled
+    item into a bonded generation; a new binding requires a successful bonded
+    capture from an eligible unbound source item.
 40. Old API clients link; the new accessor's default facade fails closed.
 41. Public views are immutable and tokens cannot be forged/reused.
 42. Each event fires once logically after commit; listener exceptions are
