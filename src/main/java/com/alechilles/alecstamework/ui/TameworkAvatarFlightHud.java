@@ -12,12 +12,13 @@ import javax.annotation.Nullable;
 public final class TameworkAvatarFlightHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:avatar_flight";
     public static final String UI_PATH = "TameworkAvatarFlightHud.ui";
+    private static final int HUD_Z_ORDER = 100;
 
     private AvatarFlightHudViewModel model;
 
     public TameworkAvatarFlightHud(@Nonnull PlayerRef playerRef,
                                    @Nonnull AvatarFlightHudViewModel model) {
-        super(playerRef, HUD_KEY);
+        super(playerRef, HUD_KEY, HUD_Z_ORDER);
         this.model = model;
     }
 

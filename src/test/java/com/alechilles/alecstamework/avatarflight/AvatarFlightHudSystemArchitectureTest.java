@@ -15,7 +15,8 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("extends CustomUIHud"));
         Assertions.assertTrue(source.contains("HUD_KEY = \"alecstamework:avatar_flight\""));
         Assertions.assertTrue(source.contains("UI_PATH = \"TameworkAvatarFlightHud.ui\""));
-        Assertions.assertTrue(source.contains("super(playerRef, HUD_KEY)"));
+        Assertions.assertTrue(source.contains("HUD_Z_ORDER = 100"));
+        Assertions.assertTrue(source.contains("super(playerRef, HUD_KEY, HUD_Z_ORDER)"));
         Assertions.assertTrue(source.contains("new UICommandBuilder()"));
         Assertions.assertTrue(source.contains("AvatarFlightHudBinder.bind(commandBuilder, updatedModel)"));
         Assertions.assertTrue(source.contains("update(false, commandBuilder)"));
