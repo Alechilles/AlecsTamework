@@ -89,7 +89,8 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Background: #f04444;"));
         Assertions.assertTrue(ui.contains("Style: (FontSize: 11, RenderBold: true, TextColor: #f2f6fb, HorizontalAlignment: Center, VerticalAlignment: Center)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
-        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("LayoutMode: Left;"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
         Assertions.assertTrue(ui.contains("Group #AirbrakeIcon"));
@@ -99,6 +100,10 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/Airbrake.png"));
         Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/Launch.png"));
         Assertions.assertTrue(ui.contains("Text: \"CROUCH\";"));
+        Assertions.assertTrue(ui.contains("Text: \"LMB\";"));
+        Assertions.assertTrue(ui.contains("Text: \"Q\";"));
+        Assertions.assertTrue(ui.contains("Text: \"RMB\";"));
+        Assertions.assertEquals(4, countOccurrences(ui, "Tamework/AvatarFlightControls/ControlFrame.png"));
     }
 
     private static int countOccurrences(String text, String token) {

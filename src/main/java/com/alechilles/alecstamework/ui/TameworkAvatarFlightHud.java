@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 public final class TameworkAvatarFlightHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:avatar_flight";
     public static final String UI_PATH = "TameworkAvatarFlightHud.ui";
-    private static final int HUD_Z_ORDER = 100;
+    private static final int HUD_Z_ORDER = 1;
 
     private AvatarFlightHudViewModel model;
 
