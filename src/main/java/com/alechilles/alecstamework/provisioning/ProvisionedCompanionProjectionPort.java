@@ -17,6 +17,24 @@ public interface ProvisionedCompanionProjectionPort {
     CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> prepare(
             @Nonnull ProvisioningPopulationBackend.ActiveRequest request);
 
+    /**
+     * Reconstructs a process-local projection capability from the durable provisioning request.
+     *
+     * <p>The returned operation id must equal {@code previousPopulationOperationId}. A production
+     * implementation may reacquire a new lower-level population reservation after startup
+     * reconciliation, but it must keep that replacement hidden beneath the original durable
+     * provisioning identity. If the deterministic projection is already live, recovery must
+     * expose an idempotent capability for that exact identity instead of spawning again.</p>
+     */
+    @Nonnull
+    default CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> resume(
+            @Nonnull ProvisioningPopulationBackend.ActiveRequest request,
+            @Nonnull UUID previousPopulationOperationId) {
+        java.util.Objects.requireNonNull(previousPopulationOperationId,
+                "previousPopulationOperationId");
+        return prepare(java.util.Objects.requireNonNull(request, "request"));
+    }
+
     @Nonnull
     ProvisioningPopulationBackend.ClaimResult claim(@Nonnull UUID populationOperationId);
 
@@ -44,6 +62,15 @@ public interface ProvisionedCompanionProjectionPort {
         @Override
         public CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> prepare(
                 ProvisioningPopulationBackend.ActiveRequest request) {
+            return CompletableFuture.completedFuture(new ProvisioningPopulationBackend.AdmissionPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.UNAVAILABLE,
+                    "provisioned-companion-projection-unavailable", null, null));
+        }
+
+        @Override
+        public CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> resume(
+                ProvisioningPopulationBackend.ActiveRequest request,
+                UUID previousPopulationOperationId) {
             return CompletableFuture.completedFuture(new ProvisioningPopulationBackend.AdmissionPreparation(
                     ProvisioningPopulationBackend.AdmissionPreparation.Status.UNAVAILABLE,
                     "provisioned-companion-projection-unavailable", null, null));

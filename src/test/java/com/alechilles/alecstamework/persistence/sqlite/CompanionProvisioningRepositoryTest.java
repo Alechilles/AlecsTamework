@@ -109,6 +109,56 @@ class CompanionProvisioningRepositoryTest {
         }
     }
 
+    @Test
+    void activeRecoveryIdentitySurvivesRealSqliteCloseAndReopenAtBothBoundaries()
+            throws Exception {
+        Path database = tempDir.resolve("provisioning-active-restart.sqlite");
+        try (HydragonPersistenceTestHarness first = new HydragonPersistenceTestHarness(database)) {
+            CompanionProvisioningRepository repository = new CompanionProvisioningRepository(
+                    first.connections, first.queue);
+            await(repository.createAsync(request("operation-a")));
+            advance(repository, CompanionProvisioningOperationRecord.State.PREPARING_DORMANT,
+                    CompanionProvisioningOperationRecord.State.DORMANT_PREPARED,
+                    null, "population-dormant", null, null, 2L);
+            advance(repository, CompanionProvisioningOperationRecord.State.DORMANT_PREPARED,
+                    CompanionProvisioningOperationRecord.State.DORMANT_APPLYING,
+                    null, null, null, null, 3L);
+            advance(repository, CompanionProvisioningOperationRecord.State.DORMANT_APPLYING,
+                    CompanionProvisioningOperationRecord.State.DORMANT_COMMITTED,
+                    "profile-canonical", null, null, null, 4L);
+            advance(repository, CompanionProvisioningOperationRecord.State.DORMANT_COMMITTED,
+                    CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED,
+                    "profile-canonical", null, "population-active", null, 5L);
+        }
+
+        try (HydragonPersistenceTestHarness second = new HydragonPersistenceTestHarness(database)) {
+            CompanionProvisioningRepository repository = new CompanionProvisioningRepository(
+                    second.connections, second.queue);
+            CompanionProvisioningOperationRecord prepared = repository.find("operation-a");
+            assertEquals(CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED,
+                    prepared.state());
+            assertEquals("profile-canonical", prepared.canonicalProfileId());
+            assertEquals("population-active", prepared.activePopulationOperationId());
+            advance(repository, CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED,
+                    CompanionProvisioningOperationRecord.State.ACTIVE_APPLYING,
+                    "profile-canonical", null, "population-active", null, 6L);
+        }
+
+        try (HydragonPersistenceTestHarness third = new HydragonPersistenceTestHarness(database)) {
+            CompanionProvisioningRepository repository = new CompanionProvisioningRepository(
+                    third.connections, third.queue);
+            CompanionProvisioningOperationRecord applying = repository.loadRecoverable().stream()
+                    .filter(row -> row.operationId().equals("operation-a"))
+                    .findFirst().orElseThrow();
+            assertEquals(CompanionProvisioningOperationRecord.State.ACTIVE_APPLYING,
+                    applying.state());
+            assertEquals("profile-canonical", applying.canonicalProfileId());
+            assertEquals("population-active", applying.activePopulationOperationId());
+            assertEquals("hydragon", applying.callerNamespace());
+            assertEquals("soul-bond-1", applying.idempotencyKey());
+        }
+    }
+
     private CompanionProvisioningRepository.MutationResult advance(
             CompanionProvisioningRepository repository,
             CompanionProvisioningOperationRecord.State expected,

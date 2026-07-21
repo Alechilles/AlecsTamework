@@ -367,6 +367,18 @@ public final class CompanionProvisioningCoordinator {
             CompanionProvisioningOperationRecord operation, boolean recovered) {
         UUID populationOperationId = UUID.fromString(requireText(
                 operation.activePopulationOperationId(), "activePopulationOperationId"));
+        if (recovered) {
+            return backend.resumeActive(activeRequest(operation), populationOperationId)
+                    .thenCompose(prepared -> resumeActivePreparation(
+                            operation, prepared, populationOperationId, false));
+        }
+        return claimActiveAcquired(operation, false, populationOperationId);
+    }
+
+    private CompletionStage<CompanionProvisioningResult> claimActiveAcquired(
+            CompanionProvisioningOperationRecord operation,
+            boolean recovered,
+            UUID populationOperationId) {
         ProvisioningPopulationBackend.ClaimResult claim = backend.claimActive(populationOperationId);
         if (!claim.claimed()) {
             return backend.cancelActive(populationOperationId, claim.reason())
@@ -383,6 +395,53 @@ public final class CompanionProvisioningCoordinator {
             CompanionProvisioningOperationRecord operation, boolean recovered) {
         UUID populationOperationId = UUID.fromString(requireText(
                 operation.activePopulationOperationId(), "activePopulationOperationId"));
+        if (recovered) {
+            return backend.resumeActive(activeRequest(operation), populationOperationId)
+                    .thenCompose(prepared -> resumeActivePreparation(
+                            operation, prepared, populationOperationId, true));
+        }
+        return commitActiveAcquired(operation, false, populationOperationId);
+    }
+
+    private CompletionStage<CompanionProvisioningResult> resumeActivePreparation(
+            CompanionProvisioningOperationRecord operation,
+            ProvisioningPopulationBackend.AdmissionPreparation prepared,
+            UUID populationOperationId,
+            boolean alreadyApplying) {
+        if (prepared.status() != ProvisioningPopulationBackend.AdmissionPreparation.Status.PREPARED
+                || prepared.populationOperationId() == null) {
+            return switch (prepared.status()) {
+                case QUARANTINED -> terminalAdvance(operation,
+                        CompanionProvisioningOperationRecord.State.QUARANTINED,
+                        prepared.reason(), "QUARANTINED");
+                case DENIED -> partialDormant(operation, prepared.reason());
+                case UNAVAILABLE -> completedUnavailable(prepared.reason());
+                case PREPARED -> terminalAdvance(operation,
+                        CompanionProvisioningOperationRecord.State.QUARANTINED,
+                        "active-population-operation-missing-on-resume", "QUARANTINED");
+            };
+        }
+        if (!populationOperationId.equals(prepared.populationOperationId())) {
+            return terminalAdvance(operation,
+                    CompanionProvisioningOperationRecord.State.QUARANTINED,
+                    "active-population-operation-changed-on-resume", "QUARANTINED");
+        }
+        if (!alreadyApplying) {
+            return claimActiveAcquired(operation, true, populationOperationId);
+        }
+        ProvisioningPopulationBackend.ClaimResult claim = backend.claimActive(populationOperationId);
+        if (!claim.claimed()) {
+            return backend.cancelActive(populationOperationId, claim.reason())
+                    .handle((ignored, failure) -> null)
+                    .thenCompose(ignored -> partialDormant(operation, claim.reason()));
+        }
+        return commitActiveAcquired(operation, true, populationOperationId);
+    }
+
+    private CompletionStage<CompanionProvisioningResult> commitActiveAcquired(
+            CompanionProvisioningOperationRecord operation,
+            boolean recovered,
+            UUID populationOperationId) {
         return backend.commitActive(populationOperationId)
                 .thenCompose(profile -> advance(operation,
                         CompanionProvisioningOperationRecord.State.COMMITTED,
@@ -390,6 +449,21 @@ public final class CompanionProvisioningCoordinator {
                         recovered ? "RECOVERED_COMMITTED" : "COMMITTED"))
                 .thenApply(committed -> completeProvisioning(committed, recovered))
                 .exceptionallyCompose(failure -> partialDormant(operation, "active-projection-failed"));
+    }
+
+    private ProvisioningPopulationBackend.ActiveRequest activeRequest(
+            CompanionProvisioningOperationRecord operation) {
+        ProvisioningPopulationBackend.ProfileSnapshot profile = backend
+                .findProfile(requireText(operation.canonicalProfileId(), "canonicalProfileId"))
+                .orElseThrow(() -> new IllegalStateException("canonical-profile-missing"));
+        return new ProvisioningPopulationBackend.ActiveRequest(
+                UUID.fromString(operation.operationId()), profile.profileId(), profile.ownerUuid(),
+                profile.roleId(), operation.ownershipWorldName(),
+                parseDestination(operation.destinationContextJson()),
+                // Dormant recovery reacquires against the current canonical revision. If projection
+                // already completed, the recovery port accepts the newer revision only alongside
+                // exact deterministic live-identity evidence.
+                profile.profileRevision());
     }
 
     private CompanionProvisioningResult completeProvisioning(

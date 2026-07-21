@@ -18,7 +18,8 @@ class HyDragonBehavioralSelfTestFixturesTest {
                         "isolated population group rejects boundary overflow",
                         "isolated provisioning commits dormant profile",
                         "isolated provisioning projects active profile",
-                        "isolated failed projection stays durable and recoverable"),
+                        "isolated failed projection stays durable and recoverable",
+                        "isolated restart reacquires lost active projection token"),
                 assertions.stream().map(ApiSelfTestAssertion::name).toList());
         assertTrue(assertions.stream().allMatch(ApiSelfTestAssertion::passed),
                 () -> assertions.stream()

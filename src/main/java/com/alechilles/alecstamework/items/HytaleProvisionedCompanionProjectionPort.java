@@ -54,6 +54,9 @@ public final class HytaleProvisionedCompanionProjectionPort
     private final NpcProfileRepository profiles;
     private final CompanionSpawnPopulationAdmissionService admission;
     private final ConcurrentHashMap<UUID, PreparedProjection> prepared = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, CompletableFuture<
+            ProvisioningPopulationBackend.AdmissionPreparation>> resumptions =
+            new ConcurrentHashMap<>();
 
     public HytaleProvisionedCompanionProjectionPort(
             @Nonnull OwnerPopulationRuntime ownerRuntime,
@@ -89,6 +92,91 @@ public final class HytaleProvisionedCompanionProjectionPort
                 request.profileId(), source.previousNpcUuid(), source.lifecycle(), request.ownerUuid(),
                 request.destination(), request.provisioningOperationId());
         return prepareSpawn(spawn, request.profileId());
+    }
+
+    @Nonnull
+    @Override
+    public CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> resume(
+            @Nonnull ProvisioningPopulationBackend.ActiveRequest request,
+            @Nonnull UUID previousPopulationOperationId) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(previousPopulationOperationId, "previousPopulationOperationId");
+        PreparedProjection cached = prepared.get(previousPopulationOperationId);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached.profileId().equals(request.profileId())
+                    ? prepared(previousPopulationOperationId,
+                    "provisioned-companion-projection-reacquired")
+                    : new ProvisioningPopulationBackend.AdmissionPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                    "provisioned-companion-recovery-profile-conflict", null, null));
+        }
+        CompletableFuture<ProvisioningPopulationBackend.AdmissionPreparation> created =
+                new CompletableFuture<>();
+        CompletableFuture<ProvisioningPopulationBackend.AdmissionPreparation> concurrent =
+                resumptions.putIfAbsent(previousPopulationOperationId, created);
+        if (concurrent != null) {
+            return concurrent;
+        }
+        resumeUncached(request, previousPopulationOperationId).whenComplete((result, failure) -> {
+            resumptions.remove(previousPopulationOperationId, created);
+            if (failure == null && result != null) created.complete(result);
+            else created.completeExceptionally(failure == null
+                    ? new IllegalStateException("provisioned-companion-resume-result-missing")
+                    : failure);
+        });
+        return created;
+    }
+
+    @Nonnull
+    private CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> resumeUncached(
+            ProvisioningPopulationBackend.ActiveRequest request,
+            UUID previousPopulationOperationId) {
+        OwnerPopulationEntry owner = ownerRuntime.index().entry(request.profileId()).orElse(null);
+        NpcProfileRepository.ProfileRecord profile = profiles.loadProfileById(request.profileId());
+        if (owner == null || owner.ownerId() == null || profile == null
+                || profile.ownerUuid() == null || profile.roleId() == null) {
+            return CompletableFuture.completedFuture(recoveryPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                    "provisioned-companion-recovery-profile-missing"));
+        }
+        if (!owner.ownerId().equals(request.ownerUuid())
+                || !profile.ownerUuid().equals(request.ownerUuid())) {
+            return CompletableFuture.completedFuture(recoveryPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                    "provisioned-companion-recovery-owner-conflict"));
+        }
+        if (!profile.roleId().equals(request.roleId())) {
+            return CompletableFuture.completedFuture(recoveryPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                    "provisioned-companion-recovery-role-conflict"));
+        }
+
+        CompanionSpawnAdmissionRequest spawn = spawnRequest(
+                request.profileId(), null, CompanionLifecycleState.PROVISIONED_DORMANT,
+                request.ownerUuid(), request.destination(), request.provisioningOperationId());
+        UUID currentNpcUuid = ownerRuntime.identityResolver().currentNpcUuid(request.profileId())
+                .orElse(profile.currentNpcUuid());
+        if (owner.lifecycleState() == CompanionLifecycleState.ACTIVE
+                || owner.lifecycleState() == CompanionLifecycleState.UNLOADED
+                || owner.lifecycleState() == CompanionLifecycleState.RESTORING) {
+            if (!isExactRecoveredProjection(spawn, currentNpcUuid)) {
+                return CompletableFuture.completedFuture(recoveryPreparation(
+                        ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                        "provisioned-companion-recovery-active-identity-conflict"));
+            }
+            prepared.put(previousPopulationOperationId,
+                    PreparedProjection.alreadyActive(request.profileId()));
+            return CompletableFuture.completedFuture(prepared(previousPopulationOperationId,
+                    "provisioned-companion-recovery-already-active"));
+        }
+        if (owner.lifecycleState() != CompanionLifecycleState.PROVISIONED_DORMANT
+                || owner.revision() != request.expectedProfileRevision()
+                || currentNpcUuid != null) {
+            return CompletableFuture.completedFuture(recoveryPreparation(
+                    ProvisioningPopulationBackend.AdmissionPreparation.Status.QUARANTINED,
+                    "provisioned-companion-recovery-source-conflict"));
+        }
+        return prepareSpawn(spawn, request.profileId(), previousPopulationOperationId);
     }
 
     @Override
@@ -281,6 +369,13 @@ public final class HytaleProvisionedCompanionProjectionPort
     @Nonnull
     private CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> prepareSpawn(
             CompanionSpawnAdmissionRequest request, String profileId) {
+        return prepareSpawn(request, profileId, null);
+    }
+
+    @Nonnull
+    private CompletionStage<ProvisioningPopulationBackend.AdmissionPreparation> prepareSpawn(
+            CompanionSpawnAdmissionRequest request, String profileId,
+            @Nullable UUID recoveredOperationId) {
         if (!available()) {
             return CompletableFuture.completedFuture(new ProvisioningPopulationBackend.AdmissionPreparation(
                     ProvisioningPopulationBackend.AdmissionPreparation.Status.UNAVAILABLE,
@@ -297,7 +392,9 @@ public final class HytaleProvisionedCompanionProjectionPort
                         ProvisioningPopulationBackend.AdmissionPreparation.Status.DENIED,
                         result.reason(), null, null);
             }
-            UUID operationId = result.preparedBatch().populationBatch().batchId();
+            UUID operationId = recoveredOperationId == null
+                    ? result.preparedBatch().populationBatch().batchId()
+                    : recoveredOperationId;
             prepared.put(operationId, new PreparedProjection(
                     profileId, request, result.preparedBatch(), false));
             return prepared(operationId, result.reason());
@@ -484,6 +581,14 @@ public final class HytaleProvisionedCompanionProjectionPort
                 PopulationCompanionLifecycle.PROVISIONED_DORMANT);
     }
 
+    /** Recovery may accept live evidence only for this operation's deterministic NPC UUID. */
+    static boolean isExactRecoveredProjection(
+            CompanionSpawnAdmissionRequest request, @Nullable UUID currentNpcUuid) {
+        return currentNpcUuid != null
+                && currentNpcUuid.equals(
+                CompanionSpawnPopulationAdmissionService.plannedNpcUuid(request));
+    }
+
     private static UUID stableProjectionOperationId(UUID provisioningOperationId) {
         return UUID.nameUUIDFromBytes(("companion-projection:" + provisioningOperationId)
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -501,6 +606,11 @@ public final class HytaleProvisionedCompanionProjectionPort
                 reason.endsWith("unavailable")
                         ? ProvisioningPopulationBackend.AdmissionPreparation.Status.UNAVAILABLE
                         : ProvisioningPopulationBackend.AdmissionPreparation.Status.DENIED;
+        return new ProvisioningPopulationBackend.AdmissionPreparation(status, reason, null, null);
+    }
+
+    private static ProvisioningPopulationBackend.AdmissionPreparation recoveryPreparation(
+            ProvisioningPopulationBackend.AdmissionPreparation.Status status, String reason) {
         return new ProvisioningPopulationBackend.AdmissionPreparation(status, reason, null, null);
     }
 

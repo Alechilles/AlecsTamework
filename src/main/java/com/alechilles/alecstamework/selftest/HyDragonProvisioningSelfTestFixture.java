@@ -87,6 +87,36 @@ final class HyDragonProvisioningSelfTestFixture {
                     "status=" + failed.status() + " projection=" + failed.projectionStatus()
                             + " diagnostic=" + (diagnostic == null ? "missing" : diagnostic.status())
                             + " dormantCommits=" + backend.dormantCommitCount("failed-projection")));
+
+            backend.interruptBeforeActiveClaimKey = "restart-active";
+            CompanionProvisioningResult interrupted = coordinator.provision(
+                    request("restart-active", CompanionProvisioningDisposition.ACTIVE))
+                    .toCompletableFuture().join();
+            var interruptedOperation = coordinator.findOperation(
+                    "tamework-self-test", "restart-active")
+                    .toCompletableFuture().join().orElse(null);
+            InMemoryProvisioningBackend restartedBackend =
+                    new InMemoryProvisioningBackend(backend.profiles);
+            CompanionProvisioningCoordinator tokenlessRestart =
+                    new CompanionProvisioningCoordinator(journal, restartedBackend, () -> NOW_MS + 2L);
+            var recovery = tokenlessRestart.recover(8).toCompletableFuture().join();
+            var recoveredProfile = tokenlessRestart.getByOrigin(
+                    "tamework-self-test", "restart-active").orElse(null);
+            assertions.add(new ApiSelfTestAssertion(
+                    "isolated restart reacquires lost active projection token",
+                    interrupted.status() == CompanionProvisioningResult.Status.UNAVAILABLE
+                            && interruptedOperation != null
+                            && interruptedOperation.status()
+                            == CompanionProvisioningOperationStatus.PROJECTING
+                            && recovery.failures() == 0
+                            && recoveredProfile != null
+                            && recoveredProfile.lifecycle() == PopulationCompanionLifecycle.ACTIVE
+                            && restartedBackend.activeResumeCount > 0,
+                    "interrupted=" + interrupted.status()
+                            + " durable=" + (interruptedOperation == null
+                            ? "missing" : interruptedOperation.status())
+                            + " recoveryFailures=" + recovery.failures()
+                            + " resumes=" + restartedBackend.activeResumeCount));
         } catch (RuntimeException failure) {
             assertions.add(new ApiSelfTestAssertion(
                     "isolated provisioning fixtures execute",
@@ -122,6 +152,15 @@ final class HyDragonProvisioningSelfTestFixture {
         private final Map<UUID, ActiveRequest> activeRequests = new LinkedHashMap<>();
         private final Map<String, Integer> dormantCommitsByKey = new LinkedHashMap<>();
         private String failProjectionKey;
+        private String interruptBeforeActiveClaimKey;
+        private int activeResumeCount;
+
+        private InMemoryProvisioningBackend() {
+        }
+
+        private InMemoryProvisioningBackend(Map<String, ProfileSnapshot> recoveredProfiles) {
+            profiles.putAll(recoveredProfiles);
+        }
 
         @Override
         public PolicyResolution resolvePolicy(String roleId, long requestedRevision) {
@@ -202,10 +241,28 @@ final class HyDragonProvisioningSelfTestFixture {
 
         @Override
         public ClaimResult claimActive(UUID populationOperationId) {
+            ActiveRequest request = activeRequests.get(populationOperationId);
+            if (request != null && provisioningKey(request.provisioningOperationId())
+                    .equals(interruptBeforeActiveClaimKey)) {
+                interruptBeforeActiveClaimKey = null;
+                throw new IllegalStateException("self-test process stop before active claim");
+            }
             return new ClaimResult(
                     activeRequests.containsKey(populationOperationId),
                     "self-test-active-claimed",
                     null);
+        }
+
+        @Override
+        public CompletionStage<AdmissionPreparation> resumeActive(
+                ActiveRequest request, UUID previousPopulationOperationId) {
+            activeResumeCount++;
+            activeRequests.put(previousPopulationOperationId, request);
+            return CompletableFuture.completedFuture(new AdmissionPreparation(
+                    AdmissionPreparation.Status.PREPARED,
+                    "self-test-active-reacquired",
+                    previousPopulationOperationId,
+                    null));
         }
 
         @Override
@@ -264,7 +321,8 @@ final class HyDragonProvisioningSelfTestFixture {
         }
 
         private String operationOriginKey(UUID provisioningOperationId) {
-            for (String key : List.of("dormant", "active", "failed-projection")) {
+            for (String key : List.of(
+                    "dormant", "active", "failed-projection", "restart-active")) {
                 UUID expected = UUID.nameUUIDFromBytes(
                         ("tamework:provision:tamework-self-test\0" + key).getBytes(StandardCharsets.UTF_8));
                 if (expected.equals(provisioningOperationId)) return key;

@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,5 +57,20 @@ class HytaleProvisionedCompanionProjectionPortTest {
         assertNull(admission.destination());
         assertEquals(OWNER, admission.oldOwnerUuid());
         assertEquals(OWNER, admission.newOwnerUuid());
+    }
+
+    @Test
+    void restartEvidenceAcceptsOnlyTheOriginalDeterministicProjectionIdentity() {
+        CompanionSpawnAdmissionRequest original = HytaleProvisionedCompanionProjectionPort.spawnRequest(
+                "profile", null, CompanionLifecycleState.PROVISIONED_DORMANT,
+                OWNER, new PopulationAdmissionLocation("default", 3, -2), OPERATION);
+        UUID expected = CompanionSpawnPopulationAdmissionService.plannedNpcUuid(original);
+
+        assertTrue(HytaleProvisionedCompanionProjectionPort
+                .isExactRecoveredProjection(original, expected));
+        assertFalse(HytaleProvisionedCompanionProjectionPort
+                .isExactRecoveredProjection(original, UUID.randomUUID()));
+        assertFalse(HytaleProvisionedCompanionProjectionPort
+                .isExactRecoveredProjection(original, null));
     }
 }

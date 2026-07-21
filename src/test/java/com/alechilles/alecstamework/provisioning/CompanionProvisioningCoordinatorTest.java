@@ -126,6 +126,79 @@ class CompanionProvisioningCoordinatorTest {
                 "restart must reacquire the durable operation before committing");
     }
 
+    @Test
+    void recoveryReacquiresActivePreparedCapabilityUnderOriginalOperationId() throws Exception {
+        InMemoryJournal journal = new InMemoryJournal();
+        FakeBackend firstBackend = new FakeBackend();
+        firstBackend.throwOnActiveClaim = true;
+        CompanionProvisioningCoordinator first =
+                new CompanionProvisioningCoordinator(journal, firstBackend, () -> 100L);
+
+        CompanionProvisioningResult interrupted = await(first.provision(
+                activeRequest("hydragon", "active-prepared-restart")));
+        assertEquals(CompanionProvisioningResult.Status.UNAVAILABLE, interrupted.status());
+        CompanionProvisioningOperationRecord durable = journal.findByOrigin(
+                "hydragon", "active-prepared-restart");
+        assertEquals(CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED, durable.state());
+        String profileId = durable.canonicalProfileId();
+        String operationId = durable.operationId();
+        String populationOperationId = durable.activePopulationOperationId();
+
+        FakeBackend restartedBackend = new FakeBackend(firstBackend.profiles);
+        CompanionProvisioningCoordinator restarted =
+                new CompanionProvisioningCoordinator(journal, restartedBackend, () -> 200L);
+        CompanionProvisioningCoordinator.RecoveryReport report = await(restarted.recover(8));
+
+        assertEquals(1, report.completed());
+        assertEquals(0, report.failures());
+        CompanionProvisioningOperationRecord committed = journal.findByOrigin(
+                "hydragon", "active-prepared-restart");
+        assertEquals(CompanionProvisioningOperationRecord.State.COMMITTED, committed.state());
+        assertEquals(operationId, committed.operationId());
+        assertEquals(profileId, committed.canonicalProfileId());
+        assertEquals(populationOperationId, committed.activePopulationOperationId());
+        assertEquals(2, restartedBackend.activeResumeAttempts,
+                "prepared and applying boundaries must both reacquire the same durable id");
+        assertEquals(1, restartedBackend.activeProjectionMutations);
+    }
+
+    @Test
+    void recoveryUsesExactLiveProjectionEvidenceAfterApplyingCrashWithoutSpawningAgain()
+            throws Exception {
+        InMemoryJournal journal = new InMemoryJournal();
+        FakeBackend firstBackend = new FakeBackend();
+        firstBackend.pauseAfterActiveProjection = true;
+        CompanionProvisioningCoordinator first =
+                new CompanionProvisioningCoordinator(journal, firstBackend, () -> 100L);
+
+        CompletionStage<CompanionProvisioningResult> interrupted = first.provision(
+                activeRequest("hydragon", "active-applying-restart"));
+        assertTrue(!interrupted.toCompletableFuture().isDone(),
+                "fault fixture must interrupt after projection but before durable completion");
+        CompanionProvisioningOperationRecord durable = journal.findByOrigin(
+                "hydragon", "active-applying-restart");
+        assertEquals(CompanionProvisioningOperationRecord.State.ACTIVE_APPLYING, durable.state());
+        String profileId = durable.canonicalProfileId();
+        UUID liveNpc = firstBackend.profiles.get(profileId).currentNpcUuid();
+        assertEquals(1, firstBackend.activeProjectionMutations);
+
+        FakeBackend restartedBackend = new FakeBackend(firstBackend.profiles);
+        CompanionProvisioningCoordinator restarted =
+                new CompanionProvisioningCoordinator(journal, restartedBackend, () -> 200L);
+        CompanionProvisioningCoordinator.RecoveryReport report = await(restarted.recover(8));
+
+        assertEquals(1, report.completed());
+        assertEquals(0, report.failures());
+        CompanionProvisioningOperationRecord committed = journal.findByOrigin(
+                "hydragon", "active-applying-restart");
+        assertEquals(CompanionProvisioningOperationRecord.State.COMMITTED, committed.state());
+        assertEquals(profileId, committed.canonicalProfileId());
+        assertEquals(liveNpc, restartedBackend.profiles.get(profileId).currentNpcUuid());
+        assertEquals(1, restartedBackend.activeResumeAttempts);
+        assertEquals(0, restartedBackend.activeProjectionMutations,
+                "exact live evidence must converge without a replacement projection");
+    }
+
     private static CompanionProvisioningRequest activeRequest(String namespace, String key) {
         return new CompanionProvisioningRequest(namespace, key, null,
                 UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "miniwyvern",
@@ -150,8 +223,19 @@ class CompanionProvisioningCoordinatorTest {
         private final Map<UUID, ActiveRequest> activeRequests = new LinkedHashMap<>();
         private int dormantCommits;
         private int activeCommitAttempts;
+        private int activeResumeAttempts;
+        private int activeProjectionMutations;
         private boolean failNextActiveCommit;
         private boolean pauseDormantCommit;
+        private boolean throwOnActiveClaim;
+        private boolean pauseAfterActiveProjection;
+
+        private FakeBackend() {
+        }
+
+        private FakeBackend(Map<String, ProfileSnapshot> recoveredProfiles) {
+            profiles.putAll(recoveredProfiles);
+        }
 
         @Override
         public PolicyResolution resolvePolicy(String roleId, long requestedRevision) {
@@ -210,8 +294,22 @@ class CompanionProvisioningCoordinatorTest {
 
         @Override
         public ClaimResult claimActive(UUID populationOperationId) {
+            if (throwOnActiveClaim) {
+                throwOnActiveClaim = false;
+                throw new IllegalStateException("simulated-process-stop-before-active-claim");
+            }
             return new ClaimResult(activeRequests.containsKey(populationOperationId),
                     "active-claimed", null);
+        }
+
+        @Override
+        public CompletionStage<AdmissionPreparation> resumeActive(
+                ActiveRequest request, UUID previousPopulationOperationId) {
+            activeResumeAttempts++;
+            activeRequests.put(previousPopulationOperationId, request);
+            return CompletableFuture.completedFuture(new AdmissionPreparation(
+                    AdmissionPreparation.Status.PREPARED, "active-reacquired",
+                    previousPopulationOperationId, null));
         }
 
         @Override
@@ -223,12 +321,20 @@ class CompanionProvisioningCoordinatorTest {
             }
             ActiveRequest request = activeRequests.get(populationOperationId);
             ProfileSnapshot prior = profiles.get(request.profileId());
+            if (prior.lifecycle() == PopulationCompanionLifecycle.ACTIVE
+                    && prior.currentNpcUuid() != null) {
+                return CompletableFuture.completedFuture(prior);
+            }
             ProfileSnapshot active = new ProfileSnapshot(prior.profileId(), prior.ownerUuid(), prior.roleId(),
                     PopulationCompanionLifecycle.ACTIVE,
                     CompanionProvisioningProjectionStatus.ACTIVE,
                     UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                     prior.profileRevision() + 1L, 200L);
             profiles.put(active.profileId(), active);
+            activeProjectionMutations++;
+            if (pauseAfterActiveProjection) {
+                return new CompletableFuture<>();
+            }
             return CompletableFuture.completedFuture(active);
         }
 

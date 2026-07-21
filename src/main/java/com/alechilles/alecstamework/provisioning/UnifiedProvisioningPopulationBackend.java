@@ -271,6 +271,12 @@ public final class UnifiedProvisioningPopulationBackend implements ProvisioningP
         return projectionPort.prepare(request);
     }
 
+    @Override
+    public CompletionStage<AdmissionPreparation> resumeActive(
+            ActiveRequest request, UUID previousPopulationOperationId) {
+        return projectionPort.resume(request, previousPopulationOperationId);
+    }
+
     @Override public ClaimResult claimActive(UUID populationOperationId) {
         return projectionPort.claim(populationOperationId);
     }

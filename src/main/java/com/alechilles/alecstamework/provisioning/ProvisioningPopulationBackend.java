@@ -55,6 +55,15 @@ public interface ProvisioningPopulationBackend {
     @Nonnull
     CompletionStage<AdmissionPreparation> prepareActive(@Nonnull ActiveRequest request);
 
+    /** Reacquires the active projection capability after process-local state was lost. */
+    @Nonnull
+    default CompletionStage<AdmissionPreparation> resumeActive(
+            @Nonnull ActiveRequest request,
+            @Nonnull UUID previousPopulationOperationId) {
+        Objects.requireNonNull(previousPopulationOperationId, "previousPopulationOperationId");
+        return prepareActive(Objects.requireNonNull(request, "request"));
+    }
+
     @Nonnull
     ClaimResult claimActive(@Nonnull UUID populationOperationId);
 
