@@ -95,7 +95,8 @@ public final class PopulationGroupAdmissionRuntime {
         final CompletableFuture<OwnerPopulationPreparationResult> ownerPreparation;
         admissionLock.lock();
         try {
-            ownerPreparation = ownerCoordinator.prepareProvisionedDormantCompositeAsync(
+            ownerPreparation = ownerCoordinator.groupCompositeCoordinator()
+                    .prepareProvisionedDormantAsync(
                     request.ownerPlan(), groupRepository, groupOperation, evidence);
         } finally {
             admissionLock.unlock();
@@ -161,7 +162,7 @@ public final class PopulationGroupAdmissionRuntime {
             return CompletableFuture.completedFuture(Commit.denied(
                     "population-group-capability-not-claimed"));
         }
-        return ownerCoordinator.commitProvisionedDormantCompositeAsync(
+        return ownerCoordinator.groupCompositeCoordinator().commitProvisionedDormantAsync(
                 prepared.ownerAdmission(), profileRepository, profileMutation,
                 groupRepository, prepared.groupOperation().operationId(),
                 prepared.classification(), nowMs).thenApply(result -> {

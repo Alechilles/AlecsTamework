@@ -138,8 +138,8 @@ class UnifiedPopulationPersistenceTest {
                             owner, "soul_bond", PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL,
                             null, 1, 0, 1, 0, 7L);
 
-            CompanionPopulationRepository.ProvisionedDormantPreparationResult prepared = await(
-                    population.prepareProvisionedDormantCompositeAsync(
+            UnifiedPopulationCompositeStore.ProvisionedDormantPreparationResult prepared = await(
+                    population.unifiedPopulationCompositeStore().prepareProvisionedDormantAsync(
                             ownerPrepare, groups, groupOperation, List.of(groupEvidence)));
             assertTrue(prepared.prepared());
             assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
@@ -161,8 +161,8 @@ class UnifiedPopulationPersistenceTest {
                             PopulationGroupClassificationRecord.Status.RESOLVED,
                             "provisioning", nowMs, 110L);
 
-            CompanionPopulationRepository.ProvisionedDormantCommitResult committed = await(
-                    population.commitProvisionedDormantCompositeAsync(
+            UnifiedPopulationCompositeStore.ProvisionedDormantCommitResult committed = await(
+                    population.unifiedPopulationCompositeStore().commitProvisionedDormantAsync(
                             ownerCommit, profiles, profileMutation, groups, "group-composite",
                             new PopulationGroupRepository.ClassificationMutation(null, classification),
                             110L));

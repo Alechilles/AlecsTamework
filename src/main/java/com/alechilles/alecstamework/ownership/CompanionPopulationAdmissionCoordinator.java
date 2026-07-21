@@ -118,7 +118,7 @@ public final class CompanionPopulationAdmissionCoordinator {
                             ? null : reservation.ownerReservation().decision(),
                     reservation.claimDecision(), null));
         }
-        return ownerCoordinator.preparePopulationGroupCompositeReservedAsync(
+        return ownerCoordinator.groupCompositeCoordinator().prepareReservedAsync(
                         reservation.ownerReservation(), groupRepository, groupOperation, groupEvidence)
                 .thenApply(ownerResult -> finishPreparation(ownerResult, reservation.claimDecision()));
     }
@@ -364,7 +364,7 @@ public final class CompanionPopulationAdmissionCoordinator {
         }
         final boolean finalClaimCommitted = claimCommitted;
         CompletableFuture<OwnerPopulationCommitResult> owner =
-                ownerCoordinator.commitPopulationGroupCompositeAsync(
+                ownerCoordinator.groupCompositeCoordinator().commitPopulationGroupsAsync(
                         prepared.ownerAdmission(), groupRepository, groupOperationId,
                         classification, nowMs);
         return owner.handle((ownerCommit, failure) -> {
