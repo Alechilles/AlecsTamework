@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 /** Defers owner mutations whose caller cannot wait for SQLite without blocking a world thread. */
@@ -87,7 +88,8 @@ public final class OwnerMutationScheduler {
                 idempotencyKey,
                 callbacks,
                 null,
-                false
+                false,
+                null
         );
     }
 
@@ -100,7 +102,7 @@ public final class OwnerMutationScheduler {
         return scheduleInternal(
                 npcRef, store, null, null, false, null, null, null,
                 CompanionLifecycleState.RELEASED, OwnerPopulationOperation.OWNER_CLEAR,
-                force, idempotencyKey, callbacks, null, true
+                force, idempotencyKey, callbacks, null, true, null
         );
     }
     /** Records a permanent release with trusted recovery context in the same operation journal. */
@@ -114,7 +116,7 @@ public final class OwnerMutationScheduler {
                 npcRef, store, null, null, false, null, null, null,
                 CompanionLifecycleState.RELEASED, OwnerPopulationOperation.OWNER_CLEAR,
                 force, idempotencyKey, callbacks,
-                Objects.requireNonNull(durableContextJson, "durableContextJson"), true
+                Objects.requireNonNull(durableContextJson, "durableContextJson"), true, null
         );
     }
     /**
@@ -148,7 +150,8 @@ public final class OwnerMutationScheduler {
                 idempotencyKey,
                 callbacks,
                 null,
-                false
+                false,
+                null
         );
     }
 
@@ -172,7 +175,36 @@ public final class OwnerMutationScheduler {
                 npcRef, store, canonicalProfileId, previousNpcUuid,
                 canonicalProfileId != null, expectedLiveOwnerId, newOwnerId, newOwnerName,
                 lifecycleState, operation, force, idempotencyKey, callbacks,
-                Objects.requireNonNull(durableContextJson, "durableContextJson"), false
+                Objects.requireNonNull(durableContextJson, "durableContextJson"), false,
+                null
+        );
+    }
+
+    /**
+     * Prepares owner, claim, and population capacity without applying the live mutation. The
+     * returned continuation is the only authority that may later apply or cancel that admission.
+     */
+    public boolean prepareWithDurableContext(
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store,
+            @Nullable String canonicalProfileId,
+            @Nullable UUID previousNpcUuid,
+            @Nullable UUID expectedLiveOwnerId,
+            @Nullable UUID newOwnerId,
+            @Nullable String newOwnerName,
+            @Nonnull CompanionLifecycleState lifecycleState,
+            @Nonnull OwnerPopulationOperation operation,
+            boolean force,
+            @Nonnull String idempotencyKey,
+            @Nonnull String durableContextJson,
+            @Nonnull PreparationCallbacks callbacks
+    ) {
+        return scheduleInternal(
+                npcRef, store, canonicalProfileId, previousNpcUuid,
+                canonicalProfileId != null, expectedLiveOwnerId, newOwnerId, newOwnerName,
+                lifecycleState, operation, force, idempotencyKey, MutationCallbacks.NOOP,
+                Objects.requireNonNull(durableContextJson, "durableContextJson"), false,
+                Objects.requireNonNull(callbacks, "callbacks")
         );
     }
 
@@ -190,7 +222,8 @@ public final class OwnerMutationScheduler {
                                      @Nonnull String idempotencyKey,
                                      @Nullable MutationCallbacks callbacks,
                                      @Nullable String durableContextJson,
-        boolean permanentRelease) {
+                                     boolean permanentRelease,
+                                     @Nullable PreparationCallbacks preparationCallbacks) {
         MutationCallbacks safeCallbacks = callbacks == null ? MutationCallbacks.NOOP : callbacks;
         final OwnerMutationSnapshotResolver.Snapshot snapshot;
         try {
@@ -200,10 +233,12 @@ public final class OwnerMutationScheduler {
             );
         } catch (RuntimeException | LinkageError failure) {
             terminality.denied(safeCallbacks, "owner-mutation-identity-unavailable", null);
+            notifyPreparationDenied(preparationCallbacks, "owner-mutation-identity-unavailable");
             return false;
         }
         if (snapshot == null) {
             terminality.denied(safeCallbacks, "owner-mutation-snapshot-unavailable", null);
+            notifyPreparationDenied(preparationCallbacks, "owner-mutation-snapshot-unavailable");
             return false;
         }
         final OwnerMutationAdmissionPlanFactory.Plan plan;
@@ -213,11 +248,15 @@ public final class OwnerMutationScheduler {
                     && operation != OwnerPopulationOperation.LEGACY_ADOPTION) {
                 releaseAndDenyBeforePreparation(snapshot, safeCallbacks,
                         "owner-mutation-canonical-profile-unavailable", null);
+                notifyPreparationDenied(
+                        preparationCallbacks, "owner-mutation-canonical-profile-unavailable");
                 return false;
             }
             if (OwnerMutationSnapshotResolver.isDuplicateRepresentation(snapshot, current, operation)) {
                 releaseAndDenyBeforePreparation(snapshot, safeCallbacks,
                         "owner-mutation-duplicate-active-profile", null);
+                notifyPreparationDenied(
+                        preparationCallbacks, "owner-mutation-duplicate-active-profile");
                 return false;
             }
             if (current == null && snapshot.liveOwnerId() != null) {
@@ -235,6 +274,7 @@ public final class OwnerMutationScheduler {
             releaseAndDenyBeforePreparation(
                     snapshot, safeCallbacks, "owner-mutation-plan-unavailable", null
             );
+            notifyPreparationDenied(preparationCallbacks, "owner-mutation-plan-unavailable");
             return false;
         }
         try {
@@ -252,15 +292,19 @@ public final class OwnerMutationScheduler {
                 terminality.denied(
                         safeCallbacks, "owner-mutation-prepare-stage-missing", null
                 );
+                notifyPreparationDenied(
+                        preparationCallbacks, "owner-mutation-prepare-stage-missing");
                 return false;
             }
             preparation.whenComplete((result, failure) -> dispatchPrepared(
-                    snapshot, newOwnerId, newOwnerName, safeCallbacks, result, failure
+                    snapshot, newOwnerId, newOwnerName, safeCallbacks,
+                    preparationCallbacks, result, failure
             ));
             return true;
         } catch (RuntimeException | LinkageError failure) {
             terminality.degrade("owner_mutation_prepare_start_ambiguous");
             terminality.denied(safeCallbacks, "owner-mutation-prepare-failed", null);
+            notifyPreparationDenied(preparationCallbacks, "owner-mutation-prepare-failed");
             return false;
         }
     }
@@ -269,6 +313,7 @@ public final class OwnerMutationScheduler {
                                   @Nullable UUID newOwnerId,
                                   @Nullable String newOwnerName,
                                   @Nonnull MutationCallbacks callbacks,
+                                  @Nullable PreparationCallbacks preparationCallbacks,
                                   @Nullable CompanionPopulationPreparationResult preparation,
                                   @Nullable Throwable failure) {
         if (failure != null || preparation == null || !preparation.allowed()) {
@@ -281,6 +326,9 @@ public final class OwnerMutationScheduler {
                 terminality.degrade("owner_mutation_prepare_completion_ambiguous");
             }
             LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> {
+                if (preparationCallbacks != null) {
+                    preparationCallbacks.onDenied(reason);
+                }
                 if (preparation != null) {
                     try {
                         callbacks.onPopulationDenied(preparation);
@@ -299,6 +347,9 @@ public final class OwnerMutationScheduler {
         if (prepared == null) {
             terminality.degrade("owner_mutation_prepared_capability_missing");
             terminality.denied(callbacks, "owner-mutation-prepared-capability-missing", null);
+            if (preparationCallbacks != null) {
+                preparationCallbacks.onDenied("owner-mutation-prepared-capability-missing");
+            }
             return;
         }
         if (!identityLifecycle.promotePrepared(snapshot)) {
@@ -310,6 +361,26 @@ public final class OwnerMutationScheduler {
                     "owner-mutation-prepared-identity-promotion-failed",
                     prepared.ownerAdmission().decision()
             );
+            if (preparationCallbacks != null) {
+                preparationCallbacks.onDenied("owner-mutation-prepared-identity-promotion-failed");
+            }
+            return;
+        }
+        if (preparationCallbacks != null) {
+            LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> {
+                PreparedMutation mutation = new PreparedMutation(
+                        snapshot, newOwnerId, newOwnerName, prepared);
+                try {
+                    preparationCallbacks.onPrepared(mutation);
+                } catch (RuntimeException | LinkageError callbackFailure) {
+                    mutation.cancel("owner-mutation-preparation-callback-failed");
+                    preparationCallbacks.onDenied(
+                            "owner-mutation-preparation-callback-failed");
+                }
+            }, () -> {
+                cancelPrepared(prepared, "owner-mutation-world-unavailable");
+                preparationCallbacks.onDenied("owner-mutation-world-unavailable");
+            });
             return;
         }
         LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> applyPrepared(
@@ -488,8 +559,76 @@ public final class OwnerMutationScheduler {
         identityLifecycle.cancelPrepared(prepared, reason);
     }
 
+    private static void notifyPreparationDenied(
+            @Nullable PreparationCallbacks callbacks, @Nonnull String reason) {
+        if (callbacks != null) {
+            callbacks.onDenied(reason);
+        }
+    }
+
     public interface MutationCallbacks extends OwnerMutationCallbacks {
         MutationCallbacks NOOP = new MutationCallbacks() {
         };
+    }
+
+    public interface PreparationCallbacks {
+        void onPrepared(@Nonnull PreparedMutation mutation);
+
+        default void onDenied(@Nonnull String reason) {
+        }
+    }
+
+    /** One-shot capability retaining the exact prepared population admission. */
+    public final class PreparedMutation {
+        private final OwnerMutationSnapshotResolver.Snapshot snapshot;
+        @Nullable
+        private final UUID newOwnerId;
+        @Nullable
+        private final String newOwnerName;
+        private final PreparedCompanionPopulationAdmission prepared;
+        private final AtomicBoolean terminal = new AtomicBoolean();
+
+        private PreparedMutation(OwnerMutationSnapshotResolver.Snapshot snapshot,
+                                 @Nullable UUID newOwnerId,
+                                 @Nullable String newOwnerName,
+                                 PreparedCompanionPopulationAdmission prepared) {
+            this.snapshot = snapshot;
+            this.newOwnerId = newOwnerId;
+            this.newOwnerName = newOwnerName;
+            this.prepared = prepared;
+        }
+
+        @Nonnull
+        public UUID populationOperationId() {
+            return prepared.ownerAdmission().operationId();
+        }
+
+        @Nonnull
+        public String profileId() {
+            return prepared.ownerAdmission().plan().transition().profileId();
+        }
+
+        public boolean apply(@Nullable MutationCallbacks callbacks) {
+            if (!terminal.compareAndSet(false, true)) {
+                return false;
+            }
+            MutationCallbacks safeCallbacks = callbacks == null ? MutationCallbacks.NOOP : callbacks;
+            LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> applyPrepared(
+                    snapshot, newOwnerId, newOwnerName, safeCallbacks, prepared
+            ), () -> {
+                cancelPrepared(prepared, "owner-mutation-world-unavailable");
+                safeCallbacks.onWorldDispatchRejected(
+                        "owner-mutation-world-unavailable", false, null);
+            });
+            return true;
+        }
+
+        public boolean cancel(@Nonnull String reason) {
+            if (!terminal.compareAndSet(false, true)) {
+                return false;
+            }
+            cancelPrepared(prepared, Objects.requireNonNull(reason, "reason"));
+            return true;
+        }
     }
 }

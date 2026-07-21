@@ -89,6 +89,22 @@ class SpawnerCaptureChanceServiceTest {
         assertEquals(0, entropy.get());
     }
 
+    @Test
+    void finalRequirementRevalidationIsIndependentOfEntropy() {
+        AtomicInteger requirementCalls = new AtomicInteger();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        SpawnerCaptureChanceService service = new SpawnerCaptureChanceService(
+                runtime(requirementCalls, true));
+        CapturePolicyConfigView policy = policy(0, 0.0D, 1.0D, 0.0D, null, true);
+
+        CaptureRequirementDecision decision = service.revalidateRequirements(
+                policy, context(), 0L);
+
+        assertTrue(decision.allowed());
+        assertEquals(1, requirementCalls.get());
+        assertEquals(0, entropyCalls.get());
+    }
+
     private static ItemFeatureConfig.CaptureItemMechanics mechanics(
             int power, double base, double perPower, double minimum, double maximum
     ) {

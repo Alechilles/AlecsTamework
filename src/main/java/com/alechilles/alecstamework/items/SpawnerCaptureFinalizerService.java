@@ -23,6 +23,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -93,6 +94,44 @@ public final class SpawnerCaptureFinalizerService {
         return prepared != null && schedule(prepared, durableContextJson, safeCallbacks);
     }
 
+    /** Prepares population capacity while leaving the NPC and source item untouched. */
+    public boolean prepareCapture(Player player,
+                                  ItemFeatureConfig config,
+                                  Ref<EntityStore> targetRef,
+                                  @Nullable String durableContextJson,
+                                  @Nonnull String idempotencyKey,
+                                  @Nonnull CapturePreparationCallbacks callbacks) {
+        CapturePreparationCallbacks safeCallbacks = Objects.requireNonNull(callbacks, "callbacks");
+        PreparedCapture prepared = prepare(player, config, targetRef, new CaptureCallbacks() {
+            @Override
+            public void onDenied(String reason) {
+                safeCallbacks.onDenied(reason);
+            }
+        });
+        if (prepared == null) {
+            return false;
+        }
+        idempotencyKey = requireText(idempotencyKey, "idempotencyKey");
+        String scopedContext = capturePersistenceContext(durableContextJson);
+        return prepared.scheduler().prepareWithDurableContext(
+                prepared.targetRef(), prepared.store(), null, null,
+                prepared.expectedLiveOwnerId(), prepared.retainedOwnerId(),
+                prepared.retainedOwnerName(), CompanionLifecycleState.CAPTURED,
+                prepared.operation(), false, idempotencyKey, scopedContext,
+                new OwnerMutationScheduler.PreparationCallbacks() {
+                    @Override
+                    public void onPrepared(OwnerMutationScheduler.PreparedMutation mutation) {
+                        safeCallbacks.onPrepared(new PreparedCaptureMutation(prepared, mutation));
+                    }
+
+                    @Override
+                    public void onDenied(String reason) {
+                        safeCallbacks.onDenied(reason);
+                    }
+                }
+        );
+    }
+
     @Nullable
     private PreparedCapture prepare(Player player,
                                     ItemFeatureConfig config,
@@ -152,9 +191,7 @@ public final class SpawnerCaptureFinalizerService {
                              CaptureCallbacks callbacks) {
         OwnerMutationScheduler scheduler = prepared.scheduler();
         OwnerMutationScheduler.MutationCallbacks mutationCallbacks = callbacks(prepared, callbacks);
-        String idempotencyKey = "spawner-capture:" + prepared.npcUuid()
-                + ":clear-owner=" + prepared.config().isCaptureClearsOwner()
-                + ":tames-target=" + prepared.config().isCaptureTamesTarget();
+        String idempotencyKey = captureIdempotencyKey(prepared);
         String scopedContext = capturePersistenceContext(durableContextJson);
         return scheduler.scheduleWithDurableContext(
                 prepared.targetRef(), prepared.store(), null, null,
@@ -163,6 +200,22 @@ public final class SpawnerCaptureFinalizerService {
                 prepared.operation(), false, idempotencyKey, scopedContext,
                 mutationCallbacks
         );
+    }
+
+    @Nonnull
+    private static String captureIdempotencyKey(@Nonnull PreparedCapture prepared) {
+        return "spawner-capture:" + prepared.npcUuid()
+                + ":clear-owner=" + prepared.config().isCaptureClearsOwner()
+                + ":tames-target=" + prepared.config().isCaptureTamesTarget();
+    }
+
+    @Nonnull
+    private static String requireText(@Nonnull String value, @Nonnull String field) {
+        String normalized = Objects.requireNonNull(value, field).trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+        return normalized;
     }
 
     @Nonnull
@@ -289,6 +342,43 @@ public final class SpawnerCaptureFinalizerService {
         }
 
         default void onDurabilityDegraded(@Nonnull String reason) {
+        }
+    }
+
+    public interface CapturePreparationCallbacks {
+        void onPrepared(@Nonnull PreparedCaptureMutation mutation);
+
+        default void onDenied(@Nonnull String reason) {
+        }
+    }
+
+    public final class PreparedCaptureMutation {
+        private final PreparedCapture capture;
+        private final OwnerMutationScheduler.PreparedMutation mutation;
+
+        private PreparedCaptureMutation(PreparedCapture capture,
+                                        OwnerMutationScheduler.PreparedMutation mutation) {
+            this.capture = capture;
+            this.mutation = mutation;
+        }
+
+        @Nonnull
+        public UUID populationOperationId() {
+            return mutation.populationOperationId();
+        }
+
+        @Nonnull
+        public String profileId() {
+            return mutation.profileId();
+        }
+
+        public boolean apply(@Nullable CaptureCallbacks callbacks) {
+            CaptureCallbacks safeCallbacks = callbacks == null ? CaptureCallbacks.NOOP : callbacks;
+            return mutation.apply(SpawnerCaptureFinalizerService.this.callbacks(capture, safeCallbacks));
+        }
+
+        public boolean cancel(@Nonnull String reason) {
+            return mutation.cancel(reason);
         }
     }
 

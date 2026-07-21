@@ -42,12 +42,10 @@ public final class SpawnerCaptureChanceService {
         int minimumPower = policy == null ? 0 : policy.minimumPower();
         if (item.power() < minimumPower) return Evaluation.denied("capture-power-below-minimum");
 
-        List<CaptureRequirementSpec> configured = policy == null ? List.of() : policy.requirements();
-        for (CaptureRequirementSpec requirement : configured) {
-            CaptureRequirementDecision decision = requirements.evaluateCaptureRequirement(
-                    requirement, context, expectedRequirementGeneration
-            );
-            if (!decision.allowed()) return Evaluation.denied(decision.reason());
+        CaptureRequirementDecision requirementsDecision = revalidateRequirements(
+                policy, context, expectedRequirementGeneration);
+        if (!requirementsDecision.allowed()) {
+            return Evaluation.denied(requirementsDecision.reason());
         }
 
         double missingHealthFraction = clamp(1.0D - currentHealth / maximumHealth, 0.0D, 1.0D);
@@ -84,6 +82,25 @@ public final class SpawnerCaptureChanceService {
         return entropy < effectiveChance
                 ? Evaluation.success(effectiveChance, false, missingHealthFraction, entropy, "capture-probability-success")
                 : Evaluation.failure(effectiveChance, false, missingHealthFraction, entropy, "capture-probability-failure");
+    }
+
+    /** Re-runs only side-effect-free custom requirements without obtaining entropy. */
+    @Nonnull
+    public CaptureRequirementDecision revalidateRequirements(
+            @Nullable CapturePolicyConfigView policy,
+            @Nonnull CaptureRequirementContext context,
+            long expectedRequirementGeneration) {
+        Objects.requireNonNull(context, "context");
+        List<CaptureRequirementSpec> configured = policy == null ? List.of() : policy.requirements();
+        for (CaptureRequirementSpec requirement : configured) {
+            CaptureRequirementDecision decision = requirements.evaluateCaptureRequirement(
+                    requirement, context, expectedRequirementGeneration
+            );
+            if (!decision.allowed()) {
+                return decision;
+            }
+        }
+        return CaptureRequirementDecision.allow();
     }
 
     private static double clamp(double value, double minimum, double maximum) {

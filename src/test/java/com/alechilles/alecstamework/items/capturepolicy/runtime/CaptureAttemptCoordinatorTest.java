@@ -84,6 +84,33 @@ class CaptureAttemptCoordinatorTest {
     }
 
     @Test
+    void activeDurableFailureCooldownDeniesBeforePrepareOrEntropy() {
+        FakeJournal journal = new FakeJournal();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        CaptureAttemptCoordinator coordinator = coordinator(
+                journal,
+                ignored -> {
+                    entropyCalls.incrementAndGet();
+                    return 0.1D;
+                },
+                ignored -> { });
+        CaptureAttemptCoordinator.AttemptRequest request = request(
+                new ItemFeatureConfig.CaptureItemMechanics(
+                        CaptureChanceMode.PROBABILITY, 1, 0.5D, 0.0D,
+                        0.0D, 1.0D, 2_000, null, null));
+        journal.cooldown = new CaptureAttemptRepository.FailureCooldown(
+                request.actorUuid(), request.spawnerConfigId(), UUID.randomUUID().toString(),
+                NOW + 1_000L, 1L, NOW);
+
+        CaptureAttemptCoordinator.ResolutionResult result = coordinator.resolve(request).join();
+
+        assertEquals(CaptureAttemptCoordinator.ResultStatus.DENIED, result.status());
+        assertEquals("capture-failure-cooldown-active", result.reason());
+        assertEquals(0, entropyCalls.get());
+        assertTrue(journal.rows.isEmpty());
+    }
+
+    @Test
     void boundedRecoveryCancelsExpiredPreparationAndQuarantinesUnsafeApply() {
         FakeJournal journal = new FakeJournal();
         CaptureAttemptCoordinator coordinator = coordinator(journal, ignored -> 0.5D, ignored -> { });
@@ -177,6 +204,7 @@ class CaptureAttemptCoordinatorTest {
     private static final class FakeJournal implements CaptureAttemptJournal {
         final Map<String, CaptureAttemptRecord> rows = new LinkedHashMap<>();
         final java.util.Set<String> emitted = new java.util.HashSet<>();
+        CaptureAttemptRepository.FailureCooldown cooldown;
 
         @Override
         public CompletableFuture<CaptureAttemptRepository.PrepareResult> prepare(CaptureAttemptRecord attempt) {
@@ -218,6 +246,12 @@ class CaptureAttemptCoordinatorTest {
         @Override
         public CompletableFuture<Boolean> markEventEmitted(String attemptId, long emittedAtMs) {
             return CompletableFuture.completedFuture(emitted.add(attemptId));
+        }
+
+        @Override
+        public CompletableFuture<CaptureAttemptRepository.FailureCooldown> findFailureCooldown(
+                UUID actorUuid, String spawnerConfigId) {
+            return CompletableFuture.completedFuture(cooldown);
         }
 
         @Override public CaptureAttemptRecord find(String attemptId) { return rows.get(attemptId); }

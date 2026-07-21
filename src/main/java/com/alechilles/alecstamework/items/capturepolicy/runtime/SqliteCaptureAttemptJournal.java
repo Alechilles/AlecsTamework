@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,6 +47,12 @@ public final class SqliteCaptureAttemptJournal implements CaptureAttemptJournal 
     }
 
     @Override
+    public CompletableFuture<CaptureAttemptRepository.FailureCooldown> findFailureCooldown(
+            UUID actorUuid, String spawnerConfigId) {
+        return committedNullable(repository.findFailureCooldownAsync(actorUuid, spawnerConfigId));
+    }
+
+    @Override
     public CaptureAttemptRecord find(String attemptId) throws Exception {
         return repository.find(attemptId);
     }
@@ -67,6 +74,25 @@ public final class SqliteCaptureAttemptJournal implements CaptureAttemptJournal 
             }
             String reason = outcome == null || outcome.failureReason() == null
                     ? "capture_attempt_write_failed"
+                    : outcome.failureReason();
+            Throwable failure = outcome == null ? null : outcome.failure();
+            return CompletableFuture.failedFuture(
+                    failure == null ? new IllegalStateException(reason) : new IllegalStateException(reason, failure));
+        });
+    }
+
+    private static <T> CompletableFuture<T> committedNullable(
+            @Nullable PersistenceWriteQueue.WriteSubmission<T> submission) {
+        if (submission == null || !submission.accepted() || submission.completion() == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("capture_attempt_read_rejected"));
+        }
+        return submission.completion().thenCompose(outcome -> {
+            if (outcome != null && outcome.isCommitted()) {
+                return CompletableFuture.completedFuture(outcome.value());
+            }
+            String reason = outcome == null || outcome.failureReason() == null
+                    ? "capture_attempt_read_failed"
                     : outcome.failureReason();
             Throwable failure = outcome == null ? null : outcome.failure();
             return CompletableFuture.failedFuture(

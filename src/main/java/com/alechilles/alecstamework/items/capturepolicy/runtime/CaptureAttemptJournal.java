@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items.capturepolicy.runtime;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -28,6 +29,10 @@ public interface CaptureAttemptJournal {
 
     @Nonnull
     CompletableFuture<Boolean> markEventEmitted(@Nonnull String attemptId, long emittedAtMs);
+
+    @Nonnull
+    CompletableFuture<CaptureAttemptRepository.FailureCooldown> findFailureCooldown(
+            @Nonnull UUID actorUuid, @Nonnull String spawnerConfigId);
 
     @Nullable
     CaptureAttemptRecord find(@Nonnull String attemptId) throws Exception;

@@ -23,6 +23,13 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(handler.contains("captureAttemptCoordinator.beginApply(attemptId)"));
         assertTrue(handler.contains("captureAttemptCoordinator.commit(finalizedAttemptId)"));
         assertTrue(handler.contains("channelAttemptIds.put(playerUuid.getUuid(), UUID.randomUUID())"));
+        assertTrue(handler.contains("missing-channel-attempt-identity"));
+        assertTrue(!handler.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
+        int populationPrepare = handler.indexOf("captureFinalizerService.prepareCapture(");
+        int roll = handler.indexOf("captureAttemptCoordinator.resolve(request)");
+        assertTrue(populationPrepare >= 0 && roll > populationPrepare);
+        assertTrue(handler.contains("preparedMutation.populationOperationId()"));
+        assertTrue(handler.contains("captureAttemptCoordinator.revalidateBeforeApply("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_POLICY)"));
     }
 

@@ -80,6 +80,19 @@ public final class CaptureAttemptRepository {
         );
     }
 
+    /** Serializes the read behind prior attempt writes without blocking the world thread. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<FailureCooldown> findFailureCooldownAsync(
+            @Nonnull UUID actorUuid,
+            @Nonnull String spawnerConfigId) {
+        return writeQueue.submitTracked(
+                "capture_failure_cooldown_read",
+                connection -> findFailureCooldownInTransaction(
+                        connection, actorUuid, spawnerConfigId),
+                null
+        );
+    }
+
     @Nullable
     public CaptureAttemptRecord find(@Nonnull String attemptId) throws Exception {
         try (Connection connection = connectionManager.openConnection()) {
@@ -104,8 +117,17 @@ public final class CaptureAttemptRepository {
     @Nullable
     public FailureCooldown findFailureCooldown(@Nonnull UUID actorUuid,
                                                @Nonnull String spawnerConfigId) throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
+        try (Connection connection = connectionManager.openConnection()) {
+            return findFailureCooldownInTransaction(connection, actorUuid, spawnerConfigId);
+        }
+    }
+
+    @Nullable
+    private FailureCooldown findFailureCooldownInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull UUID actorUuid,
+            @Nonnull String spawnerConfigId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
                      SELECT actor_uuid, spawner_config_id, attempt_id, cooldown_until_ms,
                             generation, updated_at_ms
                      FROM capture_failure_cooldowns

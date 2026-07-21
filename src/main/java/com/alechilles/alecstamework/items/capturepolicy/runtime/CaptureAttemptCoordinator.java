@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
 import com.alechilles.alecstamework.api.CaptureChanceMode;
 import com.alechilles.alecstamework.api.CapturePolicyConfigView;
 import com.alechilles.alecstamework.api.CaptureRequirementContext;
+import com.alechilles.alecstamework.api.CaptureRequirementDecision;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
@@ -48,10 +49,25 @@ public final class CaptureAttemptCoordinator {
     @Nonnull
     public CompletableFuture<ResolutionResult> resolve(@Nonnull AttemptRequest request) {
         Objects.requireNonNull(request, "request");
+        return journal.findFailureCooldown(request.actorUuid(), request.spawnerConfigId())
+                .thenCompose(cooldown -> {
+                    long now = clock.millis();
+                    if (cooldown != null && cooldown.cooldownUntilMs() > now
+                            && !request.attemptId().toString().equals(cooldown.attemptId())) {
+                        return CompletableFuture.completedFuture(ResolutionResult.denied(
+                                request.attemptId(), "capture-failure-cooldown-active", false, null));
+                    }
+                    return resolveAfterCooldown(request, now);
+                }).exceptionally(failure -> ResolutionResult.denied(
+                        request.attemptId(), "capture-attempt-persistence-unavailable", true, null));
+    }
+
+    @Nonnull
+    private CompletableFuture<ResolutionResult> resolveAfterCooldown(
+            AttemptRequest request, long now) {
         CapturePolicyConfigView policy = request.itemMechanics().chanceMode() == CaptureChanceMode.GUARANTEED
                 ? null
                 : policies.snapshot().resolveForRole(request.roleId()).orElse(null);
-        long now = clock.millis();
         CaptureAttemptRecord prepared = preparedRecord(request, policy, now);
         return journal.prepare(prepared).thenCompose(result -> {
             if (result.status() == CaptureAttemptRepository.PrepareStatus.CONFLICT
@@ -64,8 +80,32 @@ public final class CaptureAttemptCoordinator {
                 return CompletableFuture.completedFuture(fromExisting(active));
             }
             return resolvePrepared(request, policy, active);
-        }).exceptionally(failure -> ResolutionResult.denied(
-                request.attemptId(), "capture-attempt-persistence-unavailable", true, null));
+        });
+    }
+
+    /** Revalidates pinned custom requirements immediately before the prepared mutation applies. */
+    @Nonnull
+    public CaptureRequirementDecision revalidateBeforeApply(
+            @Nonnull CaptureAttemptRecord attempt,
+            @Nonnull CaptureRequirementContext context,
+            long expectedRequirementGeneration) {
+        Objects.requireNonNull(attempt, "attempt");
+        Objects.requireNonNull(context, "context");
+        if (attempt.config().guaranteed()) {
+            return CaptureRequirementDecision.allow();
+        }
+        CapturePolicyConfigView policy = null;
+        String policyId = attempt.config().targetPolicyConfigId();
+        if (policyId != null) {
+            policy = policies.snapshot().getById(policyId).orElse(null);
+            Long expectedRevision = attempt.config().targetPolicyConfigRevision();
+            if (policy == null || expectedRevision == null
+                    || policy.configRevision() != expectedRevision) {
+                return CaptureRequirementDecision.deny("capture-policy-revision-changed");
+            }
+        }
+        return chanceService.revalidateRequirements(
+                policy, context, expectedRequirementGeneration);
     }
 
     @Nonnull
