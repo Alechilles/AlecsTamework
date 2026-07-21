@@ -147,26 +147,32 @@ public final class SpawnerCapturePolicyService {
         if (!Double.isFinite(maximumPercent) || maximumPercent < 0.0 || maximumPercent > 100.0) {
             return false;
         }
-        var statType = EntityStatMap.getComponentType();
-        if (statType == null || EntityStatType.getAssetMap() == null) {
-            return false;
-        }
-        EntityStatMap statMap = store.getComponent(targetRef, statType);
-        if (statMap == null) {
-            return false;
-        }
-        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
-        if (healthIndex < 0) {
-            return false;
-        }
-        EntityStatValue health = statMap.get(healthIndex);
-        if (health == null || !Double.isFinite(health.get()) || !Double.isFinite(health.getMax())
-                || health.getMax() <= 0.0) {
-            return false;
-        }
-        double currentPercent = Math.max(0.0, Math.min(100.0, (health.get() / health.getMax()) * 100.0));
+        CaptureHealth health = resolveCaptureHealth(targetRef, store);
+        if (health == null) return false;
+        double currentPercent = Math.max(0.0, Math.min(100.0,
+                (health.currentHealth() / health.maximumHealth()) * 100.0));
         return currentPercent <= maximumPercent;
     }
+
+    /** Samples finite terminal health evidence for the durable chance boundary. */
+    public CaptureHealth resolveCaptureHealth(Ref<EntityStore> targetRef, Store<EntityStore> store) {
+        var statType = EntityStatMap.getComponentType();
+        if (targetRef == null || store == null || statType == null || EntityStatType.getAssetMap() == null) {
+            return null;
+        }
+        EntityStatMap statMap = store.getComponent(targetRef, statType);
+        if (statMap == null) return null;
+        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
+        if (healthIndex < 0) return null;
+        EntityStatValue health = statMap.get(healthIndex);
+        if (health == null || !Double.isFinite(health.get()) || !Double.isFinite(health.getMax())
+                || health.getMax() <= 0.0 || health.get() < 0.0 || health.get() > health.getMax()) {
+            return null;
+        }
+        return new CaptureHealth(health.get(), health.getMax());
+    }
+
+    public record CaptureHealth(double currentHealth, double maximumHealth) { }
 
     private boolean hasRequiredEffect(Ref<EntityStore> targetRef,
                                       ItemFeatureConfig config,

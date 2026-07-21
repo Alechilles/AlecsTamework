@@ -25,6 +25,8 @@ import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
+import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
+import com.alechilles.alecstamework.api.CapturePolicyConfigView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
@@ -51,6 +53,7 @@ import com.alechilles.alecstamework.damage.TamedDamageDecision;
 import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicy;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -277,6 +280,10 @@ public final class TameworkApiImpl
             TameworkApiCapability.PERSISTENCE_RESILIENCE
     );
     private final Gson gson = new Gson();
+    @Nullable
+    private volatile ItemFeatureRegistry captureItemConfigs;
+    @Nullable
+    private volatile CapturePolicyRegistry capturePolicies;
 
     public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
                            @Nonnull TameworkEventBus eventBus,
@@ -336,7 +343,19 @@ public final class TameworkApiImpl
 
     @Override
     public EnumSet<TameworkApiCapability> getCapabilities() {
-        return capabilities.clone();
+        synchronized (capabilities) {
+            return capabilities.clone();
+        }
+    }
+
+    /** Activates the API surface only after capture journal recovery has succeeded. */
+    public void activateCapturePolicyRuntime(@Nonnull ItemFeatureRegistry itemConfigs,
+                                             @Nonnull CapturePolicyRegistry policyRegistry) {
+        captureItemConfigs = Objects.requireNonNull(itemConfigs, "itemConfigs");
+        capturePolicies = Objects.requireNonNull(policyRegistry, "policyRegistry");
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.CAPTURE_POLICY);
+        }
     }
 
     /** Drops reflected optional-claim contracts after a settings change. */
@@ -665,6 +684,45 @@ public final class TameworkApiImpl
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<SpawnerCaptureMechanicsView> getSpawnerCaptureMechanicsById(String id) {
+        ItemFeatureRegistry itemConfigs = captureItemConfigs;
+        if (itemConfigs == null) return Optional.empty();
+        return configById(id, TwSpawnerConfig.getAssetMap() != null
+                        ? TwSpawnerConfig.getAssetMap().getAssetMap() : Map.of())
+                .map(config -> config.toCaptureMechanicsView(itemConfigs.revision()));
+    }
+
+    @Override
+    public Optional<SpawnerCaptureMechanicsView> resolveSpawnerCaptureMechanicsForItemId(String itemId) {
+        ItemFeatureRegistry itemConfigs = captureItemConfigs;
+        if (itemConfigs == null || isBlank(itemId) || TwSpawnerConfig.getAssetMap() == null) {
+            return Optional.empty();
+        }
+        String normalizedItemId = normalizeItemId(itemId);
+        for (TwSpawnerConfig config : TwSpawnerConfig.getAssetMap().getAssetMap().values()) {
+            if (config != null && (matchesItemId(config.getEmptyItemId(), normalizedItemId)
+                    || matchesItemId(config.getFilledItemId(), normalizedItemId))) {
+                return Optional.of(config.toCaptureMechanicsView(itemConfigs.revision()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<CapturePolicyConfigView> getCapturePolicyById(String id) {
+        CapturePolicyRegistry policies = capturePolicies;
+        return policies == null || isBlank(id)
+                ? Optional.empty() : policies.snapshot().getById(id.trim());
+    }
+
+    @Override
+    public Optional<CapturePolicyConfigView> resolveCapturePolicyForRole(String roleId) {
+        CapturePolicyRegistry policies = capturePolicies;
+        return policies == null || isBlank(roleId)
+                ? Optional.empty() : policies.snapshot().resolveForRole(roleId.trim());
     }
 
     @Override

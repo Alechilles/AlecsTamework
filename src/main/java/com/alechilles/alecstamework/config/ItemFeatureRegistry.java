@@ -10,6 +10,7 @@ import java.util.Objects;
  */
 public final class ItemFeatureRegistry {
     private final Map<String, ItemFeatureConfig> configsByItemId = new HashMap<>();
+    private long revision;
 
     public void register(String itemId, ItemFeatureConfig config) {
         Objects.requireNonNull(itemId, "itemId");
@@ -54,6 +55,12 @@ public final class ItemFeatureRegistry {
 
     public void clear() {
         configsByItemId.clear();
+        revision++;
+    }
+
+    /** Monotonic item-config generation pinned by durable capture attempts. */
+    public long revision() {
+        return revision;
     }
 
     public void registerDefaults() {

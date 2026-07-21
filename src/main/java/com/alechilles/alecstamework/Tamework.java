@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
+import java.time.Clock;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -100,6 +101,10 @@ import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilde
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
+import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
+import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
+import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureEntropySource;
+import com.alechilles.alecstamework.items.capturepolicy.runtime.SqliteCaptureAttemptJournal;
 import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
@@ -295,6 +300,8 @@ public class Tamework extends JavaPlugin {
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
+    private CaptureAttemptCoordinator captureAttemptCoordinator;
+    private boolean captureAttemptRuntimeReady;
     private PopulationGroupRegistry populationGroupRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
@@ -860,6 +867,21 @@ public class Tamework extends JavaPlugin {
                 HeldItemAttachmentInteractionService.EXCHANGE_ATTACHMENT_EFFECT_ID,
                 heldItemAttachmentInteractions::exchangeAttachment
         );
+        captureAttemptCoordinator = new CaptureAttemptCoordinator(
+                new SqliteCaptureAttemptJournal(persistenceRuntime.getCaptureAttemptRepository()),
+                capturePolicyRegistry,
+                new SpawnerCaptureChanceService(interactionExtensionRegistry),
+                CaptureEntropySource.sha256(),
+                Clock.systemUTC(),
+                apiEventBus::emitCaptureAttemptResolved
+        );
+        CaptureAttemptCoordinator.RecoveryReport captureRecovery =
+                captureAttemptCoordinator.recover(128).join();
+        captureAttemptRuntimeReady = captureRecovery.ready();
+        if (!captureAttemptRuntimeReady) {
+            getLogger().at(Level.WARNING).log(
+                    "Capture-attempt recovery did not become ready; CAPTURE_POLICY remains unavailable.");
+        }
         traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = TameworkPopulationRuntimeLifecycle
@@ -904,6 +926,9 @@ public class Tamework extends JavaPlugin {
                 damagePolicy,
                 ownerPopulationRuntime.populationPolicyAuthority()
         );
+        if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl implementation) {
+            implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
+        }
         ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
                 new ClaimProviderLifecycleInvalidator(provider -> {
                     OwnerPopulationRuntime runtime = ownerPopulationRuntime;
@@ -1056,7 +1081,9 @@ public class Tamework extends JavaPlugin {
                 new SpawnerManagedCoopCaptureDetachService(
                         persistenceRuntime.getManagedCoopServices().residentIndex(),
                         persistenceRuntime.getManagedCoopServices().compositeIndexRefreshService()
-                )
+                ),
+                captureAttemptRuntimeReady ? captureAttemptCoordinator : null,
+                interactionExtensionRegistry::captureRequirementGeneration
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1588,6 +1615,10 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    public boolean isCaptureAttemptRuntimeReady() {
+        return captureAttemptRuntimeReady;
     }
 
     @Nullable

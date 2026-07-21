@@ -34,7 +34,7 @@ public final class SpawnerEffectService {
         playEffects(world, targetRef, config.getCaptureParticleSystem(), config.getCaptureSoundEvent());
     }
 
-    private void playEffects(World world, Ref<EntityStore> targetRef, String particleSystem, String soundEvent) {
+    public void playEffects(World world, Ref<EntityStore> targetRef, String particleSystem, String soundEvent) {
         if (world == null || targetRef == null || !targetRef.isValid()) {
             return;
         }

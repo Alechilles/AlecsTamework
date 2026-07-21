@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CaptureRequirementContext;
+import com.alechilles.alecstamework.api.CaptureRequirementPhase;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
+import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -25,6 +28,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 
@@ -52,6 +57,10 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCapturePolicyService capturePolicyService;
     private final SpawnerPreparedSpawnService preparedSpawnService;
     private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
+    @Nullable
+    private final CaptureAttemptCoordinator captureAttemptCoordinator;
+    private final LongSupplier captureRequirementGeneration;
+    private final ConcurrentHashMap<UUID, UUID> channelAttemptIds = new ConcurrentHashMap<>();
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -88,6 +97,20 @@ public final class SpawnerFeatureHandler {
                                  @Nullable CommandLinkedNpcLostService lostService,
                                  @Nullable TranslationRegistry translationRegistry,
                                  @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService) {
+        this(logger, registry, captureService, coopService, relocationService, lostService,
+                translationRegistry, managedCoopDetachService, null, () -> 0L);
+    }
+
+    public SpawnerFeatureHandler(HytaleLogger logger,
+                                 ItemFeatureRegistry registry,
+                                 CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandLinkedNpcCoopService coopService,
+                                 @Nullable CommandNpcRelocationService relocationService,
+                                 @Nullable CommandLinkedNpcLostService lostService,
+                                 @Nullable TranslationRegistry translationRegistry,
+                                 @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService,
+                                 @Nullable CaptureAttemptCoordinator captureAttemptCoordinator,
+                                 LongSupplier captureRequirementGeneration) {
         this.logger = logger;
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
@@ -140,6 +163,8 @@ public final class SpawnerFeatureHandler {
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.managedCoopDetachService = managedCoopDetachService;
+        this.captureAttemptCoordinator = captureAttemptCoordinator;
+        this.captureRequirementGeneration = captureRequirementGeneration == null ? () -> 0L : captureRequirementGeneration;
     }
 
     /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
@@ -421,6 +446,7 @@ public final class SpawnerFeatureHandler {
                     store
             );
         }
+        channelAttemptIds.put(playerUuid.getUuid(), UUID.randomUUID());
         return true;
     }
 
@@ -434,6 +460,9 @@ public final class SpawnerFeatureHandler {
         UUIDComponent playerUuid = player.getReference() == null
                 ? null
                 : store.getComponent(player.getReference(), UUIDComponent.getComponentType());
+        if (playerUuid != null && playerUuid.getUuid() != null) {
+            channelAttemptIds.remove(playerUuid.getUuid());
+        }
         Ref<EntityStore> lockedTarget = playerUuid == null || playerUuid.getUuid() == null
                 ? null
                 : CaptureChannelVfxSystem.stop(playerUuid.getUuid(), world);
@@ -455,8 +484,11 @@ public final class SpawnerFeatureHandler {
                                           Ref<EntityStore> targetRef,
                                           ItemStack itemStack,
                                           @Nullable String captureBurstParticleSystem) {
+        UUID attemptId = player == null ? null : channelAttemptIds.remove(player.getUuid());
         endCaptureChannel(player, targetRef, itemStack);
-        return captureFromItemInteraction(player, itemStack, targetRef, captureBurstParticleSystem);
+        return captureFromItemInteraction(
+                player, itemStack, targetRef, captureBurstParticleSystem,
+                attemptId == null ? UUID.randomUUID() : attemptId);
     }
 
     public boolean canSpawnInteraction(ItemStack itemStack) {
@@ -490,6 +522,15 @@ public final class SpawnerFeatureHandler {
                                                ItemStack itemStack,
                                                Ref<EntityStore> targetRef,
                                                @Nullable String captureBurstParticleSystem) {
+        return captureFromItemInteraction(
+                player, itemStack, targetRef, captureBurstParticleSystem, UUID.randomUUID());
+    }
+
+    private boolean captureFromItemInteraction(Player player,
+                                               ItemStack itemStack,
+                                               Ref<EntityStore> targetRef,
+                                               @Nullable String captureBurstParticleSystem,
+                                               UUID attemptId) {
         if (player == null || itemStack == null || itemStack.isEmpty() || targetRef == null) {
             return false;
         }
@@ -503,7 +544,8 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
-        return captureFromNpcAction(player, targetRef, itemStack, config, captureBurstParticleSystem);
+        return captureFromNpcAction(
+                player, targetRef, itemStack, config, captureBurstParticleSystem, attemptId, false);
     }
 
     // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
@@ -560,7 +602,7 @@ public final class SpawnerFeatureHandler {
 
     // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
-        return captureFromNpcAction(player, targetRef, itemStack, config, null);
+        return captureFromNpcAction(player, targetRef, itemStack, config, null, UUID.randomUUID(), false);
     }
 
     private boolean captureFromNpcAction(Player player,
@@ -568,6 +610,17 @@ public final class SpawnerFeatureHandler {
                                          ItemStack itemStack,
                                          ItemFeatureConfig config,
                                          @Nullable String captureBurstParticleSystem) {
+        return captureFromNpcAction(
+                player, targetRef, itemStack, config, captureBurstParticleSystem, UUID.randomUUID(), false);
+    }
+
+    private boolean captureFromNpcAction(Player player,
+                                         Ref<EntityStore> targetRef,
+                                         ItemStack itemStack,
+                                         ItemFeatureConfig config,
+                                         @Nullable String captureBurstParticleSystem,
+                                         UUID attemptId,
+                                         boolean outcomeResolved) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
@@ -599,6 +652,10 @@ public final class SpawnerFeatureHandler {
                             + " requireTamed=" + config.isCaptureRequireTamed()
             );
             return false;
+        }
+        if (!outcomeResolved && captureAttemptCoordinator != null) {
+            return scheduleDurableCaptureAttempt(
+                    player, targetRef, itemStack, config, captureBurstParticleSystem, attemptId);
         }
         SpawnerCaptureMetadataService.CaptureInfo captureInfo = captureMetadataService.buildCaptureInfo(
                 player,
@@ -722,6 +779,7 @@ public final class SpawnerFeatureHandler {
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
         ItemStack capturedItem = updated;
         ItemFeatureConfig finalizedConfig = config;
+        UUID finalizedAttemptId = outcomeResolved ? attemptId : null;
         UUID finalizedOwnerToStore = ownerToStore;
         Integer sourceHotbarSlot = resolveSourceHotbarSlot(player, null);
         SpawnerSourceItemTransaction sourceItem = new SpawnerSourceItemTransaction(
@@ -754,6 +812,9 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onApplyCompensated(String profileId, String reason) {
                         sourceItem.compensate();
+                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
+                            captureAttemptCoordinator.quarantineApply(finalizedAttemptId, reason);
+                        }
                     }
 
                     @Override
@@ -793,6 +854,9 @@ public final class SpawnerFeatureHandler {
 
                     @Override
                     public void onDenied(String reason) {
+                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
+                            captureAttemptCoordinator.quarantineApply(finalizedAttemptId, reason);
+                        }
                         logSpawnerFlowDebug(
                                 "capture denied reason=" + reason
                                         + " player=" + player.getUuid()
@@ -803,6 +867,9 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onPopulationCommitted(
                             com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
+                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
+                            captureAttemptCoordinator.commit(finalizedAttemptId);
+                        }
                         if (detachPlan.requiresDetach()
                                 && (managedCoopDetachService == null
                                 || !managedCoopDetachService.refreshAfterCommit())) {
@@ -820,6 +887,101 @@ public final class SpawnerFeatureHandler {
                     }
                 }
         );
+    }
+
+    private boolean scheduleDurableCaptureAttempt(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemStack itemStack,
+            ItemFeatureConfig config,
+            @Nullable String captureBurstParticleSystem,
+            UUID attemptId) {
+        World world = player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        NPCEntity npc = store == null ? null : store.getComponent(targetRef, NPCEntity.getComponentType());
+        UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
+        String roleId = npc == null ? null : rolePolicyService.resolveRoleIdFromNpc(npc);
+        SpawnerCapturePolicyService.CaptureHealth health =
+                capturePolicyService.resolveCaptureHealth(targetRef, store);
+        if (world == null || store == null || targetUuid == null || roleId == null || roleId.isBlank()
+                || health == null || attemptId == null) {
+            return false;
+        }
+        double healthFraction = health.currentHealth() / health.maximumHealth();
+        long requirementGeneration = Math.max(0L, captureRequirementGeneration.getAsLong());
+        long expiresAt;
+        try {
+            expiresAt = Math.addExact(System.currentTimeMillis(), 120_000L);
+        } catch (ArithmeticException overflow) {
+            expiresAt = Long.MAX_VALUE;
+        }
+        CaptureRequirementContext requirementContext = new CaptureRequirementContext(
+                attemptId,
+                CaptureRequirementPhase.FINAL_REVALIDATION,
+                player.getUuid(),
+                targetUuid,
+                null,
+                roleId,
+                world.getName(),
+                itemStack.getItemId(),
+                healthFraction,
+                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
+        );
+        CaptureAttemptCoordinator.AttemptRequest request =
+                new CaptureAttemptCoordinator.AttemptRequest(
+                        attemptId,
+                        UUID.randomUUID(),
+                        null,
+                        null,
+                        player.getUuid(),
+                        targetUuid,
+                        null,
+                        CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
+                        itemStack.getItemId(),
+                        roleId,
+                        "{\"world\":\"" + jsonEscape(world.getName()) + "\"}",
+                        itemStack.getItemId(),
+                        registry.revision(),
+                        config.getCaptureMechanics(),
+                        health.currentHealth(),
+                        health.maximumHealth(),
+                        requirementContext,
+                        requirementGeneration,
+                        null,
+                        expiresAt
+                );
+        captureAttemptCoordinator.resolve(request).thenCompose(result -> {
+            if (result.status() == CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL) {
+                world.execute(() -> effectService.playEffects(
+                        world, targetRef,
+                        config.getCaptureMechanics().failureParticleSystem(),
+                        config.getCaptureMechanics().failureSoundEvent()));
+                return java.util.concurrent.CompletableFuture.completedFuture(false);
+            }
+            if (result.status() != CaptureAttemptCoordinator.ResultStatus.SUCCESS) {
+                logSpawnerFlowDebug("capture denied reason=" + result.reason()
+                        + " player=" + player.getUuid() + " targetUuid=" + targetUuid);
+                return java.util.concurrent.CompletableFuture.completedFuture(false);
+            }
+            return captureAttemptCoordinator.beginApply(attemptId);
+        }).whenComplete((applyReady, failure) -> {
+            if (failure != null || !Boolean.TRUE.equals(applyReady)) return;
+            world.execute(() -> {
+                boolean scheduled = captureFromNpcAction(
+                        player, targetRef, itemStack, config,
+                        captureBurstParticleSystem, attemptId, true);
+                if (!scheduled) {
+                    captureAttemptCoordinator.quarantineApply(
+                            attemptId, "capture-terminal-revalidation-failed");
+                }
+            });
+        });
+        return true;
+    }
+
+    private static String jsonEscape(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private static void spawnCaptureSuccessParticle(
