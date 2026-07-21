@@ -68,7 +68,10 @@ public record CompanionProvisioningOperationRecord(
                         || next == QUARANTINED;
                 case QUARANTINED -> next == DORMANT_APPLYING || next == ACTIVE_APPLYING
                         || next == PARTIAL_DORMANT || next == DENIED;
-                case COMMITTED, PARTIAL_DORMANT, DENIED, CANCELED -> false;
+                // PARTIAL_DORMANT is a durable terminal result for the failed attempt, but an
+                // explicit retry may reopen only the optional projection for the same profile.
+                case PARTIAL_DORMANT -> next == ACTIVE_PREPARED;
+                case COMMITTED, DENIED, CANCELED -> false;
             };
         }
     }

@@ -52,6 +52,23 @@ class CompanionProvisioningRepositoryTest {
                     repository.findByCallerKey("hydragon", "soul-bond-1").canonicalProfileId());
             assertEquals("operation-a",
                     repository.findByCanonicalProfile("profile-canonical").operationId());
+
+            CompanionProvisioningRepository.MutationResult resumed = advance(
+                    repository, CompanionProvisioningOperationRecord.State.PARTIAL_DORMANT,
+                    CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED,
+                    "profile-canonical", null, "population-active", null, 7L);
+            assertEquals(CompanionProvisioningRepository.Status.ADVANCED, resumed.status());
+            assertEquals("profile-canonical", resumed.operation().canonicalProfileId());
+            assertEquals("population-dormant", resumed.operation().dormantPopulationOperationId());
+            assertEquals("population-active", resumed.operation().activePopulationOperationId());
+            assertEquals(0L, resumed.operation().completedAtMs());
+
+            CompanionProvisioningRepository.MutationResult replay = advance(
+                    repository, CompanionProvisioningOperationRecord.State.PARTIAL_DORMANT,
+                    CompanionProvisioningOperationRecord.State.ACTIVE_PREPARED,
+                    "profile-canonical", null, "population-active", null, 8L);
+            assertEquals(CompanionProvisioningRepository.Status.IDEMPOTENT, replay.status());
+            assertEquals("profile-canonical", replay.operation().canonicalProfileId());
         }
     }
 
