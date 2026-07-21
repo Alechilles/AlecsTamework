@@ -171,7 +171,7 @@ public final class HytaleBondedVesselExactInventoryPort implements ExactInventor
             return cas(ExactCasStatus.SOURCE_CHANGED, "exact-cas-source-changed",
                     evidenceJson(observed));
         }
-        ItemStack target = replacementStack(replacement);
+        ItemStack target = replacementStack(current, replacement);
         MetadataRead targetMetadataRead = readMetadata(target);
         if (targetMetadataRead.status() != MetadataStatus.EXACT
                 || !fingerprints.fingerprint(targetMetadataRead.metadata()).equals(
@@ -263,8 +263,12 @@ public final class HytaleBondedVesselExactInventoryPort implements ExactInventor
         }
     }
 
-    private ItemStack replacementStack(ReplacementProjection replacement) {
-        return new ItemStack(replacement.itemId(), 1)
+    private ItemStack replacementStack(ItemStack source, ReplacementProjection replacement) {
+        ItemStack target = replacement.itemId().equals(source.getItemId())
+                ? source
+                : new ItemStack(replacement.itemId(), 1, source.getDurability(),
+                        source.getMaxDurability(), source.getMetadata());
+        target = target
                 .withMetadata(TameworkMetadataKeys.VESSEL_BINDING_ID,
                         Codec.STRING, replacement.bindingId().toString().toLowerCase())
                 .withMetadata(TameworkMetadataKeys.VESSEL_PROFILE_ID,
@@ -275,6 +279,7 @@ public final class HytaleBondedVesselExactInventoryPort implements ExactInventor
                         Codec.STRING, replacement.configId())
                 .withMetadata(TameworkMetadataKeys.VESSEL_STATE,
                         Codec.STRING, replacement.state().name());
+        return target;
     }
 
     private boolean singleVessel(ItemStack stack) {
