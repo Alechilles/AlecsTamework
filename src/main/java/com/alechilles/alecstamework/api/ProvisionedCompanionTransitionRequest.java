@@ -14,13 +14,25 @@ public record ProvisionedCompanionTransitionRequest(@Nonnull String callerNamesp
                                                     @Nonnull ProvisionedCompanionTransition transition,
                                                     @Nonnull String ownershipWorldName,
                                                     @Nullable PopulationAdmissionLocation destination) {
+    public static final int MAX_CALLER_NAMESPACE_LENGTH = 128;
+    public static final int MAX_IDEMPOTENCY_KEY_LENGTH = 256;
+    public static final int MAX_PROFILE_ID_LENGTH = 256;
+    public static final int MAX_WORLD_NAME_LENGTH = 256;
+
     public ProvisionedCompanionTransitionRequest {
-        callerNamespace = requireText(callerNamespace, "callerNamespace");
-        idempotencyKey = requireText(idempotencyKey, "idempotencyKey");
+        callerNamespace = requireText(callerNamespace, "callerNamespace",
+                MAX_CALLER_NAMESPACE_LENGTH);
+        idempotencyKey = requireText(idempotencyKey, "idempotencyKey",
+                MAX_IDEMPOTENCY_KEY_LENGTH);
         actorUuid = Objects.requireNonNull(actorUuid, "actorUuid");
-        profileId = requireText(profileId, "profileId");
+        profileId = requireText(profileId, "profileId", MAX_PROFILE_ID_LENGTH);
         transition = Objects.requireNonNull(transition, "transition");
-        ownershipWorldName = requireText(ownershipWorldName, "ownershipWorldName");
+        ownershipWorldName = requireText(ownershipWorldName, "ownershipWorldName",
+                MAX_WORLD_NAME_LENGTH);
+        if (destination != null && destination.worldName().length() > MAX_WORLD_NAME_LENGTH) {
+            throw new IllegalArgumentException("destination.worldName exceeds "
+                    + MAX_WORLD_NAME_LENGTH + " characters.");
+        }
         if (expectedProfileRevision < 0L) {
             throw new IllegalArgumentException("Expected profile revision cannot be negative.");
         }
@@ -33,9 +45,12 @@ public record ProvisionedCompanionTransitionRequest(@Nonnull String callerNamesp
         }
     }
 
-    private static String requireText(String value, String field) {
+    private static String requireText(String value, String field, int maxLength) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required.");
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(field + " exceeds " + maxLength + " characters.");
+        }
         return normalized;
     }
 }
