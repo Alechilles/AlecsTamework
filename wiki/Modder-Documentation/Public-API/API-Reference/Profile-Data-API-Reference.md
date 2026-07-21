@@ -14,9 +14,10 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 Capabilities: `PROFILE_DATA` for legacy reads/writes and
 `PROFILE_DATA_TRANSACTIONS` for revision-fenced, restart-visible mutations.
 
-Tamework 3.0.0 advertises `PROFILE_DATA`, but does not currently advertise
-`PROFILE_DATA_TRANSACTIONS`. The transactional methods below are a fail-closed
-binary-compatible contract until their durable repository is wired.
+Tamework 3.0.0 advertises `PROFILE_DATA_TRANSACTIONS` after the schema-v8
+profile-data repository and idempotent operation journal initialize. Older API
+implementations retain fail-closed binary-compatible defaults, so consumers
+must still require the capability before using the transactional methods.
 
 ## Entry Point
 `TameworkApi.profileData() -> ProfileDataApi`

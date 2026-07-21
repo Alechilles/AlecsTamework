@@ -23,12 +23,26 @@ Do not infer availability from `getApiVersion() == "0.9.0"`. A runtime
 advertises one of these capabilities only when its authoritative persistence,
 recovery, and mutation path is installed.
 
-Current Tamework 3.0.0 runtime status: `CAPTURE_POLICY` is added only after
-`CaptureAttemptCoordinator.recover(128)` reports ready. Its API config views
-and the gameplay capture path then share the recovered journal authority. The
-runtime does not currently advertise `BONDED_VESSELS`, `POPULATION_GROUPS`,
-`COMPANION_PROVISIONING`, or `PROFILE_DATA_TRANSACTIONS`; those surfaces remain
-fail-closed integration contracts until their concrete authorities are wired.
+Tamework 3.0.0 installs production implementations for all five API 0.9
+surfaces, but advertises each capability independently:
+
+- `PROFILE_DATA_TRANSACTIONS` requires the migrated profile-data repository and
+  its idempotent operation journal.
+- `CAPTURE_POLICY` requires bounded capture-attempt recovery and the same
+  recovered coordinator used by gameplay capture.
+- `POPULATION_GROUPS` requires successful group-operation recovery,
+  reconciliation, and installation on the canonical owner-population mutation
+  paths.
+- `COMPANION_PROVISIONING` requires recovered population/provisioning journals
+  plus both dormant-profile and requested active-projection authority.
+- `BONDED_VESSELS` requires recovered vessel operations plus exact inventory,
+  projection-evidence, canonical-profile, unified-population, and world
+  mutation authority.
+
+If any prerequisite is unavailable or degraded, that capability is omitted and
+its public facade continues to fail closed. `/tw diagnose` reports the result
+for the packaged server; the presence of schema tables or Java classes is not
+readiness evidence.
 
 ## Configuration families
 
@@ -39,9 +53,9 @@ fail-closed integration contracts until their concrete authorities are wired.
 - Probabilistic item mechanics are opt-in fields inside
   `TwSpawnerConfig.Capture`; legacy/default `ChanceMode: Guaranteed` bypasses
   role policy and preserves deterministic capture.
-- Bonded-vessel config views and APIs are part of the 0.9 contract, but an
-  integration must not author or invoke bonded behavior unless
-  `BONDED_VESSELS` is advertised.
+- Bonded-vessel config views and APIs are part of the 0.9 contract. An
+  integration may author bonded configuration, but it must not invoke bonded
+  mutations unless `BONDED_VESSELS` is advertised.
 
 Both new standalone families use normal asset loaded/removed events. A failed
 rebuild retains the last valid compiled index. Parent fallback follows the
@@ -116,12 +130,24 @@ Source-level verification:
 ./mvnw package
 ```
 
-Live operator verification uses the existing `/tw api test` suites and
-`/tw debugdb` commands. `/tw diagnose` prints the advertised capability set,
-capture recovery readiness, the three other integration-authority states, and
-persistence health. A capability must not be described as live merely
+Live operator verification uses `/tw api test run hydragon-integrations` and
+the existing `/tw debugdb` commands. `/tw diagnose` prints the advertised
+capability set, each HyDragon integration-authority state, and persistence
+health. A capability must not be described as live merely
 because its DTOs, schema tables, or unit tests exist; the packaged runtime must
 advertise it and its feature-specific live checks must pass.
+
+The HyDragon suite needs no prepared live fixture. It uses isolated,
+deterministic fixtures to prove guaranteed capture without entropy,
+duplicate-safe failed capture, stale bonded-generation rejection, group-cap
+boundary denial, dormant and active provisioning, and restart-style lookup of
+one failed projection retained as `PARTIAL_DORMANT`.
+
+For focused read-only inspection, use `/tw diagnose population`,
+`/tw diagnose vessel <binding-or-profile>`, or
+`/tw diagnose provisioning <caller-namespace> <idempotency-key>`. These views
+are bounded and sanitized; they do not retry, repair, or expose raw item JSON or
+owner UUIDs.
 
 ## Public documentation
 

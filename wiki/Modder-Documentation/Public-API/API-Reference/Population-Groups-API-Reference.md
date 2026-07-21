@@ -12,9 +12,12 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 > Group-aware reads and admissions are authoritative only when
 > `POPULATION_GROUPS` is advertised.
 
-The current Tamework 3.0.0 runtime does not advertise this capability.
-Definitions, DTOs, and schema-v8 tables alone do not authorize group-aware
-admission; the ordinary population authority remains the live path.
+Tamework 3.0.0 installs group admission on the canonical owner-population
+coordinator after group-operation recovery and reconciliation succeed. It
+advertises this capability only while that installation remains authoritative;
+definitions, DTOs, or schema-v8 tables alone never authorize group-aware
+admission. A role-changing integration must use an admitted canonical mutation
+path; API 0.9 does not expose an independent role-transformation authority.
 
 Capability: `POPULATION_GROUPS`
 

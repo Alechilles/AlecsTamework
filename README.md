@@ -47,13 +47,14 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Managed coop integrity**: configured coops use one Tamework-owned resident lifecycle with stable profile identity, durable capture/release operations, and explicit legacy-resident reconciliation; unmanaged coops remain vanilla.
 - **Capacity-safe breeding**: manual and passive pairing share idempotent birth jobs, pending-litter population reservations, execution-time cap checks, and parent-capture cancellation while preserving intentional zero-to-four litters.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
-- **3.0.0 integration foundations**: experimental API 0.9 adds capability-gated
-  contracts and schema-v8 durability for generic probabilistic capture, bonded
-  companion vessels, population groups, and idempotent companion provisioning.
-  Each authority remains fail-closed unless its capability is advertised by the
-  packaged runtime. In the current 3.0.0 runtime, only `CAPTURE_POLICY` becomes
-  available after its bounded recovery succeeds; the other new authorities
-  remain contract-only and unavailable.
+- **3.0.0 HyDragon integration runtime**: experimental API 0.9 adds
+  capability-gated, schema-v8 authorities for generic probabilistic capture,
+  revision-fenced profile data, bonded companion vessels, population groups,
+  and idempotent companion provisioning. Each authority is installed through
+  its production runtime and is advertised only after its own recovery,
+  persistence, and mutation dependencies report ready. Missing capabilities
+  remain fail-closed; use `/tw diagnose` against the packaged server instead of
+  assuming readiness from the mod or API version.
 
 ## What Integration Looks Like
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:

@@ -75,11 +75,15 @@ API 0.9 also declares independently gated capabilities:
 - `COMPANION_PROVISIONING`
 - `PROFILE_DATA_TRANSACTIONS`
 
-In the current Tamework 3.0.0 runtime, `CAPTURE_POLICY` is added only after its
-bounded capture-journal recovery reports ready. The other four API 0.9
-capabilities are not advertised yet and their default accessors/results remain
-fail closed. Use `/tw diagnose` to inspect the exact packaged runtime rather
-than copying a capability list from documentation.
+Tamework 3.0.0 includes production implementations for all five API 0.9
+capabilities, but adds each capability only after its own authoritative runtime
+reports ready. This includes repository and recovery checks for transactional
+profile data and capture; group reconciliation plus canonical mutation-path
+installation for population groups; recovered profile/population/projection
+authority for provisioning; and all exact evidence and mutation ports for
+bonded vessels. A degraded prerequisite omits only the affected capability and
+leaves its public facade fail closed. Use `/tw diagnose` to inspect the exact
+packaged runtime rather than copying a capability list from documentation.
 
 The Java enum, DTO, or default accessor may exist even when a capability is not
 advertised. This is intentional binary compatibility, not partial success.

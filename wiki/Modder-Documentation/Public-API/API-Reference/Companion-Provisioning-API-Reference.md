@@ -12,10 +12,11 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 > Call this API only when `COMPANION_PROVISIONING` is advertised. Otherwise
 > `TameworkApi.companionProvisioning()` returns the unavailable facade.
 
-The current Tamework 3.0.0 runtime does not advertise this capability. Its
-request/result types and schema-v8 operation journal remain a fail-closed
-contract until the concrete profile, projection, admission, and recovery
-authority is wired.
+Tamework 3.0.0 includes the production provisioning coordinator and advertises
+this capability only after population and provisioning recovery, dormant
+profile creation, and the requested active-projection path are authoritative.
+If any required authority is unavailable, the capability remains absent and
+this facade fails closed.
 
 Capability: `COMPANION_PROVISIONING`
 

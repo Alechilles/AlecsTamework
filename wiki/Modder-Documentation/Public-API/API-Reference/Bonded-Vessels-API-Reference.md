@@ -12,9 +12,12 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 > Call this API only when `BONDED_VESSELS` is advertised. Otherwise
 > `TameworkApi.bondedVessels()` returns a fail-closed unavailable facade.
 
-The current Tamework 3.0.0 runtime does not advertise this capability. The
-types and schema-v8 journal are an integration contract, not a live vessel
-authority, until a later runtime wires the full gameplay and recovery path.
+Tamework 3.0.0 includes the production vessel runtime, but advertises this
+capability only after pending-operation recovery and every exact evidence and
+mutation authority reports ready. Those authorities cover held inventory,
+projection evidence, canonical profile state, unified population admission,
+and world projection changes. If any dependency is missing or degraded, the
+capability remains absent and this facade fails closed.
 
 Capability: `BONDED_VESSELS`
 

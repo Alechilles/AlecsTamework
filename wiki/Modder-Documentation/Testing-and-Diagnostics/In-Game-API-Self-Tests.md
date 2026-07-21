@@ -22,7 +22,7 @@ Use the commands in this order:
 Available commands:
 - `/tw api test prepare`
 - `/tw api test status`
-- `/tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|diagnostics|all] [verbose]`
+- `/tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|diagnostics|hydragon-integrations|all] [verbose]`
 - `/tw api test reset`
 
 These commands are intended for trusted operators and use the `tamework.api.test` permission node with the usual OP/Admin/Operator fallback groups.
@@ -42,12 +42,14 @@ Each fixture is marked with an internal self-test component, linked to the gener
 ## What `run` validates
 `run core` checks API availability, versioning, capabilities including `COMPANION_XP_EVENTS`, global config reads, and persistence diagnostics.
 
-For API 0.9 builds, `run core` proves only the capabilities it explicitly
-requires in the packaged runner. It does not exercise the probabilistic
-capture journal or make an unadvertised `BONDED_VESSELS`, `POPULATION_GROUPS`,
-`COMPANION_PROVISIONING`, or `PROFILE_DATA_TRANSACTIONS` authority available.
-Check the command usage and verbose report for the suites present in that
-exact build.
+For API 0.9 builds, `run core` proves only the baseline capabilities it
+explicitly requires. `run hydragon-integrations` separately requires capture
+policy, bonded-vessel readiness, population-group reconciliation,
+provisioning, and transactional profile-data capability evidence from the
+packaged runtime. It also runs isolated deterministic behavioral fixtures and
+does not require `prepare`, a live profile, player inventory, world fixture, or
+database fixture. The suite never makes an unavailable authority available;
+an absent or degraded capability is a failed assertion.
 
 Use `/tw diagnose` alongside the self-tests. It reports the API version and
 advertised capabilities, capture-policy recovery readiness, the current
@@ -102,6 +104,21 @@ bonded-vessel/group/provisioning availability, and persistence health.
 - persistence diagnostics availability
 - health snapshot presence
 - queue-metric readability
+
+`run hydragon-integrations` checks:
+- capture-policy capability and bundled capture-mechanics resolution
+- bonded-vessel capability plus `READY` vessel recovery state
+- population-group capability plus `READY` reconciliation state
+- companion-provisioning capability
+- transactional profile-data capability
+- guaranteed capture commits without invoking entropy
+- failed probabilistic capture leaves its source/target immutable, emits once,
+  applies nothing, and reuses the original result for a duplicate callback
+- current bonded generation validates while a stale generation is rejected
+- a population-group admission at the configured boundary rejects overflow
+- dormant and active provisioning each commit exactly one profile
+- failed active projection retains one durable `PARTIAL_DORMANT` profile that a
+  fresh coordinator can find through the same operation origin
 
 Add `verbose` to print each individual assertion instead of only the suite summaries.
 

@@ -63,6 +63,7 @@ Tamework adds these additive enum values:
 - `BONDED_VESSELS`
 - `POPULATION_GROUPS`
 - `COMPANION_PROVISIONING`
+- `PROFILE_DATA_TRANSACTIONS`
 
 Feature gates are independent; existing capabilities are not one global
 all-or-nothing list:

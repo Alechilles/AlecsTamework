@@ -43,12 +43,15 @@ experimental; version equality is not an authority check.
 If a new API 0.9 type is present but its capability is absent, the feature is
 unavailable by design. Default accessors return empty or fail-closed facades.
 
-For the current Tamework 3.0.0 runtime, only `CAPTURE_POLICY` can join the
-baseline capability set, and only after bounded capture-journal recovery
-succeeds. Bonded vessels, population groups, provisioning, and transactional
-profile data therefore remain disabled HyDragon feature lanes until a runtime
-advertises their individual capabilities. `/tw diagnose` is the operator's
-concise source of truth for the packaged server.
+Tamework 3.0.0 installs production implementations for each API 0.9 authority,
+but does not advertise them optimistically. Transactional profile data requires
+its migrated repository; capture policy requires bounded attempt recovery;
+population groups require group recovery, reconciliation, and canonical-path
+installation; provisioning requires its recovered journals and requested
+projection authority; bonded vessels require recovered operations and every
+exact evidence/mutation port. A failed prerequisite omits only that capability
+and leaves its facade fail closed. `/tw diagnose` is the operator's concise
+source of truth for the packaged server.
 
 ## Fixed integration decisions
 
@@ -154,9 +157,18 @@ Before enabling a gameplay surface:
    asynchronous.
 
 Operators can use `/tw debugdb health`, `/tw debugdb integrity`, incident
-inspection/retry, and redacted exports. `/tw api test` validates the packaged
-public runtime; only suites present in the command's usage output are available
-in that build.
+inspection/retry, and redacted exports. `/tw api test run
+hydragon-integrations` needs no prepared live fixture: it validates the
+packaged API 0.9 capabilities and isolated capture, stale-vessel, group-limit,
+and provisioning/recovery behaviors. Only suites present in the command's
+usage output are available in that build.
+
+Use `/tw diagnose population` for group reconciliation and owner/claim
+reservation evidence, `/tw diagnose vessel <binding-or-profile>` for one
+binding's generation/lifecycle/evidence and active-operation correlation, and
+`/tw diagnose provisioning <caller-namespace> <idempotency-key>` for one
+durable provisioning origin. These exact lookups are bounded, sanitized, and
+read-only.
 
 ## Related pages
 

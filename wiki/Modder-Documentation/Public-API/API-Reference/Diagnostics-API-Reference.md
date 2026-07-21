@@ -50,6 +50,9 @@ readiness/result before mutation.
 Operator commands remain:
 
 - `/tw diagnose`
+- `/tw diagnose population`
+- `/tw diagnose vessel <binding-or-profile>`
+- `/tw diagnose provisioning <caller-namespace> <idempotency-key>`
 - `/tw debugdb health`
 - `/tw debugdb incidents [open|all]`
 - `/tw debugdb incident <incident-id-or-unique-prefix>`
@@ -61,9 +64,12 @@ Operator commands remain:
 manufacture missing source evidence. Support exports are redacted and do not
 include the SQLite database or complete Hytale save.
 
-`/tw diagnose` prints the API version and advertised capabilities, capture
-recovery readiness, bonded-vessel/group/provisioning availability, and storage
-health. It is a concise operator check, not a mutation or recovery command.
+`/tw diagnose` prints a bounded summary of API capabilities, capture recovery,
+bonded-vessel/group/provisioning readiness and operation counts, persistence
+incidents/quarantines, and relevant evidence coverage. The focused population,
+vessel, and provisioning forms provide sanitized correlation and recovery
+details without exposing raw item JSON or owner UUIDs. All diagnose forms are
+read-only; they do not mutate, repair, or retry an operation.
 
 ## `PersistenceDiagnosticsView`
 - `databasePath`

@@ -1,6 +1,7 @@
 # Configurable capture policy
 
-Status: Proposed
+Status: Implemented for Public API `0.9.0` / Tamework 3.0.0; runtime
+capability activation remains capture-journal-recovery-gated
 Depends on: existing `TwSpawnerConfig`, `TameworkSpawn`, canonical profiles, and
 population admission
 HyDragon counterpart: [capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)
@@ -367,7 +368,7 @@ identified by attempt ID.
 
 ## Implementation file map
 
-| Area | Existing anchor | Proposed responsibility |
+| Area | Existing anchor | Implemented responsibility |
 | --- | --- | --- |
 | Item asset schema | `config/assets/TwSpawnerConfig` | Codec, validation, inheritance, conversion of new item mechanics |
 | Target asset schema | new `config/assets/TwCapturePolicyConfig` and role index | Role resolution, difficulty codec, validation, inheritance |
