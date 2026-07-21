@@ -127,6 +127,9 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Text: \"Q\";"));
         Assertions.assertTrue(ui.contains("Text: \"RMB\";"));
         Assertions.assertEquals(4, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
+        Assertions.assertTrue(ui.indexOf("Group #LaunchControl") < ui.indexOf("Group #ForwardBoostControl"));
+        Assertions.assertTrue(ui.indexOf("Group #ForwardBoostControl") < ui.indexOf("Group #UpwardFlapControl"));
+        Assertions.assertTrue(ui.indexOf("Group #UpwardFlapControl") < ui.indexOf("Group #AirbrakeControl"));
     }
 
     private static int countOccurrences(String text, String token) {

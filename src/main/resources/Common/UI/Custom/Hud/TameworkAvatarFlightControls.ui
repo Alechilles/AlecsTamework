@@ -42,29 +42,6 @@ Group #TameworkAvatarFlightControls {
 
     Group { Anchor: (Width: @FlightControlSlotGap); }
 
-    Group #UpwardFlapControl {
-        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
-
-        Group #UpwardFlapFrame {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #UpwardFlapIcon {
-                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-                Background: "../Tamework/AvatarFlightControls/UpwardFlap.png";
-            }
-        }
-
-        Label #UpwardFlapBinding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "LMB";
-            Style: @FlightControlBindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @FlightControlSlotGap); }
-
     Group #ForwardBoostControl {
         Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
 
@@ -82,6 +59,29 @@ Group #TameworkAvatarFlightControls {
             Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
             Background: @FlightControlBindingBackground;
             Text: "Q";
+            Style: @FlightControlBindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @FlightControlSlotGap); }
+
+    Group #UpwardFlapControl {
+        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
+
+        Group #UpwardFlapFrame {
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Group #UpwardFlapIcon {
+                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+                Background: "../Tamework/AvatarFlightControls/UpwardFlap.png";
+            }
+        }
+
+        Label #UpwardFlapBinding {
+            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
+            Background: @FlightControlBindingBackground;
+            Text: "LMB";
             Style: @FlightControlBindingStyle;
         }
     }
