@@ -179,8 +179,53 @@ public final class PopulationGroupOwnerAdmissionExtension {
                     failure == null && Boolean.TRUE.equals(ok)
                             ? report.successOne() : report.failureOne()));
         }
-        return chain.thenApply(report -> new RecoveryReport(
-                report.scanned(), report.succeeded(), report.failed(), report.failed() == 0));
+        return chain.thenCompose(this::reconcileClassifications)
+                .thenApply(report -> new RecoveryReport(
+                        report.scanned(), report.succeeded(), report.failed(), report.failed() == 0));
+    }
+
+    private CompletableFuture<RecoveryReport> reconcileClassifications(RecoveryReport initial) {
+        final List<com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord> states;
+        try {
+            states = ownerCoordinator.populationRepository().loadAllStates();
+        } catch (Exception failure) {
+            return CompletableFuture.completedFuture(initial.failureOne());
+        }
+        CompletableFuture<RecoveryReport> chain = CompletableFuture.completedFuture(initial);
+        for (var state : states) {
+            if (CompanionLifecycleState.RELEASED.name().equals(state.lifecycleState())) continue;
+            chain = chain.thenCompose(report -> reconcileClassification(state)
+                    .handle((resolved, failure) -> failure == null && Boolean.TRUE.equals(resolved)
+                            ? report.successOne() : report.failureOne()));
+        }
+        return chain;
+    }
+
+    private CompletableFuture<Boolean> reconcileClassification(
+            com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord state) {
+        var index = registry.snapshot();
+        PopulationGroupClassificationRecord existing = classification(state.profileId());
+        String role = profileRole(state.profileId());
+        boolean resolved = role != null || index.definitions().isEmpty();
+        List<String> groups = resolve(index, role);
+        long now = System.currentTimeMillis();
+        PopulationGroupClassificationRecord replacement = new PopulationGroupClassificationRecord(
+                state.profileId(), role, groups, index.revision(),
+                role != null ? PopulationGroupClassificationRecord.Status.RESOLVED
+                        : PopulationGroupClassificationRecord.Status.UNRESOLVED,
+                "population_group_reconciliation",
+                existing == null ? now : existing.createdAtMs(), now);
+        var submission = repository.replaceClassificationAsync(
+                new PopulationGroupRepository.ClassificationMutation(
+                        existing == null ? null : existing.classificationRevision(), replacement));
+        if (submission == null || submission.completion() == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return submission.completion().thenApply(outcome -> outcome != null
+                && outcome.isCommitted() && outcome.value() != null
+                && (outcome.value().status() == PopulationGroupRepository.Status.APPLIED
+                || outcome.value().status() == PopulationGroupRepository.Status.IDEMPOTENT)
+                && resolved);
     }
 
     private PreparedGroup draft(OwnerPopulationReservationPreparation reserved) {

@@ -308,19 +308,35 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull PopulationGroupRegistry registry,
             @Nonnull PopulationGroupRepository repository,
             @Nonnull NpcProfileRepository profiles) {
-        if (populationGroups != null) {
-            return CompletableFuture.completedFuture(new PopulationGroupOwnerAdmissionExtension.RecoveryReport(
-                    0, 0, populationGroupsReady ? 0 : 1, populationGroupsReady));
+        PopulationGroupOwnerAdmissionExtension extension = populationGroups;
+        if (extension == null) {
+            extension = new PopulationGroupOwnerAdmissionExtension(
+                    admissionCoordinator, registry, repository, profiles);
+            populationGroups = extension;
         }
-        PopulationGroupOwnerAdmissionExtension extension =
-                new PopulationGroupOwnerAdmissionExtension(
-                        admissionCoordinator, registry, repository, profiles);
+        final PopulationGroupOwnerAdmissionExtension installed = extension;
+        populationGroupsReady = false;
         return extension.recover().thenApply(report -> {
             if (report.ready()) {
-                admissionCoordinator.installPopulationGroups(extension);
-                populationGroups = extension;
+                admissionCoordinator.installPopulationGroups(installed);
                 populationGroupsReady = true;
             }
+            return report;
+        });
+    }
+
+    /** Reconciles classifications after a valid population-group config index swap. */
+    @Nonnull
+    public synchronized CompletableFuture<PopulationGroupOwnerAdmissionExtension.RecoveryReport>
+    reconcilePopulationGroups() {
+        PopulationGroupOwnerAdmissionExtension extension = populationGroups;
+        if (extension == null) {
+            return CompletableFuture.completedFuture(
+                    new PopulationGroupOwnerAdmissionExtension.RecoveryReport(0, 0, 1, false));
+        }
+        populationGroupsReady = false;
+        return extension.recover().thenApply(report -> {
+            populationGroupsReady = report.ready();
             return report;
         });
     }
