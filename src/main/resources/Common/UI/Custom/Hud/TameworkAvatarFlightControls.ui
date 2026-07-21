@@ -11,8 +11,7 @@
     Border: 8
 );
 
-// This root is appended to the native MapServerContent anchor so it renders
-// after Hytale's built-in ability strip.
+// This root aligns custom glyphs beneath Hytale's native ability frames.
 Group #TameworkAvatarFlightControls {
     Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107);
 

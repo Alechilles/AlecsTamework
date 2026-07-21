@@ -15,13 +15,17 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("extends CustomUIHud"));
         Assertions.assertTrue(source.contains("HUD_KEY = \"alecstamework:avatar_flight\""));
         Assertions.assertTrue(source.contains("UI_PATH = \"TameworkAvatarFlightHud.ui\""));
+        Assertions.assertTrue(source.contains(
+                "CONTROLS_UI_PATH = \"Hud/TameworkAvatarFlightControls.ui\""
+        ));
         Assertions.assertTrue(source.contains("HUD_Z_ORDER = 10"));
         Assertions.assertTrue(source.contains("super(playerRef, HUD_KEY, HUD_Z_ORDER)"));
         Assertions.assertTrue(source.contains("new UICommandBuilder()"));
         Assertions.assertTrue(source.contains("AvatarFlightHudBinder.bind(commandBuilder, updatedModel)"));
         Assertions.assertTrue(source.contains("update(false, commandBuilder)"));
+        Assertions.assertTrue(source.contains("commandBuilder.append(CONTROLS_UI_PATH)"));
         Assertions.assertTrue(source.contains("removeCustomHud(playerRef, TameworkAvatarFlightHud.HUD_KEY)"));
-        Assertions.assertTrue(source.contains("TameworkAvatarFlightControlOverlay.remove(playerRef)"));
+        Assertions.assertFalse(source.contains("TameworkAvatarFlightControlOverlay"));
     }
 
     @Test
@@ -53,37 +57,19 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("config.getVigour().isHudEnabled()"));
         Assertions.assertTrue(source.contains("config.getVigour().getHudResendIntervalMs()"));
         Assertions.assertTrue(source.contains("player.getHudManager().addCustomHud(playerRef, hud)"));
-        Assertions.assertTrue(source.contains("TameworkAvatarFlightControlOverlay.show(playerRef)"));
+        Assertions.assertFalse(source.contains("TameworkAvatarFlightControlOverlay"));
         Assertions.assertTrue(source.contains("TameworkAvatarFlightHud.removeFrom(player)"));
         Assertions.assertFalse(source.contains("Universe.get()"));
         Assertions.assertFalse(source.contains("PlayerRef.getComponent(Player"));
     }
 
     @Test
-    void flightControlsReplaceAndClearNativeServerContentAnchorWithoutSelectorCommands() throws Exception {
-        String source = Files.readString(Path.of(
+    void flightControlsDoNotUseMapOnlyServerContentAnchor() {
+        Path overlay = Path.of(
                 "src/main/java/com/alechilles/alecstamework/ui/TameworkAvatarFlightControlOverlay.java"
-        ));
+        );
 
-        Assertions.assertTrue(source.contains("ANCHOR_ID = \"MapServerContent\""));
-        Assertions.assertTrue(source.contains("UI_PATH = \"Hud/TameworkAvatarFlightControls.ui\""));
-        Assertions.assertTrue(source.contains("commandBuilder.append(UI_PATH)"));
-        Assertions.assertTrue(source.contains("new UpdateAnchorUI("));
-        Assertions.assertEquals(2, countOccurrences(source, "ANCHOR_ID,\n                true,"));
-        Assertions.assertTrue(source.contains("ANCHOR_ID,\n                true,\n                null,\n                null"));
-        Assertions.assertFalse(source.contains("commandBuilder.remove("),
-                "missing selectors disconnect the client instead of becoming no-ops");
-        Assertions.assertTrue(source.contains("writeNoCache"));
-    }
-
-    private static int countOccurrences(String text, String token) {
-        int count = 0;
-        int index = 0;
-        while ((index = text.indexOf(token, index)) >= 0) {
-            count++;
-            index += token.length();
-        }
-        return count;
+        Assertions.assertFalse(Files.exists(overlay));
     }
 
     @Test

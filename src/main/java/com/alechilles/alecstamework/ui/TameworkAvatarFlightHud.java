@@ -8,11 +8,12 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Compact bottom HUD shown while avatar flight vigour is active. */
+/** Compact flight telemetry and native-aligned control artwork shown during avatar flight. */
 public final class TameworkAvatarFlightHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:avatar_flight";
     public static final String UI_PATH = "TameworkAvatarFlightHud.ui";
-    // Public HUD overlays use this bounded layer; layer 100 crashes the 0.5.6 client.
+    public static final String CONTROLS_UI_PATH = "Hud/TameworkAvatarFlightControls.ui";
+    // The control artwork is an underlay for Hytale's native ability frames and input labels.
     private static final int HUD_Z_ORDER = 10;
 
     private AvatarFlightHudViewModel model;
@@ -34,16 +35,16 @@ public final class TameworkAvatarFlightHud extends CustomUIHud {
         if (player == null || player.getPlayerRef() == null) {
             return;
         }
-        PlayerRef playerRef = player.getPlayerRef();
         if (player.getHudManager() != null) {
+            PlayerRef playerRef = player.getPlayerRef();
             player.getHudManager().removeCustomHud(playerRef, TameworkAvatarFlightHud.HUD_KEY);
         }
-        TameworkAvatarFlightControlOverlay.remove(playerRef);
     }
 
     @Override
     protected void build(@Nonnull UICommandBuilder commandBuilder) {
         commandBuilder.append(UI_PATH);
+        commandBuilder.append(CONTROLS_UI_PATH);
         AvatarFlightHudBinder.bind(commandBuilder, model);
     }
 }
