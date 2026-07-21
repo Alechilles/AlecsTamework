@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.ProfileChangeType;
+import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
+import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
@@ -149,6 +151,16 @@ public final class TameworkEventBus
 
     public void emitCompanionProvisioned(@Nonnull CompanionProvisionedEvent event) {
         dispatch(Objects.requireNonNull(event, "event"));
+    }
+
+    /** Isolated post-commit delivery seam for canonical population-group events. */
+    public void emitPopulationGroupEvent(@Nonnull TameworkEvent event) {
+        Objects.requireNonNull(event, "event");
+        if (!(event instanceof PopulationGroupMembershipChangedEvent)
+                && !(event instanceof PopulationGroupLimitChangedEvent)) {
+            throw new IllegalArgumentException("Only canonical population-group events are accepted.");
+        }
+        dispatch(event);
     }
 
     /** Isolated post-commit delivery seam for the bonded-vessel runtime. */

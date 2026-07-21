@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.api.PopulationGroupDefinitionView;
+import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
+import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.PopulationGroupScope;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupBucket;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupCountDelta;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupLifecycleClassifier;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupEventSink;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
@@ -33,17 +36,29 @@ public final class PopulationGroupOwnerAdmissionExtension {
     private final PopulationGroupRegistry registry;
     private final PopulationGroupRepository repository;
     private final NpcProfileRepository profiles;
+    private final PopulationGroupEventSink events;
     private final ConcurrentHashMap<UUID, PreparedGroup> prepared = new ConcurrentHashMap<>();
+    private final java.util.Set<UUID> emittedEvents = ConcurrentHashMap.newKeySet();
 
     public PopulationGroupOwnerAdmissionExtension(
             @Nonnull OwnerPopulationAdmissionCoordinator ownerCoordinator,
             @Nonnull PopulationGroupRegistry registry,
             @Nonnull PopulationGroupRepository repository,
             @Nonnull NpcProfileRepository profiles) {
+        this(ownerCoordinator, registry, repository, profiles, PopulationGroupEventSink.noop());
+    }
+
+    public PopulationGroupOwnerAdmissionExtension(
+            @Nonnull OwnerPopulationAdmissionCoordinator ownerCoordinator,
+            @Nonnull PopulationGroupRegistry registry,
+            @Nonnull PopulationGroupRepository repository,
+            @Nonnull NpcProfileRepository profiles,
+            @Nonnull PopulationGroupEventSink events) {
         this.ownerCoordinator = Objects.requireNonNull(ownerCoordinator, "ownerCoordinator");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     @Nonnull
@@ -94,7 +109,9 @@ public final class PopulationGroupOwnerAdmissionExtension {
                         group.classification(), System.currentTimeMillis())
                 .whenComplete((result, failure) -> {
                     if (failure == null && result != null
+                            && result.committed()
                             && result.status() != OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING) {
+                        emitMembership(group, false);
                         prepared.remove(admission.operationId(), group);
                     }
                 });
@@ -124,6 +141,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
                         : CompletableFuture.completedFuture(false))
                 .whenComplete((ok, failure) -> {
                     if (failure == null && Boolean.TRUE.equals(ok)) {
+                        emitMembership(group, false);
                         prepared.remove(admission.operationId(), group);
                     }
                 });
@@ -155,6 +173,11 @@ public final class PopulationGroupOwnerAdmissionExtension {
 
     @Nonnull
     public CompletableFuture<RecoveryReport> recover() {
+        return recover(true);
+    }
+
+    @Nonnull
+    public CompletableFuture<RecoveryReport> recover(boolean recovered) {
         final List<PopulationGroupOperationRecord> operations;
         try {
             operations = repository.loadRecoverableOperations();
@@ -179,12 +202,13 @@ public final class PopulationGroupOwnerAdmissionExtension {
                     failure == null && Boolean.TRUE.equals(ok)
                             ? report.successOne() : report.failureOne()));
         }
-        return chain.thenCompose(this::reconcileClassifications)
+        return chain.thenCompose(report -> reconcileClassifications(report, recovered))
                 .thenApply(report -> new RecoveryReport(
                         report.scanned(), report.succeeded(), report.failed(), report.failed() == 0));
     }
 
-    private CompletableFuture<RecoveryReport> reconcileClassifications(RecoveryReport initial) {
+    private CompletableFuture<RecoveryReport> reconcileClassifications(
+            RecoveryReport initial, boolean recovered) {
         final List<com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord> states;
         try {
             states = ownerCoordinator.populationRepository().loadAllStates();
@@ -194,7 +218,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
         CompletableFuture<RecoveryReport> chain = CompletableFuture.completedFuture(initial);
         for (var state : states) {
             if (CompanionLifecycleState.RELEASED.name().equals(state.lifecycleState())) continue;
-            chain = chain.thenCompose(report -> reconcileClassification(state)
+            chain = chain.thenCompose(report -> reconcileClassification(state, recovered)
                     .handle((resolved, failure) -> failure == null && Boolean.TRUE.equals(resolved)
                             ? report.successOne() : report.failureOne()));
         }
@@ -202,7 +226,8 @@ public final class PopulationGroupOwnerAdmissionExtension {
     }
 
     private CompletableFuture<Boolean> reconcileClassification(
-            com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord state) {
+            com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord state,
+            boolean recovered) {
         var index = registry.snapshot();
         PopulationGroupClassificationRecord existing = classification(state.profileId());
         String role = profileRole(state.profileId());
@@ -221,11 +246,19 @@ public final class PopulationGroupOwnerAdmissionExtension {
         if (submission == null || submission.completion() == null) {
             return CompletableFuture.completedFuture(false);
         }
-        return submission.completion().thenApply(outcome -> outcome != null
-                && outcome.isCommitted() && outcome.value() != null
-                && (outcome.value().status() == PopulationGroupRepository.Status.APPLIED
-                || outcome.value().status() == PopulationGroupRepository.Status.IDEMPOTENT)
-                && resolved);
+        return submission.completion().thenApply(outcome -> {
+            boolean committed = outcome != null && outcome.isCommitted()
+                    && outcome.value() != null
+                    && (outcome.value().status() == PopulationGroupRepository.Status.APPLIED
+                    || outcome.value().status() == PopulationGroupRepository.Status.IDEMPOTENT);
+            if (committed && resolved && state.ownerUuid() != null
+                    && (existing == null || !existing.groupIds().equals(groups)
+                    || !Objects.equals(existing.roleId(), role))) {
+                emitReconciledMembership(state.ownerUuid(), state.profileId(), role,
+                        existing, groups, index.revision(), recovered);
+            }
+            return committed && resolved;
+        });
     }
 
     private PreparedGroup draft(OwnerPopulationReservationPreparation reserved) {
@@ -271,6 +304,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
         return new PreparedGroup(operation, evidence,
                 new PopulationGroupRepository.ClassificationMutation(
                         existing == null ? null : existing.classificationRevision(), replacement),
+                existing == null ? 0L : existing.classificationRevision(),
                 index.revision());
     }
 
@@ -352,7 +386,10 @@ public final class PopulationGroupOwnerAdmissionExtension {
                     ? CompletableFuture.completedFuture(false)
                     : advance(operation.operationId(), operation.state(),
                             PopulationGroupOperationRecord.State.COMMITTED,
-                            "recovered-owner-commit");
+                            "recovered-owner-commit").thenApply(ok -> {
+                                if (Boolean.TRUE.equals(ok)) emitMembership(operation, true);
+                                return ok;
+                            });
             case APPLYING, QUARANTINED -> CompletableFuture.completedFuture(false);
             case COMPENSATING -> advance(operation.operationId(), operation.state(),
                     PopulationGroupOperationRecord.State.FAILED, "recovered-compensation");
@@ -420,6 +457,106 @@ public final class PopulationGroupOwnerAdmissionExtension {
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
     }
 
+    /** Publishes limit changes only after the caller has reconciled and activated the new index. */
+    public void publishLimitChanges(
+            @Nonnull com.alechilles.alecstamework.ownership.groups.PopulationGroupIndex previous,
+            @Nonnull com.alechilles.alecstamework.ownership.groups.PopulationGroupIndex current,
+            boolean recovered) {
+        java.util.TreeSet<String> groupIds = new java.util.TreeSet<>();
+        groupIds.addAll(previous.definitions().keySet());
+        groupIds.addAll(current.definitions().keySet());
+        long now = System.currentTimeMillis();
+        for (String groupId : groupIds) {
+            PopulationGroupDefinitionView oldDefinition = previous.getDefinition(groupId).orElse(null);
+            PopulationGroupDefinitionView newDefinition = current.getDefinition(groupId).orElse(null);
+            if (!limitChanged(oldDefinition, newDefinition)) continue;
+            PopulationGroupScope scope = newDefinition != null
+                    ? newDefinition.scope() : oldDefinition.scope();
+            UUID operationId = UUID.nameUUIDFromBytes(
+                    ("population-group-limit:" + groupId + ":" + current.revision())
+                            .getBytes(StandardCharsets.UTF_8));
+            emit(operationId, new PopulationGroupLimitChangedEvent(
+                    operationId, groupId, previous.revision(), current.revision(),
+                    oldDefinition == null ? 0L : oldDefinition.maxOwnedPerOwner(),
+                    newDefinition == null ? 0L : newDefinition.maxOwnedPerOwner(),
+                    oldDefinition == null ? 0L : oldDefinition.maxActivePerOwner(),
+                    newDefinition == null ? 0L : newDefinition.maxActivePerOwner(),
+                    scope, recovered, now, System.currentTimeMillis()));
+        }
+    }
+
+    private static boolean limitChanged(
+            @Nullable PopulationGroupDefinitionView previous,
+            @Nullable PopulationGroupDefinitionView current) {
+        if (previous == null || current == null) return previous != current;
+        return previous.maxOwnedPerOwner() != current.maxOwnedPerOwner()
+                || previous.maxActivePerOwner() != current.maxActivePerOwner()
+                || previous.scope() != current.scope();
+    }
+
+    private void emitMembership(PreparedGroup group, boolean recovered) {
+        emitMembership(group.operation(), group.oldClassificationRevision(), recovered);
+    }
+
+    private void emitReconciledMembership(
+            UUID ownerUuid,
+            String profileId,
+            String roleId,
+            @Nullable PopulationGroupClassificationRecord existing,
+            List<String> newGroups,
+            long newRevision,
+            boolean recovered) {
+        UUID operationId = UUID.nameUUIDFromBytes(
+                ("population-group-membership:" + profileId + ":" + newRevision)
+                        .getBytes(StandardCharsets.UTF_8));
+        long now = System.currentTimeMillis();
+        emit(operationId, new PopulationGroupMembershipChangedEvent(
+                operationId, profileId, ownerUuid, roleId,
+                existing == null ? java.util.Set.of() : java.util.Set.copyOf(existing.groupIds()),
+                java.util.Set.copyOf(newGroups),
+                existing == null ? 0L
+                        : Math.min(existing.classificationRevision(), newRevision),
+                newRevision, recovered, now, System.currentTimeMillis()));
+    }
+
+    private void emitMembership(PopulationGroupOperationRecord operation, boolean recovered) {
+        emitMembership(operation, 0L, recovered);
+    }
+
+    private void emitMembership(
+            PopulationGroupOperationRecord operation,
+            long oldClassificationRevision,
+            boolean recovered) {
+        if (operation.oldGroupIds().equals(operation.newGroupIds())
+                && Objects.equals(operation.oldRoleId(), operation.newRoleId())) return;
+        UUID owner = operation.newOwnerUuid() != null
+                ? operation.newOwnerUuid() : operation.oldOwnerUuid();
+        String role = first(operation.newRoleId(), operation.oldRoleId());
+        if (owner == null || role == null) return;
+        UUID operationId;
+        try {
+            operationId = UUID.fromString(operation.operationId());
+        } catch (IllegalArgumentException invalid) {
+            operationId = UUID.nameUUIDFromBytes(operation.operationId().getBytes(StandardCharsets.UTF_8));
+        }
+        long now = System.currentTimeMillis();
+        emit(operationId, new PopulationGroupMembershipChangedEvent(
+                operationId, operation.profileId(), owner, role,
+                java.util.Set.copyOf(operation.oldGroupIds()),
+                java.util.Set.copyOf(operation.newGroupIds()),
+                Math.min(oldClassificationRevision, operation.classificationRevision()),
+                operation.classificationRevision(), recovered, now, System.currentTimeMillis()));
+    }
+
+    private void emit(UUID operationId, com.alechilles.alecstamework.api.TameworkEvent event) {
+        if (!emittedEvents.add(operationId)) return;
+        try {
+            events.emit(event);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Event delivery is informational and must never alter committed population state.
+        }
+    }
+
     private static String reason(RuntimeException failure) {
         return failure.getMessage() == null || failure.getMessage().isBlank()
                 ? "population-group-admission-unavailable" : failure.getMessage();
@@ -429,6 +566,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
             PopulationGroupOperationRecord operation,
             List<PopulationGroupRepository.ReservationEvidence> evidence,
             PopulationGroupRepository.ClassificationMutation classification,
+            long oldClassificationRevision,
             long policyRevision) {
     }
 

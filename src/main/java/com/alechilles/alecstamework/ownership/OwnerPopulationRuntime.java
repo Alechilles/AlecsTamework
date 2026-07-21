@@ -18,6 +18,8 @@ import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulation
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupEventSink;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupIndex;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
@@ -308,15 +310,26 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull PopulationGroupRegistry registry,
             @Nonnull PopulationGroupRepository repository,
             @Nonnull NpcProfileRepository profiles) {
+        return installPopulationGroups(
+                registry, repository, profiles, PopulationGroupEventSink.noop());
+    }
+
+    @Nonnull
+    public synchronized CompletableFuture<PopulationGroupOwnerAdmissionExtension.RecoveryReport>
+    installPopulationGroups(
+            @Nonnull PopulationGroupRegistry registry,
+            @Nonnull PopulationGroupRepository repository,
+            @Nonnull NpcProfileRepository profiles,
+            @Nonnull PopulationGroupEventSink events) {
         PopulationGroupOwnerAdmissionExtension extension = populationGroups;
         if (extension == null) {
             extension = new PopulationGroupOwnerAdmissionExtension(
-                    admissionCoordinator, registry, repository, profiles);
+                    admissionCoordinator, registry, repository, profiles, events);
             populationGroups = extension;
         }
         final PopulationGroupOwnerAdmissionExtension installed = extension;
         populationGroupsReady = false;
-        return extension.recover().thenApply(report -> {
+        return extension.recover(true).thenApply(report -> {
             if (report.ready()) {
                 admissionCoordinator.installPopulationGroups(installed);
                 populationGroupsReady = true;
@@ -335,7 +348,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                     new PopulationGroupOwnerAdmissionExtension.RecoveryReport(0, 0, 1, false));
         }
         populationGroupsReady = false;
-        return extension.recover().thenApply(report -> {
+        return extension.recover(false).thenApply(report -> {
             populationGroupsReady = report.ready();
             return report;
         });
@@ -343,6 +356,16 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
 
     public boolean populationGroupsReady() {
         return populationGroupsReady;
+    }
+
+    /** Emits immutable limit events after a reconciled index has become authoritative. */
+    public void publishPopulationGroupLimitChanges(
+            @Nonnull PopulationGroupIndex previous,
+            @Nonnull PopulationGroupIndex current,
+            boolean recovered) {
+        PopulationGroupOwnerAdmissionExtension extension = populationGroups;
+        if (extension == null || !populationGroupsReady) return;
+        extension.publishLimitChanges(previous, current, recovered);
     }
 
     @Nonnull

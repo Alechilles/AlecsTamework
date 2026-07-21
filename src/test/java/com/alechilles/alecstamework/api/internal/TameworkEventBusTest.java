@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.ProfileChangeType;
+import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
@@ -61,6 +62,25 @@ class TameworkEventBusTest {
         bus.subscribe(TameworkEvent.class, event -> successfulDeliveries.incrementAndGet());
 
         bus.emitConfigReload(TameworkConfigFamily.GLOBAL, Set.of("global/default"));
+        assertEquals(1, successfulDeliveries.get());
+    }
+
+    @Test
+    void populationGroupListenersAreTypedAndIsolated() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        AtomicInteger successfulDeliveries = new AtomicInteger();
+        bus.subscribe(PopulationGroupMembershipChangedEvent.class, event -> {
+            throw new IllegalStateException("population-listener-failure");
+        });
+        bus.subscribe(PopulationGroupMembershipChangedEvent.class,
+                event -> successfulDeliveries.incrementAndGet());
+        UUID operationId = UUID.randomUUID();
+
+        bus.emitPopulationGroupEvent(new PopulationGroupMembershipChangedEvent(
+                operationId, "profile-mini", UUID.randomUUID(), "Tamed_Wyvern_Mini",
+                Set.of(), Set.of("hydragon:soulbound_mini"),
+                0L, 1L, false, 100L, 101L));
+
         assertEquals(1, successfulDeliveries.get());
     }
 

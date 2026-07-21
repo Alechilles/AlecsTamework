@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.api.PopulationGroupScope;
+import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
+import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
+import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
@@ -17,6 +20,8 @@ import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -48,6 +53,8 @@ class PopulationGroupOwnerAdmissionExtensionTest {
                     first.preparedAdmission(), 1L, ClaimProviderGeneration.NONE));
             assertTrue(harness.coordinator().commitAsync(first.preparedAdmission())
                     .get(2, TimeUnit.SECONDS).committed());
+            assertFalse(harness.coordinator().commitAsync(first.preparedAdmission())
+                    .get(2, TimeUnit.SECONDS).committed());
 
             assertEquals(List.of("hydragon:soulbound_mini"), harness.groups()
                     .findClassification(first.preparedAdmission().plan().transition().profileId())
@@ -57,6 +64,32 @@ class PopulationGroupOwnerAdmissionExtensionTest {
                     PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL, null);
             assertEquals(1, counts.committedOwned());
             assertEquals(1, counts.committedActive());
+            assertEquals(1, harness.events().size());
+            PopulationGroupMembershipChangedEvent event =
+                    (PopulationGroupMembershipChangedEvent) harness.events().getFirst();
+            assertEquals(Set.of(), event.oldGroupIds());
+            assertEquals(Set.of("hydragon:soulbound_mini"), event.newGroupIds());
+            assertFalse(event.recovered());
+        }
+    }
+
+    @Test
+    void limitPublicationIsIdempotentAndReportsOnlyChangedDefinitions() throws Exception {
+        try (Harness harness = harness()) {
+            PopulationGroupRegistry next = new PopulationGroupRegistry();
+            assertTrue(next.replace(List.of(group(2, 1)), 2L).applied());
+
+            harness.extension().publishLimitChanges(
+                    harness.registry().snapshot(), next.snapshot(), false);
+            harness.extension().publishLimitChanges(
+                    harness.registry().snapshot(), next.snapshot(), false);
+
+            assertEquals(1, harness.events().size());
+            PopulationGroupLimitChangedEvent event =
+                    (PopulationGroupLimitChangedEvent) harness.events().getFirst();
+            assertEquals("hydragon:soulbound_mini", event.groupId());
+            assertEquals(1L, event.oldMaxOwned());
+            assertEquals(2L, event.newMaxOwned());
         }
     }
 
@@ -130,11 +163,13 @@ class PopulationGroupOwnerAdmissionExtensionTest {
                 new OwnerPopulationAdmissionCoordinator(index, population, health);
         PopulationGroupRegistry registry = new PopulationGroupRegistry();
         assertTrue(registry.replace(List.of(group()), 1L).applied());
+        List<TameworkEvent> events = new ArrayList<>();
         PopulationGroupOwnerAdmissionExtension extension =
-                new PopulationGroupOwnerAdmissionExtension(coordinator, registry, groups, profiles);
+                new PopulationGroupOwnerAdmissionExtension(
+                        coordinator, registry, groups, profiles, events::add);
         assertTrue(extension.recover().get(2, TimeUnit.SECONDS).ready());
         coordinator.installPopulationGroups(extension);
-        return new Harness(queue, coordinator, groups);
+        return new Harness(queue, coordinator, groups, registry, extension, events);
     }
 
     private static OwnerPopulationAdmissionPlan plan(String profileId, UUID owner, String role) {
@@ -156,6 +191,10 @@ class PopulationGroupOwnerAdmissionExtensionTest {
     }
 
     private static TwPopulationGroupConfig group() throws Exception {
+        return group(1, 1);
+    }
+
+    private static TwPopulationGroupConfig group(int maxOwned, int maxActive) throws Exception {
         var constructor = TwPopulationGroupConfig.class.getDeclaredConstructor();
         constructor.setAccessible(true);
         TwPopulationGroupConfig config = constructor.newInstance();
@@ -164,8 +203,8 @@ class PopulationGroupOwnerAdmissionExtensionTest {
         set(config, "priority", 100);
         set(config, "roleIds", new String[] {"Tamed_Wyvern_Mini"});
         Object limits = field(config, "limits");
-        set(limits, "maxOwnedPerOwner", 1);
-        set(limits, "maxActivePerOwner", 1);
+        set(limits, "maxOwnedPerOwner", maxOwned);
+        set(limits, "maxActivePerOwner", maxActive);
         set(limits, "scope", PopulationGroupScope.GLOBAL);
         return config;
     }
@@ -184,7 +223,10 @@ class PopulationGroupOwnerAdmissionExtensionTest {
 
     private record Harness(PersistenceWriteQueue queue,
                            OwnerPopulationAdmissionCoordinator coordinator,
-                           PopulationGroupRepository groups) implements AutoCloseable {
+                           PopulationGroupRepository groups,
+                           PopulationGroupRegistry registry,
+                           PopulationGroupOwnerAdmissionExtension extension,
+                           List<TameworkEvent> events) implements AutoCloseable {
         @Override
         public void close() {
             queue.close();
