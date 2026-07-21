@@ -7,6 +7,18 @@ import org.junit.jupiter.api.Test;
 
 class AvatarFlightHudBinderTest {
     @Test
+    void flightHudUsesClientSafeCustomLayer() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ui/TameworkAvatarFlightHud.java"
+        ));
+
+        Assertions.assertTrue(source.contains("private static final int HUD_Z_ORDER = 1;"));
+        Assertions.assertTrue(source.contains("super(playerRef, HUD_KEY, HUD_Z_ORDER);"));
+        Assertions.assertFalse(source.contains("HUD_Z_ORDER = 10"));
+        Assertions.assertFalse(source.contains("HUD_Z_ORDER = 100"));
+    }
+
+    @Test
     void binderUsesDynamicAnchorsAndSixPipSelectors() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/ui/AvatarFlightHudBinder.java"
