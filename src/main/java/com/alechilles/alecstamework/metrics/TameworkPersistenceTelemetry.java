@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 
 /** Sole adapter from persistence diagnostics into Alec's Telemetry's allowlisted API. */
 public final class TameworkPersistenceTelemetry implements PersistenceIncidentSink {
-    public static final int PERSISTENCE_SUBSYSTEM_VERSION = 7;
+    public static final int PERSISTENCE_SUBSYSTEM_VERSION = 8;
     static final Set<String> REMOTE_DETAIL_KEYS = Set.of(
             "incidentId", "traceId", "operationId", "bootId", "domain", "phase", "reason",
             "failureClass", "disposition", "scopeType", "scopeCountBucket", "retryCountBucket",

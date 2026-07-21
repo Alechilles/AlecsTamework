@@ -58,11 +58,15 @@ class PersistenceDiagnosticsServiceTest {
             assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith(".sqlite")));
             assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith(".sqlite.bak")));
 
+            JsonObject operations = readJson(zip, zip.getEntry("operations.json"));
+            assertEquals("complete", operations.get("status").getAsString());
+            assertTrue(operations.getAsJsonArray("rows").isEmpty());
+
             JsonObject manifest = readJson(zip, zip.getEntry("manifest.json"));
             assertEquals(3, manifest.get("formatVersion").getAsInt());
             assertEquals("bounded_redacted_persistence_evidence",
                     manifest.get("scope").getAsString());
-            assertEquals(7, manifest.get("schemaVersion").getAsInt());
+            assertEquals(8, manifest.get("schemaVersion").getAsInt());
             assertEquals(PersistenceDiagnosticsService.MAX_UNCOMPRESSED_BUNDLE_BYTES,
                     manifest.get("maxUncompressedBundleBytes").getAsInt());
             assertEquals(PersistenceDiagnosticsService.MAX_EXPORT_MILLIS,

@@ -94,6 +94,10 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
             readPopulationOperations(connection, rows);
             readCoopOperations(connection, rows);
             readRecoveryOperations(connection, rows);
+            readCaptureAttemptOperations(connection, rows);
+            readBondedVesselOperations(connection, rows);
+            readPopulationGroupOperations(connection, rows);
+            readProvisioningOperations(connection, rows);
             rows.sort(java.util.Comparator.comparingLong(OperationRow::updatedAtMs).reversed());
             int omitted = Math.max(0, rows.size() - ROW_LIMIT);
             if (rows.size() > ROW_LIMIT) rows.subList(ROW_LIMIT, rows.size()).clear();
@@ -137,6 +141,65 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
         readOperations(connection, sql, "lifecycle_recovery", out);
     }
 
+    private void readCaptureAttemptOperations(Connection connection, List<OperationRow> out) throws Exception {
+        String sql = """
+                SELECT attempt_id AS operation_id, profile_id, 'capture_attempt' AS operation_type,
+                       state, created_at_ms, updated_at_ms, completed_at_ms,
+                       source_context_json IS NOT NULL AS has_source
+                FROM capture_attempts
+                ORDER BY CASE state WHEN 'PREPARED' THEN 0 WHEN 'RESOLVED_SUCCESS' THEN 0
+                         WHEN 'APPLYING' THEN 0 WHEN 'COMPENSATING' THEN 0
+                         WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
+                         updated_at_ms DESC LIMIT 100
+                """;
+        readOperations(connection, sql, "capture_policy", out);
+    }
+
+    private void readBondedVesselOperations(Connection connection, List<OperationRow> out) throws Exception {
+        String sql = """
+                SELECT operation_id, profile_id, action AS operation_type, state,
+                       created_at_ms, updated_at_ms, completed_at_ms,
+                       source_context_json IS NOT NULL AS has_source
+                FROM bonded_vessel_operations
+                ORDER BY CASE state WHEN 'PREPARED' THEN 0 WHEN 'APPLYING' THEN 0
+                         WHEN 'APPLIED' THEN 0 WHEN 'COMPENSATING' THEN 0
+                         WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
+                         updated_at_ms DESC LIMIT 100
+                """;
+        readOperations(connection, sql, "bonded_vessel", out);
+    }
+
+    private void readPopulationGroupOperations(Connection connection, List<OperationRow> out) throws Exception {
+        String sql = """
+                SELECT operation_id, profile_id, operation_type, state,
+                       created_at_ms, updated_at_ms, completed_at_ms,
+                       (old_owner_uuid IS NOT NULL OR new_owner_uuid IS NOT NULL) AS has_source
+                FROM companion_population_group_operations
+                ORDER BY CASE state WHEN 'PREPARED' THEN 0 WHEN 'APPLYING' THEN 0
+                         WHEN 'APPLIED' THEN 0 WHEN 'COMPENSATING' THEN 0
+                         WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
+                         updated_at_ms DESC LIMIT 100
+                """;
+        readOperations(connection, sql, "population_group", out);
+    }
+
+    private void readProvisioningOperations(Connection connection, List<OperationRow> out) throws Exception {
+        String sql = """
+                SELECT operation_id,
+                       COALESCE(canonical_profile_id, provisional_profile_id) AS profile_id,
+                       requested_disposition AS operation_type, state,
+                       created_at_ms, updated_at_ms, completed_at_ms,
+                       destination_context_json IS NOT NULL AS has_source
+                FROM companion_provisioning_operations
+                ORDER BY CASE state WHEN 'PREPARING_DORMANT' THEN 0 WHEN 'DORMANT_PREPARED' THEN 0
+                         WHEN 'DORMANT_APPLYING' THEN 0 WHEN 'DORMANT_COMMITTED' THEN 0
+                         WHEN 'ACTIVE_PREPARED' THEN 0 WHEN 'ACTIVE_APPLYING' THEN 0
+                         WHEN 'PARTIAL_DORMANT' THEN 0 WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
+                         updated_at_ms DESC LIMIT 100
+                """;
+        readOperations(connection, sql, "companion_provisioning", out);
+    }
+
     private void readOperations(Connection connection, String sql, String domain,
                                 List<OperationRow> out) throws Exception {
         try (Statement statement = connection.createStatement();
@@ -173,6 +236,31 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
                     SELECT COUNT(*) FROM (SELECT profile_id FROM companion_population_operations
                     WHERE state IN ('PREPARED','APPLYING','APPLIED','COMPENSATING')
                     GROUP BY profile_id HAVING COUNT(*) > 1)
+                    """);
+            duplicateCheck(connection, issues, "duplicate_active_vessel_profile", """
+                    SELECT COUNT(*) FROM (SELECT profile_id FROM bonded_vessel_bindings
+                    WHERE lifecycle_state <> 'RELEASED'
+                    GROUP BY profile_id HAVING COUNT(*) > 1)
+                    """);
+            duplicateCheck(connection, issues, "duplicate_nonterminal_vessel_generation", """
+                    SELECT COUNT(*) FROM (SELECT binding_id, prior_generation FROM bonded_vessel_operations
+                    WHERE state IN ('PREPARED','APPLYING','APPLIED','COMPENSATING','QUARANTINED')
+                    GROUP BY binding_id, prior_generation HAVING COUNT(*) > 1)
+                    """);
+            duplicateCheck(connection, issues, "duplicate_nonterminal_population_group_profile", """
+                    SELECT COUNT(*) FROM (SELECT profile_id FROM companion_population_group_operations
+                    WHERE state IN ('PREPARED','APPLYING','APPLIED','COMPENSATING','QUARANTINED')
+                    GROUP BY profile_id HAVING COUNT(*) > 1)
+                    """);
+            duplicateCheck(connection, issues, "duplicate_capture_origin", """
+                    SELECT COUNT(*) FROM (SELECT caller_namespace, idempotency_key FROM capture_attempts
+                    WHERE caller_namespace IS NOT NULL
+                    GROUP BY caller_namespace, idempotency_key HAVING COUNT(*) > 1)
+                    """);
+            duplicateCheck(connection, issues, "duplicate_provisioning_origin", """
+                    SELECT COUNT(*) FROM (SELECT caller_namespace, idempotency_key
+                    FROM companion_provisioning_operations
+                    GROUP BY caller_namespace, idempotency_key HAVING COUNT(*) > 1)
                     """);
             return Section.complete(issues, 0);
         } catch (Exception failure) {
