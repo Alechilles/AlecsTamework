@@ -64,6 +64,24 @@ final class CompanionPreparedSpawnService {
             deny(safeCallbacks, "spawn-population-recheck-failed");
             return false;
         }
+        return spawnClaimedAndCommit(
+                world, store, npcPlugin, roleIndex, position, rotation, batch, unitIndex,
+                safeCallbacks);
+    }
+
+    /** Executes a world projection after an outer journal has already claimed the prepared unit. */
+    boolean spawnClaimedAndCommit(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull NPCPlugin npcPlugin,
+            int roleIndex,
+            @Nonnull Vector3d position,
+            @Nonnull Rotation3f rotation,
+            @Nonnull PreparedCompanionSpawnBatch batch,
+            int unitIndex,
+            @Nullable Callbacks callbacks
+    ) {
+        Callbacks safeCallbacks = callbacks == null ? Callbacks.NOOP : callbacks;
         SpawnAttempt attempt = spawn(
                 world, store, npcPlugin, roleIndex, position, rotation, batch, unitIndex
         );

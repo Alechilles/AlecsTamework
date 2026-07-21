@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.provisioning;
 
 import com.alechilles.alecstamework.api.CompanionProvisioningDisposition;
+import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
 import com.alechilles.alecstamework.api.CompanionProvisioningOperationStatus;
 import com.alechilles.alecstamework.api.CompanionProvisioningOperationView;
 import com.alechilles.alecstamework.api.CompanionProvisioningProjectionStatus;
@@ -31,18 +32,27 @@ public final class CompanionProvisioningCoordinator {
     private static final int DEFAULT_RECOVERY_LIMIT = 128;
     private final ProvisioningOperationJournal journal;
     private final ProvisioningPopulationBackend backend;
+    private final ProvisioningEventSink eventSink;
     private final LongSupplier wallClockMs;
 
     public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
                                             @Nonnull ProvisioningPopulationBackend backend) {
-        this(journal, backend, System::currentTimeMillis);
+        this(journal, backend, ProvisioningEventSink.NO_OP, System::currentTimeMillis);
     }
 
     public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
                                             @Nonnull ProvisioningPopulationBackend backend,
                                             @Nonnull LongSupplier wallClockMs) {
+        this(journal, backend, ProvisioningEventSink.NO_OP, wallClockMs);
+    }
+
+    public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
+                                            @Nonnull ProvisioningPopulationBackend backend,
+                                            @Nonnull ProvisioningEventSink eventSink,
+                                            @Nonnull LongSupplier wallClockMs) {
         this.journal = Objects.requireNonNull(journal, "journal");
         this.backend = Objects.requireNonNull(backend, "backend");
+        this.eventSink = Objects.requireNonNull(eventSink, "eventSink");
         this.wallClockMs = Objects.requireNonNull(wallClockMs, "wallClockMs");
     }
 
@@ -297,7 +307,7 @@ public final class CompanionProvisioningCoordinator {
                 == CompanionProvisioningOperationRecord.RequestedDisposition.PROVISIONED_DORMANT) {
             return advance(operation, CompanionProvisioningOperationRecord.State.COMMITTED,
                     null, null, null, "provisioned_dormant", "not_requested", "COMMITTED")
-                    .thenApply(this::resultFromDurable);
+                    .thenApply(committed -> completeProvisioning(committed, recovered));
         }
         ProvisioningPopulationBackend.ProfileSnapshot profile = backend
                 .findProfile(requireText(operation.canonicalProfileId(), "canonicalProfileId"))
@@ -377,8 +387,39 @@ public final class CompanionProvisioningCoordinator {
                         CompanionProvisioningOperationRecord.State.COMMITTED,
                         profile.profileId(), null, null, "provisioned_active", "active",
                         recovered ? "RECOVERED_COMMITTED" : "COMMITTED"))
-                .thenApply(this::resultFromDurable)
+                .thenApply(committed -> completeProvisioning(committed, recovered))
                 .exceptionallyCompose(failure -> partialDormant(operation, "active-projection-failed"));
+    }
+
+    private CompanionProvisioningResult completeProvisioning(
+            CompanionProvisioningOperationRecord operation, boolean recovered) {
+        CompanionProvisioningResult result = resultFromDurable(operation);
+        if (!result.accepted() || operation.state() != CompanionProvisioningOperationRecord.State.COMMITTED) {
+            return result;
+        }
+        ProvisioningPopulationBackend.ProfileSnapshot profile = backend
+                .findProfile(requireText(operation.canonicalProfileId(), "canonicalProfileId"))
+                .orElse(null);
+        if (profile == null) {
+            return result;
+        }
+        try {
+            eventSink.emit(new CompanionProvisionedEvent(
+                    UUID.fromString(operation.operationId()), operation.callerNamespace(),
+                    operation.idempotencyKey(), profile.profileId(), profile.ownerUuid(),
+                    profile.roleId(), profile.lifecycle(), profile.projectionStatus(),
+                    profile.profileRevision(), recovered, operation.completedAtMs(), nowMs()));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Post-commit listeners are notifications and cannot roll back provisioning.
+        }
+        return result;
+    }
+
+    @FunctionalInterface
+    public interface ProvisioningEventSink {
+        ProvisioningEventSink NO_OP = event -> { };
+
+        void emit(@Nonnull CompanionProvisionedEvent event);
     }
 
     private CompletionStage<CompanionProvisioningResult> terminalFromPreparation(

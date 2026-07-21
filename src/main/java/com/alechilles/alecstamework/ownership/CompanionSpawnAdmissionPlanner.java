@@ -96,7 +96,8 @@ final class CompanionSpawnAdmissionPlanner {
     @Nonnull
     private Source resolveSource(@Nonnull CompanionSpawnAdmissionRequest request) {
         UUID previousUuid = request.previousNpcUuid();
-        String aliasProfile = identityResolver.resolveProfileId(previousUuid).orElse(null);
+        String aliasProfile = previousUuid == null
+                ? null : identityResolver.resolveProfileId(previousUuid).orElse(null);
         if (request.canonicalProfileId() != null
                 && aliasProfile != null
                 && !request.canonicalProfileId().equals(aliasProfile)) {
@@ -173,36 +174,37 @@ final class CompanionSpawnAdmissionPlanner {
 
     @Nullable
     static String validateDormantSource(
-            @Nonnull UUID previousNpcUuid,
+            @Nullable UUID previousNpcUuid,
             @Nullable UUID currentNpcUuid,
             @Nonnull CompanionLifecycleState requiredLifecycle,
             @Nullable OwnerPopulationEntry owner,
             @Nullable ClaimOccupancyEntry claim,
             boolean legacyAdoption
     ) {
-        if (!previousNpcUuid.equals(currentNpcUuid)) {
+        if (previousNpcUuid == null ? currentNpcUuid != null : !previousNpcUuid.equals(currentNpcUuid)) {
             return "spawn-source-duplicate-active-profile";
         }
         if (legacyAdoption) {
-            return owner == null && claim == null
+            return previousNpcUuid != null && owner == null && claim == null
                     ? null
                     : "spawn-source-population-state-mismatch";
         }
-        if (owner == null || claim == null) {
+        if (owner == null || (claim == null
+                && requiredLifecycle != CompanionLifecycleState.PROVISIONED_DORMANT)) {
             return "spawn-source-population-profile-unavailable";
         }
         if (owner.lifecycleState() == CompanionLifecycleState.ACTIVE
                 || owner.lifecycleState() == CompanionLifecycleState.UNLOADED
-                || claim.lifecycleState() == CompanionLifecycleState.ACTIVE
-                || claim.lifecycleState() == CompanionLifecycleState.UNLOADED) {
+                || (claim != null && (claim.lifecycleState() == CompanionLifecycleState.ACTIVE
+                || claim.lifecycleState() == CompanionLifecycleState.UNLOADED))) {
             return "spawn-source-duplicate-active-profile";
         }
         if (owner.lifecycleState() != requiredLifecycle
-                || claim.lifecycleState() != requiredLifecycle) {
+                || (claim != null && claim.lifecycleState() != requiredLifecycle)) {
             return "spawn-source-lifecycle-mismatch";
         }
-        if (owner.revision() != claim.revision()
-                || !Objects.equals(owner.ownerId(), claim.ownerId())) {
+        if (claim != null && (owner.revision() != claim.revision()
+                || !Objects.equals(owner.ownerId(), claim.ownerId()))) {
             return "spawn-source-population-state-mismatch";
         }
         return null;

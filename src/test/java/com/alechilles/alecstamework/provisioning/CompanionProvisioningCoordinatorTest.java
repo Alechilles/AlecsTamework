@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.CompanionProvisioningOperationStatus;
 import com.alechilles.alecstamework.api.CompanionProvisioningProjectionStatus;
 import com.alechilles.alecstamework.api.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.api.CompanionProvisioningResult;
+import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
 import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
@@ -72,6 +73,31 @@ class CompanionProvisioningCoordinatorTest {
         assertNotEquals(first.operationId(), second.operationId());
         assertNotEquals(first.profileId(), second.profileId());
         assertEquals(2, backend.dormantCommits);
+    }
+
+    @Test
+    void committedProvisioningEmitsOnePostCommitEventAndIdempotentReplayDoesNotRepeatIt()
+            throws Exception {
+        InMemoryJournal journal = new InMemoryJournal();
+        FakeBackend backend = new FakeBackend();
+        List<CompanionProvisionedEvent> events = new ArrayList<>();
+        CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
+                journal, backend, events::add, () -> 100L);
+        CompanionProvisioningRequest request = dormantRequest("hydragon", "event-once");
+
+        CompanionProvisioningResult first = await(coordinator.provision(request));
+        CompanionProvisioningResult replay = await(coordinator.provision(request));
+
+        assertEquals(CompanionProvisioningResult.Status.PROVISIONED_DORMANT, first.status());
+        assertEquals(first.operationId(), replay.operationId());
+        assertEquals(1, events.size());
+        CompanionProvisionedEvent event = events.getFirst();
+        assertEquals(first.operationId(), event.operationId());
+        assertEquals(first.profileId(), event.profileId());
+        assertEquals(PopulationCompanionLifecycle.PROVISIONED_DORMANT, event.lifecycle());
+        assertEquals(CompanionProvisioningProjectionStatus.NOT_REQUESTED,
+                event.projectionStatus());
+        assertEquals(100L, event.provisionedAtMs());
     }
 
     @Test

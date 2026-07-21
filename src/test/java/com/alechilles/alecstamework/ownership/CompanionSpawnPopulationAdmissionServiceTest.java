@@ -62,6 +62,25 @@ class CompanionSpawnPopulationAdmissionServiceTest {
     }
 
     @Test
+    void provisionedNullNpcProfileCanEnterTheNormalRestorePipelineWithoutAClaimBaseline() {
+        CompanionSpawnAdmissionRequest request = new CompanionSpawnAdmissionRequest(
+                "profile", null, CompanionLifecycleState.PROVISIONED_DORMANT, false,
+                OWNER, null, "world", 2, -4, OwnerPopulationOperation.RESTORE,
+                "companion_provisioning", "provisioning:activate", false);
+        OwnerPopulationEntry owner = new OwnerPopulationEntry(
+                "profile", OWNER, "world", CompanionLifecycleState.PROVISIONED_DORMANT, 1L);
+
+        assertTrue(request.replacement());
+        assertTrue(request.canonicalNullNpcRestore());
+        assertNull(CompanionSpawnPopulationAdmissionService.validateDormantSource(
+                null, null, CompanionLifecycleState.PROVISIONED_DORMANT, owner, null, false));
+        assertEquals("spawn-source-duplicate-active-profile",
+                CompanionSpawnPopulationAdmissionService.validateDormantSource(
+                        null, PREVIOUS, CompanionLifecycleState.PROVISIONED_DORMANT,
+                        owner, null, false));
+    }
+
+    @Test
     void lifecycleOrRevisionMismatchFailsClosed() {
         assertEquals(
                 "spawn-source-lifecycle-mismatch",

@@ -63,6 +63,13 @@ public final class CompanionSpawnPopulationAdmissionService {
         return prepareBatchAsync(List.of(request), CompanionPopulationBatchMode.EXACT);
     }
 
+    /** Stable projection UUID used by restart recovery before a prepared batch is reacquired. */
+    @Nonnull
+    public static UUID plannedNpcUuid(@Nonnull CompanionSpawnAdmissionRequest request) {
+        return CompanionSpawnAdmissionPlanner.deterministicIdentity(
+                Objects.requireNonNull(request, "request"), "npc");
+    }
+
     @Nonnull
     public CompletableFuture<CompanionSpawnPreparationResult> prepareBatchAsync(
             @Nonnull List<CompanionSpawnAdmissionRequest> requests,
@@ -337,7 +344,7 @@ public final class CompanionSpawnPopulationAdmissionService {
     /** Exact canonical source validation shared by restore-path regression tests. */
     @Nullable
     static String validateDormantSource(
-            @Nonnull UUID previousNpcUuid,
+            @Nullable UUID previousNpcUuid,
             @Nullable UUID currentNpcUuid,
             @Nonnull CompanionLifecycleState requiredLifecycle,
             @Nullable OwnerPopulationEntry owner,
