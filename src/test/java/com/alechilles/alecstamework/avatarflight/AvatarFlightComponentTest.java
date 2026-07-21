@@ -106,4 +106,19 @@ class AvatarFlightComponentTest {
         assertEquals(3, clone.getLockedHotbarSlot());
         assertEquals(0, clone.getPreviousUtilitySlot());
     }
+
+    @Test
+    void cloneAndClearPreserveGroundedMovementOverrideState() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.captureGroundedBaseSpeed(5.5);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertTrue(clone.isGroundedMoveSpeedApplied());
+        assertEquals(5.5, clone.getOriginalGroundedBaseSpeed(), EPSILON);
+
+        clone.clearGroundedBaseSpeed();
+        assertFalse(clone.isGroundedMoveSpeedApplied());
+        assertEquals(0.0, clone.getOriginalGroundedBaseSpeed(), EPSILON);
+    }
 }

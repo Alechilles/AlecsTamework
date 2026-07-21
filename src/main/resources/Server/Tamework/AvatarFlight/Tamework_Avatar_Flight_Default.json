@@ -13,6 +13,7 @@
     "AirborneJumpActivationDelayMs": 250.0
   },
   "Movement": {
+    "GroundedMoveSpeed": 8.0,
     "MaxForwardSpeed": 14.0,
     "MaxGlideSpeed": 15.0,
     "NeutralGlideSpeed": 6.0,

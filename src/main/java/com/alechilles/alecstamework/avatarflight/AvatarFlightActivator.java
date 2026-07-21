@@ -25,6 +25,8 @@ public final class AvatarFlightActivator {
     private final AvatarFlightModelService modelService = new AvatarFlightModelService();
     private final AvatarFlightRiderVisualService riderVisualService = new AvatarFlightRiderVisualService();
     private final AvatarFlightInventoryGuardService inventoryGuard = new AvatarFlightInventoryGuardService();
+    private final AvatarFlightGroundMovementService groundMovementService =
+            new AvatarFlightGroundMovementService();
 
     @Nonnull
     public Result enable(@Nonnull Store<EntityStore> store,
@@ -80,6 +82,9 @@ public final class AvatarFlightActivator {
         boolean restoreModel = config != null && config.getModel().isApplyModel();
         AvatarFlightTrailService.stopFastGlideTrail(flight, ref, store);
         inventoryGuard.disengage(store, ref, flight);
+        if (flight != null) {
+            groundMovementService.restore(store, ref, flight);
+        }
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }

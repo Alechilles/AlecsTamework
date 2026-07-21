@@ -110,6 +110,10 @@ The generator warns when player-style locomotion sets that the native transforme
 
 The camera override preserves the ModelAsset's existing yaw and pitch target settings. The current client camera contract cannot anchor directly to an arbitrary model-attachment node such as the fake rider's `Head`, so `EyeHeight` provides the closest stable first-person alignment.
 
+### Grounded Movement
+
+- `Movement.GroundedMoveSpeed`: native player base speed used while the transformed avatar is genuinely grounded. It defaults to `8.0`, matching the base game's `Mount` movement configuration. Tamework restores the player's previous base speed while airborne, swimming, and when avatar flight ends.
+
 ### Mounting
 
 - `DismountHoldMs`: grounded back+crouch hold duration required for voluntary dismount.

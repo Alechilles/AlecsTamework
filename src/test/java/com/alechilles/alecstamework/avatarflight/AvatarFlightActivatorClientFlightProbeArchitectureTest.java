@@ -51,6 +51,8 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
                 "disable must send the owner client back to non-flying animation state");
         assertTrue(disableBody.contains("resetVisualPose(store, ref)"),
                 "disable must clear any pitch/roll left on the transformed player pose");
+        assertTrue(disableBody.contains("groundMovementService.restore(store, ref, flight)"),
+                "disable must restore the player's pre-flight native movement speed");
     }
 
     @Test

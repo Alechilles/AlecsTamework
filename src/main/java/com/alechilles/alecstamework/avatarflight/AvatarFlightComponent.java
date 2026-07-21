@@ -194,6 +194,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setPreviousUtilitySlot,
                     AvatarFlightComponent::getPreviousUtilitySlot)
             .add()
+            .<Boolean>append(new KeyedCodec<>("GroundedMoveSpeedApplied", Codec.BOOLEAN),
+                    AvatarFlightComponent::setGroundedMoveSpeedApplied,
+                    AvatarFlightComponent::isGroundedMoveSpeedApplied)
+            .add()
+            .<Double>append(new KeyedCodec<>("OriginalGroundedBaseSpeed", Codec.DOUBLE),
+                    AvatarFlightComponent::setOriginalGroundedBaseSpeed,
+                    AvatarFlightComponent::getOriginalGroundedBaseSpeed)
+            .add()
             .build();
 
     private String configId = "";
@@ -240,6 +248,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long burstTrailUntilMs;
     private int lockedHotbarSlot = AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED;
     private int previousUtilitySlot = AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED;
+    private boolean groundedMoveSpeedApplied;
+    private double originalGroundedBaseSpeed;
 
     public AvatarFlightComponent() {
     }
@@ -587,6 +597,22 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     public void setPreviousUtilitySlot(@Nullable Integer value) {
         previousUtilitySlot = value == null ? AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED : value;
     }
+    public boolean isGroundedMoveSpeedApplied() { return groundedMoveSpeedApplied; }
+    public void setGroundedMoveSpeedApplied(@Nullable Boolean value) {
+        groundedMoveSpeedApplied = value != null && value;
+    }
+    public double getOriginalGroundedBaseSpeed() { return Math.max(0.0, originalGroundedBaseSpeed); }
+    public void setOriginalGroundedBaseSpeed(@Nullable Double value) {
+        originalGroundedBaseSpeed = finiteOrZero(value);
+    }
+    public void captureGroundedBaseSpeed(double value) {
+        originalGroundedBaseSpeed = Math.max(0.0, finiteOrZero(value));
+        groundedMoveSpeedApplied = true;
+    }
+    public void clearGroundedBaseSpeed() {
+        groundedMoveSpeedApplied = false;
+        originalGroundedBaseSpeed = 0.0;
+    }
 
     public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
         launchVfxOriginValid = true;
@@ -661,6 +687,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.burstTrailUntilMs = burstTrailUntilMs;
         clone.lockedHotbarSlot = lockedHotbarSlot;
         clone.previousUtilitySlot = previousUtilitySlot;
+        clone.groundedMoveSpeedApplied = groundedMoveSpeedApplied;
+        clone.originalGroundedBaseSpeed = originalGroundedBaseSpeed;
         return clone;
     }
 

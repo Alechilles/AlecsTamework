@@ -27,6 +27,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(750L, config.getInput().getIntentTimeoutMs());
         assertEquals(250L, config.getInput().getAirborneJumpActivationDelayMs());
         assertTrue(config.getMovement().getMaxForwardSpeed() > 0.0);
+        assertEquals(8.0, config.getMovement().getGroundedMoveSpeed(), 0.00001);
         assertEquals(18.0, config.getMovement().getAirbrakeDeceleration(), 0.00001);
         assertTrue(config.getJump().getCooldownSeconds() > 0.0);
         assertEquals(0.45, config.getBoost().getDurationSeconds(), 0.00001);
@@ -179,6 +180,7 @@ class TwAvatarFlightConfigTest {
         TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
         setNestedField(parent, "movement", "maxForwardSpeed", 22.0);
+        setNestedField(parent, "movement", "groundedMoveSpeed", 9.5);
         setNestedField(parent, "jump", "upwardImpulse", 9.0);
         setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 725.0);
         setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 710.0);
@@ -188,6 +190,7 @@ class TwAvatarFlightConfigTest {
         child.inheritMissingTopLevelFrom(parent, Set.of());
 
         assertEquals(22.0, child.getMovement().getMaxForwardSpeed(), 0.00001);
+        assertEquals(9.5, child.getMovement().getGroundedMoveSpeed(), 0.00001);
         assertEquals(9.0, child.getJump().getUpwardImpulse(), 0.00001);
         assertEquals(725L, child.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(710L, child.getAudio().getLaunchChargeEarlyIntervalMs());
@@ -333,6 +336,8 @@ class TwAvatarFlightConfigTest {
     void explicitNestedMovementSectionOnlyKeepsExplicitKeys() throws Exception {
         TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "movement", "groundedMoveSpeed", 9.5);
+        setNestedField(child, "movement", "groundedMoveSpeed", 6.0);
         setNestedField(parent, "movement", "maxForwardSpeed", 20.0);
         setNestedField(parent, "movement", "maxGlideSpeed", 23.0);
         setNestedField(parent, "movement", "neutralGlideSpeed", 9.0);
@@ -358,6 +363,7 @@ class TwAvatarFlightConfigTest {
                 Map.of("Movement", Set.of("MaxForwardSpeed"))
         );
 
+        assertEquals(9.5, child.getMovement().getGroundedMoveSpeed(), 0.00001);
         assertEquals(12.0, child.getMovement().getMaxForwardSpeed(), 0.00001);
         assertEquals(23.0, child.getMovement().getMaxGlideSpeed(), 0.00001);
         assertEquals(9.0, child.getMovement().getNeutralGlideSpeed(), 0.00001);

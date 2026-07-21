@@ -52,6 +52,8 @@ public final class AvatarFlightMovementSystem
     private final AvatarFlightLaunchVfxService launchVfxService = new AvatarFlightLaunchVfxService();
     private final AvatarFlightLaunchAudioService launchAudioService = new AvatarFlightLaunchAudioService();
     private final AvatarFlightTrailService trailService = new AvatarFlightTrailService();
+    private final AvatarFlightGroundMovementService groundMovementService =
+            new AvatarFlightGroundMovementService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.AFTER, MovementStatesSystems.TickingSystem.class),
@@ -105,6 +107,15 @@ public final class AvatarFlightMovementSystem
                 config,
                 Math.max(0.0, dt),
                 now
+        );
+        groundMovementService.sync(
+                ref,
+                commandBuffer,
+                flight,
+                config.getMovement().getGroundedMoveSpeed(),
+                output.mode() == AvatarFlightMode.GROUNDED
+                        && controllerInput.onGround()
+                        && !controllerInput.inFluid()
         );
         spendAppliedVigour(flight, config, output, now);
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);

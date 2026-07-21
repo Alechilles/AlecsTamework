@@ -68,6 +68,7 @@ final class TwAvatarFlightConfigInheritance {
                                         @Nullable Set<String> keys, Set<String> top) {
         if (!top.contains("Movement")) target.movement = parent.movement;
         else if (keys != null && target.movement != null && parent.movement != null) {
+            if (!keys.contains("GroundedMoveSpeed")) target.movement.groundedMoveSpeed = parent.movement.groundedMoveSpeed;
             if (!keys.contains("MaxForwardSpeed")) target.movement.maxForwardSpeed = parent.movement.maxForwardSpeed;
             if (!keys.contains("MaxGlideSpeed")) target.movement.maxGlideSpeed = parent.movement.maxGlideSpeed;
             if (!keys.contains("NeutralGlideSpeed")) target.movement.neutralGlideSpeed = parent.movement.neutralGlideSpeed;
