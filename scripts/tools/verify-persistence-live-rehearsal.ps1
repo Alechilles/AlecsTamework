@@ -139,8 +139,8 @@ $candidateGeneratedAt = Get-RehearsalTimestamp $candidate "generatedAtUtc" "cand
 if ($candidateGeneratedAt -gt [DateTimeOffset]::UtcNow.AddMinutes(5)) {
     Fail-Rehearsal "candidate.generatedAtUtc is in the future"
 }
-if ((Get-RehearsalNumber $rehearsal "evidenceSchemaVersion" "rehearsal") -ne 1) {
-    Fail-Rehearsal "rehearsal.evidenceSchemaVersion must equal 1"
+if ((Get-RehearsalNumber $rehearsal "evidenceSchemaVersion" "rehearsal") -ne 2) {
+    Fail-Rehearsal "rehearsal.evidenceSchemaVersion must equal 2"
 }
 $candidateArtifactRecord = Get-RehearsalProperty (Get-RehearsalProperty $candidate "package" "candidate") `
     "artifact" "candidate.package"
@@ -295,9 +295,9 @@ $snapshotHash = Assert-RehearsalSha256 `
 if ((Get-RehearsalString $snapshot "integrityCheck" "backupBoundary.sqliteMigrationSnapshot") -cne "ok") {
     Fail-Rehearsal "SQLite migration snapshot integrity must be ok"
 }
-if ((Get-RehearsalNumber $snapshot "sourceSchema" "backupBoundary.sqliteMigrationSnapshot") -ge 7 -or
-        (Get-RehearsalNumber $snapshot "targetSchema" "backupBoundary.sqliteMigrationSnapshot") -ne 7) {
-    Fail-Rehearsal "SQLite migration snapshot must prove a pre-v7 to v7 transition"
+if ((Get-RehearsalNumber $snapshot "sourceSchema" "backupBoundary.sqliteMigrationSnapshot") -ge 8 -or
+        (Get-RehearsalNumber $snapshot "targetSchema" "backupBoundary.sqliteMigrationSnapshot") -ne 8) {
+    Fail-Rehearsal "SQLite migration snapshot must prove a pre-v8 to v8 transition"
 }
 
 $rollback = Get-RehearsalProperty $rehearsal "rollback" "rehearsal"
@@ -307,20 +307,20 @@ if ($backupReference -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$') {
     Fail-Rehearsal "rollback operator backup reference must be opaque and path-free"
 }
 $rollbackSqliteHash = Assert-RehearsalSha256 `
-    (Get-RehearsalString $rollback "matchingPreV7SqliteSha256" "rollback") `
-    "rollback.matchingPreV7SqliteSha256"
+    (Get-RehearsalString $rollback "matchingPreV8SqliteSha256" "rollback") `
+    "rollback.matchingPreV8SqliteSha256"
 if ($rollbackSqliteHash -cne $snapshotHash) {
-    Fail-Rehearsal "rollback SQLite hash must match the verified pre-v7 migration snapshot"
+    Fail-Rehearsal "rollback SQLite hash must match the verified pre-v8 migration snapshot"
 }
 $priorJarHash = Assert-RehearsalSha256 `
     (Get-RehearsalString $rollback "priorJarSha256" "rollback") "rollback.priorJarSha256"
 if ($priorJarHash -ceq $candidateSha) { Fail-Rehearsal "rollback prior JAR must differ from the candidate" }
 Assert-RehearsalTrue (Get-RehearsalBoolean $rollback "restoredCopyBootPassed" "rollback") `
     "rollback.restoredCopyBootPassed"
-Assert-RehearsalTrue (Get-RehearsalBoolean $rollback "schemaV7AbsentAfterRestore" "rollback") `
-    "rollback.schemaV7AbsentAfterRestore"
-Assert-RehearsalTrue (Get-RehearsalBoolean $rollback "postV7ProgressLossAcknowledged" "rollback") `
-    "rollback.postV7ProgressLossAcknowledged"
+Assert-RehearsalTrue (Get-RehearsalBoolean $rollback "schemaV8AbsentAfterRestore" "rollback") `
+    "rollback.schemaV8AbsentAfterRestore"
+Assert-RehearsalTrue (Get-RehearsalBoolean $rollback "postV8ProgressLossAcknowledged" "rollback") `
+    "rollback.postV8ProgressLossAcknowledged"
 Assert-EvidenceHashes $rollback "rollback"
 $rollbackHashes = @((Get-RehearsalArray $rollback "evidenceSha256" "rollback" 1) |
     ForEach-Object { ([string]$_).ToLowerInvariant() })
@@ -328,7 +328,7 @@ Assert-RehearsalTrue (Get-RehearsalBoolean $rehearsal "operatorSignedOff" "rehea
     "rehearsal.operatorSignedOff"
 
 $output = [ordered]@{
-    evidenceSchemaVersion = 1
+    evidenceSchemaVersion = 2
     verifiedAtUtc = [DateTime]::UtcNow.ToString("o")
     status = "passed"
     candidateArtifactSha256 = $candidateSha

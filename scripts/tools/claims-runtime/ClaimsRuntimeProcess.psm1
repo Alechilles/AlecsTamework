@@ -134,7 +134,7 @@ function Initialize-ClaimsRuntimeScenario {
 
     $databasePath = Join-Path $universe "Tamework\Data\tamework.sqlite"
     $upgradeCopyEvidence = $null
-    $preexistingPreV6Backups = @()
+    $preexistingPreV8Backups = @()
     if ($Scenario.copiedUpgrade) {
         if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
             throw "Copied upgrade scenario is missing its database at '$databasePath'."
@@ -171,8 +171,8 @@ function Initialize-ClaimsRuntimeScenario {
             snapshotFiles = @($snapshotFiles)
             matchedBeforeStartup = $true
         }
-        $preexistingPreV6Backups = @(Get-ChildItem -LiteralPath (Split-Path $databasePath -Parent) `
-            -File -Filter "tamework_pre_v7_*.sqlite.bak" | ForEach-Object {
+        $preexistingPreV8Backups = @(Get-ChildItem -LiteralPath (Split-Path $databasePath -Parent) `
+            -File -Filter "tamework_pre_v8_*.sqlite.bak" | ForEach-Object {
                 [pscustomobject][ordered]@{
                     path = $_.FullName
                     length = $_.Length
@@ -234,7 +234,7 @@ function Initialize-ClaimsRuntimeScenario {
         serverConfigEvidence = $serverConfigEvidence
         databasePath = $databasePath
         upgradeCopyEvidence = $upgradeCopyEvidence
-        preexistingPreV6Backups = $preexistingPreV6Backups
+        preexistingPreV8Backups = $preexistingPreV8Backups
         stagedTamework = $stagedTamework
         stagedProviders = @($stagedProviders)
         expectedPluginIds = @($Manifests.tamework.pluginId) + @($expectedProviderIds)

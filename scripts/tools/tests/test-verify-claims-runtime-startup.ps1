@@ -309,7 +309,7 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
     } | ConvertTo-Json -Depth 10) + [Environment]::NewLine)
     $sourceConfigHash = (Get-FileHash -LiteralPath $sourceConfigPath -Algorithm SHA256).Hash
     $preexistingBackup = Join-Path (Split-Path $sourceDatabase -Parent) `
-        "tamework_pre_v7_existing.sqlite.bak"
+        "tamework_pre_v8_existing.sqlite.bak"
     Copy-Item -LiteralPath $sourceDatabase -Destination $preexistingBackup
 
     $existingOutput = Join-Path $testRoot "existing-output"
@@ -413,22 +413,22 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
         -DatabasePath $context.databasePath -JavaExecutable $JavaExecutable `
         -BuiltArtifact $BuiltArtifact -ProbeSource $probeSource `
         -ExpectedProfileRows 77 -ExpectedMigrationVersions $sourceProbe.migrationVersions `
-        -PreexistingBackups $context.preexistingPreV6Backups
+        -PreexistingBackups $context.preexistingPreV8Backups
     Assert-ClaimsTest (-not $beforeNewBackup.passed) "a copied preexisting backup cannot satisfy runtime proof"
     $newBackup = Join-Path (Split-Path $context.databasePath -Parent) `
-        "tamework_pre_v7_created.sqlite.bak"
+        "tamework_pre_v8_created.sqlite.bak"
     Copy-Item -LiteralPath $context.databasePath -Destination $newBackup
     $afterNewBackup = Get-ClaimsRuntimeUpgradeBackupEvidence `
         -DatabasePath $context.databasePath -JavaExecutable $JavaExecutable `
         -BuiltArtifact $BuiltArtifact -ProbeSource $probeSource `
         -ExpectedProfileRows 77 -ExpectedMigrationVersions $sourceProbe.migrationVersions `
-        -PreexistingBackups $context.preexistingPreV6Backups
+        -PreexistingBackups $context.preexistingPreV8Backups
     Assert-ClaimsTest ($afterNewBackup.passed -and $afterNewBackup.createdByThisRun.Count -eq 1) `
-        "a new non-empty integrity-clean pre-v7 SQLite snapshot satisfies runtime proof"
+        "a new non-empty integrity-clean pre-v8 SQLite snapshot satisfies runtime proof"
 
     $postEvidence = [pscustomobject]@{
         integrityCheck = "ok"; journalMode = "wal"; synchronous = 2
-        migrationV6Count = 1; migrationV7Count = 1
+        migrationV6Count = 1; migrationV7Count = 1; migrationV8Count = 1
         coverageTotal = 7; coverageReady = 7; coverageErrorCount = 0
         coverageDistinctDimensions = 7
         coverageDimensions = "BASE_CONTAINER_BLOCKS,CUSTOM_CONTAINERS,GLOBAL_OWNER,PER_WORLD_OWNER,PLAYER_SAVES,PROFILE_STATE,WORLD_ENTITIES"

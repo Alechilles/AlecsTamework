@@ -102,7 +102,7 @@ function Get-ClaimsRuntimeInputs {
     }
     $backupProbe = Join-Path $output (
         "scenarios\copied-upgrade-save\home\universe\Tamework\Data\" +
-        "tamework_pre_v7_20000101-000000-999.sqlite.bak"
+        "tamework_pre_v8_20000101-000000-999.sqlite.bak"
     )
     if ($backupProbe.Length -gt 240) {
         throw "OutputRoot exceeds the Windows SQLite snapshot path budget " +

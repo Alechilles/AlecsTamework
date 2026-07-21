@@ -1,5 +1,5 @@
 {
-  "evidenceSchemaVersion": 1,
+  "evidenceSchemaVersion": 2,
   "completedAtUtc": "REPLACE_WITH_UTC_TIMESTAMP",
   "candidateArtifactSha256": "REPLACE_WITH_CANDIDATE_SHA256",
   "sourceCommits": {
@@ -50,17 +50,17 @@
       "sha256": "REPLACE_WITH_SQLITE_SNAPSHOT_SHA256",
       "integrityCheck": "REPLACE_WITH_INTEGRITY_RESULT",
       "sourceSchema": 0,
-      "targetSchema": 7
+      "targetSchema": 8
     }
   },
   "rollback": {
     "passed": false,
     "operatorHytaleBackupReference": "REPLACE_WITH_OPAQUE_REFERENCE",
-    "matchingPreV7SqliteSha256": "REPLACE_WITH_PRE_V7_SQLITE_SHA256",
+    "matchingPreV8SqliteSha256": "REPLACE_WITH_PRE_V8_SQLITE_SHA256",
     "priorJarSha256": "REPLACE_WITH_PRIOR_JAR_SHA256",
     "restoredCopyBootPassed": false,
-    "schemaV7AbsentAfterRestore": false,
-    "postV7ProgressLossAcknowledged": false,
+    "schemaV8AbsentAfterRestore": false,
+    "postV8ProgressLossAcknowledged": false,
     "evidenceSha256": []
   },
   "operatorSignedOff": false

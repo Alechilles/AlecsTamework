@@ -296,6 +296,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $requiredEntries = @(
     'com/alechilles/alecstamework/ui/TameworkCommandSelectionPage$CommandSelectionEventData.class',
     'com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV7Migration.class',
+    'com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV8Migration.class',
     'com/alechilles/alecstamework/persistence/sqlite/SqliteMigrationBackupService.class',
     'com/alechilles/alecstamework/persistence/incidents/PersistenceResilienceRuntime.class',
     'com/alechilles/alecstamework/persistence/diagnostics/PersistenceDiagnosticsService.class',
@@ -327,8 +328,10 @@ if ($embeddedRuntimeVersion -cne "1.0.4") {
 $javaVersion = (& java -version 2>&1 | Select-Object -First 1).ToString()
 $nodeVersion = (& node --version).Trim()
 $npmVersion = (& npm.cmd --version).Trim()
-$schemaSource = Join-Path $tameworkRoot `
+$schemaV7Source = Join-Path $tameworkRoot `
     "src/main/java/com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV7Migration.java"
+$schemaV8Source = Join-Path $tameworkRoot `
+    "src/main/java/com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV8Migration.java"
 $telemetryDescriptor = Join-Path $tameworkRoot "src/main/resources/telemetry/project.json"
 $requiredTameworkReports = Get-RequiredSurefireReportEvidence $tameworkRoot @(
     "com.alechilles.alecstamework.architecture.AsyncThreadSafetyGuardTest",
@@ -351,6 +354,7 @@ $requiredTameworkReports = Get-RequiredSurefireReportEvidence $tameworkRoot @(
     "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueueIsolationTest",
     "com.alechilles.alecstamework.persistence.sqlite.SqliteMigrationBackupServiceTest",
     "com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaV7MigrationTest",
+    "com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaV8MigrationTest",
     "com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntimeMigrationTest",
     "com.alechilles.alecstamework.metrics.PersistenceTelemetryDescriptorTest",
     "com.alechilles.alecstamework.metrics.PersistenceTelemetryPrivacyTest",
@@ -423,7 +427,7 @@ $evidence = [ordered]@{
         java = $javaVersion
         node = $nodeVersion
         npm = $npmVersion
-        persistenceSchema = 7
+        persistenceSchema = 8
         embeddedTelemetryRuntime = $embeddedRuntimeVersion
     }
     tests = [ordered]@{
@@ -451,7 +455,8 @@ $evidence = [ordered]@{
         tameworkVersion = $pluginManifest.Version
         artifact = Get-FileEvidence $artifact.FullName
         requiredEntries = $requiredEntries
-        schemaV7Source = Get-FileEvidence $schemaSource
+        schemaV7Source = Get-FileEvidence $schemaV7Source
+        schemaV8Source = Get-FileEvidence $schemaV8Source
         telemetryDescriptor = Get-FileEvidence $telemetryDescriptor
     }
     backupBoundary = [ordered]@{
@@ -476,7 +481,7 @@ $evidence = [ordered]@{
     knownLimitations = @(
         "Candidate evidence does not replace representative copied-player-world gameplay rehearsal.",
         "Platform deployment and public download verification require explicit deployment authorization.",
-        "Rollback proof requires an operator-selected Hytale backup paired with its matching pre-v7 Tamework SQLite state."
+        "Rollback proof requires an operator-selected Hytale backup paired with its matching pre-v8 Tamework SQLite state."
     )
 }
 

@@ -52,11 +52,17 @@ function Invoke-LiveTestVerifier {
         [string] $RehearsalPath,
         [string] $OutputPath
     )
-    $text = & $PowerShell -NoLogo -NoProfile -File $Verifier `
-        -CandidateManifest $CandidatePath -CandidateArtifact $CandidateArtifactPath `
-        -RehearsalManifest $RehearsalPath `
-        -OutputPath $OutputPath 2>&1 | Out-String
-    return [pscustomobject]@{ exitCode = $LASTEXITCODE; text = $text }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $text = & $PowerShell -NoLogo -NoProfile -File $Verifier `
+            -CandidateManifest $CandidatePath -CandidateArtifact $CandidateArtifactPath `
+            -RehearsalManifest $RehearsalPath `
+            -OutputPath $OutputPath 2>&1 | Out-String
+        return [pscustomobject]@{ exitCode = $LASTEXITCODE; text = $text }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 
 function Assert-LiveTestRejects {
@@ -76,7 +82,8 @@ function Assert-LiveTestRejects {
     $result = Invoke-LiveTestVerifier $PowerShell $Verifier $CandidatePath $CandidateArtifactPath `
         $inputPath $outputPath
     Assert-LiveTest ($result.exitCode -ne 0) "$Name must be rejected"
-    Assert-LiveTest ($result.text -match $Pattern) "$Name must report '$Pattern': $($result.text)"
+    $normalizedText = $result.text -replace '\s+', ' '
+    Assert-LiveTest ($normalizedText -match $Pattern) "$Name must report '$Pattern': $($result.text)"
     Assert-LiveTest (-not (Test-Path -LiteralPath $outputPath)) "$Name must not emit passing output"
 }
 
@@ -99,7 +106,8 @@ function Assert-LiveTestCandidateRejects {
     $result = Invoke-LiveTestVerifier $PowerShell $Verifier $candidatePath $CandidateArtifactPath `
         $inputPath $outputPath
     Assert-LiveTest ($result.exitCode -ne 0) "$Name must be rejected"
-    Assert-LiveTest ($result.text -match $Pattern) "$Name must report '$Pattern': $($result.text)"
+    $normalizedText = $result.text -replace '\s+', ' '
+    Assert-LiveTest ($normalizedText -match $Pattern) "$Name must report '$Pattern': $($result.text)"
     Assert-LiveTest (-not (Test-Path -LiteralPath $outputPath)) "$Name must not emit passing output"
 }
 
@@ -135,7 +143,7 @@ $candidate = [ordered]@{
     releaseRehearsal = [ordered]@{ exactRepositoryAndPackageGates = "passed" }
 }
 $rehearsal = [ordered]@{
-    evidenceSchemaVersion = 1
+    evidenceSchemaVersion = 2
     completedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
     candidateArtifactSha256 = $candidateHash
     sourceCommits = $commits
@@ -182,18 +190,18 @@ $rehearsal = [ordered]@{
             scope = "tamework_sqlite_only"
             sha256 = $snapshotHash
             integrityCheck = "ok"
-            sourceSchema = 6
-            targetSchema = 7
+            sourceSchema = 7
+            targetSchema = 8
         }
     }
     rollback = [ordered]@{
         passed = $true
         operatorHytaleBackupReference = "hytale-backup:rehearsal-42"
-        matchingPreV7SqliteSha256 = $snapshotHash
+        matchingPreV8SqliteSha256 = $snapshotHash
         priorJarSha256 = $priorJarHash
         restoredCopyBootPassed = $true
-        schemaV7AbsentAfterRestore = $true
-        postV7ProgressLossAcknowledged = $true
+        schemaV8AbsentAfterRestore = $true
+        postV8ProgressLossAcknowledged = $true
         evidenceSha256 = @($evidenceHash)
     }
     operatorSignedOff = $true
@@ -283,8 +291,8 @@ try {
         $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $wrongRollbackState = Copy-LiveTestObject $rehearsal
-    $wrongRollbackState.rollback.matchingPreV7SqliteSha256 = "e" * 64
-    Assert-LiveTestRejects "rollback-sqlite" $wrongRollbackState "must match the verified pre-v7" `
+    $wrongRollbackState.rollback.matchingPreV8SqliteSha256 = "e" * 64
+    Assert-LiveTestRejects "rollback-sqlite" $wrongRollbackState "must match the verified pre-v8" `
         $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $unsigned = Copy-LiveTestObject $rehearsal
