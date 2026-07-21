@@ -67,7 +67,8 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         boolean deadRespawnEnabled = CompanionRevivePolicy.featureEnabled(roleId);
         boolean canonicalAuthority = identity != null
-                && CompanionReviveEligibilityService.current().supports(identity.getUuid());
+                && CompanionReviveEligibilityService.current()
+                .protectsFromPermanentDeath(identity.getUuid());
         if (!shouldSuppressDrops(links, deadRespawnEnabled, canonicalAuthority)) {
             return;
         }

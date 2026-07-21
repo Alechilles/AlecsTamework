@@ -26,7 +26,7 @@ public final class CompanionRevivePolicy {
                                          @Nullable TameworkCommandLinksComponent links,
                                          @Nullable UUID npcUuid) {
         return supportsRevive(links, featureEnabled(roleId),
-                CompanionReviveEligibilityService.current().supports(npcUuid));
+                CompanionReviveEligibilityService.current().protectsFromPermanentDeath(npcUuid));
     }
 
     static boolean supportsRevive(@Nullable TameworkCommandLinksComponent links,

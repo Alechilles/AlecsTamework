@@ -10,6 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionReviveEligibilityServiceTest {
     @Test
+    void unavailableAuthorityProtectsAgainstDestructivePermanentRelease() {
+        CompanionReviveEligibilityService service = new CompanionReviveEligibilityService();
+        UUID npc = UUID.randomUUID();
+
+        assertFalse(service.ready());
+        assertFalse(service.supports(npc));
+        assertTrue(service.protectsFromPermanentDeath(npc));
+    }
+
+    @Test
     void memorySnapshotRemapsAndReleasesWithoutPersistenceReads() {
         CompanionReviveEligibilityService service = new CompanionReviveEligibilityService();
         UUID first = UUID.randomUUID();

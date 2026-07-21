@@ -140,7 +140,8 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
             boolean commandLinked = links != null && links.getToolIds() != null
                     && links.getToolIds().length > 0;
             return !commandLinked
-                    && !CompanionReviveEligibilityService.current().supports(npcUuid);
+                    && !CompanionReviveEligibilityService.current()
+                    .protectsFromPermanentDeath(npcUuid);
         } catch (RuntimeException | LinkageError failure) {
             return false;
         }

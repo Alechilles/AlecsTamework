@@ -130,6 +130,11 @@ public final class CompanionReviveEligibilityService {
         return npcUuid != null && byNpc.containsKey(npcUuid);
     }
 
+    /** Degraded authority must preserve an owned death rather than release it destructively. */
+    public boolean protectsFromPermanentDeath(@Nullable UUID npcUuid) {
+        return npcUuid != null && (!ready || supports(npcUuid));
+    }
+
     @Nullable
     public Eligibility findByNpc(@Nullable UUID npcUuid) {
         return npcUuid == null ? null : byNpc.get(npcUuid);
