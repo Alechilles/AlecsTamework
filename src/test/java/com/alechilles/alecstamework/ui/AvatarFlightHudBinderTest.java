@@ -19,6 +19,7 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(source.contains("Anchor"));
         Assertions.assertTrue(source.contains("Value.of("));
         Assertions.assertTrue(source.contains("#Root.Visible"));
+        Assertions.assertTrue(source.contains("#ControlsOverlay.Visible"));
         Assertions.assertTrue(source.contains("LAUNCH_TRACK_WIDTH"));
         Assertions.assertTrue(source.contains("LAUNCH_FILL_MAX_WIDTH"));
         Assertions.assertTrue(source.contains("LAUNCH_MIN_MARKER_WIDTH"));
@@ -51,6 +52,7 @@ class AvatarFlightHudBinderTest {
         )).replace("\r\n", "\n");
 
         Assertions.assertTrue(ui.contains("Group #Root"));
+        Assertions.assertTrue(ui.contains("Group #ControlsOverlay"));
         Assertions.assertTrue(ui.contains("Group #LaunchChargeGroup"));
         Assertions.assertTrue(ui.contains("Group #LaunchChargeTrack"));
         Assertions.assertTrue(ui.contains("Group #LaunchChargeFill"));
@@ -87,6 +89,16 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Background: #f04444;"));
         Assertions.assertTrue(ui.contains("Style: (FontSize: 11, RenderBold: true, TextColor: #f2f6fb, HorizontalAlignment: Center, VerticalAlignment: Center)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107)"));
+        Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
+        Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
+        Assertions.assertTrue(ui.contains("Group #AirbrakeIcon"));
+        Assertions.assertTrue(ui.contains("Group #LaunchIcon"));
+        Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/ForwardBoost.png"));
+        Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/UpwardFlap.png"));
+        Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/Airbrake.png"));
+        Assertions.assertTrue(ui.contains("Tamework/AvatarFlightControls/Launch.png"));
+        Assertions.assertTrue(ui.contains("Text: \"CROUCH\";"));
     }
 
     private static int countOccurrences(String text, String token) {

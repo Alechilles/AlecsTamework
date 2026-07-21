@@ -37,6 +37,7 @@
 - Added configurable positional wind cues for successful avatar-flight upward flaps, forward boosts, and airbrake activation.
 - Added reusable animation-timed wing-flap audio and a subtle sustained fast-flight loop for avatar-flight models.
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
+- Added dedicated forward boost, upward flap, airbrake, and crouch-launch artwork to the lower-right avatar-flight controls while preserving Hytale's native frames and input presentation.
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.

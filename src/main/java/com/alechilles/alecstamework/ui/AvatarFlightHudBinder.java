@@ -28,6 +28,7 @@ final class AvatarFlightHudBinder {
     static void bind(@Nonnull UICommandBuilder commandBuilder,
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
+        commandBuilder.set("#ControlsOverlay.Visible", model.visible());
         commandBuilder.set("#LaunchChargeGroup.Visible", model.visible() && model.launchChargeVisible());
         commandBuilder.setObject("#LaunchChargeFill.Anchor",
                 fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
