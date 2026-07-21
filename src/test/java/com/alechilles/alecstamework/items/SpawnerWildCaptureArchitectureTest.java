@@ -39,10 +39,7 @@ class SpawnerWildCaptureArchitectureTest {
         ));
         int complete = source.indexOf("boolean completeCaptureChannel(");
         int removeAura = source.indexOf("endCaptureChannel(player, targetRef, itemStack)", complete);
-        int capture = source.indexOf(
-                "captureFromItemInteraction(player, itemStack, targetRef, captureBurstParticleSystem)",
-                removeAura
-        );
+        int capture = source.indexOf("return captureFromItemInteraction(", removeAura);
 
         assertTrue(complete >= 0);
         assertTrue(removeAura > complete);
