@@ -82,7 +82,7 @@ Copy the template into a private rehearsal workspace, replace every placeholder 
 ```powershell
 .\scripts\tools\verify-persistence-live-rehearsal.ps1 `
   -CandidateManifest ".\target\persistence-release-evidence\candidate.json" `
-  -CandidateArtifact ".\target\Alec's Tamework! v2.17.0.jar" `
+  -CandidateArtifact ".\target\Alec's Tamework! v3.0.jar" `
   -RehearsalManifest "C:\rehearsal\persistence-live-rehearsal.json" `
   -OutputPath "C:\rehearsal\persistence-live-rehearsal-verified.json"
 ```

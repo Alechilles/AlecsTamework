@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.0 - Persistence Resilience and Companion Systems Overhaul - 2026-07-20
 
 ### Added
 - Added scoped persistence incidents and durable quarantines so a conflict affecting one companion, owner, coop slot, breeding pair, or world can be contained without disabling unrelated Tamework systems.
