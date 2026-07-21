@@ -34,7 +34,8 @@ class IntegrationConfigRuntimeWiringTest {
         assertTrue(source.contains("if (rebuildCapturePolicyIndex() && !event.isInitial())"));
         assertTrue(source.contains("TwPopulationGroupConfig.clearInheritanceFallbackCache();"));
         assertTrue(source.contains("populationGroupRegistry.replace("));
-        assertTrue(source.contains("if (rebuildPopulationGroupIndex() && !event.isInitial())"));
+        assertTrue(source.contains(
+                "if (rebuildPopulationGroupIndex(event.isInitial()) && !event.isInitial())"));
         assertTrue(source.contains("retaining revision"),
                 "Rejected assets must retain the prior compiled index and log its revision.");
     }
