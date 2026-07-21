@@ -37,10 +37,11 @@ final class HyDragonCaptureSelfTestFixture {
         try {
             runGuaranteed(assertions);
             runFailedProbabilityAndDuplicate(assertions);
+            runRestartCheckpoints(assertions);
         } catch (RuntimeException failure) {
             assertions.add(new ApiSelfTestAssertion(
                     "isolated capture fixtures execute", false,
-                    failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage())));
+                    failure.getClass().getSimpleName() + ": isolated-fixture-failed"));
         }
         return List.copyOf(assertions);
     }
@@ -111,6 +112,62 @@ final class HyDragonCaptureSelfTestFixture {
                         + " applyTransitions=" + journal.applyTransitions));
     }
 
+    private static void runRestartCheckpoints(List<ApiSelfTestAssertion> assertions) {
+        InMemoryCaptureJournal journal = new InMemoryCaptureJournal();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        AtomicInteger events = new AtomicInteger();
+        CaptureAttemptCoordinator firstRuntime = coordinator(journal, entropyCalls, events, 0.10D);
+        CaptureAttemptCoordinator.AttemptRequest original = request(
+                "restart-apply", ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT);
+
+        CaptureAttemptCoordinator.ResolutionResult resolved = firstRuntime.resolve(original).join();
+        boolean began = firstRuntime.beginApply(original.attemptId()).join();
+        CaptureAttemptCoordinator restarted = coordinator(journal, entropyCalls, events, 0.99D);
+        CaptureAttemptCoordinator.RecoveryReport recovery = restarted.recover(8).join();
+        CaptureAttemptCoordinator.AttemptRequest lateCallback = request(
+                "restart-apply", ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT,
+                "late-after-restart");
+        CaptureAttemptCoordinator.ResolutionResult duplicate = restarted.resolve(lateCallback).join();
+        CaptureAttemptRecord durable = journal.findUnchecked(original.attemptId());
+        assertions.add(new ApiSelfTestAssertion(
+                "isolated capture restart quarantines ambiguous apply and reuses its outcome",
+                resolved.status() == CaptureAttemptCoordinator.ResultStatus.SUCCESS
+                        && began
+                        && recovery.ready()
+                        && recovery.discovered() == 1
+                        && recovery.quarantined() == 1
+                        && durable.state() == CaptureAttemptRecord.State.QUARANTINED
+                        && duplicate.status() == CaptureAttemptCoordinator.ResultStatus.DENIED
+                        && duplicate.attemptId().equals(original.attemptId())
+                        && entropyCalls.get() == 0
+                        && events.get() == 0,
+                "recovery=" + recovery.quarantined() + "/" + recovery.discovered()
+                        + " state=" + durable.state() + " duplicate=" + duplicate.status()
+                        + " entropyCalls=" + entropyCalls.get()));
+
+        InMemoryCaptureJournal expiredJournal = new InMemoryCaptureJournal();
+        CaptureAttemptCoordinator seedCoordinator = coordinator(
+                expiredJournal, new AtomicInteger(), new AtomicInteger(), 0.0D);
+        CaptureAttemptCoordinator.AttemptRequest expiredRequest = request(
+                "expired-prepared", ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT);
+        seedCoordinator.resolve(expiredRequest).join();
+        CaptureAttemptRecord seed = expiredJournal.findUnchecked(expiredRequest.attemptId());
+        expiredJournal.replace(new CaptureAttemptRecord(
+                seed.identity(), seed.config(), CaptureAttemptRecord.State.PREPARED, null,
+                seed.populationOperationId(), seed.captureOperationId(), 0L, "READY",
+                NOW_MS, seed.createdAtMs(), seed.updatedAtMs(), 0L, null));
+        CaptureAttemptCoordinator.RecoveryReport expiredRecovery = coordinator(
+                expiredJournal, new AtomicInteger(), new AtomicInteger(), 0.0D).recover(8).join();
+        assertions.add(new ApiSelfTestAssertion(
+                "isolated capture restart cancels an expired prepared checkpoint",
+                expiredRecovery.ready()
+                        && expiredRecovery.canceled() == 1
+                        && expiredJournal.findUnchecked(expiredRequest.attemptId()).state()
+                        == CaptureAttemptRecord.State.CANCELED,
+                "canceled=" + expiredRecovery.canceled()
+                        + " state=" + expiredJournal.findUnchecked(expiredRequest.attemptId()).state()));
+    }
+
     private static CaptureAttemptCoordinator coordinator(
             InMemoryCaptureJournal journal,
             AtomicInteger entropyCalls,
@@ -167,7 +224,8 @@ final class HyDragonCaptureSelfTestFixture {
                 -1L,
                 "HyDragon_SelfTest_Stone",
                 "HyDragon_SelfTest_Dragon",
-                "{\"fixture\":true}",
+                "{\"version\":1,\"world\":\"fixture-world\",\"inventory\":\"hotbar\","
+                        + "\"slot\":0,\"fingerprint\":\"fixture-stone-fingerprint\"}",
                 "HyDragon_SelfTest_Spawner",
                 1L,
                 mechanics,
@@ -271,6 +329,10 @@ final class HyDragonCaptureSelfTestFixture {
 
         private CaptureAttemptRecord findUnchecked(UUID attemptId) {
             return attempts.get(attemptId.toString());
+        }
+
+        private void replace(CaptureAttemptRecord attempt) {
+            attempts.put(attempt.identity().attemptId(), attempt);
         }
 
         private CompletableFuture<CaptureAttemptRepository.MutationResult> mutation(

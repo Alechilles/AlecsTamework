@@ -113,8 +113,6 @@ final class TameworkApiSelfTestCommandSupport {
         plugin.getLogger().at(Level.INFO).log(
                 "[tw api test] run suite="
                         + suiteName
-                        + " requester="
-                        + player.getUuid()
                         + " chatVerbose="
                         + verbose
                         + " totals="

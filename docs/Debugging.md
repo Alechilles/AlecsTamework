@@ -79,6 +79,7 @@
 - `Unavoidable companion relocation created a per-world owner over-cap condition` means a cross-world move was preserved even though the destination now exceeds its per-world owner cap. The warning is throttled, `unavoidablePerWorldOverCapRelocations` increments, and later positive admissions remain blocked until the count falls.
 - Population-bearing world work uses a lease-aligned start watchdog. If an accepted callback never starts during shutdown, its rejection cleanup runs exactly once and any late queued wrapper is inert. Repeated warnings here usually indicate world shutdown or executor backlog, not a second mutation.
 - `/tw api test prepare` and `/tw api test reset` use production journaled `ADMIN_FORCE` assignment and permanent-release authority. A readiness, admission, or durability failure from these commands is therefore meaningful and should not be bypassed with direct owner/profile edits.
+- `/tw api test run hydragon-integrations` does not require prepared live fixtures. Its capture, population, provisioning, and vessel transaction checks use fixed in-memory ports or a disposable temporary SQLite database, never the live player/world/profile database. Verbose assertion details are single-line and capped before output.
 - API 0.9 DTO/schema tests do not prove a gated feature is live. Require its
   advertised capability and feature-specific runtime result. An unavailable
   facade or empty default read is a deliberate denial.

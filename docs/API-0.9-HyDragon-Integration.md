@@ -139,9 +139,14 @@ advertise it and its feature-specific live checks must pass.
 
 The HyDragon suite needs no prepared live fixture. It uses isolated,
 deterministic fixtures to prove guaranteed capture without entropy,
-duplicate-safe failed capture, stale bonded-generation rejection, group-cap
-boundary denial, dormant and active provisioning, and restart-style lookup of
-one failed projection retained as `PARTIAL_DORMANT`.
+duplicate-safe failure and restart checkpoints, generation-one vessel binding,
+summon/store/death/lost/recovery behavior, stale bonded-generation rejection,
+group-cap boundary/concurrent reservation/cancellation/role-change/unavailable
+authority behavior, dormant and active provisioning, and restart-style lookup
+of one failed projection retained as `PARTIAL_DORMANT`. Vessel lifecycle checks
+use a disposable temporary SQLite database and fake item/world ports; they never
+open the live Tamework database or read or mutate players, inventories, profiles,
+or worlds. Assertion detail is flattened and capped before chat or log output.
 
 For focused read-only inspection, use `/tw diagnose population`,
 `/tw diagnose capture-attempt <id>`,

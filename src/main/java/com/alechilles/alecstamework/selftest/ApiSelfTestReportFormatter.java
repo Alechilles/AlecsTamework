@@ -5,6 +5,8 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 public final class ApiSelfTestReportFormatter {
+    private static final int MAX_DETAIL_CHARACTERS = 240;
+
     private ApiSelfTestReportFormatter() {
     }
 
@@ -22,7 +24,7 @@ public final class ApiSelfTestReportFormatter {
                 builder.append(assertion.passed() ? "  PASS " : "  FAIL ");
                 builder.append(assertion.name());
                 if (assertion.detail() != null && !assertion.detail().isBlank()) {
-                    builder.append(": ").append(assertion.detail());
+                    builder.append(": ").append(boundedDetail(assertion.detail()));
                 }
                 lines.add(builder.toString());
             }
@@ -69,8 +71,21 @@ public final class ApiSelfTestReportFormatter {
             if (assertion.detail() == null || assertion.detail().isBlank()) {
                 return summary + ": " + assertion.name();
             }
-            return summary + ": " + assertion.name() + " - " + assertion.detail();
+            return summary + ": " + assertion.name() + " - "
+                    + boundedDetail(assertion.detail());
         }
         return summary;
+    }
+
+    /** Keeps operator output single-line and bounded even when an API returns hostile detail text. */
+    @Nonnull
+    private static String boundedDetail(@Nonnull String detail) {
+        String singleLine = detail.replaceAll("[\\r\\n\\t]+", " ")
+                .replaceAll("[\\p{Cntrl}&&[^ ]]", "?")
+                .trim();
+        if (singleLine.length() <= MAX_DETAIL_CHARACTERS) {
+            return singleLine;
+        }
+        return singleLine.substring(0, MAX_DETAIL_CHARACTERS - 3) + "...";
     }
 }

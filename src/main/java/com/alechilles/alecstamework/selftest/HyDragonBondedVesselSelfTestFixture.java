@@ -51,7 +51,7 @@ final class HyDragonBondedVesselSelfTestFixture {
             return new ApiSelfTestAssertion(
                     "isolated bonded vessel rejects stale generation",
                     false,
-                    failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage()));
+                    failure.getClass().getSimpleName() + ": isolated-fixture-failed");
         }
     }
 
