@@ -2,7 +2,11 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
 import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
+import com.alechilles.alecstamework.api.BondedVesselBindingInvalidatedEvent;
+import com.alechilles.alecstamework.api.BondedVesselBoundEvent;
+import com.alechilles.alecstamework.api.BondedVesselStateChangedEvent;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
+import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -140,6 +144,21 @@ public final class TameworkEventBus
     }
 
     public void emitCaptureAttemptResolved(@Nonnull CaptureAttemptResolvedEvent event) {
+        dispatch(event);
+    }
+
+    public void emitCompanionProvisioned(@Nonnull CompanionProvisionedEvent event) {
+        dispatch(Objects.requireNonNull(event, "event"));
+    }
+
+    /** Isolated post-commit delivery seam for the bonded-vessel runtime. */
+    public void emitBondedVesselEvent(@Nonnull TameworkEvent event) {
+        Objects.requireNonNull(event, "event");
+        if (!(event instanceof BondedVesselBoundEvent)
+                && !(event instanceof BondedVesselStateChangedEvent)
+                && !(event instanceof BondedVesselBindingInvalidatedEvent)) {
+            throw new IllegalArgumentException("Only canonical bonded-vessel events are accepted.");
+        }
         dispatch(event);
     }
 

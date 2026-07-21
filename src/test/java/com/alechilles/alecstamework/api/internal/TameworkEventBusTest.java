@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
+import com.alechilles.alecstamework.api.BondedVesselBoundEvent;
+import com.alechilles.alecstamework.api.BondedVesselState;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
@@ -60,6 +62,24 @@ class TameworkEventBusTest {
 
         bus.emitConfigReload(TameworkConfigFamily.GLOBAL, Set.of("global/default"));
         assertEquals(1, successfulDeliveries.get());
+    }
+
+    @Test
+    void canonicalBondedVesselEventsReachTypedAndGeneralSubscribers() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        List<TameworkEvent> all = new ArrayList<>();
+        List<BondedVesselBoundEvent> bound = new ArrayList<>();
+        bus.subscribe(TameworkEvent.class, all::add);
+        bus.subscribe(BondedVesselBoundEvent.class, bound::add);
+        BondedVesselBoundEvent event = new BondedVesselBoundEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "profile-vessel", UUID.randomUUID(),
+                "dragon-stone", 1L, 4L, BondedVesselState.STORED,
+                false, 100L, 101L);
+
+        bus.emitBondedVesselEvent(event);
+
+        assertEquals(List.of(event), all);
+        assertEquals(List.of(event), bound);
     }
 
     @Test
