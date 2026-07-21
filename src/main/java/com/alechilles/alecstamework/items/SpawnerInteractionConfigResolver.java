@@ -52,6 +52,8 @@ final class SpawnerInteractionConfigResolver {
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
                 .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
+                .captureMechanics(baseConfig.getCaptureMechanics())
+                .vesselMechanics(baseConfig.getVesselMechanics())
                 .build();
     }
 }

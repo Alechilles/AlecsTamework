@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
+import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
@@ -445,6 +446,15 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .documentation("Spawn settings for spawner items. Inheritance: omitted section inherits from parent; when "
                 + "present, only explicitly defined nested fields override parent.")
         .add()
+        .<TwSpawnerVesselSettings>append(
+            new KeyedCodec<>("Vessel", TwSpawnerVesselSettings.CODEC),
+            (asset, value) -> asset.vessel = value == null ? new TwSpawnerVesselSettings() : value,
+            asset -> asset.vessel
+        )
+        .documentation("Vessel lifecycle settings. Inheritance: an omitted section inherits the parent section; "
+                + "an explicit object inherits missing nested scalar fields, while explicit StateItemIds replaces "
+                + "the parent map. Mode defaults to Disposable.")
+        .add()
         .<SpawnerIconOverride[]>append(
             new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
             (asset, value) -> asset.iconOverrides = value == null ? EMPTY_OVERRIDES : value,
@@ -495,6 +505,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private ItemFeatureConfig.SpawnerTooltipMode tooltipMode = ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
     private CaptureSettings capture = new CaptureSettings();
     private SpawnSettings spawn = new SpawnSettings();
+    private TwSpawnerVesselSettings vessel = new TwSpawnerVesselSettings();
 
     public static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -575,6 +586,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             spawn = parent.spawn;
         } else {
             inheritSpawnSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Spawn"));
+        }
+        if (!explicitTopLevelKeys.contains("Vessel")) {
+            vessel = parent.vessel;
+        } else {
+            inheritVesselSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Vessel"));
         }
         if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
         if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
@@ -660,6 +676,15 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("MaxDistance")) spawn.maxDistance = parent.spawn.maxDistance;
     }
 
+    private void inheritVesselSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) return;
+        if (vessel == null) {
+            vessel = parent.vessel;
+            return;
+        }
+        if (parent.vessel != null) vessel.inheritMissingFrom(parent.vessel, nestedExplicitKeys);
+    }
+
     @Nullable
     private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
                                                      @Nonnull String topLevelKey) {
@@ -675,6 +700,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
     public String getFilledItemId() {
         return filledItemId;
+    }
+
+    public TwSpawnerVesselSettings getVessel() {
+        return vessel;
     }
 
     public ItemFeatureConfig toItemFeatureConfig() {
@@ -723,7 +752,30 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnerIconOverrideGroups(toOverrideGroups(iconOverrideGroups))
             .spawnerTooltipMode(tooltipMode)
             .captureMechanics(captureSettings.toMechanics())
+            .vesselMechanics((vessel == null ? new TwSpawnerVesselSettings() : vessel)
+                    .toRuntimeMechanics(emptyItemId, filledItemId))
             .build();
+    }
+
+    public SpawnerVesselConfigView toVesselConfigView(long revision) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Spawner config ID is required for vessel mechanics.");
+        }
+        return (vessel == null ? new TwSpawnerVesselSettings() : vessel)
+                .toView(id, revision, emptyItemId, filledItemId);
+    }
+
+    public boolean matchesVesselItemId(@Nullable String itemId) {
+        if (itemId == null || itemId.isBlank()) return false;
+        ItemFeatureConfig.VesselItemMechanics mechanics =
+                (vessel == null ? new TwSpawnerVesselSettings() : vessel)
+                        .toRuntimeMechanics(emptyItemId, filledItemId);
+        return itemId.equals(mechanics.emptyItemId())
+                || itemId.equals(mechanics.storedItemId())
+                || itemId.equals(mechanics.activeItemId())
+                || itemId.equals(mechanics.deadItemId())
+                || itemId.equals(mechanics.lostItemId())
+                || itemId.equals(mechanics.unavailableItemId());
     }
 
     public SpawnerCaptureMechanicsView toCaptureMechanicsView(long revision) {
