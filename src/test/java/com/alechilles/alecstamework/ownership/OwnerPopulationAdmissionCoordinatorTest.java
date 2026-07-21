@@ -5,6 +5,10 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationReposi
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupCountEvidenceRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaMigrator;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityStatus;
@@ -55,6 +59,71 @@ class OwnerPopulationAdmissionCoordinatorTest {
             assertEquals(ownerUuid, durable.ownerUuid());
             assertEquals(1L, durable.revision());
             assertEquals("COMMITTED", operationState(harness.connections, prepared.operationId()));
+        }
+    }
+
+    /**
+     * Regression: source cleanup cannot close before its replacement is durable, but the group
+     * classification must still be applied in the same transaction as the owner projection.
+     */
+    @Test
+    void groupCompositePreservesSourceFinalizationPendingSemantics() throws Exception {
+        try (Harness harness = harness("group-source-finalization.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            String profileId = UUID.randomUUID().toString();
+            OwnerPopulationAdmissionPlan plan = withSourceFinalization(
+                    newPlan(profileId, npcUuid, ownerUuid, 1, 12L), npcUuid);
+            String groupOperationId = "groups-" + UUID.randomUUID();
+            PopulationGroupOperationRecord groupOperation = new PopulationGroupOperationRecord(
+                    groupOperationId, null, profileId, "NEW_OWNERSHIP",
+                    PopulationGroupOperationRecord.State.PREPARED, 0L, 12L,
+                    null, ownerUuid, null, "miniwyvern", List.of(), List.of("soul_bond"),
+                    null, CompanionLifecycleState.ACTIVE.name(), null, "default", null,
+                    "PREPARING", 100L, 100L, 0L);
+            PopulationGroupRepository.ReservationEvidence evidence =
+                    new PopulationGroupRepository.ReservationEvidence(
+                            ownerUuid, "soul_bond",
+                            PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL,
+                            null, 1, 1, 1, 1, 12L);
+
+            OwnerPopulationPreparationResult preparation = harness.coordinator()
+                    .groupCompositeCoordinator()
+                    .prepareProvisionedDormantAsync(
+                            plan, harness.groups(), groupOperation, List.of(evidence))
+                    .get(2, TimeUnit.SECONDS);
+            assertTrue(preparation.allowed());
+            PreparedOwnerPopulationAdmission prepared = preparation.preparedAdmission();
+            assertTrue(harness.coordinator().claimForApply(
+                    prepared, 12L, ClaimProviderGeneration.NONE));
+            PopulationGroupClassificationRecord classification =
+                    new PopulationGroupClassificationRecord(
+                            profileId, "miniwyvern", List.of("soul_bond"), 12L,
+                            PopulationGroupClassificationRecord.Status.RESOLVED,
+                            "test", 100L, 110L);
+
+            OwnerPopulationCommitResult result = harness.coordinator()
+                    .groupCompositeCoordinator()
+                    .commitPopulationGroupsAsync(
+                            prepared, harness.groups(), groupOperationId,
+                            new PopulationGroupRepository.ClassificationMutation(
+                                    null, classification), 110L)
+                    .get(2, TimeUnit.SECONDS);
+
+            assertEquals(OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING,
+                    result.status());
+            assertTrue(result.committed());
+            assertTrue(result.sourceFinalizationPending());
+            assertEquals(PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZATION_PENDING,
+                    prepared.state());
+            assertEquals("APPLIED", operationState(
+                    harness.connections(), prepared.operationId()));
+            assertEquals(PopulationGroupOperationRecord.State.APPLIED,
+                    harness.groups().findOperation(groupOperationId).state());
+            assertEquals(List.of("soul_bond"),
+                    harness.groups().findClassification(profileId).groupIds());
+            assertEquals(1L, harness.index().counts(ownerUuid, "default").globalCommitted());
+            assertTrue(harness.health().isHealthy());
         }
     }
 
@@ -326,6 +395,7 @@ class OwnerPopulationAdmissionCoordinatorTest {
         PersistenceHealthService health = new PersistenceHealthService();
         PersistenceWriteQueue queue = new PersistenceWriteQueue(connections, health, null);
         CompanionPopulationRepository repository = new CompanionPopulationRepository(connections, queue);
+        PopulationGroupRepository groups = new PopulationGroupRepository(connections, queue);
         OwnerPopulationIndex index = new OwnerPopulationIndex();
         index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.READY);
         return new Harness(
@@ -333,9 +403,23 @@ class OwnerPopulationAdmissionCoordinatorTest {
                 queue,
                 health,
                 repository,
+                groups,
                 index,
                 new OwnerPopulationAdmissionCoordinator(index, repository, health)
         );
+    }
+
+    private static OwnerPopulationAdmissionPlan withSourceFinalization(
+            OwnerPopulationAdmissionPlan plan, UUID sourceNpcUuid) {
+        return new OwnerPopulationAdmissionPlan(
+                plan.transition(), plan.baselineState(), plan.finalNpcUuid(),
+                plan.finalPhysicalWorldName(), plan.finalPhysicalChunkX(),
+                plan.finalPhysicalChunkZ(), plan.source(), plan.oldStateJson(),
+                plan.newStateJson(), CompanionSpawnSourceFinalizationContext.extensionJson(
+                        CompanionSpawnSourceFinalizationContext.Kind.SPAWNER_ITEM,
+                        "source-finalization-test", sourceNpcUuid, UUID.randomUUID(), 0,
+                        "before", "after"),
+                plan.settingsRevision(), plan.providerGeneration());
     }
 
     private static OwnerPopulationAdmissionPlan newPlan(String profileId,
@@ -422,6 +506,7 @@ class OwnerPopulationAdmissionCoordinatorTest {
                            PersistenceWriteQueue queue,
                            PersistenceHealthService health,
                            CompanionPopulationRepository repository,
+                           PopulationGroupRepository groups,
                            OwnerPopulationIndex index,
                            OwnerPopulationAdmissionCoordinator coordinator) implements AutoCloseable {
         @Override

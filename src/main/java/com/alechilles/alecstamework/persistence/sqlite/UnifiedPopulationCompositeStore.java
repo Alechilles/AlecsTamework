@@ -226,21 +226,28 @@ public final class UnifiedPopulationCompositeStore {
         try {
             PopulationPersistenceTransition.Result owner =
                     populationRepository.commitInTransaction(connection, ownerCommit);
-            if (!ownerCommitted(owner)) {
+            boolean sourcePending = owner.status()
+                    == PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING;
+            if (!ownerCommitted(owner) && !sourcePending) {
                 rollback(connection, boundary);
                 return PopulationGroupCompositeCommitResult.denied(owner, null,
                         reason(owner.reason(), "owner_population_commit_denied"));
             }
-            PopulationGroupRepository.OperationResult groups = commitGroups(
-                    connection, groupRepository, groupOperationId, classification, nowMs);
-            if (!groupsCommitted(groups)) {
+            PopulationGroupRepository.OperationResult groups = sourcePending
+                    ? groupRepository.applyClassificationInTransaction(
+                            connection, groupOperationId, classification, nowMs)
+                    : commitGroups(connection, groupRepository, groupOperationId,
+                            classification, nowMs);
+            if (!(sourcePending ? groupsApplied(groups) : groupsCommitted(groups))) {
                 rollback(connection, boundary);
                 return PopulationGroupCompositeCommitResult.denied(owner, groups,
                         reason(groups.reason(), "population_group_commit_denied"));
             }
             connection.releaseSavepoint(boundary);
             return new PopulationGroupCompositeCommitResult(
-                    CompositeStatus.COMMITTED, owner, groups, null);
+                    sourcePending ? CompositeStatus.SOURCE_FINALIZATION_PENDING
+                            : CompositeStatus.COMMITTED,
+                    owner, groups, null);
         } catch (Exception failure) {
             rollback(connection, boundary);
             throw failure;
@@ -267,6 +274,11 @@ public final class UnifiedPopulationCompositeStore {
                 || groups.status() == PopulationGroupRepository.Status.IDEMPOTENT;
     }
 
+    private static boolean groupsApplied(PopulationGroupRepository.OperationResult groups) {
+        return groups.status() == PopulationGroupRepository.Status.APPLIED
+                || groups.status() == PopulationGroupRepository.Status.IDEMPOTENT;
+    }
+
     private static String reason(@Nullable String value, String fallback) {
         return value == null ? fallback : value;
     }
@@ -276,7 +288,7 @@ public final class UnifiedPopulationCompositeStore {
         connection.releaseSavepoint(boundary);
     }
 
-    public enum CompositeStatus { PREPARED, COMMITTED, DENIED }
+    public enum CompositeStatus { PREPARED, SOURCE_FINALIZATION_PENDING, COMMITTED, DENIED }
 
     public record ProvisionedDormantPreparationResult(
             @Nonnull CompositeStatus status,
@@ -337,6 +349,9 @@ public final class UnifiedPopulationCompositeStore {
                     CompositeStatus.DENIED, owner, groups, reason);
         }
 
-        public boolean committed() { return status == CompositeStatus.COMMITTED; }
+        public boolean committed() {
+            return status == CompositeStatus.COMMITTED
+                    || status == CompositeStatus.SOURCE_FINALIZATION_PENDING;
+        }
     }
 }

@@ -168,10 +168,18 @@ public final class OwnerPopulationGroupCompositeCoordinator {
             return submission.completion().handle((outcome, failure) -> {
                 if (failure == null && outcome != null && outcome.isCommitted()
                         && outcome.value() != null && outcome.value().committed()) {
-                    prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
+                    boolean sourcePending = outcome.value().status()
+                            == UnifiedPopulationCompositeStore.CompositeStatus.SOURCE_FINALIZATION_PENDING;
+                    prepared.setState(sourcePending
+                            ? PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZATION_PENDING
+                            : PreparedOwnerPopulationAdmission.State.COMMITTED);
                     return new OwnerPopulationCommitResult(
-                            OwnerPopulationCommitResult.Status.COMMITTED,
-                            "population-group-composite-committed", outcome.value().ownerResult());
+                            sourcePending
+                                    ? OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING
+                                    : OwnerPopulationCommitResult.Status.COMMITTED,
+                            sourcePending ? "population-group-source-finalization-pending"
+                                    : "population-group-composite-committed",
+                            outcome.value().ownerResult());
                 }
                 return degraded(prepared, "population_group_composite_commit_failed",
                         "population-group-composite-commit-failed",
