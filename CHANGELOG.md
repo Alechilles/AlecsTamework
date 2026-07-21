@@ -78,6 +78,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed an avatar-flight client crash that could become persistent after transforming while another hotbar item was selected. Avatar flight now requires Flightmaster's Talisman to be held before model replacement, ignores repeated enable requests for an active session, and no longer sends an extra custom hidden-equipment packet to the local transformed player.
 - Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer now that the native weapon strip is hidden.
 - Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
 - Fixed individual unloaded recalls sometimes waiting until another companion happened to load the source area. Each request now leases its own canonical source chunk, including across worlds, and legacy recovery history no longer blocks a genuinely missing recovered companion from becoming safely Lost.

@@ -18,7 +18,7 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains(
                 "CONTROLS_UI_PATH = \"Hud/TameworkAvatarFlightControls.ui\""
         ));
-        Assertions.assertTrue(source.contains("HUD_Z_ORDER = 10"));
+        Assertions.assertTrue(source.contains("HUD_Z_ORDER = 1"));
         Assertions.assertTrue(source.contains("super(playerRef, HUD_KEY, HUD_Z_ORDER)"));
         Assertions.assertTrue(source.contains("new UICommandBuilder()"));
         Assertions.assertTrue(source.contains("AvatarFlightHudBinder.bind(commandBuilder, updatedModel)"));

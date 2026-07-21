@@ -14,12 +14,25 @@ public final class AvatarFlightInventoryGuardService {
     static final int NO_SLOT_CAPTURED = -2;
     static final String TALISMAN_ITEM_ID = "Tamework_Flightmasters_Talisman";
 
+    public boolean isTalismanSelected(@Nonnull Store<EntityStore> store,
+                                      @Nonnull Ref<EntityStore> playerRef) {
+        InventoryComponent.Hotbar hotbar = store.getComponent(
+                playerRef, InventoryComponent.Hotbar.getComponentType());
+        return hotbar != null && isTalismanSelected(
+                hotbar.getInventory(), hotbar.getActiveSlot());
+    }
+
     public void engage(@Nonnull Store<EntityStore> store,
                        @Nonnull Ref<EntityStore> playerRef,
                        @Nonnull AvatarFlightComponent flight) {
         InventoryComponent.Hotbar hotbar = store.getComponent(
                 playerRef, InventoryComponent.Hotbar.getComponentType());
-        byte talismanSlot = findTalismanSlot(hotbar == null ? null : hotbar.getInventory());
+        byte talismanSlot = selectedTalismanSlot(
+                hotbar == null ? null : hotbar.getInventory(),
+                hotbar == null ? InventoryComponent.INACTIVE_SLOT_INDEX : hotbar.getActiveSlot());
+        if (talismanSlot < 0) {
+            talismanSlot = findTalismanSlot(hotbar == null ? null : hotbar.getInventory());
+        }
         flight.setLockedHotbarSlot((int) talismanSlot);
         if (hotbar != null && talismanSlot >= 0 && hotbar.getActiveSlot() != talismanSlot) {
             hotbar.setActiveSlot(talismanSlot, playerRef, store);
@@ -67,6 +80,20 @@ public final class AvatarFlightInventoryGuardService {
             }
         }
         return InventoryComponent.INACTIVE_SLOT_INDEX;
+    }
+
+    static boolean isTalismanSelected(@Nullable ItemContainer hotbar, int activeSlot) {
+        return selectedTalismanSlot(hotbar, activeSlot) >= 0;
+    }
+
+    private static byte selectedTalismanSlot(@Nullable ItemContainer hotbar, int activeSlot) {
+        if (hotbar == null || activeSlot < 0 || activeSlot >= hotbar.getCapacity()) {
+            return InventoryComponent.INACTIVE_SLOT_INDEX;
+        }
+        ItemStack stack = hotbar.getItemStack((short) activeSlot);
+        return stack != null && !stack.isEmpty() && TALISMAN_ITEM_ID.equals(stack.getItemId())
+                ? (byte) activeSlot
+                : InventoryComponent.INACTIVE_SLOT_INDEX;
     }
 
     private static boolean validUtilitySlot(@Nonnull ItemContainer utility, int slot) {

@@ -37,21 +37,23 @@ public final class AvatarFlightActivator {
         if (!config.isEnabled()) {
             return Result.fail("Avatar flight config is disabled: " + safeConfigId(config));
         }
+        ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
+        ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
+        if (flightType == null || inputType == null) {
+            return Result.fail("Avatar flight component types are not registered.");
+        }
+        if (store.getComponent(ref, flightType) != null) {
+            return Result.ok("Avatar flight is already active.");
+        }
+        if (!inventoryGuard.isTalismanSelected(store, ref)) {
+            return Result.fail("Hold Flightmaster's Talisman before starting avatar flight.");
+        }
         boolean applyModel = config.getModel().isApplyModel();
         if (applyModel && !modelService.apply(store, ref, playerUuid, config)) {
             return Result.fail("Avatar flight model asset not found: " + config.getModel().getModelId());
         }
         if (applyModel) {
             riderVisualService.spawn(store, ref, playerUuid, config, modelService.savedModelCopy(playerUuid));
-        }
-        ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
-        ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
-        if (flightType == null || inputType == null) {
-            if (applyModel) {
-                riderVisualService.remove(store, ref);
-                modelService.restore(store, ref, playerUuid);
-            }
-            return Result.fail("Avatar flight component types are not registered.");
         }
         long enabledAtMs = System.currentTimeMillis();
         AvatarFlightComponent flight = new AvatarFlightComponent(config.getId(), enabledAtMs);

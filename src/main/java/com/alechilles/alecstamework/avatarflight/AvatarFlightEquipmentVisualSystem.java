@@ -76,11 +76,9 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                 ref,
                 commandBuffer
         );
-        String sourceSignature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
         AvatarFlightEquipmentPacketService.applyHiddenOwnerEquipment(update, settings);
         queueAllExceptSelf(ref, update, visible.visibleTo);
         queueAllExceptSelf(ref, update, visible.newlyVisibleTo);
-        queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update, sourceSignature);
     }
 
     private void refreshRiderVisualIfNeeded(
@@ -136,42 +134,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             }
             entry.getValue().queueUpdate(ref, update);
         }
-    }
-
-    private void queueSelfIfHiddenOwnerEquipmentChanged(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull CommandBuffer<EntityStore> commandBuffer,
-            @Nonnull EntityTrackerSystems.Visible visible,
-            @Nonnull EquipmentUpdate update,
-            @Nonnull String sourceSignature) {
-        AvatarFlightRiderVisualComponent visual = commandBuffer.getComponent(ref, visualType);
-        if (visual == null || visual.isRiderEntity()) {
-            return;
-        }
-        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
-        if (signature.equals(visual.getHiddenOwnerEquipmentSignature())
-                && sourceSignature.equals(visual.getHiddenOwnerSourceEquipmentSignature())) {
-            return;
-        }
-        if (!queueSelf(ref, update, visible.visibleTo) && !queueSelf(ref, update, visible.newlyVisibleTo)) {
-            return;
-        }
-        AvatarFlightRiderVisualComponent updated = visual.clone();
-        updated.setHiddenOwnerEquipmentSignature(signature);
-        updated.setHiddenOwnerSourceEquipmentSignature(sourceSignature);
-        commandBuffer.putComponent(ref, visualType, updated);
-    }
-
-    private static boolean queueSelf(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull EquipmentUpdate update,
-            @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
-        EntityTrackerSystems.EntityViewer viewer = visibleTo.get(ref);
-        if (viewer == null) {
-            return false;
-        }
-        viewer.queueUpdate(ref, update);
-        return true;
     }
 
     @Nullable

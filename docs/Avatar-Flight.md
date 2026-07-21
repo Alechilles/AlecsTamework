@@ -27,6 +27,7 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
 - Right-click with Flightmaster's Talisman applies the airbrake.
 - Q with Flightmaster's Talisman performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
+- Flightmaster's Talisman must already be selected before mounting or enabling avatar flight. Activation fails before changing the player model when another hotbar item is held.
 - While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, and airbrake. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman remains tool-only, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman so weapon controls cannot replace or overlap the flight controls. The previous utility selection is restored on dismount.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.

@@ -24,6 +24,20 @@ class AvatarFlightInventoryGuardServiceTest {
     }
 
     @Test
+    void requiresTalismanToAlreadyBeSelected() throws ReflectiveOperationException {
+        SimpleItemContainer hotbar = new SimpleItemContainer((short) 5);
+        hotbar.setItemStackForSlot((short) 1,
+                itemStack(AvatarFlightInventoryGuardService.TALISMAN_ITEM_ID));
+        hotbar.setItemStackForSlot((short) 3,
+                itemStack(AvatarFlightInventoryGuardService.TALISMAN_ITEM_ID));
+
+        assertEquals(1, AvatarFlightInventoryGuardService.findTalismanSlot(hotbar));
+        assertTrue(AvatarFlightInventoryGuardService.isTalismanSelected(hotbar, 3));
+        assertFalse(AvatarFlightInventoryGuardService.isTalismanSelected(hotbar, 2));
+        assertFalse(AvatarFlightInventoryGuardService.isTalismanSelected(hotbar, -1));
+    }
+
+    @Test
     void auxiliaryClientSelectionChangesAreLockedWhileServerRestorationRemainsAllowed() {
         AvatarFlightComponent flight = new AvatarFlightComponent();
         flight.setLockedHotbarSlot(3);

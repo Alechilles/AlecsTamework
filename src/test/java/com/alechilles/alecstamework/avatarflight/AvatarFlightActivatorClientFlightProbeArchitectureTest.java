@@ -56,6 +56,22 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     }
 
     @Test
+    void enablingValidatesSessionAndHeldTalismanBeforeModelReplacement() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String enableBody = methodBody(source, "public Result enable", "public Result disable");
+
+        int activeSessionCheck = enableBody.indexOf("store.getComponent(ref, flightType) != null");
+        int talismanCheck = enableBody.indexOf("inventoryGuard.isTalismanSelected(store, ref)");
+        int modelReplacement = enableBody.indexOf("modelService.apply(store, ref, playerUuid, config)");
+        assertTrue(activeSessionCheck >= 0 && activeSessionCheck < modelReplacement,
+                "repeat enable requests must stop before replacing the player model");
+        assertTrue(talismanCheck >= 0 && talismanCheck < modelReplacement,
+                "the talisman must already be selected before replacing the player model");
+        assertTrue(enableBody.contains("Avatar flight is already active."));
+        assertTrue(enableBody.contains("Hold Flightmaster's Talisman before starting avatar flight."));
+    }
+
+    @Test
     void disablingAvatarFlightClearsForcedAnimationSlots() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
