@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.persistence.sqlite.LostRecoveryWriteResult;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.RecoveredProjectionSnapshotLoadResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,8 @@ import org.junit.jupiter.api.Test;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.ACCEPTED_PENDING;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.ALREADY_PENDING;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.MISSING_FULL_SNAPSHOT;
+import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.DURABLE_SNAPSHOT_CONFLICT;
+import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.DURABLE_SNAPSHOT_READ_FAILED;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.PersistStatus.REJECTED;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.CancelStatus.COMPENSATION_PENDING;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.CancelStatus.COMPENSATION_REJECTED;
@@ -192,6 +195,66 @@ class CommandLostTransitionPersistenceServiceTest {
         assertTrue(published.isEmpty());
     }
 
+    /** Regression for the restart path that stranded recovered companions as UNLOADED. */
+    @Test
+    void verifiedRecoveredProjectionBridgesMissingLiveSnapshotAfterRestart() {
+        UUID historicalSourceUuid = uuid(1);
+        UUID currentNpcUuid = uuid(2);
+        CoopResidentStateSnapshotService.CoopResidentStateSnapshot durable =
+                fullSnapshot(historicalSourceUuid);
+        AtomicReference<CoopResidentStateSnapshotService.CoopResidentStateSnapshot> handedOff =
+                new AtomicReference<>();
+        CommandLostTransitionPersistenceService service = new CommandLostTransitionPersistenceService(
+                ignored -> null,
+                ignored -> RecoveredProjectionSnapshotLoadResult.found(
+                        "profile-a", historicalSourceUuid, durable),
+                (lost, full) -> {
+                    handedOff.set(full);
+                    return committedSubmission(currentNpcUuid);
+                },
+                ignored -> committedVoidSubmission()
+        );
+
+        assertEquals(ACCEPTED_PENDING, service.persist(lost(currentNpcUuid), ignored -> { }));
+        assertNotNull(handedOff.get());
+        assertEquals(currentNpcUuid, handedOff.get().npcUuid());
+        assertEquals(durable.roleId(), handedOff.get().roleId());
+        assertEquals(durable.npcName().getName(), handedOff.get().npcName().getName());
+        assertEquals(durable.capturedAtMs(), handedOff.get().capturedAtMs());
+    }
+
+    @Test
+    void conflictedOrUnreadableDurableProjectionNeverWrites() {
+        UUID currentNpcUuid = uuid(2);
+        AtomicInteger writes = new AtomicInteger();
+        CommandLostTransitionPersistenceService conflicted = new CommandLostTransitionPersistenceService(
+                ignored -> null,
+                ignored -> RecoveredProjectionSnapshotLoadResult.conflict(
+                        "profile-a", uuid(1), "active_recovery_conflict"),
+                (lost, full) -> {
+                    writes.incrementAndGet();
+                    return rejectedSubmission();
+                },
+                ignored -> committedVoidSubmission()
+        );
+        CommandLostTransitionPersistenceService failed = new CommandLostTransitionPersistenceService(
+                ignored -> null,
+                ignored -> RecoveredProjectionSnapshotLoadResult.failed(
+                        "profile-a", uuid(1), "lost_envelope_snapshot_hash_invalid", null),
+                (lost, full) -> {
+                    writes.incrementAndGet();
+                    return rejectedSubmission();
+                },
+                ignored -> committedVoidSubmission()
+        );
+
+        assertEquals(DURABLE_SNAPSHOT_CONFLICT,
+                conflicted.persist(lost(currentNpcUuid), ignored -> { }));
+        assertEquals(DURABLE_SNAPSHOT_READ_FAILED,
+                failed.persist(lost(currentNpcUuid), ignored -> { }));
+        assertEquals(0, writes.get());
+    }
+
     @Test
     void rejectedCancellationStillSuppressesPublicationAfterAcceptedWriteCommits() {
         UUID sourceUuid = uuid(1);
@@ -253,6 +316,19 @@ class CommandLostTransitionPersistenceServiceTest {
                         PersistenceWriteQueue.WriteStatus.REJECTED,
                         null,
                         "forced_rejection",
+                        null
+                ))
+        );
+    }
+
+    private PersistenceWriteQueue.WriteSubmission<LostRecoveryWriteResult> committedSubmission(
+            UUID npcUuid) {
+        return new PersistenceWriteQueue.WriteSubmission<>(
+                true,
+                CompletableFuture.completedFuture(new PersistenceWriteQueue.WriteOutcome<>(
+                        PersistenceWriteQueue.WriteStatus.COMMITTED,
+                        new LostRecoveryWriteResult("profile-a", npcUuid, 1, true, "sha"),
+                        null,
                         null
                 ))
         );

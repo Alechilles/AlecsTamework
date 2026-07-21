@@ -26,6 +26,7 @@ public final class LostRepository {
     private final PersistenceWriteQueue writeQueue;
     private final NpcProfileRepository profileRepository;
     private final LostRecoveryEnvelopeCodec envelopeCodec;
+    private final RecoveredProjectionSnapshotStore recoveredProjectionSnapshots;
 
     public LostRepository(@Nonnull SqliteConnectionManager connectionManager,
                           @Nonnull PersistenceWriteQueue writeQueue) {
@@ -39,6 +40,7 @@ public final class LostRepository {
         this.writeQueue = Objects.requireNonNull(writeQueue, "writeQueue");
         this.profileRepository = Objects.requireNonNull(profileRepository, "profileRepository");
         this.envelopeCodec = new LostRecoveryEnvelopeCodec();
+        this.recoveredProjectionSnapshots = new RecoveredProjectionSnapshotStore(connectionManager);
     }
 
     @Nonnull
@@ -117,6 +119,16 @@ public final class LostRepository {
             return Map.of();
         }
         return Map.copyOf(replacements);
+    }
+
+    /**
+     * Loads restart-safe full state for the current projection of a finalized recovery.
+     * Durable identity, lifecycle, alias, and operation evidence must all agree.
+     */
+    @Nonnull
+    public RecoveredProjectionSnapshotLoadResult loadRecoveredProjectionSnapshot(
+            @Nullable UUID currentNpcUuid) {
+        return recoveredProjectionSnapshots.load(currentNpcUuid);
     }
 
     public boolean upsertAsync(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot) {

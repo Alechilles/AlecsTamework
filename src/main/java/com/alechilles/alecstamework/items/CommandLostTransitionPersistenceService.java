@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.persistence.sqlite.LostRecoveryWriteResult;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.RecoveredProjectionSnapshotLoadResult;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,19 +20,39 @@ import org.joml.Vector3d;
  */
 final class CommandLostTransitionPersistenceService {
     private final FullSnapshotSource snapshotSource;
+    private final DurableSnapshotSource durableSnapshotSource;
     private final TrackedLostWriter writer;
     private final TrackedLostDeleter deleter;
     private final ConcurrentHashMap<UUID, UUID> pendingTokensByNpc = new ConcurrentHashMap<>();
 
     CommandLostTransitionPersistenceService(@Nonnull CommandLinkedNpcStateSnapshotService snapshotService,
                                             @Nonnull LostRepository repository) {
-        this(snapshotService::getFullSnapshot, repository::upsertTracked, repository::deleteTracked);
+        this(
+                snapshotService::getFullSnapshot,
+                repository::loadRecoveredProjectionSnapshot,
+                repository::upsertTracked,
+                repository::deleteTracked
+        );
     }
 
     CommandLostTransitionPersistenceService(@Nonnull FullSnapshotSource snapshotSource,
                                             @Nonnull TrackedLostWriter writer,
                                             @Nonnull TrackedLostDeleter deleter) {
+        this(
+                snapshotSource,
+                ignored -> RecoveredProjectionSnapshotLoadResult.notFound("fallback_not_configured"),
+                writer,
+                deleter
+        );
+    }
+
+    CommandLostTransitionPersistenceService(@Nonnull FullSnapshotSource snapshotSource,
+                                            @Nonnull DurableSnapshotSource durableSnapshotSource,
+                                            @Nonnull TrackedLostWriter writer,
+                                            @Nonnull TrackedLostDeleter deleter) {
         this.snapshotSource = Objects.requireNonNull(snapshotSource, "snapshotSource");
+        this.durableSnapshotSource = Objects.requireNonNull(
+                durableSnapshotSource, "durableSnapshotSource");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.deleter = Objects.requireNonNull(deleter, "deleter");
     }
@@ -77,15 +98,11 @@ final class CommandLostTransitionPersistenceService {
     PersistStatus persist(
             @Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot,
             @Nonnull Consumer<CommandLinkedNpcLostService.LostLinkedNpcSnapshot> committedPublisher) {
-        final CoopResidentStateSnapshotService.CoopResidentStateSnapshot fullSnapshot;
-        try {
-            fullSnapshot = snapshotSource.get(lostSnapshot.npcUuid());
-        } catch (RuntimeException exception) {
-            return PersistStatus.MISSING_FULL_SNAPSHOT;
+        SnapshotResolution resolution = resolveSnapshot(lostSnapshot.npcUuid());
+        if (resolution.snapshot() == null) {
+            return resolution.failureStatus();
         }
-        if (fullSnapshot == null || !lostSnapshot.npcUuid().equals(fullSnapshot.npcUuid())) {
-            return PersistStatus.MISSING_FULL_SNAPSHOT;
-        }
+        CoopResidentStateSnapshotService.CoopResidentStateSnapshot fullSnapshot = resolution.snapshot();
         UUID token = UUID.randomUUID();
         if (pendingTokensByNpc.putIfAbsent(lostSnapshot.npcUuid(), token) != null) {
             return PersistStatus.ALREADY_PENDING;
@@ -110,6 +127,66 @@ final class CommandLostTransitionPersistenceService {
             }
         });
         return PersistStatus.ACCEPTED_PENDING;
+    }
+
+    @Nonnull
+    private SnapshotResolution resolveSnapshot(@Nonnull UUID npcUuid) {
+        CoopResidentStateSnapshotService.CoopResidentStateSnapshot liveSnapshot = null;
+        try {
+            liveSnapshot = snapshotSource.get(npcUuid);
+        } catch (RuntimeException ignored) {
+            // A verified durable recovery envelope may still safely bridge a lost process cache.
+        }
+        if (liveSnapshot != null) {
+            return npcUuid.equals(liveSnapshot.npcUuid())
+                    ? SnapshotResolution.found(liveSnapshot)
+                    : SnapshotResolution.missing(PersistStatus.MISSING_FULL_SNAPSHOT);
+        }
+        RecoveredProjectionSnapshotLoadResult durable;
+        try {
+            durable = durableSnapshotSource.load(npcUuid);
+        } catch (RuntimeException exception) {
+            return SnapshotResolution.missing(PersistStatus.DURABLE_SNAPSHOT_READ_FAILED);
+        }
+        if (durable == null) {
+            return SnapshotResolution.missing(PersistStatus.DURABLE_SNAPSHOT_READ_FAILED);
+        }
+        CommandLostTransitionDiagnostics.recordDurableFallback(durable);
+        if (durable.isFound() && durable.snapshot() != null) {
+            return SnapshotResolution.found(copyForNpc(durable.snapshot(), npcUuid));
+        }
+        PersistStatus failure = switch (durable.status()) {
+            case CONFLICT -> PersistStatus.DURABLE_SNAPSHOT_CONFLICT;
+            case FAILED -> PersistStatus.DURABLE_SNAPSHOT_READ_FAILED;
+            case FOUND, NOT_FOUND -> PersistStatus.MISSING_FULL_SNAPSHOT;
+        };
+        return SnapshotResolution.missing(failure);
+    }
+
+    @Nonnull
+    private CoopResidentStateSnapshotService.CoopResidentStateSnapshot copyForNpc(
+            @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot source,
+            @Nonnull UUID npcUuid) {
+        return new CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
+                npcUuid,
+                source.coopId(),
+                source.residentSlot(),
+                source.roleId(),
+                source.commandLinks(),
+                source.owner(),
+                source.tamed(),
+                source.npcName(),
+                source.happiness(),
+                source.needs(),
+                source.breeding(),
+                source.leveling(),
+                source.traits(),
+                source.talents(),
+                source.lifeStage(),
+                source.attachments(),
+                source.healthPercent(),
+                source.capturedAtMs()
+        );
     }
 
     @Nonnull
@@ -148,6 +225,8 @@ final class CommandLostTransitionPersistenceService {
         ACCEPTED_PENDING,
         ALREADY_PENDING,
         MISSING_FULL_SNAPSHOT,
+        DURABLE_SNAPSHOT_CONFLICT,
+        DURABLE_SNAPSHOT_READ_FAILED,
         REJECTED
     }
 
@@ -164,6 +243,12 @@ final class CommandLostTransitionPersistenceService {
     }
 
     @FunctionalInterface
+    interface DurableSnapshotSource {
+        @Nonnull
+        RecoveredProjectionSnapshotLoadResult load(@Nonnull UUID currentNpcUuid);
+    }
+
+    @FunctionalInterface
     interface TrackedLostWriter {
         @Nonnull
         PersistenceWriteQueue.WriteSubmission<LostRecoveryWriteResult> upsert(
@@ -175,5 +260,20 @@ final class CommandLostTransitionPersistenceService {
     interface TrackedLostDeleter {
         @Nonnull
         PersistenceWriteQueue.WriteSubmission<Void> delete(@Nonnull UUID npcUuid);
+    }
+
+    private record SnapshotResolution(
+            @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
+            @Nonnull PersistStatus failureStatus) {
+        @Nonnull
+        private static SnapshotResolution found(
+                @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot) {
+            return new SnapshotResolution(snapshot, PersistStatus.ACCEPTED_PENDING);
+        }
+
+        @Nonnull
+        private static SnapshotResolution missing(@Nonnull PersistStatus failureStatus) {
+            return new SnapshotResolution(null, failureStatus);
+        }
     }
 }

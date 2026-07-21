@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.joml.Vector3d;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LostRepositoryTest {
     private static final UUID SOURCE_A = uuid(1L);
     private static final UUID SOURCE_B = uuid(2L);
+    private static final UUID TARGET_A = uuid(101L);
 
     @TempDir
     Path tempDir;
@@ -229,6 +231,68 @@ class LostRepositoryTest {
                 repository.loadAwaitingByProfile(written.profileId()).status());
     }
 
+    /** Regression for a recovered companion whose live full-state cache vanished on restart. */
+    @Test
+    void finalizedRecoveredProjectionProvidesVerifiedRestartSnapshot() throws Exception {
+        RecoveredFixture recovered = prepareRecoveredProjection();
+
+        RecoveredProjectionSnapshotLoadResult result =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.FOUND, result.status());
+        assertEquals(recovered.profileId(), result.profileId());
+        assertEquals(SOURCE_A, result.sourceNpcUuid());
+        assertNotNull(result.snapshot());
+        assertEquals(SOURCE_A, result.snapshot().npcUuid());
+        assertEquals("tamed_test", result.snapshot().roleId());
+        assertEquals(-9_001L, result.snapshot().capturedAtMs());
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.NOT_FOUND,
+                repository.loadRecoveredProjectionSnapshot(SOURCE_A).status());
+    }
+
+    @Test
+    void recoveredProjectionFallbackRejectsLifecycleAndOperationConflicts() throws Exception {
+        RecoveredFixture recovered = prepareRecoveredProjection();
+
+        execute("UPDATE companion_population_state SET lifecycle_state = 'ACTIVE' WHERE profile_id = '"
+                + recovered.profileId() + "'");
+        RecoveredProjectionSnapshotLoadResult active =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.CONFLICT, active.status());
+        assertEquals("population_not_unloaded", active.reason());
+
+        execute("UPDATE companion_population_state SET lifecycle_state = 'UNLOADED' WHERE profile_id = '"
+                + recovered.profileId() + "'");
+        insertActiveRecovery(recovered.profileId());
+        RecoveredProjectionSnapshotLoadResult recovering =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.CONFLICT, recovering.status());
+        assertEquals("active_recovery_conflict", recovering.reason());
+
+        execute("DELETE FROM npc_recovery_operations WHERE active = 1");
+        execute("DELETE FROM npc_recovery_operations WHERE profile_id = '"
+                + recovered.profileId() + "' AND state = 'FINALIZED'");
+        RecoveredProjectionSnapshotLoadResult unproven =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.CONFLICT, unproven.status());
+        assertEquals("finalized_recovery_evidence_missing", unproven.reason());
+    }
+
+    @Test
+    void recoveredProjectionFallbackRejectsTamperedDurableSnapshot() throws Exception {
+        RecoveredFixture recovered = prepareRecoveredProjection();
+        JsonObject payload = activePayloadObject(recovered.profileId());
+        payload.getAsJsonObject("fullStateSnapshot").addProperty("capturedAtMs", -999L);
+        updateActivePayload(recovered.profileId(), payload.toString());
+
+        RecoveredProjectionSnapshotLoadResult result =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.FAILED, result.status());
+        assertEquals("lost_envelope_snapshot_hash_invalid", result.reason());
+        assertNull(result.snapshot());
+    }
+
     private CommandLinkedNpcLostService.LostLinkedNpcSnapshot lost(UUID source, UUID replacement) {
         return new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
                 source,
@@ -267,13 +331,75 @@ class LostRepositoryTest {
 
     private LostRecoveryWriteResult committed(
             PersistenceWriteQueue.WriteSubmission<LostRecoveryWriteResult> submission) throws Exception {
+        return committedValue(submission);
+    }
+
+    private <T> T committedValue(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
         assertTrue(submission.accepted());
-        PersistenceWriteQueue.WriteOutcome<LostRecoveryWriteResult> outcome =
+        PersistenceWriteQueue.WriteOutcome<T> outcome =
                 submission.completion().get(3, TimeUnit.SECONDS);
         assertEquals(PersistenceWriteQueue.WriteStatus.COMMITTED, outcome.status());
         assertNull(outcome.failure());
         assertNotNull(outcome.value());
         return outcome.value();
+    }
+
+    private RecoveredFixture prepareRecoveredProjection() throws Exception {
+        LostRecoveryWriteResult written = committed(
+                repository.upsertTracked(lost(SOURCE_A, null), fullSnapshot(SOURCE_A)));
+        NpcRecoveryOperationRepository recoveryRepository =
+                new NpcRecoveryOperationRepository(connections, writeQueue, () -> 300L);
+        String operationId = "restart-fallback-operation";
+        var claimed = committedValue(recoveryRepository.claim(
+                new NpcRecoveryOperationRepository.RecoveryClaim(
+                        operationId, written.profileId(), SOURCE_A, TARGET_A)));
+        assertEquals(NpcRecoveryOperationRepository.ClaimStatus.CLAIMED, claimed.status());
+        var projected = committedValue(recoveryRepository.recordProjectionCreated(
+                operationId, written.profileId(), TARGET_A, 0L));
+        assertEquals(NpcRecoveryOperationRepository.TransitionStatus.APPLIED, projected.status());
+        var finalized = committedValue(recoveryRepository.finalizeRecovery(
+                new NpcRecoveryOperationRepository.RecoveryFinalization(
+                        operationId,
+                        written.profileId(),
+                        SOURCE_A,
+                        TARGET_A,
+                        TARGET_A,
+                        1L,
+                        List.of()
+                )));
+        assertEquals(NpcRecoveryOperationRepository.TransitionStatus.APPLIED, finalized.status());
+        insertPopulationState(written.profileId(), "UNLOADED");
+        return new RecoveredFixture(written.profileId());
+    }
+
+    private void insertPopulationState(String profileId, String lifecycle) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO companion_population_state (
+                         profile_id, ownership_world_name, lifecycle_state,
+                         physical_world_name, physical_chunk_x, physical_chunk_z,
+                         revision, source, created_at_ms, updated_at_ms
+                     ) VALUES (?, 'source-world', ?, NULL, NULL, NULL, 1, 'test', 1, 1)
+                     """)) {
+            statement.setString(1, profileId);
+            statement.setString(2, lifecycle);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertActiveRecovery(String profileId) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO npc_recovery_operations (
+                         operation_id, profile_id, source_npc_uuid, planned_target_uuid,
+                         state, active, generation, attempt_count, created_at_ms, updated_at_ms
+                     ) VALUES ('conflicting-recovery', ?, ?, ?, 'PREPARED', 1, 0, 0, 2, 2)
+                     """)) {
+            statement.setString(1, profileId);
+            statement.setString(2, TARGET_A.toString());
+            statement.setString(3, uuid(102L).toString());
+            statement.executeUpdate();
+        }
     }
 
     private void insertProfile(String profileId, UUID currentUuid) throws Exception {
@@ -375,5 +501,8 @@ class LostRepositoryTest {
 
     private static UUID uuid(long value) {
         return new UUID(0L, value);
+    }
+
+    private record RecoveredFixture(String profileId) {
     }
 }

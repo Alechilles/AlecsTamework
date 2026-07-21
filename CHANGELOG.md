@@ -51,6 +51,7 @@
 - Fixed historical databases whose recorded early-schema markers outlived one or more prerequisite tables or profile columns. Startup now restores only the missing SQLite structure, preserves every existing profile row, and leaves identities conservatively dormant instead of failing the entire migration.
 - Persistence storage health now represents only SQLite authority. Domain conflicts use narrow evidence readiness, quarantine, and circuit states instead of broadly degrading every persistence-backed feature.
 - Healthy persistence scopes are usable immediately after login. There is no arbitrary login grace period, and login itself does not request companion recall.
+- Recovered companions that become unreachable after a restart can now enter Lost recovery from their last verified full-state envelope instead of remaining permanently Unloaded. Tamework reuses that envelope only when canonical identity, historical aliases, finalized recovery evidence, and every lifecycle authority agree that the current projection is safely unloaded.
 - Avatar-flight configs can now override transformed-model camera position and eye height per species while preserving the model's authored look yaw and pitch behavior.
 - Avatar-flight `FlyFast` animation and airborne Vigour recharge now remain active while horizontal speed is at or above 80% of sustainable glide speed, allowing strong ordinary flight and dives to maintain the state after a boost ends.
 - Avatar-flight airbraking now uses the upward-flap wing-displacement sound by default.
