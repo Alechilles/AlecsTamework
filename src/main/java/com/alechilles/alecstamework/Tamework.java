@@ -2775,6 +2775,8 @@ public class Tamework extends JavaPlugin {
                     System::currentTimeMillis,
                     System::nanoTime);
             bondedVesselRuntime = runtime;
+            ownerPopulationRuntime.installSealedProjectionObserver(
+                    runtime.itemProjectionReconciler()::reconcileSealed);
             BondedVesselSpawnerBridge spawnerBridge = new BondedVesselSpawnerBridge(
                     runtime.initialBindings(),
                     new BondedVesselInteractionDispatcher(runtime.apiDelegate()),
