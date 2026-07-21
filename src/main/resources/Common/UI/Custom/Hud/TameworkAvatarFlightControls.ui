@@ -16,7 +16,7 @@
 // Flightmaster's Talisman is tool-only, so Hytale hides its native weapon
 // ability strip and this self-contained row supplies all flight controls.
 Group #TameworkAvatarFlightControls {
-    Anchor: (Right: 50, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight);
+    Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight);
     LayoutMode: Left;
 
     Group #LaunchControl {

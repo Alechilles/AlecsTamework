@@ -47,6 +47,7 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Avatar flight now keeps Flightmaster's Talisman selected, temporarily suppresses active utility equipment, and places its custom controls inside Hytale's right-side shortcut hints. This prevents equipped shields or other hotbar items from restoring the native combat ability strip while mounted; utility selection returns on dismount.
 - Automatic companion following across login, portals, and other world changes is now disabled by default. Explicit Follow remains a local command, and explicit cross-world Recall remains available.
 - Upgrading Tamework persistence to schema v7 now creates a verified, transactionally consistent snapshot of Tamework's SQLite database before migration. Tamework never copies the Hytale save or invokes a whole-world backup; Hytale, the host, and the operator remain responsible for complete-save backups.
 - Fixed historical databases whose recorded early-schema markers outlived one or more prerequisite tables or profile columns. Startup now restores only the missing SQLite structure, preserves every existing profile row, and leaves identities conservatively dormant instead of failing the entire migration.

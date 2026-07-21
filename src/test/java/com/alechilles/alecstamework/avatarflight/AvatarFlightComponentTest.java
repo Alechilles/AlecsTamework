@@ -94,4 +94,16 @@ class AvatarFlightComponentTest {
         assertEquals("", clone.getAbilityAnimationKind());
         assertEquals(0L, clone.getAbilityAnimationUntilMs());
     }
+
+    @Test
+    void clonePreservesInventoryGuardState() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setLockedHotbarSlot(3);
+        component.setPreviousUtilitySlot(0);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertEquals(3, clone.getLockedHotbarSlot());
+        assertEquals(0, clone.getPreviousUtilitySlot());
+    }
 }

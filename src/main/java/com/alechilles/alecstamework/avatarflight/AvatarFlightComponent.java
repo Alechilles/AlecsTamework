@@ -186,6 +186,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setBurstTrailUntilMs,
                     AvatarFlightComponent::getBurstTrailUntilMs)
             .add()
+            .<Integer>append(new KeyedCodec<>("LockedHotbarSlot", Codec.INTEGER),
+                    AvatarFlightComponent::setLockedHotbarSlot,
+                    AvatarFlightComponent::getLockedHotbarSlot)
+            .add()
+            .<Integer>append(new KeyedCodec<>("PreviousUtilitySlot", Codec.INTEGER),
+                    AvatarFlightComponent::setPreviousUtilitySlot,
+                    AvatarFlightComponent::getPreviousUtilitySlot)
+            .add()
             .build();
 
     private String configId = "";
@@ -230,6 +238,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private int fastGlideTrailChainId;
     private String activeTrailRootInteraction = "";
     private long burstTrailUntilMs;
+    private int lockedHotbarSlot = AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED;
+    private int previousUtilitySlot = AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED;
 
     public AvatarFlightComponent() {
     }
@@ -569,6 +579,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     }
     public long getBurstTrailUntilMs() { return burstTrailUntilMs; }
     public void setBurstTrailUntilMs(@Nullable Long value) { burstTrailUntilMs = value == null ? 0L : value; }
+    public int getLockedHotbarSlot() { return lockedHotbarSlot; }
+    public void setLockedHotbarSlot(@Nullable Integer value) {
+        lockedHotbarSlot = value == null ? AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED : value;
+    }
+    public int getPreviousUtilitySlot() { return previousUtilitySlot; }
+    public void setPreviousUtilitySlot(@Nullable Integer value) {
+        previousUtilitySlot = value == null ? AvatarFlightInventoryGuardService.NO_SLOT_CAPTURED : value;
+    }
 
     public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
         launchVfxOriginValid = true;
@@ -641,6 +659,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.fastGlideTrailChainId = fastGlideTrailChainId;
         clone.activeTrailRootInteraction = getActiveTrailRootInteraction();
         clone.burstTrailUntilMs = burstTrailUntilMs;
+        clone.lockedHotbarSlot = lockedHotbarSlot;
+        clone.previousUtilitySlot = previousUtilitySlot;
         return clone;
     }
 

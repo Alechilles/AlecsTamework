@@ -100,7 +100,7 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Group #TameworkAvatarFlightControls"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotSize = 58"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotHeight = 74"));
-        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
         Assertions.assertTrue(ui.contains("LayoutMode: Left"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));

@@ -25,6 +25,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightDisconnectRecoveryS
 import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightHudSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightInventoryGuardSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
@@ -627,6 +628,9 @@ public class Tamework extends JavaPlugin {
                         avatarFlightInputComponentType,
                         Player.getComponentType()
                 )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightInventoryGuardSystem(avatarFlightComponentType)
         );
         getEntityStoreRegistry().registerSystem(
                 new AvatarFlightEquipmentVisualSystem(

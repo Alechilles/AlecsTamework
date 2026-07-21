@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 public final class AvatarFlightActivator {
     private final AvatarFlightModelService modelService = new AvatarFlightModelService();
     private final AvatarFlightRiderVisualService riderVisualService = new AvatarFlightRiderVisualService();
+    private final AvatarFlightInventoryGuardService inventoryGuard = new AvatarFlightInventoryGuardService();
 
     @Nonnull
     public Result enable(@Nonnull Store<EntityStore> store,
@@ -61,6 +62,7 @@ public final class AvatarFlightActivator {
             store.putComponent(ref, inputType, new AvatarFlightInputComponent());
         }
         AvatarFlightSessionRegistry.markActive(playerUuid);
+        inventoryGuard.engage(store, ref, flight);
         return Result.ok("Avatar flight enabled with config=" + safeConfigId(config)
                 + " modelSwap=" + (applyModel ? config.getModel().getModelId() : "disabled"));
     }
@@ -77,6 +79,7 @@ public final class AvatarFlightActivator {
         boolean restoreEquipment = config != null && config.getRiderVisual().isHideOwnerEquipment();
         boolean restoreModel = config != null && config.getModel().isApplyModel();
         AvatarFlightTrailService.stopFastGlideTrail(flight, ref, store);
+        inventoryGuard.disengage(store, ref, flight);
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }
