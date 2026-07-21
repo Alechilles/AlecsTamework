@@ -32,6 +32,8 @@ class SqliteSchemaV8MigrationTest {
             migrator.migrate(connection);
 
             assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+            assertTrue(tableExists(connection, "api_profile_data_operations"));
+            assertTrue(columnExists(connection, "api_profile_data", "revision"));
             assertEquals(Set.of(
                     "capture_attempts",
                     "capture_failure_cooldowns",
@@ -202,6 +204,18 @@ class SqliteSchemaV8MigrationTest {
             try (ResultSet result = statement.executeQuery()) {
                 return result.next();
             }
+        }
+    }
+
+    private boolean columnExists(Connection connection, String table, String column) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (result.next()) {
+                if (column.equalsIgnoreCase(result.getString("name"))) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

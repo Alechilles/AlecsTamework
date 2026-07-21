@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import javax.annotation.Nonnull;
 
@@ -8,11 +9,75 @@ import javax.annotation.Nonnull;
 final class SqliteSchemaV8Migration {
 
     void apply(@Nonnull Connection connection) throws Exception {
+        ensureApiProfileDataTransactions(connection);
         try (Statement statement = connection.createStatement()) {
             createCaptureAttempts(statement);
             createBondedVessels(statement);
             createPopulationGroups(statement);
             createProvisioningOperations(statement);
+        }
+    }
+
+    private void ensureApiProfileDataTransactions(@Nonnull Connection connection) throws Exception {
+        if (!hasColumn(connection, "api_profile_data", "revision")) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ALTER TABLE api_profile_data ADD COLUMN revision "
+                        + "INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)");
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS api_profile_data_operations (
+                        operation_id TEXT PRIMARY KEY,
+                        namespace TEXT NOT NULL,
+                        idempotency_key TEXT NOT NULL,
+                        profile_id TEXT NOT NULL,
+                        data_key TEXT NOT NULL,
+                        expected_revision INTEGER NOT NULL CHECK (
+                            expected_revision >= 0 AND expected_revision < 9223372036854775807),
+                        resulting_revision INTEGER CHECK (resulting_revision >= 1),
+                        payload_fingerprint TEXT NOT NULL,
+                        result_json_payload TEXT,
+                        result_updated_at_ms INTEGER,
+                        status TEXT NOT NULL CHECK (status IN (
+                            'PREPARED', 'APPLYING', 'COMMITTED',
+                            'TERMINAL_DENIED', 'QUARANTINED')),
+                        reason TEXT NOT NULL,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        UNIQUE (namespace, idempotency_key),
+                        CHECK ((status = 'COMMITTED'
+                                AND resulting_revision = expected_revision + 1
+                                AND result_json_payload IS NOT NULL
+                                AND result_updated_at_ms IS NOT NULL)
+                            OR (status <> 'COMMITTED'
+                                AND resulting_revision IS NULL
+                                AND result_json_payload IS NULL
+                                AND result_updated_at_ms IS NULL))
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_api_profile_data_operations_status_age
+                    ON api_profile_data_operations(status, updated_at_ms, operation_id)
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_api_profile_data_operations_target
+                    ON api_profile_data_operations(profile_id, namespace, data_key, updated_at_ms)
+                    """);
+        }
+    }
+
+    private boolean hasColumn(@Nonnull Connection connection,
+                              @Nonnull String tableName,
+                              @Nonnull String columnName) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("PRAGMA table_info(" + tableName + ")")) {
+            while (result.next()) {
+                if (columnName.equalsIgnoreCase(result.getString("name"))) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

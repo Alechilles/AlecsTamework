@@ -23,6 +23,11 @@ import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.ProfileDataApi;
+import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
+import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
+import com.alechilles.alecstamework.api.ProfileDataEntryView;
+import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
+import com.alechilles.alecstamework.api.ProfileDataOperationView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
@@ -110,6 +115,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -327,6 +334,9 @@ public final class TameworkApiImpl
         this.persistenceRuntime = Objects.requireNonNull(persistenceRuntime);
         this.profileRepository = Objects.requireNonNull(persistenceRuntime.getNpcProfileRepository());
         this.profileDataRepository = Objects.requireNonNull(persistenceRuntime.getApiProfileDataRepository());
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS);
+        }
         this.eventBus = Objects.requireNonNull(eventBus);
         this.stateSnapshotService = stateSnapshotService;
         this.damagePolicy = Objects.requireNonNull(damagePolicy);
@@ -625,6 +635,103 @@ public final class TameworkApiImpl
             return false;
         }
         return profileDataRepository.deleteAsync(profileId.trim(), namespace.trim(), key.trim());
+    }
+
+    @Override
+    public Optional<ProfileDataEntryView> getVersioned(String profileId,
+                                                       String namespace,
+                                                       String key) {
+        if (!isValidProfileDataScope(profileId, namespace, key)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(profileDataRepository.getVersioned(
+                        profileId.trim(), namespace.trim(), key.trim()))
+                .map(TameworkApiImpl::mapProfileDataEntry);
+    }
+
+    @Override
+    public CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(
+            ProfileDataCompareAndSetRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        return profileDataRepository.compareAndSetAsync(
+                        request.profileId(),
+                        request.namespace(),
+                        request.key(),
+                        request.expectedRevision(),
+                        request.idempotencyKey(),
+                        request.jsonPayload())
+                .thenApply(TameworkApiImpl::mapProfileDataTransactionResult);
+    }
+
+    @Override
+    public CompletionStage<Optional<ProfileDataOperationView>> findOperation(
+            String namespace,
+            String idempotencyKey
+    ) {
+        if (isBlank(namespace) || isBlank(idempotencyKey)) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return CompletableFuture.completedFuture(Optional.ofNullable(
+                        profileDataRepository.findOperation(
+                                namespace.trim(), idempotencyKey.trim()))
+                .map(TameworkApiImpl::mapProfileDataOperation));
+    }
+
+    private static ProfileDataCompareAndSetResult mapProfileDataTransactionResult(
+            ApiProfileDataRepository.TransactionResult result
+    ) {
+        if (result == null || result.outcome()
+                == ApiProfileDataRepository.TransactionOutcome.UNAVAILABLE) {
+            String reason = result == null ? "profile-data-transaction-authority-unavailable"
+                    : result.reason();
+            return new ProfileDataCompareAndSetResult(
+                    ProfileDataCompareAndSetResult.Status.UNAVAILABLE,
+                    reason,
+                    null,
+                    null);
+        }
+        ProfileDataOperationView operation = mapProfileDataOperation(
+                Objects.requireNonNull(result.operation(), "durable operation"));
+        return switch (result.outcome()) {
+            case COMMITTED -> new ProfileDataCompareAndSetResult(
+                    ProfileDataCompareAndSetResult.Status.COMMITTED,
+                    result.reason(),
+                    operation,
+                    mapProfileDataEntry(Objects.requireNonNull(result.value(), "committed value")));
+            case TERMINAL_DENIED -> new ProfileDataCompareAndSetResult(
+                    ProfileDataCompareAndSetResult.Status.TERMINAL_DENIED,
+                    result.reason(), operation, null);
+            case QUARANTINED -> new ProfileDataCompareAndSetResult(
+                    ProfileDataCompareAndSetResult.Status.QUARANTINED,
+                    result.reason(), operation, null);
+            case UNAVAILABLE -> throw new IllegalStateException("handled above");
+        };
+    }
+
+    private static ProfileDataEntryView mapProfileDataEntry(
+            ApiProfileDataRepository.VersionedValue value
+    ) {
+        return new ProfileDataEntryView(
+                value.profileId(), value.namespace(), value.key(), value.revision(),
+                value.jsonPayload(), value.updatedAtMs());
+    }
+
+    private static ProfileDataOperationView mapProfileDataOperation(
+            ApiProfileDataRepository.TransactionOperation operation
+    ) {
+        return new ProfileDataOperationView(
+                operation.operationId(),
+                operation.namespace(),
+                operation.idempotencyKey(),
+                operation.profileId(),
+                operation.key(),
+                operation.expectedRevision(),
+                operation.resultingRevision(),
+                operation.payloadFingerprint(),
+                ProfileDataOperationStatus.valueOf(operation.status().name()),
+                operation.reason(),
+                operation.updatedAtMs());
     }
 
     @Override

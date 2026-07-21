@@ -72,7 +72,8 @@ class TameworkApiImplTest {
                             TameworkApiCapability.COMPANION_XP_EVENTS,
                             TameworkApiCapability.CONFIG_READ,
                             TameworkApiCapability.DIAGNOSTICS,
-                            TameworkApiCapability.PERSISTENCE_RESILIENCE
+                            TameworkApiCapability.PERSISTENCE_RESILIENCE,
+                            TameworkApiCapability.PROFILE_DATA_TRANSACTIONS
                     ),
                     api.getCapabilities()
             );

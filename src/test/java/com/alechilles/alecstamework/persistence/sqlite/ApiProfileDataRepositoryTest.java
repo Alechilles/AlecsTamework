@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiProfileDataRepositoryTest {
@@ -73,6 +75,89 @@ class ApiProfileDataRepositoryTest {
             assertFalse(repository.putAsync("missing", "example.plugin", " ", "{\"value\":1}"));
             assertFalse(repository.deleteAsync("missing", "example.plugin", "alpha"));
             assertTrue(repository.list("missing", "example.plugin").isEmpty());
+        }
+    }
+
+    @Test
+    void compareAndSetIsRevisionFencedIdempotentAndRestartVisible() throws Exception {
+        String profileId;
+        UUID npcUuid = UUID.randomUUID();
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                    npcUuid, UUID.randomUUID(), "Owner", "Mob_Test", "Display", null,
+                    true, null, null, null, new String[0])));
+            assertTrue(awaitUntil(() -> runtime.getNpcProfileRepository().resolveProfileId(npcUuid) != null));
+            profileId = runtime.getNpcProfileRepository().resolveProfileId(npcUuid);
+
+            ApiProfileDataRepository repository = runtime.getApiProfileDataRepository();
+            ApiProfileDataRepository.TransactionResult created = repository.compareAndSetAsync(
+                            profileId, "Alechilles:HyDragon", "state", 0L,
+                            "attune:1", " { \"archetype\" : \"fire\" } ")
+                    .toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertEquals(ApiProfileDataRepository.TransactionOutcome.COMMITTED, created.outcome());
+            assertEquals(1L, created.value().revision());
+            assertEquals("{\"archetype\":\"fire\"}", created.value().jsonPayload());
+            assertEquals(64, created.operation().payloadFingerprint().length());
+
+            ApiProfileDataRepository.TransactionResult replay = repository.compareAndSetAsync(
+                            profileId, "Alechilles:HyDragon", "state", 0L,
+                            "attune:1", "{\"archetype\":\"fire\"}")
+                    .toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertEquals(created.operation().operationId(), replay.operation().operationId());
+            assertEquals(1L, replay.value().revision());
+
+            ApiProfileDataRepository.TransactionResult denied = repository.compareAndSetAsync(
+                            profileId, "Alechilles:HyDragon", "state", 0L,
+                            "attune:stale", "{\"archetype\":\"ice\"}")
+                    .toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertEquals(ApiProfileDataRepository.TransactionOutcome.TERMINAL_DENIED, denied.outcome());
+            assertEquals("revision-mismatch", denied.reason());
+            assertNull(denied.value());
+        }
+
+        try (TameworkPersistenceRuntime restarted = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            ApiProfileDataRepository repository = restarted.getApiProfileDataRepository();
+            ApiProfileDataRepository.TransactionOperation committed =
+                    repository.findOperation("Alechilles:HyDragon", "attune:1");
+            ApiProfileDataRepository.TransactionOperation denied =
+                    repository.findOperation("Alechilles:HyDragon", "attune:stale");
+            assertNotNull(committed);
+            assertNotNull(denied);
+            assertEquals(ApiProfileDataRepository.TransactionStatus.COMMITTED, committed.status());
+            assertEquals(ApiProfileDataRepository.TransactionStatus.TERMINAL_DENIED, denied.status());
+            assertEquals(1L, repository.getVersioned(
+                    profileId, "Alechilles:HyDragon", "state").revision());
+        }
+    }
+
+    @Test
+    void conflictingIdempotencyReplayIsDurablyQuarantined() throws Exception {
+        String profileId;
+        UUID npcUuid = UUID.randomUUID();
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                    npcUuid, UUID.randomUUID(), "Owner", "Mob_Test", "Display", null,
+                    true, null, null, null, new String[0])));
+            assertTrue(awaitUntil(() -> runtime.getNpcProfileRepository().resolveProfileId(npcUuid) != null));
+            profileId = runtime.getNpcProfileRepository().resolveProfileId(npcUuid);
+            ApiProfileDataRepository repository = runtime.getApiProfileDataRepository();
+            assertEquals(ApiProfileDataRepository.TransactionOutcome.COMMITTED,
+                    repository.compareAndSetAsync(profileId, "Alechilles:HyDragon", "state", 0L,
+                                    "same-key", "{\"value\":1}")
+                            .toCompletableFuture().get(5, TimeUnit.SECONDS).outcome());
+
+            ApiProfileDataRepository.TransactionResult conflict = repository.compareAndSetAsync(
+                            profileId, "Alechilles:HyDragon", "state", 0L,
+                            "same-key", "{\"value\":2}")
+                    .toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertEquals(ApiProfileDataRepository.TransactionOutcome.QUARANTINED, conflict.outcome());
+            assertEquals("idempotency-key-conflict", conflict.reason());
+        }
+
+        try (TameworkPersistenceRuntime restarted = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            assertEquals(ApiProfileDataRepository.TransactionStatus.QUARANTINED,
+                    restarted.getApiProfileDataRepository()
+                            .findOperation("Alechilles:HyDragon", "same-key").status());
         }
     }
 
