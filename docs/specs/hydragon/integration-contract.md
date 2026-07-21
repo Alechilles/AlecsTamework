@@ -301,12 +301,14 @@ another group slot.
   fail-closed methods and new data uses new/V2 immutable types.
 - HyDragon raises its manifest dependency to `>=3.0.0 <4.0.0` before shipping
   configs or code that reference the new capabilities.
-- Legacy spawner/profile/item adoption follows the subsystem evidence rules;
-  the integration layer never guesses ambiguous identity or silently opts a
-  legacy disposable item into a bonded generation.
-- Startup runs migration and population/binding reconciliation before HyDragon
-  enables positive mutations. Existing content remains inspectable while a
-  feature is gated unavailable.
+- HyDragon has no released spawner/profile/item data to adopt. Its configs use
+  `LegacyFilledItemMode: Reject`, and HyDragon MUST NOT call or expose a legacy
+  adoption flow. Generic Tamework adoption support remains available only to
+  other already-released consumers under the subsystem evidence rules.
+- Tamework completes its own schema migration and population/binding
+  reconciliation before HyDragon enables positive mutations. This upgrades
+  Tamework-owned data only; HyDragon has no pre-release data migration step.
+  Existing content remains inspectable while a feature is gated unavailable.
 
 ## Implementation file map
 

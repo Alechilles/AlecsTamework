@@ -48,6 +48,11 @@ Add a top-level `Vessel` object to `TwSpawnerConfig` at:
 | `AllowStoreInCombat` | boolean `false` | Whether an active companion with combat state may be stored. |
 | `LegacyFilledItemMode` | `Reject` | `Reject` or guarded `AdoptOnFirstUse`; see migration. |
 
+HyDragon MUST use `LegacyFilledItemMode: Reject`. HyDragon has never shipped, so
+no HyDragon item/profile adoption or compatibility flow exists; the guarded
+`AdoptOnFirstUse` option is a generic Tamework facility for other already-released
+consumers only.
+
 `EmptyItemId` remains the unbound item. `FilledItemId` is the default stored
 projection. Missing state item IDs fall back to `FilledItemId`; metadata and the
 durable binding state remain authoritative even when visual item IDs are shared.
