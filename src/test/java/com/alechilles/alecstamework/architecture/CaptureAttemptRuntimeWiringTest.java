@@ -20,11 +20,15 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("captureAttemptRuntimeReady ? captureAttemptCoordinator : null"));
         assertTrue(plugin.contains("if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl"));
         assertTrue(handler.contains("captureAttemptCoordinator.resolve(request)"));
-        assertTrue(handler.contains("captureAttemptCoordinator.beginApply(attemptId)"));
+        assertTrue(handler.contains("captureAttemptCoordinator.beginApply(effective.attemptId())"));
         assertTrue(handler.contains("captureAttemptCoordinator.commit(finalizedAttemptId)"));
-        assertTrue(handler.contains("channelAttemptIds.put(playerUuid.getUuid(), UUID.randomUUID())"));
+        assertTrue(handler.contains("channelAttemptIds.put(playerUuid.getUuid(), attempt)"));
+        assertTrue(handler.contains("CaptureAttemptHandle.forDispatch"));
+        assertTrue(handler.contains("attempt.sourceContextJson(world.getName())"));
+        assertTrue(handler.contains("attempt.sourceFingerprint().equals"));
         assertTrue(handler.contains("missing-channel-attempt-identity"));
         assertTrue(!handler.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
+        assertTrue(!handler.contains("captureBurstParticleSystem, UUID.randomUUID()"));
         int populationPrepare = handler.indexOf("captureFinalizerService.prepareCapture(");
         int roll = handler.indexOf("captureAttemptCoordinator.resolve(request)");
         assertTrue(populationPrepare >= 0 && roll > populationPrepare);

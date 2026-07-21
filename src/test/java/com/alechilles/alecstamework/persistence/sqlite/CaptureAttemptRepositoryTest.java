@@ -115,6 +115,50 @@ class CaptureAttemptRepositoryTest {
         }
     }
 
+    @Test
+    void terminalCompactionPersistsTombstoneAndRejectsLateAttemptAndCallerRetries()
+            throws Exception {
+        Path database = tempDir.resolve("tombstone.sqlite");
+        CaptureAttemptRecord terminal;
+        try (HydragonPersistenceTestHarness harness = new HydragonPersistenceTestHarness(database)) {
+            CaptureAttemptRepository repository = new CaptureAttemptRepository(
+                    harness.connections, harness.queue);
+            terminal = probabilityAttempt(
+                    "attempt-terminal", "stable-caller-key",
+                    UUID.randomUUID(), UUID.randomUUID());
+            await(repository.prepareAsync(terminal));
+            assertEquals(CaptureAttemptRepository.MutationStatus.APPLIED,
+                    await(repository.advanceAsync(
+                            terminal.identity().attemptId(), CaptureAttemptRecord.State.PREPARED,
+                            CaptureAttemptRecord.State.CANCELED, "precondition-denied", null, 100L)).status());
+
+            CaptureAttemptRepository.CompactionResult compacted = await(
+                    repository.compactTerminalAsync(100L, 200L, 10_000L, 8));
+            assertEquals(1, compacted.compactedAttempts());
+            assertNull(repository.find(terminal.identity().attemptId()));
+            assertEquals(CaptureAttemptRepository.PrepareStatus.TOMBSTONED,
+                    await(repository.prepareAsync(terminal)).status());
+
+            CaptureAttemptRecord sameCaller = probabilityAttempt(
+                    "attempt-late", "stable-caller-key",
+                    terminal.identity().actorUuid(), terminal.identity().targetNpcUuid());
+            assertEquals(CaptureAttemptRepository.PrepareStatus.TOMBSTONED,
+                    await(repository.prepareAsync(sameCaller)).status());
+        }
+
+        try (HydragonPersistenceTestHarness restarted = new HydragonPersistenceTestHarness(database)) {
+            CaptureAttemptRepository repository = new CaptureAttemptRepository(
+                    restarted.connections, restarted.queue);
+            assertEquals(CaptureAttemptRepository.PrepareStatus.TOMBSTONED,
+                    await(repository.prepareAsync(terminal)).status());
+            assertEquals(CaptureAttemptRepository.MutationStatus.TOMBSTONED,
+                    await(repository.advanceAsync(
+                            terminal.identity().attemptId(), CaptureAttemptRecord.State.PREPARED,
+                            CaptureAttemptRecord.State.CANCELED,
+                            "late-duplicate", null, 300L)).status());
+        }
+    }
+
     private CaptureAttemptRecord probabilityAttempt(String attemptId, String key,
                                                     UUID actor, UUID target) {
         return new CaptureAttemptRecord(

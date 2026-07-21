@@ -161,6 +161,29 @@ final class SqliteSchemaV8Migration {
                 CREATE INDEX IF NOT EXISTS idx_capture_failure_cooldowns_expiry
                 ON capture_failure_cooldowns(cooldown_until_ms, actor_uuid)
                 """);
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS capture_attempt_tombstones (
+                    attempt_id TEXT PRIMARY KEY,
+                    caller_namespace TEXT,
+                    idempotency_key TEXT,
+                    terminal_state TEXT NOT NULL CHECK (terminal_state IN (
+                        'RESOLVED_FAILURE', 'COMMITTED', 'CANCELED')),
+                    compacted_at_ms INTEGER NOT NULL,
+                    retain_until_ms INTEGER NOT NULL,
+                    CHECK ((caller_namespace IS NULL AND idempotency_key IS NULL)
+                        OR (caller_namespace IS NOT NULL AND length(caller_namespace) > 0
+                            AND idempotency_key IS NOT NULL AND length(idempotency_key) > 0))
+                )
+                """);
+        statement.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_capture_attempt_tombstones_caller_key
+                ON capture_attempt_tombstones(caller_namespace, idempotency_key)
+                WHERE caller_namespace IS NOT NULL
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_capture_attempt_tombstones_retention
+                ON capture_attempt_tombstones(retain_until_ms, attempt_id)
+                """);
     }
 
     private void createBondedVessels(@Nonnull Statement statement) throws Exception {

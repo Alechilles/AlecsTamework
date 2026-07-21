@@ -116,14 +116,15 @@ class SpawnerFeatureHandlerTest {
         ));
 
         int prepare = source.indexOf("prepareCapturedLinkedNpcSnapshot(");
-        int finalizeCapture = source.indexOf("captureFinalizerService.finalizeCapture(", prepare);
-        int applied = source.indexOf("public void onApplied(", finalizeCapture);
+        int applied = source.indexOf("public void onApplied(", prepare);
         int publish = source.indexOf("publishPreparedCapturedLinkedNpcSnapshot(", applied);
+        int finalizeCapture = source.indexOf("captureFinalizerService.finalizeCapture(", publish);
 
         assertTrue(prepare >= 0, "capture must freeze command links while the live component still exists");
-        assertTrue(prepare < finalizeCapture, "link snapshot must precede owner mutation scheduling");
-        assertTrue(applied > finalizeCapture, "capture publication must remain an applied-mutation continuation");
+        assertTrue(applied > prepare, "capture publication must remain an applied-mutation continuation");
         assertTrue(publish > applied, "prepared links must publish only after capture applies");
+        assertTrue(finalizeCapture > publish,
+                "the applied callback must be installed before owner mutation scheduling");
     }
 
     @Test

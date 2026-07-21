@@ -36,6 +36,7 @@ class SqliteSchemaV8MigrationTest {
             assertTrue(columnExists(connection, "api_profile_data", "revision"));
             assertEquals(Set.of(
                     "capture_attempts",
+                    "capture_attempt_tombstones",
                     "capture_failure_cooldowns",
                     "bonded_vessel_bindings",
                     "bonded_vessel_operations",

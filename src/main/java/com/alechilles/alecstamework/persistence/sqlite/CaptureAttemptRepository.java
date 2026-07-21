@@ -71,6 +71,31 @@ public final class CaptureAttemptRepository {
         );
     }
 
+    /** Converges an interrupted successful capture from correlated canonical evidence. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> reconcileTerminalAsync(
+            @Nonnull String attemptId,
+            @Nonnull CaptureAttemptRecord.State expected,
+            @Nonnull CaptureAttemptRecord.State terminal,
+            @Nonnull String reasonCode,
+            long nowMs) {
+        boolean eligible = expected == CaptureAttemptRecord.State.RESOLVED_SUCCESS
+                || expected == CaptureAttemptRecord.State.APPLYING
+                || expected == CaptureAttemptRecord.State.COMPENSATING
+                || expected == CaptureAttemptRecord.State.QUARANTINED;
+        if (!eligible || (terminal != CaptureAttemptRecord.State.COMMITTED
+                && terminal != CaptureAttemptRecord.State.CANCELED)) {
+            throw new IllegalArgumentException(
+                    "Invalid capture recovery convergence: " + expected + " -> " + terminal);
+        }
+        return writeQueue.submitTracked(
+                "capture_attempt_reconcile_terminal",
+                connection -> reconcileTerminalInTransaction(
+                        connection, attemptId, expected, terminal, reasonCode, nowMs),
+                null
+        );
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<Boolean> markEventEmittedAsync(
             @Nonnull String attemptId,
@@ -78,6 +103,30 @@ public final class CaptureAttemptRepository {
         return writeQueue.submitTracked(
                 "capture_attempt_event_fence",
                 connection -> markEventEmittedInTransaction(connection, attemptId, emittedAtMs),
+                null
+        );
+    }
+
+    /**
+     * Replaces old terminal rows with compact idempotency tombstones in one transaction.
+     * Active failure cooldowns fence their source attempts from compaction.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<CompactionResult> compactTerminalAsync(
+            long completedBeforeMs,
+            long compactedAtMs,
+            long retainUntilMs,
+            int maximumRows) {
+        if (maximumRows <= 0) {
+            throw new IllegalArgumentException("maximumRows must be positive");
+        }
+        if (retainUntilMs <= compactedAtMs) {
+            throw new IllegalArgumentException("retainUntilMs must be after compactedAtMs");
+        }
+        return writeQueue.submitTracked(
+                "capture_attempt_compaction",
+                connection -> compactTerminalInTransaction(
+                        connection, completedBeforeMs, compactedAtMs, retainUntilMs, maximumRows),
                 null
         );
     }
@@ -204,6 +253,14 @@ public final class CaptureAttemptRepository {
     @Nonnull
     private PrepareResult prepareInTransaction(@Nonnull Connection connection,
                                                @Nonnull CaptureAttemptRecord attempt) throws Exception {
+        CaptureAttemptTombstone tombstone = findTombstoneInTransaction(
+                connection, attempt.identity());
+        if (tombstone != null) {
+            recordDuplicateCallback(null);
+            return new PrepareResult(
+                    PrepareStatus.TOMBSTONED, null,
+                    "capture_attempt_compacted:" + tombstone.terminalState().name());
+        }
         CaptureAttemptRecord existing = findInTransaction(connection, attempt.identity().attemptId());
         if (existing != null) {
             if (samePreparation(existing, attempt)) {
@@ -229,6 +286,10 @@ public final class CaptureAttemptRepository {
                                                 @Nonnull ResolutionMutation mutation) throws Exception {
         CaptureAttemptRecord existing = findInTransaction(connection, mutation.attemptId());
         if (existing == null) {
+            if (findTombstoneByAttemptIdInTransaction(connection, mutation.attemptId()) != null) {
+                recordDuplicateCallback(null);
+                return new MutationResult(MutationStatus.TOMBSTONED, null, "attempt_compacted");
+            }
             return new MutationResult(MutationStatus.NOT_FOUND, null, "attempt_not_found");
         }
         CaptureAttemptRecord.State target = mutation.success()
@@ -358,10 +419,56 @@ public final class CaptureAttemptRepository {
         }
         CaptureAttemptRecord existing = findInTransaction(connection, attemptId);
         if (existing == null) {
+            if (findTombstoneByAttemptIdInTransaction(connection, attemptId) != null) {
+                recordDuplicateCallback(null);
+                return new MutationResult(MutationStatus.TOMBSTONED, null, "attempt_compacted");
+            }
             return new MutationResult(MutationStatus.NOT_FOUND, null, "attempt_not_found");
         }
         if (existing.state() == next) {
             return new MutationResult(MutationStatus.IDEMPOTENT, existing, "already_advanced");
+        }
+        return new MutationResult(MutationStatus.INVALID_STATE, existing, "attempt_state_changed");
+    }
+
+    @Nonnull
+    private MutationResult reconcileTerminalInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String attemptId,
+            @Nonnull CaptureAttemptRecord.State expected,
+            @Nonnull CaptureAttemptRecord.State terminal,
+            @Nonnull String reasonCode,
+            long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE capture_attempts
+                SET state = ?, outcome = CASE WHEN ? = 'COMMITTED' THEN 'CAPTURED' ELSE outcome END,
+                    reason_code = ?, recovery_status = ?, last_error = NULL,
+                    updated_at_ms = ?, completed_at_ms = ?
+                WHERE attempt_id = ? AND state = ? AND resolved_at_ms > 0
+                """)) {
+            statement.setString(1, terminal.name());
+            statement.setString(2, terminal.name());
+            statement.setString(3, requireText(reasonCode, "reasonCode"));
+            statement.setString(4, terminal == CaptureAttemptRecord.State.COMMITTED
+                    ? "RECOVERED_COMMITTED" : "RECOVERED_COMPENSATED");
+            statement.setLong(5, nowMs);
+            statement.setLong(6, nowMs);
+            statement.setString(7, requireText(attemptId, "attemptId"));
+            statement.setString(8, expected.name());
+            if (statement.executeUpdate() == 1) {
+                return new MutationResult(MutationStatus.APPLIED,
+                        findInTransaction(connection, attemptId), null);
+            }
+        }
+        CaptureAttemptRecord existing = findInTransaction(connection, attemptId);
+        if (existing == null) {
+            if (findTombstoneByAttemptIdInTransaction(connection, attemptId) != null) {
+                return new MutationResult(MutationStatus.TOMBSTONED, null, "attempt_compacted");
+            }
+            return new MutationResult(MutationStatus.NOT_FOUND, null, "attempt_not_found");
+        }
+        if (existing.state() == terminal) {
+            return new MutationResult(MutationStatus.IDEMPOTENT, existing, "already_reconciled");
         }
         return new MutationResult(MutationStatus.INVALID_STATE, existing, "attempt_state_changed");
     }
@@ -451,14 +558,142 @@ public final class CaptureAttemptRepository {
                                     @Nonnull CaptureAttemptRecord requested) {
         return existing.identity().actorUuid().equals(requested.identity().actorUuid())
                 && existing.identity().targetNpcUuid().equals(requested.identity().targetNpcUuid())
+                && Objects.equals(existing.identity().profileId(), requested.identity().profileId())
+                && Objects.equals(existing.identity().expectedProfileRevision(),
+                        requested.identity().expectedProfileRevision())
                 && existing.identity().sourceItemId().equals(requested.identity().sourceItemId())
+                && Objects.equals(existing.identity().sourceRoleId(), requested.identity().sourceRoleId())
+                && existing.identity().sourceContextJson().equals(
+                        requested.identity().sourceContextJson())
                 && existing.config().equals(requested.config());
     }
 
-    private void recordDuplicateCallback(@Nonnull CaptureAttemptRecord existing) {
-        if (existing.state() != CaptureAttemptRecord.State.PREPARED) {
+    private void recordDuplicateCallback(@Nullable CaptureAttemptRecord existing) {
+        if (existing == null || existing.state() != CaptureAttemptRecord.State.PREPARED) {
             duplicateCallbacksSinceBoot.incrementAndGet();
         }
+    }
+
+    @Nonnull
+    private CompactionResult compactTerminalInTransaction(
+            @Nonnull Connection connection,
+            long completedBeforeMs,
+            long compactedAtMs,
+            long retainUntilMs,
+            int maximumRows) throws Exception {
+        try (PreparedStatement cleanupCooldowns = connection.prepareStatement(
+                "DELETE FROM capture_failure_cooldowns WHERE cooldown_until_ms <= ?")) {
+            cleanupCooldowns.setLong(1, compactedAtMs);
+            cleanupCooldowns.executeUpdate();
+        }
+        List<CaptureAttemptTombstone> candidates = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT attempt_id, caller_namespace, idempotency_key, state
+                FROM capture_attempts a
+                WHERE state IN ('RESOLVED_FAILURE', 'COMMITTED', 'CANCELED')
+                  AND completed_at_ms > 0 AND completed_at_ms <= ?
+                  AND (state = 'CANCELED' OR event_emitted_at_ms > 0)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM capture_failure_cooldowns c
+                      WHERE c.attempt_id = a.attempt_id)
+                ORDER BY completed_at_ms, attempt_id
+                LIMIT ?
+                """)) {
+            statement.setLong(1, completedBeforeMs);
+            statement.setInt(2, maximumRows);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    candidates.add(new CaptureAttemptTombstone(
+                            result.getString("attempt_id"),
+                            result.getString("caller_namespace"),
+                            result.getString("idempotency_key"),
+                            CaptureAttemptRecord.State.valueOf(result.getString("state")),
+                            compactedAtMs,
+                            retainUntilMs));
+                }
+            }
+        }
+        int compacted = 0;
+        for (CaptureAttemptTombstone candidate : candidates) {
+            try (PreparedStatement tombstone = connection.prepareStatement("""
+                    INSERT INTO capture_attempt_tombstones (
+                        attempt_id, caller_namespace, idempotency_key, terminal_state,
+                        compacted_at_ms, retain_until_ms
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(attempt_id) DO UPDATE SET
+                        retain_until_ms = MAX(capture_attempt_tombstones.retain_until_ms,
+                                              excluded.retain_until_ms)
+                    """)) {
+                tombstone.setString(1, candidate.attemptId());
+                setText(tombstone, 2, candidate.callerNamespace());
+                setText(tombstone, 3, candidate.idempotencyKey());
+                tombstone.setString(4, candidate.terminalState().name());
+                tombstone.setLong(5, candidate.compactedAtMs());
+                tombstone.setLong(6, candidate.retainUntilMs());
+                tombstone.executeUpdate();
+            }
+            try (PreparedStatement delete = connection.prepareStatement(
+                    "DELETE FROM capture_attempts WHERE attempt_id = ? AND state = ?")) {
+                delete.setString(1, candidate.attemptId());
+                delete.setString(2, candidate.terminalState().name());
+                compacted += delete.executeUpdate();
+            }
+        }
+        int expired;
+        try (PreparedStatement cleanup = connection.prepareStatement(
+                "DELETE FROM capture_attempt_tombstones WHERE retain_until_ms <= ?")) {
+            cleanup.setLong(1, compactedAtMs);
+            expired = cleanup.executeUpdate();
+        }
+        return new CompactionResult(compacted, expired);
+    }
+
+    @Nullable
+    private CaptureAttemptTombstone findTombstoneInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull CaptureAttemptRecord.Identity identity) throws Exception {
+        String sql = identity.callerNamespace() == null
+                ? "SELECT attempt_id, caller_namespace, idempotency_key, terminal_state, "
+                    + "compacted_at_ms, retain_until_ms FROM capture_attempt_tombstones "
+                    + "WHERE attempt_id = ? LIMIT 1"
+                : "SELECT attempt_id, caller_namespace, idempotency_key, terminal_state, "
+                    + "compacted_at_ms, retain_until_ms FROM capture_attempt_tombstones "
+                    + "WHERE attempt_id = ? OR (caller_namespace = ? AND idempotency_key = ?) "
+                    + "ORDER BY CASE WHEN attempt_id = ? THEN 0 ELSE 1 END LIMIT 1";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, identity.attemptId());
+            if (identity.callerNamespace() != null) {
+                statement.setString(2, identity.callerNamespace());
+                statement.setString(3, identity.idempotencyKey());
+                statement.setString(4, identity.attemptId());
+            }
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readTombstone(result) : null;
+            }
+        }
+    }
+
+    @Nullable
+    private CaptureAttemptTombstone findTombstoneByAttemptIdInTransaction(
+            @Nonnull Connection connection, @Nonnull String attemptId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT attempt_id, caller_namespace, idempotency_key, terminal_state,
+                       compacted_at_ms, retain_until_ms
+                FROM capture_attempt_tombstones WHERE attempt_id = ? LIMIT 1
+                """)) {
+            statement.setString(1, requireText(attemptId, "attemptId"));
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readTombstone(result) : null;
+            }
+        }
+    }
+
+    private CaptureAttemptTombstone readTombstone(@Nonnull ResultSet result) throws Exception {
+        return new CaptureAttemptTombstone(
+                result.getString("attempt_id"), result.getString("caller_namespace"),
+                result.getString("idempotency_key"),
+                CaptureAttemptRecord.State.valueOf(result.getString("terminal_state")),
+                result.getLong("compacted_at_ms"), result.getLong("retain_until_ms"));
     }
 
     @Nonnull
@@ -473,6 +708,7 @@ public final class CaptureAttemptRepository {
     public enum PrepareStatus {
         PREPARED,
         IDEMPOTENT,
+        TOMBSTONED,
         CONFLICT
     }
 
@@ -480,6 +716,7 @@ public final class CaptureAttemptRepository {
         APPLIED,
         IDEMPOTENT,
         NOT_FOUND,
+        TOMBSTONED,
         INVALID_STATE,
         CONFLICT
     }
@@ -511,6 +748,24 @@ public final class CaptureAttemptRepository {
                                   long cooldownUntilMs,
                                   long generation,
                                   long updatedAtMs) {
+    }
+
+    public record CaptureAttemptTombstone(@Nonnull String attemptId,
+                                          @Nullable String callerNamespace,
+                                          @Nullable String idempotencyKey,
+                                          @Nonnull CaptureAttemptRecord.State terminalState,
+                                          long compactedAtMs,
+                                          long retainUntilMs) {
+        public CaptureAttemptTombstone {
+            attemptId = requireText(attemptId, "attemptId");
+            terminalState = Objects.requireNonNull(terminalState, "terminalState");
+            if (!terminalState.isTerminal()) {
+                throw new IllegalArgumentException("terminalState must be terminal");
+            }
+        }
+    }
+
+    public record CompactionResult(int compactedAttempts, int expiredTombstones) {
     }
 
     /** Aggregate counters; duplicate callbacks are intentionally scoped to the current boot. */

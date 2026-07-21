@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +33,7 @@ public final class CaptureAttemptCoordinator {
     private final CaptureEntropySource entropy;
     private final Clock clock;
     private final Consumer<CaptureAttemptResolvedEvent> events;
+    private final CaptureAttemptRecoveryEvidence recoveryEvidence;
 
     public CaptureAttemptCoordinator(@Nonnull CaptureAttemptJournal journal,
                                      @Nonnull CapturePolicyRegistry policies,
@@ -38,12 +41,24 @@ public final class CaptureAttemptCoordinator {
                                      @Nonnull CaptureEntropySource entropy,
                                      @Nonnull Clock clock,
                                      @Nonnull Consumer<CaptureAttemptResolvedEvent> events) {
+        this(journal, policies, chanceService, entropy, clock, events,
+                CaptureAttemptRecoveryEvidence.unavailable());
+    }
+
+    public CaptureAttemptCoordinator(@Nonnull CaptureAttemptJournal journal,
+                                     @Nonnull CapturePolicyRegistry policies,
+                                     @Nonnull SpawnerCaptureChanceService chanceService,
+                                     @Nonnull CaptureEntropySource entropy,
+                                     @Nonnull Clock clock,
+                                     @Nonnull Consumer<CaptureAttemptResolvedEvent> events,
+                                     @Nonnull CaptureAttemptRecoveryEvidence recoveryEvidence) {
         this.journal = Objects.requireNonNull(journal, "journal");
         this.policies = Objects.requireNonNull(policies, "policies");
         this.chanceService = Objects.requireNonNull(chanceService, "chanceService");
         this.entropy = Objects.requireNonNull(entropy, "entropy");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.events = Objects.requireNonNull(events, "events");
+        this.recoveryEvidence = Objects.requireNonNull(recoveryEvidence, "recoveryEvidence");
     }
 
     @Nonnull
@@ -70,12 +85,21 @@ public final class CaptureAttemptCoordinator {
                 : policies.snapshot().resolveForRole(request.roleId()).orElse(null);
         CaptureAttemptRecord prepared = preparedRecord(request, policy, now);
         return journal.prepare(prepared).thenCompose(result -> {
+            if (result.status() == CaptureAttemptRepository.PrepareStatus.TOMBSTONED) {
+                return CompletableFuture.completedFuture(ResolutionResult.denied(
+                        request.attemptId(), "capture-attempt-compacted", false, null));
+            }
             if (result.status() == CaptureAttemptRepository.PrepareStatus.CONFLICT
                     || result.attempt() == null) {
                 return CompletableFuture.completedFuture(ResolutionResult.denied(
                         request.attemptId(), "capture-attempt-conflict", false, result.attempt()));
             }
             CaptureAttemptRecord active = result.attempt();
+            if (!active.identity().attemptId().equals(request.attemptId().toString())) {
+                return CompletableFuture.completedFuture(ResolutionResult.denied(
+                        request.attemptId(), "capture-attempt-canonical-identity-mismatch",
+                        false, active));
+            }
             if (active.state() != CaptureAttemptRecord.State.PREPARED) {
                 return CompletableFuture.completedFuture(fromExisting(active));
             }
@@ -232,7 +256,8 @@ public final class CaptureAttemptCoordinator {
         try {
             recoverable = journal.loadRecoverable();
         } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new RecoveryReport(false, 0, 0, 0, 1));
+            return CompletableFuture.completedFuture(
+                    new RecoveryReport(false, 0, 0, 0, 0, 0, 0, 1));
         }
         CompletableFuture<MutableRecovery> chain = CompletableFuture.completedFuture(new MutableRecovery());
         for (CaptureAttemptRecord attempt : recoverable.stream().limit(maximumAttempts).toList()) {
@@ -240,13 +265,16 @@ public final class CaptureAttemptCoordinator {
                 if (failure != null) report.failed++;
                 else if (result == RecoveryAction.CANCELED) report.canceled++;
                 else if (result == RecoveryAction.QUARANTINED) report.quarantined++;
+                else if (result == RecoveryAction.COMMITTED) report.committed++;
+                else if (result == RecoveryAction.COMPENSATED) report.compensated++;
                 else report.resumable++;
                 return report;
             }));
         }
         return chain.thenApply(report -> new RecoveryReport(
                 report.failed == 0, recoverable.size(), report.canceled,
-                report.quarantined, report.failed));
+                report.quarantined, report.committed, report.compensated,
+                report.resumable, report.failed));
     }
 
     private CompletableFuture<RecoveryAction> recoverOne(CaptureAttemptRecord attempt) {
@@ -259,15 +287,58 @@ public final class CaptureAttemptCoordinator {
             }
             return CompletableFuture.completedFuture(RecoveryAction.RESUMABLE);
         }
-        if (attempt.state() == CaptureAttemptRecord.State.QUARANTINED) {
-            return CompletableFuture.completedFuture(RecoveryAction.RESUMABLE);
+        return recoverResolved(attempt);
+    }
+
+    private CompletableFuture<RecoveryAction> recoverResolved(CaptureAttemptRecord attempt) {
+        final CaptureAttemptRecoveryEvidence.Evidence evidence;
+        try {
+            evidence = recoveryEvidence.inspect(attempt);
+        } catch (Exception failure) {
+            return CompletableFuture.failedFuture(failure);
         }
-        CaptureAttemptRecord.State expected = attempt.state();
+        return switch (evidence.status()) {
+            case COMMITTED -> journal.reconcileTerminal(
+                    attempt.identity().attemptId(), attempt.state(),
+                    CaptureAttemptRecord.State.COMMITTED, evidence.reason(), clock.millis()
+            ).thenCompose(result -> {
+                if (result.attempt() == null
+                        || result.attempt().state() != CaptureAttemptRecord.State.COMMITTED) {
+                    return CompletableFuture.failedFuture(
+                            new IllegalStateException("capture_recovery_commit_conflict"));
+                }
+                return emitOnce(result.attempt()).thenApply(ignored -> RecoveryAction.COMMITTED);
+            });
+            case COMPENSATED -> journal.reconcileTerminal(
+                    attempt.identity().attemptId(), attempt.state(),
+                    CaptureAttemptRecord.State.CANCELED, evidence.reason(), clock.millis()
+            ).thenApply(result -> {
+                if (result.attempt() == null
+                        || result.attempt().state() != CaptureAttemptRecord.State.CANCELED) {
+                    throw new IllegalStateException("capture_recovery_compensation_conflict");
+                }
+                return RecoveryAction.COMPENSATED;
+            });
+            case RESUMABLE -> CompletableFuture.completedFuture(RecoveryAction.RESUMABLE);
+            case CONFLICT, UNAVAILABLE -> quarantineRecovery(attempt, evidence.reason());
+        };
+    }
+
+    private CompletableFuture<RecoveryAction> quarantineRecovery(
+            CaptureAttemptRecord attempt, String reason) {
+        if (attempt.state() == CaptureAttemptRecord.State.QUARANTINED) {
+            return CompletableFuture.completedFuture(RecoveryAction.QUARANTINED);
+        }
         return journal.advance(
-                attempt.identity().attemptId(), expected, CaptureAttemptRecord.State.QUARANTINED,
-                "capture-recovery-needs-live-fences",
-                "Successful capture apply requires the original world and source-item fences.",
-                clock.millis()).thenApply(ignored -> RecoveryAction.QUARANTINED);
+                attempt.identity().attemptId(), attempt.state(), CaptureAttemptRecord.State.QUARANTINED,
+                "capture-recovery-evidence-conflict", reason, clock.millis()
+        ).thenApply(result -> {
+            if (result.attempt() == null
+                    || result.attempt().state() != CaptureAttemptRecord.State.QUARANTINED) {
+                throw new IllegalStateException("capture_recovery_quarantine_conflict");
+            }
+            return RecoveryAction.QUARANTINED;
+        });
     }
 
     private CompletableFuture<Boolean> emitOnce(CaptureAttemptRecord attempt) {
@@ -344,6 +415,32 @@ public final class CaptureAttemptCoordinator {
         return normalized;
     }
 
+    private static String requireSourceContext(String value) {
+        String normalized = requireText(value, "sourceContextJson");
+        if (normalized.length() > 2_048) {
+            throw new IllegalArgumentException("sourceContextJson exceeds 2048 characters");
+        }
+        final JsonObject context;
+        try {
+            context = JsonParser.parseString(normalized).getAsJsonObject();
+        } catch (RuntimeException failure) {
+            throw new IllegalArgumentException("sourceContextJson must be an object", failure);
+        }
+        if (!context.has("version") || context.get("version").getAsInt() != 1
+                || !context.has("world") || context.get("world").getAsString().isBlank()
+                || context.get("world").getAsString().length() > 256
+                || !context.has("inventory")
+                || !"hotbar".equals(context.get("inventory").getAsString())
+                || !context.has("slot") || context.get("slot").getAsInt() < 0
+                || !context.has("fingerprint")
+                || context.get("fingerprint").getAsString().isBlank()
+                || context.get("fingerprint").getAsString().length() > 512) {
+            throw new IllegalArgumentException(
+                    "sourceContextJson must contain bounded version/world/hotbar/slot/fingerprint evidence");
+        }
+        return normalized;
+    }
+
     public record AttemptRequest(
             @Nonnull UUID attemptId,
             @Nonnull UUID operationId,
@@ -372,7 +469,7 @@ public final class CaptureAttemptCoordinator {
             targetNpcUuid = Objects.requireNonNull(targetNpcUuid, "targetNpcUuid");
             sourceItemId = requireText(sourceItemId, "sourceItemId");
             roleId = requireText(roleId, "roleId");
-            sourceContextJson = requireText(sourceContextJson, "sourceContextJson");
+            sourceContextJson = requireSourceContext(sourceContextJson);
             spawnerConfigId = requireText(spawnerConfigId, "spawnerConfigId");
             itemMechanics = Objects.requireNonNull(itemMechanics, "itemMechanics");
             requirementContext = Objects.requireNonNull(requirementContext, "requirementContext");
@@ -412,13 +509,16 @@ public final class CaptureAttemptCoordinator {
     public enum ResultStatus { SUCCESS, FAILED_ROLL, DENIED }
 
     public record RecoveryReport(boolean ready, int discovered, int canceled,
-                                 int quarantined, int failed) { }
+                                 int quarantined, int committed, int compensated,
+                                 int resumable, int failed) { }
 
-    private enum RecoveryAction { RESUMABLE, CANCELED, QUARANTINED }
+    private enum RecoveryAction { RESUMABLE, CANCELED, QUARANTINED, COMMITTED, COMPENSATED }
     private static final class MutableRecovery {
         int resumable;
         int canceled;
         int quarantined;
+        int committed;
+        int compensated;
         int failed;
     }
 }

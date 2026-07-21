@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.items.CaptureAttemptHandle;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -116,8 +117,16 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
                 super.tick0(true, time, type, context, cooldownHandler);
                 return;
             }
+            CaptureAttemptHandle attempt = handler.prepareCaptureAttempt(
+                    player, heldItem, (int) context.getHeldItemSlot());
+            if (attempt == null) {
+                context.getState().state = InteractionState.Failed;
+                super.tick0(true, time, type, context, cooldownHandler);
+                return;
+            }
             long startedNs = debugLag ? System.nanoTime() : 0L;
-            commandBuffer.run(store -> handler.captureFromItemInteraction(player, heldItem, targetEntity));
+            commandBuffer.run(store -> handler.captureFromItemInteraction(
+                    player, heldItem, targetEntity, attempt));
             if (debugLag) {
                 logSlowInteraction(plugin, startedNs, "capture", player, heldItem, targetEntity);
             }

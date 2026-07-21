@@ -135,10 +135,82 @@ class CaptureAttemptCoordinatorTest {
                 journal.rows.get(applying.identity().attemptId()).state());
     }
 
+    @Test
+    void restartRecoveryConvergesCanonicalCommitAndCompensationWithoutRerolling() {
+        FakeJournal journal = new FakeJournal();
+        AtomicInteger entropyCalls = new AtomicInteger();
+        AtomicInteger events = new AtomicInteger();
+        CaptureAttemptRecord baseline = prepared(request(
+                ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT), NOW + 30_000L);
+        CaptureAttemptRecord committed = copy(
+                baseline, UUID.randomUUID().toString(), CaptureAttemptRecord.State.APPLYING,
+                successResolution());
+        CaptureAttemptRecord compensated = copy(
+                baseline, UUID.randomUUID().toString(), CaptureAttemptRecord.State.RESOLVED_SUCCESS,
+                successResolution());
+        CaptureAttemptRecord resumable = copy(
+                baseline, UUID.randomUUID().toString(), CaptureAttemptRecord.State.APPLYING,
+                successResolution());
+        journal.rows.put(committed.identity().attemptId(), committed);
+        journal.rows.put(compensated.identity().attemptId(), compensated);
+        journal.rows.put(resumable.identity().attemptId(), resumable);
+        CaptureAttemptRecoveryEvidence evidence = attempt -> {
+            if (attempt.identity().attemptId().equals(committed.identity().attemptId())) {
+                return new CaptureAttemptRecoveryEvidence.Evidence(
+                        CaptureAttemptRecoveryEvidence.Status.COMMITTED, "population-committed");
+            }
+            if (attempt.identity().attemptId().equals(compensated.identity().attemptId())) {
+                return new CaptureAttemptRecoveryEvidence.Evidence(
+                        CaptureAttemptRecoveryEvidence.Status.COMPENSATED, "population-compensated");
+            }
+            return new CaptureAttemptRecoveryEvidence.Evidence(
+                    CaptureAttemptRecoveryEvidence.Status.RESUMABLE, "population-applying");
+        };
+        CaptureAttemptCoordinator coordinator = coordinator(
+                journal, ignored -> {
+                    entropyCalls.incrementAndGet();
+                    return 0.5D;
+                }, ignored -> events.incrementAndGet(), evidence);
+
+        CaptureAttemptCoordinator.RecoveryReport report = coordinator.recover(8).join();
+
+        assertTrue(report.ready());
+        assertEquals(1, report.committed());
+        assertEquals(1, report.compensated());
+        assertEquals(1, report.resumable());
+        assertEquals(CaptureAttemptRecord.State.COMMITTED,
+                journal.rows.get(committed.identity().attemptId()).state());
+        assertEquals(CaptureAttemptRecord.State.CANCELED,
+                journal.rows.get(compensated.identity().attemptId()).state());
+        assertEquals(CaptureAttemptRecord.State.APPLYING,
+                journal.rows.get(resumable.identity().attemptId()).state());
+        assertEquals(0, entropyCalls.get());
+        assertEquals(1, events.get());
+
+        CaptureAttemptCoordinator restarted = coordinator(
+                journal, ignored -> {
+                    entropyCalls.incrementAndGet();
+                    return 0.5D;
+                }, ignored -> events.incrementAndGet(), evidence);
+        CaptureAttemptCoordinator.RecoveryReport retry = restarted.recover(8).join();
+        assertEquals(1, retry.discovered());
+        assertEquals(1, retry.resumable());
+        assertEquals(0, entropyCalls.get());
+        assertEquals(1, events.get());
+    }
+
     private static CaptureAttemptCoordinator coordinator(
             FakeJournal journal,
             CaptureEntropySource entropy,
             java.util.function.Consumer<com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent> events) {
+        return coordinator(journal, entropy, events, CaptureAttemptRecoveryEvidence.unavailable());
+    }
+
+    private static CaptureAttemptCoordinator coordinator(
+            FakeJournal journal,
+            CaptureEntropySource entropy,
+            java.util.function.Consumer<com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent> events,
+            CaptureAttemptRecoveryEvidence recoveryEvidence) {
         CaptureRequirementRuntime requirements = new CaptureRequirementRuntime() {
             @Override public long captureRequirementGeneration() { return 0; }
             @Override public CaptureRequirementDecision evaluateCaptureRequirement(
@@ -153,7 +225,8 @@ class CaptureAttemptCoordinatorTest {
                 new SpawnerCaptureChanceService(requirements),
                 entropy,
                 Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC),
-                events);
+                events,
+                recoveryEvidence);
     }
 
     private static CaptureAttemptCoordinator.AttemptRequest request(
@@ -163,7 +236,10 @@ class CaptureAttemptCoordinatorTest {
         UUID target = UUID.randomUUID();
         return new CaptureAttemptCoordinator.AttemptRequest(
                 attemptId, UUID.randomUUID(), "test", "capture-1", actor, target,
-                null, -1L, "Test_Stone", "Test_Role", "{}", "test-spawner",
+                null, -1L, "Test_Stone", "Test_Role",
+                "{\"version\":1,\"world\":\"test-world\",\"inventory\":\"hotbar\","
+                        + "\"slot\":2,\"fingerprint\":\"test-stone-fingerprint\"}",
+                "test-spawner",
                 1L, mechanics, 5.0D, 10.0D,
                 new CaptureRequirementContext(
                         attemptId, CaptureRequirementPhase.FINAL_REVALIDATION,
@@ -199,6 +275,12 @@ class CaptureAttemptCoordinatorTest {
                 source.config(), state, resolution, source.populationOperationId(),
                 UUID.randomUUID().toString(), 0, "READY", source.expiresAtMs(),
                 source.createdAtMs(), source.updatedAtMs(), 0, null);
+    }
+
+    private static CaptureAttemptRecord.Resolution successResolution() {
+        return new CaptureAttemptRecord.Resolution(
+                0, 0, 1, 1, 0, 0, 1, null,
+                "CAPTURED", "capture-guaranteed-item", 0, NOW - 100);
     }
 
     private static final class FakeJournal implements CaptureAttemptJournal {
@@ -244,6 +326,21 @@ class CaptureAttemptCoordinatorTest {
         }
 
         @Override
+        public CompletableFuture<CaptureAttemptRepository.MutationResult> reconcileTerminal(
+                String attemptId, CaptureAttemptRecord.State expected,
+                CaptureAttemptRecord.State terminal, String reasonCode, long nowMs) {
+            CaptureAttemptRecord current = rows.get(attemptId);
+            if (current == null || current.state() != expected) {
+                return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                        CaptureAttemptRepository.MutationStatus.INVALID_STATE, current, "state"));
+            }
+            CaptureAttemptRecord updated = withState(current, terminal, current.resolution());
+            rows.put(attemptId, updated);
+            return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                    CaptureAttemptRepository.MutationStatus.APPLIED, updated, null));
+        }
+
+        @Override
         public CompletableFuture<Boolean> markEventEmitted(String attemptId, long emittedAtMs) {
             return CompletableFuture.completedFuture(emitted.add(attemptId));
         }
@@ -255,7 +352,13 @@ class CaptureAttemptCoordinatorTest {
         }
 
         @Override public CaptureAttemptRecord find(String attemptId) { return rows.get(attemptId); }
-        @Override public List<CaptureAttemptRecord> loadRecoverable() { return new ArrayList<>(rows.values()); }
+        @Override
+        public List<CaptureAttemptRecord> loadRecoverable() {
+            return rows.values().stream().filter(attempt -> switch (attempt.state()) {
+                case PREPARED, RESOLVED_SUCCESS, APPLYING, COMPENSATING, QUARANTINED -> true;
+                case RESOLVED_FAILURE, COMMITTED, CANCELED -> false;
+            }).toList();
+        }
 
         private CaptureAttemptRecord withState(CaptureAttemptRecord current,
                                                CaptureAttemptRecord.State state,

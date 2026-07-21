@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.items.CaptureAttemptHandle;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -67,6 +68,8 @@ public final class ActionTameworkCaptureWild extends TameworkActionBase {
         if (handler == null) {
             return false;
         }
-        return handler.captureFromNpcAction(player, npcRef, itemStack, config);
+        CaptureAttemptHandle attempt = handler.prepareCaptureAttempt(player, itemStack, null);
+        return attempt != null
+                && handler.captureFromNpcAction(player, npcRef, itemStack, config, attempt);
     }
 }

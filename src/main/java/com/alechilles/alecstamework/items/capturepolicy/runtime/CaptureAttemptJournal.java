@@ -27,6 +27,18 @@ public interface CaptureAttemptJournal {
             @Nullable String lastError,
             long nowMs);
 
+    /** Recovery-only convergence from an interrupted successful roll to its durable terminal fact. */
+    @Nonnull
+    default CompletableFuture<CaptureAttemptRepository.MutationResult> reconcileTerminal(
+            @Nonnull String attemptId,
+            @Nonnull CaptureAttemptRecord.State expected,
+            @Nonnull CaptureAttemptRecord.State terminal,
+            @Nonnull String reasonCode,
+            long nowMs) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("capture_terminal_reconciliation_unavailable"));
+    }
+
     @Nonnull
     CompletableFuture<Boolean> markEventEmitted(@Nonnull String attemptId, long emittedAtMs);
 

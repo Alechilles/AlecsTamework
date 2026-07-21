@@ -42,6 +42,14 @@ public final class SqliteCaptureAttemptJournal implements CaptureAttemptJournal 
     }
 
     @Override
+    public CompletableFuture<CaptureAttemptRepository.MutationResult> reconcileTerminal(
+            String attemptId, CaptureAttemptRecord.State expected,
+            CaptureAttemptRecord.State terminal, String reasonCode, long nowMs) {
+        return committed(repository.reconcileTerminalAsync(
+                attemptId, expected, terminal, reasonCode, nowMs));
+    }
+
+    @Override
     public CompletableFuture<Boolean> markEventEmitted(String attemptId, long emittedAtMs) {
         return committed(repository.markEventEmittedAsync(attemptId, emittedAtMs));
     }

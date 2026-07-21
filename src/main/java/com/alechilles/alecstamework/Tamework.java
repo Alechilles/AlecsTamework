@@ -108,6 +108,7 @@ import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceServ
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureEntropySource;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.SqliteCaptureAttemptJournal;
+import com.alechilles.alecstamework.items.capturepolicy.runtime.SqliteCaptureAttemptRecoveryEvidence;
 import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
@@ -913,7 +914,9 @@ public class Tamework extends JavaPlugin {
                 new SpawnerCaptureChanceService(interactionExtensionRegistry),
                 CaptureEntropySource.sha256(),
                 Clock.systemUTC(),
-                apiEventBus::emitCaptureAttemptResolved
+                apiEventBus::emitCaptureAttemptResolved,
+                new SqliteCaptureAttemptRecoveryEvidence(
+                        persistenceRuntime.getCompanionPopulationRepository())
         );
         CaptureAttemptCoordinator.RecoveryReport captureRecovery =
                 captureAttemptCoordinator.recover(128).join();
@@ -2714,6 +2717,26 @@ public class Tamework extends JavaPlugin {
                 getLogger().at(Level.WARNING).withCause(failure).log(message);
             }
             return;
+        }
+        try {
+            var groupRecovery = ownerPopulationRuntime.reconcilePopulationGroups().join();
+            populationGroupRecoveryReady = groupRecovery.ready()
+                    && ownerPopulationRuntime.populationGroupsReady();
+            if (populationGroupRecoveryReady) {
+                activatePopulationGroupsIfReady();
+                if (!companionProvisioningRecoveryReady) {
+                    initializeCompanionProvisioningRuntime();
+                }
+                activateCompanionProvisioningIfReady();
+            } else {
+                getLogger().at(Level.WARNING).log(
+                        "Population-group recovery remained unresolved after canonical owner "
+                                + "recovery; dependent capabilities remain unavailable.");
+            }
+        } catch (RuntimeException | LinkageError groupFailure) {
+            populationGroupRecoveryReady = false;
+            getLogger().at(Level.WARNING).withCause(groupFailure).log(
+                    "Population-group recovery retry failed after canonical owner recovery.");
         }
         activateBondedVesselRuntimeAfterRecovery();
     }

@@ -34,12 +34,14 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -71,7 +73,8 @@ public final class SpawnerFeatureHandler {
     private final LongSupplier captureRequirementGeneration;
     @Nullable
     private volatile BondedVesselSpawnerBridge bondedVesselBridge;
-    private final ConcurrentHashMap<UUID, UUID> channelAttemptIds = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, CaptureAttemptHandle> channelAttemptIds =
+            new ConcurrentHashMap<>();
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -301,7 +304,9 @@ public final class SpawnerFeatureHandler {
         if (targetRef == null || !targetRef.isValid()) {
             return false;
         }
-        return captureFromNpcAction(player, targetRef, itemStack, config);
+        CaptureAttemptHandle attempt = prepareCaptureAttempt(player, itemStack, null);
+        return attempt != null && captureFromNpcAction(
+                player, targetRef, itemStack, config, attempt);
     }
 
     private void captureStub(Player player, ItemStack itemStack, int targetEntityId, ItemFeatureConfig config, int activeHotbarSlot) {
@@ -312,7 +317,11 @@ public final class SpawnerFeatureHandler {
         if (targetRef == null || !targetRef.isValid()) {
             return;
         }
-        captureFromNpcAction(player, targetRef, itemStack, config);
+        CaptureAttemptHandle attempt = prepareCaptureAttempt(
+                player, itemStack, activeHotbarSlot);
+        if (attempt != null) {
+            captureFromNpcAction(player, targetRef, itemStack, config, attempt);
+        }
     }
 
     public boolean canCaptureInteraction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
@@ -432,7 +441,9 @@ public final class SpawnerFeatureHandler {
         Store<EntityStore> store = world.getEntityStore().getStore();
         UUIDComponent playerUuid = store.getComponent(player.getReference(), UUIDComponent.getComponentType());
         UUIDComponent targetUuid = store.getComponent(targetRef, UUIDComponent.getComponentType());
+        CaptureAttemptHandle attempt = prepareCaptureAttempt(player, itemStack, null);
         if (playerUuid == null || playerUuid.getUuid() == null || targetUuid == null || targetUuid.getUuid() == null
+                || attempt == null
                 || !CaptureChannelVfxSystem.start(
                         playerUuid.getUuid(),
                         targetUuid.getUuid(),
@@ -457,7 +468,7 @@ public final class SpawnerFeatureHandler {
                     store
             );
         }
-        channelAttemptIds.put(playerUuid.getUuid(), UUID.randomUUID());
+        channelAttemptIds.put(playerUuid.getUuid(), attempt);
         return true;
     }
 
@@ -500,15 +511,15 @@ public final class SpawnerFeatureHandler {
                                           Ref<EntityStore> targetRef,
                                           ItemStack itemStack,
                                           @Nullable String captureBurstParticleSystem) {
-        UUID attemptId = player == null ? null : channelAttemptIds.remove(player.getUuid());
+        CaptureAttemptHandle attempt = player == null ? null : channelAttemptIds.remove(player.getUuid());
         endCaptureChannel(player, targetRef, itemStack);
-        if (attemptId == null) {
+        if (attempt == null) {
             logSpawnerFlowDebug("capture denied reason=missing-channel-attempt-identity");
             return false;
         }
         return captureFromItemInteraction(
                 player, itemStack, targetRef, captureBurstParticleSystem,
-                attemptId);
+                attempt);
     }
 
     public boolean canSpawnInteraction(ItemStack itemStack) {
@@ -537,23 +548,49 @@ public final class SpawnerFeatureHandler {
     }
 
     // Used by TameworkSpawnInteraction: capture from a targeted NPC using the held spawner item.
-    public boolean captureFromItemInteraction(Player player, ItemStack itemStack, Ref<EntityStore> targetRef) {
-        return captureFromItemInteraction(player, itemStack, targetRef, null);
+    @Nullable
+    public CaptureAttemptHandle prepareCaptureAttempt(
+            Player player, ItemStack itemStack, @Nullable Integer hotbarSlot) {
+        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
+        if (player == null || itemStack == null || itemStack.isEmpty() || exactSlot == null) {
+            return null;
+        }
+        ItemStack current = playerInventoryService.getHotbarItem(player, exactSlot);
+        if (current == null || !Objects.equals(current, itemStack)) {
+            return null;
+        }
+        return CaptureAttemptHandle.forDispatch(exactSlot, current);
     }
 
-    private boolean captureFromItemInteraction(Player player,
+    /** Public/direct callers must reuse the same namespace and key for every callback retry. */
+    @Nullable
+    public CaptureAttemptHandle prepareCaptureAttempt(
+            Player player, ItemStack itemStack, @Nullable Integer hotbarSlot,
+            @Nonnull String callerNamespace, @Nonnull String idempotencyKey) {
+        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
+        if (player == null || itemStack == null || itemStack.isEmpty() || exactSlot == null) {
+            return null;
+        }
+        ItemStack current = playerInventoryService.getHotbarItem(player, exactSlot);
+        if (current == null || !Objects.equals(current, itemStack)) {
+            return null;
+        }
+        return CaptureAttemptHandle.forCaller(
+                callerNamespace, idempotencyKey, exactSlot, current);
+    }
+
+    public boolean captureFromItemInteraction(Player player,
                                                ItemStack itemStack,
                                                Ref<EntityStore> targetRef,
-                                               @Nullable String captureBurstParticleSystem) {
-        return captureFromItemInteraction(
-                player, itemStack, targetRef, captureBurstParticleSystem, UUID.randomUUID());
+                                               @Nonnull CaptureAttemptHandle attempt) {
+        return captureFromItemInteraction(player, itemStack, targetRef, null, attempt);
     }
 
     private boolean captureFromItemInteraction(Player player,
                                                ItemStack itemStack,
                                                Ref<EntityStore> targetRef,
                                                @Nullable String captureBurstParticleSystem,
-                                               UUID attemptId) {
+                                               @Nonnull CaptureAttemptHandle attempt) {
         if (player == null || itemStack == null || itemStack.isEmpty() || targetRef == null) {
             return false;
         }
@@ -568,7 +605,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         return captureFromNpcAction(
-                player, targetRef, itemStack, config, captureBurstParticleSystem, attemptId, false,
+                player, targetRef, itemStack, config, captureBurstParticleSystem, attempt, false,
                 null, null, 0L);
     }
 
@@ -628,9 +665,11 @@ public final class SpawnerFeatureHandler {
         return SpawnerInteractionConfigResolver.resolve(baseConfig, spawnAssignsOwnerOverride);
     }
 
-    // Called by NPC action chains to capture an NPC into the held spawner item.
-    public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
-        return captureFromNpcAction(player, targetRef, itemStack, config, null, UUID.randomUUID(), false,
+    // Called by NPC action chains with an identity allocated before any async continuation.
+    public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef,
+                                        ItemStack itemStack, ItemFeatureConfig config,
+                                        @Nonnull CaptureAttemptHandle attempt) {
+        return captureFromNpcAction(player, targetRef, itemStack, config, null, attempt, false,
                 null, null, 0L);
     }
 
@@ -685,18 +724,8 @@ public final class SpawnerFeatureHandler {
                                          Ref<EntityStore> targetRef,
                                          ItemStack itemStack,
                                          ItemFeatureConfig config,
-                                         @Nullable String captureBurstParticleSystem) {
-        return captureFromNpcAction(
-                player, targetRef, itemStack, config, captureBurstParticleSystem, UUID.randomUUID(), false,
-                null, null, 0L);
-    }
-
-    private boolean captureFromNpcAction(Player player,
-                                         Ref<EntityStore> targetRef,
-                                         ItemStack itemStack,
-                                         ItemFeatureConfig config,
                                          @Nullable String captureBurstParticleSystem,
-                                         UUID attemptId,
+                                         @Nonnull CaptureAttemptHandle attempt,
                                          boolean outcomeResolved,
                                          @Nullable SpawnerCaptureFinalizerService.PreparedCaptureMutation preparedMutation,
                                          @Nullable CaptureAttemptRecord resolvedAttempt,
@@ -704,6 +733,7 @@ public final class SpawnerFeatureHandler {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
+        UUID attemptId = attempt.attemptId();
         config = buildSpawnerConfigForInteraction(config, null);
         if (config == null) {
             return false;
@@ -733,6 +763,15 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
+        if (!sourceMatches(player, attempt)) {
+            logSpawnerFlowDebug("capture denied reason=source-attempt-fence-changed"
+                    + " player=" + player.getUuid() + " attempt=" + attemptId);
+            if (outcomeResolved && captureAttemptCoordinator != null) {
+                captureAttemptCoordinator.quarantineApply(
+                        attemptId, "capture-source-attempt-fence-changed");
+            }
+            return false;
+        }
         World world = player.getWorld();
         if (world == null) {
             return false;
@@ -758,7 +797,7 @@ public final class SpawnerFeatureHandler {
         if (!outcomeResolved && captureAttemptCoordinator != null) {
             return prepareDurableCaptureAttempt(
                     player, targetRef, itemStack, config, captureBurstParticleSystem,
-                    attemptId, detachPlan);
+                    attempt, detachPlan);
         }
         if (outcomeResolved) {
             if (preparedMutation == null || resolvedAttempt == null
@@ -912,7 +951,7 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig finalizedConfig = config;
         UUID finalizedAttemptId = outcomeResolved ? attemptId : null;
         UUID finalizedOwnerToStore = ownerToStore;
-        Integer sourceHotbarSlot = resolveSourceHotbarSlot(player, null);
+        Integer sourceHotbarSlot = attempt.hotbarSlot();
         if (bondedCapture && sourceHotbarSlot == null) {
             logSpawnerFlowDebug("capture denied reason=bonded-source-slot-unavailable");
             if (preparedMutation != null) {
@@ -1039,18 +1078,18 @@ public final class SpawnerFeatureHandler {
             ItemStack itemStack,
             ItemFeatureConfig config,
             @Nullable String captureBurstParticleSystem,
-            UUID attemptId,
+            @Nonnull CaptureAttemptHandle attempt,
             SpawnerManagedCoopCaptureDetachService.Plan detachPlan) {
         return captureFinalizerService.prepareCapture(
                 player, config, targetRef, detachPlan.durableContextJson(),
-                "spawner-capture-attempt:" + attemptId,
+                "spawner-capture-attempt:" + attempt.attemptId(),
                 new SpawnerCaptureFinalizerService.CapturePreparationCallbacks() {
                     @Override
                     public void onPrepared(
                             SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation) {
                         if (!scheduleDurableCaptureAttempt(
                                 player, targetRef, itemStack, config,
-                                captureBurstParticleSystem, attemptId, mutation)) {
+                                captureBurstParticleSystem, attempt, mutation)) {
                             mutation.cancel("capture-attempt-preparation-failed");
                         }
                     }
@@ -1070,8 +1109,9 @@ public final class SpawnerFeatureHandler {
             ItemStack itemStack,
             ItemFeatureConfig config,
             @Nullable String captureBurstParticleSystem,
-            UUID attemptId,
+            @Nonnull CaptureAttemptHandle attempt,
             SpawnerCaptureFinalizerService.PreparedCaptureMutation preparedMutation) {
+        UUID attemptId = attempt.attemptId();
         World world = player.getWorld();
         Store<EntityStore> store = world == null || world.getEntityStore() == null
                 ? null : world.getEntityStore().getStore();
@@ -1082,6 +1122,12 @@ public final class SpawnerFeatureHandler {
                 capturePolicyService.resolveCaptureHealth(targetRef, store);
         if (world == null || store == null || targetUuid == null || roleId == null || roleId.isBlank()
                 || health == null || attemptId == null) {
+            return false;
+        }
+        ItemStack exactSource = playerInventoryService.getHotbarItem(
+                player, attempt.hotbarSlot());
+        if (exactSource == null
+                || !attempt.sourceFingerprint().equals(SpawnerSourceFingerprint.of(exactSource))) {
             return false;
         }
         double healthFraction = health.currentHealth() / health.maximumHealth();
@@ -1108,15 +1154,15 @@ public final class SpawnerFeatureHandler {
                 new CaptureAttemptCoordinator.AttemptRequest(
                         attemptId,
                         preparedMutation.populationOperationId(),
-                        null,
-                        null,
+                        attempt.callerNamespace(),
+                        attempt.idempotencyKey(),
                         player.getUuid(),
                         targetUuid,
                         preparedMutation.profileId(),
                         CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
                         itemStack.getItemId(),
                         roleId,
-                        "{\"world\":\"" + jsonEscape(world.getName()) + "\"}",
+                        attempt.sourceContextJson(world.getName()),
                         itemStack.getItemId(),
                         registry.revision(),
                         config.getCaptureMechanics(),
@@ -1128,6 +1174,7 @@ public final class SpawnerFeatureHandler {
                         expiresAt
                 );
         AtomicReference<CaptureAttemptRecord> resolvedAttempt = new AtomicReference<>();
+        AtomicReference<CaptureAttemptHandle> resolvedHandle = new AtomicReference<>(attempt);
         captureAttemptCoordinator.resolve(request).thenCompose(result -> {
             if (result.status() == CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL) {
                 preparedMutation.cancel("capture-probability-failure");
@@ -1144,7 +1191,9 @@ public final class SpawnerFeatureHandler {
                 return java.util.concurrent.CompletableFuture.completedFuture(false);
             }
             resolvedAttempt.set(result.attempt());
-            return captureAttemptCoordinator.beginApply(attemptId);
+            CaptureAttemptHandle effective = attempt.withAttemptId(result.attemptId());
+            resolvedHandle.set(effective);
+            return captureAttemptCoordinator.beginApply(effective.attemptId());
         }).whenComplete((applyReady, failure) -> {
             if (failure != null || !Boolean.TRUE.equals(applyReady)) {
                 preparedMutation.cancel("capture-attempt-apply-fence-failed");
@@ -1153,20 +1202,16 @@ public final class SpawnerFeatureHandler {
             world.execute(() -> {
                 boolean scheduled = captureFromNpcAction(
                         player, targetRef, itemStack, config,
-                        captureBurstParticleSystem, attemptId, true,
+                        captureBurstParticleSystem, resolvedHandle.get(), true,
                         preparedMutation, resolvedAttempt.get(), requirementGeneration);
                 if (!scheduled) {
                     preparedMutation.cancel("capture-terminal-revalidation-failed");
                     captureAttemptCoordinator.quarantineApply(
-                            attemptId, "capture-terminal-revalidation-failed");
+                            resolvedHandle.get().attemptId(), "capture-terminal-revalidation-failed");
                 }
             });
         });
         return true;
-    }
-
-    private static String jsonEscape(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private void bindCapturedVessel(
@@ -1256,6 +1301,13 @@ public final class SpawnerFeatureHandler {
         }
         byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
         return activeSlot < 0 ? null : (int) activeSlot;
+    }
+
+    private boolean sourceMatches(Player player, CaptureAttemptHandle attempt) {
+        if (player == null || attempt == null) return false;
+        ItemStack current = playerInventoryService.getHotbarItem(player, attempt.hotbarSlot());
+        return current != null && attempt.sourceFingerprint().equals(
+                SpawnerSourceFingerprint.of(current));
     }
 
     @Nullable

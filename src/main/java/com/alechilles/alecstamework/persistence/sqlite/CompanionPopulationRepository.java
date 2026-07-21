@@ -7,12 +7,14 @@ import java.sql.ResultSet;
 import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.bindState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.parseUuid;
+import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readOperation;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setInteger;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setText;
@@ -171,6 +173,24 @@ public final class CompanionPopulationRepository {
     @Nonnull
     public List<CompanionPopulationOperationRecord> loadNonterminalOperations() throws Exception {
         return journalStore.loadNonterminalOperations();
+    }
+
+    /** Reads one durable operation for cross-journal recovery correlation. */
+    @Nullable
+    public CompanionPopulationOperationRecord findOperation(@Nonnull String operationId) throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
+                            old_state_json, new_state_json, target_context_json,
+                            created_at_ms, updated_at_ms, completed_at_ms, last_error
+                     FROM companion_population_operations
+                     WHERE operation_id = ? LIMIT 1
+                     """)) {
+            statement.setString(1, Objects.requireNonNull(operationId, "operationId"));
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readOperation(result) : null;
+            }
+        }
     }
 
     /** Loads retained breeding rows, including COMMITTED rows used as restart birth evidence. */
