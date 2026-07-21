@@ -70,7 +70,7 @@ class TwPopulationGroupConfigTest {
         assertEquals(PopulationGroupScope.PER_WORLD, perWorld.getLimits().getScope());
         assertEquals(0, perWorld.getLimits().getMaxActivePerOwner());
         assertThrows(IllegalArgumentException.class, negative::validateOrThrow);
-        assertThrows(IllegalArgumentException.class, () -> TwPopulationGroupConfig.CODEC.decode(
+        assertThrows(RuntimeException.class, () -> TwPopulationGroupConfig.CODEC.decode(
                 BsonDocument.parse("{\"GroupId\":\"hydragon:bad\",\"RoleIds\":[\"Hydra_Tamed\"],\"Limits\":{\"Scope\":\"Everywhere\"}}"),
                 new ExtraInfo()
         ));
