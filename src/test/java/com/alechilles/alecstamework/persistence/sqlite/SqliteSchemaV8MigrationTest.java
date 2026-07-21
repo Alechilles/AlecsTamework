@@ -44,6 +44,7 @@ class SqliteSchemaV8MigrationTest {
                     "companion_population_group_assignments",
                     "companion_population_group_operations",
                     "companion_population_group_count_evidence",
+                    "companion_population_group_event_receipts",
                     "companion_provisioning_operations"
             ), featureTables(connection));
         }

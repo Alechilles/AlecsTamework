@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupEventSink;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupCountEvidenceRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
@@ -38,7 +39,6 @@ public final class PopulationGroupOwnerAdmissionExtension {
     private final NpcProfileRepository profiles;
     private final PopulationGroupEventSink events;
     private final ConcurrentHashMap<UUID, PreparedGroup> prepared = new ConcurrentHashMap<>();
-    private final java.util.Set<UUID> emittedEvents = ConcurrentHashMap.newKeySet();
 
     public PopulationGroupOwnerAdmissionExtension(
             @Nonnull OwnerPopulationAdmissionCoordinator ownerCoordinator,
@@ -107,13 +107,14 @@ public final class PopulationGroupOwnerAdmissionExtension {
         return ownerCoordinator.groupCompositeCoordinator().commitPopulationGroupsAsync(
                         admission, repository, group.operation().operationId(),
                         group.classification(), System.currentTimeMillis())
-                .whenComplete((result, failure) -> {
-                    if (failure == null && result != null
-                            && result.committed()
-                            && result.status() != OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING) {
-                        emitMembership(group, false);
-                        prepared.remove(admission.operationId(), group);
+                .thenCompose(result -> {
+                    if (result == null || !result.committed()
+                            || result.status()
+                            == OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING) {
+                        return CompletableFuture.completedFuture(result);
                     }
+                    prepared.remove(admission.operationId(), group);
+                    return emitMembership(group, false).thenApply(ignored -> result);
                 });
     }
 
@@ -139,11 +140,10 @@ public final class PopulationGroupOwnerAdmissionExtension {
                                 PopulationGroupOperationRecord.State.COMMITTED,
                                 "source-finalization-complete")
                         : CompletableFuture.completedFuture(false))
-                .whenComplete((ok, failure) -> {
-                    if (failure == null && Boolean.TRUE.equals(ok)) {
-                        emitMembership(group, false);
-                        prepared.remove(admission.operationId(), group);
-                    }
+                .thenCompose(ok -> {
+                    if (!Boolean.TRUE.equals(ok)) return CompletableFuture.completedFuture(false);
+                    prepared.remove(admission.operationId(), group);
+                    return emitMembership(group, false).thenApply(ignored -> true);
                 });
     }
 
@@ -179,27 +179,34 @@ public final class PopulationGroupOwnerAdmissionExtension {
     @Nonnull
     public CompletableFuture<RecoveryReport> recover(boolean recovered) {
         final List<PopulationGroupOperationRecord> operations;
+        final List<PopulationGroupOperationRecord> unemitted;
         try {
             operations = repository.loadRecoverableOperations();
+            unemitted = repository.loadUnemittedMembershipOperations();
         } catch (Exception failure) {
             return CompletableFuture.completedFuture(new RecoveryReport(0, 0, 1, false));
         }
-        final Map<String, CompanionPopulationOperationRecord> nonterminalOwners;
+        final Map<String, CompanionPopulationStateRecord> states;
         try {
-            nonterminalOwners = ownerCoordinator.populationRepository().loadNonterminalOperations()
-                    .stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-                            CompanionPopulationOperationRecord::operationId,
-                            operation -> operation,
+            states = ownerCoordinator.populationRepository().loadAllStates().stream()
+                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                            CompanionPopulationStateRecord::profileId, state -> state,
                             (left, right) -> left));
         } catch (Exception failure) {
             return CompletableFuture.completedFuture(new RecoveryReport(
                     operations.size(), 0, Math.max(1, operations.size()), false));
         }
         CompletableFuture<RecoveryReport> chain = CompletableFuture.completedFuture(
-                new RecoveryReport(operations.size(), 0, 0, false));
+                new RecoveryReport(operations.size() + unemitted.size(), 0, 0, false));
         for (PopulationGroupOperationRecord operation : operations) {
-            chain = chain.thenCompose(report -> recover(operation, nonterminalOwners).handle((ok, failure) ->
+            chain = chain.thenCompose(report -> recover(
+                    operation, states.get(operation.profileId())).handle((ok, failure) ->
                     failure == null && Boolean.TRUE.equals(ok)
+                            ? report.successOne() : report.failureOne()));
+        }
+        for (PopulationGroupOperationRecord operation : unemitted) {
+            chain = chain.thenCompose(report -> emitMembership(operation, true)
+                    .handle((ignored, failure) -> failure == null
                             ? report.successOne() : report.failureOne()));
         }
         return chain.thenCompose(report -> reconcileClassifications(report, recovered))
@@ -246,7 +253,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
         if (submission == null || submission.completion() == null) {
             return CompletableFuture.completedFuture(false);
         }
-        return submission.completion().thenApply(outcome -> {
+        return submission.completion().thenCompose(outcome -> {
             boolean committed = outcome != null && outcome.isCommitted()
                     && outcome.value() != null
                     && (outcome.value().status() == PopulationGroupRepository.Status.APPLIED
@@ -254,10 +261,10 @@ public final class PopulationGroupOwnerAdmissionExtension {
             if (committed && resolved && state.ownerUuid() != null
                     && (existing == null || !existing.groupIds().equals(groups)
                     || !Objects.equals(existing.roleId(), role))) {
-                emitReconciledMembership(state.ownerUuid(), state.profileId(), role,
-                        existing, groups, index.revision(), recovered);
+                return emitReconciledMembership(state.ownerUuid(), state.profileId(), role,
+                        existing, groups, index.revision(), recovered).thenApply(ignored -> true);
             }
-            return committed && resolved;
+            return CompletableFuture.completedFuture(committed && resolved);
         });
     }
 
@@ -376,25 +383,169 @@ public final class PopulationGroupOwnerAdmissionExtension {
 
     private CompletableFuture<Boolean> recover(
             PopulationGroupOperationRecord operation,
-            Map<String, CompanionPopulationOperationRecord> nonterminalOwners) {
-        boolean ownerStillNonterminal = operation.populationOperationId() != null
-                && nonterminalOwners.containsKey(operation.populationOperationId());
+            @Nullable CompanionPopulationStateRecord state) {
+        CompanionPopulationOperationRecord owner = ownerOperation(operation);
         return switch (operation.state()) {
             case PREPARED -> advance(operation.operationId(), operation.state(),
                     PopulationGroupOperationRecord.State.CANCELED, "recovered-unclaimed-reservation");
-            case APPLIED -> ownerStillNonterminal
-                    ? CompletableFuture.completedFuture(false)
-                    : advance(operation.operationId(), operation.state(),
-                            PopulationGroupOperationRecord.State.COMMITTED,
-                            "recovered-owner-commit").thenApply(ok -> {
-                                if (Boolean.TRUE.equals(ok)) emitMembership(operation, true);
-                                return ok;
-                            });
-            case APPLYING, QUARANTINED -> CompletableFuture.completedFuture(false);
-            case COMPENSATING -> advance(operation.operationId(), operation.state(),
-                    PopulationGroupOperationRecord.State.FAILED, "recovered-compensation");
+            case APPLYING, QUARANTINED -> recoverApplying(operation, owner, state);
+            case APPLIED -> recoverApplied(operation, owner, state);
+            case COMPENSATING -> ownerRolledBack(operation, owner) && matchesOld(operation, state)
+                    ? advance(operation.operationId(), operation.state(),
+                            PopulationGroupOperationRecord.State.FAILED,
+                            "recovered-compensation")
+                    : CompletableFuture.completedFuture(false);
             case COMMITTED, CANCELED, FAILED -> CompletableFuture.completedFuture(true);
         };
+    }
+
+    private CompletableFuture<Boolean> recoverApplying(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationOperationRecord owner,
+            @Nullable CompanionPopulationStateRecord state) {
+        if (ownerCommitted(operation, owner) && matchesNew(operation, state)) {
+            CompletableFuture<Boolean> applying = operation.state()
+                    == PopulationGroupOperationRecord.State.QUARANTINED
+                    ? advance(operation.operationId(), operation.state(),
+                            PopulationGroupOperationRecord.State.APPLYING,
+                            "recovered-owner-commit")
+                    : CompletableFuture.completedFuture(true);
+            return applying.thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? advance(operation.operationId(),
+                                    PopulationGroupOperationRecord.State.APPLYING,
+                                    PopulationGroupOperationRecord.State.APPLIED,
+                                    "recovered-owner-commit")
+                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? advance(operation.operationId(),
+                                    PopulationGroupOperationRecord.State.APPLIED,
+                                    PopulationGroupOperationRecord.State.COMMITTED,
+                                    "recovered-owner-commit")
+                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? emitMembership(operation, true).thenApply(ignored -> true)
+                            : CompletableFuture.completedFuture(false));
+        }
+        if (ownerRolledBack(operation, owner) && matchesOld(operation, state)) {
+            return toCompensating(operation.operationId(), "recovered-owner-rollback")
+                    .thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? advance(operation.operationId(),
+                                    PopulationGroupOperationRecord.State.COMPENSATING,
+                                    PopulationGroupOperationRecord.State.FAILED,
+                                    "recovered-owner-rollback")
+                            : CompletableFuture.completedFuture(false));
+        }
+        if (operation.state() == PopulationGroupOperationRecord.State.APPLYING
+                && owner != null && owner.state().isTerminal()) {
+            return advance(operation.operationId(), operation.state(),
+                    PopulationGroupOperationRecord.State.QUARANTINED,
+                    "recovery-evidence-mismatch").thenApply(ignored -> false);
+        }
+        return CompletableFuture.completedFuture(false);
+    }
+
+    private CompletableFuture<Boolean> recoverApplied(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationOperationRecord owner,
+            @Nullable CompanionPopulationStateRecord state) {
+        if (ownerCommitted(operation, owner) && matchesNew(operation, state)) {
+            return advance(operation.operationId(), operation.state(),
+                    PopulationGroupOperationRecord.State.COMMITTED,
+                    "recovered-owner-commit").thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? emitMembership(operation, true).thenApply(ignored -> true)
+                            : CompletableFuture.completedFuture(false));
+        }
+        if (ownerRolledBack(operation, owner) && matchesOld(operation, state)) {
+            return toCompensating(operation.operationId(), "recovered-owner-rollback")
+                    .thenCompose(ok -> Boolean.TRUE.equals(ok)
+                            ? advance(operation.operationId(),
+                                    PopulationGroupOperationRecord.State.COMPENSATING,
+                                    PopulationGroupOperationRecord.State.FAILED,
+                                    "recovered-owner-rollback")
+                            : CompletableFuture.completedFuture(false));
+        }
+        return CompletableFuture.completedFuture(false);
+    }
+
+    @Nullable
+    private CompanionPopulationOperationRecord ownerOperation(
+            PopulationGroupOperationRecord operation) {
+        if (operation.populationOperationId() == null) return null;
+        try {
+            return ownerCoordinator.populationRepository().findOperation(
+                    operation.populationOperationId());
+        } catch (Exception failure) {
+            throw new IllegalStateException("population-owner-operation-unavailable", failure);
+        }
+    }
+
+    private boolean matchesNew(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationStateRecord state) {
+        return matchesState(operation, state, true)
+                && matchesClassification(operation, true);
+    }
+
+    private boolean matchesOld(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationStateRecord state) {
+        return matchesState(operation, state, false)
+                && matchesClassification(operation, false);
+    }
+
+    private boolean matchesState(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationStateRecord state,
+            boolean target) {
+        if (state == null) return false;
+        long expectedRevision = operation.expectedPopulationRevision() + (target ? 1L : 0L);
+        return state.revision() == expectedRevision
+                && Objects.equals(state.ownerUuid(), target
+                        ? operation.newOwnerUuid() : operation.oldOwnerUuid())
+                && Objects.equals(state.lifecycleState(), target
+                        ? operation.newLifecycleState() : operation.oldLifecycleState())
+                && Objects.equals(normalize(state.ownershipWorldName()), normalize(target
+                        ? operation.newOwnershipWorldName()
+                        : operation.oldOwnershipWorldName()));
+    }
+
+    private boolean matchesClassification(
+            PopulationGroupOperationRecord operation, boolean target) {
+        PopulationGroupClassificationRecord current;
+        try {
+            current = repository.findClassification(operation.profileId());
+        } catch (Exception failure) {
+            return false;
+        }
+        String role = target ? operation.newRoleId() : operation.oldRoleId();
+        List<String> groups = target ? operation.newGroupIds() : operation.oldGroupIds();
+        if (current == null) return role == null && groups.isEmpty();
+        return Objects.equals(current.roleId(), role)
+                && current.groupIds().equals(groups)
+                && (!target || current.classificationRevision()
+                        == operation.classificationRevision());
+    }
+
+    private static boolean ownerCommitted(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationOperationRecord owner) {
+        return owner != null
+                ? owner.state() == CompanionPopulationOperationRecord.State.COMMITTED
+                : operation.populationOperationId() == null;
+    }
+
+    private static boolean ownerRolledBack(
+            PopulationGroupOperationRecord operation,
+            @Nullable CompanionPopulationOperationRecord owner) {
+        return owner != null
+                ? owner.state() == CompanionPopulationOperationRecord.State.FAILED
+                        || owner.state() == CompanionPopulationOperationRecord.State.RETRYABLE
+                : operation.populationOperationId() == null;
+    }
+
+    @Nullable
+    private static String normalize(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private CompletableFuture<Boolean> compensate(String operationId, String reason) {
@@ -412,6 +563,9 @@ public final class PopulationGroupOwnerAdmissionExtension {
             return CompletableFuture.completedFuture(false);
         }
         if (operation == null) return CompletableFuture.completedFuture(false);
+        if (operation.state() == PopulationGroupOperationRecord.State.FAILED) {
+            return CompletableFuture.completedFuture(true);
+        }
         if (operation.state() == PopulationGroupOperationRecord.State.COMPENSATING) {
             return CompletableFuture.completedFuture(true);
         }
@@ -431,13 +585,40 @@ public final class PopulationGroupOwnerAdmissionExtension {
             if (submission == null || submission.completion() == null) {
                 return CompletableFuture.completedFuture(false);
             }
-            return submission.completion().thenApply(outcome -> outcome != null
-                    && outcome.isCommitted() && outcome.value() != null
-                    && outcome.value().status() != PopulationGroupRepository.Status.CONFLICT
-                    && outcome.value().status() != PopulationGroupRepository.Status.INVALID_STATE);
+            return submission.completion().thenApply(outcome -> {
+                if (outcome == null || !outcome.isCommitted() || outcome.value() == null) {
+                    return false;
+                }
+                PopulationGroupRepository.OperationResult value = outcome.value();
+                if (value.status() != PopulationGroupRepository.Status.CONFLICT
+                        && value.status() != PopulationGroupRepository.Status.INVALID_STATE) {
+                    return true;
+                }
+                return value.operation() != null
+                        && atOrBeyond(next, value.operation().state());
+            });
         } catch (RuntimeException failure) {
             return CompletableFuture.completedFuture(false);
         }
+    }
+
+    private static boolean atOrBeyond(
+            PopulationGroupOperationRecord.State target,
+            PopulationGroupOperationRecord.State actual) {
+        return switch (target) {
+            case PREPARED -> actual == PopulationGroupOperationRecord.State.PREPARED;
+            case APPLYING -> actual == PopulationGroupOperationRecord.State.APPLYING
+                    || actual == PopulationGroupOperationRecord.State.APPLIED
+                    || actual == PopulationGroupOperationRecord.State.COMMITTED;
+            case APPLIED -> actual == PopulationGroupOperationRecord.State.APPLIED
+                    || actual == PopulationGroupOperationRecord.State.COMMITTED;
+            case COMMITTED -> actual == PopulationGroupOperationRecord.State.COMMITTED;
+            case CANCELED -> actual == PopulationGroupOperationRecord.State.CANCELED;
+            case COMPENSATING -> actual == PopulationGroupOperationRecord.State.COMPENSATING
+                    || actual == PopulationGroupOperationRecord.State.FAILED;
+            case QUARANTINED -> actual == PopulationGroupOperationRecord.State.QUARANTINED;
+            case FAILED -> actual == PopulationGroupOperationRecord.State.FAILED;
+        };
     }
 
     private static CompanionLifecycleState lifecycle(String value) {
@@ -494,11 +675,11 @@ public final class PopulationGroupOwnerAdmissionExtension {
                 || previous.scope() != current.scope();
     }
 
-    private void emitMembership(PreparedGroup group, boolean recovered) {
-        emitMembership(group.operation(), group.oldClassificationRevision(), recovered);
+    private CompletableFuture<Boolean> emitMembership(PreparedGroup group, boolean recovered) {
+        return emitMembership(group.operation(), group.oldClassificationRevision(), recovered);
     }
 
-    private void emitReconciledMembership(
+    private CompletableFuture<Boolean> emitReconciledMembership(
             UUID ownerUuid,
             String profileId,
             String roleId,
@@ -510,7 +691,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
                 ("population-group-membership:" + profileId + ":" + newRevision)
                         .getBytes(StandardCharsets.UTF_8));
         long now = System.currentTimeMillis();
-        emit(operationId, new PopulationGroupMembershipChangedEvent(
+        return emit(operationId, new PopulationGroupMembershipChangedEvent(
                 operationId, profileId, ownerUuid, roleId,
                 existing == null ? java.util.Set.of() : java.util.Set.copyOf(existing.groupIds()),
                 java.util.Set.copyOf(newGroups),
@@ -519,20 +700,23 @@ public final class PopulationGroupOwnerAdmissionExtension {
                 newRevision, recovered, now, System.currentTimeMillis()));
     }
 
-    private void emitMembership(PopulationGroupOperationRecord operation, boolean recovered) {
-        emitMembership(operation, 0L, recovered);
+    private CompletableFuture<Boolean> emitMembership(
+            PopulationGroupOperationRecord operation, boolean recovered) {
+        return emitMembership(operation, 0L, recovered);
     }
 
-    private void emitMembership(
+    private CompletableFuture<Boolean> emitMembership(
             PopulationGroupOperationRecord operation,
             long oldClassificationRevision,
             boolean recovered) {
         if (operation.oldGroupIds().equals(operation.newGroupIds())
-                && Objects.equals(operation.oldRoleId(), operation.newRoleId())) return;
+                && Objects.equals(operation.oldRoleId(), operation.newRoleId())) {
+            return CompletableFuture.completedFuture(false);
+        }
         UUID owner = operation.newOwnerUuid() != null
                 ? operation.newOwnerUuid() : operation.oldOwnerUuid();
         String role = first(operation.newRoleId(), operation.oldRoleId());
-        if (owner == null || role == null) return;
+        if (owner == null || role == null) return CompletableFuture.completedFuture(false);
         UUID operationId;
         try {
             operationId = UUID.fromString(operation.operationId());
@@ -540,7 +724,7 @@ public final class PopulationGroupOwnerAdmissionExtension {
             operationId = UUID.nameUUIDFromBytes(operation.operationId().getBytes(StandardCharsets.UTF_8));
         }
         long now = System.currentTimeMillis();
-        emit(operationId, new PopulationGroupMembershipChangedEvent(
+        return emit(operationId, new PopulationGroupMembershipChangedEvent(
                 operationId, operation.profileId(), owner, role,
                 java.util.Set.copyOf(operation.oldGroupIds()),
                 java.util.Set.copyOf(operation.newGroupIds()),
@@ -548,13 +732,30 @@ public final class PopulationGroupOwnerAdmissionExtension {
                 operation.classificationRevision(), recovered, now, System.currentTimeMillis()));
     }
 
-    private void emit(UUID operationId, com.alechilles.alecstamework.api.TameworkEvent event) {
-        if (!emittedEvents.add(operationId)) return;
+    private CompletableFuture<Boolean> emit(
+            UUID operationId, com.alechilles.alecstamework.api.TameworkEvent event) {
+        final com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue
+                .WriteSubmission<Boolean> submission;
         try {
-            events.emit(event);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Event delivery is informational and must never alter committed population state.
+            submission = repository.claimEventEmissionAsync(
+                    operationId, event.getClass().getSimpleName(), System.currentTimeMillis());
+        } catch (RuntimeException failure) {
+            return CompletableFuture.completedFuture(false);
         }
+        if (submission == null || submission.completion() == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return submission.completion().thenApply(outcome -> {
+            boolean claimed = outcome != null && outcome.isCommitted()
+                    && Boolean.TRUE.equals(outcome.value());
+            if (!claimed) return false;
+            try {
+                events.emit(event);
+            } catch (RuntimeException | LinkageError ignored) {
+                // Event delivery is informational and must never alter committed population state.
+            }
+            return true;
+        });
     }
 
     private static String reason(RuntimeException failure) {

@@ -95,6 +95,27 @@ public final class PopulationGroupRepository {
         );
     }
 
+    /**
+     * Durably claims one informational event before listener delivery. The primary key is the
+     * restart-safe logical-once fence shared by membership and limit notifications.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> claimEventEmissionAsync(
+            @Nonnull UUID eventId,
+            @Nonnull String eventType,
+            long emittedAtMs) {
+        Objects.requireNonNull(eventId, "eventId");
+        String normalizedType = requireText(eventType, "eventType");
+        if (emittedAtMs <= 0L) {
+            throw new IllegalArgumentException("emittedAtMs must be positive.");
+        }
+        return writeQueue.submitTracked(
+                "population_group_event_fence",
+                connection -> claimEventEmissionInTransaction(
+                        connection, eventId, normalizedType, emittedAtMs),
+                null);
+    }
+
     @Nullable
     public PopulationGroupClassificationRecord findClassification(@Nonnull String profileId)
             throws Exception {
@@ -131,6 +152,25 @@ public final class PopulationGroupRepository {
                      OPERATION_COLUMNS + " WHERE state IN "
                              + "('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING', 'QUARANTINED') "
                              + "ORDER BY created_at_ms, operation_id");
+             ResultSet result = statement.executeQuery()) {
+            List<PopulationGroupOperationRecord> operations = new ArrayList<>();
+            while (result.next()) operations.add(readOperation(result));
+            return List.copyOf(operations);
+        }
+    }
+
+    /** Loads committed membership changes whose durable listener fence was never claimed. */
+    @Nonnull
+    public List<PopulationGroupOperationRecord> loadUnemittedMembershipOperations()
+            throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     OPERATION_COLUMNS + " LEFT JOIN companion_population_group_event_receipts r "
+                             + "ON r.event_id = companion_population_group_operations.operation_id "
+                             + "WHERE state = 'COMMITTED' AND r.event_id IS NULL "
+                             + "AND (old_role_id IS NOT new_role_id "
+                             + "OR old_group_ids_json <> new_group_ids_json) "
+                             + "ORDER BY completed_at_ms, operation_id");
              ResultSet result = statement.executeQuery()) {
             List<PopulationGroupOperationRecord> operations = new ArrayList<>();
             while (result.next()) operations.add(readOperation(result));
@@ -342,6 +382,22 @@ public final class PopulationGroupRepository {
             insertEvidence(connection, row);
         }
         return new OperationResult(Status.PREPARED, operation, null);
+    }
+
+    private boolean claimEventEmissionInTransaction(
+            Connection connection, UUID eventId, String eventType, long emittedAtMs)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO companion_population_group_event_receipts (
+                    event_id, event_type, emitted_at_ms
+                ) VALUES (?, ?, ?)
+                ON CONFLICT(event_id) DO NOTHING
+                """)) {
+            statement.setString(1, eventId.toString());
+            statement.setString(2, eventType);
+            statement.setLong(3, emittedAtMs);
+            return statement.executeUpdate() == 1;
+        }
     }
 
     @Nonnull

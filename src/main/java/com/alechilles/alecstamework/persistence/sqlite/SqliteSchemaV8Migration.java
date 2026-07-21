@@ -390,6 +390,13 @@ final class SqliteSchemaV8Migration {
                 ON companion_population_group_count_evidence(
                     owner_uuid, group_id, scope_kind, scope_world_name, state)
                 """);
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS companion_population_group_event_receipts (
+                    event_id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    emitted_at_ms INTEGER NOT NULL CHECK (emitted_at_ms > 0)
+                )
+                """);
     }
 
     private void createProvisioningOperations(@Nonnull Statement statement) throws Exception {
