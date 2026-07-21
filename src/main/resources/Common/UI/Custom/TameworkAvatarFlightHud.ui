@@ -1,8 +1,6 @@
 $C = "Common.ui";
 
-@FlightControlSlotSize = 58;
-@FlightControlSlotHeight = 74;
-@FlightControlSlotGap = 6;
+@FlightControlMask = #142431;
 @FlightControlBindingStyle = (
     FontName: "Secondary",
     FontSize: 10,
@@ -105,99 +103,59 @@ Group #Root {
     }
 }
 
-// Self-contained controls use the same construction as the original working
-// flight-control row, positioned over the lower-right native ability area.
+// Covers the native weapon glyphs while preserving Hytale's ability frames,
+// input labels, and cooldown presentation underneath.
 Group #ControlsOverlay {
-    Anchor: (Right: 50, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight);
-    LayoutMode: Left;
+    Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107);
     Visible: false;
 
+    Group #ForwardBoostControl {
+        Anchor: (Left: 68, Top: 23, Width: 50, Height: 54);
+        Background: @FlightControlMask;
+
+        Group #ForwardBoostIcon {
+            Anchor: (Left: -1, Top: 1, Width: 52, Height: 52);
+            Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
+        }
+    }
+
+    Group #UpwardFlapControl {
+        Anchor: (Left: 168, Top: 28, Width: 40, Height: 44);
+        Background: @FlightControlMask;
+
+        Group #UpwardFlapIcon {
+            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
+            Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
+        }
+    }
+
+    Group #AirbrakeControl {
+        Anchor: (Left: 254, Top: 28, Width: 40, Height: 44);
+        Background: @FlightControlMask;
+
+        Group #AirbrakeIcon {
+            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
+            Background: "Tamework/AvatarFlightControls/Airbrake.png";
+        }
+    }
+
     Group #LaunchControl {
-        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
+        Anchor: (Left: -36, Top: 20, Width: 58, Height: 78);
 
         Group #LaunchFrame {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
             Background: "Tamework/AvatarFlightControls/ControlFrame.png";
 
             Group #LaunchIcon {
-                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+                Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
                 Background: "Tamework/AvatarFlightControls/Launch.png";
             }
         }
 
         Label #LaunchBinding {
-            Anchor: (Top: 50, Left: 3, Width: 52, Height: 19);
+            Anchor: (Left: 3, Top: 55, Width: 52, Height: 19);
             Background: @FlightControlBindingBackground;
             Text: "CROUCH";
-            Style: @FlightControlBindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @FlightControlSlotGap); }
-
-    Group #UpwardFlapControl {
-        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
-
-        Group #UpwardFlapFrame {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #UpwardFlapIcon {
-                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-                Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
-            }
-        }
-
-        Label #UpwardFlapBinding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "LMB";
-            Style: @FlightControlBindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @FlightControlSlotGap); }
-
-    Group #ForwardBoostControl {
-        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
-
-        Group #ForwardBoostFrame {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #ForwardBoostIcon {
-                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-                Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
-            }
-        }
-
-        Label #ForwardBoostBinding {
-            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "Q";
-            Style: @FlightControlBindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @FlightControlSlotGap); }
-
-    Group #AirbrakeControl {
-        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
-
-        Group #AirbrakeFrame {
-            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #AirbrakeIcon {
-                Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
-                Background: "Tamework/AvatarFlightControls/Airbrake.png";
-            }
-        }
-
-        Label #AirbrakeBinding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "RMB";
             Style: @FlightControlBindingStyle;
         }
     }
