@@ -43,7 +43,9 @@ final class OwnerMutationAdmissionPlanFactory {
                 ownerJson(newOwnerId),
                 contextJson(snapshot, permanentRelease, durableContextJson),
                 policy.settingsRevision(),
-                policy.claimContext().providerGeneration()
+                policy.claimContext().providerGeneration(),
+                snapshot.roleId() == null ? null
+                        : PopulationGroupRoleContext.unchanged(snapshot.roleId())
         );
         ClaimAdmissionRequest claimRequest = policyResolver.request(
                 snapshot, newOwnerId, lifecycleState, operation, claimTransition, policy, force

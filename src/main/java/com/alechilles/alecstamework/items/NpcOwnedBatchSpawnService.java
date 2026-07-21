@@ -79,7 +79,7 @@ final class NpcOwnedBatchSpawnService {
         );
         List<Vector3d> positions = positions(base, quantity, spawnRadius);
         List<CompanionSpawnAdmissionRequest> requests = requests(
-                player, world, ownerId, positions
+                player, world, ownerId, roleId, positions
         );
         preparationRetry.prepare(() -> admission.prepareBatchAsync(
                         requests, CompanionPopulationBatchMode.UP_TO
@@ -226,6 +226,7 @@ final class NpcOwnedBatchSpawnService {
             Player player,
             World world,
             UUID ownerId,
+            String roleId,
             List<Vector3d> positions
     ) {
         String batchId = UUID.randomUUID().toString();
@@ -237,7 +238,7 @@ final class NpcOwnedBatchSpawnService {
                     null, null, null, false, ownerId, ownerName, world.getName(),
                     ChunkUtil.chunkCoordinate(position.x), ChunkUtil.chunkCoordinate(position.z),
                     OwnerPopulationOperation.NEW_OWNERSHIP, "command_spawn",
-                    "command-spawn:" + batchId + ":" + index, false
+                    "command-spawn:" + batchId + ":" + index, false, null, roleId
             ));
         }
         return List.copyOf(requests);

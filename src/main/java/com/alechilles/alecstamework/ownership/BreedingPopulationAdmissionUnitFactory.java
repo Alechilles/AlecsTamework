@@ -98,7 +98,8 @@ final class BreedingPopulationAdmissionUnitFactory {
                 ownerJson(child.ownerId()),
                 targetJson(request, child, destination),
                 policy.settingsRevision(),
-                policy.claimContext().providerGeneration()
+                policy.claimContext().providerGeneration(),
+                PopulationGroupRoleContext.unchanged(childRole(request, child.childKey()))
         );
         ClaimOccupancyTransition claimTransition = new ClaimOccupancyTransition(
                 claim,
@@ -157,6 +158,18 @@ final class BreedingPopulationAdmissionUnitFactory {
             throw new IllegalStateException("Companion population revision exhausted.");
         }
         return revision + 1L;
+    }
+
+    @Nonnull
+    private static String childRole(
+            @Nonnull BreedingPopulationAdmissionRequest request,
+            @Nonnull String childKey) {
+        return request.birthPlan().children().stream()
+                .filter(child -> child.childKey().equals(childKey))
+                .map(BreedingBirthPlanSnapshot.PlannedChild::roleId)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Breeding child role is missing from the durable birth plan: " + childKey));
     }
 
     @Nonnull

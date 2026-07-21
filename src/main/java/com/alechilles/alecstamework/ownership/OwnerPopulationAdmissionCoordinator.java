@@ -32,6 +32,8 @@ public final class OwnerPopulationAdmissionCoordinator {
     private final OwnerPopulationCompensationCoordinator compensationCoordinator;
     private final OwnerPopulationGroupCompositeCoordinator groupCompositeCoordinator;
     private final OwnerPopulationPersistenceGuard persistenceGuard;
+    @Nullable
+    private volatile PopulationGroupOwnerAdmissionExtension populationGroups;
 
     public OwnerPopulationAdmissionCoordinator(@Nonnull OwnerPopulationIndex index,
                                                @Nonnull CompanionPopulationRepository repository,
@@ -82,6 +84,16 @@ public final class OwnerPopulationAdmissionCoordinator {
     @Nonnull
     public OwnerPopulationGroupCompositeCoordinator groupCompositeCoordinator() {
         return groupCompositeCoordinator;
+    }
+
+    /** Installs the single production population-group extension before gameplay admissions begin. */
+    public synchronized void installPopulationGroups(
+            @Nonnull PopulationGroupOwnerAdmissionExtension extension) {
+        Objects.requireNonNull(extension, "extension");
+        if (populationGroups != null && populationGroups != extension) {
+            throw new IllegalStateException("Population-group admission is already installed.");
+        }
+        populationGroups = extension;
     }
 
     /** Performs only the short in-memory compare/headroom/reservation phase. */
@@ -143,6 +155,10 @@ public final class OwnerPopulationAdmissionCoordinator {
                     null
             ));
         }
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null) {
+            return groups.prepareReservedAsync(reserved);
+        }
         OwnerPopulationAdmissionPlan plan = reserved.plan();
         OwnerPopulationDecision decision = reserved.decision();
         UUID operationId = decision.reservation().tokenId();
@@ -193,6 +209,11 @@ public final class OwnerPopulationAdmissionCoordinator {
             cancelAsync(prepared, "owner-population-context-changed");
             return false;
         }
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && !groups.claimAllowed(prepared)) {
+            cancelAsync(prepared, "population-group-policy-revision-changed");
+            return false;
+        }
         if (!prepared.transition(
                 PreparedOwnerPopulationAdmission.State.PREPARED,
                 PreparedOwnerPopulationAdmission.State.APPLYING
@@ -214,6 +235,10 @@ public final class OwnerPopulationAdmissionCoordinator {
             @Nonnull PreparedOwnerPopulationAdmission prepared
     ) {
         Objects.requireNonNull(prepared, "prepared");
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && groups.owns(prepared)) {
+            return groups.commitAsync(prepared);
+        }
         if (!prepared.transition(
                 PreparedOwnerPopulationAdmission.State.APPLYING,
                 PreparedOwnerPopulationAdmission.State.COMMITTING
@@ -266,6 +291,10 @@ public final class OwnerPopulationAdmissionCoordinator {
     public CompletableFuture<Boolean> completeSourceFinalizationAsync(
             @Nonnull PreparedOwnerPopulationAdmission prepared
     ) {
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && groups.owns(prepared)) {
+            return groups.completeSourceFinalizationAsync(prepared);
+        }
         return journalCloseCoordinator.completeSourceFinalizationAsync(prepared);
     }
 
@@ -275,6 +304,10 @@ public final class OwnerPopulationAdmissionCoordinator {
     @Nonnull
     public CompletableFuture<Boolean> cancelAsync(@Nonnull PreparedOwnerPopulationAdmission prepared,
                                                    @Nonnull String reason) {
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && groups.owns(prepared)) {
+            return groups.cancelAsync(prepared, reason);
+        }
         return journalCloseCoordinator.cancelAsync(prepared, reason);
     }
 
@@ -284,6 +317,10 @@ public final class OwnerPopulationAdmissionCoordinator {
             @Nonnull PreparedOwnerPopulationAdmission prepared,
             @Nonnull String reason
     ) {
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && groups.owns(prepared)) {
+            return groups.beginCompensationAsync(prepared, reason);
+        }
         return compensationCoordinator.beginAsync(prepared, reason);
     }
 
@@ -293,7 +330,43 @@ public final class OwnerPopulationAdmissionCoordinator {
             @Nonnull PreparedOwnerPopulationAdmission prepared,
             @Nonnull String reason
     ) {
+        PopulationGroupOwnerAdmissionExtension groups = populationGroups;
+        if (groups != null && groups.owns(prepared)) {
+            return groups.completeCompensationAsync(prepared, reason);
+        }
         return compensationCoordinator.completeAsync(prepared, reason);
+    }
+
+    CompletableFuture<Boolean> cancelOwnerOnlyAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason) {
+        return journalCloseCoordinator.cancelAsync(prepared, reason);
+    }
+
+    CompletableFuture<Boolean> completeSourceFinalizationOwnerOnlyAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared) {
+        return journalCloseCoordinator.completeSourceFinalizationAsync(prepared);
+    }
+
+    CompletableFuture<Boolean> beginCompensationOwnerOnlyAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason) {
+        return compensationCoordinator.beginAsync(prepared, reason);
+    }
+
+    CompletableFuture<Boolean> completeCompensationOwnerOnlyAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason) {
+        return compensationCoordinator.completeAsync(prepared, reason);
+    }
+
+    void indexCancel(@Nonnull OwnerPopulationReservation reservation) {
+        index.cancel(reservation);
+    }
+
+    @Nonnull
+    CompanionPopulationRepository populationRepository() {
+        return repository;
     }
 
     /** Fails positive owner admissions closed after a post-apply accounting failure. */

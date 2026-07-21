@@ -22,7 +22,8 @@ public record OwnerPopulationAdmissionPlan(
         @Nonnull String newStateJson,
         @Nullable String targetContextJson,
         long settingsRevision,
-        @Nonnull ClaimProviderGeneration providerGeneration
+        @Nonnull ClaimProviderGeneration providerGeneration,
+        @Nullable PopulationGroupRoleContext populationGroupRoleContext
 ) {
     public OwnerPopulationAdmissionPlan {
         Objects.requireNonNull(transition, "transition");
@@ -46,6 +47,30 @@ public record OwnerPopulationAdmissionPlan(
         if (!noPhysicalLocation && !completePhysicalLocation) {
             throw new IllegalArgumentException("Final physical location must be entirely present or absent.");
         }
+    }
+
+    /**
+     * Binary/source-compatible construction seam for paths that do not yet carry role evidence.
+     * A production population-group runtime resolves an existing role from the canonical profile;
+     * positive creation paths must use the canonical constructor and supply explicit target-role
+     * evidence instead of relying on this overload.
+     */
+    public OwnerPopulationAdmissionPlan(
+            @Nonnull OwnerPopulationTransitionRequest transition,
+            @Nonnull CompanionPopulationStateRecord baselineState,
+            @Nullable UUID finalNpcUuid,
+            @Nullable String finalPhysicalWorldName,
+            @Nullable Integer finalPhysicalChunkX,
+            @Nullable Integer finalPhysicalChunkZ,
+            @Nullable String source,
+            @Nonnull String oldStateJson,
+            @Nonnull String newStateJson,
+            @Nullable String targetContextJson,
+            long settingsRevision,
+            @Nonnull ClaimProviderGeneration providerGeneration) {
+        this(transition, baselineState, finalNpcUuid, finalPhysicalWorldName,
+                finalPhysicalChunkX, finalPhysicalChunkZ, source, oldStateJson, newStateJson,
+                targetContextJson, settingsRevision, providerGeneration, null);
     }
 
     private static void validateRevisionAndOwner(OwnerPopulationTransitionRequest transition,

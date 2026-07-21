@@ -195,7 +195,8 @@ final class CommandRespawnService {
                         null,
                         toolId + "|" + Integer.toUnsignedString(stack.hashCode(), 16),
                         null
-                )
+                ),
+                roleId
         );
         return preparedSpawnService.schedule(
                 player.getWorld(),

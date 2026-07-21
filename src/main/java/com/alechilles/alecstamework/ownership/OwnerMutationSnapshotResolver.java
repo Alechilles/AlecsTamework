@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -52,6 +53,7 @@ final class OwnerMutationSnapshotResolver {
                 identity.profileId(),
                 live.ownerId(),
                 live.ownerName(),
+                live.roleId(),
                 explicitLiveOwnerExpectation ? expectedLiveOwnerId : live.ownerId(),
                 live.chunkX(),
                 live.chunkZ(),
@@ -89,6 +91,7 @@ final class OwnerMutationSnapshotResolver {
                 uuid.getUuid(),
                 owner == null ? null : owner.getOwnerId(),
                 owner == null ? null : owner.getOwnerName(),
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store),
                 ChunkUtil.chunkCoordinate((int) Math.floor(position.x)),
                 ChunkUtil.chunkCoordinate((int) Math.floor(position.z))
         );
@@ -148,10 +151,25 @@ final class OwnerMutationSnapshotResolver {
                     @Nonnull String profileId,
                     @Nullable UUID liveOwnerId,
                     @Nullable String liveOwnerName,
+                    @Nullable String roleId,
                     @Nullable UUID expectedLiveOwnerId,
                     int chunkX,
                     int chunkZ,
                     boolean provisionalIdentity) {
+        Snapshot(@Nonnull World world,
+                 @Nonnull String worldName,
+                 @Nonnull UUID npcUuid,
+                 @Nonnull UUID baselineNpcUuid,
+                 @Nonnull String profileId,
+                 @Nullable UUID liveOwnerId,
+                 @Nullable String liveOwnerName,
+                 @Nullable UUID expectedLiveOwnerId,
+                 int chunkX,
+                 int chunkZ,
+                 boolean provisionalIdentity) {
+            this(world, worldName, npcUuid, baselineNpcUuid, profileId, liveOwnerId,
+                    liveOwnerName, null, expectedLiveOwnerId, chunkX, chunkZ, provisionalIdentity);
+        }
     }
 
     private record LiveEntity(@Nonnull World world,
@@ -159,6 +177,7 @@ final class OwnerMutationSnapshotResolver {
                               @Nonnull UUID npcUuid,
                               @Nullable UUID ownerId,
                               @Nullable String ownerName,
+                              @Nullable String roleId,
                               int chunkX,
                               int chunkZ) {
     }

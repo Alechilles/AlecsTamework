@@ -17,6 +17,9 @@ import com.alechilles.alecstamework.ownership.reconciliation.ReconciliationEvide
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.health.BreedingPersistenceMutationGate;
 import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
@@ -54,6 +57,8 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     private final BreedingReplayJournalLoader breedingReplayJournal;
     private final OwnerPopulationCanonicalRecoveryService canonicalRecoveryService;
     private final CompanionPopulationBootstrapService.BootstrapResult bootstrapResult;
+    private volatile PopulationGroupOwnerAdmissionExtension populationGroups;
+    private volatile boolean populationGroupsReady;
 
     private OwnerPopulationRuntime(
             @Nonnull OwnerPopulationIndex index,
@@ -291,6 +296,37 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     @Nonnull
     public OwnerPopulationAdmissionCoordinator admissionCoordinator() {
         return admissionCoordinator;
+    }
+
+    /**
+     * Recovers durable group operations and installs group admission on the canonical owner
+     * coordinator. Callers may publish POPULATION_GROUPS only when the returned report is ready.
+     */
+    @Nonnull
+    public synchronized CompletableFuture<PopulationGroupOwnerAdmissionExtension.RecoveryReport>
+    installPopulationGroups(
+            @Nonnull PopulationGroupRegistry registry,
+            @Nonnull PopulationGroupRepository repository,
+            @Nonnull NpcProfileRepository profiles) {
+        if (populationGroups != null) {
+            return CompletableFuture.completedFuture(new PopulationGroupOwnerAdmissionExtension.RecoveryReport(
+                    0, 0, populationGroupsReady ? 0 : 1, populationGroupsReady));
+        }
+        PopulationGroupOwnerAdmissionExtension extension =
+                new PopulationGroupOwnerAdmissionExtension(
+                        admissionCoordinator, registry, repository, profiles);
+        return extension.recover().thenApply(report -> {
+            if (report.ready()) {
+                admissionCoordinator.installPopulationGroups(extension);
+                populationGroups = extension;
+                populationGroupsReady = true;
+            }
+            return report;
+        });
+    }
+
+    public boolean populationGroupsReady() {
+        return populationGroupsReady;
     }
 
     @Nonnull

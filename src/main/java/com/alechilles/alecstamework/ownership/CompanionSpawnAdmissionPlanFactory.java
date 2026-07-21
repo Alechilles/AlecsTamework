@@ -64,7 +64,9 @@ final class CompanionSpawnAdmissionPlanFactory {
                 ownerJson(request.ownerId()),
                 contextJson(request, plannedNpcUuid, operation),
                 policy.settingsRevision(),
-                policy.claimContext().providerGeneration()
+                policy.claimContext().providerGeneration(),
+                request.targetRoleId() == null ? null
+                        : PopulationGroupRoleContext.unchanged(request.targetRoleId())
         );
         ClaimOccupancyTransition claimTransition = new ClaimOccupancyTransition(claim, proposedClaim);
         ClaimAdmissionRequest claimRequest = new ClaimAdmissionRequest(
@@ -93,7 +95,8 @@ final class CompanionSpawnAdmissionPlanFactory {
         ClaimChunkCoordinate physical = claim == null ? null : claim.physicalChunk();
         return new CompanionPopulationStateRecord(
                 profileId,
-                request.previousNpcUuid() == null ? plannedNpcUuid : request.previousNpcUuid(),
+                request.canonicalNullNpcRestore() ? null
+                        : request.previousNpcUuid() == null ? plannedNpcUuid : request.previousNpcUuid(),
                 owner == null ? null : owner.ownerId(),
                 physical == null ? request.worldName() : physical.worldName(),
                 owner == null ? request.worldName() : owner.ownershipWorldName(),

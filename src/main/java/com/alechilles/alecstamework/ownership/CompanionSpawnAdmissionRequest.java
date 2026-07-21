@@ -20,7 +20,8 @@ public record CompanionSpawnAdmissionRequest(
         @Nonnull String sourceKind,
         @Nonnull String idempotencyKey,
         boolean force,
-        @Nullable String durableContextJson
+        @Nullable String durableContextJson,
+        @Nullable String targetRoleId
 ) {
     public CompanionSpawnAdmissionRequest {
         canonicalProfileId = normalizeNullable(canonicalProfileId);
@@ -29,9 +30,15 @@ public record CompanionSpawnAdmissionRequest(
         sourceKind = requireText(sourceKind, "sourceKind");
         idempotencyKey = requireText(idempotencyKey, "idempotencyKey");
         durableContextJson = normalizeNullable(durableContextJson);
+        targetRoleId = normalizeNullable(targetRoleId);
         CompanionSpawnSourceFinalizationContext.validateExtension(durableContextJson);
         Objects.requireNonNull(operation, "operation");
-        if (previousNpcUuid == null) {
+        boolean canonicalNullNpcRestore = previousNpcUuid == null
+                && canonicalProfileId != null
+                && requiredSourceLifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
+                && !allowLegacyAdoption
+                && operation == OwnerPopulationOperation.RESTORE;
+        if (previousNpcUuid == null && !canonicalNullNpcRestore) {
             if (canonicalProfileId != null || requiredSourceLifecycle != null || allowLegacyAdoption) {
                 throw new IllegalArgumentException("New spawns cannot declare a dormant source.");
             }
@@ -39,7 +46,7 @@ public record CompanionSpawnAdmissionRequest(
                     && operation != OwnerPopulationOperation.ADMIN_FORCE) {
                 throw new IllegalArgumentException("New spawns require a new-ownership operation.");
             }
-        } else {
+        } else if (previousNpcUuid != null) {
             Objects.requireNonNull(requiredSourceLifecycle, "requiredSourceLifecycle");
             if (operation != OwnerPopulationOperation.RESTORE
                     && operation != OwnerPopulationOperation.ADMIN_FORCE) {
@@ -51,6 +58,27 @@ public record CompanionSpawnAdmissionRequest(
                 throw new IllegalArgumentException("Replacement sources must be dormant.");
             }
         }
+    }
+
+    /** Backward-compatible constructor; existing-profile restores resolve role from persistence. */
+    public CompanionSpawnAdmissionRequest(
+            @Nullable String canonicalProfileId,
+            @Nullable UUID previousNpcUuid,
+            @Nullable CompanionLifecycleState requiredSourceLifecycle,
+            boolean allowLegacyAdoption,
+            @Nullable UUID ownerId,
+            @Nullable String ownerName,
+            @Nonnull String worldName,
+            int chunkX,
+            int chunkZ,
+            @Nonnull OwnerPopulationOperation operation,
+            @Nonnull String sourceKind,
+            @Nonnull String idempotencyKey,
+            boolean force,
+            @Nullable String durableContextJson) {
+        this(canonicalProfileId, previousNpcUuid, requiredSourceLifecycle, allowLegacyAdoption,
+                ownerId, ownerName, worldName, chunkX, chunkZ, operation, sourceKind,
+                idempotencyKey, force, durableContextJson, null);
     }
 
     /** Backward-compatible constructor for spawns without post-commit source cleanup. */
@@ -71,11 +99,18 @@ public record CompanionSpawnAdmissionRequest(
     ) {
         this(canonicalProfileId, previousNpcUuid, requiredSourceLifecycle, allowLegacyAdoption,
                 ownerId, ownerName, worldName, chunkX, chunkZ, operation, sourceKind,
-                idempotencyKey, force, null);
+                idempotencyKey, force, null, null);
     }
 
     public boolean replacement() {
-        return previousNpcUuid != null;
+        return previousNpcUuid != null || canonicalProfileId != null;
+    }
+
+    /** True only for an intentionally provisioned profile that has never had a live NPC UUID. */
+    public boolean canonicalNullNpcRestore() {
+        return previousNpcUuid == null
+                && canonicalProfileId != null
+                && requiredSourceLifecycle == CompanionLifecycleState.PROVISIONED_DORMANT;
     }
 
     @Nullable
