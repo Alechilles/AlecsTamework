@@ -10,6 +10,7 @@ public enum PopulationCompanionLifecycle {
     LOST,
     RESTORING,
     UNKNOWN_DORMANT,
+    PROVISIONED_DORMANT,
     RELEASED;
 
     /** Active and unloaded companions occupy their physical claim location while owned. */

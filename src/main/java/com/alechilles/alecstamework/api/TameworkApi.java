@@ -26,5 +26,21 @@ public interface TameworkApi {
     TameworkConfigReadApi configs();
 
     DiagnosticsApi diagnostics();
+
+    /**
+     * Returns the mutation-bound bonded-vessel authority when advertised by
+     * {@link TameworkApiCapability#BONDED_VESSELS}.
+     */
+    default BondedVesselsApi bondedVessels() {
+        return BondedVesselsApi.unavailable();
+    }
+
+    /**
+     * Returns the idempotent companion-provisioning authority when advertised by
+     * {@link TameworkApiCapability#COMPANION_PROVISIONING}.
+     */
+    default CompanionProvisioningApi companionProvisioning() {
+        return CompanionProvisioningApi.unavailable();
+    }
 }
 

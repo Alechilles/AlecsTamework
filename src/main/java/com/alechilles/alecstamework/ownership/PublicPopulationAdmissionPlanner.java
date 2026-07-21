@@ -184,6 +184,7 @@ final class PublicPopulationAdmissionPlanner {
                 || lifecycle == CompanionLifecycleState.COOP
                 || lifecycle == CompanionLifecycleState.DEAD_REVIVABLE
                 || lifecycle == CompanionLifecycleState.LOST
+                || lifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
                 ? null : "population-admission-restore-source-not-authoritative";
     }
 

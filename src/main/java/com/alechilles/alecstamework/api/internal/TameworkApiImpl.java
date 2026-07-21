@@ -114,7 +114,7 @@ import javax.annotation.Nullable;
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "0.8.0";
+    static final String API_VERSION = "0.9.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";

@@ -15,5 +15,6 @@ public enum CompanionLifecycleState {
     LOST,
     RESTORING,
     UNKNOWN_DORMANT,
+    PROVISIONED_DORMANT,
     RELEASED
 }

@@ -112,7 +112,21 @@ public final class ApiSelfTestRunner {
                 "version=" + api.getApiVersion()
         ));
 
-        EnumSet<TameworkApiCapability> expected = EnumSet.allOf(TameworkApiCapability.class);
+        EnumSet<TameworkApiCapability> expected = EnumSet.of(
+                TameworkApiCapability.PROFILES,
+                TameworkApiCapability.COMMAND_LINKS,
+                TameworkApiCapability.PROGRESSION,
+                TameworkApiCapability.PROGRESSION_MUTATIONS,
+                TameworkApiCapability.POLICY,
+                TameworkApiCapability.INTERACTION_EXTENSIONS,
+                TameworkApiCapability.TRAIT_EFFECTS,
+                TameworkApiCapability.PROFILE_DATA,
+                TameworkApiCapability.EVENTS,
+                TameworkApiCapability.COMPANION_XP_EVENTS,
+                TameworkApiCapability.CONFIG_READ,
+                TameworkApiCapability.DIAGNOSTICS,
+                TameworkApiCapability.PERSISTENCE_RESILIENCE
+        );
         EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
         assertions.add(check(
                 "required capabilities advertised",

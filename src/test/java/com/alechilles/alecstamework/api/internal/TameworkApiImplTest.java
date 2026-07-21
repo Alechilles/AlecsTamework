@@ -57,7 +57,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
             );
 
-            assertEquals("0.8.0", api.getApiVersion());
+            assertEquals("0.9.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,

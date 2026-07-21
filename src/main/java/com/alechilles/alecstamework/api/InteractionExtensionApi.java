@@ -26,4 +26,20 @@ public interface InteractionExtensionApi {
 
     @Nonnull
     Set<String> listPresetIds();
+
+    /**
+     * Registers a side-effect-free capture requirement. Runtime code invokes the handler during
+     * eligibility and final revalidation; durable outcomes are reported through events instead.
+     */
+    @Nonnull
+    default AutoCloseable registerCaptureRequirement(@Nonnull String id,
+                                                       @Nonnull CaptureRequirementHandler handler) {
+        throw new UnsupportedOperationException("capture-policy-unavailable");
+    }
+
+    /** Lists registered capture requirement identifiers. */
+    @Nonnull
+    default Set<String> listCaptureRequirementIds() {
+        return Set.of();
+    }
 }

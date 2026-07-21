@@ -40,4 +40,10 @@ public interface PolicyApi {
     default PopulationAdmissionApi populationAdmissions() {
         return PopulationAdmissionApi.unavailable();
     }
+
+    /** Returns read-only population-group definitions, counts, and reconciliation health. */
+    @Nonnull
+    default PopulationGroupApi populationGroups() {
+        return PopulationGroupApi.unavailable();
+    }
 }

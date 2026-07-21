@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface TameworkConfigReadApi {
     GlobalConfigView getGlobalConfig();
@@ -48,5 +49,38 @@ public interface TameworkConfigReadApi {
     Optional<RoleScopedConfigView> getTalentConfigById(String id);
 
     Optional<RoleScopedConfigView> resolveTalentConfigForRole(String roleId);
+
+    /** API 0.9 item-side capture mechanics without changing {@link SpawnerConfigView}. */
+    default Optional<SpawnerCaptureMechanicsView> getSpawnerCaptureMechanicsById(String id) {
+        return Optional.empty();
+    }
+
+    default Optional<SpawnerCaptureMechanicsView> resolveSpawnerCaptureMechanicsForItemId(String itemId) {
+        return Optional.empty();
+    }
+
+    default Optional<CapturePolicyConfigView> getCapturePolicyById(String id) {
+        return Optional.empty();
+    }
+
+    default Optional<CapturePolicyConfigView> resolveCapturePolicyForRole(String roleId) {
+        return Optional.empty();
+    }
+
+    default Optional<SpawnerVesselConfigView> getSpawnerVesselConfigById(String id) {
+        return Optional.empty();
+    }
+
+    default Optional<SpawnerVesselConfigView> resolveSpawnerVesselConfigForItemId(String itemId) {
+        return Optional.empty();
+    }
+
+    default Optional<PopulationGroupDefinitionView> getPopulationGroupById(String groupId) {
+        return Optional.empty();
+    }
+
+    default List<PopulationGroupDefinitionView> resolvePopulationGroupsForRole(String roleId) {
+        return List.of();
+    }
 }
 
