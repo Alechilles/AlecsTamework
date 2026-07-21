@@ -1,17 +1,24 @@
 # Profile-scoped companion inventory
 
-Status: Proposed
+Status: Deferred post-MVP design; not part of Public API `0.9.0` or schema v8
 Depends on: canonical profiles, ownership/lifecycle policy, SQLite persistence
 resilience, and permanent-release coordination
 HyDragon counterpart: [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md)
 
 ## Goal
 
-Add an optional, generic backpack to configured companion roles. Inventory is
+In a later Tamework update, add an optional, generic backpack to configured
+companion roles. Inventory is
 owned by the canonical companion `profile_id`, not by a live entity UUID,
 command item, bonded vessel, or model attachment. It survives unload, summon,
 store, death/revive, role changes, and server restart without duplication or
 loss.
+
+This document preserves the future implementation contract, but none of its
+config families, tables, API accessors, capability values, UI, or acceptance
+tests block the current Tamework/HyDragon MVP. The implementation update must
+choose the then-current API and schema versions rather than retroactively add
+this surface to API `0.9.0` or schema v8.
 
 The core conservation invariant is:
 
@@ -33,8 +40,8 @@ items.
 - Treating native container change events as a durable transaction.
 - Automatically giving a prior owner's items to a new profile owner.
 - World drops as the sole recovery guarantee.
-- Implementing world-drop receipts in the MVP; all unattended recovery remains durable
-  inventory overflow or a claim.
+- Implementing world-drop receipts in the first companion-inventory release;
+  all unattended recovery remains durable inventory overflow or a claim.
 
 ## Configuration
 
@@ -145,9 +152,10 @@ The family mirrors `TwCompanionConfig` resolution:
   disposition behavior.
 
 Normal asset loaded/removed events validate and atomically swap the role index;
-`/tw reloadconfig` remains item-feature-only. Add `COMPANION_INVENTORY` to
-internal/public config-family enums and emit `ConfigReloadedEvent` after a valid
-swap. Invalid updates retain the last valid index and report the asset/role.
+`/tw reloadconfig` remains item-feature-only. In the deferred implementation,
+add `COMPANION_INVENTORY` to internal/public config-family enums and emit
+`ConfigReloadedEvent` after a valid swap. Invalid updates retain the last valid
+index and report the asset/role.
 
 Role/config changes never delete data:
 
@@ -164,8 +172,10 @@ Role/config changes never delete data:
 
 ## Canonical storage model
 
-Coordinate the suite as one schema v8 migration (or one ordered migration plan)
-with these logical tables:
+Use a dedicated, backup-first migration at the next schema version available
+when this deferred feature is implemented. Do not add these tables to the
+current schema v8 migration. The future migration contains these logical
+tables:
 
 ### `companion_inventories`
 
@@ -342,7 +352,8 @@ explicit audited action to replace corrupt payloads.
   deletion-independent claim receipt. Raw `NpcProfileRepository` deletion is
   guarded/package-scoped behind a `CompanionProfileDeletionCoordinator`.
 - Unknown-owner items remain in quarantine claims. World-drop disposition is
-  not part of the MVP and cannot replace a durable row/claim.
+  not part of the first companion-inventory release and cannot replace a
+  durable row/claim.
 
 Inventory does not consume [population-group](population-groups.md) owned or
 active slots. A denied population transition leaves inventory and sessions
@@ -372,9 +383,10 @@ serve stale mutable containers.
 
 ## Public API and events
 
-Add capability `COMPANION_INVENTORY` and a default fail-closed
-`TameworkApi.companionInventories()` accessor. Do not change
-`RoleScopedConfigView` constructors.
+In the future implementation's API version, add capability
+`COMPANION_INVENTORY` and a default fail-closed
+`TameworkApi.companionInventories()` accessor. This capability is explicitly
+absent from API `0.9.0`. Do not change `RoleScopedConfigView` constructors.
 
 Expose immutable types and bounded operations:
 
@@ -570,5 +582,5 @@ proving rollback, or set a slot without checking transaction success.
     inventory deletion because its operation journal has no required
     profile/session foreign key.
 49. Config-removed rows can be fully withdrawn or escrowed to claims before
-    profile deletion, and no MVP disposition creates an authoritative world-drop
-    receipt.
+    profile deletion, and no first-release disposition creates an authoritative
+    world-drop receipt.

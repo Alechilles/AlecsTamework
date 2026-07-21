@@ -267,10 +267,11 @@ item is gone while reconciliation coverage is incomplete.
 ### Permanent release
 
 Unbinding/permanent profile release is a distinct destructive admin or
-integration operation. It retires the binding generation, verifies no active
-projection, evacuates companion inventory according to
-[companion-inventory](companion-inventory.md), commits profile release, then
-marks the binding `RELEASED`. Normal item use cannot invoke it accidentally.
+integration operation. It retires the binding generation and verifies no active
+projection before committing profile release and marking the binding
+`RELEASED`. After the deferred [companion-inventory](companion-inventory.md)
+system is implemented, the same operation must evacuate inventory before
+profile release. Normal item use cannot invoke it accidentally.
 
 ## Atomicity and recovery
 

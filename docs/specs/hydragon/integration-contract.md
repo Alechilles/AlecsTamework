@@ -3,7 +3,7 @@
 Status: Proposed
 Related Tamework specs: [index](README.md), [capture policy](capture-policy.md),
 [bonded vessels](bonded-vessels.md), [population groups](population-groups.md),
-[companion inventory](companion-inventory.md)
+and deferred [companion inventory](companion-inventory.md)
 HyDragon counterparts: [plugin architecture](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/plugin-architecture.md),
 [capture and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md),
 [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md), and
@@ -19,8 +19,9 @@ prevents Tamework from acquiring dragon-specific behavior.
 
 - Give HyDragon mutation-authoritative, capability-gated APIs for every generic
   companion operation it cannot implement safely from assets.
-- Keep profile, vessel, population, provisioning, and inventory identity under
-  one Tamework persistence/recovery authority.
+- Keep profile, vessel, population, and provisioning identity under one
+  Tamework persistence/recovery authority; later companion inventory follows
+  the same boundary in its own update.
 - Preserve source/binary behavior for 3.0.0-era consumers that do not opt in.
 
 ### Non-goals
@@ -62,7 +63,6 @@ Tamework adds these additive enum values:
 - `BONDED_VESSELS`
 - `POPULATION_GROUPS`
 - `COMPANION_PROVISIONING`
-- `COMPANION_INVENTORY`
 
 Feature gates are independent; existing capabilities are not one global
 all-or-nothing list:
@@ -92,10 +92,10 @@ Feature-specific gates:
   Soul Bond-exclusive Miniwyvern directly rather than capturing/binding one.
 - No feature emulates a missing Tamework authority with ad-hoc metadata.
 
-`COMPANION_INVENTORY` is required only for the Miniwyvern backpack. If absent,
-HyDragon disables the backpack interaction and keeps the rest of the
-Miniwyvern enabled. The capability check must be repeated after a Tamework
-plugin reload before re-registering optional hooks.
+`COMPANION_INVENTORY` is not part of API `0.9.0` or the initial HyDragon
+release. HyDragon does not query it or register a backpack interaction. The
+deferred [companion-inventory specification](companion-inventory.md) will assign
+its API/migration version and capability gate when that update is scheduled.
 
 ## Stable identity and data ownership
 
@@ -104,7 +104,7 @@ plugin reload before re-registering optional hooks.
 | Canonical profile identity, owner, role, lifecycle and revision | Tamework | HyDragon keys all durable per-dragon data by `profile_id` |
 | Population group membership/count/reservation | Tamework | HyDragon supplies config membership and requests mutations through the public admission API |
 | Vessel binding ID, generation, state and current projection | Tamework | HyDragon treats item metadata as a display/interaction projection only |
-| Companion inventory and recovery claims | Tamework | HyDragon requests open/summary operations; it never serializes the backpack into profile data |
+| Deferred companion inventory and recovery claims | Future Tamework update | HyDragon will request open/summary operations; it must never serialize a backpack into profile data |
 | Vessel `DEAD`/damaged lifecycle, binding generation and durable `TransitionCooldownMs` | Tamework | HyDragon configures `10000` ms in the vessel asset and never duplicates condition/cooldown authority in profile data or code |
 | Stone tier values, repair material transaction, cosmetics and localization | HyDragon | Invoke supported Tamework vessel transitions; compensate material changes idempotently if the transition fails |
 | Soul Bond player entitlement | HyDragon | Persist by player UUID in HyDragon storage; the Miniwyvern profile remains Tamework-owned |
@@ -211,11 +211,13 @@ policy also qualifies the companion for `DEAD_REVIVABLE` without a command-tool
 link. Provisioned death/revive events are canonical and command-link-independent;
 revive restores the same profile through normal active/group/claim admission.
 
-### Companion inventory
+### Deferred companion inventory
 
-`TameworkApi.companionInventories()` provides summary/open-session/recovery
-operations. HyDragon does not receive repository access or a mutable backing
-collection. Events are successful-post-commit notifications:
+This surface is not implemented or advertised in Public API `0.9.0`. A later
+API version will add `TameworkApi.companionInventories()` with
+summary/open-session/recovery operations. HyDragon does not receive repository
+access or a mutable backing collection. The future events are
+successful-post-commit notifications:
 
 - `CompanionInventoryChangedEvent`
 - `CompanionInventoryDispositionEvent` for overflow, escrow, quarantine, and
@@ -267,29 +269,33 @@ another group slot.
 | Group cap reached | Deny before spawning/reviving; retain stored vessel and profile state |
 | Listener or cosmetic effect fails after commit | Gameplay commit remains; record degraded presentation diagnostic |
 | HyDragon profile-data write fails | Do not claim a Tamework mutation succeeded on HyDragon's behalf; retry idempotently or compensate domain state |
-| Inventory capacity shrinks | Move excess slots to durable overflow, never delete them |
-| Profile permanently deleted with items | Atomically create an owner recovery claim or block deletion |
+| Deferred inventory capacity shrinks | In the later inventory update, move excess slots to durable overflow and never delete them |
+| Deferred profile deletion with inventory items | In the later inventory update, atomically create an owner recovery claim or block deletion |
 
 ## Reload behavior
 
 - `/tw reloadconfig` reloads `TwSpawnerConfig`, including item-side capture
   mechanics and vessel sections, and item-feature registries.
-- Capture-policy, population-group, and companion-inventory families update from normal asset
-  loaded/removed events.
-- `ConfigReloadedEvent` adds `CAPTURE_POLICY`, `POPULATION_GROUP`, and
-  `COMPANION_INVENTORY` enum values. Existing `SPAWNER` covers only item-side
-  capture mechanics and vessel-section changes.
+- Capture-policy and population-group families update from normal asset
+  loaded/removed events. The deferred companion-inventory family will use that
+  same lifecycle when implemented.
+- API `0.9.0` adds `CAPTURE_POLICY` and `POPULATION_GROUP` to
+  `ConfigReloadedEvent`. Existing `SPAWNER` covers only item-side capture
+  mechanics and vessel-section changes; `COMPANION_INVENTORY` is deferred.
 - An in-flight operation is pinned to its prepared config revision. If the
-  relevant item, role, group, or inventory config changes before claim-for-
+  relevant item, role, or group config changes before claim-for-
   apply, revalidation either accepts the pinned safe operation or cancels it;
   it never silently executes under a different formula or capacity.
-- Reload invalidation never deletes existing profiles, bindings, or inventory.
+- Reload invalidation never deletes existing profiles or bindings. The later
+  inventory implementation must extend this invariant to inventory rows.
 
 ## Migration contract
 
 - Tamework coordinates the suite persistence changes in one backup-first,
   transactional schema v8 plan. A failed migration rolls back DDL and schema
-  marker and preserves all v7 data.
+  marker and preserves all v7 data. Schema v8 excludes companion-inventory
+  tables and claims; the deferred system receives the next appropriate
+  migration version when scheduled.
 - Public API advances additively from `0.8.0` to `0.9.0`; old records and
   abstract interface methods are not mutated. New accessors are default
   fail-closed methods and new data uses new/V2 immutable types.
@@ -309,7 +315,7 @@ another group slot.
 | API root/capabilities | `api/TameworkApi`, `TameworkApiCapability`, `api/internal/TameworkApiImpl` | API `0.9.0`, discrete capabilities, default unavailable facades |
 | Policies/config reads | `api/PolicyApi`, `TameworkConfigReadApi`, `api/internal/ApiMapper` | V2/default methods and immutable subsystem views |
 | Events | `api/TameworkEventsApi`, `api/internal/TameworkEventBus` | New immutable post-commit event types and once-logical dispatch |
-| Config families | `Tamework` asset registration, internal/public config enums, override/UI schema registries | Capture-policy, group, and inventory family wiring |
+| Config families | `Tamework` asset registration, internal/public config enums, override/UI schema registries | Current capture-policy and group family wiring; inventory is deferred |
 | Persistence | `persistence/sqlite`, operation/recovery/incidents/health | Coordinated schema v8 and subsystem readiness |
 | Live contract tests | `selftest/ApiSelfTestRunner`, API compatibility/unit tests | Advertise/test every capability and unavailable fallback |
 | Public documentation | `wiki/Modder-Documentation/Public-API`, config references/recipes/indexes, `CHANGELOG.md` | Update API version/dependency examples and integration recipes atomically |
@@ -335,17 +341,18 @@ transaction behind these effects.
 
 ## Diagnostics
 
-`/tw api test` must report each new capability and run non-destructive fixtures
-for capture attempts, generation fencing, group admission, dormant/active/
-failed-projection companion provisioning, and inventory round-trip.
+`/tw api test` must report each current capability and run non-destructive
+fixtures for capture attempts, generation fencing, group admission, and
+dormant/active/failed-projection companion provisioning.
 `/tw diagnose` includes config IDs/revisions, subsystem readiness,
-open operations, quarantines, stale vessel evidence, group counts/reservations,
-overflow item counts, and recovery claims. Player-facing messages omit raw
-SQLite details and binding secrets; admin output includes correlation IDs.
+open operations, quarantines, stale vessel evidence, and group
+counts/reservations. Player-facing messages omit raw SQLite details and binding
+secrets; admin output includes correlation IDs.
 
 HyDragon's startup diagnostics log its version, detected Tamework mod/API
-versions, capability matrix, registered extension IDs, configured group IDs,
-and whether backpack support is enabled.
+versions, capability matrix, registered extension IDs, and configured group
+IDs. Initial-release diagnostics do not report backpack support because the
+feature is not registered.
 
 ## Acceptance tests
 
@@ -358,7 +365,8 @@ and whether backpack support is enabled.
    admissions without changing existing profiles, items, NPCs, or owners.
 4. Missing `COMPANION_PROVISIONING` disables only Soul Bond creation; the
    full-dragon stone loop and existing Miniwyvern profiles remain usable.
-5. Missing `COMPANION_INVENTORY` disables only backpack access.
+5. HyDragon registers no backpack action or inventory persistence for the
+   initial release, and API `0.9.0` does not advertise `COMPANION_INVENTORY`.
 6. A consumer compiled against the pre-change API still links and uses existing
    methods.
 7. Capability switches with unknown future enum values do not throw.
@@ -374,12 +382,12 @@ and whether backpack support is enabled.
 13. A duplicated callback with one operation ID produces one durable mutation
     and one logical event sequence.
 14. Listener exceptions do not roll back committed capture, vessel,
-    provisioning, population, or inventory state and are visible in
+    provisioning, or population state and are visible in
     diagnostics.
 15. Config reload during a prepared operation cannot mix old eligibility with a
     new chance formula or group limit.
 16. Server restart between every prepare/apply/commit boundary converges to one
-    profile, one binding generation, correct group counts, and intact inventory.
+    profile, one binding generation, and correct group counts.
 17. Tamework unavailable/degraded states fail closed without blocking the world
     thread.
 18. The packaged integration smoke test completes the end-to-end loop listed in

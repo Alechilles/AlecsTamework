@@ -4,8 +4,11 @@ Status: Proposed
 Target: Tamework 3.x (backward-compatible additions)
 Consumer: HyDragon plugin, requiring Tamework `>=3.0.0 <4.0.0`
 
-The suite adds an experimental Public API `0.9.0` surface; mod and API versions
-remain independent, so consumers must still use capability checks.
+The current suite adds an experimental Public API `0.9.0` surface for capture
+policy, bonded vessels, population groups, and companion provisioning; mod and
+API versions remain independent, so consumers must still use capability checks.
+The companion-inventory design is retained for a later update and is not part
+of API `0.9.0` or the current schema migration.
 
 This suite specifies the generic Tamework capabilities required to finish the
 HyDragon gameplay loop. The capabilities are deliberately content-neutral:
@@ -37,8 +40,9 @@ balance, elemental powers, rituals, encounters, and presentation.
   one only when neither guaranteed mode nor `GuaranteedAtPower` resolves the
   outcome. Failure leaves NPC and ownership unchanged, retains the empty item,
   and may apply a configured failure cooldown.
-- Companion inventories are canonical-profile-scoped. Capacity reductions and
-  permanent profile deletion may never silently destroy items.
+- The Miniwyvern backpack and generic companion inventory are deferred
+  post-MVP. When implemented, inventories are canonical-profile-scoped and may
+  never silently destroy items during capacity reduction or profile deletion.
 
 ## Documents
 
@@ -47,7 +51,7 @@ balance, elemental powers, rituals, encounters, and presentation.
 | [Capture policy](capture-policy.md) | Capture power, role resistance, exactly-once chance, failure feedback | [Capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md) |
 | [Bonded vessels](bonded-vessels.md) | Durable item-to-profile binding, generation fencing, summon/store lifecycle | [Capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md) |
 | [Population groups](population-groups.md) | Per-owner group membership and atomic owned/active limits | [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) and [dragon content and encounters](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/dragon-content-encounters.md) |
-| [Companion inventory](companion-inventory.md) | Profile-scoped storage, UI/session safety, overflow and recovery | [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) |
+| Deferred: [Companion inventory](companion-inventory.md) | Post-MVP profile-scoped storage, UI/session safety, overflow and recovery | [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) |
 | [Integration contract](integration-contract.md) | Version/capability contract, ownership boundaries, event ordering | [Plugin architecture](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/plugin-architecture.md) |
 
 HyDragon's suite begins at its
@@ -65,10 +69,13 @@ HyDragon's suite begins at its
   admission journal.
 - A generic, idempotent companion-provisioning API that creates one owned
   canonical profile through normal group admission before optional projection.
-- Optional profile-scoped companion inventory with durable overflow and
-  recovery claims.
 - Public capability flags, immutable views, lifecycle events, diagnostics, and
-  self-test coverage for those systems.
+  self-test coverage for the current systems.
+
+### Tamework adds later
+
+- Optional profile-scoped companion inventory with durable overflow and
+  recovery claims, after the current HyDragon MVP integration is complete.
 
 ### HyDragon adds
 
@@ -98,15 +105,15 @@ flowchart LR
     CP["Capture policy"] --> BV["Bonded vessels"]
     PG["Population groups"] --> BV
     BV --> HP["HyDragon plugin"]
-    CI["Companion inventory"] --> HP
+    CI["Deferred companion inventory"] -. post-MVP .-> HP
     API["Integration contract"] --> HP
     PG --> HP
 ```
 
 Capture policy can ship independently. Bonded-vessel spawning must use group
-admission before it can be considered production-ready. Companion inventory is
-independent of vessels because its identity is the canonical profile rather
-than an item stack or live entity UUID.
+admission before it can be considered production-ready. Deferred companion
+inventory remains independent of vessels because its identity is the canonical
+profile rather than an item stack or live entity UUID.
 
 ## Shared invariants
 
@@ -158,10 +165,11 @@ The implementation should land as coordinated, reviewable slices, but the
 following surfaces must agree before release:
 
 - one backup-first, transactional, idempotent schema v8 plan for attempt,
-  binding, group-classification, inventory, operation, and recovery-claim data;
+  binding, group-classification, provisioning, and operation data; inventory
+  tables use a separately versioned future migration;
 - asset-store registration, internal/public config-family enums, override
   paths, schema editor adapters, codec documentation, example/default assets,
-  loaded/removed hooks, and config-read views for each new family;
+  loaded/removed hooks, and config-read views for each current family;
 - Public API `0.9.0`, fail-closed default methods, capability advertisement,
   immutable events/views, unit compatibility tests, and `/tw api test` fixtures;
 - persistence domains, mutation-availability gates, incident reasons, circuits,
@@ -182,15 +190,17 @@ work.
 3. Implement [bonded vessels](bonded-vessels.md) on those admission primitives.
 4. Publish the [integration contract](integration-contract.md) and live API
    fixture coverage.
-5. Implement [companion inventory](companion-inventory.md); HyDragon may ship
-   the Miniwyvern without a backpack until this capability is available.
+
+Post-MVP: implement [companion inventory](companion-inventory.md) as a separate
+versioned update. HyDragon ships its initial Miniwyvern without a backpack.
 
 ## Definition of suite completion
 
-The suite is complete only when all five subsystem specifications satisfy their
-acceptance tests, their public capabilities appear in `/tw api test`, schema and
-codec docs are generated, `/tw diagnose` reports their health, and a packaged
-HyDragon integration test demonstrates this uninterrupted loop:
+The current HyDragon enablement suite is complete when capture policy,
+population groups/provisioning, bonded vessels, and the integration contract
+satisfy their acceptance tests; their public capabilities appear in
+`/tw api test`; schema and codec docs are generated; `/tw diagnose` reports
+their health; and a packaged HyDragon integration test demonstrates this loop:
 
 1. A tier-qualified stone begins capture.
 2. Completion revalidates and records exactly one outcome, obtaining at most
@@ -202,5 +212,6 @@ HyDragon integration test demonstrates this uninterrupted loop:
 7. A copied stale vessel cannot spawn, store, repair, or supersede the binding.
 8. A Soul Bond provisions at most one Miniwyvern profile for the owner; failed
    initial projection leaves that one profile dormant/recoverable.
-9. That profile's backpack survives summon/store, death/revive, restart, and
-   capacity shrink without item loss.
+
+The deferred companion-inventory specification has its own later completion
+gate and does not block this suite or the initial HyDragon release.
