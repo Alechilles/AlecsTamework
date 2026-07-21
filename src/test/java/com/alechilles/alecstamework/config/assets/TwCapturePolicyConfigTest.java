@@ -3,18 +3,83 @@ package com.alechilles.alecstamework.config.assets;
 import com.alechilles.alecstamework.api.CapturePolicyConfigView;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyIndex;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwCapturePolicyConfigTest {
+    @Test
+    void codecDecodesCompletePolicyShapeAndExplicitZeroes() throws Exception {
+        TwCapturePolicyConfig config = decode("HydragonHydra", """
+                {
+                  "Enabled": true,
+                  "Priority": 100,
+                  "RoleIds": ["Hydra"],
+                  "Difficulty": {
+                    "MinimumPower": 0,
+                    "Resistance": 0.0,
+                    "ChanceMultiplier": 0.7,
+                    "MissingHealthBonus": 0.25,
+                    "GuaranteedAtPower": 5
+                  },
+                  "Requirements": [
+                    {
+                      "Id": "hydragon:special_encounter_capture_ready",
+                      "Param": "grounded_phase",
+                      "Values": ["grounded"],
+                      "JsonPayload": "true"
+                    }
+                  ]
+                }
+                """);
+
+        config.validateOrThrow();
+
+        assertTrue(config.isEnabled());
+        assertEquals(100, config.getPriority());
+        assertArrayEquals(new String[] { "Hydra" }, config.getRoleIds());
+        assertEquals(0, config.getDifficulty().getMinimumPower());
+        assertEquals(0.0D, config.getDifficulty().getResistance());
+        assertEquals(0.7D, config.getDifficulty().getChanceMultiplier());
+        assertEquals(0.25D, config.getDifficulty().getMissingHealthBonus());
+        assertEquals(5, config.getDifficulty().getGuaranteedAtPower());
+        assertEquals("hydragon:special_encounter_capture_ready", config.getRequirements()[0].getId());
+        assertEquals("grounded_phase", config.getRequirements()[0].getParam());
+        assertArrayEquals(new String[] { "grounded" }, config.getRequirements()[0].getValues());
+        assertEquals("true", config.getRequirements()[0].getJsonPayload());
+    }
+
+    @Test
+    void decodedInvalidPolicyFailsValidationWithoutClamping() throws Exception {
+        TwCapturePolicyConfig negative = decode("NegativePolicy", """
+                {
+                  "RoleIds": ["Hydra"],
+                  "Difficulty": {
+                    "MinimumPower": -1,
+                    "ChanceMultiplier": -0.5
+                  }
+                }
+                """);
+
+        assertEquals(-1, negative.getDifficulty().getMinimumPower());
+        assertEquals(-0.5D, negative.getDifficulty().getChanceMultiplier());
+        assertThrows(IllegalArgumentException.class, negative::validateOrThrow);
+        assertThrows(RuntimeException.class, () -> TwCapturePolicyConfig.CODEC.decode(
+                BsonDocument.parse("{\"RoleIds\":[\"Hydra\"],\"Difficulty\":{\"MinimumPower\":\"three\"}}"),
+                new ExtraInfo()
+        ));
+    }
+
     @Test
     void nestedDifficultyInheritsAndRequirementsReplace() throws Exception {
         TwCapturePolicyConfig parent = policy("Parent", 1, "Hydra");
@@ -81,6 +146,15 @@ class TwCapturePolicyConfigTest {
         set(config, "id", id);
         set(config, "priority", priority);
         set(config, "roleIds", roles);
+        return config;
+    }
+
+    private static TwCapturePolicyConfig decode(String id, String json) throws Exception {
+        TwCapturePolicyConfig config = TwCapturePolicyConfig.CODEC.decode(
+                BsonDocument.parse(json),
+                new ExtraInfo()
+        );
+        set(config, "id", id);
         return config;
     }
 
