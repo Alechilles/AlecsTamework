@@ -13,6 +13,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiV08BinaryCompatibilityTest {
     private static final String FIXTURE_CLASS =
@@ -46,6 +47,17 @@ class ApiV08BinaryCompatibilityTest {
         );
         assertThrows(NullPointerException.class, () -> bondedVessels.prepareTransition(null));
         assertInstanceOf(CompanionProvisioningApi.class, legacyApi.companionProvisioning());
+
+        // Added to existing API 0.8 interfaces: the methods themselves must remain defaults so a
+        // frozen third-party implementor does not gain new abstract methods at link time.
+        assertTrue(BondedVesselsApi.class.getMethod(
+                "resolveHeldItemProjection", BondedVesselHeldItemProjectionRequest.class).isDefault());
+        assertTrue(ProfileDataApi.class.getMethod(
+                "getVersioned", String.class, String.class, String.class).isDefault());
+        assertTrue(ProfileDataApi.class.getMethod(
+                "compareAndSet", ProfileDataCompareAndSetRequest.class).isDefault());
+        assertTrue(ProfileDataApi.class.getMethod(
+                "findOperation", String.class, String.class).isDefault());
 
         // Added to PolicyApi in 0.9.
         assertInstanceOf(PopulationGroupApi.class, legacyApi.policies().populationGroups());

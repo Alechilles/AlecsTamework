@@ -22,6 +22,19 @@ public interface BondedVesselsApi {
             @Nonnull BondedVesselProjectionValidationRequest request
     );
 
+    /**
+     * Resolves one exact actor-held item to canonical vessel identity without exposing item or
+     * persistence internals. Implementations must re-read the supplied holder/container/slot,
+     * revision, and fingerprint and return authority only for one owner- and state-matching row.
+     */
+    @Nonnull
+    default CompletionStage<BondedVesselHeldItemProjectionView> resolveHeldItemProjection(
+            @Nonnull BondedVesselHeldItemProjectionRequest request
+    ) {
+        return CompletableFuture.completedFuture(BondedVesselHeldItemProjectionView.unavailable(
+                java.util.Objects.requireNonNull(request, "request")));
+    }
+
     @Nonnull
     CompletionStage<BondedVesselOperationResult> prepareTransition(
             @Nonnull BondedVesselTransitionRequest request

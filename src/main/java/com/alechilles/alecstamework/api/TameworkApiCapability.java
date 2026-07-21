@@ -17,6 +17,8 @@ public enum TameworkApiCapability {
     CAPTURE_POLICY,
     BONDED_VESSELS,
     POPULATION_GROUPS,
-    COMPANION_PROVISIONING
+    COMPANION_PROVISIONING,
+    /** Durable revision-fenced profile-data mutations and restart-visible operation queries. */
+    PROFILE_DATA_TRANSACTIONS
 }
 
