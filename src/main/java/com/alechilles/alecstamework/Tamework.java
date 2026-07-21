@@ -44,6 +44,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
@@ -60,6 +61,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
+import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -97,6 +99,7 @@ import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
+import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
@@ -166,6 +169,7 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
 import com.alechilles.alecstamework.ownership.reconciliation.TameworkPopulationRuntimeLifecycle;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
@@ -290,6 +294,8 @@ public class Tamework extends JavaPlugin {
     private TameworkEventBus apiEventBus;
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
+    private CapturePolicyRegistry capturePolicyRegistry;
+    private PopulationGroupRegistry populationGroupRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -320,6 +326,10 @@ public class Tamework extends JavaPlugin {
     private boolean talentAssetsRegistered;
     private boolean debugAssetsRegistered;
     private boolean persistenceAssetsRegistered;
+    private boolean capturePolicyAssetsRegistered;
+    private boolean populationGroupAssetsRegistered;
+    private long capturePolicyAssetRevision;
+    private long populationGroupAssetRevision;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -460,6 +470,8 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry = new ItemFeatureRegistry();
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
+        capturePolicyRegistry = new CapturePolicyRegistry();
+        populationGroupRegistry = new PopulationGroupRegistry();
         assetEditorPackService = new TameworkAssetEditorPackService(this);
         assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
         assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
@@ -523,6 +535,8 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
         registerCompanionAssets();
+        registerCapturePolicyAssets();
+        registerPopulationGroupAssets();
         registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();
@@ -1936,6 +1950,42 @@ public class Tamework extends JavaPlugin {
         companionAssetsRegistered = true;
     }
 
+    private void registerCapturePolicyAssets() {
+        if (capturePolicyAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCapturePolicyConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/CapturePolicies")
+                        .setCodec(TwCapturePolicyConfig.CODEC)
+                        .setKeyFunction(TwCapturePolicyConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsLoaded);
+        getEventRegistry().register(
+                RemovedAssetsEvent.class, TwCapturePolicyConfig.class, this::onCapturePolicyAssetsRemoved);
+        capturePolicyAssetsRegistered = true;
+    }
+
+    private void registerPopulationGroupAssets() {
+        if (populationGroupAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwPopulationGroupConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/PopulationGroups")
+                        .setCodec(TwPopulationGroupConfig.CODEC)
+                        .setKeyFunction(TwPopulationGroupConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class, TwPopulationGroupConfig.class, this::onPopulationGroupAssetsLoaded);
+        getEventRegistry().register(
+                RemovedAssetsEvent.class, TwPopulationGroupConfig.class, this::onPopulationGroupAssetsRemoved);
+        populationGroupAssetsRegistered = true;
+    }
+
     private void registerInteractionAssets() {
         if (interactionAssetsRegistered) {
             return;
@@ -2399,6 +2449,76 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> event) {
         TwCompanionConfig.clearRoleCache();
         emitExperimentalConfigReload(TameworkConfigFamily.COMPANION, event.getRemovedAssets());
+    }
+
+    private void onCapturePolicyAssetsLoaded(
+            LoadedAssetsEvent<String, TwCapturePolicyConfig,
+                    DefaultAssetMap<String, TwCapturePolicyConfig>> event) {
+        if (rebuildCapturePolicyIndex() && !event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.CAPTURE_POLICY, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onCapturePolicyAssetsRemoved(
+            RemovedAssetsEvent<String, TwCapturePolicyConfig,
+                    DefaultAssetMap<String, TwCapturePolicyConfig>> event) {
+        if (rebuildCapturePolicyIndex()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.CAPTURE_POLICY, event.getRemovedAssets());
+        }
+    }
+
+    private boolean rebuildCapturePolicyIndex() {
+        TwCapturePolicyConfig.clearInheritanceFallbackCache();
+        if (capturePolicyRegistry == null) {
+            return false;
+        }
+        DefaultAssetMap<String, TwCapturePolicyConfig> assetMap = TwCapturePolicyConfig.getAssetMap();
+        java.util.Collection<TwCapturePolicyConfig> configs = assetMap == null
+                ? java.util.List.of()
+                : assetMap.getAssetMap().values();
+        CapturePolicyRegistry.ReloadResult result = capturePolicyRegistry.replace(
+                configs, ++capturePolicyAssetRevision);
+        if (!result.applied()) {
+            getLogger().at(Level.WARNING).log(
+                    "Capture-policy reload rejected; retaining revision "
+                            + result.active().revision() + ": " + result.error());
+        }
+        return result.applied();
+    }
+
+    private void onPopulationGroupAssetsLoaded(
+            LoadedAssetsEvent<String, TwPopulationGroupConfig,
+                    DefaultAssetMap<String, TwPopulationGroupConfig>> event) {
+        if (rebuildPopulationGroupIndex() && !event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.POPULATION_GROUP, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onPopulationGroupAssetsRemoved(
+            RemovedAssetsEvent<String, TwPopulationGroupConfig,
+                    DefaultAssetMap<String, TwPopulationGroupConfig>> event) {
+        if (rebuildPopulationGroupIndex()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.POPULATION_GROUP, event.getRemovedAssets());
+        }
+    }
+
+    private boolean rebuildPopulationGroupIndex() {
+        TwPopulationGroupConfig.clearInheritanceFallbackCache();
+        if (populationGroupRegistry == null) {
+            return false;
+        }
+        DefaultAssetMap<String, TwPopulationGroupConfig> assetMap = TwPopulationGroupConfig.getAssetMap();
+        java.util.Collection<TwPopulationGroupConfig> configs = assetMap == null
+                ? java.util.List.of()
+                : assetMap.getAssetMap().values();
+        PopulationGroupRegistry.ReloadResult result = populationGroupRegistry.replace(
+                configs, ++populationGroupAssetRevision);
+        if (!result.applied()) {
+            getLogger().at(Level.WARNING).log(
+                    "Population-group reload rejected; retaining revision "
+                            + result.active().revision() + ": " + result.error());
+        }
+        return result.applied();
     }
 
     private void onInteractionAssetsLoaded(
