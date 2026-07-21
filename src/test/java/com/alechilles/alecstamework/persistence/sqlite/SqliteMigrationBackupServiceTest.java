@@ -38,7 +38,7 @@ class SqliteMigrationBackupServiceTest {
             first = service.backupBeforeVersion(
                     database, connections, new SqliteSchemaMigrator(), 5,
                     new SqliteMigrationBackupService.MigrationBackupContext(
-                            "2.16.1", "3.0", "hytale-backup:rehearsal-42"))
+                            "2.16.1", "3.0.0", "hytale-backup:rehearsal-42"))
                     .orElseThrow();
             second = service.backupBeforeVersion(database, connections, new SqliteSchemaMigrator(), 5).orElseThrow();
         }
@@ -56,7 +56,7 @@ class SqliteMigrationBackupServiceTest {
         assertEquals("hytale_server_operator", manifest.get("hytaleSaveBackupOwnedBy").getAsString());
         assertEquals(5, manifest.get("targetSchemaVersion").getAsInt());
         assertEquals("2.16.1", manifest.get("sourcePluginVersion").getAsString());
-        assertEquals("3.0", manifest.get("targetPluginVersion").getAsString());
+        assertEquals("3.0.0", manifest.get("targetPluginVersion").getAsString());
         assertEquals("hytale-backup:rehearsal-42",
                 manifest.get("externalHytaleBackupReference").getAsString());
         assertEquals(Files.size(first), manifest.get("snapshotSizeBytes").getAsLong());
