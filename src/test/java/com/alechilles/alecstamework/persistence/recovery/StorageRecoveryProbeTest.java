@@ -13,12 +13,14 @@ import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaMigrator;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StorageRecoveryProbeTest {
@@ -57,6 +59,24 @@ class StorageRecoveryProbeTest {
     }
 
     @Test
+    void v7SchemaRetainsReadOnlyUntilV8MigrationIsApplied() throws Exception {
+        try (Harness harness = new Harness(
+                "v7-schema.sqlite", SqliteSchemaMigrator.SCHEMA_VERSION_V7)) {
+            AtomicInteger publications = new AtomicInteger();
+            harness.storage.enterReadOnly("migration_incomplete", "incident-v8");
+
+            StorageRecoveryProbe.ProbeResult result =
+                    harness.probe(publications::incrementAndGet).probe();
+
+            assertEquals(StorageRecoveryProbe.ProbeStatus.RETAINED_READ_ONLY, result.status());
+            assertEquals(0, publications.get());
+            assertNotNull(result.failure());
+            assertEquals("schema_v8_unavailable", result.failure().getMessage());
+            assertEquals(PersistenceStorageState.READ_ONLY, harness.storage.getState().status());
+        }
+    }
+
+    @Test
     void publicationFailureReturnsToReadOnlyAfterDurableProbe() throws Exception {
         try (Harness harness = new Harness("publication-failure.sqlite", true)) {
             harness.storage.enterReadOnly("runtime_index_failed", "incident-3");
@@ -80,10 +100,21 @@ class StorageRecoveryProbeTest {
         private final PersistenceFeatureCircuitRegistry circuits = new PersistenceFeatureCircuitRegistry();
 
         private Harness(String filename, boolean migrate) throws Exception {
+            this(filename, migrate ? SqliteSchemaMigrator.SCHEMA_VERSION_V8 : 0);
+        }
+
+        private Harness(String filename, int targetSchemaVersion) throws Exception {
             connections = new SqliteConnectionManager(tempDir.resolve(filename));
-            if (migrate) {
+            if (targetSchemaVersion > 0) {
                 try (Connection connection = connections.openConnection()) {
                     migrator.migrate(connection);
+                    if (targetSchemaVersion < SqliteSchemaMigrator.SCHEMA_VERSION_V8) {
+                        try (PreparedStatement statement = connection.prepareStatement(
+                                "DELETE FROM schema_migrations WHERE version > ?")) {
+                            statement.setInt(1, targetSchemaVersion);
+                            statement.executeUpdate();
+                        }
+                    }
                 }
             }
             queue = new PersistenceWriteQueue(connections, new PersistenceHealthService(storage), null);

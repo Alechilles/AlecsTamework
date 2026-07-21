@@ -70,8 +70,8 @@ public final class StorageRecoveryProbe {
 
     private long executeDurableProbe() throws Exception {
         try (Connection connection = connections.openConnection()) {
-            if (!schemaMigrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V7)) {
-                throw new IllegalStateException("schema_v7_unavailable");
+            if (!schemaMigrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8)) {
+                throw new IllegalStateException("schema_v8_unavailable");
             }
             connection.setAutoCommit(false);
             try {

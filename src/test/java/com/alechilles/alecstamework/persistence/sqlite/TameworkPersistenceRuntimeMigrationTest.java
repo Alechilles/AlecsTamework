@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.joml.Vector3d;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,16 +13,60 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.UUID;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkPersistenceRuntimeMigrationTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void backsUpV7DatabaseBeforeV8MigrationAndWritesManifest() throws Exception {
+        Path sqlitePath = tempDir.resolve(TameworkPersistenceRuntime.SQLITE_FILENAME);
+        SqliteConnectionManager connections = new SqliteConnectionManager(sqlitePath);
+        SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+        try (Connection connection = connections.openConnection()) {
+            migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V7);
+            assertFalse(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+        }
+
+        try (TameworkPersistenceRuntime ignored = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            // Initialization owns the backup-before-migrate ordering under test.
+        }
+
+        List<Path> backups;
+        try (Stream<Path> files = Files.list(tempDir)) {
+            backups = files
+                    .filter(path -> path.getFileName().toString().startsWith("tamework_pre_v8_"))
+                    .filter(path -> path.getFileName().toString().endsWith(".sqlite.bak"))
+                    .toList();
+        }
+        assertEquals(1, backups.size());
+        Path backup = backups.get(0);
+        JsonObject manifest = JsonParser.parseString(
+                Files.readString(SqliteMigrationBackupService.manifestPath(backup))).getAsJsonObject();
+        assertEquals(SqliteSchemaMigrator.SCHEMA_VERSION_V7,
+                manifest.get("sourceSchemaVersion").getAsInt());
+        assertEquals(SqliteSchemaMigrator.SCHEMA_VERSION_V8,
+                manifest.get("targetSchemaVersion").getAsInt());
+
+        try (Connection backupConnection = DriverManager.getConnection("jdbc:sqlite:" + backup)) {
+            assertTrue(migrator.isVersionApplied(
+                    backupConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V7));
+            assertFalse(migrator.isVersionApplied(
+                    backupConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+        }
+        try (Connection upgradedConnection = connections.openConnection()) {
+            assertTrue(migrator.isVersionApplied(
+                    upgradedConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+        }
+    }
 
     @Test
     void importsLegacyDatFilesIntoSqliteAndBacksThemUp() throws Exception {
