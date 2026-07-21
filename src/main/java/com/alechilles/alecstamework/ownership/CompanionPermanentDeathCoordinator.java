@@ -189,7 +189,7 @@ public final class CompanionPermanentDeathCoordinator {
                 context.npcRef(), TameworkCommandLinksComponent.getComponentType()
         );
         String roleId = CompanionRoleIdResolver.resolveRoleId(context.npcRef(), context.store());
-        if (CompanionRevivePolicy.supportsRevive(roleId, links)) {
+        if (CompanionRevivePolicy.supportsRevive(roleId, links, pending.npcUuid())) {
             return false;
         }
         if (!pending.subtractHealth()) {

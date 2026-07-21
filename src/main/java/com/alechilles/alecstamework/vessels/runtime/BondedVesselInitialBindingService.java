@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.vessels.runtime;
 
 import com.alechilles.alecstamework.api.BondedVesselBoundEvent;
 import com.alechilles.alecstamework.api.BondedVesselState;
+import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselRepository;
@@ -168,6 +169,9 @@ public final class BondedVesselInitialBindingService {
             if (mutation.status() == BondedVesselRepository.Status.COMMITTED) {
                 emitBound(request, operation, recovered);
             }
+            CompanionReviveEligibilityService.current().record(
+                    request.profileId(), CompanionReviveEligibilityService.Authority.BONDED_VESSEL,
+                    null);
             return Result.committed("initial-binding-committed",
                     request.bindingId(), request.profileId());
         });

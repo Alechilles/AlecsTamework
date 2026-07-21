@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.persistence.sqlite.BondedVesselSqlSupport.BINDING_COLUMNS;
@@ -214,6 +216,18 @@ final class BondedVesselTransitionStore {
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? readBinding(result) : null;
             }
+        }
+    }
+
+    static List<BondedVesselBindingRecord> loadNonReleasedBindings(Connection connection)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                BINDING_COLUMNS + " WHERE lifecycle_state <> 'RELEASED' "
+                        + "ORDER BY profile_id, binding_id");
+             ResultSet result = statement.executeQuery()) {
+            List<BondedVesselBindingRecord> bindings = new ArrayList<>();
+            while (result.next()) bindings.add(readBinding(result));
+            return List.copyOf(bindings);
         }
     }
 

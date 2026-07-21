@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Objects;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -111,12 +112,92 @@ public final class CompanionPopulationObservationRepository
         }
         updateProfile(connection, observation);
         updateState(connection, observation);
+        commitBondedLifecycleIfPresent(connection, observation, existing.revision() + 1L);
         setCurrentAlias(connection, observation.profileId(), observation.currentNpcUuid());
         return result(
                 CompanionPopulationObservationPersistResult.Status.COMMITTED,
                 existing.revision() + 1L,
                 null
         );
+    }
+
+    /**
+     * Advances a bonded binding in the same SQLite transaction as the observed population death
+     * or loss. The prior item generation becomes stale immediately; exact item repair remains a
+     * separate evidence-based projection step.
+     */
+    private void commitBondedLifecycleIfPresent(
+            @Nonnull Connection connection,
+            @Nonnull CompanionPopulationObservation observation,
+            long committedProfileRevision
+    ) throws Exception {
+        BondedVesselBindingRecord.LifecycleState target = switch (observation.lifecycleState()) {
+            case DEAD_REVIVABLE -> BondedVesselBindingRecord.LifecycleState.DEAD;
+            case LOST -> BondedVesselBindingRecord.LifecycleState.LOST;
+            default -> null;
+        };
+        if (target == null) return;
+        BondedVesselBindingRecord binding = BondedVesselTransitionStore.findBindingByProfile(
+                connection, observation.profileId());
+        if (binding == null) return;
+        if (binding.lifecycleState() == target
+                && binding.expectedProfileRevision() == committedProfileRevision) {
+            return;
+        }
+        if (binding.lifecycleState() != BondedVesselBindingRecord.LifecycleState.ACTIVE
+                || binding.activeOperationId() != null
+                || !Objects.equals(binding.activeNpcUuid(), observation.currentNpcUuid())) {
+            throw new IllegalStateException("Bonded lifecycle observation conflicts with binding authority.");
+        }
+        long now = System.currentTimeMillis();
+        String logicalKey = observation.profileId() + ":" + target.name() + ":"
+                + committedProfileRevision;
+        String operationId = UUID.nameUUIDFromBytes(
+                ("tamework:bonded-observation:" + logicalKey)
+                        .getBytes(StandardCharsets.UTF_8)).toString();
+        BondedVesselOperationRecord.Action action = target
+                == BondedVesselBindingRecord.LifecycleState.DEAD
+                ? BondedVesselOperationRecord.Action.MARK_DEAD
+                : BondedVesselOperationRecord.Action.MARK_LOST;
+        BondedVesselOperationRecord operation = new BondedVesselOperationRecord(
+                operationId, "tamework.lifecycle", logicalKey, null,
+                binding.bindingId(), binding.profileId(), action,
+                BondedVesselOperationRecord.State.COMMITTED,
+                binding.generation(), binding.generation() + 1L,
+                binding.expectedProfileRevision(), binding.configId(), binding.configRevision(),
+                binding.lifecycleState(), binding.lifecycleState(), target,
+                binding.itemProjectionStatus(),
+                BondedVesselBindingRecord.ItemProjectionStatus.REISSUE_PENDING,
+                binding.cooldownUntilMs(), binding.cooldownUntilMs(), binding.lastItemId(),
+                binding.lastItemId(), null, null,
+                "{\"source\":\"canonical_population_observation\"}", "{}", null,
+                observation.currentNpcUuid(), observation.lifecycleState() ==
+                com.alechilles.alecstamework.ownership.CompanionLifecycleState.DEAD_REVIVABLE
+                ? "bonded-companion-death-recorded" : "bonded-companion-lost-recorded",
+                "COMMITTED", 0L, now, now, now, now);
+        BondedVesselTransitionStore.insertOperation(connection, operation);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_vessel_bindings
+                SET generation = generation + 1, lifecycle_state = ?,
+                    item_projection_status = 'REISSUE_PENDING', expected_profile_revision = ?,
+                    active_npc_uuid = NULL, active_world_name = NULL,
+                    active_chunk_x = NULL, active_chunk_z = NULL,
+                    active_operation_id = NULL, diagnostic_reason = ?,
+                    row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE binding_id = ? AND generation = ? AND lifecycle_state = 'ACTIVE'
+                  AND active_operation_id IS NULL AND active_npc_uuid = ?
+                """)) {
+            statement.setString(1, target.name());
+            statement.setLong(2, committedProfileRevision);
+            statement.setString(3, operation.reasonCode());
+            statement.setLong(4, now);
+            statement.setString(5, binding.bindingId());
+            statement.setLong(6, binding.generation());
+            statement.setString(7, observation.currentNpcUuid().toString());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Bonded binding changed during lifecycle observation.");
+            }
+        }
     }
 
     @Nullable

@@ -74,7 +74,7 @@ public final class CompanionPermanentDeathFallbackSystem extends DeathSystems.On
         TameworkCommandLinksComponent links = linksType == null
                 ? null : commandBuffer.getComponent(ref, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
-        if (CompanionRevivePolicy.supportsRevive(roleId, links)) {
+        if (CompanionRevivePolicy.supportsRevive(roleId, links, identity.getUuid())) {
             return;
         }
         coordinator.interceptExistingDeath(

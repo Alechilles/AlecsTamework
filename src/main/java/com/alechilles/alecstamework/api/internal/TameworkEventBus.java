@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.api.BondedVesselBoundEvent;
 import com.alechilles.alecstamework.api.BondedVesselStateChangedEvent;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
+import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
+import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -151,6 +153,18 @@ public final class TameworkEventBus
 
     public void emitCompanionProvisioned(@Nonnull CompanionProvisionedEvent event) {
         dispatch(Objects.requireNonNull(event, "event"));
+    }
+
+    /** Isolated delivery seam for command-link-independent canonical lifecycle events. */
+    public void emitCanonicalCompanionLifecycleEvent(@Nonnull TameworkEvent event) {
+        Objects.requireNonNull(event, "event");
+        if (!(event instanceof ProvisionedCompanionDeathRecordedEvent)
+                && !(event instanceof ProvisionedCompanionRevivedEvent)
+                && !(event instanceof BondedVesselStateChangedEvent)) {
+            throw new IllegalArgumentException(
+                    "Only canonical provisioned/bonded lifecycle events are accepted.");
+        }
+        dispatch(event);
     }
 
     /** Isolated post-commit delivery seam for canonical population-group events. */

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
+import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -12,6 +13,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.asset.type.gameplay.DeathConfig;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -60,9 +62,13 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
             return;
         }
         TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, linksType);
+        UUIDComponent identity = UUIDComponent.getComponentType() == null
+                ? null : commandBuffer.getComponent(ref, UUIDComponent.getComponentType());
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         boolean deadRespawnEnabled = CompanionRevivePolicy.featureEnabled(roleId);
-        if (!shouldSuppressDrops(links, deadRespawnEnabled)) {
+        boolean canonicalAuthority = identity != null
+                && CompanionReviveEligibilityService.current().supports(identity.getUuid());
+        if (!shouldSuppressDrops(links, deadRespawnEnabled, canonicalAuthority)) {
             return;
         }
         component.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);
@@ -70,9 +76,17 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
 
     static boolean shouldSuppressDrops(@Nullable TameworkCommandLinksComponent links,
                                        boolean deadRespawnEnabled) {
-        if (!deadRespawnEnabled || links == null) {
+        return shouldSuppressDrops(links, deadRespawnEnabled, false);
+    }
+
+    static boolean shouldSuppressDrops(@Nullable TameworkCommandLinksComponent links,
+                                       boolean deadRespawnEnabled,
+                                       boolean canonicalAuthority) {
+        if (!deadRespawnEnabled) {
             return false;
         }
+        if (canonicalAuthority) return true;
+        if (links == null) return false;
         String[] toolIds = links.getToolIds();
         return toolIds != null && toolIds.length > 0;
     }

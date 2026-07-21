@@ -95,7 +95,7 @@ public final class CompanionPermanentDeathDamageGateSystem extends DamageEventSy
         TameworkCommandLinksComponent links = linksType == null
                 ? null : chunk.getComponent(index, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
-        if (CompanionRevivePolicy.supportsRevive(roleId, links)) {
+        if (CompanionRevivePolicy.supportsRevive(roleId, links, identity.getUuid())) {
             return;
         }
         coordinator.interceptLethalDamage(

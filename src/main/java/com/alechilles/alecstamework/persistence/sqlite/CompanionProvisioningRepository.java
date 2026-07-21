@@ -91,6 +91,21 @@ public final class CompanionProvisioningRepository {
         }
     }
 
+    /** Bootstrap snapshot of rows that have durably allocated a canonical profile. */
+    @Nonnull
+    public List<CompanionProvisioningOperationRecord> loadAuthoritativeProfiles() throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     SELECT_COLUMNS + " WHERE canonical_profile_id IS NOT NULL "
+                             + "AND state NOT IN ('DENIED', 'CANCELED') "
+                             + "ORDER BY canonical_profile_id, operation_id");
+             ResultSet result = statement.executeQuery()) {
+            List<CompanionProvisioningOperationRecord> operations = new ArrayList<>();
+            while (result.next()) operations.add(read(result));
+            return List.copyOf(operations);
+        }
+    }
+
     @Nonnull
     private MutationResult createInTransaction(
             @Nonnull Connection connection,

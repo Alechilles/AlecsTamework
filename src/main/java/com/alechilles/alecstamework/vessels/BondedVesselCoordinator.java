@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.api.BondedVesselTransitionContext;
 import com.alechilles.alecstamework.api.BondedVesselTransitionRequest;
 import com.alechilles.alecstamework.api.BondedVesselTransitionToken;
 import com.alechilles.alecstamework.api.BondedVesselView;
+import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselRepository;
@@ -985,10 +986,20 @@ public final class BondedVesselCoordinator {
 
     private void emitCommitted(BondedVesselOperationRecord operation, boolean recovered) {
         try {
+            BondedVesselBindingRecord committedBinding = requireBinding(operation.bindingId());
+            if (committedBinding.lifecycleState()
+                    == BondedVesselBindingRecord.LifecycleState.RELEASED) {
+                CompanionReviveEligibilityService.current().release(operation.profileId());
+            } else {
+                CompanionReviveEligibilityService.current().record(
+                        operation.profileId(),
+                        CompanionReviveEligibilityService.Authority.BONDED_VESSEL,
+                        committedBinding.activeNpcUuid());
+            }
             eventSink.emit(new BondedVesselStateChangedEvent(
                     UUID.fromString(operation.operationId()), UUID.fromString(operation.bindingId()),
                     operation.profileId(),
-                    requireBinding(operation.bindingId()).ownerUuid(),
+                    committedBinding.ownerUuid(),
                     operation.configId(), operation.priorGeneration(), operation.candidateGeneration(),
                     toState(operation.priorLifecycleState()), toState(operation.targetLifecycleState()),
                     operation.expectedProfileRevision(), operation.targetCooldownUntilMs(),

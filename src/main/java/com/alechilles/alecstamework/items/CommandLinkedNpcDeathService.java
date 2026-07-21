@@ -151,7 +151,7 @@ public final class CommandLinkedNpcDeathService {
         }
         TameworkCommandLinksComponent links = store.getComponent(reference, TameworkCommandLinksComponent.getComponentType());
         String deathRoleId = resolveRoleId(npc);
-        if (!CompanionRevivePolicy.supportsRevive(deathRoleId, links)) {
+        if (!CompanionRevivePolicy.supportsRevive(deathRoleId, links, npcUuid)) {
             permanentlyReleasedDeaths.add(npcUuid);
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
@@ -159,6 +159,11 @@ public final class CommandLinkedNpcDeathService {
             return;
         }
         permanentlyReleasedDeaths.remove(npcUuid);
+        if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
+            // Bonded/provisioned lifecycle observers own the canonical no-command-link record.
+            // This legacy service must not manufacture an empty command-linked snapshot/event.
+            return;
+        }
         if (stateSnapshotService != null) {
             stateSnapshotService.refreshFromEntity(reference, store);
             DeadLinkedNpcSnapshot cached = stateSnapshotService.getSnapshot(npcUuid);

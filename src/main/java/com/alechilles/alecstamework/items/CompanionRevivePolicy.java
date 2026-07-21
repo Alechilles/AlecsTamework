@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 /** Resolves the one effective revive policy shared by death, drops, and command UI. */
@@ -18,14 +19,27 @@ public final class CompanionRevivePolicy {
 
     public static boolean supportsRevive(@Nullable String roleId,
                                          @Nullable TameworkCommandLinksComponent links) {
-        return supportsRevive(links, featureEnabled(roleId));
+        return supportsRevive(roleId, links, null);
+    }
+
+    public static boolean supportsRevive(@Nullable String roleId,
+                                         @Nullable TameworkCommandLinksComponent links,
+                                         @Nullable UUID npcUuid) {
+        return supportsRevive(links, featureEnabled(roleId),
+                CompanionReviveEligibilityService.current().supports(npcUuid));
     }
 
     static boolean supportsRevive(@Nullable TameworkCommandLinksComponent links,
                                   boolean featureEnabled) {
-        return featureEnabled
-                && links != null
+        return supportsRevive(links, featureEnabled, false);
+    }
+
+    static boolean supportsRevive(@Nullable TameworkCommandLinksComponent links,
+                                  boolean featureEnabled,
+                                  boolean canonicalAuthority) {
+        return featureEnabled && (canonicalAuthority
+                || links != null
                 && links.getToolIds() != null
-                && links.getToolIds().length > 0;
+                && links.getToolIds().length > 0);
     }
 }

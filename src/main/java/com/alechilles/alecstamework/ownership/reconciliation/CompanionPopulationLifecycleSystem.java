@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
@@ -98,8 +99,16 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
                 .orElse(CompanionLifecycleState.ACTIVE);
         CompanionLifecycleState classified = removalClassifier.classify(
                 observation.npcUuid(), reason, current,
-                isPermanentDeath(ref, store)
+                isPermanentDeath(ref, store, observation.npcUuid())
         );
+        CompanionReviveEligibilityService.Eligibility eligibility =
+                CompanionReviveEligibilityService.current().findByNpc(observation.npcUuid());
+        if (classified == CompanionLifecycleState.UNKNOWN_DORMANT
+                && eligibility != null
+                && eligibility.authority()
+                == CompanionReviveEligibilityService.Authority.BONDED_VESSEL) {
+            classified = CompanionLifecycleState.LOST;
+        }
         if (classified == CompanionLifecycleState.UNLOADED) {
             reconciler.observePhysical(
                     observation.npcUuid(), observation.ownerUuid(), observation.worldName(),
@@ -117,7 +126,8 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
     }
 
     private static boolean isPermanentDeath(@Nonnull Ref<EntityStore> ref,
-                                            @Nonnull Store<EntityStore> store) {
+                                            @Nonnull Store<EntityStore> store,
+                                            @Nonnull java.util.UUID npcUuid) {
         try {
             if (!store.getArchetype(ref).contains(DeathComponent.getComponentType())) {
                 return false;
@@ -127,7 +137,10 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
             TameworkCommandLinksComponent links = linksType == null
                     ? null
                     : store.getComponent(ref, linksType);
-            return links == null || links.getToolIds() == null || links.getToolIds().length == 0;
+            boolean commandLinked = links != null && links.getToolIds() != null
+                    && links.getToolIds().length > 0;
+            return !commandLinked
+                    && !CompanionReviveEligibilityService.current().supports(npcUuid);
         } catch (RuntimeException | LinkageError failure) {
             return false;
         }

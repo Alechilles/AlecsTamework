@@ -74,7 +74,7 @@ public final class CompanionRevivableDeathPopulationSystem extends DeathSystems.
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         projector.observeRevivableDeath(
                 observation,
-                CompanionRevivePolicy.supportsRevive(roleId, links)
+                CompanionRevivePolicy.supportsRevive(roleId, links, observation.npcUuid())
         );
     }
 

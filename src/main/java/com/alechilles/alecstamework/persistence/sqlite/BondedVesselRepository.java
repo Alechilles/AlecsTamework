@@ -148,6 +148,14 @@ public final class BondedVesselRepository {
         }
     }
 
+    /** Bootstrap snapshot for command-link-independent lifecycle qualification. */
+    @Nonnull
+    public List<BondedVesselBindingRecord> loadNonReleasedBindings() throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            return BondedVesselTransitionStore.loadNonReleasedBindings(connection);
+        }
+    }
+
     @Nullable
     public BondedVesselOperationRecord findOperation(@Nonnull String operationId) throws Exception {
         try (Connection connection = connectionManager.openConnection()) {

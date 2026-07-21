@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.api.ProvisionedCompanionTransitionRequest;
 import com.alechilles.alecstamework.api.ProvisionedCompanionView;
 import com.alechilles.alecstamework.api.Vector3View;
+import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningRepository;
 import com.google.gson.JsonObject;
@@ -412,6 +413,9 @@ public final class CompanionProvisioningCoordinator {
         } catch (RuntimeException | LinkageError ignored) {
             // Post-commit listeners are notifications and cannot roll back provisioning.
         }
+        CompanionReviveEligibilityService.current().record(
+                profile.profileId(), CompanionReviveEligibilityService.Authority.PROVISIONED,
+                profile.currentNpcUuid());
         return result;
     }
 
@@ -533,7 +537,7 @@ public final class CompanionProvisioningCoordinator {
                     outcome.populationDecision(), CompanionProvisioningResult.UNKNOWN_PROFILE_REVISION);
         }
         ProvisioningPopulationBackend.ProfileSnapshot profile = outcome.profile();
-        return new CompanionProvisioningResult(
+        CompanionProvisioningResult result = new CompanionProvisioningResult(
                 outcome.status() == ProvisioningPopulationBackend.TransitionOutcome.Status.IDEMPOTENT
                         ? CompanionProvisioningResult.Status.ALREADY_TRANSITIONED
                         : CompanionProvisioningResult.Status.TRANSITIONED,
@@ -541,6 +545,11 @@ public final class CompanionProvisioningCoordinator {
                 profile.profileId(), profile.ownerUuid(), profile.roleId(), profile.lifecycle(),
                 profile.projectionStatus(), outcome.reason(), outcome.populationDecision(),
                 profile.profileRevision());
+        if (outcome.status() == ProvisioningPopulationBackend.TransitionOutcome.Status.COMMITTED) {
+            CompanionReviveEligibilityService.current().onProvisionedTransitionCommitted(
+                    operationId, request, profile, false);
+        }
+        return result;
     }
 
     private CompanionProvisioningOperationView operationView(
