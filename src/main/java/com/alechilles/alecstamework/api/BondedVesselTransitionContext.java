@@ -17,11 +17,20 @@ public record BondedVesselTransitionContext(@Nonnull String sourceItemId,
                                             @Nonnull String sourceItemFingerprint,
                                             @Nullable UUID expectedNpcUuid,
                                             @Nullable PopulationAdmissionLocation destination) {
+    public static final int MAX_SOURCE_ITEM_ID_LENGTH = 256;
+    public static final int MAX_HOLDER_EVIDENCE_ID_LENGTH = 256;
+    public static final int MAX_CONTAINER_PATH_LENGTH = 256;
+    public static final int MAX_ITEM_FINGERPRINT_LENGTH = 1024;
+
     public BondedVesselTransitionContext {
-        sourceItemId = requireText(sourceItemId, "sourceItemId");
-        sourceHolderEvidenceId = requireText(sourceHolderEvidenceId, "sourceHolderEvidenceId");
-        sourceContainerPath = requireText(sourceContainerPath, "sourceContainerPath");
-        sourceItemFingerprint = requireText(sourceItemFingerprint, "sourceItemFingerprint");
+        sourceItemId = requireText(
+                sourceItemId, "sourceItemId", MAX_SOURCE_ITEM_ID_LENGTH);
+        sourceHolderEvidenceId = requireText(
+                sourceHolderEvidenceId, "sourceHolderEvidenceId", MAX_HOLDER_EVIDENCE_ID_LENGTH);
+        sourceContainerPath = requireText(
+                sourceContainerPath, "sourceContainerPath", MAX_CONTAINER_PATH_LENGTH);
+        sourceItemFingerprint = requireText(
+                sourceItemFingerprint, "sourceItemFingerprint", MAX_ITEM_FINGERPRINT_LENGTH);
         if (sourceInventorySlot < 0 || sourceInventoryRevision < 0L) {
             throw new IllegalArgumentException("Source slot and inventory revision cannot be negative.");
         }
@@ -52,9 +61,13 @@ public record BondedVesselTransitionContext(@Nonnull String sourceItemId,
         }
     }
 
-    private static String requireText(String value, String field) {
+    private static String requireText(String value, String field, int maxLength) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required.");
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(
+                    field + " cannot exceed " + maxLength + " characters.");
+        }
         return normalized;
     }
 }

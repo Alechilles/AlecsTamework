@@ -32,6 +32,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -42,6 +44,11 @@ public final class TameworkEventBus
     @Nullable
     private final HytaleLogger logger;
     private final CopyOnWriteArrayList<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
+    private final LongAdder dispatchedEvents = new LongAdder();
+    private final LongAdder deliveryAttempts = new LongAdder();
+    private final LongAdder deliveredListeners = new LongAdder();
+    private final LongAdder listenerFailures = new LongAdder();
+    private final AtomicReference<String> lastFailedEventType = new AtomicReference<>();
 
     public TameworkEventBus(@Nullable HytaleLogger logger) {
         this.logger = logger;
@@ -194,11 +201,42 @@ public final class TameworkEventBus
     }
 
     private void dispatch(@Nonnull TameworkEvent event) {
+        dispatchedEvents.increment();
         for (Subscription<?> subscription : List.copyOf(subscriptions)) {
             if (!subscription.accepts(event)) {
                 continue;
             }
-            subscription.invoke(event, logger);
+            deliveryAttempts.increment();
+            if (subscription.invoke(event, logger)) {
+                deliveredListeners.increment();
+            } else {
+                listenerFailures.increment();
+                lastFailedEventType.set(event.getClass().getSimpleName());
+            }
+        }
+    }
+
+    /** Thread-safe, bounded counters only; listener identities and event payloads are never exposed. */
+    @Nonnull
+    public DeliveryDiagnostics deliveryDiagnostics() {
+        return new DeliveryDiagnostics(
+                dispatchedEvents.sum(), deliveryAttempts.sum(), deliveredListeners.sum(),
+                listenerFailures.sum(), lastFailedEventType.get());
+    }
+
+    public record DeliveryDiagnostics(long dispatchedEvents,
+                                      long deliveryAttempts,
+                                      long deliveredListeners,
+                                      long listenerFailuresSinceBoot,
+                                      @Nullable String lastFailedEventType) {
+        public DeliveryDiagnostics {
+            if (dispatchedEvents < 0L || deliveryAttempts < 0L || deliveredListeners < 0L
+                    || listenerFailuresSinceBoot < 0L
+                    || deliveredListeners + listenerFailuresSinceBoot > deliveryAttempts) {
+                throw new IllegalArgumentException("Invalid event delivery diagnostics");
+            }
+            lastFailedEventType = lastFailedEventType == null
+                    || lastFailedEventType.isBlank() ? null : lastFailedEventType.trim();
         }
     }
 
@@ -233,10 +271,11 @@ public final class TameworkEventBus
             return type.isAssignableFrom(event.getClass());
         }
 
-        private void invoke(@Nonnull TameworkEvent event, @Nullable HytaleLogger logger) {
+        private boolean invoke(@Nonnull TameworkEvent event, @Nullable HytaleLogger logger) {
             try {
                 listener.accept(type.cast(event));
-            } catch (Exception ex) {
+                return true;
+            } catch (RuntimeException | LinkageError ex) {
                 if (logger != null) {
                     logger.at(Level.SEVERE).log(
                             "Tamework API event listener failed for "
@@ -245,6 +284,7 @@ public final class TameworkEventBus
                                     + ex.getMessage()
                     );
                 }
+                return false;
             }
         }
     }

@@ -27,7 +27,7 @@ public record BondedVesselBindingInvalidatedEvent(@Nonnull UUID operationId,
         state = Objects.requireNonNull(state, "state");
         projectionStatus = Objects.requireNonNull(projectionStatus, "projectionStatus");
         reason = requireText(reason, "reason");
-        if (oldGeneration < 0L || newGeneration <= oldGeneration) {
+        if (oldGeneration < 0L || newGeneration < oldGeneration) {
             throw new IllegalArgumentException("Invalidated binding generations are invalid.");
         }
     }

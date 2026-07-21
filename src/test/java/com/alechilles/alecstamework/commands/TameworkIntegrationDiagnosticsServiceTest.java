@@ -30,6 +30,9 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "oldestCorrelation=population-op-4"));
         assertTrue(contains(lines, "configs=[hydragon:miniwyvern->HyDragon_Miniwyvern]"));
         assertTrue(contains(lines, "Provisioning: readiness=READY"));
+        assertTrue(contains(lines, "API events: dispatched=12"));
+        assertTrue(contains(lines, "listenerFailuresSinceBoot=2"));
+        assertTrue(contains(lines, "lastFailedEventType=BondedVesselStateChangedEvent"));
         assertTrue(contains(lines, "activeQuarantines=2"));
     }
 
@@ -196,6 +199,10 @@ class TameworkIntegrationDiagnosticsServiceTest {
         }
         @Override public TameworkIntegrationDiagnosticsService.CaptureSummary captureSummary() {
             return new TameworkIntegrationDiagnosticsService.CaptureSummary(2L, 3L, 1L, 1L, 2L, 4L);
+        }
+        @Override public TameworkIntegrationDiagnosticsService.EventDeliverySummary eventDeliverySummary() {
+            return new TameworkIntegrationDiagnosticsService.EventDeliverySummary(
+                    12L, 9L, 7L, 2L, "BondedVesselStateChangedEvent");
         }
         @Override public TameworkIntegrationDiagnosticsService.CaptureAttemptDetail findCaptureAttempt(
                 String ignoredAttemptId) {

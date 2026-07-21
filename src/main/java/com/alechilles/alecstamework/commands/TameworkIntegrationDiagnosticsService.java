@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncident;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
@@ -42,9 +43,10 @@ final class TameworkIntegrationDiagnosticsService {
     static TameworkIntegrationDiagnosticsService live(
             @Nullable TameworkApi api,
             @Nonnull TameworkPersistenceRuntime persistence,
-            boolean captureReady) {
+            boolean captureReady,
+            @Nullable TameworkEventBus eventBus) {
         return new TameworkIntegrationDiagnosticsService(
-                new LiveSource(api, persistence, captureReady));
+                new LiveSource(api, persistence, captureReady, eventBus));
     }
 
     @Nonnull
@@ -60,8 +62,19 @@ final class TameworkIntegrationDiagnosticsService {
         appendVesselSummary(lines);
         appendPopulationSummary(lines);
         appendProvisioningSummary(lines);
+        appendEventDeliverySummary(lines);
         appendPersistenceSummary(lines);
         return List.copyOf(lines.subList(0, Math.min(lines.size(), MAX_LINES)));
+    }
+
+    private void appendEventDeliverySummary(List<String> lines) {
+        EventDeliverySummary summary = safe(source::eventDeliverySummary,
+                new EventDeliverySummary(0L, 0L, 0L, 0L, null));
+        lines.add("API events: dispatched=" + summary.dispatched()
+                + ", deliveryAttempts=" + summary.deliveryAttempts()
+                + ", delivered=" + summary.delivered()
+                + ", listenerFailuresSinceBoot=" + summary.listenerFailuresSinceBoot()
+                + ", lastFailedEventType=" + boundedOrNone(summary.lastFailedEventType()));
     }
 
     @Nonnull
@@ -339,6 +352,9 @@ final class TameworkIntegrationDiagnosticsService {
         @Nonnull GroupConfigSummary groupConfigSummary() throws Exception;
         @Nonnull PersistenceSummary persistenceSummary() throws Exception;
         @Nonnull CaptureSummary captureSummary() throws Exception;
+        default @Nonnull EventDeliverySummary eventDeliverySummary() throws Exception {
+            return new EventDeliverySummary(0L, 0L, 0L, 0L, null);
+        }
         @Nullable CaptureAttemptDetail findCaptureAttempt(@Nonnull String attemptId) throws Exception;
         @Nullable VesselDetail findVessel(@Nonnull String bindingOrProfile) throws Exception;
         @Nullable ProvisioningDetail findProvisioning(
@@ -349,13 +365,16 @@ final class TameworkIntegrationDiagnosticsService {
         @Nullable private final TameworkApi api;
         private final TameworkPersistenceRuntime persistence;
         private final boolean captureReady;
+        @Nullable private final TameworkEventBus eventBus;
 
         private LiveSource(@Nullable TameworkApi api,
                            TameworkPersistenceRuntime persistence,
-                           boolean captureReady) {
+                           boolean captureReady,
+                           @Nullable TameworkEventBus eventBus) {
             this.api = api;
             this.persistence = Objects.requireNonNull(persistence, "persistence");
             this.captureReady = captureReady;
+            this.eventBus = eventBus;
         }
 
         @Override public String apiVersion() { return api == null ? "unavailable" : api.getApiVersion(); }
@@ -465,6 +484,15 @@ final class TameworkIntegrationDiagnosticsService {
             return new CaptureSummary(summary.prepared(), summary.resolvedFailure(),
                     summary.applying(), summary.quarantined(), summary.recovered(),
                     summary.duplicateCallbacksSinceBoot());
+        }
+
+        @Override public EventDeliverySummary eventDeliverySummary() {
+            if (eventBus == null) return new EventDeliverySummary(0L, 0L, 0L, 0L, null);
+            TameworkEventBus.DeliveryDiagnostics diagnostics = eventBus.deliveryDiagnostics();
+            return new EventDeliverySummary(
+                    diagnostics.dispatchedEvents(), diagnostics.deliveryAttempts(),
+                    diagnostics.deliveredListeners(), diagnostics.listenerFailuresSinceBoot(),
+                    diagnostics.lastFailedEventType());
         }
 
         @Override public CaptureAttemptDetail findCaptureAttempt(String attemptId) throws Exception {
@@ -598,6 +626,17 @@ final class TameworkIntegrationDiagnosticsService {
     record CaptureSummary(long prepared, long resolvedFailure, long applying,
                           long quarantined, long recovered,
                           long duplicateCallbacksSinceBoot) { }
+    record EventDeliverySummary(long dispatched, long deliveryAttempts, long delivered,
+                                long listenerFailuresSinceBoot,
+                                @Nullable String lastFailedEventType) {
+        EventDeliverySummary {
+            if (dispatched < 0L || deliveryAttempts < 0L || delivered < 0L
+                    || listenerFailuresSinceBoot < 0L
+                    || delivered + listenerFailuresSinceBoot > deliveryAttempts) {
+                throw new IllegalArgumentException("Invalid event delivery summary");
+            }
+        }
+    }
     record CaptureAttemptDetail(
             @Nonnull String attemptId, @Nonnull String state,
             @Nullable String outcome, @Nullable String reasonCode,

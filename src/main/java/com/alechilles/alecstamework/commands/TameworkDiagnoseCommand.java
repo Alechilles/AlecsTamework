@@ -40,7 +40,8 @@ public final class TameworkDiagnoseCommand extends AbstractPlayerCommand {
         }
         TameworkIntegrationDiagnosticsService diagnostics =
                 TameworkIntegrationDiagnosticsService.live(
-                        plugin.getApi(), persistence, plugin.isCaptureAttemptRuntimeReady());
+                        plugin.getApi(), persistence, plugin.isCaptureAttemptRuntimeReady(),
+                        plugin.getApiEventBus());
         List<String> arguments = arguments(context);
         List<String> lines;
         if (arguments.isEmpty()) {

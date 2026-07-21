@@ -65,6 +65,13 @@ class TameworkEventBusTest {
 
         bus.emitConfigReload(TameworkConfigFamily.GLOBAL, Set.of("global/default"));
         assertEquals(1, successfulDeliveries.get());
+
+        TameworkEventBus.DeliveryDiagnostics diagnostics = bus.deliveryDiagnostics();
+        assertEquals(1L, diagnostics.dispatchedEvents());
+        assertEquals(2L, diagnostics.deliveryAttempts());
+        assertEquals(1L, diagnostics.deliveredListeners());
+        assertEquals(1L, diagnostics.listenerFailuresSinceBoot());
+        assertEquals("ConfigReloadedEvent", diagnostics.lastFailedEventType());
     }
 
     @Test
