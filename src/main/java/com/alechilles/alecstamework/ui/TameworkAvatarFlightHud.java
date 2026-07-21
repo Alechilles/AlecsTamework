@@ -31,10 +31,14 @@ public final class TameworkAvatarFlightHud extends CustomUIHud {
     }
 
     public static void removeFrom(@Nullable Player player) {
-        if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
+        if (player == null || player.getPlayerRef() == null) {
             return;
         }
-        player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkAvatarFlightHud.HUD_KEY);
+        PlayerRef playerRef = player.getPlayerRef();
+        if (player.getHudManager() != null) {
+            player.getHudManager().removeCustomHud(playerRef, TameworkAvatarFlightHud.HUD_KEY);
+        }
+        TameworkAvatarFlightControlOverlay.remove(playerRef);
     }
 
     @Override

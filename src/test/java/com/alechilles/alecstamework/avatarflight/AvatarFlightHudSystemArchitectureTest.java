@@ -20,7 +20,8 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("new UICommandBuilder()"));
         Assertions.assertTrue(source.contains("AvatarFlightHudBinder.bind(commandBuilder, updatedModel)"));
         Assertions.assertTrue(source.contains("update(false, commandBuilder)"));
-        Assertions.assertTrue(source.contains("removeCustomHud(player.getPlayerRef(), TameworkAvatarFlightHud.HUD_KEY)"));
+        Assertions.assertTrue(source.contains("removeCustomHud(playerRef, TameworkAvatarFlightHud.HUD_KEY)"));
+        Assertions.assertTrue(source.contains("TameworkAvatarFlightControlOverlay.remove(playerRef)"));
     }
 
     @Test
@@ -52,9 +53,27 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("config.getVigour().isHudEnabled()"));
         Assertions.assertTrue(source.contains("config.getVigour().getHudResendIntervalMs()"));
         Assertions.assertTrue(source.contains("player.getHudManager().addCustomHud(playerRef, hud)"));
+        Assertions.assertTrue(source.contains("TameworkAvatarFlightControlOverlay.show(playerRef)"));
         Assertions.assertTrue(source.contains("TameworkAvatarFlightHud.removeFrom(player)"));
         Assertions.assertFalse(source.contains("Universe.get()"));
         Assertions.assertFalse(source.contains("PlayerRef.getComponent(Player"));
+    }
+
+    @Test
+    void flightControlsUseNativeServerContentAnchorWithoutClearingOtherContent() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ui/TameworkAvatarFlightControlOverlay.java"
+        ));
+
+        Assertions.assertTrue(source.contains("ANCHOR_ID = \"MapServerContent\""));
+        Assertions.assertTrue(source.contains("ROOT_SELECTOR = \"#TameworkAvatarFlightControls\""));
+        Assertions.assertTrue(source.contains("UI_PATH = \"Hud/TameworkAvatarFlightControls.ui\""));
+        Assertions.assertTrue(source.contains("commandBuilder.remove(ROOT_SELECTOR)"));
+        Assertions.assertTrue(source.contains("commandBuilder.append(UI_PATH)"));
+        Assertions.assertTrue(source.contains("new UpdateAnchorUI("));
+        Assertions.assertTrue(source.contains("ANCHOR_ID,\n                false,"),
+                "the overlay must preserve unrelated content already mounted in the shared native anchor");
+        Assertions.assertTrue(source.contains("writeNoCache"));
     }
 
     @Test

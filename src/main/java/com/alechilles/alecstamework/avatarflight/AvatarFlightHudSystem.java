@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.ui.TameworkAvatarFlightControlOverlay;
 import com.alechilles.alecstamework.ui.TameworkAvatarFlightHud;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -127,6 +128,7 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
         if (hud == null) {
             hud = new TameworkAvatarFlightHud(playerRef, model);
             player.getHudManager().addCustomHud(playerRef, hud);
+            TameworkAvatarFlightControlOverlay.show(playerRef);
             stateByPlayer.put(playerUuid, new HudState(enabledAtMs, hud, model, now));
             return;
         }

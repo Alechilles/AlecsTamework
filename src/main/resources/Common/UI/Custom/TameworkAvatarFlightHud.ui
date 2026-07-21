@@ -1,18 +1,5 @@
 $C = "Common.ui";
 
-@FlightControlMask = #142431;
-@FlightControlBindingStyle = (
-    FontName: "Secondary",
-    FontSize: 10,
-    RenderBold: true,
-    TextColor: #eaf7fb,
-    Alignment: Center
-);
-@FlightControlBindingBackground = PatchStyle(
-    TexturePath: "Tamework/AvatarFlightControls/InputBadge.png",
-    Border: 8
-);
-
 Group #Root {
     Anchor: (Bottom: 178, Width: 178, Height: 70);
     Visible: false;
@@ -99,64 +86,6 @@ Group #Root {
             Anchor: (Width: 20, Height: 10);
             Background: #203044(0.92);
             Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
-        }
-    }
-}
-
-// Covers the native weapon glyphs while preserving Hytale's ability frames,
-// input labels, and cooldown presentation underneath.
-Group #ControlsOverlay {
-    Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107);
-    Visible: false;
-
-    Group #ForwardBoostControl {
-        Anchor: (Left: 68, Top: 23, Width: 50, Height: 54);
-        Background: @FlightControlMask;
-
-        Group #ForwardBoostIcon {
-            Anchor: (Left: -1, Top: 1, Width: 52, Height: 52);
-            Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
-        }
-    }
-
-    Group #UpwardFlapControl {
-        Anchor: (Left: 168, Top: 28, Width: 40, Height: 44);
-        Background: @FlightControlMask;
-
-        Group #UpwardFlapIcon {
-            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
-            Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
-        }
-    }
-
-    Group #AirbrakeControl {
-        Anchor: (Left: 254, Top: 28, Width: 40, Height: 44);
-        Background: @FlightControlMask;
-
-        Group #AirbrakeIcon {
-            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
-            Background: "Tamework/AvatarFlightControls/Airbrake.png";
-        }
-    }
-
-    Group #LaunchControl {
-        Anchor: (Left: -36, Top: 20, Width: 58, Height: 78);
-
-        Group #LaunchFrame {
-            Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #LaunchIcon {
-                Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
-                Background: "Tamework/AvatarFlightControls/Launch.png";
-            }
-        }
-
-        Label #LaunchBinding {
-            Anchor: (Left: 3, Top: 55, Width: 52, Height: 19);
-            Background: @FlightControlBindingBackground;
-            Text: "CROUCH";
-            Style: @FlightControlBindingStyle;
         }
     }
 }
