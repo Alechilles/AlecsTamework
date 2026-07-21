@@ -133,23 +133,22 @@ public final class CommandLinkedNpcStateSnapshotService {
     }
 
     /**
-     * Retires only the exact entity-store identity of a terminal generated world.
+     * Retires only the exact entity-store identity of a removed world.
      *
      * <p>The caller must run from an uncancelled, terminal-priority {@code RemoveWorldEvent}.
-     * Full state snapshots intentionally remain available for Lost recovery after the store's
-     * live identity evidence is withdrawn.</p>
+     * Full state snapshots intentionally remain available for later Lost recovery after the
+     * store's live identity evidence is withdrawn. The result indicates whether the removed
+     * world is delete-on-remove and therefore needs immediate terminal recovery.</p>
      */
-    public boolean retireDeleteOnRemoveWorld(@Nullable World world) {
-        if (world == null || world.getWorldConfig() == null
-                || !world.getWorldConfig().isDeleteOnRemove()
-                || world.getEntityStore() == null
+    public boolean retireRemovedWorld(@Nullable World world) {
+        if (world == null || world.getEntityStore() == null
                 || world.getEntityStore().getStore() == null) {
             return false;
         }
         loadedNpcIdentityIndex.clearLocation(
                 LoadedNpcLocationResolver.resolve(world.getEntityStore().getStore())
         );
-        return true;
+        return world.getWorldConfig() != null && world.getWorldConfig().isDeleteOnRemove();
     }
 
     private void indexNpcAdded(@Nonnull Ref<EntityStore> reference,

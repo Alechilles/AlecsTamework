@@ -1412,7 +1412,7 @@ public class Tamework extends JavaPlugin {
             return;
         }
         World world = event.getWorld();
-        if (commandLinkedNpcStateSnapshotService.retireDeleteOnRemoveWorld(world)) {
+        if (commandLinkedNpcStateSnapshotService.retireRemovedWorld(world)) {
             commandNpcRelocationService.onWorldRemoved(world);
         }
     }

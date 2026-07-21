@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Protects the instance-teardown regression where an ACTIVE companion became unreachable after
- * its delete-on-remove source world was destroyed.
+ * Protects world-teardown regressions where an ACTIVE companion became unreachable after its
+ * source world's entity store was removed without per-NPC removal callbacks.
  */
 class CommandDeleteOnRemoveWorldRecoveryWiringTest {
     private static final Path ROOT = Path.of("src", "main", "java", "com", "alechilles", "alecstamework");
@@ -29,9 +29,9 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
         assertTrue(plugin.contains("Short.MAX_VALUE"),
                 "Recovery must observe cancellation after all standard engine priorities.");
         assertTrue(plugin.contains("event == null || event.isCancelled()"));
-        assertTrue(plugin.contains("retireDeleteOnRemoveWorld(world)"));
+        assertTrue(plugin.contains("retireRemovedWorld(world)"));
         assertTrue(plugin.contains("commandNpcRelocationService.onWorldRemoved(world)"));
-        assertTrue(plugin.indexOf("retireDeleteOnRemoveWorld(world)")
+        assertTrue(plugin.indexOf("retireRemovedWorld(world)")
                         < plugin.indexOf("commandNpcRelocationService.onWorldRemoved(world)"),
                 "Terminal store identity must be retired before profile-safe Lost resolution.");
         assertTrue(snapshots.contains("loadedNpcIdentityIndex.clearLocation("));
@@ -53,6 +53,24 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
                 "Relocation dispatch must not race a terminal instance recovery marker.");
         assertTrue(relocation.contains("private final CommandRelocationNpcLifecycle npcLifecycle"),
                 "The oversized relocation orchestrator must delegate NPC lifecycle tracking.");
+    }
+
+    /** Protects the 2026-07-20 persistent-world Recall failure from GIGATestWorld. */
+    @Test
+    void persistentWorldRemovalRetiresLiveIdentityWithoutImmediateTerminalRecovery() throws Exception {
+        String plugin = read(ROOT.resolve("Tamework.java"));
+        String snapshots = read(ITEMS.resolve("CommandLinkedNpcStateSnapshotService.java"));
+        int methodStart = snapshots.indexOf("public boolean retireRemovedWorld");
+        int methodEnd = snapshots.indexOf("private", methodStart);
+        String method = snapshots.substring(methodStart, methodEnd);
+
+        assertTrue(method.contains("loadedNpcIdentityIndex.clearLocation("),
+                "Every removed store must stop advertising its NPC aliases as live.");
+        assertTrue(method.indexOf("loadedNpcIdentityIndex.clearLocation(")
+                        < method.indexOf("isDeleteOnRemove()"),
+                "Persistent worlds must be retired before the delete-only recovery decision.");
+        assertTrue(plugin.contains("if (commandLinkedNpcStateSnapshotService.retireRemovedWorld(world))"),
+                "Only delete-on-remove worlds should trigger immediate bulk Lost recovery.");
     }
 
     @Test
