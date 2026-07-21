@@ -7,14 +7,12 @@ import java.sql.ResultSet;
 import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.bindState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.parseUuid;
-import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readOperation;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setInteger;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setText;
@@ -76,7 +74,6 @@ public final class CompanionPopulationRepository {
 
     @Nonnull public UnifiedPopulationCompositeStore unifiedPopulationCompositeStore() {
         return unifiedPopulationCompositeStore; }
-
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<Boolean> advanceOperationAsync(
             @Nonnull String operationId,
@@ -93,7 +90,6 @@ public final class CompanionPopulationRepository {
                 null
         );
     }
-
     /**
      * Closes an unapplied operation and, when coupled to a managed-coop release, restores the
      * resident and lifecycle claim in the same transaction.
@@ -134,7 +130,6 @@ public final class CompanionPopulationRepository {
         }
         return true;
     }
-
     /** Completes an exact source-bearing spawn after its world-thread CAS finalizer succeeds. */
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<Boolean> completeSourceFinalizationAsync(
@@ -146,7 +141,6 @@ public final class CompanionPopulationRepository {
                 null
         );
     }
-
     @Nonnull
     public List<CompanionPopulationStateRecord> loadAllStates() throws Exception {
         try (Connection connection = connectionManager.openConnection();
@@ -169,30 +163,15 @@ public final class CompanionPopulationRepository {
             return List.copyOf(rows);
         }
     }
-
     @Nonnull
     public List<CompanionPopulationOperationRecord> loadNonterminalOperations() throws Exception {
         return journalStore.loadNonterminalOperations();
     }
-
     /** Reads one durable operation for cross-journal recovery correlation. */
     @Nullable
     public CompanionPopulationOperationRecord findOperation(@Nonnull String operationId) throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
-                            old_state_json, new_state_json, target_context_json,
-                            created_at_ms, updated_at_ms, completed_at_ms, last_error
-                     FROM companion_population_operations
-                     WHERE operation_id = ? LIMIT 1
-                     """)) {
-            statement.setString(1, Objects.requireNonNull(operationId, "operationId"));
-            try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? readOperation(result) : null;
-            }
-        }
+        return journalStore.findOperation(operationId);
     }
-
     /** Loads retained breeding rows, including COMMITTED rows used as restart birth evidence. */
     @Nonnull
     public List<CompanionPopulationOperationRecord> loadBreedingOperations() throws Exception {

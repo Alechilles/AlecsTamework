@@ -16,12 +16,18 @@ class OwnerMutationDispatchRejectionArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "ownership", "OwnerMutationScheduler.java"
     );
+    private static final Path APPLIER = Paths.get(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "ownership", "OwnerMutationPreparedApplier.java"
+    );
 
     @Test
     void allWorldDispatchSitesProvideExactlyOneTerminalRejectionCallback() throws IOException {
         String source = Files.readString(SCHEDULER, StandardCharsets.UTF_8);
+        String applier = Files.readString(APPLIER, StandardCharsets.UTF_8);
 
-        assertEquals(3, occurrences(source, "callbacks.onWorldDispatchRejected("));
+        assertEquals(3, occurrences(source, "callbacks.onWorldDispatchRejected(")
+                + occurrences(applier, "callbacks.onWorldDispatchRejected("));
 
         int preparationBranch = source.indexOf(
                 "if (failure != null || preparation == null || !preparation.allowed())"
@@ -32,8 +38,9 @@ class OwnerMutationDispatchRejectionArchitectureTest {
                 "callbacks.onWorldDispatchRejected(reason, false, null)"
         ));
 
-        int applyMethod = source.indexOf("private void applyPrepared(", preparedBranch);
-        String preparedDispatch = source.substring(preparedBranch, applyMethod);
+        int releaseHelper = source.indexOf(
+                "private void releaseAndDenyBeforePreparation(", preparedBranch);
+        String preparedDispatch = source.substring(preparedBranch, releaseHelper);
         int cancellation = preparedDispatch.indexOf(
                 "cancelPrepared(prepared, \"owner-mutation-world-unavailable\")"
         );
@@ -42,9 +49,9 @@ class OwnerMutationDispatchRejectionArchitectureTest {
         );
         assertTrue(cancellation >= 0 && terminalCallback > cancellation);
 
-        int completion = source.indexOf("completion.whenComplete", applyMethod);
-        int methodEnd = source.indexOf("private void releaseAndDenyBeforePreparation", completion);
-        String completionDispatch = source.substring(completion, methodEnd);
+        int completion = applier.indexOf("completion.whenComplete");
+        int methodEnd = applier.indexOf("private void cancelPrepared", completion);
+        String completionDispatch = applier.substring(completion, methodEnd);
         assertTrue(completionDispatch.contains(
                 "\"owner-mutation-world-unavailable\", true, commit"
         ));

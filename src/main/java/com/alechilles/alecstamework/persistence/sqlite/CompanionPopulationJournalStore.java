@@ -40,6 +40,23 @@ final class CompanionPopulationJournalStore {
                 """);
     }
 
+    @Nullable
+    CompanionPopulationOperationRecord findOperation(@Nonnull String operationId) throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
+                            old_state_json, new_state_json, target_context_json,
+                            created_at_ms, updated_at_ms, completed_at_ms, last_error
+                     FROM companion_population_operations
+                     WHERE operation_id = ? LIMIT 1
+                     """)) {
+            statement.setString(1, Objects.requireNonNull(operationId, "operationId"));
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readOperation(result) : null;
+            }
+        }
+    }
+
     @Nonnull
     private List<CompanionPopulationOperationRecord> loadOperations(@Nonnull String clause) throws Exception {
         String sql = """

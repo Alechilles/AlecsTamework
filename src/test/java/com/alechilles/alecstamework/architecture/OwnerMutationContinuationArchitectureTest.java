@@ -54,12 +54,13 @@ class OwnerMutationContinuationArchitectureTest {
     void liveOwnerCompensationIsJournaledBeforeRollbackAndCapacityRelease() throws IOException {
         String mutation = read("ownership", "OwnerComponentMutationService.java");
         String scheduler = read("ownership", "OwnerMutationScheduler.java");
+        String applier = read("ownership", "OwnerMutationPreparedApplier.java");
         String compensation = read("ownership", "OwnerMutationCompensationService.java");
 
         assertTrue(mutation.contains("return restoreImmediate(store, npcRef, ownerType,"));
         assertTrue(mutation.contains("WriteResult.compensationRequired("));
         assertFalse(mutation.contains("MutationResult applyBuffered("));
-        assertTrue(scheduler.contains("compensationService.handleFailedWrite("));
+        assertTrue(applier.contains("compensationService.handleFailedWrite("));
         assertTrue(compensation.contains("if (result.safeToCancel())"));
         int begin = compensation.indexOf("beginCompensationAsync(prepared, result.reason())");
         int derived = compensation.indexOf("mutationService.compensateDerivedImmediate(", begin);
@@ -92,15 +93,15 @@ class OwnerMutationContinuationArchitectureTest {
     /** Regression: a failed destructive continuation leaves APPLYING recovery evidence intact. */
     @Test
     void appliedCallbackFailureQuarantinesInsteadOfCommitting() throws IOException {
-        String scheduler = read("ownership", "OwnerMutationScheduler.java");
+        String applier = read("ownership", "OwnerMutationPreparedApplier.java");
         String terminality = read("ownership", "OwnerMutationTerminality.java");
-        int callback = scheduler.indexOf("callbacks.onApplied(");
-        int quarantine = scheduler.indexOf("terminality.appliedContinuationFailed(failure)", callback);
-        int commit = scheduler.indexOf("companionCoordinator.commitAsync(prepared)", callback);
+        int callback = applier.indexOf("callbacks.onApplied(");
+        int quarantine = applier.indexOf("terminality.appliedContinuationFailed(failure)", callback);
+        int commit = applier.indexOf("companionCoordinator.commitAsync(prepared)", callback);
 
         assertTrue(callback >= 0);
         assertTrue(quarantine > callback && quarantine < commit);
-        assertTrue(scheduler.substring(callback, commit).contains("return;"));
+        assertTrue(applier.substring(callback, commit).contains("return;"));
         assertTrue(terminality.contains("withCause(failure)"));
     }
 
@@ -116,16 +117,16 @@ class OwnerMutationContinuationArchitectureTest {
 
     @Test
     void deferredMutationCallbacksReceiveFreshlyResolvedWorldState() throws IOException {
-        String scheduler = read("ownership", "OwnerMutationScheduler.java");
+        String applier = read("ownership", "OwnerMutationPreparedApplier.java");
         String capture = read("items", "SpawnerCaptureFinalizerService.java");
         String coop = read("items", "ManagedCoopCaptureRuntimeAdapter.java");
         String release = read("items", "CommandOwnerReleaseService.java");
 
-        assertTrue(scheduler.contains("Ref<EntityStore> liveRef = world.getEntityRef(npcUuid)"));
-        assertTrue(scheduler.contains("OwnerMutationContext mutationContext = new OwnerMutationContext("));
-        assertTrue(scheduler.contains("callbacks.beforeApply(profileId, mutationContext)"));
-        assertTrue(scheduler.contains("callbacks.onApplied(")
-                && scheduler.contains("profileId, mutationContext"));
+        assertTrue(applier.contains("Ref<EntityStore> liveRef = world.getEntityRef(npcUuid)"));
+        assertTrue(applier.contains("OwnerMutationContext mutationContext = new OwnerMutationContext("));
+        assertTrue(applier.contains("callbacks.beforeApply(profileId, mutationContext)"));
+        assertTrue(applier.contains("callbacks.onApplied(")
+                && applier.contains("profileId, mutationContext"));
         assertTrue(capture.contains("context.store().getComponent("));
         assertTrue(capture.contains("context.npcRef(), NPCEntity.getComponentType()"));
         int cancellation = coop.indexOf("cancelForCapturedParentDurably(");

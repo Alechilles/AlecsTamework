@@ -395,9 +395,9 @@ public final class OwnerPopulationAdmissionCoordinator {
                 || outcome.value() == null
                 || outcome.value().status() != PopulationPersistenceTransition.ResultStatus.PREPARED) {
             index.cancel(decision.reservation());
-            OwnerPopulationDecision denied = deniedWithoutReservation(
+            OwnerPopulationDecision denied = OwnerPopulationPreparationFailure.deniedWithoutReservation(
                     decision,
-                    preparationFailureReason(outcome)
+                    OwnerPopulationPreparationFailure.reason(outcome)
             );
             return CompletableFuture.completedFuture(
                     new OwnerPopulationPreparationResult(false, denied.reason(), denied, null)
@@ -496,34 +496,5 @@ public final class OwnerPopulationAdmissionCoordinator {
                 "owner-population-final-durability-failed",
                 result
         );
-    }
-
-    @Nonnull
-    private static OwnerPopulationDecision deniedWithoutReservation(
-            @Nonnull OwnerPopulationDecision original,
-            @Nonnull String reason
-    ) {
-        return new OwnerPopulationDecision(
-                false,
-                reason,
-                null,
-                original.readiness(),
-                original.limit(),
-                original.committedCount(),
-                original.pendingCount(),
-                original.currentRevision(),
-                original.positiveDelta(),
-                original.forced()
-        );
-    }
-
-    @Nonnull
-    private static String preparationFailureReason(
-            @Nonnull PersistenceWriteQueue.WriteOutcome<PopulationPersistenceTransition.Result> outcome
-    ) {
-        PopulationPersistenceTransition.Result result = outcome.value();
-        return result != null && result.reason() != null && !result.reason().isBlank()
-                ? result.reason()
-                : "owner-population-prepare-failed";
     }
 }
