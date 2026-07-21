@@ -144,6 +144,7 @@ public final class ApiSelfTestRunner {
                 "profile data transactions capability ready",
                 capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS),
                 "capabilities=" + capabilities));
+        assertions.addAll(HyDragonBehavioralSelfTestFixtures.run());
         return new ApiSelfTestSuiteResult("hydragon-integrations", assertions);
     }
 
