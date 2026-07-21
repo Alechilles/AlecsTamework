@@ -92,17 +92,16 @@ class AvatarFlightHudBinderTest {
     }
 
     @Test
-    void controlOverlayAssetMatchesNativeAbilityStripGeometry() throws Exception {
+    void controlOverlayAssetProvidesCompleteToolOnlyAbilityRow() throws Exception {
         String ui = Files.readString(Path.of(
                 "src/main/resources/Common/UI/Custom/Hud/TameworkAvatarFlightControls.ui"
         )).replace("\r\n", "\n");
 
         Assertions.assertTrue(ui.contains("Group #TameworkAvatarFlightControls"));
-        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 329, Height: 107)"));
-        Assertions.assertTrue(ui.contains("Anchor: (Left: 68, Top: 23, Width: 50, Height: 54)"));
-        Assertions.assertTrue(ui.contains("Anchor: (Left: 168, Top: 28, Width: 40, Height: 44)"));
-        Assertions.assertTrue(ui.contains("Anchor: (Left: 254, Top: 28, Width: 40, Height: 44)"));
-        Assertions.assertTrue(ui.contains("Anchor: (Left: -36, Top: 20, Width: 58, Height: 78)"));
+        Assertions.assertTrue(ui.contains("@FlightControlSlotSize = 58"));
+        Assertions.assertTrue(ui.contains("@FlightControlSlotHeight = 74"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 50, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("LayoutMode: Left"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
         Assertions.assertTrue(ui.contains("Group #AirbrakeIcon"));
@@ -112,7 +111,10 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/Airbrake.png"));
         Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/Launch.png"));
         Assertions.assertTrue(ui.contains("Text: \"CROUCH\";"));
-        Assertions.assertEquals(1, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
+        Assertions.assertTrue(ui.contains("Text: \"LMB\";"));
+        Assertions.assertTrue(ui.contains("Text: \"Q\";"));
+        Assertions.assertTrue(ui.contains("Text: \"RMB\";"));
+        Assertions.assertEquals(4, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
     }
 
     private static int countOccurrences(String text, String token) {

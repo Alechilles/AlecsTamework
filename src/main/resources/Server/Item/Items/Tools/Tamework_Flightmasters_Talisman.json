@@ -47,7 +47,6 @@
   "MaxStack": 1,
   "UsePlayerAnimations": false,
   "Categories": [
-    "Items.Tools",
-    "Items.Weapons"
+    "Items.Tools"
   ]
 }

@@ -46,8 +46,8 @@ class FlightmastersTalismanItemAssetTest {
         assertTrue(item.contains("\"Name\": \"server.items.Tamework_Flightmasters_Talisman.name\""));
         assertTrue(item.contains("\"Description\": \"server.items.Tamework_Flightmasters_Talisman.description\""));
         assertTrue(item.contains("\"Model\": \"Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman.blockymodel\""));
-        assertTrue(item.contains("\"Items.Weapons\""),
-                "The native ability HUD must select the talisman instead of the utility weapon");
+        assertFalse(item.contains("\"Items.Weapons\""),
+                "The talisman must stay out of the weapon category so Hytale hides its native ability strip");
         assertFalse(Files.exists(LEGACY_ITEM), "Legacy Dragon Reins item asset must be removed");
         assertTrue(plugin.contains("\"TameworkFlightFlap\""));
         assertTrue(plugin.contains("TameworkFlightFlapInteraction.class"));

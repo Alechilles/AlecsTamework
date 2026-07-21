@@ -13,7 +13,7 @@ public final class TameworkAvatarFlightHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:avatar_flight";
     public static final String UI_PATH = "TameworkAvatarFlightHud.ui";
     public static final String CONTROLS_UI_PATH = "Hud/TameworkAvatarFlightControls.ui";
-    // The control artwork is an underlay for Hytale's native ability frames and input labels.
+    // Public HUD overlays use this bounded layer; layer 100 crashes the 0.5.6 client.
     private static final int HUD_Z_ORDER = 10;
 
     private AvatarFlightHudViewModel model;
