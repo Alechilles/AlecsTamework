@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -16,6 +18,8 @@ import javax.annotation.Nullable;
 public final class LegacyCapturedItemEvidenceReader {
     @Nullable
     private final ItemFeatureRegistry itemFeatures;
+    private final BondedVesselInventoryEvidence vesselItems =
+            new BondedVesselInventoryEvidence();
 
     public LegacyCapturedItemEvidenceReader(@Nullable ItemFeatureRegistry itemFeatures) {
         this.itemFeatures = itemFeatures;
@@ -49,6 +53,19 @@ public final class LegacyCapturedItemEvidenceReader {
                 null,
                 source
         ));
+    }
+
+    /** Reads every independent projection carried by one stack. */
+    @Nonnull
+    public List<CompanionPopulationEvidence> readAll(
+            @Nullable ItemStack stack,
+            @Nonnull String evidenceKey,
+            @Nonnull String source
+    ) {
+        List<CompanionPopulationEvidence> evidence = new ArrayList<>(2);
+        read(stack, evidenceKey, source).ifPresent(evidence::add);
+        vesselItems.read(stack, evidenceKey, source).ifPresent(evidence::add);
+        return List.copyOf(evidence);
     }
 
     @Nonnull

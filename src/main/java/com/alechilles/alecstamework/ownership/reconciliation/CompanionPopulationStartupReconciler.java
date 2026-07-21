@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +49,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             new AtomicReference<>(CompanionPopulationReconciliationProgress.idle());
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicReference<SealedProjectionObserver> sealedProjectionObserver =
+            new AtomicReference<>(SealedProjectionObserver.NO_OP);
     private volatile CompletableFuture<CompanionPopulationReconciliationProgress> completion;
     private volatile StartRequest lastStartRequest;
     public CompanionPopulationStartupReconciler(
@@ -271,6 +274,14 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         return progress.get();
     }
 
+    /** Installs the sole post-seal consumer; no consumer may infer absence before this boundary. */
+    public void installSealedProjectionObserver(@Nonnull SealedProjectionObserver observer) {
+        Objects.requireNonNull(observer, "observer");
+        if (!sealedProjectionObserver.compareAndSet(SealedProjectionObserver.NO_OP, observer)) {
+            throw new IllegalStateException("Sealed projection observer is already installed.");
+        }
+    }
+
     private record StartRequest(
             Universe universe,
             ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
@@ -470,7 +481,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                     result, "reconciliation-final-index-" + bootstrap.reason()
             );
         }
-        return finalization.thenApply(finalResult -> {
+        return finalization.thenCompose(finalResult -> {
             CompanionPopulationReconciliationProgress.Status finalStatus =
                     switch (finalResult.status()) {
                         case READY -> CompanionPopulationReconciliationProgress.Status.READY;
@@ -483,8 +494,27 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
                 claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
             }
-            return publishProgress(finalResult, tracker, finalStatus);
+            CompletionStage<?> observed = finalStatus
+                    == CompanionPopulationReconciliationProgress.Status.READY
+                    ? observeSealedProjection() : CompletableFuture.completedFuture(null);
+            return observed.handle((ignored, failure) ->
+                    publishProgress(finalResult, tracker, finalStatus));
         });
+    }
+
+    @Nonnull
+    private CompletionStage<?> observeSealedProjection() {
+        CompanionPersistedProjectionEvidenceRegistry.Snapshot snapshot =
+                persistence.getCompanionPersistedProjectionEvidenceRegistry().snapshot();
+        if (!snapshot.sealed()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        try {
+            CompletionStage<?> observed = sealedProjectionObserver.get().reconcile(snapshot);
+            return observed == null ? CompletableFuture.completedFuture(null) : observed;
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(null);
+        }
     }
 
     @Nonnull
@@ -608,6 +638,15 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 System.currentTimeMillis()
         ));
         executor.shutdownNow();
+    }
+
+    @FunctionalInterface
+    public interface SealedProjectionObserver {
+        SealedProjectionObserver NO_OP = snapshot -> CompletableFuture.completedFuture(null);
+
+        @Nonnull
+        CompletionStage<?> reconcile(
+                @Nonnull CompanionPersistedProjectionEvidenceRegistry.Snapshot snapshot);
     }
 
     private record StartupCatalog(

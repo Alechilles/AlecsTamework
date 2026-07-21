@@ -19,6 +19,7 @@ public final class CompanionPopulationEvidenceSet {
     private final Map<UUID, ResolvedEvidence> byNpcUuid;
     private final Map<UUID, List<CompanionPopulationEvidence>> observationsByNpcUuid;
     private final Map<String, List<ProjectionObservation>> projectionObservationsByFingerprint;
+    private final Map<UUID, List<BondedVesselInventoryEvidence.Observation>> bondedVesselItems;
     private final List<Conflict> conflicts;
 
     public CompanionPopulationEvidenceSet(@Nonnull Collection<CompanionPopulationEvidence> evidence) {
@@ -26,6 +27,8 @@ public final class CompanionPopulationEvidenceSet {
         this.allEvidence = List.copyOf(evidence);
         Map<UUID, List<CompanionPopulationEvidence>> grouped = new LinkedHashMap<>();
         Map<String, List<ProjectionObservation>> projections = new LinkedHashMap<>();
+        Map<UUID, LinkedHashSet<BondedVesselInventoryEvidence.Observation>> vesselItems =
+                new LinkedHashMap<>();
         for (CompanionPopulationEvidence observation : allEvidence) {
             Objects.requireNonNull(observation, "observation");
             CompanionProjectionEvidence.ProjectionObservation projection =
@@ -45,6 +48,14 @@ public final class CompanionPopulationEvidenceSet {
             if (observation.kind().isProjectionMarker()) {
                 continue;
             }
+            BondedVesselInventoryEvidence.Observation vesselItem =
+                    BondedVesselInventoryEvidence.parse(observation.evidenceKey());
+            if (vesselItem != null) {
+                vesselItems.computeIfAbsent(
+                        vesselItem.bindingId(), ignored -> new LinkedHashSet<>()
+                ).add(vesselItem);
+                continue;
+            }
             grouped.computeIfAbsent(observation.npcUuid(), ignored -> new ArrayList<>()).add(observation);
         }
         Map<UUID, List<CompanionPopulationEvidence>> copied = new LinkedHashMap<>();
@@ -57,6 +68,13 @@ public final class CompanionPopulationEvidenceSet {
             copiedProjections.put(entry.getKey(), List.copyOf(entry.getValue()));
         }
         this.projectionObservationsByFingerprint = Map.copyOf(copiedProjections);
+        Map<UUID, List<BondedVesselInventoryEvidence.Observation>> copiedVesselItems =
+                new LinkedHashMap<>();
+        for (Map.Entry<UUID, LinkedHashSet<BondedVesselInventoryEvidence.Observation>> entry
+                : vesselItems.entrySet()) {
+            copiedVesselItems.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        this.bondedVesselItems = Map.copyOf(copiedVesselItems);
         Map<UUID, ResolvedEvidence> resolved = new LinkedHashMap<>();
         List<Conflict> foundConflicts = new ArrayList<>();
         for (Map.Entry<UUID, List<CompanionPopulationEvidence>> entry : grouped.entrySet()) {
@@ -97,6 +115,14 @@ public final class CompanionPopulationEvidenceSet {
         return projectionObservationsByFingerprint.getOrDefault(
                 Objects.requireNonNull(fingerprint, "fingerprint"), List.of()
         );
+    }
+
+    /** Returns unique locations carrying any exact item generation for one vessel binding. */
+    @Nonnull
+    public List<BondedVesselInventoryEvidence.Observation> bondedVesselItemObservations(
+            @Nonnull UUID bindingId) {
+        return bondedVesselItems.getOrDefault(
+                Objects.requireNonNull(bindingId, "bindingId"), List.of());
     }
 
     public boolean isConflictFree() {

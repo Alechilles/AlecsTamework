@@ -72,12 +72,19 @@ public record CompanionPopulationEvidence(
         }
         CompanionProjectionEvidence.ProjectionObservation projection =
                 CompanionProjectionEvidence.parseEvidenceKey(evidenceKey);
+        BondedVesselInventoryEvidence.Observation vesselItem =
+                BondedVesselInventoryEvidence.parse(evidenceKey);
         if (CompanionProjectionEvidence.containsReservedSuffix(evidenceKey) && projection == null) {
             throw new IllegalArgumentException("Projection evidence key suffix is malformed.");
         }
         if (kind.isProjectionMarker() != (projection != null)) {
             throw new IllegalArgumentException(
                     "Projection marker kind and evidence key suffix must be present together."
+            );
+        }
+        if (vesselItem != null && kind != Kind.CAPTURED_ITEM) {
+            throw new IllegalArgumentException(
+                    "Bonded vessel item evidence must use captured-item inventory kind."
             );
         }
     }

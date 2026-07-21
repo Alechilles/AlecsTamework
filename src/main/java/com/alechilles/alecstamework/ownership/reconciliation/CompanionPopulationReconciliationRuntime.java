@@ -146,6 +146,12 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         return recoveryProofs;
     }
 
+    /** Connects a feature-specific observer to the complete post-seal evidence boundary. */
+    public void installSealedProjectionObserver(
+            @Nonnull CompanionPopulationStartupReconciler.SealedProjectionObserver observer) {
+        startupReconciler.installSealedProjectionObserver(observer);
+    }
+
     private CompanionPopulationReconciliationProgress publishCoverage(
             CompanionPopulationReconciliationProgress progress
     ) {

@@ -86,7 +86,7 @@ public final class RecursiveItemContainerEvidenceScanner {
             throw new IllegalStateException("Nested item stack count exceeded " + maxStacks + ".");
         }
         String stackPath = path + "/slot-" + slot;
-        evidenceReader.read(stack, stackPath, source).ifPresent(state.evidence::add);
+        state.evidence.addAll(evidenceReader.readAll(stack, stackPath, source));
         ItemStackItemContainer nested = ItemStackItemContainer.getContainer(parent, slot);
         if (nested != null) {
             scanContainer(nested, stackPath + "/nested", source, depth + 1, state);

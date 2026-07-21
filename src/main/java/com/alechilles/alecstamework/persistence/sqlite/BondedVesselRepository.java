@@ -111,6 +111,42 @@ public final class BondedVesselRepository {
                 null);
     }
 
+    /**
+     * Reconciles only the durable item projection after a complete sealed inventory scan.
+     * Vessel lifecycle and generation are immutable at this boundary.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> reconcileItemProjectionAsync(
+            @Nonnull String bindingId,
+            long expectedGeneration,
+            @Nonnull BondedVesselBindingRecord.LifecycleState expectedLifecycle,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String reason,
+            long nowMs) {
+        if (expectedGeneration <= 0L) {
+            throw new IllegalArgumentException("expectedGeneration must be positive.");
+        }
+        Objects.requireNonNull(expectedLifecycle, "expectedLifecycle");
+        Objects.requireNonNull(projectionStatus, "projectionStatus");
+        if (expectedLifecycle != BondedVesselBindingRecord.LifecycleState.ACTIVE
+                && expectedLifecycle != BondedVesselBindingRecord.LifecycleState.STORED) {
+            throw new IllegalArgumentException(
+                    "Only active or stored vessel item projections may be reconciled.");
+        }
+        if (projectionStatus != BondedVesselBindingRecord.ItemProjectionStatus.PRESENT
+                && projectionStatus != BondedVesselBindingRecord.ItemProjectionStatus.MISSING
+                && projectionStatus != BondedVesselBindingRecord.ItemProjectionStatus.AMBIGUOUS) {
+            throw new IllegalArgumentException("Unsupported reconciled item projection status.");
+        }
+        String requiredBindingId = requireText(bindingId, "bindingId");
+        return writeQueue.submitTracked(
+                "bonded_vessel_reconcile_item_projection",
+                connection -> reconcileItemProjectionInTransaction(
+                        connection, requiredBindingId, expectedGeneration, expectedLifecycle,
+                        projectionStatus, reason, nowMs),
+                null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> cancelPreparedAsync(
             @Nonnull String operationId,
@@ -354,6 +390,53 @@ public final class BondedVesselRepository {
         }
         return result(Status.APPLIED, findBinding(connection, operation.bindingId()),
                 operation, reason);
+    }
+
+    @Nonnull
+    private MutationResult reconcileItemProjectionInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String bindingId,
+            long expectedGeneration,
+            @Nonnull BondedVesselBindingRecord.LifecycleState expectedLifecycle,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String reason,
+            long nowMs) throws Exception {
+        BondedVesselBindingRecord binding = findBinding(connection, bindingId);
+        if (binding == null) {
+            return result(Status.NOT_FOUND, null, null, "binding_not_found");
+        }
+        if (binding.generation() != expectedGeneration
+                || binding.lifecycleState() != expectedLifecycle) {
+            return result(Status.CONFLICT, binding, null,
+                    "binding_changed_during_item_projection_reconciliation");
+        }
+        if (binding.activeOperationId() != null) {
+            return result(Status.INVALID_STATE, binding, null,
+                    "binding_transition_in_progress");
+        }
+        if (binding.itemProjectionStatus() == projectionStatus) {
+            return result(Status.IDEMPOTENT, binding, null,
+                    "item_projection_already_reconciled");
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_vessel_bindings
+                SET item_projection_status = ?, diagnostic_reason = ?,
+                    row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE binding_id = ? AND generation = ? AND lifecycle_state = ?
+                    AND active_operation_id IS NULL
+                """)) {
+            statement.setString(1, projectionStatus.name());
+            statement.setString(2, reason);
+            statement.setLong(3, nowMs);
+            statement.setString(4, bindingId);
+            statement.setLong(5, expectedGeneration);
+            statement.setString(6, expectedLifecycle.name());
+            if (statement.executeUpdate() != 1) {
+                return result(Status.CONFLICT, findBinding(connection, bindingId), null,
+                        "binding_changed_during_item_projection_reconciliation");
+            }
+        }
+        return result(Status.APPLIED, findBinding(connection, bindingId), null, reason);
     }
 
     @Nonnull

@@ -23,6 +23,7 @@ public final class ProductionBondedVesselRuntime {
     private final BondedVesselRuntimeBootstrap bootstrap;
     private final BondedVesselInitialBindingService initialBindings;
     private final BondedVesselLifecycleObserver lifecycleObserver;
+    private final BondedVesselItemProjectionReconciler itemProjectionReconciler;
 
     private ProductionBondedVesselRuntime(
             ProductionBondedVesselEvidenceAuthority evidenceAuthority,
@@ -30,13 +31,15 @@ public final class ProductionBondedVesselRuntime {
             BondedVesselsApiDelegate apiDelegate,
             BondedVesselRuntimeBootstrap bootstrap,
             BondedVesselInitialBindingService initialBindings,
-            BondedVesselLifecycleObserver lifecycleObserver) {
+            BondedVesselLifecycleObserver lifecycleObserver,
+            BondedVesselItemProjectionReconciler itemProjectionReconciler) {
         this.evidenceAuthority = evidenceAuthority;
         this.mutationAuthority = mutationAuthority;
         this.apiDelegate = apiDelegate;
         this.bootstrap = bootstrap;
         this.initialBindings = initialBindings;
         this.lifecycleObserver = lifecycleObserver;
+        this.itemProjectionReconciler = itemProjectionReconciler;
     }
 
     @Nonnull
@@ -79,11 +82,15 @@ public final class ProductionBondedVesselRuntime {
                 new BondedVesselLifecycleObserver(
                         repository, new TwSpawnerVesselConfigResolver(itemConfigRevision),
                         evidence, events, executor, wallClockMs);
+        BondedVesselItemProjectionReconciler itemProjectionReconciler =
+                new BondedVesselItemProjectionReconciler(
+                        repository, events, executor, wallClockMs);
         BondedVesselRuntimeBootstrap bootstrap = new BondedVesselRuntimeBootstrap(
                 api, delegate, initialBindings,
                 evidence::isCapabilityReady, mutation::isCapabilityReady);
         return new ProductionBondedVesselRuntime(
-                evidence, mutation, delegate, bootstrap, initialBindings, lifecycleObserver);
+                evidence, mutation, delegate, bootstrap, initialBindings, lifecycleObserver,
+                itemProjectionReconciler);
     }
 
     @Nonnull
@@ -114,5 +121,11 @@ public final class ProductionBondedVesselRuntime {
     @Nonnull
     public BondedVesselLifecycleObserver lifecycleObserver() {
         return lifecycleObserver;
+    }
+
+    /** Sealed all-inventory observer installed into population startup reconciliation. */
+    @Nonnull
+    public BondedVesselItemProjectionReconciler itemProjectionReconciler() {
+        return itemProjectionReconciler;
     }
 }
