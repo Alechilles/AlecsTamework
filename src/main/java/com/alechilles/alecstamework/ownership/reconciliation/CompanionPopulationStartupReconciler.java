@@ -280,6 +280,18 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         if (!sealedProjectionObserver.compareAndSet(SealedProjectionObserver.NO_OP, observer)) {
             throw new IllegalStateException("Sealed projection observer is already installed.");
         }
+        CompanionPersistedProjectionEvidenceRegistry.Snapshot current =
+                persistence.getCompanionPersistedProjectionEvidenceRegistry().snapshot();
+        if (current.sealed()) {
+            try {
+                CompletionStage<?> catchUp = observer.reconcile(current);
+                if (catchUp != null) {
+                    catchUp.exceptionally(failure -> null);
+                }
+            } catch (RuntimeException | LinkageError ignored) {
+                // The durable projection remains unchanged when the observer cannot catch up.
+            }
+        }
     }
 
     private record StartRequest(
