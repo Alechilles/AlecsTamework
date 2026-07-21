@@ -38,5 +38,10 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(diagnose.contains("bondedVessels="));
         assertTrue(diagnose.contains("populationGroups="));
         assertTrue(diagnose.contains("provisioning="));
+
+        String selfTest = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/selftest/ApiSelfTestRunner.java"));
+        assertTrue(selfTest.contains("HYDRAGON_INTEGRATIONS"));
+        assertTrue(selfTest.contains("profile data transactions capability ready"));
     }
 }

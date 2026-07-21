@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
+import com.alechilles.alecstamework.api.BondedVesselReadinessView;
+import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
@@ -60,6 +62,7 @@ public final class ApiSelfTestRunner {
         TRAIT_EFFECTS,
         POLICIES,
         DIAGNOSTICS,
+        HYDRAGON_INTEGRATIONS,
         ALL;
 
         @Nonnull
@@ -98,7 +101,50 @@ public final class ApiSelfTestRunner {
         if (suite == Suite.ALL || suite == Suite.DIAGNOSTICS) {
             suites.add(runDiagnostics(context));
         }
+        if (suite == Suite.ALL || suite == Suite.HYDRAGON_INTEGRATIONS) {
+            suites.add(runHyDragonIntegrations(context));
+        }
         return new ApiSelfTestRunReport(suites);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runHyDragonIntegrations(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        TameworkApi api = context.api();
+        EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
+        assertions.add(check(
+                "capture policy capability ready",
+                capabilities.contains(TameworkApiCapability.CAPTURE_POLICY),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "capture mechanics fixture resolves",
+                api.configs().resolveSpawnerCaptureMechanicsForItemId(EXAMPLE_SPAWNER_ITEM_ID).isPresent(),
+                "item=" + EXAMPLE_SPAWNER_ITEM_ID));
+
+        BondedVesselReadinessView vesselReadiness = api.bondedVessels().readiness();
+        assertions.add(check(
+                "bonded vessel capability ready",
+                capabilities.contains(TameworkApiCapability.BONDED_VESSELS)
+                        && vesselReadiness.readiness() == BondedVesselReadinessView.Readiness.READY,
+                "readiness=" + vesselReadiness.readiness() + " reason=" + vesselReadiness.reason()));
+
+        PopulationGroupReconciliationView groupReadiness =
+                api.policies().populationGroups().getReconciliationStatus();
+        assertions.add(check(
+                "population group capability ready",
+                capabilities.contains(TameworkApiCapability.POPULATION_GROUPS)
+                        && groupReadiness.readiness()
+                        == PopulationGroupReconciliationView.Readiness.READY,
+                "readiness=" + groupReadiness.readiness() + " reason=" + groupReadiness.reason()));
+        assertions.add(check(
+                "companion provisioning capability ready",
+                capabilities.contains(TameworkApiCapability.COMPANION_PROVISIONING),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "profile data transactions capability ready",
+                capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS),
+                "capabilities=" + capabilities));
+        return new ApiSelfTestSuiteResult("hydragon-integrations", assertions);
     }
 
     @Nonnull
