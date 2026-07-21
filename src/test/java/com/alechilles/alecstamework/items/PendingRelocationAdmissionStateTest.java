@@ -167,6 +167,17 @@ class PendingRelocationAdmissionStateTest {
         assertTrue(pending.shouldRequestChunk("destination", 4, 9, 1_200L, 1_500L));
     }
 
+    @Test
+    void chunkReadinessIsScopedByWorldAndCoordinates() {
+        PendingRelocation pending = pending();
+
+        pending.markChunkReady("destination", 4, 9);
+
+        assertTrue(pending.isChunkReady("destination", 4, 9));
+        assertFalse(pending.isChunkReady("source", 4, 9));
+        assertFalse(pending.isChunkReady("destination", 5, 9));
+    }
+
     private static PendingRelocation reserved() {
         PendingRelocation pending = pending();
         pending.beginAdmissionPreparation();

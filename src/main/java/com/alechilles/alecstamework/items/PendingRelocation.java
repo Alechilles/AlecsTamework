@@ -34,6 +34,7 @@ final class PendingRelocation {
     private final Set<String> requiredStateFilter;
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
             new ConcurrentHashMap<>();
+    private final Set<ChunkRequestKey> readyChunks = ConcurrentHashMap.newKeySet();
     long nextScheduledApplyAtMs = Long.MAX_VALUE;
     boolean relocationIssued;
     long relocationIssuedAtMs;
@@ -101,6 +102,14 @@ final class PendingRelocation {
         }
         lastChunkRequestAtMsByChunk.put(chunkKey, nowMs);
         return true;
+    }
+
+    void markChunkReady(String worldName, int chunkX, int chunkZ) {
+        readyChunks.add(new ChunkRequestKey(worldName, chunkX, chunkZ));
+    }
+
+    boolean isChunkReady(String worldName, int chunkX, int chunkZ) {
+        return readyChunks.contains(new ChunkRequestKey(worldName, chunkX, chunkZ));
     }
 
     private record ChunkRequestKey(String worldName, int chunkX, int chunkZ) {

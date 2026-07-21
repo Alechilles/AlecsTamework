@@ -155,7 +155,7 @@ final class CommandRelocationWorldAccess {
     }
 
     @Nullable
-    private static <T extends Component<EntityStore>> T safeGetComponent(
+    <T extends Component<EntityStore>> T safeGetComponent(
             Store<EntityStore> store,
             Ref<EntityStore> reference,
             @Nullable ComponentType<EntityStore, T> componentType

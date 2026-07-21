@@ -76,6 +76,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
 - Fixed individual unloaded recalls sometimes waiting until another companion happened to load the source area. Each request now leases its own canonical source chunk, including across worlds, and legacy recovery history no longer blocks a genuinely missing recovered companion from becoming safely Lost.
 - Fixed Recall leaving companions permanently Unloaded when their persistent source world closed without per-NPC removal callbacks. Removed worlds now retire their exact loaded-identity evidence, allowing failed explicit transfers to become safely recoverable Lost companions.
 - Fixed legacy generation-zero projection markers causing the detached saved-world scan to invalidate all population evidence dimensions. Generation zero now remains exact restart evidence, matching the loaded identity index and migration contract, while negative generations still fail closed.

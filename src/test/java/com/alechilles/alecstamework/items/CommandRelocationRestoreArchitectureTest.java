@@ -31,10 +31,11 @@ class CommandRelocationRestoreArchitectureTest {
 
         assertTrue(access.contains(": isEntityPresent(sourceWorld, npcUuid);"),
                 "A valid or invalid add ref must still be verified through UUID presence.");
-        assertTrue(service.contains("if (!worldAccess.restoreSourceEntity(")
+        assertTrue(service.contains("if (!restoreSourceEntity(")
+                        && service.contains("transferHolders.restoreSource(drainedHolder, sourceTransform)")
                         && service.contains("commitUnconfirmedRelocationAsLost("),
-                "Failed/ambiguous restoration must retain capacity and terminate through LOST commit.");
-        int failedRestore = service.indexOf("if (!worldAccess.restoreSourceEntity(");
+                "Failed/ambiguous transform or entity restoration must retain capacity and terminate through LOST commit.");
+        int failedRestore = service.indexOf("if (!restoreSourceEntity(");
         assertTrue(service.indexOf("pending.markPhysicalMutationCompensated()", failedRestore)
                         > failedRestore,
                 "APPLYING may be canceled/retried only after verified source compensation.");

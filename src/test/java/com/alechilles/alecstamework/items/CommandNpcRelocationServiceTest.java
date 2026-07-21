@@ -231,4 +231,32 @@ class CommandNpcRelocationServiceTest {
         assertTrue(chunkRequests.contains("applyScheduler.schedule(\n                        destinationWorld"),
                 "A source chunk completion must retry against the requested destination world.");
     }
+
+    /** Regression for a successful destination insert being retried against the old source. */
+    @Test
+    void crossWorldTransferRequiresDestinationReadinessAndCannotRestartAfterInstall() throws Exception {
+        String service = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
+                "CommandNpcRelocationService.java"
+        ), StandardCharsets.UTF_8);
+        String chunkRequests = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
+                "CommandRelocationChunkRequestService.java"
+        ), StandardCharsets.UTF_8);
+        int installedGuard = service.indexOf("pending.crossWorldDestinationInstalled()", service.indexOf(
+                "private boolean maybeStartCrossWorldTransfer"
+        ));
+        int sourceResolution = service.indexOf("World sourceWorld =", installedGuard);
+
+        assertTrue(installedGuard >= 0 && installedGuard < sourceResolution,
+                "A destination-installed transfer must not resolve or drain its canonical source again.");
+        assertTrue(service.contains("!chunkRequests.isDestinationReady(destinationWorld, pending)"),
+                "Source removal must wait until the exact destination chunk lease is ready.");
+        assertTrue(chunkRequests.contains("pending.markChunkReady(worldName, chunkX, chunkZ)"),
+                "Only a successfully retained chunk may satisfy transfer readiness.");
+        assertTrue(service.contains("transferHolders.prepareForDestination(drainedHolder, pending.destination)"),
+                "The detached holder must carry a destination transform before destination insertion.");
+        assertTrue(service.contains("transferHolders.restoreSource(drainedHolder, sourceTransform)"),
+                "A rejected destination insertion must restore the original source transform.");
+    }
 }

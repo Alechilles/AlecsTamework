@@ -102,6 +102,17 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         requestSourceHints(sourceWorld, destinationWorld, pending);
     }
 
+    boolean isDestinationReady(World destinationWorld, PendingRelocation pending) {
+        if (destinationWorld == null || pending == null) {
+            return false;
+        }
+        return pending.isChunkReady(
+                destinationWorld.getName(),
+                worldAccess.toChunk(pending.destination.x),
+                worldAccess.toChunk(pending.destination.z)
+        );
+    }
+
     @Nullable
     World resolveCanonicalSourceWorld(World destinationWorld, PendingRelocation pending) {
         if (destinationWorld == null || pending == null || pending.canonicalSource == null) {
@@ -169,7 +180,9 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
             if (failure == null && chunk != null) {
                 if (!chunkLeases.retain(pending, chunk)) {
                     diagnostics.chunkLeaseNotRetained(pending.npcUuid, chunkX, chunkZ);
+                    return;
                 }
+                pending.markChunkReady(worldName, chunkX, chunkZ);
                 applyScheduler.schedule(
                         destinationWorld, pending.npcUuid, APPLY_AFTER_LOAD_DELAY_MS);
                 return;
