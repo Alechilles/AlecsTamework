@@ -88,6 +88,19 @@ class CaptureAttemptRepositoryTest {
                     .completion().get(5, TimeUnit.SECONDS);
             assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, outcome.status());
             assertTrue(outcome.failure() instanceof IllegalArgumentException);
+
+            CaptureAttemptRecord certainProbability = probabilityAttempt(
+                    "attempt-certain", "capture-certain", UUID.randomUUID(), UUID.randomUUID());
+            await(repository.prepareAsync(certainProbability));
+            CaptureAttemptRepository.MutationResult certain = await(repository.resolveAsync(
+                    new CaptureAttemptRepository.ResolutionMutation(
+                            "attempt-certain", true,
+                            new CaptureAttemptRecord.Resolution(
+                                    5, 1, 1, 2, 0.5, 0, 1.0,
+                                    null, "CAPTURED", "guaranteed_at_power", 0, 30),
+                            null, "capture-certain-operation")));
+            assertEquals(CaptureAttemptRecord.State.RESOLVED_SUCCESS, certain.attempt().state());
+            assertNull(certain.attempt().resolution().entropySample());
         }
     }
 

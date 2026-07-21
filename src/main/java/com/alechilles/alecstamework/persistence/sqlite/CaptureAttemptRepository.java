@@ -230,8 +230,14 @@ public final class CaptureAttemptRepository {
         if (existing.config().guaranteed() && resolution.entropySample() != null) {
             throw new IllegalArgumentException("Guaranteed attempts cannot consume entropy.");
         }
-        if (!existing.config().guaranteed() && resolution.entropySample() == null) {
-            throw new IllegalArgumentException("Probability attempts require one entropy sample.");
+        boolean probabilisticBoundary = resolution.effectiveChance() > 0.0D
+                && resolution.effectiveChance() < 1.0D;
+        if (!existing.config().guaranteed() && probabilisticBoundary
+                && resolution.entropySample() == null) {
+            throw new IllegalArgumentException("Non-terminal probability requires one entropy sample.");
+        }
+        if (resolution.entropySample() != null && !probabilisticBoundary) {
+            throw new IllegalArgumentException("Certain or impossible outcomes cannot consume entropy.");
         }
         if (mutation.success() && resolution.failureCooldownUntilMs() != 0L) {
             throw new IllegalArgumentException("Successful attempts cannot start a failure cooldown.");

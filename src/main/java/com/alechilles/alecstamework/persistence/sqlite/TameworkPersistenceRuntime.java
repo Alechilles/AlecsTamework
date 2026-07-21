@@ -78,6 +78,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionPopulationCoverageRepository companionPopulationCoverageRepository;
     private final CompanionIdentityRepository companionIdentityRepository;
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
+    private final CaptureAttemptRepository captureAttemptRepository;
     private final BondedVesselRepository bondedVesselRepository;
     private final CompanionProvisioningRepository companionProvisioningRepository;
     private final PopulationGroupRepository populationGroupRepository;
@@ -110,6 +111,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
             @Nonnull CompanionIdentityRepository companionIdentityRepository,
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
+            @Nonnull CaptureAttemptRepository captureAttemptRepository,
             @Nonnull BondedVesselRepository bondedVesselRepository,
             @Nonnull CompanionProvisioningRepository companionProvisioningRepository,
             @Nonnull PopulationGroupRepository populationGroupRepository,
@@ -140,6 +142,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.companionPopulationCoverageRepository = companionPopulationCoverageRepository;
         this.companionIdentityRepository = companionIdentityRepository;
         this.populationReconciliationPersistence = populationReconciliationPersistence;
+        this.captureAttemptRepository = captureAttemptRepository;
         this.bondedVesselRepository = bondedVesselRepository;
         this.companionProvisioningRepository = companionProvisioningRepository;
         this.populationGroupRepository = populationGroupRepository;
@@ -263,6 +266,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CompanionIdentityRepository(connectionManager);
         CompanionPopulationReconciliationPersistence populationReconciliationPersistence =
                 new CompanionPopulationReconciliationPersistence(connectionManager, writeQueue);
+        CaptureAttemptRepository captureAttemptRepository =
+                new CaptureAttemptRepository(connectionManager, writeQueue);
         BondedVesselRepository bondedVesselRepository =
                 new BondedVesselRepository(connectionManager, writeQueue);
         CompanionProvisioningRepository companionProvisioningRepository =
@@ -303,6 +308,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 companionPopulationCoverageRepository,
                 companionIdentityRepository,
                 populationReconciliationPersistence,
+                captureAttemptRepository,
                 bondedVesselRepository,
                 companionProvisioningRepository,
                 populationGroupRepository,
@@ -525,6 +531,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public CompanionPopulationScanSessionRepository getCompanionPopulationScanSessionRepository() {
         return populationReconciliationPersistence.scanSessionRepository();
+    }
+
+    /** Durable authority for exactly-once capture outcome resolution. */
+    @Nonnull
+    public CaptureAttemptRepository getCaptureAttemptRepository() {
+        return captureAttemptRepository;
     }
 
     /** Durable authority for generation-fenced bonded-vessel transitions. */
