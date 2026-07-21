@@ -92,9 +92,15 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (visual == null || visual.isRiderEntity()) {
             return;
         }
+        long attachAfterMs = visual.getRiderAttachAfterMs();
+        boolean pendingInitialAttachment = attachAfterMs != 0L;
+        if (pendingInitialAttachment && System.currentTimeMillis() < attachAfterMs) {
+            return;
+        }
         AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment =
                 AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ref, commandBuffer);
-        if (equipment.armorSignature().equals(visual.getEquipmentSignature())) {
+        if (!pendingInitialAttachment
+                && equipment.armorSignature().equals(visual.getEquipmentSignature())) {
             return;
         }
         UUID ownerUuid = parseOwnerUuid(visual);
@@ -108,6 +114,7 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (riderVisualService.refresh(commandBuffer, ref, savedModel, equipment)) {
             AvatarFlightRiderVisualComponent updated = visual.clone();
             updated.setEquipmentSignature(equipment.armorSignature());
+            updated.setRiderAttachAfterMs(0L);
             commandBuffer.putComponent(ref, visualType, updated);
         }
     }

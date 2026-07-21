@@ -37,6 +37,11 @@ class AvatarFlightRiderVisualComponentArchitectureTest {
         assertTrue(component.contains("BuilderCodec<AvatarFlightRiderVisualComponent> CODEC"));
         assertTrue(component.contains("private String riderEntityUuid"));
         assertTrue(component.contains("private String equipmentSignature"));
+        assertTrue(component.contains("private long riderAttachAfterMs"));
+        assertTrue(component.contains("\"RiderAttachAfterMs\", Codec.LONG"));
+        assertTrue(component.contains("getRiderAttachAfterMs"));
+        assertTrue(component.contains("setRiderAttachAfterMs"));
+        assertTrue(component.contains("clone.riderAttachAfterMs = riderAttachAfterMs"));
         assertTrue(component.contains("private String hiddenOwnerEquipmentSignature"));
         assertTrue(component.contains("private String hiddenOwnerSourceEquipmentSignature"));
         assertTrue(component.contains("\"HiddenOwnerEquipmentSignature\""));

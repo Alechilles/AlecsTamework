@@ -26,9 +26,16 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
     void riderVisualServiceUsesModelAttachmentInsteadOfNativeMount() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false, "
-                + "equipment.armorSignature()))"));
-        assertTrue(source.contains("appendRiderAttachment("));
+        assertTrue(source.contains("INITIAL_RIDER_ATTACHMENT_DELAY_MS = 1_000L"));
+        assertTrue(source.contains("System.currentTimeMillis() + INITIAL_RIDER_ATTACHMENT_DELAY_MS"));
+        assertTrue(source.contains("equipment.armorSignature(),"));
+        assertTrue(source.contains("attachAfterMs"));
+        String spawn = source.substring(
+                source.indexOf("public boolean spawn("),
+                source.indexOf("public boolean refresh(")
+        );
+        assertFalse(spawn.contains("ModelComponent.getComponentType()"));
+        assertFalse(source.contains("appendRiderAttachment("));
         assertTrue(source.contains("new ModelAttachment("));
         assertTrue(source.contains("savedModel.getModel()"));
         assertTrue(source.contains("savedModel.getTexture()"));
@@ -65,7 +72,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("riderHiddenCosmeticCount=%s"));
         assertFalse(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
-        assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
+        assertFalse(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
         assertFalse(source.contains("new MountedComponent("));
         assertFalse(source.contains("MountController.BlockMount"));
         assertFalse(source.contains("AddReason.SPAWN"));

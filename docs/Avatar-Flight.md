@@ -94,6 +94,8 @@ Normal avatar flight does not enable the client's native `canFly` movement setti
 
 When `RiderVisual.ShowRider` is enabled, the fake rider is attached to the transformed model. If the transformed model's animation tracks use player-like node names such as `Pelvis`, `Chest`, `Head`, `L-Arm`, or `R-Arm`, those animations can also affect the fake rider. Use the AvatarFlight namespace generator to create a model variant whose rider-colliding rig nodes are prefixed while unrelated nodes such as mount anchors are left unchanged. `Origin` remains unchanged for Tamework's injected pitch/bank poses:
 
+Tamework sends the transformed dragon model first, then adds the fake rider attachment after a one-second settling period. This keeps the client's first transformed-model update separate from the larger rider-bearing update. Equipment changes after that initial attachment continue to refresh the rider normally.
+
 ```powershell
 python scripts/tools/avatarflight_namespace_assets.py --mod-root "C:\Path\To\Mod" --model-id MyDragon
 ```
