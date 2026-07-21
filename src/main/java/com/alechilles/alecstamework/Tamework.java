@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.api.internal.CompanionProvisioningApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
@@ -168,6 +169,9 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryWiring;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
+import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;
+import com.alechilles.alecstamework.provisioning.UnifiedProvisioningPopulationBackend;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
@@ -303,6 +307,9 @@ public class Tamework extends JavaPlugin {
     private CaptureAttemptCoordinator captureAttemptCoordinator;
     private boolean captureAttemptRuntimeReady;
     private PopulationGroupRegistry populationGroupRegistry;
+    private UnifiedProvisioningPopulationBackend companionProvisioningBackend;
+    private CompanionProvisioningApiDelegate companionProvisioningApi;
+    private boolean companionProvisioningRecoveryReady;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -846,6 +853,7 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime, getLogger()
         );
         TameworkScopedRecoveryWiring.installAndStart(persistenceRuntime, ownerPopulationRuntime);
+        initializeCompanionProvisioningRuntime();
         commandNpcRelocationService.setRelocationAdmissionService(ownerPopulationRuntime.relocationAdmissionService());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
@@ -929,6 +937,7 @@ public class Tamework extends JavaPlugin {
         if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl implementation) {
             implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
         }
+        activateCompanionProvisioningIfReady();
         ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
                 new ClaimProviderLifecycleInvalidator(provider -> {
                     OwnerPopulationRuntime runtime = ownerPopulationRuntime;
@@ -1387,6 +1396,9 @@ public class Tamework extends JavaPlugin {
             implementation.close();
         }
         api = null;
+        companionProvisioningApi = null;
+        companionProvisioningBackend = null;
+        companionProvisioningRecoveryReady = false;
         if (managedCoopRuntime != null) {
             managedCoopRuntime.close();
             managedCoopRuntime = null;
@@ -2549,7 +2561,54 @@ public class Tamework extends JavaPlugin {
                     "Population-group reload rejected; retaining revision "
                             + result.active().revision() + ": " + result.error());
         }
+        if (result.applied()) {
+            activateCompanionProvisioningIfReady();
+        }
         return result.applied();
+    }
+
+    private void initializeCompanionProvisioningRuntime() {
+        companionProvisioningApi = null;
+        companionProvisioningBackend = null;
+        companionProvisioningRecoveryReady = false;
+        try {
+            UnifiedProvisioningPopulationBackend backend =
+                    new UnifiedProvisioningPopulationBackend(
+                            ownerPopulationRuntime,
+                            populationGroupRegistry,
+                            persistenceRuntime.getPopulationGroupRepository(),
+                            persistenceRuntime.getNpcProfileRepository());
+            var populationRecovery = backend.recover().toCompletableFuture().join();
+            CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
+                    new SqliteProvisioningOperationJournal(
+                            persistenceRuntime.getCompanionProvisioningRepository()),
+                    backend);
+            var provisioningRecovery = coordinator.recover().toCompletableFuture().join();
+            companionProvisioningBackend = backend;
+            companionProvisioningApi = new CompanionProvisioningApiDelegate(coordinator);
+            companionProvisioningRecoveryReady = populationRecovery.ready()
+                    && provisioningRecovery.failures() == 0;
+            if (!companionProvisioningRecoveryReady) {
+                getLogger().at(Level.WARNING).log(
+                        "Companion-provisioning recovery did not become ready; "
+                                + "COMPANION_PROVISIONING remains unavailable.");
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            getLogger().at(Level.WARNING).withCause(failure).log(
+                    "Companion-provisioning bootstrap failed; capability remains unavailable.");
+        }
+    }
+
+    private void activateCompanionProvisioningIfReady() {
+        if (!(api instanceof TameworkApiImpl implementation)
+                || companionProvisioningApi == null
+                || companionProvisioningBackend == null
+                || !companionProvisioningRecoveryReady
+                || !companionProvisioningBackend.dormantReady()
+                || !companionProvisioningBackend.recoveryReady()) {
+            return;
+        }
+        implementation.activateCompanionProvisioningRuntime(companionProvisioningApi, true);
     }
 
     private void onInteractionAssetsLoaded(

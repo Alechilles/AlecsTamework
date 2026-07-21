@@ -44,4 +44,19 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(selfTest.contains("HYDRAGON_INTEGRATIONS"));
         assertTrue(selfTest.contains("profile data transactions capability ready"));
     }
+
+    @Test
+    void companionProvisioningIsJournalBackedAndRecoveryGated() throws Exception {
+        String plugin = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/Tamework.java"));
+        String api = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/api/internal/TameworkApiImpl.java"));
+
+        assertTrue(plugin.contains("new SqliteProvisioningOperationJournal("));
+        assertTrue(plugin.contains("backend.recover().toCompletableFuture().join()"));
+        assertTrue(plugin.contains("coordinator.recover().toCompletableFuture().join()"));
+        assertTrue(plugin.contains("companionProvisioningBackend.recoveryReady()"));
+        assertTrue(api.contains("activateCompanionProvisioningRuntime("));
+        assertTrue(api.contains("capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING)"));
+    }
 }
