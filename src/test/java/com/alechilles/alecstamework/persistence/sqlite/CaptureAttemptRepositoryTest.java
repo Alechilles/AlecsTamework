@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,7 +10,6 @@ import static com.alechilles.alecstamework.persistence.sqlite.HydragonPersistenc
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers exactly-once capture resolution, idempotency, and durable cooldown authority. */
@@ -77,13 +77,17 @@ class CaptureAttemptRepositoryTest {
             CaptureAttemptRecord probability = probabilityAttempt(
                     "attempt-p", "capture-p", UUID.randomUUID(), UUID.randomUUID());
             await(repository.prepareAsync(probability));
-            assertThrows(IllegalArgumentException.class, () -> repository.resolveAsync(
+            PersistenceWriteQueue.WriteOutcome<CaptureAttemptRepository.MutationResult> outcome =
+                    repository.resolveAsync(
                     new CaptureAttemptRepository.ResolutionMutation(
                             "attempt-p", true,
                             new CaptureAttemptRecord.Resolution(
                                     1, 1, 1, 2, 0.5, 0, 0.5,
                                     null, null, "missing_entropy", 0, 20),
-                            null, null)));
+                            null, null))
+                    .completion().get(5, TimeUnit.SECONDS);
+            assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, outcome.status());
+            assertTrue(outcome.failure() instanceof IllegalArgumentException);
         }
     }
 
