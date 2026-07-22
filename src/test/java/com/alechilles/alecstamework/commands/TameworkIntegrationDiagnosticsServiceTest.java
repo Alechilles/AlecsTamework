@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.api.BondedVesselReadinessView;
 import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
@@ -24,7 +23,9 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "capturePolicy=true"));
         assertTrue(contains(lines, "Capture attempts: prepared=2"));
         assertTrue(contains(lines, "duplicateCallbacksSinceBoot=4"));
-        assertTrue(contains(lines, "bindings=7"));
+        assertTrue(contains(lines, "commandFamilyRosters=true"));
+        assertTrue(contains(lines, "timedSummoning=true"));
+        assertTrue(contains(lines, "paidRevival=true"));
         assertTrue(contains(lines, "openOperations=3"));
         assertTrue(contains(lines, "classified=21"));
         assertTrue(contains(lines, "oldestCorrelation=population-op-4"));
@@ -32,7 +33,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "Provisioning: readiness=READY"));
         assertTrue(contains(lines, "API events: dispatched=12"));
         assertTrue(contains(lines, "listenerFailuresSinceBoot=2"));
-        assertTrue(contains(lines, "lastFailedEventType=BondedVesselStateChangedEvent"));
+        assertTrue(contains(lines, "lastFailedEventType=CommandTimedSummoningChangedEvent"));
         assertTrue(contains(lines, "activeQuarantines=2"));
     }
 
@@ -70,19 +71,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
     }
 
     @Test
-    void vesselLookupIsThreeLinesAndDoesNotExposeRawEvidence() {
-        List<String> lines = new TameworkIntegrationDiagnosticsService(new FakeSource())
-                .vessel("binding-a");
-
-        assertEquals(3, lines.size());
-        assertTrue(contains(lines, "binding=binding-a"));
-        assertTrue(contains(lines, "generation=5"));
-        assertTrue(contains(lines, "itemEvidence=present"));
-        assertTrue(contains(lines, "populationOperation=population-op-4"));
-        assertFalse(contains(lines, "raw-inventory-json"));
-    }
-
-    @Test
     void provisioningLookupShowsDurablePhasesAndSanitizesFields() {
         FakeSource source = new FakeSource();
         source.provisioning = new TameworkIntegrationDiagnosticsService.ProvisioningDetail(
@@ -108,14 +96,11 @@ class TameworkIntegrationDiagnosticsServiceTest {
     @Test
     void missingExactLookupsReturnOneBoundedLine() {
         FakeSource source = new FakeSource();
-        source.vessel = null;
         source.provisioning = null;
         source.captureAttempt = null;
         TameworkIntegrationDiagnosticsService service =
                 new TameworkIntegrationDiagnosticsService(source);
 
-        assertEquals(List.of("Bonded vessel not found for binding/profile 'missing'."),
-                service.vessel("missing"));
         assertEquals(List.of("Provisioning operation not found for origin 'hydragon/missing'."),
                 service.provisioning("hydragon", "missing"));
         assertEquals(List.of("Capture attempt not found for id 'missing'."),
@@ -128,15 +113,11 @@ class TameworkIntegrationDiagnosticsServiceTest {
 
     private static final class FakeSource implements TameworkIntegrationDiagnosticsService.Source {
         private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
-                TameworkApiCapability.BONDED_VESSELS,
+                TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
+                TameworkApiCapability.COMMAND_TIMED_SUMMONING,
+                TameworkApiCapability.PAID_COMMAND_REVIVAL,
                 TameworkApiCapability.POPULATION_GROUPS,
                 TameworkApiCapability.COMPANION_PROVISIONING);
-        private TameworkIntegrationDiagnosticsService.VesselDetail vessel =
-                new TameworkIntegrationDiagnosticsService.VesselDetail(
-                        "binding-a", "profile-a", "ACTIVE", 5L, 8L,
-                        "hydragon:draconic-stone", 4L, "PRESENT", "HyDragon_Draconic_Stone",
-                        true, 105L, false, null, "vessel-op-4", "SUMMON", "APPLYING",
-                        "population-op-4", "correlation-4", "RECOVERING");
         private TameworkIntegrationDiagnosticsService.ProvisioningDetail provisioning =
                 new TameworkIntegrationDiagnosticsService.ProvisioningDetail(
                         "provision-op", "hydragon", "soul-bond-7", "correlation-7",
@@ -158,15 +139,12 @@ class TameworkIntegrationDiagnosticsServiceTest {
 
         @Override public String apiVersion() { return "0.9.0"; }
         @Override public String capabilities() {
-            return "[BONDED_VESSELS, COMPANION_PROVISIONING, POPULATION_GROUPS]";
+            return "[COMMAND_FAMILY_ROSTERS, COMMAND_TIMED_SUMMONING, "
+                    + "PAID_COMMAND_REVIVAL, COMPANION_PROVISIONING, POPULATION_GROUPS]";
         }
         @Override public boolean captureReady() { return true; }
         @Override public boolean hasCapability(TameworkApiCapability capability) {
             return capabilities.contains(capability);
-        }
-        @Override public BondedVesselReadinessView vesselReadiness() {
-            return new BondedVesselReadinessView(
-                    BondedVesselReadinessView.Readiness.READY, "ready", 7L, 3L, 1L, 100L);
         }
         @Override public PopulationGroupReconciliationView groupReadiness() {
             return new PopulationGroupReconciliationView(
@@ -202,14 +180,11 @@ class TameworkIntegrationDiagnosticsServiceTest {
         }
         @Override public TameworkIntegrationDiagnosticsService.EventDeliverySummary eventDeliverySummary() {
             return new TameworkIntegrationDiagnosticsService.EventDeliverySummary(
-                    12L, 9L, 7L, 2L, "BondedVesselStateChangedEvent");
+                    12L, 9L, 7L, 2L, "CommandTimedSummoningChangedEvent");
         }
         @Override public TameworkIntegrationDiagnosticsService.CaptureAttemptDetail findCaptureAttempt(
                 String ignoredAttemptId) {
             return captureAttempt;
-        }
-        @Override public TameworkIntegrationDiagnosticsService.VesselDetail findVessel(String ignored) {
-            return vessel;
         }
         @Override public TameworkIntegrationDiagnosticsService.ProvisioningDetail findProvisioning(
                 String ignoredNamespace, String ignoredKey) {

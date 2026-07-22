@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.api.BondedVesselReadinessView;
 import com.alechilles.alecstamework.api.PersistenceResilienceView;
 import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
@@ -9,8 +8,6 @@ import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncident;
-import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
-import com.alechilles.alecstamework.persistence.sqlite.BondedVesselOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
@@ -55,11 +52,15 @@ final class TameworkIntegrationDiagnosticsService {
         lines.add("Tamework API=" + safe(source::apiVersion, "unavailable")
                 + " capabilities=" + safe(source::capabilities, "[]"));
         lines.add("Integration readiness: capturePolicy=" + source.captureReady()
-                + ", bondedVessels=" + source.hasCapability(TameworkApiCapability.BONDED_VESSELS)
+                + ", commandFamilyRosters="
+                + source.hasCapability(TameworkApiCapability.COMMAND_FAMILY_ROSTERS)
+                + ", timedSummoning="
+                + source.hasCapability(TameworkApiCapability.COMMAND_TIMED_SUMMONING)
+                + ", paidRevival="
+                + source.hasCapability(TameworkApiCapability.PAID_COMMAND_REVIVAL)
                 + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS)
                 + ", provisioning=" + source.hasCapability(TameworkApiCapability.COMPANION_PROVISIONING));
         appendCaptureSummary(lines);
-        appendVesselSummary(lines);
         appendPopulationSummary(lines);
         appendProvisioningSummary(lines);
         appendEventDeliverySummary(lines);
@@ -163,40 +164,6 @@ final class TameworkIntegrationDiagnosticsService {
     }
 
     @Nonnull
-    List<String> vessel(@Nonnull String bindingOrProfile) {
-        String key = bounded(bindingOrProfile);
-        VesselDetail detail;
-        try {
-            detail = source.findVessel(bindingOrProfile);
-        } catch (Exception failure) {
-            return List.of("Bonded vessel diagnostic unavailable: " + failureCode(failure));
-        }
-        if (detail == null) {
-            return List.of("Bonded vessel not found for binding/profile '" + key + "'.");
-        }
-        List<String> lines = new ArrayList<>(3);
-        lines.add("Bonded vessel: binding=" + bounded(detail.bindingId())
-                + ", profile=" + bounded(detail.profileId())
-                + ", lifecycle=" + detail.lifecycle()
-                + ", generation=" + detail.generation()
-                + ", profileRevision=" + detail.profileRevision()
-                + ", config=" + bounded(detail.configId()) + "@" + detail.configRevision());
-        lines.add("Vessel projection: status=" + detail.projectionStatus()
-                + ", lastItem=" + boundedOrNone(detail.lastItemId())
-                + ", itemEvidence=" + (detail.hasItemEvidence() ? "present" : "absent")
-                + ", evidenceUpdatedAtMs=" + detail.evidenceUpdatedAtMs()
-                + ", quarantine=" + detail.quarantined()
-                + ", reason=" + boundedOrNone(detail.reason()));
-        lines.add("Vessel operation: id=" + boundedOrNone(detail.operationId())
-                + ", action=" + boundedOrNone(detail.operationAction())
-                + ", state=" + boundedOrNone(detail.operationState())
-                + ", populationOperation=" + boundedOrNone(detail.populationOperationId())
-                + ", correlation=" + boundedOrNone(detail.correlationId())
-                + ", recovery=" + boundedOrNone(detail.recoveryStatus()));
-        return List.copyOf(lines);
-    }
-
-    @Nonnull
     List<String> provisioning(@Nonnull String callerNamespace,
                               @Nonnull String idempotencyKey) {
         ProvisioningDetail detail;
@@ -231,20 +198,6 @@ final class TameworkIntegrationDiagnosticsService {
                 + ", updatedAtMs=" + detail.updatedAtMs()
                 + ", completedAtMs=" + detail.completedAtMs());
         return List.copyOf(lines);
-    }
-
-    private void appendVesselSummary(List<String> lines) {
-        BondedVesselReadinessView view = safe(source::vesselReadiness, null);
-        if (view == null) {
-            lines.add("Bonded vessels: readiness=UNAVAILABLE, reason=diagnostics-read-failed");
-            return;
-        }
-        lines.add("Bonded vessels: readiness=" + view.readiness()
-                + ", reason=" + bounded(view.reason())
-                + ", bindings=" + view.bindingCount()
-                + ", openOperations=" + view.pendingOperationCount()
-                + ", quarantined=" + view.quarantinedCount()
-                + ", updatedAtMs=" + view.updatedAtMs());
     }
 
     private void appendCaptureSummary(List<String> lines) {
@@ -344,7 +297,6 @@ final class TameworkIntegrationDiagnosticsService {
         @Nonnull String capabilities() throws Exception;
         boolean captureReady();
         boolean hasCapability(@Nonnull TameworkApiCapability capability);
-        @Nonnull BondedVesselReadinessView vesselReadiness() throws Exception;
         @Nonnull PopulationGroupReconciliationView groupReadiness() throws Exception;
         @Nonnull PopulationDiagnosticsView populationDiagnostics() throws Exception;
         @Nonnull ProvisioningSummary provisioningSummary() throws Exception;
@@ -356,7 +308,6 @@ final class TameworkIntegrationDiagnosticsService {
             return new EventDeliverySummary(0L, 0L, 0L, 0L, null);
         }
         @Nullable CaptureAttemptDetail findCaptureAttempt(@Nonnull String attemptId) throws Exception;
-        @Nullable VesselDetail findVessel(@Nonnull String bindingOrProfile) throws Exception;
         @Nullable ProvisioningDetail findProvisioning(
                 @Nonnull String callerNamespace, @Nonnull String idempotencyKey) throws Exception;
     }
@@ -389,11 +340,6 @@ final class TameworkIntegrationDiagnosticsService {
 
         @Override public boolean hasCapability(TameworkApiCapability capability) {
             return api != null && api.getCapabilities().contains(capability);
-        }
-
-        @Override public BondedVesselReadinessView vesselReadiness() {
-            return api == null ? BondedVesselReadinessView.unavailable()
-                    : api.bondedVessels().readiness();
         }
 
         @Override public PopulationGroupReconciliationView groupReadiness() {
@@ -558,31 +504,6 @@ final class TameworkIntegrationDiagnosticsService {
                     .findFirst().orElse(null);
         }
 
-        @Override public VesselDetail findVessel(String bindingOrProfile) throws Exception {
-            BondedVesselBindingRecord binding =
-                    persistence.getBondedVesselRepository().findBinding(bindingOrProfile);
-            if (binding == null) {
-                binding = persistence.getBondedVesselRepository().findBindingByProfile(bindingOrProfile);
-            }
-            if (binding == null) return null;
-            BondedVesselOperationRecord operation = binding.activeOperationId() == null
-                    ? null : persistence.getBondedVesselRepository().findOperation(binding.activeOperationId());
-            boolean quarantined = binding.itemProjectionStatus()
-                    == BondedVesselBindingRecord.ItemProjectionStatus.QUARANTINED
-                    || operation != null && operation.state() == BondedVesselOperationRecord.State.QUARANTINED;
-            return new VesselDetail(binding.bindingId(), binding.profileId(), binding.lifecycleState().name(),
-                    binding.generation(), binding.expectedProfileRevision(), binding.configId(),
-                    binding.configRevision(), binding.itemProjectionStatus().name(), binding.lastItemId(),
-                    binding.itemEvidenceJson() != null, binding.updatedAtMs(), quarantined,
-                    binding.diagnosticReason(),
-                    operation == null ? binding.activeOperationId() : operation.operationId(),
-                    operation == null ? null : operation.action().name(),
-                    operation == null ? null : operation.state().name(),
-                    operation == null ? null : operation.populationOperationId(),
-                    operation == null ? null : operation.correlationId(),
-                    operation == null ? null : operation.recoveryStatus());
-        }
-
         @Override public ProvisioningDetail findProvisioning(
                 String callerNamespace, String idempotencyKey) throws Exception {
             CompanionProvisioningOperationRecord operation = persistence
@@ -653,15 +574,6 @@ final class TameworkIntegrationDiagnosticsService {
             boolean eventEmitted, boolean quarantined, boolean hasQuarantineEvidence,
             @Nullable String incidentId, @Nullable String incidentStatus,
             @Nullable String incidentReason) { }
-    record VesselDetail(@Nonnull String bindingId, @Nonnull String profileId,
-                        @Nonnull String lifecycle, long generation, long profileRevision,
-                        @Nonnull String configId, long configRevision,
-                        @Nonnull String projectionStatus, @Nullable String lastItemId,
-                        boolean hasItemEvidence, long evidenceUpdatedAtMs,
-                        boolean quarantined, @Nullable String reason,
-                        @Nullable String operationId, @Nullable String operationAction,
-                        @Nullable String operationState, @Nullable String populationOperationId,
-                        @Nullable String correlationId, @Nullable String recoveryStatus) { }
     record ProvisioningDetail(@Nonnull String operationId, @Nonnull String callerNamespace,
                               @Nonnull String idempotencyKey, @Nullable String correlationId,
                               @Nonnull String disposition, @Nonnull String state,

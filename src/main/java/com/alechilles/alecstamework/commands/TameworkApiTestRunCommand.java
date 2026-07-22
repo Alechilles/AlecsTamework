@@ -11,18 +11,19 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * `/tw api test run [suite] [verbose]`
  */
-public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
+public final class TameworkApiTestRunCommand extends AbstractTameworkServerCommand {
     public TameworkApiTestRunCommand() {
         super("run", "Run the live Tamework API self-test suites.");
         requirePermission(TameworkApiTestPermission.NODE);
@@ -31,11 +32,7 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext commandContext) {
         if (!TameworkApiSelfTestCommandSupport.checkPermission(commandContext)) {
             return;
         }
@@ -43,25 +40,40 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
         if (plugin == null) {
             return;
         }
-        ApiSelfTestFixtureManager manager = TameworkApiSelfTestCommandSupport.requireFixtureManager(commandContext, plugin);
         ApiSelfTestRunner runner = TameworkApiSelfTestCommandSupport.requireRunner(commandContext, plugin);
         TameworkApi api = TameworkApiSelfTestCommandSupport.requireApi(commandContext, plugin);
-        if (manager == null || runner == null || api == null) {
-            return;
-        }
-        Player player = store.getComponent(ref, Player.getComponentType());
-        if (player == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to resolve the player for API self-tests."));
+        if (runner == null || api == null) {
             return;
         }
 
         ParsedArgs parsed = parse(commandContext);
         if (parsed == null) {
             commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|policies|diagnostics|hydragon-integrations|all] [verbose]"
+                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|diagnostics|hydragon-integrations|all] [verbose]"
             ));
             return;
         }
+        PlayerExecution playerExecution = resolvePlayerExecution(commandContext);
+        if (playerExecution == null) {
+            ApiSelfTestRunReport report = TameworkApiSelfTestCommandSupport.runConsoleSafe(
+                    runner, plugin, api, parsed.suite());
+            if (report == null) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "That suite requires prepared in-world fixtures. From the console use "
+                                + "core, diagnostics, hydragon-integrations, or all for the read-only aggregate."));
+                return;
+            }
+            TameworkApiSelfTestCommandSupport.sendReport(
+                    commandContext, plugin, report, parsed.suite(), parsed.verbose());
+            return;
+        }
+        ApiSelfTestFixtureManager manager = TameworkApiSelfTestCommandSupport.requireFixtureManager(
+                commandContext, plugin);
+        if (manager == null) return;
+        Player player = playerExecution.player();
+        Store<EntityStore> store = playerExecution.store();
+        Ref<EntityStore> ref = playerExecution.ref();
+        World world = playerExecution.world();
         ApiSelfTestFixtureSet fixtureSet = manager.resolveFixtureSet(player, store, world).orElse(null);
         ApiSelfTestContext context = TameworkApiSelfTestCommandSupport.buildContext(
                 plugin,
@@ -76,11 +88,24 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
         TameworkApiSelfTestCommandSupport.sendReport(
                 commandContext,
                 plugin,
-                player,
                 report,
                 parsed.suite(),
                 parsed.verbose()
         );
+    }
+
+    @Nullable
+    private static PlayerExecution resolvePlayerExecution(@Nonnull CommandContext context) {
+        if (!context.isPlayer()) return null;
+        PlayerRef playerRef = context.senderAs(PlayerRef.class);
+        Ref<EntityStore> ref = context.senderAsPlayerRef();
+        if (playerRef == null || ref == null || !ref.isValid()) return null;
+        World world = Universe.get().getWorld(playerRef.getWorldUuid());
+        if (world == null || world.getEntityStore() == null) return null;
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) return null;
+        Player player = store.getComponent(ref, Player.getComponentType());
+        return player == null ? null : new PlayerExecution(player, store, ref, world);
     }
 
     private ParsedArgs parse(@Nonnull CommandContext commandContext) {
@@ -112,4 +137,9 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
 
     private record ParsedArgs(@Nonnull ApiSelfTestRunner.Suite suite, boolean verbose) {
     }
+
+    private record PlayerExecution(@Nonnull Player player,
+                                   @Nonnull Store<EntityStore> store,
+                                   @Nonnull Ref<EntityStore> ref,
+                                   @Nonnull World world) { }
 }

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -32,18 +33,33 @@ public final class TameworkDiagnoseCommand extends AbstractTameworkServerCommand
                 TameworkIntegrationDiagnosticsService.live(
                         plugin.getApi(), persistence, plugin.isCaptureAttemptRuntimeReady(),
                         plugin.getApiEventBus());
+        CommandLifecycleDiagnosticsService lifecycle =
+                new CommandLifecycleDiagnosticsService(persistence);
         List<String> arguments = arguments(context);
         List<String> lines;
         if (arguments.isEmpty()) {
-            lines = diagnostics.overview();
+            ArrayList<String> overview = new ArrayList<>(diagnostics.overview());
+            overview.addAll(lifecycle.overview());
+            lines = List.copyOf(overview);
         } else {
             lines = switch (arguments.getFirst().toLowerCase(Locale.ROOT)) {
                 case "population" -> arguments.size() == 1
                         ? diagnostics.population() : usage();
                 case "capture-attempt" -> arguments.size() == 2
                         ? diagnostics.captureAttempt(arguments.get(1)) : usage();
-                case "vessel" -> arguments.size() == 2
-                        ? diagnostics.vessel(arguments.get(1)) : usage();
+                case "command-family" -> arguments.size() <= 3
+                        ? lifecycle.commandFamily(
+                                arguments.size() >= 2 ? arguments.get(1) : null,
+                                arguments.size() >= 3 ? arguments.get(2) : null)
+                        : usage();
+                case "timed" -> arguments.size() <= 2
+                        ? lifecycle.timed(arguments.size() == 2 ? arguments.get(1) : null)
+                        : usage();
+                case "provision" -> arguments.size() == 2
+                        ? lifecycle.provision(arguments.get(1)) : usage();
+                case "revive" -> arguments.size() <= 2
+                        ? lifecycle.revive(arguments.size() == 2 ? arguments.get(1) : null)
+                        : usage();
                 case "provisioning" -> arguments.size() == 3
                         ? diagnostics.provisioning(arguments.get(1), arguments.get(2)) : usage();
                 default -> usage();
@@ -56,7 +72,8 @@ public final class TameworkDiagnoseCommand extends AbstractTameworkServerCommand
 
     private static List<String> usage() {
         return List.of("Usage: /tw diagnose [population|capture-attempt <id>"
-                + "|vessel <binding-or-profile>"
+                + "|command-family [owner-uuid] [family]|timed [operation-or-profile]"
+                + "|provision <operation-id>|revive [operation-or-profile]"
                 + "|provisioning <caller-namespace> <idempotency-key>]");
     }
 

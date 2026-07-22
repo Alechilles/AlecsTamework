@@ -21,7 +21,6 @@ import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
-import com.alechilles.alecstamework.api.BondedVesselReadinessView;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
@@ -120,13 +119,26 @@ public final class ApiSelfTestRunner {
                 "capture mechanics fixture resolves",
                 api.configs().resolveSpawnerCaptureMechanicsForItemId(EXAMPLE_SPAWNER_ITEM_ID).isPresent(),
                 "item=" + EXAMPLE_SPAWNER_ITEM_ID));
-
-        BondedVesselReadinessView vesselReadiness = api.bondedVessels().readiness();
         assertions.add(check(
-                "bonded vessel capability ready",
-                capabilities.contains(TameworkApiCapability.BONDED_VESSELS)
-                        && vesselReadiness.readiness() == BondedVesselReadinessView.Readiness.READY,
-                "readiness=" + vesselReadiness.readiness() + " reason=" + vesselReadiness.reason()));
+                "command-family roster capability ready",
+                capabilities.contains(TameworkApiCapability.COMMAND_FAMILY_ROSTERS),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "timed command summoning capability ready",
+                capabilities.contains(TameworkApiCapability.COMMAND_TIMED_SUMMONING),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "paid command revival capability ready",
+                capabilities.contains(TameworkApiCapability.PAID_COMMAND_REVIVAL),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "resolved capture consumption capability ready",
+                capabilities.contains(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION),
+                "capabilities=" + capabilities));
+        assertions.add(check(
+                "capture tame-and-link capability ready",
+                capabilities.contains(TameworkApiCapability.CAPTURE_TAME_AND_LINK),
+                "capabilities=" + capabilities));
 
         PopulationGroupReconciliationView groupReadiness =
                 api.policies().populationGroups().getReconciliationStatus();
