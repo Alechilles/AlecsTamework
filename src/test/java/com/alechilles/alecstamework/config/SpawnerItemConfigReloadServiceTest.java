@@ -88,6 +88,50 @@ class SpawnerItemConfigReloadServiceTest {
         assertTrue(registry.snapshot().isEmpty());
     }
 
+    @Test
+    void missingItemsAreRetryableAfterItemAssetsLoadAndPublishOnceAvailable() throws Exception {
+        // Regression: downstream TwSpawnerConfig assets can load before their Item assets.
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        Map<String, Integer> items = new HashMap<>();
+        SpawnerItemConfigReloadService service = service(registry, items);
+        TwSpawnerConfig config = bonded("DragonVessel", "PlainOrb", "RestingOrb",
+                "\"Active\":\"AwakeOrb\",\"Dead\":\"CrackedOrb\"");
+
+        SpawnerItemConfigReloadService.ReloadResult initial = service.reload(List.of(config));
+
+        assertFalse(initial.applied());
+        assertTrue(initial.retryableAfterItemAssetsLoad());
+        assertEquals(0L, registry.revision());
+        assertTrue(registry.snapshot().isEmpty());
+
+        for (String itemId : List.of("PlainOrb", "RestingOrb", "AwakeOrb", "CrackedOrb")) {
+            items.put(itemId, 1);
+        }
+        SpawnerItemConfigReloadService.ReloadResult recovered = service.reload(List.of(config));
+
+        assertTrue(recovered.applied());
+        assertFalse(recovered.retryableAfterItemAssetsLoad());
+        assertEquals(1L, registry.revision());
+        assertEquals("DragonVessel", registry.resolveVesselForItemId("RestingOrb")
+                .orElseThrow().configId());
+    }
+
+    @Test
+    void hardValidationFailureIsNotRetriedMerelyBecauseItemsLoaded() throws Exception {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        Map<String, Integer> items = new HashMap<>(Map.of("PlainOrb", 1, "RestingOrb", 2));
+        SpawnerItemConfigReloadService service = service(registry, items);
+        TwSpawnerConfig config = bonded("DragonVessel", "PlainOrb", "RestingOrb", "");
+
+        SpawnerItemConfigReloadService.ReloadResult rejected = service.reload(List.of(config));
+
+        assertFalse(rejected.applied());
+        assertFalse(rejected.retryableAfterItemAssetsLoad());
+        assertTrue(rejected.errors().contains(
+                "vessel-item-must-be-non-stackable:DragonVessel:RestingOrb"));
+        assertEquals(0L, registry.revision());
+    }
+
     private static SpawnerItemConfigReloadService service(ItemFeatureRegistry registry,
                                                           Map<String, Integer> items) {
         return new SpawnerItemConfigReloadService(registry, itemId -> {

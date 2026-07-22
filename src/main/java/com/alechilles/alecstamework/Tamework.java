@@ -367,6 +367,7 @@ public class Tamework extends JavaPlugin {
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
     private boolean itemFeatureReloadPending;
+    private volatile boolean spawnerReloadPendingOnItemAssets;
     private final Object overrideAssetEventSuppressionLock = new Object();
     private int overrideAssetEventSuppressionDepth;
     private boolean globalReconcilePendingAfterOverrideReload;
@@ -2469,6 +2470,15 @@ public class Tamework extends JavaPlugin {
     private void onItemAssetsLoaded(
             LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
         recordAssetPatchHotReload(Item.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+        if (spawnerReloadPendingOnItemAssets) {
+            int loaded = loadSpawnerItemAssets();
+            if (loaded > 0) {
+                getLogger().at(Level.INFO).log(
+                        "Recovered deferred spawner config reload after referenced Item assets loaded: "
+                                + loaded + " config(s)."
+                );
+            }
+        }
     }
 
     private void onParticleSystemAssetsLoaded(
@@ -3111,6 +3121,7 @@ public class Tamework extends JavaPlugin {
         SpawnerItemConfigReloadService.ReloadResult result =
                 spawnerItemConfigReloadService.reload(assetMap.getAssetMap().values());
         if (!result.applied()) {
+            spawnerReloadPendingOnItemAssets = result.retryableAfterItemAssetsLoad();
             for (String error : result.errors()) {
                 getLogger().at(Level.WARNING).log(
                         "Spawner config reload rejected at active revision "
@@ -3118,6 +3129,7 @@ public class Tamework extends JavaPlugin {
             }
             return 0;
         }
+        spawnerReloadPendingOnItemAssets = false;
         return result.loadedCount();
     }
 

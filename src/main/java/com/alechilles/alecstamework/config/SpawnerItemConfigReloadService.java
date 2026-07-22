@@ -146,6 +146,16 @@ public final class SpawnerItemConfigReloadService {
             }
         }
 
+        /**
+         * Returns whether this rejected generation should be retried after Item assets load.
+         * Missing vessel items can be transient while asset packs are still loading; all other
+         * validation failures remain terminal until the spawner config itself changes.
+         */
+        public boolean retryableAfterItemAssetsLoad() {
+            return !applied && !errors.isEmpty()
+                    && errors.stream().allMatch(error -> error.startsWith("vessel-item-missing:"));
+        }
+
         private static ReloadResult rejected(long activeRevision, List<String> errors) {
             return new ReloadResult(false, 0, activeRevision, errors);
         }
