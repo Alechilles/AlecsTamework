@@ -26,6 +26,7 @@ Required capability IDs:
 - `COMMAND_FAMILY_ROSTERS`
 - `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`
 - `CAPTURE_TAME_AND_LINK`
+- `COMMAND_TIMED_SUMMONING`
 - `PAID_COMMAND_REVIVAL`
 
 Optional/deferred:
@@ -46,7 +47,8 @@ Each capability reports `AVAILABLE`, `DEGRADED`, `UNAVAILABLE`, or `UNSUPPORTED`
 | Tame in place and add to Horn | Above plus command-family rosters and capture tame-and-link | Deny before roll; retain stone and target |
 | Wyvern Egg claim | Profiles, persistence resilience, population groups, provisioning, command-family rosters | Deny before Egg consumption |
 | Horn commands/roster | Profiles, policy, persistence resilience, command-family rosters | Disable roster mutation/positive relocation; preserve rows/profiles |
-| Paid revival | Profiles, persistence resilience, population groups, command-family rosters, paid command revival | Disable Revive; do not reserve or consume essence |
+| Timed Summon/Dismiss/storage | Profiles, policy, persistence resilience, command-family rosters, population groups, command timed summoning | Disable new timed projections; preserve active/stored profile and lease state for recovery |
+| Paid revival | Profiles, persistence resilience, population groups, command-family rosters, paid command revival | Disable Revive; do not reserve or consume any configured item component |
 | Elemental archetype data | Profiles and profile data | Disable attunement before essence consumption; retain existing profile data |
 | Miniwyvern backpack | Companion inventory plus profile/lifecycle authority | Feature absent until later update |
 
@@ -59,8 +61,9 @@ Missing one feature's capability must not disable unrelated safe features. In pa
 | Profile ID, owner, lifecycle, death/lost state | Tamework | HyDragon stores references only where its domain record requires them |
 | Capture attempt/result/cooldown/source spend | Tamework | HyDragon supplies data and presentation; never pre-rolls or mirrors cooldown |
 | Command-family membership and group/home preferences | Tamework | Horn metadata is cache only |
-| Population group membership/admission | Tamework | HyDragon configures role rules; never maintains a second count |
-| Revival quote, reservation, cost consumption, recovery | Tamework | HyDragon supplies item IDs/quantities and localized presentation |
+| Population group membership/admission and active cap | Tamework | HyDragon configures any non-negative limit; never maintains a second count |
+| Summon lease, remaining time, cooldown, roster storage, and active-slot release | Tamework | HyDragon supplies role/group balance and localized presentation |
+| Revival quote, multi-component reservation, exact cost consumption, recovery | Tamework | HyDragon supplies arbitrary item IDs/quantities and localized presentation |
 | Soul Bond entitlement | HyDragon | Tamework provisions/links the requested profile idempotently |
 | Miniwyvern archetype/ability state | HyDragon namespaced profile data | Tamework persists and revision-fences opaque domain values |
 | Stone tiers, role difficulty, materials, Dragon Horn/Egg assets | HyDragon | Tamework treats IDs and values as content data |
@@ -121,10 +124,19 @@ Public operations include:
 - set active-for-bulk-command;
 - assign command group;
 - set/query home;
+- query/Summon/Dismiss a roster-stored profile and inspect its active lease/cooldown;
 - resolve a compatible access item;
 - refresh physical item projections where safe.
 
 Authorization is evaluated from the acting owner and canonical profile. Supplying a copied item or cached row never grants authority. Queries usable for diagnostics accept an optional owner and must not require a live `Player` entity.
+
+### 7.1 Active limits and timed summoning
+
+Tamework exposes immutable per-profile summon status and idempotent Summon/Dismiss operations. `TwPopulationGroupConfig.Limits.MaxActivePerOwner` remains the sole concurrency authority and supports zero/unlimited or any positive configured count.
+
+Summon status includes lifecycle, session/operation ID, snapshotted config revision, remaining active duration, cooldown deadline, projection status, and stable denial/recovery reason. `ROSTER_STORED` represents an owned command-roster profile with no live projection or captured item.
+
+Capture tame/link, Egg projection, Horn Summon, and paid revival start a lease only after population admission and successful projection. Recall/relocation never starts or resets one. Expiry and Dismiss transition through durable `STORING`; active capacity releases only when snapshot/despawn and `ROSTER_STORED` commit. Retry/restart returns the existing operation result and cannot create a second projection or replenish time.
 
 ## 8. Provisioning integration
 
@@ -142,16 +154,16 @@ Initial projection is separately admitted. Its failure does not undo a committed
 
 ## 9. Paid revival integration
 
-HyDragon supplies role-scoped cost data through `TwCompanionConfig.Command.Revive`. Tamework exposes:
+HyDragon supplies role-scoped cost data through `TwCompanionConfig.Command.Revive`. The cost is an ordered AND-list of reusable `(ItemId, Quantity)` components; Tamework does not know or prefer essence types. Tamework exposes:
 
-- immutable revive quote;
+- immutable revive quote containing every component, localized/item presentation reference, owned/required quantity, and shortage status;
 - prepare/confirm request with actor, profile, command family, quoted config revision, and caller key;
 - operation query/recovery result;
 - post-commit paid-revival event.
 
-Tamework owns ownership/roster/death/cooldown/population/placement validation, inventory reservation and consumption, profile recovery, projection, refund claims, and result persistence. HyDragon supplies localized labels/effects and may react to the post-commit event.
+Tamework owns ownership/roster/death/cooldown/population/placement validation, inventory reservation and exact multi-component consumption, profile recovery, projection/lease start, refund claims, and result persistence. HyDragon supplies item/quantity config, localized labels/effects, and may react to the post-commit event.
 
-A quote is not a reservation. Confirmation revalidates the snapshotted config and exact inventory. A missing or changed source stack before consumption denies with no charge.
+A quote is not a reservation. Confirmation revalidates the snapshotted config and exact inventory. Missing any one component or a changed source stack before consumption denies with no charge from every component. The confirmation UI must show all costs and disable confirmation while any shortage exists.
 
 ## 10. Profile data and HyDragon extensions
 
@@ -180,7 +192,7 @@ No profile-data value may represent command roster authority, population members
 ## 12. Reload semantics
 
 - `/tw reloadconfig` refreshes `TwSpawnerConfig` and `TwCommandItemConfig`, including new capture/roster fields.
-- `TwCompanionConfig` revival fields update through normal asset events.
+- `TwCompanionConfig` timed-summon and revival fields update through normal asset events.
 - An in-flight operation remains bound to snapshotted config revisions.
 - Invalid reload input does not replace the last valid compiled registry.
 - Capability availability is recomputed after registry/persistence changes.
@@ -194,6 +206,7 @@ Required surfaces include:
 - `/tw api test`
 - `/tw diagnose capture-attempt <id>`
 - `/tw diagnose command-family [owner] [family]`
+- `/tw diagnose summon <operation-id-or-profile>`
 - `/tw diagnose provision <operation-id>`
 - `/tw diagnose revive <operation-id-or-profile>`
 - aggregate persistence/recovery/circuit health
@@ -214,9 +227,11 @@ There is no HyDragon migration/adoption contract. Development-only worlds and it
 4. Failed capture spends one stone once; successful capture spends one stone once and commits one profile/roster membership.
 5. Egg retries return one Miniwyvern profile and one Horn membership.
 6. Roster queries and diagnostics work without a live player entity; mutations still require explicit authorization/context.
-7. Paid revival charges once and restores the same profile once; terminal compensation creates at most one refund claim.
-8. Config reload cannot alter in-flight capture/revival costs or semantics.
-9. World-transfer, unload, death, lost recovery, item replacement, relog, and restart preserve profile and roster identity.
-10. Missing listener, listener exception, cosmetic failure, or UI refresh failure cannot corrupt committed state.
-11. Repository and packaged-artifact scans find no bonded-vessel API/config/runtime/docs other than the withdrawn-design notice.
-12. Cross-repository tests exercise all failure checkpoints and prove no free roll, double spend, duplicate profile, duplicate projection, or lost paid item.
+7. Configurable active limits apply atomically to capture, Summon, provisioning, revival, and recovery; `STORING` retains capacity until roster storage commits.
+8. Each timed profile has one durable lease; expiry or Dismiss stores/despawns once, releases one slot, and starts one cooldown without timer-reset exploits.
+9. Paid revival displays and consumes every arbitrary configured item component once and restores the same profile once; terminal compensation creates at most one exact multi-item refund claim.
+10. Config reload cannot alter in-flight capture, summon-duration, cooldown, or revival-cost semantics.
+11. World-transfer, unload, death, lost recovery, item replacement, relog, and restart preserve profile, roster, population, and lease identity.
+12. Missing listener, listener exception, cosmetic failure, or UI refresh failure cannot corrupt committed state.
+13. Repository and packaged-artifact scans find no bonded-vessel API/config/runtime/docs other than the withdrawn-design notice.
+14. Cross-repository tests exercise all failure checkpoints and prove no free roll, double spend, timer reset, active-cap bypass, duplicate profile/projection, partial charge, or lost paid item.

@@ -1,15 +1,16 @@
 # Owner population groups
 
-Status: Implementation and automated release verification complete
+Status: Base implementation complete; command-roster lifecycle additions proposed
 Depends on: existing canonical owner/claim population admission and persistence
 HyDragon counterparts: [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) and
 [dragon content and encounters](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/dragon-content-encounters.md)
 
 ## Goal
 
-The implemented config-defined companion groups enforce atomic per-owner owned and active
-limits. HyDragon uses this to allow many owned full dragons but only one summoned
-full dragon, and to permit only one Soul Bond Miniwyvern per player.
+The config-defined companion groups enforce atomic per-owner owned and active
+limits. HyDragon uses this to allow many owned full dragons while configuring
+the permitted number summoned at once, and to permit only one Soul Bond
+Miniwyvern per player. Positive limits are data; Tamework does not hardcode one.
 
 Group limits extend the existing canonical owner/claim admission transaction.
 They are not command-item limits, live-entity scans, or an independent counter.
@@ -26,12 +27,15 @@ is:
 
 - `ACTIVE`;
 - durably `UNLOADED`; or
-- committed `RESTORING`.
+- committed `RESTORING`; or
+- durable `STORING` until roster storage and projection removal commit.
 
 A pending dormant-to-active or new-active reservation also consumes pending
-active headroom. Consequently, chunk unload does not free an active slot, and
-two concurrent restores cannot both pass a limit of one. `CAPTURED`, `COOP`,
-`DEAD_REVIVABLE`, `LOST`, `UNKNOWN_DORMANT`, and the new
+active headroom. An ambiguous recovery/storage operation that may still have a
+live projection also retains pending headroom. Consequently, chunk unload or a
+timer reaching zero does not itself free an active slot. `CAPTURED`,
+`ROSTER_STORED`, `COOP`, `DEAD_REVIVABLE`, terminally fenced `LOST`,
+`UNKNOWN_DORMANT`, and
 `PROVISIONED_DORMANT` do not consume active group capacity.
 
 These predicates are safety invariants, not configurable lifecycle lists.
@@ -182,9 +186,12 @@ active counts. Transition deltas include:
 | New owned `CAPTURED` | `+1` | `0` |
 | New owned `PROVISIONED_DORMANT` | `+1` | `0` |
 | `CAPTURED/COOP/DEAD_REVIVABLE/LOST/UNKNOWN_DORMANT/PROVISIONED_DORMANT -> RESTORING/ACTIVE` | `0` | `+1` |
+| `ROSTER_STORED -> RESTORING/ACTIVE` | `0` | `+1` |
 | `UNLOADED -> ACTIVE` | `0` | `0` |
 | `ACTIVE -> UNLOADED` | `0` | `0` |
-| `ACTIVE/UNLOADED/RESTORING -> CAPTURED/COOP/DEAD_REVIVABLE/LOST/PROVISIONED_DORMANT` | `0` | `-1` at durable commit |
+| `ACTIVE/UNLOADED/RESTORING -> STORING` | `0` | `0` |
+| `STORING -> ROSTER_STORED` | `0` | `-1` only after snapshot/removal/storage commit |
+| `ACTIVE/UNLOADED/RESTORING/STORING -> CAPTURED/COOP/DEAD_REVIVABLE/LOST/PROVISIONED_DORMANT` | `0` | `-1` at durable commit |
 | Owner transfer while active | `-1/+1` by owner | `-1/+1` by owner |
 | Role/group change | old groups `-1`, new groups `+1` as applicable | same, atomically |
 | Permanent release | `-1` | `-1` only if active-classified |
@@ -210,8 +217,9 @@ state; it cannot manufacture owned/active headroom or create another unique
 companion.
 
 `MaxActive` is separate from physical claim occupancy even though both count
-`ACTIVE` and `UNLOADED`: group active additionally counts `RESTORING` and is
-owner/group scoped, while claim limits are location/provider scoped.
+`ACTIVE` and `UNLOADED`: group active additionally counts `RESTORING`,
+`STORING`, and pending potentially-live recovery headroom and is owner/group
+scoped, while claim limits are location/provider scoped.
 
 ## Mutation-path coverage
 
@@ -221,6 +229,7 @@ role/group classification and use the unified authority, including:
 - tame/set-owner and first wild capture;
 - legacy adoption and admin/API creation;
 - captured-item restore/store and command-roster tame/link;
+- timed command Summon, Dismiss, expiry storage, and owner-logout storage;
 - revive and lost recovery;
 - managed coop capture/release;
 - breeding and batch birth;
@@ -476,14 +485,15 @@ config indexes, CHANGELOG, generated agent index, and `/tw api test` coverage.
 ### Counting and concurrency
 
 7. Owned counts every non-released lifecycle with a non-null owner.
-8. Active counts committed `ACTIVE`, durable `UNLOADED`, and committed
-   `RESTORING`, excluding all other lifecycles including
-   `PROVISIONED_DORMANT`.
+8. Active counts committed `ACTIVE`, durable `UNLOADED`, committed
+   `RESTORING`, and durable `STORING`, excluding dormant lifecycles including
+   `ROSTER_STORED` and `PROVISIONED_DORMANT`.
 9. Pending dormant-to-active/new-active reservation consumes active headroom.
-10. Two concurrent `CAPTURED -> ACTIVE` reservations at max one produce one
-    winner, including across different items/rosters/world callbacks.
+10. Two concurrent `CAPTURED/ROSTER_STORED -> ACTIVE` reservations at max one
+    produce one winner, including across different items/rosters/world callbacks.
 11. `UNLOADED -> ACTIVE` and `ACTIVE -> UNLOADED` are zero active delta.
-12. Active capacity releases only on durable transition to a dormant lifecycle.
+12. Active capacity releases only on durable transition to a dormant lifecycle;
+    timer expiry or projection removal alone is insufficient.
 13. Cancel, expiry, start-watchdog rejection, and compensation release each
     pending delta exactly once.
 14. MaxOwned one blocks a second Soul Bond profile even when the first is
@@ -499,8 +509,9 @@ config indexes, CHANGELOG, generated agent index, and `/tw api test` coverage.
 
 ### Lifecycle path integration
 
-20. Wild capture, tame, command-roster link, admin/API creation, breeding,
-    captured-item restore/store, revive, lost recovery, managed coop release, role change,
+20. Wild capture, tame, command-roster link, timed Summon/Dismiss/expiry,
+    owner-logout storage, admin/API creation, breeding, captured-item
+    restore/store, revive, lost recovery, managed coop release, role change,
     transfer, release, cull, and permanent death all route through one group
     authority.
 21. Command-item `MaxActive` changes do not affect or bypass group counts.
