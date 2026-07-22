@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.PopulationAdmissionIdentity;
 import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
+import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
 import com.alechilles.alecstamework.integration.claims.ClaimAdmissionOperation;
 import com.alechilles.alecstamework.integration.claims.ClaimAdmissionRequest;
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
@@ -26,19 +27,40 @@ final class PublicPopulationAdmissionPlanner {
     private final CompanionIdentityResolver identityResolver;
     private final ClaimOccupancyIndex claimIndex;
     private final CompanionAdmissionPolicyResolver policyResolver;
+    private final CanonicalRoleResolver roleResolver;
 
     PublicPopulationAdmissionPlanner(@Nonnull OwnerPopulationIndex ownerIndex,
                                      @Nonnull CompanionIdentityResolver identityResolver,
                                      @Nonnull ClaimOccupancyIndex claimIndex,
                                      @Nonnull CompanionAdmissionPolicyResolver policyResolver) {
+        this(ownerIndex, identityResolver, claimIndex, policyResolver, profileId -> null);
+    }
+
+    PublicPopulationAdmissionPlanner(@Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull CompanionAdmissionPolicyResolver policyResolver,
+            @Nonnull CanonicalRoleResolver roleResolver) {
         this.ownerIndex = Objects.requireNonNull(ownerIndex, "ownerIndex");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
         this.policyResolver = Objects.requireNonNull(policyResolver, "policyResolver");
+        this.roleResolver = Objects.requireNonNull(roleResolver, "roleResolver");
     }
 
     @Nonnull
     Result plan(@Nonnull PopulationAdmissionRequest request) {
+        return plan(request, null, null);
+    }
+
+    @Nonnull Result plan(@Nonnull PopulationAdmissionRequestV2 request) {
+        Objects.requireNonNull(request, "request");
+        return plan(request.request(), request.targetRoleId(), request.ownershipWorldName());
+    }
+
+    @Nonnull
+    private Result plan(@Nonnull PopulationAdmissionRequest request, @Nullable String targetRoleId,
+                        @Nullable String ownershipWorldName) {
         Objects.requireNonNull(request, "request");
         if (request.currentNpcUuid() == null) {
             return Result.denied("population-admission-current-npc-required");
@@ -62,6 +84,15 @@ final class PublicPopulationAdmissionPlanner {
         if (stateReason != null) {
             return deniedAfterIdentity(identity, request.currentNpcUuid(), stateReason);
         }
+        String oldRoleId = null;
+        if (targetRoleId != null
+                && request.expectedProfileRevision() != PopulationAdmissionRequest.NEW_PROFILE_REVISION) {
+            oldRoleId = roleResolver.resolve(identity.profileId());
+            if (oldRoleId == null) {
+                return deniedAfterIdentity(identity, request.currentNpcUuid(),
+                        "population-admission-source-role-unavailable");
+            }
+        }
         ClaimOccupancyTransition claimTransition = claimTransition(
                 identity.profileId(), request, currentClaim
         );
@@ -80,7 +111,10 @@ final class PublicPopulationAdmissionPlanner {
                 currentClaim,
                 claimTransition.proposed(),
                 operation,
-                policy
+                policy,
+                ownershipWorldName,
+                targetRoleId == null ? null
+                        : new PopulationGroupRoleContext(oldRoleId, targetRoleId)
         );
         ClaimAdmissionRequest claimRequest = claimRequest(
                 request,
@@ -262,13 +296,17 @@ final class PublicPopulationAdmissionPlanner {
             @Nullable ClaimOccupancyEntry currentClaim,
             @Nonnull ClaimOccupancyEntry proposedClaim,
             @Nonnull OwnerPopulationOperation operation,
-            @Nonnull CompanionAdmissionPolicyResolver.Policy policy
+            @Nonnull CompanionAdmissionPolicyResolver.Policy policy,
+            @Nullable String ownershipWorldName,
+            @Nullable PopulationGroupRoleContext roleContext
     ) {
         String destinationWorld = request.newOwnerUuid() == null
                 ? null
-                : request.destination() == null
-                        ? currentOwner.ownershipWorldName()
-                        : request.destination().worldName();
+                : ownershipWorldName != null
+                        ? ownershipWorldName
+                        : request.destination() == null
+                                ? currentOwner.ownershipWorldName()
+                                : request.destination().worldName();
         OwnerPopulationTransitionRequest transition = new OwnerPopulationTransitionRequest(
                 profileId,
                 request.expectedProfileRevision(),
@@ -302,7 +340,8 @@ final class PublicPopulationAdmissionPlanner {
                 ownerJson(request.newOwnerUuid()),
                 contextJson(request),
                 policy.settingsRevision(),
-                policy.claimContext().providerGeneration()
+                policy.claimContext().providerGeneration(),
+                roleContext
         );
     }
 
@@ -453,5 +492,9 @@ final class PublicPopulationAdmissionPlanner {
         static IdentityResult denied(String reason) {
             return new IdentityResult(false, null, false, reason);
         }
+    }
+
+    @FunctionalInterface interface CanonicalRoleResolver {
+        @Nullable String resolve(@Nonnull String profileId);
     }
 }

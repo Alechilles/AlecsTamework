@@ -200,6 +200,41 @@ class PopulationGroupOwnerAdmissionExtensionTest {
         }
     }
 
+    /** Regression: a post-change live snapshot must not replace the durable old classification. */
+    @Test
+    void roleChangeUsesPersistedOldClassificationWhenPlanAlreadyObservesTargetRole()
+            throws Exception {
+        try (Harness harness = harness(List.of(
+                group("Group_A", "test:a", "Role_A", 1, 1),
+                group("Group_B", "test:b", "Role_B", 1, 1)))) {
+            UUID owner = UUID.randomUUID();
+            String profileId = UUID.randomUUID().toString();
+            OwnerPopulationPreparationResult created = harness.coordinator().prepareAsync(
+                    plan(profileId, owner, "Role_A")).get(2, TimeUnit.SECONDS);
+            assertTrue(created.allowed());
+            assertTrue(harness.coordinator().claimForApply(
+                    created.preparedAdmission(), 1L, ClaimProviderGeneration.NONE));
+            assertTrue(harness.coordinator().commitAsync(created.preparedAdmission())
+                    .get(2, TimeUnit.SECONDS).committed());
+
+            CompanionPopulationStateRecord baseline = harness.population().loadAllStates().stream()
+                    .filter(state -> state.profileId().equals(profileId)).findFirst().orElseThrow();
+            OwnerPopulationPreparationResult changed = harness.coordinator().prepareAsync(
+                    roleChangePlan(baseline, owner, "Role_B", "Role_B"))
+                    .get(2, TimeUnit.SECONDS);
+            assertTrue(changed.allowed());
+            assertTrue(harness.coordinator().claimForApply(
+                    changed.preparedAdmission(), 1L, ClaimProviderGeneration.NONE));
+            assertTrue(harness.coordinator().commitAsync(changed.preparedAdmission())
+                    .get(2, TimeUnit.SECONDS).committed());
+
+            assertEquals(0, harness.groups().count(owner, "test:a",
+                    PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL, null).committedOwned());
+            assertEquals(1, harness.groups().count(owner, "test:b",
+                    PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL, null).committedOwned());
+        }
+    }
+
     @Test
     void configPersistenceUnavailableDeniesWithoutLeavingPendingHeadroom() throws Exception {
         try (Harness harness = harness()) {

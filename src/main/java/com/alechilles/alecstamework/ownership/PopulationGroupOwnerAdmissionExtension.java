@@ -275,9 +275,9 @@ public final class PopulationGroupOwnerAdmissionExtension {
         PopulationGroupClassificationRecord existing = classification(transition.profileId());
         PopulationGroupRoleContext context = plan.populationGroupRoleContext();
         String profileRole = profileRole(transition.profileId());
-        String oldRole = first(context == null ? null : context.oldRoleId(),
-                existing == null ? null : existing.roleId(), profileRole);
-        String newRole = first(context == null ? null : context.newRoleId(), oldRole, profileRole);
+        String oldRole = first(existing == null ? null : existing.roleId(),
+                context == null ? null : context.oldRoleId(), profileRole);
+        String newRole = first(context == null ? null : context.newRoleId(), profileRole, oldRole);
         if (!index.definitions().isEmpty()
                 && transition.newOwnerId() != null && newRole == null) {
             throw new IllegalStateException("population-group-target-role-unresolved");

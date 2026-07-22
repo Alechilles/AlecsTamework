@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
+import com.alechilles.alecstamework.api.PopulationAdmissionRequestV2;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.PopulationBatchAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationBatchAdmissionRequest;
@@ -65,7 +66,8 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
                 claimAdmissionService,
                 claimProviderRegistry,
                 System::nanoTime,
-                new ClaimLookupMetrics()
+                new ClaimLookupMetrics(),
+                profileId -> null
         );
     }
 
@@ -79,6 +81,23 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
             @Nonnull ClaimProviderRegistry claimProviderRegistry,
             @Nonnull LongSupplier monotonicClock,
             @Nonnull ClaimLookupMetrics lookupMetrics
+    ) {
+        this(ownerIndex, identityResolver, coordinator, batchCoordinator, claimIndex,
+                claimAdmissionService, claimProviderRegistry, monotonicClock, lookupMetrics,
+                profileId -> null);
+    }
+
+    RuntimePopulationPolicyAuthority(
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull CompanionPopulationAdmissionCoordinator coordinator,
+            @Nonnull CompanionPopulationBatchAdmissionCoordinator batchCoordinator,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull ClaimAdmissionService claimAdmissionService,
+            @Nonnull ClaimProviderRegistry claimProviderRegistry,
+            @Nonnull LongSupplier monotonicClock,
+            @Nonnull ClaimLookupMetrics lookupMetrics,
+            @Nonnull PublicPopulationAdmissionPlanner.CanonicalRoleResolver roleResolver
     ) {
         Objects.requireNonNull(ownerIndex, "ownerIndex");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
@@ -99,7 +118,8 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
                 ownerIndex,
                 identityResolver,
                 claimIndex,
-                policyResolver
+                policyResolver,
+                roleResolver
         );
         this.decisions = new PopulationAdmissionDecisionMapper(ownerIndex, policyResolver);
         this.registrar = new PublicPopulationAdmissionRegistrar(
@@ -159,16 +179,32 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
     public CompletionStage<PopulationAdmissionDecision> tryAdmit(
             @Nonnull PopulationAdmissionRequest request
     ) {
+        return tryAdmit(request, null);
+    }
+
+    @Nonnull
+    @Override
+    public CompletionStage<PopulationAdmissionDecision> tryAdmitV2(
+            @Nonnull PopulationAdmissionRequestV2 request
+    ) {
+        Objects.requireNonNull(request, "request");
+        return tryAdmit(request.request(), request);
+    }
+
+    private CompletionStage<PopulationAdmissionDecision> tryAdmit(
+            @Nonnull PopulationAdmissionRequest request,
+            @Nullable PopulationAdmissionRequestV2 requestV2
+    ) {
         Objects.requireNonNull(request, "request");
         String key = request.identity().idempotencyKey();
         CompletableFuture<PopulationAdmissionDecision> future = new CompletableFuture<>();
         if (key != null) {
             SinglePreparation candidate = new SinglePreparation(
-                    request, future, retentionCleaner.retentionDeadline()
+                    request, requestV2, future, retentionCleaner.retentionDeadline()
             );
             SinglePreparation existing = idempotentSingles.putIfAbsent(key, candidate);
             if (existing != null) {
-                return existing.request().equals(request)
+                return existing.matches(request, requestV2)
                         ? existing.future()
                         : CompletableFuture.completedFuture(decisions.denied(
                                 request, "population-admission-idempotency-conflict"
@@ -176,7 +212,7 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
             }
         }
         afterCleanup(
-                () -> startSingle(request, future),
+                () -> startSingle(request, requestV2, future),
                 () -> future.complete(PopulationAdmissionDecision.unavailable(
                         "population-admission-cleanup-failed"
                 ))
@@ -283,10 +319,12 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
     }
 
     private void startSingle(PopulationAdmissionRequest request,
+                             @Nullable PopulationAdmissionRequestV2 requestV2,
                              CompletableFuture<PopulationAdmissionDecision> future) {
         PublicPopulationAdmissionPlanner.Result plan = null;
         try {
-            PublicPopulationAdmissionPlanner.Result planned = planner.plan(request);
+            PublicPopulationAdmissionPlanner.Result planned = requestV2 == null
+                    ? planner.plan(request) : planner.plan(requestV2);
             plan = planned;
             if (!planned.allowed()) {
                 future.complete(decisions.denied(request, planned.reason()));
@@ -380,9 +418,14 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
     }
 
     private record SinglePreparation(PopulationAdmissionRequest request,
+                                     @Nullable PopulationAdmissionRequestV2 requestV2,
                                      CompletableFuture<PopulationAdmissionDecision> future,
                                      long retainUntilNanos)
             implements PublicPopulationRetentionCleaner.RetainedPreparation {
+        boolean matches(PopulationAdmissionRequest candidate,
+                        @Nullable PopulationAdmissionRequestV2 candidateV2) {
+            return request.equals(candidate) && Objects.equals(requestV2, candidateV2);
+        }
     }
 
     private record BatchPreparation(PopulationBatchAdmissionRequest request,

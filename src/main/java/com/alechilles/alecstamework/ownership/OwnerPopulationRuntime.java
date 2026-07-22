@@ -249,7 +249,10 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                 claimAdmissionService,
                 claimProviderRegistry,
                 System::nanoTime,
-                claimLookupMetrics
+                claimLookupMetrics,
+                new PersistencePopulationRoleResolver(
+                        persistence.getPopulationGroupRepository(),
+                        persistence.getNpcProfileRepository())
         );
         PublicPopulationCapabilityMaintenance capabilityMaintenance =
                 PublicPopulationCapabilityMaintenance.start(populationPolicyAuthority);
