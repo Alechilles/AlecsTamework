@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +20,18 @@ import java.util.List;
  * Emits spawner particle and sound effects for capture/spawn events.
  */
 public final class SpawnerEffectService {
+
+    public void playCaptureSuccessParticle(String particleSystem, OwnerMutationContext context) {
+        if (particleSystem == null || particleSystem.isBlank()
+                || context == null || context.npcRef() == null || !context.npcRef().isValid()) {
+            return;
+        }
+        TransformComponent transform = context.store().getComponent(
+                context.npcRef(), TransformComponent.getComponentType());
+        if (transform != null && transform.getPosition() != null) {
+            ParticleUtil.spawnParticleEffect(particleSystem, transform.getPosition(), context.store());
+        }
+    }
 
     public void playSpawnEffects(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
         if (config == null) {

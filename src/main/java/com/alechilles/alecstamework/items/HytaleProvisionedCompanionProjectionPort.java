@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.PopulationAdmissionOperation;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.api.ProvisionedCompanionTransition;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.CompanionSpawnAdmissionRequest;
@@ -21,12 +22,15 @@ import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.provisioning.ProvisionedCompanionProjectionPort;
 import com.alechilles.alecstamework.provisioning.ProvisioningPopulationBackend;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import java.util.Objects;
 import java.util.Optional;
@@ -53,6 +57,9 @@ public final class HytaleProvisionedCompanionProjectionPort
     private final OwnerPopulationRuntime ownerRuntime;
     private final NpcProfileRepository profiles;
     private final CompanionSpawnPopulationAdmissionService admission;
+    @Nullable private final CommandNpcRelocationService relocation;
+    private final CompanionProjectionSpawnPositionService spawnPosition =
+            new CompanionProjectionSpawnPositionService();
     private final ConcurrentHashMap<UUID, PreparedProjection> prepared = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CompletableFuture<
             ProvisioningPopulationBackend.AdmissionPreparation>> resumptions =
@@ -61,9 +68,17 @@ public final class HytaleProvisionedCompanionProjectionPort
     public HytaleProvisionedCompanionProjectionPort(
             @Nonnull OwnerPopulationRuntime ownerRuntime,
             @Nonnull NpcProfileRepository profiles) {
+        this(ownerRuntime, profiles, null);
+    }
+
+    public HytaleProvisionedCompanionProjectionPort(
+            @Nonnull OwnerPopulationRuntime ownerRuntime,
+            @Nonnull NpcProfileRepository profiles,
+            @Nullable CommandNpcRelocationService relocation) {
         this.ownerRuntime = Objects.requireNonNull(ownerRuntime, "ownerRuntime");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.admission = ownerRuntime.companionSpawnAdmissionService();
+        this.relocation = relocation;
     }
 
     @Override
@@ -268,8 +283,12 @@ public final class HytaleProvisionedCompanionProjectionPort
                     source.reason(), null);
         }
         if (source.alreadyActive()) {
-            return completedTransition(ProvisioningPopulationBackend.TransitionOutcome.Status.IDEMPOTENT,
-                    "provisioned-companion-already-active", snapshot(request.profileId()).orElse(null));
+            return recallActive(request, source.previousNpcUuid(), profile.roleId())
+                    .thenApply(queued -> new ProvisioningPopulationBackend.TransitionOutcome(
+                            ProvisioningPopulationBackend.TransitionOutcome.Status.IDEMPOTENT,
+                            queued ? "provisioned-companion-active-recall-queued"
+                                    : "provisioned-companion-already-active",
+                            snapshot(request.profileId()).orElse(null), null));
         }
         CompanionSpawnAdmissionRequest spawn = spawnRequest(
                 request.profileId(), source.previousNpcUuid(), source.lifecycle(), profile.ownerUuid(),
@@ -295,6 +314,48 @@ public final class HytaleProvisionedCompanionProjectionPort
                             ProvisioningPopulationBackend.TransitionOutcome.Status.QUARANTINED,
                             "provisioned-companion-transition-outcome-ambiguous", null, null));
         });
+    }
+
+    @Nonnull
+    private CompletionStage<Boolean> recallActive(
+            ProvisioningPopulationBackend.TransitionRequest request,
+            @Nullable UUID npcUuid,
+            String roleId) {
+        if (relocation == null || npcUuid == null || request.destination() == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        Universe universe = Universe.get();
+        World world = universe == null ? null
+                : universe.getWorld(request.destination().worldName());
+        if (world == null || !world.isAlive()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        CompletableFuture<Boolean> completion = new CompletableFuture<>();
+        LeaseBoundWorldDispatcher.execute(world, () -> {
+            try {
+                Store<EntityStore> store = world.getEntityStore().getStore();
+                Ref<EntityStore> actorRef = world.getEntityRef(request.actorUuid());
+                Vector3d destination = new CommandCompanionPlacementService()
+                        .computeSafeRecallPosition(actorRef, store, 5.0D, roleId, null);
+                if (destination == null) {
+                    completion.complete(false);
+                    return;
+                }
+                Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+                TransformComponent transform = npcRef == null ? null : store.getComponent(
+                        npcRef, TransformComponent.getComponentType());
+                Vector3d source = transform == null || transform.getPosition() == null
+                        ? null : new Vector3d(transform.getPosition());
+                relocation.queueRelocation(
+                        world, npcUuid, destination, request.actorUuid(), true, true,
+                        null, null, 0L, source, null, true,
+                        TwCompanionConfig.TransferFailurePolicy.QueueForRecall);
+                completion.complete(true);
+            } catch (RuntimeException | LinkageError failure) {
+                completion.complete(false);
+            }
+        }, () -> completion.complete(false));
+        return completion;
     }
 
     @Nonnull
@@ -439,14 +500,14 @@ public final class HytaleProvisionedCompanionProjectionPort
                     "provisioned-companion-spawn-context-unavailable", false);
             return;
         }
-        int local = ChunkUtil.SIZE / 2;
-        double x = ChunkUtil.minBlock(projection.request().chunkX()) + local + 0.5D;
-        double z = ChunkUtil.minBlock(projection.request().chunkZ()) + local + 0.5D;
-        double y = chunk.getHeight(local, local) + 1.0D;
+        String roleId = resolveRole(projection.profileId());
+        CompanionProjectionSpawnPositionService.Placement placement = spawnPosition.resolve(
+                world, projection.request().ownerId(), roleId,
+                projection.request().chunkX(), projection.request().chunkZ(), chunk);
         EntityStore entityStore = world.getEntityStore();
         boolean started = new CompanionPreparedSpawnService(admission).spawnClaimedAndCommit(
-                world, entityStore.getStore(), npcPlugin, roleIndex, new Vector3d(x, y, z),
-                new Rotation3f(), projection.batch(), 0,
+                world, entityStore.getStore(), npcPlugin, roleIndex, placement.position(),
+                placement.rotation(), projection.batch(), 0,
                 new CompanionPreparedSpawnService.Callbacks() {
                     @Override
                     public void onSpawned(CompanionPreparedSpawnService.SpawnedCompanion live) {

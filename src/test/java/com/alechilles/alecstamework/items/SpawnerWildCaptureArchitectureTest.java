@@ -52,7 +52,7 @@ class SpawnerWildCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
         ));
         int callback = source.indexOf("public void onApplied(String profileId,");
-        int burst = source.indexOf("spawnCaptureSuccessParticle(captureBurstParticleSystem, context)", callback);
+        int burst = source.indexOf("effectService.playCaptureSuccessParticle(captureBurstParticleSystem, context)", callback);
         int denied = source.indexOf("public void onDenied(String reason)", callback);
 
         assertTrue(callback >= 0);

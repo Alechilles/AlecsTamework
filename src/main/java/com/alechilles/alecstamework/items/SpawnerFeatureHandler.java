@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedVesselMode;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -8,6 +7,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
 import com.hypixel.hytale.codec.Codec;
@@ -20,8 +20,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -61,6 +59,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCaptureAttemptRuntimeCoordinator captureAttemptRuntime;
     private final SpawnerBondedVesselCoordinator bondedVessels;
     private final SpawnerCaptureOperationalLog captureLog;
+    private final SpawnerCapturedProfilePersistenceService profilePersistence;
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -98,7 +97,7 @@ public final class SpawnerFeatureHandler {
                                  @Nullable TranslationRegistry translationRegistry,
                                  @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService) {
         this(logger, registry, captureService, coopService, relocationService, lostService,
-                translationRegistry, managedCoopDetachService, null, () -> 0L);
+                translationRegistry, managedCoopDetachService, null, () -> 0L, null);
     }
 
     public SpawnerFeatureHandler(HytaleLogger logger,
@@ -111,8 +110,25 @@ public final class SpawnerFeatureHandler {
                                  @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService,
                                  @Nullable CaptureAttemptCoordinator captureAttemptCoordinator,
                                  LongSupplier captureRequirementGeneration) {
+        this(logger, registry, captureService, coopService, relocationService, lostService,
+                translationRegistry, managedCoopDetachService, captureAttemptCoordinator,
+                captureRequirementGeneration, null);
+    }
+
+    public SpawnerFeatureHandler(HytaleLogger logger,
+                                 ItemFeatureRegistry registry,
+                                 CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandLinkedNpcCoopService coopService,
+                                 @Nullable CommandNpcRelocationService relocationService,
+                                 @Nullable CommandLinkedNpcLostService lostService,
+                                 @Nullable TranslationRegistry translationRegistry,
+                                 @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService,
+                                 @Nullable CaptureAttemptCoordinator captureAttemptCoordinator,
+                                 LongSupplier captureRequirementGeneration,
+                                 @Nullable CaptureRepository captureRepository) {
         this.logger = logger;
         this.registry = registry;
+        this.profilePersistence = new SpawnerCapturedProfilePersistenceService(logger, captureRepository);
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
         this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
         this.spawnPositionService = new SpawnerSpawnPositionService(logger);
@@ -138,6 +154,7 @@ public final class SpawnerFeatureHandler {
                 ownershipPolicyService,
                 npcIdentityService
         );
+        this.captureLog = new SpawnerCaptureOperationalLog(logger);
         this.preparedSpawnService = new SpawnerPreparedSpawnService(
                 spawnPositionService,
                 rolePolicyService,
@@ -150,7 +167,7 @@ public final class SpawnerFeatureHandler {
                 linkedNpcSyncService,
                 effectService,
                 coopService,
-                this::logSpawnerFlowDebug
+                captureLog::flowDebug
         );
         this.pendingSourceRecoveryService = new SpawnerPendingSourceRecoveryService(
                 registry,
@@ -163,7 +180,6 @@ public final class SpawnerFeatureHandler {
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.managedCoopDetachService = managedCoopDetachService;
-        this.captureLog = new SpawnerCaptureOperationalLog(logger);
         this.captureAttemptRuntime = new SpawnerCaptureAttemptRuntimeCoordinator(
                 registry,
                 playerInventoryService,
@@ -631,7 +647,7 @@ public final class SpawnerFeatureHandler {
     private boolean spawnFromItem(Player player, ItemStack itemStack, ItemFeatureConfig config,
                                   Integer hotbarSlot, String emptyItemIdOverride) {
         if (player == null || itemStack == null || config == null) {
-            logSpawnerFlowDebug("spawn denied reason=invalid-input");
+            captureLog.flowDebug("spawn denied reason=invalid-input");
             return false;
         }
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
@@ -899,6 +915,8 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig finalizedConfig = config;
         UUID finalizedAttemptId = outcomeResolved ? attemptId : null;
         UUID finalizedOwnerToStore = ownerToStore;
+        String finalizedCaptureRoleId = captureRoleId;
+        String finalizedSnapshotDisplayName = snapshotDisplayName;
         Integer sourceHotbarSlot = attempt.hotbarSlot();
         if (bondedCapture && sourceHotbarSlot == null) {
             captureLog.capture("capture denied reason=bonded-source-slot-unavailable");
@@ -950,7 +968,7 @@ public final class SpawnerFeatureHandler {
                         if (coopService != null) {
                             coopService.clearCoopSnapshot(liveUuid);
                         }
-                        spawnCaptureSuccessParticle(captureBurstParticleSystem, context);
+                        effectService.playCaptureSuccessParticle(captureBurstParticleSystem, context);
                         effectService.playCaptureEffects(world, context.npcRef(), finalizedConfig);
                         logger.at(Level.FINE).log(
                                 "Spawner stub: capture request item=" + itemStack.getItemId()
@@ -980,6 +998,9 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onPopulationCommitted(
                             com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
+                        profilePersistence.persist(
+                                targetUuid, finalizedOwnerToStore, finalizedCaptureRoleId,
+                                finalizedSnapshotDisplayName);
                         if (bondedCapture) {
                             bondedVessels.bindInitialCapture(
                                     bindingAuthority,
@@ -1014,34 +1035,10 @@ public final class SpawnerFeatureHandler {
                 : preparedMutation.apply(callbacks);
     }
 
-    private static void spawnCaptureSuccessParticle(
-            @Nullable String particleSystem,
-            com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
-        if (particleSystem == null || particleSystem.isBlank()
-                || context == null || context.npcRef() == null || !context.npcRef().isValid()) {
-            return;
-        }
-        TransformComponent transform = context.store().getComponent(
-                context.npcRef(), TransformComponent.getComponentType()
-        );
-        if (transform == null || transform.getPosition() == null) {
-            return;
-        }
-        ParticleUtil.spawnParticleEffect(particleSystem, transform.getPosition(), context.store());
-    }
-
     @Nullable
     static UUID resolveCapturedOwnerMetadata(@Nullable UUID existingOwner, boolean captureClearsOwner) {
         return captureClearsOwner ? null : existingOwner;
     }
-    private void logSpawnerFlowDebug(String message) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || !instance.isDebugSpawnerEnabled()) {
-            return;
-        }
-        logger.at(Level.INFO).log("Spawner flow debug: " + message);
-    }
-
     public void logCaptureChannelDiagnostic(String message) {
         captureLog.capture("interaction status=denied " + message);
     }

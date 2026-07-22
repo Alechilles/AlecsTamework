@@ -1143,7 +1143,8 @@ public class Tamework extends JavaPlugin {
                         persistenceRuntime.getManagedCoopServices().compositeIndexRefreshService()
                 ),
                 captureAttemptRuntimeReady ? captureAttemptCoordinator : null,
-                interactionExtensionRegistry::captureRequirementGeneration
+                interactionExtensionRegistry::captureRequirementGeneration,
+                persistenceRuntime.getCaptureRepository()
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -2667,7 +2668,8 @@ public class Tamework extends JavaPlugin {
                             persistenceRuntime.getNpcProfileRepository(),
                             new HytaleProvisionedCompanionProjectionPort(
                                     ownerPopulationRuntime,
-                                    persistenceRuntime.getNpcProfileRepository()));
+                                    persistenceRuntime.getNpcProfileRepository(),
+                                    commandNpcRelocationService));
             var populationRecovery = backend.recover().toCompletableFuture().join();
             CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
                     new SqliteProvisioningOperationJournal(
@@ -2810,7 +2812,10 @@ public class Tamework extends JavaPlugin {
                     new NpcProfileBondedVesselProfilePort(
                             persistenceRuntime.getNpcProfileRepository(),
                             ownerPopulationRuntime.index(),
-                            ForkJoinPool.commonPool()),
+                            ForkJoinPool.commonPool(),
+                            persistenceRuntime.getPopulationGroupRepository(),
+                            persistenceRuntime.getBondedVesselRepository(),
+                            itemFeatureRegistry),
                     populations,
                     new HytaleBondedVesselWorldProjectionPort(
                             ownerPopulationRuntime, populations),

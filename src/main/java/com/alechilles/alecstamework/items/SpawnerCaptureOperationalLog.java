@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -18,6 +19,13 @@ final class SpawnerCaptureOperationalLog {
 
     void capture(String message) {
         logger.at(Level.INFO).log("Spawner capture flow: " + message);
+    }
+
+    void flowDebug(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.isDebugSpawnerEnabled()) {
+            logger.at(Level.INFO).log("Spawner flow debug: " + message);
+        }
     }
 
     void channelBeginRuntimeDenied(UUID playerUuid, ItemStack source) {

@@ -49,6 +49,8 @@ public final class HytaleBondedVesselWorldProjectionPort
     private final BondedVesselUnifiedPopulationPort populations;
     private final SpawnerNpcProgressionMetadataService progression =
             new SpawnerNpcProgressionMetadataService();
+    private final CompanionProjectionSpawnPositionService spawnPosition =
+            new CompanionProjectionSpawnPositionService();
 
     public HytaleBondedVesselWorldProjectionPort(
             @Nonnull OwnerPopulationRuntime ownerRuntime,
@@ -157,16 +159,15 @@ public final class HytaleBondedVesselWorldProjectionPort
                     population.binding().itemEvidenceJson()));
             return;
         }
-        int local = ChunkUtil.SIZE / 2;
-        Vector3d position = new Vector3d(
-                ChunkUtil.minBlock(destination.chunkX()) + local + 0.5D,
-                chunk.getHeight(local, local) + 1.0D,
-                ChunkUtil.minBlock(destination.chunkZ()) + local + 0.5D);
+        CompanionProjectionSpawnPositionService.Placement placement = spawnPosition.resolve(
+                world, source.actorUuid(), population.profile().roleId(),
+                destination.chunkX(), destination.chunkZ(), chunk);
+        Vector3d position = placement.position();
         Pair<Ref<EntityStore>, NPCEntity> spawned;
         try {
             TameworkProjectionIdentityComponent marker = marker(population.operation(),
                     population.binding());
-            spawned = plugin.spawnEntity(store, roleIndex, position, new Rotation3f(), null,
+            spawned = plugin.spawnEntity(store, roleIndex, position, placement.rotation(), null,
                     (npc, holder, callbackStore) -> {
                         OwnerComponentMutationService.WriteResult write =
                                 populations.writeSpawnHolder(
