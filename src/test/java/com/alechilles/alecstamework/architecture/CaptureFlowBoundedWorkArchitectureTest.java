@@ -71,6 +71,6 @@ class CaptureFlowBoundedWorkArchitectureTest {
     private static String source(String relative) throws Exception {
         return Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/" + relative.replace('/',
-                        java.io.File.separatorChar)));
+                        java.io.File.separatorChar))).replace("\r\n", "\n");
     }
 }
