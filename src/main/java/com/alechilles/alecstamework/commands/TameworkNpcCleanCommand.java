@@ -14,9 +14,8 @@ import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -30,7 +29,7 @@ import javax.annotation.Nullable;
 /**
  * Command to remove all unowned live NPC entities matching one requested role id.
  */
-public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
+public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     public TameworkNpcCleanCommand() {
         super("npcclean", "Remove all unowned NPCs matching a specific role id.");
         setAllowsExtraArguments(true);
@@ -38,10 +37,8 @@ public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         String requestedRole = getArg(commandContext, 2);
         if (requestedRole == null || requestedRole.isBlank()) {
             commandContext.sender().sendMessage(Message.raw("Usage: /tw npcclean <roleId>"));

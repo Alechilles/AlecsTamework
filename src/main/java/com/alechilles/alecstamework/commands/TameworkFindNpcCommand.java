@@ -8,9 +8,8 @@ import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -22,7 +21,7 @@ import javax.annotation.Nonnull;
 /**
  * Command to find an NPC by UUID and optionally mark its location.
  */
-public final class TameworkFindNpcCommand extends AbstractPlayerCommand {
+public final class TameworkFindNpcCommand extends AbstractWorldCommand {
     private static final String DEFAULT_MARKER_PARTICLE = "Hearts";
 
     public TameworkFindNpcCommand() {
@@ -32,10 +31,8 @@ public final class TameworkFindNpcCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         String uuidArg = getArg(commandContext, 2);
         UUID targetUuid = parseUuid(uuidArg);
         if (targetUuid == null) {
@@ -56,7 +53,10 @@ public final class TameworkFindNpcCommand extends AbstractPlayerCommand {
         }
 
         TransformComponent targetTransform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        TransformComponent playerTransform = store.getComponent(ref, TransformComponent.getComponentType());
+        Ref<EntityStore> senderRef = commandContext.isPlayer() ? commandContext.senderAsPlayerRef() : null;
+        TransformComponent playerTransform = senderRef == null
+                ? null
+                : store.getComponent(senderRef, TransformComponent.getComponentType());
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
         String lifeStage = CompanionLifeStageService.resolveCurrentStage(targetRef, store, roleId);
         double scale = CompanionModelScaleService.resolveCurrentScale(targetRef, store, 1.0);

@@ -15,15 +15,12 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceIntegrityService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.permissions.PermissionHolder;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,7 +33,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Operator diagnostics plus explicitly authorized managed-coop import reconciliation. */
-public final class TameworkCoopCommand extends AbstractPlayerCommand {
+public final class TameworkCoopCommand extends AbstractTameworkServerCommand {
     private static final String RECONCILE_PERMISSION = "tamework.command.coop.reconcile";
     private static final int MAX_DETAIL_LINES = 25;
 
@@ -46,11 +43,7 @@ public final class TameworkCoopCommand extends AbstractPlayerCommand {
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         TameworkPersistenceRuntime runtime = plugin != null ? plugin.getPersistenceRuntime() : null;
         if (runtime == null) {
@@ -60,6 +53,15 @@ public final class TameworkCoopCommand extends AbstractPlayerCommand {
         String[] tokens = tokens(commandContext);
         String action = action(tokens);
         if ("reconcile".equals(action)) {
+            PlayerRef playerRef = commandContext.isPlayer()
+                    ? commandContext.senderAs(PlayerRef.class)
+                    : null;
+            World world = playerRef == null ? null : Universe.get().getWorld(playerRef.getWorldUuid());
+            if (playerRef == null || world == null) {
+                send(commandContext, "Coop reconciliation requires an in-world player; audit, import-status, "
+                        + "and rollback-preflight are available from the server console.");
+                return;
+            }
             reconcile(commandContext, world, playerRef, tokens);
             return;
         }

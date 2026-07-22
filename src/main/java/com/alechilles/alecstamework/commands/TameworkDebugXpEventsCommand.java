@@ -2,32 +2,22 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Toggles debug logging for public companion XP API events.
  */
-public final class TameworkDebugXpEventsCommand extends AbstractPlayerCommand {
+public final class TameworkDebugXpEventsCommand extends AbstractTameworkServerCommand {
     public TameworkDebugXpEventsCommand() {
         super("debugxpevents", "Toggle Tamework companion XP API event debug logging.");
         setAllowsExtraArguments(true);
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         CompanionXpEventDebugLogService service = plugin != null ? plugin.getCompanionXpEventDebugLogService() : null;
         if (service == null) {

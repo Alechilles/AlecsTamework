@@ -6,33 +6,24 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCirc
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Lists or changes locally persisted persistence feature-circuit overrides. */
-public final class TameworkPersistenceCircuitCommand extends AbstractPlayerCommand {
+public final class TameworkPersistenceCircuitCommand extends AbstractTameworkServerCommand {
     public TameworkPersistenceCircuitCommand() {
         super("persistencecircuit", "List, enable, or disable a persistence feature circuit.");
         setAllowsExtraArguments(true);
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext context,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext context) {
         if (!TameworkConfigPermission.hasAccess(context.sender())) {
             context.sender().sendMessage(Message.raw(
                     "You do not have permission to change persistence circuits."));
@@ -48,12 +39,10 @@ public final class TameworkPersistenceCircuitCommand extends AbstractPlayerComma
             list(context, runtime.getFeatureCircuitRegistry());
             return;
         }
-        change(context, world, playerRef, runtime, arguments);
+        change(context, runtime, arguments);
     }
 
     private void change(CommandContext context,
-                        World world,
-                        PlayerRef playerRef,
                         TameworkPersistenceRuntime runtime,
                         String[] arguments) {
         Boolean enabled = parseEnabled(arguments[0]);
@@ -64,13 +53,16 @@ public final class TameworkPersistenceCircuitCommand extends AbstractPlayerComma
             return;
         }
         String reason = arguments.length > 2 ? normalizeReason(arguments[2]) : "operator_override";
-        String actor = "player:" + runtime.getPersistenceScopeFactory()
-                .ownerGlobal(playerRef.getUuid()).scopeHash();
+        UUID senderUuid = context.sender().getUuid();
+        String actor = senderUuid == null
+                ? "command:server-console"
+                : "command:" + runtime.getPersistenceScopeFactory()
+                .ownerGlobal(senderUuid).scopeHash();
         var submission = runtime.getFeatureCircuitRepository().set(
                 domain, enabled, reason, System.currentTimeMillis(), actor,
                 runtime.getFeatureCircuitRegistry());
-        submission.completion().whenComplete((outcome, failure) -> world.execute(
-                () -> reportChange(context, domain, enabled, outcome, failure)));
+        submission.completion().whenComplete(
+                (outcome, failure) -> reportChange(context, domain, enabled, outcome, failure));
     }
 
     @Nullable

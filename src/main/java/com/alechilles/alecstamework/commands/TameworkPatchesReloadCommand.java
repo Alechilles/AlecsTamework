@@ -11,19 +11,17 @@ import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.AssetPatchStatus;
 import com.alechilles.alecstamework.assets.patches.AssetPatchTargetClassifier;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
-import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Regenerates optional patches and reloads generated targets when a safe runtime route exists.
  */
-public final class TameworkPatchesReloadCommand extends AbstractPlayerCommand {
+public final class TameworkPatchesReloadCommand extends AbstractWorldCommand {
     public TameworkPatchesReloadCommand() {
         super("reload", "Reload optional Tamework patches.");
         requirePermission(TameworkConfigPermission.NODE);
@@ -32,10 +30,8 @@ public final class TameworkPatchesReloadCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || plugin.getAssetPatchService() == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework patch service is not available."));

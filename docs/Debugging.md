@@ -12,6 +12,27 @@
 - `TameworkInteract: no interactions matched` -> requirements failed; inspect requirement summary and alarm/context state.
 - `TwGlobalConfig ... missing required fields` -> one or more required interaction default param names are blank.
 
+## Server-console command scope
+
+Server-wide diagnostics and controls do not require a player identity. This includes
+`/tw diagnose`, `/tw debugdb`, `/tw persistencecircuit`, `/tw patches status`,
+the read-only `/tw coop audit`, `/tw coop import-status`, and
+`/tw coop rollback-preflight` views, plus the server-global `debug*` logging toggles.
+`/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
+event/crash actions remain restricted to the existing allowlisted player identities.
+
+Commands that operate on a world but not a player use Hytale's optional world
+argument. Console callers must provide the target world for `/tw reloadconfig`,
+`/tw patches reload`, `/tw npcclean`, `/tw findnpc`, and `/tw getalarm`. The last
+two require an NPC UUID when no player gaze target exists; player-relative distance
+is reported as `n/a` from the console.
+
+Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
+player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
+`/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw showhitboxes`,
+and `/tw showspawnmarkers` need a live player. Managed-coop reconciliation confirmation
+also remains in-world because its authority key is bound to the executing player's world.
+
 ## Interaction troubleshooting
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
 - If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.

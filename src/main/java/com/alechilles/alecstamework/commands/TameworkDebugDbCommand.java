@@ -4,14 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceIntegrityService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -22,7 +16,7 @@ import javax.annotation.Nullable;
 /**
  * Prints SQLite persistence diagnostics and allows manual maintenance triggers.
  */
-public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
+public final class TameworkDebugDbCommand extends AbstractTameworkServerCommand {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER =
             DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
 
@@ -32,11 +26,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
@@ -51,7 +41,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
         String action = normalizeAction(getFirstArg(commandContext));
         if (TameworkPersistenceDiagnosticsCommandHandler.supports(action)) {
             new TameworkPersistenceDiagnosticsCommandHandler().handle(
-                    commandContext, world, plugin, runtime, action);
+                    commandContext, plugin, runtime, action);
             return;
         } else if ("integrity".equals(action)) {
             printIntegrity(commandContext, runtime.getIntegrityService().inspect());

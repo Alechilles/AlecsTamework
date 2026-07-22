@@ -2,32 +2,22 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 
 /** Concise integration/readiness report for public API consumers. */
-public final class TameworkDiagnoseCommand extends AbstractPlayerCommand {
+public final class TameworkDiagnoseCommand extends AbstractTameworkServerCommand {
     public TameworkDiagnoseCommand() {
         super("diagnose", "Report Tamework API and integration runtime readiness.");
         setAllowsExtraArguments(true);
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext context,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext context) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             context.sender().sendMessage(Message.raw("Tamework plugin not available."));

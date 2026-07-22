@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecove
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.universe.world.World;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Set;
@@ -23,7 +22,6 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
     }
 
     void handle(CommandContext context,
-                World world,
                 Tamework plugin,
                 TameworkPersistenceRuntime runtime,
                 String action) {
@@ -37,22 +35,21 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
                         runtime, runtimeDataDirectory, plugin.getCrashTelemetryService());
         String[] args = arguments(context);
         switch (action) {
-            case "health" -> async(context, world, diagnostics::health,
+            case "health" -> async(context, diagnostics::health,
                     health -> printHealth(context, health));
-            case "incidents" -> listIncidents(context, world, diagnostics, args);
-            case "incident" -> showIncident(context, world, diagnostics, args);
-            case "retry" -> retry(context, world, diagnostics, args);
-            case "export" -> export(context, world, diagnostics, args);
+            case "incidents" -> listIncidents(context, diagnostics, args);
+            case "incident" -> showIncident(context, diagnostics, args);
+            case "retry" -> retry(context, diagnostics, args);
+            case "export" -> export(context, diagnostics, args);
             default -> send(context, "Unknown persistence diagnostic action.");
         }
     }
 
     private void listIncidents(CommandContext context,
-                               World world,
                                PersistenceDiagnosticsService diagnostics,
                                String[] args) {
         boolean openOnly = args.length == 0 || !"all".equalsIgnoreCase(args[0]);
-        async(context, world, () -> diagnostics.incidents(openOnly, 25), incidents -> {
+        async(context, () -> diagnostics.incidents(openOnly, 25), incidents -> {
             send(context, (openOnly ? "Open" : "Recent") + " persistence incidents: " + incidents.size());
             for (var incident : incidents) {
                 send(context, "- " + incident.shortId() + " " + incident.status()
@@ -64,14 +61,13 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
     }
 
     private void showIncident(CommandContext context,
-                              World world,
                               PersistenceDiagnosticsService diagnostics,
                               String[] args) {
         if (args.length == 0) {
             send(context, "Usage: /tw debugdb incident <incident-id>");
             return;
         }
-        async(context, world, () -> diagnostics.incident(args[0]), result -> {
+        async(context, () -> diagnostics.incident(args[0]), result -> {
             if (result.isEmpty()) {
                 send(context, "Incident was not found or its prefix is ambiguous.");
                 return;
@@ -93,14 +89,13 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
     }
 
     private void retry(CommandContext context,
-                       World world,
                        PersistenceDiagnosticsService diagnostics,
                        String[] args) {
         if (args.length == 0) {
             send(context, "Usage: /tw debugdb retry <incident-id>");
             return;
         }
-        diagnostics.retry(args[0]).whenComplete((result, failure) -> world.execute(() -> {
+        diagnostics.retry(args[0]).whenComplete((result, failure) -> {
             if (failure != null || result == null) {
                 send(context, "Incident verification could not be requested.");
                 return;
@@ -108,11 +103,10 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
             send(context, "Incident verification result=" + result.status()
                     + " reason=" + result.reason()
                     + (result.attempts() == null ? "" : " attempts=" + result.attempts()));
-        }));
+        });
     }
 
     private void export(CommandContext context,
-                        World world,
                         PersistenceDiagnosticsService diagnostics,
                         String[] args) {
         if (!TameworkConfigPermission.hasAccess(context.sender())) {
@@ -131,7 +125,7 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
             return;
         }
         String selectedIncident = incident;
-        async(context, world, () -> diagnostics.export(selectedIncident), result ->
+        async(context, () -> diagnostics.export(selectedIncident), result ->
                 send(context, "Persistence bundle " + shortHash(result.supportId())
                         + " created (" + result.memberCount() + " files, " + result.sizeBytes()
                         + " bytes): " + result.path().toAbsolutePath().normalize()));
@@ -154,7 +148,6 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
     }
 
     private <T> void async(CommandContext context,
-                           World world,
                            ThrowingSupplier<T> supplier,
                            Consumer<T> success) {
         CompletableFuture.supplyAsync(() -> {
@@ -163,10 +156,10 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
             } catch (Exception failure) {
                 throw new java.util.concurrent.CompletionException(failure);
             }
-        }).whenComplete((result, failure) -> world.execute(() -> {
+        }).whenComplete((result, failure) -> {
             if (failure != null) send(context, "Persistence diagnostics failed; see the server log.");
             else success.accept(result);
-        }));
+        });
     }
 
     private String[] arguments(CommandContext context) {
