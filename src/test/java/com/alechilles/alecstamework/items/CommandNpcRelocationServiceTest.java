@@ -216,11 +216,11 @@ class CommandNpcRelocationServiceTest {
         String service = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework", "items",
                 "CommandNpcRelocationService.java"
-        ), StandardCharsets.UTF_8);
+        ), StandardCharsets.UTF_8).replace("\r\n", "\n");
         String chunkRequests = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework", "items",
                 "CommandRelocationChunkRequestService.java"
-        ), StandardCharsets.UTF_8);
+        ), StandardCharsets.UTF_8).replace("\r\n", "\n");
 
         assertTrue(service.contains("admissionGate.resolveCanonicalSource(npcUuid)"),
                 "A queued recall must snapshot canonical occupancy before loading chunks.");
