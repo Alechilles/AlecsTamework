@@ -1017,7 +1017,6 @@ public class Tamework extends JavaPlugin {
         }
         activatePopulationGroupsIfReady();
         activateCompanionProvisioningIfReady();
-        initializeCommandTimedSummoningRuntime();
         ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
                 new ClaimProviderLifecycleInvalidator(provider -> {
                     OwnerPopulationRuntime runtime = ownerPopulationRuntime;
@@ -1079,6 +1078,7 @@ public class Tamework extends JavaPlugin {
                         commandLinkedNpcLostService
                 );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
+        retryCommandTimedSummoningIfReady();
         managedCoopRuntime = new ManagedCoopRuntimeComposition(
                 persistenceRuntime,
                 ownerPopulationRuntime,
@@ -2756,6 +2756,7 @@ public class Tamework extends JavaPlugin {
             activatePopulationGroupsIfReady();
             retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
             activateCompanionProvisioningIfReady();
+            retryCommandTimedSummoningIfReady();
         }
         return result.applied();
     }
@@ -2850,6 +2851,7 @@ public class Tamework extends JavaPlugin {
         if (!(api instanceof TameworkApiImpl implementation)
                 || persistenceRuntime == null || ownerPopulationRuntime == null
                 || commandFamilyRosterService == null || commandLinkedNpcStateSnapshotService == null
+                || coopResidentStateSnapshotService == null
                 || commandTimedSummoningTickSystem == null) {
             return;
         }
@@ -2930,6 +2932,18 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    private void retryCommandTimedSummoningIfReady() {
+        if (commandTimedSummoningService != null
+                || commandTimedSummoningApi != null
+                || !populationGroupRecoveryReady
+                || ownerPopulationRuntime == null
+                || !ownerPopulationRuntime.populationGroupsReady()
+                || coopResidentStateSnapshotService == null) {
+            return;
+        }
+        initializeCommandTimedSummoningRuntime();
+    }
+
     private void initializePopulationGroupRuntime() {
         populationGroupApi = null;
         populationGroupRecoveryReady = false;
@@ -2990,6 +3004,7 @@ public class Tamework extends JavaPlugin {
                 activatePopulationGroupsIfReady();
                 retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
                 activateCompanionProvisioningIfReady();
+                retryCommandTimedSummoningIfReady();
             } else {
                 getLogger().at(Level.WARNING).log(
                         "Population-group recovery remained unresolved after canonical owner "

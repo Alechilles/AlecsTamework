@@ -22,6 +22,15 @@ class CommandTimedSummoningRuntimeWiringTest {
         assertTrue(plugin.contains("submit(repository::loadAllSessions)"));
         assertTrue(plugin.contains("projection.installLifecycleService(service)"));
         assertTrue(plugin.contains("installProjectionLoadSink("));
+        assertTrue(plugin.contains("retryCommandTimedSummoningIfReady()"));
+        assertTrue(plugin.contains("|| coopResidentStateSnapshotService == null"));
+        assertTrue(plugin.contains("|| !populationGroupRecoveryReady"));
+        int snapshotsReady = plugin.indexOf(
+                "coopResidentStateSnapshotService = new CoopResidentStateSnapshotService()");
+        int firstRetryAfterSnapshots = plugin.indexOf(
+                "retryCommandTimedSummoningIfReady();", snapshotsReady);
+        assertTrue(snapshotsReady >= 0 && firstRetryAfterSnapshots > snapshotsReady);
+        assertTrue(occurrences(plugin, "retryCommandTimedSummoningIfReady();") >= 3);
     }
 
     @Test
@@ -49,5 +58,14 @@ class CommandTimedSummoningRuntimeWiringTest {
         assertTrue(schema.contains("command_timed_summon_snapshots"));
         assertTrue(schema.contains("snapshot_sha256"));
         assertTrue(marker.contains("KIND_COMMAND_ROSTER"));
+    }
+
+    private static int occurrences(String text, String fragment) {
+        int count = 0;
+        for (int cursor = 0; (cursor = text.indexOf(fragment, cursor)) >= 0;
+                cursor += fragment.length()) {
+            count++;
+        }
+        return count;
     }
 }
