@@ -2632,9 +2632,23 @@ public class Tamework extends JavaPlugin {
                 }
             }
             activatePopulationGroupsIfReady();
+            retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
             activateCompanionProvisioningIfReady();
         }
         return result.applied();
+    }
+
+    private void retryCompanionProvisioningRecoveryIfPopulationGroupsReady() {
+        if (companionProvisioningRecoveryReady
+                || !populationGroupRecoveryReady
+                || ownerPopulationRuntime == null
+                || !ownerPopulationRuntime.populationGroupsReady()
+                || populationGroupRegistry == null
+                || persistenceRuntime == null
+                || apiEventBus == null) {
+            return;
+        }
+        initializeCompanionProvisioningRuntime();
     }
 
     private void initializeCompanionProvisioningRuntime() {
@@ -2743,9 +2757,7 @@ public class Tamework extends JavaPlugin {
                     && ownerPopulationRuntime.populationGroupsReady();
             if (populationGroupRecoveryReady) {
                 activatePopulationGroupsIfReady();
-                if (!companionProvisioningRecoveryReady) {
-                    initializeCompanionProvisioningRuntime();
-                }
+                retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
                 activateCompanionProvisioningIfReady();
             } else {
                 getLogger().at(Level.WARNING).log(
