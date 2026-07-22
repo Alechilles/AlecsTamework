@@ -106,6 +106,8 @@ The script creates a `<ModelId>_AvatarFlight` server model, a copied `.blockymod
 
 The generator warns when player-style locomotion sets that the native transformed-player client can request while grounded are missing: `Sprint`, `JumpSprint`, and `StepSprint`. Keep real asset-level keys for these aliases in static avatar models, usually by mapping them to the model's `Run`, `JumpRun`, and `StepRun` sets when no dedicated sprint variants exist. The generator does not add them automatically because animation choice belongs to the model author. Runtime animation injection adds only forced flight pose clips and preserves every model-authored grounded locomotion set unchanged; native grounded walk/run/sprint selection can consult those declared animation set ids before Tamework sends any custom movement animation.
 
+Do not define nonempty `FootstepIntervals` arrays on transformed-player model animations. The current client retains its footstep interval index across model and movement-animation swaps without checking it against the new array length, so changing from an ordinary player animation to a shorter AvatarFlight interval array can crash the client on the next grounded step. The namespace generator strips these arrays from generated model variants and reports each correction. Use the AvatarFlight audio fields for timed wing sounds instead of model-animation footsteps.
+
 ## Config Fields
 
 ### Model Camera
@@ -133,7 +135,7 @@ Omitting `Mounting` inherits the complete parent section. An explicit `Mounting`
 - `IdleAnimation`: movement-slot animation used while hovering or horizontally idle.
 - `FlightAnimation`: movement-slot animation used during ordinary forward flight.
 - `FastFlightAnimation`: movement-slot animation used while forward boost speed is active.
-- `ResendIntervalMs`: interval for defensively resending an unchanged movement animation. Set this to `0` for models that attach `SoundEventId` and `FootstepIntervals` to looping flight animations; repeated play packets restart those sound events before the model-authored timing can complete.
+- `ResendIntervalMs`: interval for defensively resending an unchanged movement animation. Set this to `0` for models that attach a looping `SoundEventId` to flight animations; repeated play packets restart those sound events before the model-authored timing can complete.
 
 Omitting `Animation` inherits the complete parent section. An explicit `Animation` object overrides only its explicit nested keys and inherits the remaining values.
 
