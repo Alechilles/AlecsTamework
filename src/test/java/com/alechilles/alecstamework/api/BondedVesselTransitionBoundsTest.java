@@ -26,6 +26,16 @@ class BondedVesselTransitionBoundsTest {
     }
 
     @Test
+    void requestRejectsBlankIdentityAndNegativeAuthorityRevisions() {
+        BondedVesselTransitionContext context = context("item", "holder", "hotbar", "fingerprint");
+
+        assertThrows(IllegalArgumentException.class, () -> request(" ", "key", context));
+        assertThrows(IllegalArgumentException.class, () -> request("namespace", " ", context));
+        assertThrows(IllegalArgumentException.class, () -> request(-1L, 2L, context));
+        assertThrows(IllegalArgumentException.class, () -> request(1L, -1L, context));
+    }
+
+    @Test
     void contextEvidenceFieldsAcceptExactBoundsAndRejectOneCharacterOver() {
         assertDoesNotThrow(() -> context(
                 text(BondedVesselTransitionContext.MAX_SOURCE_ITEM_ID_LENGTH),
@@ -37,6 +47,39 @@ class BondedVesselTransitionBoundsTest {
         assertOverBoundContext(1, BondedVesselTransitionContext.MAX_HOLDER_EVIDENCE_ID_LENGTH);
         assertOverBoundContext(2, BondedVesselTransitionContext.MAX_CONTAINER_PATH_LENGTH);
         assertOverBoundContext(3, BondedVesselTransitionContext.MAX_ITEM_FINGERPRINT_LENGTH);
+    }
+
+    @Test
+    void contextRejectsBlankOrNegativeExactSourceEvidence() {
+        assertBlankContext(0);
+        assertBlankContext(1);
+        assertBlankContext(2);
+        assertBlankContext(3);
+        assertThrows(IllegalArgumentException.class, () -> context(-1, 1L, null,
+                new PopulationAdmissionLocation("world", 0, 0)));
+        assertThrows(IllegalArgumentException.class, () -> context(0, -1L, null,
+                new PopulationAdmissionLocation("world", 0, 0)));
+    }
+
+    @Test
+    void transitionSpecificEvidenceFailsClosedWhenMissingOrContradictory() {
+        PopulationAdmissionLocation destination = new PopulationAdmissionLocation("world", 0, 0);
+        UUID npcUuid = UUID.randomUUID();
+
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.SUMMON, context(0, 1L, null, null)));
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.SUMMON, context(0, 1L, npcUuid, destination)));
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.STORE, context(0, 1L, null, null)));
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.STORE, context(0, 1L, npcUuid, destination)));
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.REPAIR_DEAD_TO_STORED,
+                context(0, 1L, npcUuid, null)));
+        assertThrows(IllegalArgumentException.class, () -> request(
+                BondedVesselTransition.REPAIR_DEAD_TO_STORED,
+                context(0, 1L, null, destination)));
     }
 
     @Test
@@ -57,6 +100,23 @@ class BondedVesselTransitionBoundsTest {
                 BondedVesselTransition.SUMMON, context);
     }
 
+    private static BondedVesselTransitionRequest request(
+            long expectedGeneration,
+            long expectedProfileRevision,
+            BondedVesselTransitionContext context) {
+        return new BondedVesselTransitionRequest(
+                "namespace", "key", UUID.randomUUID(), UUID.randomUUID(), expectedGeneration,
+                expectedProfileRevision, BondedVesselTransition.SUMMON, context);
+    }
+
+    private static BondedVesselTransitionRequest request(
+            BondedVesselTransition transition,
+            BondedVesselTransitionContext context) {
+        return new BondedVesselTransitionRequest(
+                "namespace", "key", UUID.randomUUID(), UUID.randomUUID(), 1L, 2L,
+                transition, context);
+    }
+
     private static BondedVesselTransitionContext context(
             String item, String holder, String container, String fingerprint) {
         return new BondedVesselTransitionContext(
@@ -64,9 +124,26 @@ class BondedVesselTransitionBoundsTest {
                 new PopulationAdmissionLocation("world", 0, 0));
     }
 
+    private static BondedVesselTransitionContext context(
+            int slot,
+            long revision,
+            UUID expectedNpcUuid,
+            PopulationAdmissionLocation destination) {
+        return new BondedVesselTransitionContext(
+                "item", "holder", "hotbar", slot, revision, "fingerprint",
+                expectedNpcUuid, destination);
+    }
+
     private static void assertOverBoundContext(int field, int maxLength) {
         String[] values = {"item", "holder", "hotbar", "fingerprint"};
         values[field] = text(maxLength + 1);
+        assertThrows(IllegalArgumentException.class,
+                () -> context(values[0], values[1], values[2], values[3]));
+    }
+
+    private static void assertBlankContext(int field) {
+        String[] values = {"item", "holder", "hotbar", "fingerprint"};
+        values[field] = " ";
         assertThrows(IllegalArgumentException.class,
                 () -> context(values[0], values[1], values[2], values[3]));
     }
