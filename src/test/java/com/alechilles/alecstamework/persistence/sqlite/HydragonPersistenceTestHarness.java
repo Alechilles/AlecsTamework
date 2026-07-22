@@ -7,11 +7,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /** Shared isolated SQLite writer harness for schema-v8 integration repository tests. */
-final class HydragonPersistenceTestHarness implements AutoCloseable {
-    final SqliteConnectionManager connections;
-    final PersistenceWriteQueue queue;
+public final class HydragonPersistenceTestHarness implements AutoCloseable {
+    public final SqliteConnectionManager connections;
+    public final PersistenceWriteQueue queue;
 
-    HydragonPersistenceTestHarness(Path databasePath) throws Exception {
+    public HydragonPersistenceTestHarness(Path databasePath) throws Exception {
         connections = new SqliteConnectionManager(databasePath);
         try (Connection connection = connections.openConnection()) {
             connection.setAutoCommit(false);
@@ -21,8 +21,8 @@ final class HydragonPersistenceTestHarness implements AutoCloseable {
         queue = new PersistenceWriteQueue(connections, new PersistenceHealthService(), null);
     }
 
-    String insertProfile(UUID ownerUuid, String roleId, String lifecycle,
-                         String ownershipWorld, long populationRevision) throws Exception {
+    public String insertProfile(UUID ownerUuid, String roleId, String lifecycle,
+                                String ownershipWorld, long populationRevision) throws Exception {
         String profileId = UUID.randomUUID().toString();
         try (Connection connection = connections.openConnection();
              PreparedStatement profile = connection.prepareStatement("""
@@ -51,7 +51,7 @@ final class HydragonPersistenceTestHarness implements AutoCloseable {
         return profileId;
     }
 
-    static <T> T await(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
+    public static <T> T await(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
         PersistenceWriteQueue.WriteOutcome<T> outcome = submission.completion().get(5, TimeUnit.SECONDS);
         if (!outcome.isCommitted()) {
             throw new AssertionError("Write did not commit: " + outcome.failureReason(), outcome.failure());

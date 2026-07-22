@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.CompanionProvisioningApiDelegate;
+import com.alechilles.alecstamework.api.internal.CommandTimedSummoningApiDelegate;
 import com.alechilles.alecstamework.api.internal.PopulationGroupApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
@@ -135,6 +136,13 @@ import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
 import com.alechilles.alecstamework.items.HytaleProvisionedCompanionProjectionPort;
+import com.alechilles.alecstamework.items.HytaleCommandTimedSummonProjectionPort;
+import com.alechilles.alecstamework.items.CommandFamilyRosterMembershipPort;
+import com.alechilles.alecstamework.items.CommandTimedSummonPopulationPort;
+import com.alechilles.alecstamework.items.CommandTimedSummoningService;
+import com.alechilles.alecstamework.items.CommandTimedSummoningTickSystem;
+import com.alechilles.alecstamework.items.CommandTimedProjectionRetirementIndex;
+import com.alechilles.alecstamework.items.PaidCommandRevivalCoordinator;
 import com.alechilles.alecstamework.items.RecoveryProjectionReconciliationService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
@@ -178,6 +186,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryWiring;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
 import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;
 import com.alechilles.alecstamework.provisioning.UnifiedProvisioningPopulationBackend;
@@ -264,6 +273,7 @@ import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystem
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
+import java.util.UUID;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -325,6 +335,11 @@ public class Tamework extends JavaPlugin {
     private CompanionProvisioningApiDelegate companionProvisioningApi;
     private CommandFamilyRosterService commandFamilyRosterService;
     private boolean companionProvisioningRecoveryReady;
+    private CommandTimedSummoningApiDelegate commandTimedSummoningApi;
+    private CommandTimedSummoningService commandTimedSummoningService;
+    private CommandTimedSummoningTickSystem commandTimedSummoningTickSystem;
+    private PaidCommandRevivalCoordinator paidCommandRevivalCoordinator;
+    private boolean commandTimedSummoningRecoveryReady;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -869,6 +884,8 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
+        commandTimedSummoningTickSystem = new CommandTimedSummoningTickSystem();
+        getEntityStoreRegistry().registerSystem(commandTimedSummoningTickSystem);
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
@@ -996,6 +1013,7 @@ public class Tamework extends JavaPlugin {
         }
         activatePopulationGroupsIfReady();
         activateCompanionProvisioningIfReady();
+        initializeCommandTimedSummoningRuntime();
         ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
                 new ClaimProviderLifecycleInvalidator(provider -> {
                     OwnerPopulationRuntime runtime = ownerPopulationRuntime;
@@ -1174,20 +1192,19 @@ public class Tamework extends JavaPlugin {
                 ownerPopulationRuntime.identityResolver()
         );
         if (api instanceof TameworkApiImpl implementation) {
-            boolean paidRecoveryReady;
-            try {
-                paidRecoveryReady = persistenceRuntime.getPaidCommandRevivalRepository()
-                        .loadRecoverable().isEmpty();
-            } catch (Exception failure) {
-                paidRecoveryReady = false;
-                getLogger().at(Level.WARNING).log(
-                        "Paid command revival recovery scan failed; capability remains unavailable.");
-            }
-            var paidRevivalRuntime = commandItemFeatureHandler.createPaidCommandRevivalRuntime(
+            paidCommandRevivalCoordinator = commandItemFeatureHandler.createPaidCommandRevivalRuntime(
                     persistenceRuntime.getPaidCommandRevivalRepository(),
                     apiEventBus::emitPaidCommandRevived);
+            PaidCommandRevivalCoordinator.RecoveryReport paidRecovery =
+                    paidCommandRevivalCoordinator.recoverStartup(128).toCompletableFuture().join();
+            boolean paidRecoveryReady = paidRecovery != null && paidRecovery.healthy();
+            if (!paidRecoveryReady) {
+                getLogger().at(Level.WARNING).log(
+                        "Paid command revival startup recovery failed; capability remains unavailable. reason=%s",
+                        paidRecovery != null ? paidRecovery.reason() : "no-report");
+            }
             implementation.activatePaidCommandRevivalRuntime(
-                    paidRevivalRuntime, paidRecoveryReady, true);
+                    paidCommandRevivalCoordinator, paidRecoveryReady, true);
         }
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
@@ -1258,6 +1275,12 @@ public class Tamework extends JavaPlugin {
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerDisconnectEvent.class,
+                this::onTimedSummoningOwnerDisconnect,
+                "timed command summon logout storage"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerDisconnectEvent.class,
                 new AvatarFlightDisconnectRecoveryService()::onPlayerDisconnect,
                 "avatar flight disconnect cleanup"
         );
@@ -1296,6 +1319,12 @@ public class Tamework extends JavaPlugin {
             );
         }
         if (commandItemFeatureHandler != null) {
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerReadyEvent.class,
+                    this::onPaidCommandRevivalPlayerReady,
+                    "paid command revival owner recovery"
+            );
             TameworkEventRegistrationSupport.registerGlobal(
                     this,
                     PlayerConnectEvent.class,
@@ -1460,6 +1489,36 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    private void onTimedSummoningOwnerDisconnect(@Nullable PlayerDisconnectEvent event) {
+        CommandTimedSummoningService service = commandTimedSummoningService;
+        if (service == null || event == null || event.getPlayerRef() == null
+                || event.getPlayerRef().getUuid() == null) {
+            return;
+        }
+        service.onOwnerLogout(event.getPlayerRef().getUuid(), System.currentTimeMillis());
+    }
+
+    private void onPaidCommandRevivalPlayerReady(@Nullable PlayerReadyEvent event) {
+        PaidCommandRevivalCoordinator coordinator = paidCommandRevivalCoordinator;
+        UUID ownerUuid = event != null && event.getPlayer() != null
+                ? event.getPlayer().getUuid() : null;
+        if (coordinator == null || ownerUuid == null) return;
+        coordinator.recoverOwner(ownerUuid, 128).whenComplete((report, failure) -> {
+            if (failure != null || report == null || !report.healthy()) {
+                String reason = report != null ? report.reason() : "no-report";
+                if (failure != null) {
+                    getLogger().at(Level.WARNING).withCause(failure).log(
+                            "Paid command revival owner recovery failed owner=%s reason=%s",
+                            ownerUuid, reason);
+                } else {
+                    getLogger().at(Level.WARNING).log(
+                            "Paid command revival owner recovery failed owner=%s reason=%s",
+                            ownerUuid, reason);
+                }
+            }
+        });
+    }
+
     @Override
     protected void shutdown() {
         if (hStatsIntegration != null) {
@@ -1483,6 +1542,18 @@ public class Tamework extends JavaPlugin {
         companionProvisioningApi = null;
         companionProvisioningBackend = null;
         companionProvisioningRecoveryReady = false;
+        commandTimedSummoningApi = null;
+        commandTimedSummoningService = null;
+        paidCommandRevivalCoordinator = null;
+        commandTimedSummoningRecoveryReady = false;
+        if (commandLinkedNpcStateSnapshotService != null) {
+            commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(null);
+        }
+        CommandTimedProjectionRetirementIndex.clear();
+        if (commandTimedSummoningTickSystem != null) {
+            commandTimedSummoningTickSystem.install(null);
+            commandTimedSummoningTickSystem = null;
+        }
         if (managedCoopRuntime != null) {
             managedCoopRuntime.close();
             managedCoopRuntime = null;
@@ -2755,6 +2826,87 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    private void initializeCommandTimedSummoningRuntime() {
+        commandTimedSummoningApi = null;
+        commandTimedSummoningService = null;
+        commandTimedSummoningRecoveryReady = false;
+        if (!(api instanceof TameworkApiImpl implementation)
+                || persistenceRuntime == null || ownerPopulationRuntime == null
+                || commandFamilyRosterService == null || commandLinkedNpcStateSnapshotService == null
+                || commandTimedSummoningTickSystem == null) {
+            return;
+        }
+        try {
+            var repository = persistenceRuntime.getCommandTimedSummonRepository();
+            var profiles = persistenceRuntime.getNpcProfileRepository();
+            CommandTimedSummonPopulationPort population = new CommandTimedSummonPopulationPort(
+                    ownerPopulationRuntime, implementation.populationAdmissions(), profileId -> {
+                        var profile = profiles.loadProfileById(profileId);
+                        return profile == null ? null : profile.roleId();
+                    });
+            HytaleCommandTimedSummonProjectionPort projection =
+                    new HytaleCommandTimedSummonProjectionPort(
+                            ownerPopulationRuntime, profiles, repository, population,
+                            coopResidentStateSnapshotService);
+            CommandTimedSummoningService service = new CommandTimedSummoningService(
+                    repository,
+                    new CommandFamilyRosterMembershipPort(commandFamilyRosterService),
+                    population,
+                    projection,
+                    (ownerUuid, profileId, remainingMs, thresholdMs) -> getLogger().at(Level.INFO).log(
+                            "Timed command summon nearing expiry owner=" + ownerUuid
+                                    + " profile=" + profileId + " remainingMs=" + remainingMs));
+            CommandTimedSummoningApiDelegate runtime = new CommandTimedSummoningApiDelegate(
+                    repository, service, (request, operation) -> {
+                        var profile = profiles.loadProfileById(request.profileId());
+                        var populationEntry = ownerPopulationRuntime.index()
+                                .entry(request.profileId()).orElse(null);
+                        if (profile == null || profile.ownerUuid() == null
+                                || !profile.ownerUuid().equals(request.ownerUuid())
+                                || profile.roleId() == null || populationEntry == null
+                                || populationEntry.ownerId() == null
+                                || !populationEntry.ownerId().equals(request.ownerUuid())) {
+                            return null;
+                        }
+                        TwCompanionConfig.SummonSettings settings =
+                                TwCompanionConfig.resolveEffectiveForRole(profile.roleId()).getSummon();
+                        if (!settings.isEnabled()) return null;
+                        return new CommandTimedSummoningApiDelegate.ResolvedRequest(
+                                populationEntry.revision(), profile.roleId(), profile.roleId(), null,
+                                new CommandTimedSummonPolicySnapshot(
+                                        settings.getActiveDurationMs(), settings.getResummonCooldownMs(),
+                                        settings.isAutoStoreOnOwnerLogout(),
+                                        settings.getExpiryWarningThresholdsMs()),
+                                ownerPopulationRuntime.identityResolver()
+                                        .currentNpcUuid(request.profileId()).orElse(null));
+                    }, System::currentTimeMillis);
+            var recovery = service.recover(System.currentTimeMillis()).toCompletableFuture().join();
+            commandTimedSummoningRecoveryReady = recovery.ready();
+            if (!commandTimedSummoningRecoveryReady || !projection.available()) {
+                getLogger().at(Level.WARNING).log(
+                        "Timed command summoning recovery/projection is not ready; capability remains unavailable.");
+                return;
+            }
+            commandTimedSummoningService = service;
+            commandTimedSummoningApi = runtime;
+            projection.recoverRetirementTombstones();
+            commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(
+                    projection::captureUnloadedSnapshot);
+            commandTimedSummoningTickSystem.install(service);
+            if (companionProvisioningApi != null) {
+                companionProvisioningApi.installInitialProjectionHook(runtime.initialProjectionHook());
+            }
+            if (implementation.activateCommandTimedSummoningRuntime(
+                    runtime, true, ownerPopulationRuntime.populationGroupsReady(), true)) {
+                getLogger().at(Level.INFO).log(
+                        "Timed command summoning runtime recovered and activated.");
+            }
+        } catch (Exception | LinkageError failure) {
+            getLogger().at(Level.WARNING).withCause(failure).log(
+                    "Timed command summoning bootstrap failed; capability remains unavailable.");
+        }
+    }
+
     private void initializePopulationGroupRuntime() {
         populationGroupApi = null;
         populationGroupRecoveryReady = false;
@@ -3180,6 +3332,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public CommandFamilyRosterService getCommandFamilyRosterService() {
         return commandFamilyRosterService;
+    }
+
+    @Nullable
+    public CommandTimedSummoningService getCommandTimedSummoningService() {
+        return commandTimedSummoningService;
     }
 
 

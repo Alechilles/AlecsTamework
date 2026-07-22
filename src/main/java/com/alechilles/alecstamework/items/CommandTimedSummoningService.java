@@ -65,6 +65,28 @@ public final class CommandTimedSummoningService {
                         : ActionResult.fromRepository(result));
     }
 
+    /** Paid-revival seam: resets the same snapshotted lease only after the live spawn commits. */
+    @Nonnull
+    public CompletionStage<ActionResult> registerRevivedProjection(@Nonnull ActiveRegistration request) {
+        Objects.requireNonNull(request, "request");
+        if (!roster.contains(request.ownerUuid(), request.commandFamilyId(), request.profileId())) {
+            return completed(ActionResult.denied("command-roster-membership-required"));
+        }
+        String sessionId = deterministicId("revival-session", request.idempotencyKey());
+        Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
+        CommandTimedSummonSessionRecord active = new CommandTimedSummonSessionRecord(
+                request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
+                CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
+                request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
+                null, request.nowMs(), request.nowMs());
+        return write(repository.activateAfterRevivalAsync(active)).thenApply(result ->
+                result.status() == CommandTimedSummonRepository.Status.CREATED
+                        || result.status() == CommandTimedSummonRepository.Status.COMMITTED
+                        || result.status() == CommandTimedSummonRepository.Status.IDEMPOTENT
+                        ? ActionResult.success(result.session(), "revival-active-lease-registered")
+                        : ActionResult.fromRepository(result));
+    }
+
     /** Creates the dormant session row after roster membership is durably committed. */
     @Nonnull
     public CompletionStage<ActionResult> registerRosterStored(@Nonnull StoredRegistration request) {
@@ -187,6 +209,11 @@ public final class CommandTimedSummoningService {
     /** Checkpoints leases, emits each threshold once, and stores every expired active projection. */
     @Nonnull
     public CompletionStage<TickResult> tick(long nowMs) {
+        return recover(nowMs).thenCompose(ignored -> tickProjected(nowMs));
+    }
+
+    @Nonnull
+    private CompletionStage<TickResult> tickProjected(long nowMs) {
         final List<CommandTimedSummonSessionRecord> projected;
         try {
             projected = repository.loadProjectedSessions();
@@ -348,7 +375,7 @@ public final class CommandTimedSummoningService {
                 if (!populationClaim.accepted()) {
                     return rollbackSummon(operationId, reservation, populationClaim.reason(), request.nowMs());
                 }
-                return projections.spawn(plan, request.profileId(), sessionId).thenCompose(spawned -> {
+                return projections.spawn(plan, context, reservation, sessionId).thenCompose(spawned -> {
                     if (!spawned.success()) {
                         return spawned.outcome() == ProjectionOutcome.NOT_APPLIED
                                 ? rollbackSummon(operationId, reservation, spawned.reason(), request.nowMs())
@@ -570,7 +597,8 @@ public final class CommandTimedSummoningService {
     public interface ProjectionPort {
         @Nonnull CompletionStage<SpawnPlan> planSpawnInFront(@Nonnull UUID ownerUuid, @Nonnull String profileId);
         @Nonnull CompletionStage<ProjectionResult> spawn(
-                @Nonnull SpawnPlan plan, @Nonnull String profileId, @Nonnull String summonSessionId);
+                @Nonnull SpawnPlan plan, @Nonnull PopulationContext context,
+                @Nonnull PopulationReservation reservation, @Nonnull String summonSessionId);
         @Nonnull CompletionStage<ProjectionResult> snapshotAndDespawn(
                 @Nonnull PopulationContext context, @Nonnull String summonSessionId);
         default CompletionStage<ProjectionEvidence> inspect(

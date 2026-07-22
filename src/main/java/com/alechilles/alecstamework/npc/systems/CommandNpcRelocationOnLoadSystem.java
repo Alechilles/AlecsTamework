@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandUnexpectedRemovalRecoveryService;
+import com.alechilles.alecstamework.items.CommandTimedProjectionRetirementIndex;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -63,6 +64,23 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        UUID addedNpcUuid = resolveNpcUuid(reference, store);
+        CommandTimedProjectionRetirementIndex.Retirement retirement =
+                CommandTimedProjectionRetirementIndex.find(addedNpcUuid);
+        if (retirement != null) {
+            ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                    TameworkProjectionIdentityComponent.getComponentType();
+            if (markerType != null) {
+                store.putComponent(reference, markerType,
+                        new TameworkProjectionIdentityComponent(
+                                retirement.profileId(), retirement.operationId(),
+                                TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
+                                retirement.commandFamilyId(), addedNpcUuid, 0L));
+            }
+            commandBuffer.removeEntity(reference, RemoveReason.REMOVE);
+            CommandTimedProjectionRetirementIndex.observedRetired(addedNpcUuid);
+            return;
+        }
         sanitizeRoleReferencesOnAdd(reference, store);
         if (stateSnapshotService != null) {
             stateSnapshotService.onNpcAdded(reference, store);
@@ -143,8 +161,10 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
         TameworkProjectionIdentityComponent marker = markerType != null
                 ? store.getComponent(reference, markerType)
                 : null;
-        return marker != null && TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(
-                marker.getProjectionKind());
+        return marker != null && (TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(
+                marker.getProjectionKind())
+                || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(
+                marker.getProjectionKind()));
     }
 
     @Nullable

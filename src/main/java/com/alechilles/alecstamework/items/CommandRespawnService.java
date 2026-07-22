@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.CompanionSpawnAdmissionRequest;
 import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationContext;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
+import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.hypixel.hytale.component.ComponentType;
@@ -111,6 +112,45 @@ final class CommandRespawnService {
                                  long followRetryDelayMs,
                                  String traceBranch,
                                  Completion completion) {
+        return respawnDeadLinkedNpcInternal(player, playerRef, store, toolId, stack, record,
+                deadSnapshot, safeSpawnDistance, followRetryDelayMs, traceBranch,
+                null, null, null, completion);
+    }
+
+    /** Paid-revival path reuses the capacity reservation held before inventory consumption. */
+    boolean respawnDeadLinkedNpc(Player player,
+                                 Ref<EntityStore> playerRef,
+                                 Store<EntityStore> store,
+                                 String toolId,
+                                 ItemStack stack,
+                                 LinkedNpcRecord record,
+                                 CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
+                                 double safeSpawnDistance,
+                                 long followRetryDelayMs,
+                                 String traceBranch,
+                                 @Nonnull PreparedCompanionSpawnBatch preparedBatch,
+                                 @Nonnull Vector3d preparedDestination,
+                                 @Nonnull Rotation3f preparedRotation,
+                                 Completion completion) {
+        return respawnDeadLinkedNpcInternal(player, playerRef, store, toolId, stack, record,
+                deadSnapshot, safeSpawnDistance, followRetryDelayMs, traceBranch,
+                preparedBatch, preparedDestination, preparedRotation, completion);
+    }
+
+    private boolean respawnDeadLinkedNpcInternal(Player player,
+                                 Ref<EntityStore> playerRef,
+                                 Store<EntityStore> store,
+                                 String toolId,
+                                 ItemStack stack,
+                                 LinkedNpcRecord record,
+                                 CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
+                                 double safeSpawnDistance,
+                                 long followRetryDelayMs,
+                                 String traceBranch,
+                                 @Nullable PreparedCompanionSpawnBatch preparedBatch,
+                                 @Nullable Vector3d preparedDestination,
+                                 @Nullable Rotation3f preparedRotation,
+                                 Completion completion) {
         if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
                 || stack.isEmpty() || record == null || deadSnapshot == null || completion == null) {
             recordRespawnFailure("invalid_input", deadSnapshot, null, traceBranch, toolId);
@@ -142,19 +182,16 @@ final class CommandRespawnService {
                         + " cooldownUntil=" + deadSnapshot.respawnAvailableAtMs()
                         + " displayName=" + deadSnapshot.displayName()
         );
-        Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
-                playerRef,
-                store,
-                safeSpawnDistance,
-                roleId,
-                sourceHint
-        );
+        Vector3d destination = preparedDestination != null ? new Vector3d(preparedDestination)
+                : companionPlacementService.computeSafeRespawnPosition(
+                        playerRef, store, safeSpawnDistance, roleId, sourceHint);
         if (destination == null) {
             RespawnTraceLogSupport.warn(respawnTrace, "failed stage=safe_position reason=safe_position_not_found");
             recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId, traceBranch, toolId);
             return false;
         }
-        Rotation3f rotation = resolveRespawnRotation(store, playerRef, destination);
+        Rotation3f rotation = preparedRotation != null ? preparedRotation
+                : resolveRespawnRotation(store, playerRef, destination);
         UUID ownerId = deadSnapshot.ownerId() != null ? deadSnapshot.ownerId() : player.getUuid();
         Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
         String[] toolIds = linkPolicyService.mergeToolIds(deadSnapshot.toolIds(), toolId);
@@ -198,14 +235,7 @@ final class CommandRespawnService {
                 ),
                 roleId
         );
-        return preparedSpawnService.schedule(
-                player.getWorld(),
-                store,
-                npcPlugin,
-                roleIndex,
-                destination,
-                rotation,
-                request,
+        CommandPreparedRestoreSpawnService.Callbacks callbacks =
                 new CommandPreparedRestoreSpawnService.Callbacks() {
                     @Nullable
                     private AppliedRespawn pending;
@@ -259,8 +289,14 @@ final class CommandRespawnService {
                     public void onDurabilityDegraded(String reason) {
                         completion.onDurabilityDegraded(reason);
                     }
-                }
-        );
+                };
+        return preparedBatch != null
+                ? preparedSpawnService.schedulePrepared(
+                        player.getWorld(), store, npcPlugin, roleIndex,
+                        destination, rotation, preparedBatch, callbacks)
+                : preparedSpawnService.schedule(
+                        player.getWorld(), store, npcPlugin, roleIndex,
+                        destination, rotation, request, callbacks);
     }
     private ItemStack applyRestoredStateAndBuildItem(
             Player player,

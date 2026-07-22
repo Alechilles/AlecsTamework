@@ -54,6 +54,37 @@ public final class PaidCommandRevivalRepository {
                 connection -> reserve(connection, operationId, frozen, nowMs), null);
     }
 
+    /** Freezes the population reservation returned after the PREPARED journal checkpoint. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> recordActivationAsync(
+            @Nonnull UUID operationId,
+            @Nonnull String populationOperationId,
+            @Nullable String placementFingerprint,
+            long nowMs) {
+        String frozenPopulation = requireText(populationOperationId, "populationOperationId");
+        return writeQueue.submitTracked("paid_command_revival_activation", connection -> {
+            PaidCommandRevivalRecord current = find(connection, operationId);
+            if (current == null) return new MutationResult(Status.NOT_FOUND, null, "operation-not-found");
+            if (current.state() != PaidCommandRevivalRecord.State.PREPARED) {
+                return new MutationResult(Status.CONFLICT, current, "operation-not-prepared");
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE paid_command_revival_operations
+                    SET population_admission_operation_id = ?, placement_fingerprint = ?, updated_at_ms = ?
+                    WHERE operation_id = ? AND state = 'PREPARED'
+                    """)) {
+                statement.setString(1, frozenPopulation);
+                setNullable(statement, 2, placementFingerprint);
+                statement.setLong(3, nowMs);
+                statement.setString(4, operationId.toString());
+                if (statement.executeUpdate() != 1) {
+                    return new MutationResult(Status.CONFLICT, current, "activation-fence-changed");
+                }
+            }
+            return new MutationResult(Status.APPLIED, find(connection, operationId), null);
+        }, null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> transitionAsync(
             @Nonnull UUID operationId,
@@ -64,6 +95,49 @@ public final class PaidCommandRevivalRepository {
         validateTransition(expected, next);
         return writeQueue.submitTracked("paid_command_revival_transition",
                 connection -> transition(connection, operationId, expected, next, detail, nowMs), null);
+    }
+
+    /** Claims exclusive delivery of a pending exact-cost refund before inventory mutation. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<RefundDeliveryStatus> beginRefundDeliveryAsync(
+            @Nonnull UUID operationId, long nowMs) {
+        return writeQueue.submitTracked("paid_command_revival_refund_begin", connection -> {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE paid_command_revival_refund_claims
+                    SET state = 'DELIVERING', updated_at_ms = ?
+                    WHERE operation_id = ? AND state = 'PENDING'
+                    """)) {
+                statement.setLong(1, nowMs);
+                statement.setString(2, operationId.toString());
+                if (statement.executeUpdate() == 1) return RefundDeliveryStatus.STARTED;
+            }
+            RefundDeliveryStatus current = findRefundDeliveryStatus(connection, operationId);
+            return current != null ? current : RefundDeliveryStatus.MISSING;
+        }, null);
+    }
+
+    /** Returns a known failed, non-mutating delivery attempt to its retryable state. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> resetRefundDeliveryAsync(
+            @Nonnull UUID operationId, long nowMs) {
+        return writeQueue.submitTracked("paid_command_revival_refund_reset", connection -> {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE paid_command_revival_refund_claims
+                    SET state = 'PENDING', updated_at_ms = ?
+                    WHERE operation_id = ? AND state = 'DELIVERING'
+                    """)) {
+                statement.setLong(1, nowMs);
+                statement.setString(2, operationId.toString());
+                return statement.executeUpdate() == 1;
+            }
+        }, null);
+    }
+
+    @Nullable
+    public RefundDeliveryStatus findRefundDeliveryStatus(@Nonnull UUID operationId) throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            return findRefundDeliveryStatus(connection, operationId);
+        }
     }
 
     @Nullable
@@ -238,6 +312,9 @@ public final class PaidCommandRevivalRepository {
                 upsertRefundClaim(connection, current, nowMs);
             } else if (next == PaidCommandRevivalRecord.State.REFUNDED) {
                 markRefundDelivered(connection, operationId, nowMs);
+            } else if (next == PaidCommandRevivalRecord.State.QUARANTINED
+                    && current.state() == PaidCommandRevivalRecord.State.REFUND_REQUIRED) {
+                markRefundQuarantined(connection, operationId, nowMs);
             }
             connection.commit();
             return new MutationResult(Status.APPLIED, find(connection, operationId), null);
@@ -313,6 +390,36 @@ public final class PaidCommandRevivalRepository {
             statement.setLong(1, nowMs);
             statement.setString(2, operationId.toString());
             statement.executeUpdate();
+        }
+    }
+
+    private void markRefundQuarantined(Connection connection, UUID operationId, long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE paid_command_revival_refund_claims
+                SET state = 'QUARANTINED', updated_at_ms = ?
+                WHERE operation_id = ? AND state IN ('PENDING','DELIVERING')
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, operationId.toString());
+            statement.executeUpdate();
+        }
+    }
+
+    private RefundDeliveryStatus findRefundDeliveryStatus(Connection connection, UUID operationId)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT state FROM paid_command_revival_refund_claims WHERE operation_id = ?
+                """)) {
+            statement.setString(1, operationId.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                return switch (result.getString("state")) {
+                    case "PENDING" -> RefundDeliveryStatus.PENDING;
+                    case "DELIVERING" -> RefundDeliveryStatus.DELIVERING;
+                    case "DELIVERED" -> RefundDeliveryStatus.DELIVERED;
+                    default -> RefundDeliveryStatus.QUARANTINED;
+                };
+            }
         }
     }
 
@@ -436,7 +543,8 @@ public final class PaidCommandRevivalRepository {
                     || next == PaidCommandRevivalRecord.State.QUARANTINED;
             case REFUND_REQUIRED -> next == PaidCommandRevivalRecord.State.REFUNDED
                     || next == PaidCommandRevivalRecord.State.QUARANTINED;
-            case QUARANTINED -> next == PaidCommandRevivalRecord.State.REFUND_REQUIRED;
+            case QUARANTINED -> next == PaidCommandRevivalRecord.State.REFUND_REQUIRED
+                    || next == PaidCommandRevivalRecord.State.SUCCEEDED;
             default -> false;
         };
         if (!allowed) throw new IllegalArgumentException("invalid paid revival transition: " + expected + " -> " + next);
@@ -464,6 +572,7 @@ public final class PaidCommandRevivalRepository {
     }
 
     public enum Status { APPLIED, IDEMPOTENT, CONFLICT, NOT_FOUND }
+    public enum RefundDeliveryStatus { STARTED, PENDING, DELIVERING, DELIVERED, QUARANTINED, MISSING }
 
     public record MutationResult(@Nonnull Status status,
                                  @Nullable PaidCommandRevivalRecord operation,

@@ -62,6 +62,46 @@ public final class CommandTimedSummonRepository {
         );
     }
 
+    /** Resets the active lease after a paid revival has committed the canonical live projection. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> activateAfterRevivalAsync(
+            @Nonnull CommandTimedSummonSessionRecord active) {
+        Objects.requireNonNull(active, "active");
+        return writeQueue.submitTracked("command_timed_summon_activate_after_revival", connection -> {
+            CommandTimedSummonSessionRecord current = findSession(
+                    connection, active.ownerUuid(), active.commandFamilyId(), active.profileId());
+            if (current == null) return createSession(connection, active);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE command_timed_summon_sessions SET
+                        row_revision = row_revision + 1,
+                        summon_state = 'ACTIVE', summon_session_id = ?, summon_remaining_ms = ?,
+                        resummon_cooldown_until_ms = 0, summon_config_id = ?,
+                        summon_config_revision = ?, summon_policy_json = ?,
+                        warning_receipts_json = '[]', summon_last_checkpoint_at_ms = ?,
+                        active_operation_id = NULL, updated_at_ms = ?
+                    WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                    """)) {
+                int index = 1;
+                statement.setString(index++, active.summonSessionId());
+                if (active.summonRemainingMs() == null) statement.setNull(index++, Types.BIGINT);
+                else statement.setLong(index++, active.summonRemainingMs());
+                statement.setString(index++, active.summonConfigId());
+                if (active.summonConfigRevision() == null) statement.setNull(index++, Types.BIGINT);
+                else statement.setLong(index++, active.summonConfigRevision());
+                statement.setString(index++, CommandTimedSummonPolicySnapshot.toJson(active.summonPolicy()));
+                statement.setLong(index++, active.summonLastCheckpointAtMs());
+                statement.setLong(index++, active.updatedAtMs());
+                statement.setString(index++, active.ownerUuid().toString());
+                statement.setString(index++, active.commandFamilyId());
+                statement.setString(index, active.profileId());
+                statement.executeUpdate();
+            }
+            return result(Status.COMMITTED, findSession(
+                    connection, active.ownerUuid(), active.commandFamilyId(), active.profileId()),
+                    null, "revival-active-lease-registered");
+        }, null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> prepareAsync(
             @Nonnull CommandTimedSummonOperationRecord requested) {
@@ -210,6 +250,132 @@ public final class CommandTimedSummonRepository {
             }
             return List.copyOf(operations);
         }
+    }
+
+    /** Stores the last complete restorable projection before an intentional roster despawn. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<ProjectionSnapshot> saveProjectionSnapshotAsync(
+            @Nonnull ProjectionSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        return writeQueue.submitTracked(
+                "command_timed_summon_save_projection_snapshot",
+                connection -> saveProjectionSnapshot(connection, snapshot),
+                null);
+    }
+
+    /** Captures a loaded projection at chunk-unload without a synchronous world-thread lookup. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<ProjectionSnapshot> saveProjectedSnapshotAsync(
+            @Nonnull String profileId, @Nonnull UUID sourceNpcUuid,
+            @Nonnull String snapshotJson, @Nonnull String snapshotSha256, long nowMs) {
+        String requiredProfile = requireText(profileId, "profileId");
+        return writeQueue.submitTracked(
+                "command_timed_summon_save_unload_snapshot",
+                connection -> {
+                    CommandTimedSummonSessionRecord session = findProjectedSessionForProfile(
+                            connection, requiredProfile);
+                    if (session == null) {
+                        throw new IllegalStateException("Projected timed session is unavailable.");
+                    }
+                    return saveProjectionSnapshot(connection, new ProjectionSnapshot(
+                            session.ownerUuid(), session.commandFamilyId(), session.profileId(),
+                            sourceNpcUuid, snapshotJson, snapshotSha256, nowMs));
+                }, null);
+    }
+
+    @Nonnull
+    public List<ProjectionSnapshot> loadProjectionSnapshots() throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT owner_uuid, command_family_id, profile_id, source_npc_uuid,
+                            snapshot_json, snapshot_sha256, updated_at_ms
+                     FROM command_timed_summon_snapshots
+                     ORDER BY owner_uuid, command_family_id, profile_id
+                     """);
+             ResultSet result = statement.executeQuery()) {
+            List<ProjectionSnapshot> snapshots = new ArrayList<>();
+            while (result.next()) {
+                snapshots.add(readProjectionSnapshot(result));
+            }
+            return List.copyOf(snapshots);
+        }
+    }
+
+    @Nullable
+    public ProjectionSnapshot findProjectionSnapshot(@Nonnull UUID ownerUuid,
+                                                      @Nonnull String commandFamilyId,
+                                                      @Nonnull String profileId) throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT owner_uuid, command_family_id, profile_id, source_npc_uuid,
+                            snapshot_json, snapshot_sha256, updated_at_ms
+                     FROM command_timed_summon_snapshots
+                     WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                     """)) {
+            statement.setString(1, Objects.requireNonNull(ownerUuid, "ownerUuid").toString());
+            statement.setString(2, requireText(commandFamilyId, "commandFamilyId"));
+            statement.setString(3, requireText(profileId, "profileId"));
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                return readProjectionSnapshot(result);
+            }
+        }
+    }
+
+    @Nullable
+    private CommandTimedSummonSessionRecord findProjectedSessionForProfile(
+            Connection connection, String profileId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                SESSION_COLUMNS + " WHERE profile_id = ? AND summon_state IN "
+                        + "('ACTIVE','UNLOADED','STORING','ROSTER_STORED') "
+                        + "ORDER BY updated_at_ms DESC LIMIT 1")) {
+            statement.setString(1, profileId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? readSession(result) : null;
+            }
+        }
+    }
+
+    private static ProjectionSnapshot readProjectionSnapshot(ResultSet result) throws Exception {
+        return new ProjectionSnapshot(
+                UUID.fromString(result.getString("owner_uuid")),
+                result.getString("command_family_id"), result.getString("profile_id"),
+                UUID.fromString(result.getString("source_npc_uuid")),
+                result.getString("snapshot_json"), result.getString("snapshot_sha256"),
+                result.getLong("updated_at_ms"));
+    }
+
+    private ProjectionSnapshot saveProjectionSnapshot(Connection connection,
+                                                      ProjectionSnapshot snapshot) throws Exception {
+        CommandTimedSummonSessionRecord session = findSession(
+                connection, snapshot.ownerUuid(), snapshot.commandFamilyId(), snapshot.profileId());
+        if (session == null || (session.state() != CommandTimedSummonSessionRecord.State.ACTIVE
+                && session.state() != CommandTimedSummonSessionRecord.State.UNLOADED
+                && session.state() != CommandTimedSummonSessionRecord.State.STORING
+                && session.state() != CommandTimedSummonSessionRecord.State.ROSTER_STORED)) {
+            throw new IllegalStateException("Timed projection snapshot requires projected/storage authority.");
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO command_timed_summon_snapshots (
+                    owner_uuid, command_family_id, profile_id, source_npc_uuid,
+                    snapshot_json, snapshot_sha256, updated_at_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(owner_uuid, command_family_id, profile_id) DO UPDATE SET
+                    source_npc_uuid = excluded.source_npc_uuid,
+                    snapshot_json = excluded.snapshot_json,
+                    snapshot_sha256 = excluded.snapshot_sha256,
+                    updated_at_ms = excluded.updated_at_ms
+                """)) {
+            statement.setString(1, snapshot.ownerUuid().toString());
+            statement.setString(2, snapshot.commandFamilyId());
+            statement.setString(3, snapshot.profileId());
+            statement.setString(4, snapshot.sourceNpcUuid().toString());
+            statement.setString(5, snapshot.snapshotJson());
+            statement.setString(6, snapshot.snapshotSha256());
+            statement.setLong(7, snapshot.updatedAtMs());
+            statement.executeUpdate();
+        }
+        return snapshot;
     }
 
     private MutationResult createSession(Connection connection,
@@ -946,6 +1112,27 @@ public final class CommandTimedSummonRepository {
     public enum ApplyAbsenceProof {
         PROJECTION_NEVER_CREATED,
         PROJECTION_RETAINED
+    }
+
+    public record ProjectionSnapshot(@Nonnull UUID ownerUuid,
+                                     @Nonnull String commandFamilyId,
+                                     @Nonnull String profileId,
+                                     @Nonnull UUID sourceNpcUuid,
+                                     @Nonnull String snapshotJson,
+                                     @Nonnull String snapshotSha256,
+                                     long updatedAtMs) {
+        public ProjectionSnapshot {
+            Objects.requireNonNull(ownerUuid, "ownerUuid");
+            commandFamilyId = requireText(commandFamilyId, "commandFamilyId");
+            profileId = requireText(profileId, "profileId");
+            Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+            snapshotJson = requireText(snapshotJson, "snapshotJson");
+            snapshotSha256 = requireText(snapshotSha256, "snapshotSha256").toLowerCase();
+            if (!snapshotSha256.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("snapshotSha256 must be lowercase SHA-256.");
+            }
+            if (updatedAtMs < 0L) throw new IllegalArgumentException("updatedAtMs must be non-negative.");
+        }
     }
 
     public record MutationResult(@Nonnull Status status,

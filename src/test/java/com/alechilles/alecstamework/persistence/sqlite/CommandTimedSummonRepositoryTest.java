@@ -20,6 +20,44 @@ class CommandTimedSummonRepositoryTest {
     @TempDir Path tempDir;
 
     @Test
+    void storesFullProjectionSnapshotOnlyInsideStorageAuthority() throws Exception {
+        try (HydragonPersistenceTestHarness harness = new HydragonPersistenceTestHarness(
+                tempDir.resolve("timed-snapshot.sqlite"))) {
+            UUID owner = UUID.randomUUID();
+            UUID sourceNpc = UUID.randomUUID();
+            String family = "test:dragon_horn";
+            String profile = harness.insertProfile(
+                    owner, "TestDragon", CompanionLifecycleState.ACTIVE.name(), "world", 1L);
+            insertMembership(harness, owner, family, profile);
+            CommandTimedSummonRepository repository =
+                    new CommandTimedSummonRepository(harness.connections, harness.queue);
+            CommandTimedSummonPolicySnapshot policy =
+                    new CommandTimedSummonPolicySnapshot(1_000L, 0L, true, new long[0]);
+            CommandTimedSummonSessionRecord session = new CommandTimedSummonSessionRecord(
+                    owner, family, profile, 1L, CommandTimedSummonSessionRecord.State.ACTIVE,
+                    "session-snapshot", 1_000L, 0L, null, null, policy, Set.of(), 100L,
+                    null, 100L, 100L);
+            HydragonPersistenceTestHarness.await(repository.createSessionAsync(session));
+            HydragonPersistenceTestHarness.await(repository.prepareAsync(operation(
+                    owner, family, profile, session, "store-snapshot", "store-snapshot-key",
+                    CommandTimedSummonOperationRecord.Kind.STORE,
+                    CommandTimedSummonSessionRecord.State.ROSTER_STORED)));
+            HydragonPersistenceTestHarness.await(repository.claimAsync(
+                    new CommandTimedSummonRepository.ClaimMutation(
+                            "store-snapshot", "session-snapshot", 900L,
+                            null, null, policy, 200L)));
+
+            CommandTimedSummonRepository.ProjectionSnapshot expected =
+                    new CommandTimedSummonRepository.ProjectionSnapshot(
+                            owner, family, profile, sourceNpc, "{\"version\":\"1\"}",
+                            "0".repeat(64), 210L);
+            HydragonPersistenceTestHarness.await(repository.saveProjectionSnapshotAsync(expected));
+
+            assertEquals(expected, repository.findProjectionSnapshot(owner, family, profile));
+        }
+    }
+
+    @Test
     void storageKeepsActiveCapacityUntilRosterStoredCommit() throws Exception {
         try (HydragonPersistenceTestHarness harness = new HydragonPersistenceTestHarness(
                 tempDir.resolve("timed-storage.sqlite"))) {

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointH
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
@@ -81,9 +82,27 @@ final class CompanionPreparedSpawnService {
             int unitIndex,
             @Nullable Callbacks callbacks
     ) {
+        return spawnClaimedAndCommit(world, store, npcPlugin, roleIndex, position, rotation,
+                batch, unitIndex, SpawnHolderAugmenter.NO_OP, callbacks);
+    }
+
+    /** Allows a durable profile snapshot to be restored in the same pre-add holder transaction. */
+    boolean spawnClaimedAndCommit(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull NPCPlugin npcPlugin,
+            int roleIndex,
+            @Nonnull Vector3d position,
+            @Nonnull Rotation3f rotation,
+            @Nonnull PreparedCompanionSpawnBatch batch,
+            int unitIndex,
+            @Nonnull SpawnHolderAugmenter augmenter,
+            @Nullable Callbacks callbacks
+    ) {
         Callbacks safeCallbacks = callbacks == null ? Callbacks.NOOP : callbacks;
         SpawnAttempt attempt = spawn(
-                world, store, npcPlugin, roleIndex, position, rotation, batch, unitIndex
+                world, store, npcPlugin, roleIndex, position, rotation, batch, unitIndex,
+                Objects.requireNonNull(augmenter, "augmenter")
         );
         Pair<Ref<EntityStore>, NPCEntity> spawned = attempt.spawned();
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
@@ -259,7 +278,8 @@ final class CompanionPreparedSpawnService {
             @Nonnull Vector3d position,
             @Nonnull Rotation3f rotation,
             @Nonnull PreparedCompanionSpawnBatch batch,
-            int unitIndex
+            int unitIndex,
+            @Nonnull SpawnHolderAugmenter augmenter
     ) {
         try {
             hit(PersistenceCheckpoint.BEFORE_LIVE_ENTITY_SPAWN);
@@ -275,6 +295,7 @@ final class CompanionPreparedSpawnService {
                         if (!write.applied()) {
                             throw new SpawnHolderPreparationException(write.reason());
                         }
+                        augmenter.augment(npc, holder);
                     },
                     null
             );
@@ -437,6 +458,12 @@ final class CompanionPreparedSpawnService {
 
         default void onTerminal() {
         }
+    }
+
+    @FunctionalInterface
+    interface SpawnHolderAugmenter {
+        SpawnHolderAugmenter NO_OP = (npc, holder) -> { };
+        void augment(@Nonnull NPCEntity npc, @Nonnull Holder<EntityStore> holder);
     }
 
     private static final class SpawnHolderPreparationException extends RuntimeException {

@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.ItemCostComponentView;
+import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRecord;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,6 +50,66 @@ class CommandReviveInventoryPaymentServiceTest {
         var result = CommandReviveInventoryPaymentService.plan(List.of(), List.of(), 0L);
         assertTrue(result.ready());
         assertTrue(result.reservations().isEmpty());
+    }
+
+    @Test
+    void movedReceiptRemainsHeldWhenItsCleanStackEvidenceIsExact() {
+        UUID operationId = UUID.randomUUID();
+        PaidCommandRevivalRecord.Reservation reservation = reservation("original-stack", 3);
+        String receipt = CommandReviveInventoryPaymentService.receipt(operationId, reservation);
+
+        var evidence = CommandReviveInventoryPaymentService.classifyHeldReceipts(List.of(
+                new CommandReviveInventoryPaymentService.ReceiptObservation(
+                        receipt, 8, "original-stack")), operationId, List.of(reservation));
+
+        assertEquals(CommandReviveInventoryPaymentService.ReceiptEvidence.HELD, evidence);
+    }
+
+    @Test
+    void splitReceiptIsAmbiguousEvenWhenCombinedQuantityIsSufficient() {
+        UUID operationId = UUID.randomUUID();
+        PaidCommandRevivalRecord.Reservation reservation = reservation("original-stack", 3);
+        String receipt = CommandReviveInventoryPaymentService.receipt(operationId, reservation);
+
+        var evidence = CommandReviveInventoryPaymentService.classifyHeldReceipts(List.of(
+                new CommandReviveInventoryPaymentService.ReceiptObservation(receipt, 4, "split-a"),
+                new CommandReviveInventoryPaymentService.ReceiptObservation(receipt, 4, "split-b")),
+                operationId, List.of(reservation));
+
+        assertEquals(CommandReviveInventoryPaymentService.ReceiptEvidence.AMBIGUOUS, evidence);
+    }
+
+    @Test
+    void copiedReceiptIsAmbiguousAndCannotDoubleCharge() {
+        UUID operationId = UUID.randomUUID();
+        PaidCommandRevivalRecord.Reservation reservation = reservation("original-stack", 3);
+        String receipt = CommandReviveInventoryPaymentService.receipt(operationId, reservation);
+        var copy = new CommandReviveInventoryPaymentService.ReceiptObservation(
+                receipt, 8, "original-stack");
+
+        var evidence = CommandReviveInventoryPaymentService.classifyHeldReceipts(
+                List.of(copy, copy), operationId, List.of(reservation));
+
+        assertEquals(CommandReviveInventoryPaymentService.ReceiptEvidence.AMBIGUOUS, evidence);
+    }
+
+    @Test
+    void receiptWithInsufficientOrChangedStackEvidenceIsAmbiguous() {
+        UUID operationId = UUID.randomUUID();
+        PaidCommandRevivalRecord.Reservation reservation = reservation("original-stack", 3);
+        String receipt = CommandReviveInventoryPaymentService.receipt(operationId, reservation);
+
+        var evidence = CommandReviveInventoryPaymentService.classifyHeldReceipts(List.of(
+                new CommandReviveInventoryPaymentService.ReceiptObservation(
+                        receipt, 2, "original-stack")), operationId, List.of(reservation));
+
+        assertEquals(CommandReviveInventoryPaymentService.ReceiptEvidence.AMBIGUOUS, evidence);
+    }
+
+    private static PaidCommandRevivalRecord.Reservation reservation(String fingerprint, int quantity) {
+        return new PaidCommandRevivalRecord.Reservation(
+                0, 0, "backpack", 1, quantity, fingerprint, 7L,
+                PaidCommandRevivalRecord.ReservationState.HELD);
     }
 
     private static CommandReviveInventoryPaymentService.SlotStack slot(

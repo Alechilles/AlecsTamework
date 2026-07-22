@@ -319,7 +319,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                                 resolvedHandle.get().attemptId(),
                                 "capture-terminal-revalidation-failed");
                     }
-                } catch (RuntimeException | LinkageError failure) {
+                } catch (RuntimeException | LinkageError applyFailure) {
                     mutation.cancel("capture-terminal-apply-threw");
                     quarantine(resolvedHandle.get().attemptId(), "capture-terminal-apply-threw");
                     attempts.requireSourceRefund(
@@ -327,7 +327,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                     debugLog.accept("capture denied reason=capture-terminal-apply-threw"
                             + " player=" + player.getUuid()
                             + " targetUuid=" + targetUuid
-                            + " failure=" + failure.getClass().getSimpleName());
+                            + " failure=" + applyFailure.getClass().getSimpleName());
                 }
             });
         });

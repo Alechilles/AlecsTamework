@@ -43,6 +43,37 @@ final class CommandPreparedRestoreSpawnService {
         return true;
     }
 
+    /** Applies a population reservation that was durably held before a paid cost was consumed. */
+    boolean schedulePrepared(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull NPCPlugin npcPlugin,
+            int roleIndex,
+            @Nonnull Vector3d position,
+            @Nonnull Rotation3f rotation,
+            @Nonnull PreparedCompanionSpawnBatch batch,
+            @Nonnull Callbacks callbacks
+    ) {
+        Objects.requireNonNull(callbacks, "callbacks");
+        CompanionSpawnPopulationAdmissionService admission = resolveAdmissionService();
+        if (admission == null) {
+            callbacks.onDenied("spawn-population-authority-unavailable");
+            return true;
+        }
+        dispatch(world, () -> {
+            Store<EntityStore> liveStore = world.getEntityStore() == null
+                    ? null : world.getEntityStore().getStore();
+            if (liveStore == null) {
+                admission.cancelRemainingAsync(batch, "paid-revival-store-unavailable");
+                callbacks.onDenied("paid-revival-store-unavailable");
+                return;
+            }
+            spawnPrepared(world, liveStore, npcPlugin, roleIndex, position, rotation,
+                    admission, batch, callbacks);
+        }, () -> admission.cancelRemainingAsync(batch, "paid-revival-world-unavailable"));
+        return true;
+    }
+
     private void apply(
             World world,
             Store<EntityStore> store,
@@ -70,6 +101,15 @@ final class CommandPreparedRestoreSpawnService {
             callbacks.onDenied("command-restore-store-unavailable");
             return;
         }
+        spawnPrepared(world, liveStore, npcPlugin, roleIndex, position, rotation,
+                admission, batch, callbacks);
+    }
+
+    private void spawnPrepared(
+            World world, Store<EntityStore> liveStore, NPCPlugin npcPlugin, int roleIndex,
+            Vector3d position, Rotation3f rotation,
+            CompanionSpawnPopulationAdmissionService admission,
+            PreparedCompanionSpawnBatch batch, Callbacks callbacks) {
         new CompanionPreparedSpawnService(admission).spawnAndCommit(
                 world, liveStore, npcPlugin, roleIndex, position, rotation, batch, 0,
                 new CompanionPreparedSpawnService.Callbacks() {

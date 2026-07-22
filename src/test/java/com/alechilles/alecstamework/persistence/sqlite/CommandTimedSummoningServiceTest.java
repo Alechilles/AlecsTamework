@@ -228,7 +228,10 @@ class CommandTimedSummoningServiceTest {
                     true, "world", 0, 0, "front-placement"));
         }
         public CompletionStage<CommandTimedSummoningService.ProjectionResult> spawn(
-                CommandTimedSummoningService.SpawnPlan plan, String profileId, String sessionId) {
+                CommandTimedSummoningService.SpawnPlan plan,
+                CommandTimedSummoningService.PopulationContext context,
+                CommandTimedSummoningService.PopulationReservation reservation,
+                String sessionId) {
             return CompletableFuture.completedFuture(new CommandTimedSummoningService.ProjectionResult(
                     spawnOutcome,
                     spawnOutcome == CommandTimedSummoningService.ProjectionOutcome.SUCCESS

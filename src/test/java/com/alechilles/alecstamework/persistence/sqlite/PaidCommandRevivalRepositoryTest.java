@@ -75,6 +75,13 @@ class PaidCommandRevivalRepositoryTest {
             assertEquals(PaidCommandRevivalRecord.ReservationState.REFUND_REQUIRED,
                     refund.operation().reservations().get(0).state());
             assertEquals(PaidCommandRevivalRecord.State.COST_CONSUMED, consumed.operation().state());
+            assertEquals(PaidCommandRevivalRepository.RefundDeliveryStatus.PENDING,
+                    repository.findRefundDeliveryStatus(operation.operationId()));
+            assertEquals(PaidCommandRevivalRepository.RefundDeliveryStatus.STARTED,
+                    HydragonPersistenceTestHarness.await(repository.beginRefundDeliveryAsync(
+                            operation.operationId(), 60L)));
+            assertEquals(PaidCommandRevivalRepository.RefundDeliveryStatus.DELIVERING,
+                    repository.findRefundDeliveryStatus(operation.operationId()));
         }
     }
 

@@ -12,8 +12,12 @@ import com.alechilles.alecstamework.api.PopulationAdmissionToken;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
+import com.alechilles.alecstamework.ownership.CompanionSpawnAdmissionRequest;
+import com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
+import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
+import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -27,8 +31,9 @@ public final class CommandTimedSummonPopulationPort
         implements CommandTimedSummoningService.PopulationPort {
     private final OwnerPopulationRuntime runtime;
     private final PopulationAdmissionApi admissions;
+    private final CompanionSpawnPopulationAdmissionService spawnAdmissions;
     private final RoleResolver roles;
-    private final ConcurrentHashMap<String, PopulationAdmissionToken> activeReservations =
+    private final ConcurrentHashMap<String, PreparedCompanionSpawnBatch> activeReservations =
             new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Key, StorageTransition> storageTransitions =
             new ConcurrentHashMap<>();
@@ -38,6 +43,8 @@ public final class CommandTimedSummonPopulationPort
                                             @Nonnull RoleResolver roles) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.admissions = Objects.requireNonNull(admissions, "admissions");
+        this.spawnAdmissions = Objects.requireNonNull(
+                runtime.companionSpawnAdmissionService(), "spawnAdmissions");
         this.roles = Objects.requireNonNull(roles, "roles");
     }
 
@@ -45,65 +52,69 @@ public final class CommandTimedSummonPopulationPort
     public CompletionStage<CommandTimedSummoningService.PopulationReservation> reserveActive(
             CommandTimedSummoningService.PopulationContext context) {
         OwnerPopulationEntry owner = owner(context);
-        if (owner == null || owner.lifecycleState() != CompanionLifecycleState.ROSTER_STORED) {
+        if (owner == null || (owner.lifecycleState() != CompanionLifecycleState.ROSTER_STORED
+                && owner.lifecycleState() != CompanionLifecycleState.PROVISIONED_DORMANT)) {
             return completedReservation(false, null, "roster-stored-population-source-required");
         }
         PopulationAdmissionLocation destination = destination(context);
         if (destination == null) return completedReservation(false, null, "summon-destination-required");
-        UUID currentNpc = currentNpc(context);
-        PopulationAdmissionRequest request = new PopulationAdmissionRequest(
-                new PopulationAdmissionIdentity(context.profileId(), null, context.idempotencyKey()),
-                currentNpc, owner.revision(), owner.ownerId(), owner.ownerId(), null, destination,
-                PopulationAdmissionOperation.RESTORE, 1, PopulationAdmissionForcePolicy.ENFORCE,
-                PopulationCompanionLifecycle.ACTIVE);
-        PopulationAdmissionRequestV2 v2 = new PopulationAdmissionRequestV2(
-                request, requireRole(context), ownershipWorld(owner, context));
-        return admissions.tryAdmitV2(v2).thenApply(decision -> {
-            if (!decision.accepted() || decision.token() == null) {
+        CompanionSpawnAdmissionRequest request = new CompanionSpawnAdmissionRequest(
+                context.profileId(), currentNpc(context), owner.lifecycleState(),
+                false, owner.ownerId(), null, destination.worldName(), destination.chunkX(),
+                destination.chunkZ(), OwnerPopulationOperation.RESTORE, "command_timed_summon",
+                context.idempotencyKey(), false, null, requireRole(context));
+        return spawnAdmissions.prepareAsync(request).thenApply(prepared -> {
+            if (prepared == null || !prepared.allowed() || prepared.preparedBatch() == null) {
                 return new CommandTimedSummoningService.PopulationReservation(
-                        false, null, decision.reason());
+                        false, null, prepared == null
+                        ? "timed-summon-population-prepare-missing" : prepared.reason());
             }
-            String operationId = decision.token().operationId().toString();
-            activeReservations.put(operationId, decision.token());
+            String operationId = prepared.preparedBatch().populationBatch().batchId().toString();
+            activeReservations.put(operationId, prepared.preparedBatch());
             return new CommandTimedSummoningService.PopulationReservation(
-                    true, operationId, decision.reason());
+                    true, operationId, prepared.reason());
         });
     }
 
     @Override
     public CommandTimedSummoningService.PopulationDecision claimActive(
             CommandTimedSummoningService.PopulationReservation reservation) {
-        PopulationAdmissionToken token = token(reservation.populationOperationId());
-        return token == null
+        PreparedCompanionSpawnBatch batch = activeBatch(reservation.populationOperationId());
+        return batch == null
                 ? denied("population-active-reservation-missing")
-                : map(admissions.claimForApply(token));
+                : spawnAdmissions.claimForSpawn(batch, 0)
+                ? accepted("population-active-reservation-claimed")
+                : denied("population-active-reservation-claim-denied");
     }
 
     @Override
     public CompletionStage<CommandTimedSummoningService.PopulationDecision> commitActive(
             CommandTimedSummoningService.PopulationReservation reservation,
             CommandTimedSummoningService.PopulationContext context) {
-        PopulationAdmissionToken token = token(reservation.populationOperationId());
-        if (token == null) return completed(denied("population-active-reservation-missing"));
-        return admissions.commit(token).thenApply(decision -> {
-            if (decision.status() == PopulationAdmissionDecision.Status.COMMITTED) {
-                activeReservations.remove(token.operationId().toString(), token);
-            }
-            return map(decision);
-        });
+        PreparedCompanionSpawnBatch batch = activeBatch(reservation.populationOperationId());
+        if (batch == null) return completed(denied("population-active-reservation-missing"));
+        OwnerPopulationEntry owner = owner(context);
+        UUID current = runtime.identityResolver().currentNpcUuid(context.profileId()).orElse(null);
+        if (owner == null || owner.lifecycleState() != CompanionLifecycleState.ACTIVE
+                || context.projectionNpcUuid() == null
+                || !context.projectionNpcUuid().equals(current)) {
+            return completed(denied("population-active-projection-not-committed"));
+        }
+        activeReservations.remove(reservation.populationOperationId(), batch);
+        return completed(accepted("population-active-projection-committed"));
     }
 
     @Override
     public CompletionStage<CommandTimedSummoningService.PopulationDecision> cancel(
             CommandTimedSummoningService.PopulationReservation reservation) {
-        PopulationAdmissionToken token = token(reservation.populationOperationId());
-        if (token == null) return completed(accepted("population-reservation-already-closed"));
-        return admissions.cancel(token).thenApply(decision -> {
-            if (decision.status() == PopulationAdmissionDecision.Status.CANCELED) {
-                activeReservations.remove(token.operationId().toString(), token);
-            }
-            return map(decision);
-        });
+        PreparedCompanionSpawnBatch batch = activeBatch(reservation.populationOperationId());
+        if (batch == null) return completed(accepted("population-reservation-already-closed"));
+        return spawnAdmissions.cancelRemainingAsync(batch, "timed-summon-canceled")
+                .handle((ignored, failure) -> {
+                    if (failure != null) return denied("population-reservation-cancel-failed");
+                    activeReservations.remove(reservation.populationOperationId(), batch);
+                    return accepted("population-reservation-canceled");
+                });
     }
 
     @Override
@@ -173,9 +184,12 @@ public final class CommandTimedSummonPopulationPort
     @Override
     public CompletionStage<CommandTimedSummoningService.PopulationDecision> recoverCancel(
             String operationId, @Nullable String populationOperationId) {
-        PopulationAdmissionToken token = token(populationOperationId);
-        if (token == null) return completed(accepted("population-recovery-reservation-absent"));
-        return admissions.cancel(token).thenApply(CommandTimedSummonPopulationPort::map);
+        PreparedCompanionSpawnBatch batch = activeBatch(populationOperationId);
+        if (batch == null) return completed(accepted("population-recovery-reservation-absent"));
+        return spawnAdmissions.cancelRemainingAsync(batch, "timed-summon-recovery-cancel")
+                .handle((ignored, failure) -> failure == null
+                        ? accepted("population-recovery-reservation-canceled")
+                        : denied("population-recovery-reservation-cancel-failed"));
     }
 
     @Override
@@ -251,8 +265,18 @@ public final class CommandTimedSummonPopulationPort
                 : runtime.identityResolver().currentNpcUuid(context.profileId()).orElse(null);
     }
 
-    @Nullable private PopulationAdmissionToken token(@Nullable String operationId) {
+    @Nullable private PreparedCompanionSpawnBatch activeBatch(@Nullable String operationId) {
         return operationId == null ? null : activeReservations.get(operationId);
+    }
+
+    @Nullable
+    PreparedCompanionSpawnBatch claimedBatch(@Nullable String populationOperationId) {
+        return activeBatch(populationOperationId);
+    }
+
+    @Nonnull
+    CompanionSpawnPopulationAdmissionService spawnAdmissions() {
+        return spawnAdmissions;
     }
 
     private String requireRole(CommandTimedSummoningService.PopulationContext context) {

@@ -52,6 +52,7 @@ public final class CommandLinkedNpcStateSnapshotService {
     @Nullable
     private final NpcProfileRepository profileRepository;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+    @Nullable private volatile ProjectionUnloadSnapshotSink projectionUnloadSnapshotSink;
 
     public CommandLinkedNpcStateSnapshotService() {
         this(null, new LoadedNpcIdentityIndex());
@@ -75,6 +76,10 @@ public final class CommandLinkedNpcStateSnapshotService {
         refreshFromEntity(reference, store);
     }
 
+    public void installProjectionUnloadSnapshotSink(@Nullable ProjectionUnloadSnapshotSink sink) {
+        projectionUnloadSnapshotSink = sink;
+    }
+
     public void onNpcRemoved(Ref<EntityStore> reference,
                              RemoveReason reason,
                              Store<EntityStore> store) {
@@ -93,7 +98,7 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (reference == null || store == null) {
             return null;
         }
-        if (reason == RemoveReason.REMOVE) {
+        if (reason == RemoveReason.REMOVE || reason == RemoveReason.UNLOAD) {
             refreshFromEntity(reference, store);
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
@@ -108,6 +113,11 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         UUID indexedUuid = componentUuid != null ? componentUuid : legacyNpcUuid;
         UUID npcUuid = npc != null && npc.getUuid() != null ? npc.getUuid() : indexedUuid;
+        ProjectionUnloadSnapshotSink sink = projectionUnloadSnapshotSink;
+        if (reason == RemoveReason.UNLOAD && sink != null && npcUuid != null) {
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot full = fullSnapshotsByNpc.get(npcUuid);
+            if (full != null) sink.capture(npcUuid, full);
+        }
         return npcUuid;
     }
 
@@ -294,7 +304,14 @@ public final class CommandLinkedNpcStateSnapshotService {
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind);
+                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind);
+    }
+
+    @FunctionalInterface
+    public interface ProjectionUnloadSnapshotSink {
+        void capture(@Nonnull UUID npcUuid,
+                     @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot);
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {

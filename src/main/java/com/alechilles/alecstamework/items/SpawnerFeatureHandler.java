@@ -790,6 +790,7 @@ public final class SpawnerFeatureHandler {
                 return false;
             }
             String commandFamilyId = config.getCaptureMechanics().commandFamilyId();
+            ItemFeatureConfig captureConfig = config;
             commandFamilyRosterService.loadRevisionProof(player.getUuid(), commandFamilyId)
                     .whenComplete((proof, failure) -> world.execute(() -> {
                         if (failure != null || proof == null
@@ -803,7 +804,7 @@ public final class SpawnerFeatureHandler {
                             return;
                         }
                         captureFromNpcAction(
-                                player, targetRef, itemStack, config, captureBurstParticleSystem,
+                                player, targetRef, itemStack, captureConfig, captureBurstParticleSystem,
                                 attempt, outcomeResolved, preparedMutation, resolvedAttempt,
                                 expectedRequirementGeneration,
                                 new TameAndCommandLinkPreparation(

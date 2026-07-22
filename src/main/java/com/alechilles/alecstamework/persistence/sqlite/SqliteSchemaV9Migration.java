@@ -243,6 +243,21 @@ final class SqliteSchemaV9Migration {
                 ON command_timed_summon_sessions(owner_uuid, command_family_id, summon_state)
                 """);
         statement.execute("""
+                CREATE TABLE IF NOT EXISTS command_timed_summon_snapshots (
+                    owner_uuid TEXT NOT NULL,
+                    command_family_id TEXT NOT NULL,
+                    profile_id TEXT NOT NULL,
+                    source_npc_uuid TEXT NOT NULL,
+                    snapshot_json TEXT NOT NULL,
+                    snapshot_sha256 TEXT NOT NULL CHECK (length(snapshot_sha256) = 64),
+                    updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
+                    PRIMARY KEY (owner_uuid, command_family_id, profile_id),
+                    FOREIGN KEY (owner_uuid, command_family_id, profile_id)
+                        REFERENCES command_timed_summon_sessions(
+                            owner_uuid, command_family_id, profile_id) ON DELETE CASCADE
+                )
+                """);
+        statement.execute("""
                 CREATE INDEX IF NOT EXISTS idx_command_timed_sessions_expiry
                 ON command_timed_summon_sessions(
                     summon_state, summon_last_checkpoint_at_ms, summon_remaining_ms)
