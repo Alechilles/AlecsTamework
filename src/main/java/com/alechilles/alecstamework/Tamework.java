@@ -104,6 +104,7 @@ import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
+import com.alechilles.alecstamework.items.CaptureChannelSessionCleanupSystem;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
@@ -958,6 +959,7 @@ public class Tamework extends JavaPlugin {
                 )
         );
         getEntityStoreRegistry().registerSystem(new CaptureChannelVfxSystem());
+        getEntityStoreRegistry().registerSystem(new CaptureChannelSessionCleanupSystem());
         getEntityStoreRegistry().registerSystem(
                 new AvatarFlightSourceRecoverySystem(
                         avatarFlightSourceComponentType,

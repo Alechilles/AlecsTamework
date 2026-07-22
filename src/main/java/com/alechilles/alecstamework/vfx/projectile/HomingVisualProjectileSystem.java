@@ -74,11 +74,10 @@ public final class HomingVisualProjectileSystem extends TickingSystem<EntityStor
                     continue;
                 }
                 if (step.arrived()) {
-                    commandBuffer.putComponent(
-                            projectileRef,
-                            transformType,
-                            new TransformComponent(step.position(), transform.getRotation())
-                    );
+                    // Preserve the engine-managed chunk reference held by this component.
+                    // Replacing TransformComponent can strand an entity reference in its
+                    // old EntityChunk when a mote crosses a chunk boundary.
+                    transform.setPosition(step.position());
                     markForDespawn(projectileRef, store, commandBuffer);
                     continue;
                 }
@@ -86,11 +85,7 @@ public final class HomingVisualProjectileSystem extends TickingSystem<EntityStor
                 projectile.setRemainingLifetimeSeconds(remaining);
                 projectile.setLastDirection(step.direction());
                 commandBuffer.putComponent(projectileRef, projectileType, projectile);
-                commandBuffer.putComponent(
-                        projectileRef,
-                        transformType,
-                        new TransformComponent(step.position(), transform.getRotation())
-                );
+                transform.setPosition(step.position());
             }
         });
     }

@@ -10,12 +10,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Prevents probabilistic capture from becoming a tick-time all-profile operation. */
 class CaptureFlowBoundedWorkArchitectureTest {
     @Test
-    void captureTickWorkIsBoundedToActiveChannelSessions() throws Exception {
+    void captureTickWorkUsesIndexedPlayersAndABoundedOrphanSweep() throws Exception {
         String channel = source("items/CaptureChannelVfxSystem.java");
         String handler = source("items/SpawnerFeatureHandler.java");
         String attempts = source("items/SpawnerCaptureAttemptRuntimeCoordinator.java");
 
+        assertTrue(channel.contains("Session session = playerUuid == null ? null : ACTIVE.get(playerUuid)"));
+        assertTrue(channel.contains("this.query = Query.and(playerType, uuidType)"));
         assertTrue(channel.contains("for (Session session : ACTIVE.values())"));
+        assertTrue(channel.contains("shouldSweepOrphanedSession("));
         assertTrue(channel.contains("if (world == null || ACTIVE.isEmpty())"));
         assertTrue(channel.contains("ACTIVE.remove(session.playerUuid, session)"));
         assertFalse(channel.contains("OwnerPopulationIndex"));
