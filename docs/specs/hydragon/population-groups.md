@@ -220,7 +220,7 @@ role/group classification and use the unified authority, including:
 
 - tame/set-owner and first wild capture;
 - legacy adoption and admin/API creation;
-- disposable and bonded spawner restore/store;
+- captured-item restore/store and command-roster tame/link;
 - revive and lost recovery;
 - managed coop capture/release;
 - breeding and batch birth;
@@ -302,7 +302,7 @@ continues requiring its NPC/claim context; V2 callers cannot select
 
 `PROVISIONED_DORMANT` is present in internal `CompanionLifecycleState` and public
 `PopulationCompanionLifecycle`. It means an intentionally created, owned,
-non-physical profile with no vessel/coop/death/lost authority. It consumes an
+non-physical profile with no captured-item/coop/death/lost authority. It consumes an
 owned slot, consumes no active or claim slot, and may transition only through
 normal restore admission or permanent release. It is distinct from
 `UNKNOWN_DORMANT`, which remains conservative unresolved evidence. Every
@@ -481,7 +481,7 @@ config indexes, CHANGELOG, generated agent index, and `/tw api test` coverage.
    `PROVISIONED_DORMANT`.
 9. Pending dormant-to-active/new-active reservation consumes active headroom.
 10. Two concurrent `CAPTURED -> ACTIVE` reservations at max one produce one
-    winner, including across different vessels/items/world callbacks.
+    winner, including across different items/rosters/world callbacks.
 11. `UNLOADED -> ACTIVE` and `ACTIVE -> UNLOADED` are zero active delta.
 12. Active capacity releases only on durable transition to a dormant lifecycle.
 13. Cancel, expiry, start-watchdog rejection, and compensation release each
@@ -499,8 +499,8 @@ config indexes, CHANGELOG, generated agent index, and `/tw api test` coverage.
 
 ### Lifecycle path integration
 
-20. Wild capture, tame, admin/API creation, breeding, spawner summon, bonded
-    summon/store, revive, lost recovery, managed coop release, role change,
+20. Wild capture, tame, command-roster link, admin/API creation, breeding,
+    captured-item restore/store, revive, lost recovery, managed coop release, role change,
     transfer, release, cull, and permanent death all route through one group
     authority.
 21. Command-item `MaxActive` changes do not affect or bypass group counts.

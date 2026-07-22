@@ -17,8 +17,11 @@ those tiers in Tamework.
 The attempt outcome is resolved exactly once at the commit boundary after
 health, required effect, distance, role, source item, ownership, population,
 and target identity are revalidated. A failed roll does not tame, own, rename,
-change role, despawn, damage, heal, or otherwise mutate the NPC. It does not
-consume or replace the empty capture item.
+change role, despawn, damage, heal, or otherwise mutate the NPC. Source-item
+handling follows the spawner's snapshotted `SourceConsumption` policy: the
+default retains the item, while HyDragon opts into `ResolvedAttempt` and spends
+one stone on either terminal result. The generic spend/apply transaction is
+defined by [command-roster capture and revival](command-roster-capture-revival.md).
 
 ## Non-goals
 
@@ -264,10 +267,12 @@ failure is a new gameplay attempt and receives a new ID.
    The same transaction records the failure cooldown deadline when applicable.
    This is the only operation allowed to obtain random entropy for that attempt
    ID, and it obtains none for guaranteed outcomes.
-7. On failure, cancel prepared population capacity, leave the NPC and item
-   untouched, activate the already-recorded coordinator cooldown, dispatch
-   failure feedback once, mark the attempt terminal, and emit the post-commit
-   resolution event.
+7. On failure, cancel prepared population capacity and leave the NPC untouched.
+   Finalize the source according to the snapshotted `SourceConsumption` policy,
+   activate the already-recorded coordinator cooldown, dispatch failure
+   feedback once, mark the attempt terminal, and emit the post-commit event.
+   `ResolvedAttempt` cannot publish the result until one source item is durably
+   consumed; the default policy leaves the item unchanged.
 8. On success, return to the owning world thread, recheck the target/source
    fences, claim admission for apply, then run the existing capture finalizer.
 9. Commit profile, lifecycle `CAPTURED`, population, capture metadata, and item
@@ -295,8 +300,9 @@ must prevent a late duplicate callback from becoming a fresh roll.
 
 - Precondition or cap denial: no roll, no mutation, no failure cooldown.
 - Player/channel cancellation: no roll and no mutation.
-- Resolved failed probability: no NPC/owner/profile/item mutation; retain the empty source
-  item and apply only `FailureCooldownMs` plus configured presentation.
+- Resolved failed probability: no NPC/owner/profile mutation. Apply
+  `FailureCooldownMs` and configured presentation; retain the source under the
+  default policy or consume exactly one under `ResolvedAttempt`.
 - Random provider failure: fail closed before resolution and keep the attempt
   retryable with the same ID; do not substitute `Math.random()`.
 - Persistence unavailable: fail closed before roll or quarantine a previously
@@ -312,9 +318,10 @@ Failure cooldown authority is the capture-attempt journal/coordinator, keyed by
 actor UUID and spawner config ID. The terminal failure row durably records its
 `failure_cooldown_until_ms`; a later channel for that actor/config is denied
 before rolling until it expires. The coordinator never writes cooldown metadata
-to the source stack, so failed-roll item ID, quantity, metadata, and fingerprint
-remain byte-for-behavior unchanged. Journal reads/writes remain asynchronous and
-must not block the world thread.
+to the source stack. Default-policy stacks remain byte-for-behavior unchanged;
+`ResolvedAttempt` stacks are exact-CAS decremented by the separate durable spend
+step. Journal reads/writes remain asynchronous and must not block the world
+thread.
 
 ## Public API and events
 
@@ -438,12 +445,13 @@ rather than expanding either multi-domain class.
 
 ### Atomicity and idempotency
 
-20. A failed roll leaves role, owner, profile, health, effects, entity, and item
-    quantity/ID/metadata/fingerprint unchanged; cooldown state exists only in
-    the attempt coordinator.
+20. A failed roll leaves role, owner, profile, health, effects, and entity
+    unchanged. The default policy leaves the source unchanged;
+    `ResolvedAttempt` decrements its quantity exactly once. Cooldown state
+    exists only in the attempt coordinator.
 21. A failed roll durably records exactly one actor/config cooldown and sends
     feedback once even when `Complete` is delivered twice; restart preserves
-    the remaining cooldown without modifying the stack.
+    the remaining cooldown without an additional stack mutation.
 22. Duplicate completion callbacks read one journal result and invoke entropy
     exactly once only for an outcome that requires a sample; guaranteed paths
     invoke it zero times.

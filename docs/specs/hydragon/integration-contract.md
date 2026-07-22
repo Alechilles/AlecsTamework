@@ -1,494 +1,222 @@
-# Tamework-HyDragon integration contract
+# HyDragon Integration Contract
 
-Status: Implementation and automated release verification complete
-Related Tamework specs: [index](README.md), [capture policy](capture-policy.md),
-[bonded vessels](bonded-vessels.md), [population groups](population-groups.md),
-and deferred [companion inventory](companion-inventory.md)
-HyDragon counterparts: [plugin architecture](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/plugin-architecture.md),
-[capture and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md),
-[Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md), and
-[dragon content and encounters](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/dragon-content-encounters.md)
+Status: Proposed 3.x contract after the command-roster redesign
 
-## Purpose
+Related Tamework specs: [index](README.md), [capture policy](capture-policy.md), [command-roster capture and revival](command-roster-capture-revival.md), [population groups](population-groups.md), and deferred [companion inventory](companion-inventory.md).
 
-This document defines the stable seam between Tamework 3.x and the HyDragon
-Java plugin. It prevents HyDragon from depending on Tamework internals and
-prevents Tamework from acquiring dragon-specific behavior.
+HyDragon specs: [index](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/README.md), [capture and Dragon Horn](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md), and [Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md).
 
-### Goals
+## 1. Goal
 
-- Give HyDragon mutation-authoritative, capability-gated APIs for every generic
-  companion operation it cannot implement safely from assets.
-- Keep profile, vessel, population, and provisioning identity under one
-  Tamework persistence/recovery authority; later companion inventory follows
-  the same boundary in its own update.
-- Preserve source/binary behavior for 3.0.0-era consumers that do not opt in.
+Define the only supported boundary between Tamework 3.x and HyDragon. HyDragon consumes versioned public capabilities and immutable data. It does not link against internal Tamework services, duplicate canonical companion state, or infer feature readiness from the mod version alone.
 
-### Non-goals
+## 2. Version and capability discovery
 
-- Declaring Public API `0.9.0` stable/1.0 or removing capability checks.
-- Supporting HyDragon against Tamework 2.x.
-- Defining HyDragon balance, encounter choreography, elemental abilities,
-  recipes, art, localization, or player entitlement storage.
-- Allowing event listeners, profile JSON, or direct repositories to authorize a
-  Tamework mutation.
+HyDragon declares Tamework `>=3.0.0 <4.0.0`. On startup it verifies the public API major version and queries capabilities independently.
 
-## Dependency and bootstrap
+Required capability IDs:
 
-HyDragon declares:
-
-```json
-{
-  "Dependencies": {
-    "Alechilles:Alec's Tamework!": ">=3.0.0 <4.0.0"
-  }
-}
-```
-
-At plugin startup HyDragon obtains `TameworkApi` through the supported plugin
-accessor, null-checks it, records `getApiVersion()`, and checks capabilities
-before registering interactions or listeners. It never reads Tamework's SQLite
-database, casts internal implementation classes, reflects into services, or
-caches mutable `Tw*Config` instances.
-
-This additive surface bumps the experimental Public API from `0.8.0` to
-`0.9.0`. The API version remains independent of the Tamework mod version and is
-not a substitute for capability checks.
-
-### Capabilities
-
-Tamework adds these additive enum values:
-
+- `PROFILES`
+- `PROFILE_DATA`
+- `POLICY`
+- `PERSISTENCE_RESILIENCE`
 - `CAPTURE_POLICY`
-- `BONDED_VESSELS`
 - `POPULATION_GROUPS`
 - `COMPANION_PROVISIONING`
-- `PROFILE_DATA_TRANSACTIONS`
+- `COMMAND_FAMILY_ROSTERS`
+- `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`
+- `CAPTURE_TAME_AND_LINK`
+- `PAID_COMMAND_REVIVAL`
 
-Feature gates are independent; existing capabilities are not one global
-all-or-nothing list:
+Optional/deferred:
 
-| HyDragon surface | Hard capabilities | Missing-capability result |
+- `COMPANION_INVENTORY`
+
+Removed:
+
+- `BONDED_VESSELS`
+
+Each capability reports `AVAILABLE`, `DEGRADED`, `UNAVAILABLE`, or `UNSUPPORTED`, plus a stable reason and bounded incident ID. `AVAILABLE` means its complete runtime and persistence authority is ready. Tamework must withdraw or degrade a capability when its required circuit, repository, config registry, or recovery queue is not trustworthy.
+
+## 3. Feature gates
+
+| HyDragon feature | Required capabilities | Fail-closed behavior |
 | --- | --- | --- |
-| Authoritative companion mutations | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE` plus the feature-specific capabilities below | Disable that positive/destructive mutation; never substitute local state |
-| Configured custom requirements/effects | `INTERACTION_EXTENSIONS` | Disable only interactions whose config names a HyDragon handler |
-| Elemental/profile-scoped ability state | `PROFILE_DATA` | Disable persistence-dependent abilities; capture/vessels/Soul Bond entitlement continue |
-| Post-commit lifecycle/presentation consumers | `EVENTS` | Disable event-dependent HyDragon consumers; do not poll repositories or reinterpret mutation success |
-| Startup config inspection | `CONFIG_READ` | Mark config introspection unavailable; rely only on HyDragon-owned assets and disable any feature requiring Tamework view validation |
-| Operator health bridge | `DIAGNOSTICS` | Warn that integrated operator diagnostics are unavailable; gameplay authority is unchanged |
+| Probabilistic stone attempt | Profiles, policy, persistence resilience, capture policy, population groups, resolved-attempt consumption | Deny before channel completion/entropy; retain stone and target |
+| Tame in place and add to Horn | Above plus command-family rosters and capture tame-and-link | Deny before roll; retain stone and target |
+| Wyvern Egg claim | Profiles, persistence resilience, population groups, provisioning, command-family rosters | Deny before Egg consumption |
+| Horn commands/roster | Profiles, policy, persistence resilience, command-family rosters | Disable roster mutation/positive relocation; preserve rows/profiles |
+| Paid revival | Profiles, persistence resilience, population groups, command-family rosters, paid command revival | Disable Revive; do not reserve or consume essence |
+| Elemental archetype data | Profiles and profile data | Disable attunement before essence consumption; retain existing profile data |
+| Miniwyvern backpack | Companion inventory plus profile/lifecycle authority | Feature absent until later update |
 
-Feature-specific gates:
+Missing one feature's capability must not disable unrelated safe features. In particular, missing paid revival does not disable ordinary Horn commands, and missing backpack support does not disable the Miniwyvern.
 
-- The full-dragon Draconic Stone capture/summon loop requires
-  `CAPTURE_POLICY`, `BONDED_VESSELS`, `POPULATION_GROUPS`, and the shared
-  profile/policy/persistence capabilities. If one is absent, only that stone
-  loop is disabled with one actionable startup error.
-- The core Soul Bond provisioning transaction requires healthy `PROFILES`,
-  `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, and
-  `COMPANION_PROVISIONING`. The shipped Soul Bond item interaction additionally
-  requires `INTERACTION_EXTENSIONS`; missing `EVENTS` disables only its
-  post-commit presentation/listeners. `PROFILE_DATA` is not required for the
-  HyDragon-owned entitlement or profile creation. Soul Bond remains available
-  when `CAPTURE_POLICY` or `BONDED_VESSELS` is absent because it provisions a
-  Soul Bond-exclusive Miniwyvern directly rather than capturing/binding one.
-- No feature emulates a missing Tamework authority with ad-hoc metadata.
+## 4. Authority matrix
 
-The shipped HyDragon feature matrix is therefore:
-
-| HyDragon feature | Required Tamework capabilities | Fail-closed result when missing |
+| State | Authority | Consumer rule |
 | --- | --- | --- |
-| Probabilistic Draconic Stone capture | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `CAPTURE_POLICY`, `POPULATION_GROUPS` | Disable capture before eligibility/entropy; retain the source item and target unchanged |
-| Bonded summon/store | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `BONDED_VESSELS`, `POPULATION_GROUPS` | Disable vessel mutation; retain the durable profile/binding/item state |
-| Damaged-stone repair | Bonded summon/store capabilities plus the durable bonded-operation query/resume surface | Do not consume Revitalizing Essence; after a prior consumption, retry/query the same operation and never guess whether to refund |
-| Soul Bond Miniwyvern creation | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, `COMPANION_PROVISIONING`, plus `INTERACTION_EXTENSIONS` for the shipped item | Disable creation; never create a HyDragon-local profile or bypass the one-owned group |
-| Elemental profile state | `PROFILE_DATA` | Disable persistence-dependent elemental abilities only |
-| Flight gate | Bundled `Tamework_Flightmasters_Talisman` item/config; no new API capability | Disable HyDragon flight interaction if the canonical item/config is absent |
-| Miniwyvern backpack | Deferred future `COMPANION_INVENTORY` | Not registered or shown in the initial release |
+| Profile ID, owner, lifecycle, death/lost state | Tamework | HyDragon stores references only where its domain record requires them |
+| Capture attempt/result/cooldown/source spend | Tamework | HyDragon supplies data and presentation; never pre-rolls or mirrors cooldown |
+| Command-family membership and group/home preferences | Tamework | Horn metadata is cache only |
+| Population group membership/admission | Tamework | HyDragon configures role rules; never maintains a second count |
+| Revival quote, reservation, cost consumption, recovery | Tamework | HyDragon supplies item IDs/quantities and localized presentation |
+| Soul Bond entitlement | HyDragon | Tamework provisions/links the requested profile idempotently |
+| Miniwyvern archetype/ability state | HyDragon namespaced profile data | Tamework persists and revision-fences opaque domain values |
+| Stone tiers, role difficulty, materials, Dragon Horn/Egg assets | HyDragon | Tamework treats IDs and values as content data |
+| Companion inventory | Deferred Tamework authority | HyDragon does not implement a private backpack |
 
-`COMPANION_INVENTORY` is not part of API `0.9.0` or the initial HyDragon
-release. HyDragon does not query it or register a backpack interaction. The
-deferred [companion-inventory specification](companion-inventory.md) will assign
-its API/migration version and capability gate when that update is scheduled.
+Live entity UUIDs, item slots, cached Horn rows, and client UI state are projections. They cannot substitute for canonical profile, roster, population, or operation records.
 
-## Stable identity and data ownership
+## 5. Idempotency and transaction ownership
 
-| Data | Authority | Consumer rule |
-| --- | --- | --- |
-| Canonical profile identity, owner, role, lifecycle and revision | Tamework | HyDragon keys all durable per-dragon data by `profile_id` |
-| Population group membership/count/reservation | Tamework | HyDragon supplies config membership and requests mutations through the public admission API |
-| Vessel binding ID, generation, state and current projection | Tamework | HyDragon treats item metadata as a display/interaction projection only |
-| Deferred companion inventory and recovery claims | Future Tamework update | HyDragon will request open/summary operations; it must never serialize a backpack into profile data |
-| Vessel `DEAD`/damaged lifecycle, binding generation and durable `TransitionCooldownMs` | Tamework | HyDragon configures `10000` ms in the vessel asset and never duplicates condition/cooldown authority in profile data or code |
-| Stone tier values, repair material transaction, cosmetics and localization | HyDragon | Invoke supported Tamework vessel transitions; compensate material changes idempotently if the transition fails |
-| Soul Bond player entitlement | HyDragon | Persist by player UUID in HyDragon storage; the Miniwyvern profile remains Tamework-owned |
-| Elemental archetype and ability state | HyDragon | Store profile-scoped JSON under namespace `Alechilles:HyDragon` |
-| Models, roles, items, recipes, VFX, status effects and spawn assets | HyDragon | Reference only stable Tamework type/config IDs |
+Every cross-plugin mutation uses a namespaced caller key:
 
-Live entity UUIDs, command-tool links, inventory slots, and vessel item
-locations are not durable domain identities.
+```text
+hydragon:<operation-kind>:<stable-player-action-id>
+```
 
-## Required IDs and baseline policy
+The key is stable across callbacks, async continuation, retry, relog, and restart. Tamework maps it to its durable operation and returns the prior result for duplicates. HyDragon persists the same key when it owns part of a saga, such as the Soul Bond entitlement or attunement ledger.
 
-- Flight gate item: `Tamework_Flightmasters_Talisman`.
-- Full-dragon logical group: `hydragon:full_dragons` with unlimited owned and
-  one active per owner.
-- Soulbound Miniwyvern logical group: `hydragon:soulbound_mini` with
-  one owned and one active per owner.
-- Miniwyvern wild and tamed roles are excluded from every ordinary Draconic
-  Stone `AllowedRoles` and capture-policy role map. Creation is performed only
-  by the HyDragon Soul Bond workflow.
-- Every bonded Draconic Stone sets Tamework
-  `Vessel.TransitionCooldownMs: 10000`; there is no second HyDragon swap-cooldown
-  field or timer.
-- HyDragon public interaction-extension IDs use a stable `hydragon:` prefix.
-  Tamework reserves `tamework:` for its own extensions.
+Rules:
 
-If Hytale asset IDs cannot contain a colon in a particular family, the asset
-filename/config asset ID may use an underscore-safe form while the persisted
-`GroupId`, Java extension IDs, and profile-data namespaces retain their
-namespaced form.
+1. Preflight queries are advisory and side-effect-free.
+2. Positive mutation uses prepare/claim/apply/commit or prepare/cancel.
+3. Inventory consumption uses exact slot/stack/revision fencing and is never inferred from a later inventory snapshot.
+4. A committed source spend or revival charge is never repeated.
+5. A recorded capture result is never rolled again.
+6. Listener exceptions cannot roll back committed state and cannot initiate compensating mutation implicitly.
+7. Ambiguous outcomes remain pending until queried/recovered; callers do not guess that failure occurred.
+8. Terminal compensation produces at most one durable refund/recovery claim and never both the gameplay result and a spendable refund.
 
-Energy, maximum summon duration, and charge depletion are deferred optional
-HyDragon extensions. They are not required for the MVP and are not Tamework
-binding/population authority.
+## 6. Capture integration
 
-## Fixed MVP maintenance authority
+HyDragon authors `TwSpawnerConfig` and role-scoped capture-policy assets. Tamework snapshots their revisions at attempt preparation.
 
-There is exactly one owner for each maintenance rule:
+For HyDragon stones:
 
-| Rule | Authority | Baseline behavior |
-| --- | --- | --- |
-| Summon/store transition cooldown | Tamework bonded binding row configured by `Vessel.TransitionCooldownMs` | `10000` ms after each successful summon or store; HyDragon defines no duplicate timer |
-| Dead-to-stored vessel transition | Tamework `BondedVesselsApi` | Generation-fenced, idempotent, restart-resumable transition |
-| Revitalizing Essence consumption/refund | HyDragon durable repair saga | Consume once only after Tamework preparation; refund/claim only after a proven terminal pre-apply denial |
-| Energy, maximum summon duration, charge depletion | Deferred HyDragon extension | Absent from the MVP; Tamework does not infer or persist them |
+```text
+SourceConsumption = ResolvedAttempt
+SuccessDisposition = TameAndCommandLink
+CommandFamilyId = hydragon:dragon_horn
+RequiredCommandConfigId = HyDragonDragonHorn
+RequireCommandAccessItem = true
+```
 
-The corresponding HyDragon behavior is specified in
-[capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md).
+Tamework owns validation, attempt identity, entropy, exact source spend, cooldown, tame/owner/role/profile apply, population mutation, and Horn membership. HyDragon may register deterministic side-effect-free special encounter requirements and consume post-commit events for presentation/domain bookkeeping.
 
-## Public API additions
+`CaptureAttemptResolvedEvent` includes attempt/operation IDs, config IDs/revisions, actor/target/profile identity, formula inputs, outcome, source-consumption status, command-family membership status for success, stable reason, and timestamps. Secret entropy is omitted from normal public payloads.
 
-### Capture policy
+Failure before a roll emits no resolved event. A resolved failed roll reports one consumed source item. A successful event is emitted only after profile and roster membership commit.
 
-`configs()` exposes immutable item-side capture mechanics and role-scoped
-`TwCapturePolicyConfig` difficulty in new versioned views rather than changing
-the constructor of the existing `SpawnerConfigView`.
-`CaptureAttemptResolvedEvent` reports the committed attempt ID, applicable
-config IDs/revisions, actor, source item ID, target UUID/profile when known,
-role, effective power/chance/condition inputs, outcome (`CAPTURED` or
-`FAILED_ROLL`), result reason, and timestamps. Precondition/capability/capacity
-denials occur before attempt resolution and do not emit this success/failure-roll
-event. The event is emitted after the attempt result is durable.
-HyDragon registers namespaced, side-effect-free special encounter eligibility
-through the capture requirement extension added with this capability; a public
-event is never a cancelable pre-commit policy hook.
+## 7. Command-family roster integration
 
-### Bonded vessels
+Tamework exposes immutable roster queries and idempotent mutations by acting owner, family ID, and profile ID. HyDragon's Dragon Horn uses `hydragon:dragon_horn` with `OwnerCommandFamily` storage.
 
-`TameworkApi.bondedVessels()` returns a `BondedVesselsApi` when
-`BONDED_VESSELS` is present. At minimum it supports immutable lookup by binding
-ID and profile ID plus mutation-bound summon, store, and state-transition
-requests. Every request carries a caller namespace, idempotency key, expected
-binding generation, expected profile revision, actor UUID, and intended
-transition plus exact source holder/container/slot/revision/fingerprint
-evidence. Tokens are opaque and follow prepare/claim/apply/commit/cancel
-semantics, but they are process-local capabilities and are never the only
-restart credential. `resumeTransition(request)` revalidates the original
-caller/key, transition, revisions, and current exact source evidence before
-issuing a fresh token for the existing nonterminal operation; it never creates
-another operation or advances generation.
+Public operations include:
 
-`findOperation(callerNamespace, idempotencyKey)` returns a bounded immutable
-durable view for both nonterminal and terminal rows. Its status distinguishes
-at least `PREPARED`, `APPLYING`, `APPLIED`, `COMMITTED`, `CANCELED`,
-`TERMINAL_DENIED`, and `QUARANTINED`. `APPLIED` means Tamework authority may
-still finish source closure, so HyDragon must retry/resume and must not refund.
-Only `TERMINAL_DENIED` proves that a pre-apply repair denial may be compensated.
-Not-found, unavailable, and timeout/unknown never authorize a refund or a new
-idempotency key.
+- list/status query;
+- add/upsert membership;
+- unlink membership;
+- set active-for-bulk-command;
+- assign command group;
+- set/query home;
+- resolve a compatible access item;
+- refresh physical item projections where safe.
 
-Events:
+Authorization is evaluated from the acting owner and canonical profile. Supplying a copied item or cached row never grants authority. Queries usable for diagnostics accept an optional owner and must not require a live `Player` entity.
 
-- `BondedVesselBoundEvent`
-- `BondedVesselStateChangedEvent`
-- `BondedVesselBindingInvalidatedEvent`
+## 8. Provisioning integration
 
-All include binding ID, old/new generation, profile ID, state, operation ID,
-and immutable timestamps. Stale-generation denial is diagnostic, not an event
-that HyDragon may reinterpret as success.
+HyDragon's Wyvern Egg requests one owned `Tamed_Wyvern_Mini` profile, group `hydragon:soulbound_mini`, dormant initial lifecycle, and `hydragon:dragon_horn` membership under the Egg operation ID.
 
-### Population groups
+Provisioning returns:
 
-Group limits are automatically enforced by the existing
-`PopulationAdmissionApi`; callers cannot opt out. New immutable request context
-may include expected group IDs for diagnostics, but Tamework resolves and
-validates authoritative membership. `PopulationGroupApi` provides read-only
-definitions/counts and a reconciliation status view. It does not offer a
-non-transactional "increment" method.
+- canonical profile ID and revision;
+- resolved owner/group/family IDs;
+- whether each mutation was newly applied or already committed;
+- lifecycle/projection status;
+- stable denial/recovery reason and incident ID.
 
-Events:
+Initial projection is separately admitted. Its failure does not undo a committed entitlement/profile/membership and does not authorize a replacement profile.
 
-- `PopulationGroupMembershipChangedEvent`
-- `PopulationGroupLimitChangedEvent`
+## 9. Paid revival integration
 
-### Companion provisioning
+HyDragon supplies role-scoped cost data through `TwCompanionConfig.Command.Revive`. Tamework exposes:
 
-`TameworkApi.companionProvisioning()` is a default fail-closed accessor for a
-generic mutation-bound creation API. A request includes a stable caller
-namespace plus idempotency key, owner UUID, target role ID, desired initial disposition
-(`PROVISIONED_DORMANT` or `ACTIVE`), retained ownership-world context, and
-destination/world context when active projection is requested. Tamework
-resolves role-based group membership; callers cannot assert a bypassing group.
+- immutable revive quote;
+- prepare/confirm request with actor, profile, command family, quoted config revision, and caller key;
+- operation query/recovery result;
+- post-commit paid-revival event.
 
-Provisioning first creates and commits exactly one owned dormant canonical
-profile through owner/group admission. If active projection was requested, a
-second journaled restore admission projects that same profile. Projection
-failure returns the one profile as dormant/recoverable and never creates a
-replacement on retry. The result includes operation/profile IDs, committed
-lifecycle, projection status/reason, and population decision. A successful
-`CompanionProvisionedEvent` is post-commit and idempotent by operation ID.
-An authoritative non-released provisioning record plus enabled role revive
-policy also qualifies the companion for `DEAD_REVIVABLE` without a command-tool
-link. Provisioned death/revive events are canonical and command-link-independent;
-revive restores the same profile through normal active/group/claim admission.
+Tamework owns ownership/roster/death/cooldown/population/placement validation, inventory reservation and consumption, profile recovery, projection, refund claims, and result persistence. HyDragon supplies localized labels/effects and may react to the post-commit event.
 
-`findOperation(callerNamespace, idempotencyKey)` is restart-visible and returns
-nonterminal, terminal, and partial-success rows, not only final successes. Its
-operation status distinguishes `PREPARING`, `PREPARED`, `APPLYING`,
-`DORMANT_COMMITTED`, `PROJECTING`, `COMMITTED`, `PARTIAL_DORMANT`, `CANCELED`,
-`TERMINAL_DENIED`, and `QUARANTINED`. Once dormant profile creation has
-committed, every query/result
-includes the original caller namespace, idempotency key, operation/profile,
-owner, role, lifecycle, profile revision, and projection status. A retry of an
-active request after `PARTIAL_DORMANT` resumes projection of that profile; it
-must not allocate another profile.
+A quote is not a reservation. Confirmation revalidates the snapshotted config and exact inventory. A missing or changed source stack before consumption denies with no charge.
 
-### Deferred companion inventory
+## 10. Profile data and HyDragon extensions
 
-This surface is not implemented or advertised in Public API `0.9.0`. A later
-API version will add `TameworkApi.companionInventories()` with
-summary/open-session/recovery operations. HyDragon does not receive repository
-access or a mutable backing collection. The future events are
-successful-post-commit notifications:
+HyDragon registers namespaced profile-data schemas and optimistic mutations for elemental archetypes. Tamework treats the content as opaque except for size/version/safety limits.
 
-- `CompanionInventoryChangedEvent`
-- `CompanionInventoryDispositionEvent` for overflow, escrow, quarantine, and
-  recovery-claim transitions
+An attunement operation:
 
-### Compatibility shape
+1. resolves the canonical Miniwyvern profile;
+2. fences profile-data revision and essence stack;
+3. writes the new archetype under one HyDragon operation ID;
+4. consumes one essence exactly once;
+5. reconciles attachment/runtime presentation;
+6. returns the existing result on retry.
 
-New root accessors should be `default` methods returning an unavailable facade
-or `Optional` so an external implementation of the experimental `TameworkApi`
-does not fail linkage. Existing records and public constructors are not changed;
-new data uses new versioned view/request types. New enum values are additive,
-and consumers must use default branches when switching over capabilities or
-event reasons.
+No profile-data value may represent command roster authority, population membership, capture spend, or revival payment.
 
-### Public DTO validation baseline
+## 11. Threading and callbacks
 
-Public request/view constructors reject invalid data before durable or world
-work begins:
+- Entity/component mutation executes on the owning world thread.
+- SQLite and other blocking persistence runs off the world thread.
+- Async work carries immutable IDs, revisions, and snapshots, not stale `Player`, component, entity, or inventory references.
+- Before apply, Tamework reacquires and validates current world/entity/inventory state.
+- Public listeners are post-commit notifications unless explicitly registered as synchronous side-effect-free requirements.
+- Listener order is deterministic; exceptions are isolated and diagnosed.
 
-- caller namespaces, idempotency keys, item/config/role/world IDs, fingerprints,
-  and required reason strings are trimmed, nonblank, and length-bounded;
-- namespace plus idempotency key is operation origin/uniqueness; an optional
-  correlation ID is diagnostics-only and cannot alias, authorize, or resume an
-  operation;
-- revisions/generations are nonnegative except an explicitly documented
-  `CURRENT` sentinel such as provisioning policy revision `-1`; every other
-  negative value is invalid;
-- locations and health/probability inputs are finite and within their declared
-  bounds;
-- vessel requests include exact holder/container/slot/inventory-revision/item-
-  fingerprint evidence and transition-specific destination/live-NPC context;
-- dormant provisioning requires an ownership world and forbids a destination;
-  active provisioning additionally requires a finite destination; and
-- supplied expected policy/config revisions are persisted on preparation and
-  must match when nonnegative. `-1` resolves current policy once and persists
-  that resolved revision; it is not a permission to re-resolve during retry.
+## 12. Reload semantics
 
-Invalid DTOs throw/return a stable validation denial before opening a journal
-row. DTO constructors normalize representation but never silently clamp,
-invent identity, or downgrade a requested mutation.
+- `/tw reloadconfig` refreshes `TwSpawnerConfig` and `TwCommandItemConfig`, including new capture/roster fields.
+- `TwCompanionConfig` revival fields update through normal asset events.
+- An in-flight operation remains bound to snapshotted config revisions.
+- Invalid reload input does not replace the last valid compiled registry.
+- Capability availability is recomputed after registry/persistence changes.
 
-## Event ordering and idempotency
+## 13. Diagnostics
 
-For one successful first capture and summon cycle, externally visible ordering
-is:
+Read-only health and operation diagnostics must run from the server console. Player identity is an optional filter.
 
-1. Capture eligibility is revalidated.
-2. The capture attempt outcome is durably recorded exactly once.
-3. Population/binding state enters its durable applying state.
-4. Ownership/lifecycle/entity changes are applied on the owning world thread.
-5. Canonical profile/population/binding state commits as `APPLIED`.
-6. The exact source item is finalized and its journal closes as `COMMITTED`.
-7. New authoritative capture/vessel/group events are emitted in operation
-   sequence order. Existing command-link-conditioned profile/capture events are
-   compatibility notifications, not authoritative coverage.
+Required surfaces include:
 
-HyDragon handlers must be idempotent by `operationId` or `attemptId`. They may
-enqueue later work but must not block the emitting thread or perform SQLite
-I/O synchronously. Tamework catches and logs listener exceptions; a HyDragon
-listener failure cannot roll back a committed Tamework operation.
+- `/tw api test`
+- `/tw diagnose capture-attempt <id>`
+- `/tw diagnose command-family [owner] [family]`
+- `/tw diagnose provision <operation-id>`
+- `/tw diagnose revive <operation-id-or-profile>`
+- aggregate persistence/recovery/circuit health
 
-A repeated event, callback, or API request with the same caller namespace and
-idempotency key returns the previously committed decision. It never rolls capture chance again,
-increments a binding generation twice, creates another profile, or consumes
-another group slot.
+HyDragon's diagnostics may query these immutable summaries and add domain context. Neither plugin may expose inventory contents, secret entropy, or unrelated player data in routine output.
 
-## Failure contract
+## 14. Bonded-vessel removal contract
 
-| Condition | Required result |
-| --- | --- |
-| Missing hard capability | HyDragon disables related mutations; no fallback write path |
-| Tamework loading/reconciling/degraded/unavailable | Positive or destructive mutation fails closed with retryable feedback |
-| Capture roll fails | NPC/owner/role/health/effects remain unchanged; empty item remains; configured failure cooldown applies |
-| Source item moved or changed before apply | Cancel operation; do not mutate NPC or binding |
-| Stale/copied vessel generation | Deny and retain item as non-authoritative evidence; expose repair/quarantine diagnostic |
-| Group cap reached | Deny before spawning/reviving; retain stored vessel and profile state |
-| Listener or cosmetic effect fails after commit | Gameplay commit remains; record degraded presentation diagnostic |
-| HyDragon profile-data write fails | Do not claim a Tamework mutation succeeded on HyDragon's behalf; retry idempotently or compensate domain state |
-| Deferred inventory capacity shrinks | In the later inventory update, move excess slots to durable overflow and never delete them |
-| Deferred profile deletion with inventory items | In the later inventory update, atomically create an owner recovery claim or block deletion |
+`BONDED_VESSELS`, `TameworkApi.bondedVessels()`, all vessel DTOs/events/config, binding state/generation persistence, runtime orchestration, diagnostics, examples, and schema documentation are deleted. HyDragon simultaneously removes its vessel calls and assets.
 
-## Reload behavior
+There is no HyDragon migration/adoption contract. Development-only worlds and items are unsupported. Tamework may perform only its own internal schema housekeeping required to remove obsolete development tables.
 
-- `/tw reloadconfig` reloads `TwSpawnerConfig`, including item-side capture
-  mechanics and vessel sections, and item-feature registries.
-- Capture-policy and population-group families update from normal asset
-  loaded/removed events. The deferred companion-inventory family will use that
-  same lifecycle when implemented.
-- API `0.9.0` adds `CAPTURE_POLICY` and `POPULATION_GROUP` to
-  `ConfigReloadedEvent`. Existing `SPAWNER` covers only item-side capture
-  mechanics and vessel-section changes; `COMPANION_INVENTORY` is deferred.
-- An in-flight operation is pinned to its prepared config revision. If the
-  relevant item, role, or group config changes before claim-for-
-  apply, revalidation either accepts the pinned safe operation or cancels it;
-  it never silently executes under a different formula or capacity.
-- Reload invalidation never deletes existing profiles or bindings. The later
-  inventory implementation must extend this invariant to inventory rows.
+## 15. Acceptance criteria
 
-## Migration contract
-
-- Tamework coordinates the suite persistence changes in one backup-first,
-  transactional schema v8 plan. A failed migration rolls back DDL and schema
-  marker and preserves all v7 data. Schema v8 excludes companion-inventory
-  tables and claims; the deferred system receives the next appropriate
-  migration version when scheduled.
-- Public API advances additively from `0.8.0` to `0.9.0`; old records and
-  abstract interface methods are not mutated. New accessors are default
-  fail-closed methods and new data uses new/V2 immutable types.
-- HyDragon raises its manifest dependency to `>=3.0.0 <4.0.0` before shipping
-  configs or code that reference the new capabilities.
-- The integration contract exposes no filled-item conversion setting or
-  adoption operation. A HyDragon bonded generation originates only from a
-  successful first-release bonded capture using an eligible unbound source item.
-- Tamework completes its own schema migration and population/binding
-  reconciliation before HyDragon enables positive mutations. This upgrades
-  Tamework-owned data only; HyDragon has no pre-release data migration step.
-  Existing content remains inspectable while a feature is gated unavailable.
-
-## Implementation file map
-
-| Area | Tamework anchors | Implemented responsibility |
-| --- | --- | --- |
-| API root/capabilities | `api/TameworkApi`, `TameworkApiCapability`, `api/internal/TameworkApiImpl` | API `0.9.0`, discrete capabilities, default unavailable facades |
-| Policies/config reads | `api/PolicyApi`, `TameworkConfigReadApi`, `api/internal/ApiMapper` | V2/default methods and immutable subsystem views |
-| Events | `api/TameworkEventsApi`, `api/internal/TameworkEventBus` | New immutable post-commit event types and once-logical dispatch |
-| Config families | `Tamework` asset registration, internal/public config enums, override/UI schema registries | Current capture-policy and group family wiring; inventory is deferred |
-| Persistence | `persistence/sqlite`, operation/recovery/incidents/health | Coordinated schema v8 and subsystem readiness |
-| Live contract tests | `selftest/ApiSelfTestRunner`, API compatibility/unit tests | Advertise/test every capability and unavailable fallback |
-| Public documentation | `wiki/Modder-Documentation/Public-API`, config references/recipes/indexes, `CHANGELOG.md` | API version/dependency examples and integration recipes align atomically |
-
-## Registration lifecycle
-
-HyDragon registers interaction requirements/effects and event listeners during
-plugin start and closes every returned `AutoCloseable` during stop/reload. It
-must not register duplicate IDs after a partial reload. Registration failure is
-isolated by feature, and the startup report names the failed extension ID.
-
-Suggested HyDragon extension IDs include:
-
-- `hydragon:soul_bond_available`
-- `hydragon:create_soulbound_miniwyvern`
-- `hydragon:vessel_condition_allows_summon`
-- `hydragon:consume_revitalizing_essence`
-- `hydragon:apply_elemental_archetype`
-- `hydragon:special_encounter_capture_ready`
-
-Tamework remains responsible for the actual profile/vessel/population
-transaction behind these effects.
-
-## Diagnostics
-
-`/tw api test` must report each current capability and run non-destructive
-fixtures for capture attempts, generation fencing, group admission, and
-dormant/active/failed-projection companion provisioning.
-`/tw diagnose` includes config IDs/revisions, subsystem readiness,
-open operations, quarantines, stale vessel evidence, and group
-counts/reservations. Player-facing messages omit raw SQLite details and binding
-secrets; admin output includes correlation IDs.
-`/tw diagnose provisioning <caller-namespace> <idempotency-key>` reports the
-bounded operation status, original origin/correlation, dormant-commit and
-projection phases, canonical profile/revision when present, and recovery reason
-without mutating or retrying the operation. `/tw api test` includes a failed-
-projection provisioning fixture and verifies that this diagnostic finds the
-same durable `PARTIAL_DORMANT` operation/profile after restart simulation.
-
-HyDragon's startup diagnostics log its version, detected Tamework mod/API
-versions, capability matrix, registered extension IDs, and configured group
-IDs. Initial-release diagnostics do not report backpack support because the
-feature is not registered.
-
-## Acceptance tests
-
-1. HyDragon loads against Tamework 3.x with every required capability and
-   registers each extension/listener once.
-2. Missing capture-policy or vessel capability disables only the full-dragon
-   stone loop; Soul Bond remains available when its profile/population
-   capabilities are healthy.
-3. Missing `POPULATION_GROUPS` disables both stone and Soul Bond positive
-   admissions without changing existing profiles, items, NPCs, or owners.
-4. Missing `COMPANION_PROVISIONING` disables only Soul Bond creation; the
-   full-dragon stone loop and existing Miniwyvern profiles remain usable.
-5. HyDragon registers no backpack action or inventory persistence for the
-   initial release, and API `0.9.0` does not advertise `COMPANION_INVENTORY`.
-6. A consumer compiled against the pre-change API still links and uses existing
-   methods.
-7. Capability switches with unknown future enum values do not throw.
-8. Miniwyvern roles cannot be captured by any ordinary Draconic Stone.
-9. Soul Bond-created Miniwyverns enter the unique group and a second creation
-   is atomically denied.
-10. Provisioning retries/concurrency return one canonical Miniwyvern profile;
-    failed active projection leaves it dormant/recoverable.
-11. `Tamework_Flightmasters_Talisman` is the only baseline flight gate referenced
-   by the shipped HyDragon configuration.
-12. No HyDragon source imports `api.internal`, `persistence`, `ownership`,
-   `items` implementation, or SQLite packages from Tamework.
-13. A duplicated callback with one operation ID produces one durable mutation
-    and one logical event sequence.
-14. Listener exceptions do not roll back committed capture, vessel,
-    provisioning, or population state and are visible in
-    diagnostics.
-15. Config reload during a prepared operation cannot mix old eligibility with a
-    new chance formula or group limit.
-16. Server restart between every prepare/apply/commit boundary converges to one
-    profile, one binding generation, and correct group counts.
-17. Tamework unavailable/degraded states fail closed without blocking the world
-    thread.
-18. The packaged integration smoke test completes the end-to-end loop listed in
-    the suite [README](README.md#definition-of-suite-completion).
-19. A Soul Bond Miniwyvern with no command-tool link dies into a recoverable
-    state and revives as the same profile through group admission.
-20. Provisioning uniqueness is scoped by `(caller namespace, idempotency key)`:
-    same-pair retries return one result, while equal keys in two namespaces do
-    not alias and still cannot bypass group/entitlement limits.
-21. A prepared repair can be found and resumed after restart without a retained
-    process-local token; `APPLIED` never refunds, while only
-    `TERMINAL_DENIED` permits HyDragon compensation.
-22. Provisioning operation queries expose nonterminal and
-    `PARTIAL_DORMANT` rows with the original namespace/key/correlation and
-    canonical profile, and the diagnostic fixture reports that same row.
-23. Public DTO contract tests reject blank/over-bound identity, invalid
-    revisions, non-finite locations, missing transition evidence, and invalid
-    dormant/active destination combinations before mutation.
+1. Capability tests prove each new surface fails closed when unavailable and returns immutable values when ready.
+2. Existing public API consumers that do not request new capabilities remain source/behavior compatible within the supported 3.x policy.
+3. HyDragon capture cannot roll unless capture policy, spend, tame/link, roster, profile, and population authority are ready.
+4. Failed capture spends one stone once; successful capture spends one stone once and commits one profile/roster membership.
+5. Egg retries return one Miniwyvern profile and one Horn membership.
+6. Roster queries and diagnostics work without a live player entity; mutations still require explicit authorization/context.
+7. Paid revival charges once and restores the same profile once; terminal compensation creates at most one refund claim.
+8. Config reload cannot alter in-flight capture/revival costs or semantics.
+9. World-transfer, unload, death, lost recovery, item replacement, relog, and restart preserve profile and roster identity.
+10. Missing listener, listener exception, cosmetic failure, or UI refresh failure cannot corrupt committed state.
+11. Repository and packaged-artifact scans find no bonded-vessel API/config/runtime/docs other than the withdrawn-design notice.
+12. Cross-repository tests exercise all failure checkpoints and prove no free roll, double spend, duplicate profile, duplicate projection, or lost paid item.

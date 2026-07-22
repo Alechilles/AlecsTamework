@@ -10,7 +10,7 @@ HyDragon counterpart: [Soul Bond and Miniwyvern](https://github.com/Alechilles/H
 In a later Tamework update, add an optional, generic backpack to configured
 companion roles. Inventory is
 owned by the canonical companion `profile_id`, not by a live entity UUID,
-command item, bonded vessel, or model attachment. It survives unload, summon,
+command item, command-family roster, captured item, or model attachment. It survives unload, summon,
 store, death/revive, role changes, and server restart without duplication or
 loss.
 
@@ -44,7 +44,7 @@ decisions:
 - SQLite slot/claim payloads are enumerated by a dedicated bounded evidence
   source and scanned with one shared depth/container/stack/byte budget;
 - `RequireOwner=false` is not public access, and dormant linked access requires
-  current exact actor-held command-tool or bonded-generation evidence; and
+  current exact actor-held command-tool or owner-command-family evidence; and
 - claim withdrawal uses a deletion-independent operation journal with no
   required foreign key to the source profile/session.
 
@@ -53,7 +53,7 @@ decisions:
 - HyDragon-specific backpack art, unlock recipes, elemental storage, or capacity
   progression.
 - Serializing authoritative items through `ProfileDataApi` JSON.
-- Copying inventory into spawner metadata, vessel metadata, command links,
+- Copying inventory into spawner metadata, command-item metadata, command links,
   coop/death snapshots, or the NPC component.
 - Treating native container change events as a durable transaction.
 - Automatically giving a prior owner's items to a new profile owner.
@@ -272,7 +272,7 @@ events cannot grant access.
 `AllowLinkedDormantAccess=true` permits withdrawal only, and only when the
 actor also presents one current Tamework-authoritative link to the same profile:
 an exact command-tool link whose stack is proven in the actor inventory, or an
-exact bonded-vessel binding/current generation proven in that inventory. A raw
+exact owner-command-family membership plus compatible access item. A raw
 profile ID, old NPC UUID, profile-data field, provisioning record, copied/stale
 item, or link held by another player is insufficient. The requested dormant
 lifecycle must also appear in `AllowedLifecycles`. The default `false` leaves
@@ -355,7 +355,7 @@ explicit audited action to replace corrupt payloads.
 
 - Summon/store/capture/unload/death/revive changes no inventory rows; sessions
   close or revalidate and the same profile data remains canonical.
-- Bonded and disposable items store only profile identity, never the backpack.
+- Captured items and command projections store only profile identity, never the backpack.
 - A role change applies the new config capacity/filter after the role/profile
   transaction and reconciles overflow without deleting stacks.
 - Owner transfer/clear obeys `Disposition.OwnerChange`: deny while nonempty or
@@ -389,7 +389,7 @@ focused `CompanionInventoryPopulationEvidenceSource` registered through
 slot/claim payloads off the world thread, then delegates each decoded payload's
 nested contents to `RecursiveItemContainerEvidenceScanner` using the exact shared
 safety budget above. Corruption or any depth/container/stack/byte bound breach
-returns explicit partial coverage; population/vessel reconciliation must not
+returns explicit partial coverage; population/roster reconciliation must not
 treat it as absence. The source reports stable row/claim evidence IDs and never
 opens a mutable inventory session.
 
@@ -590,8 +590,8 @@ proving rollback, or set a slot without checking transaction success.
     delegated-access handler decision, and handler failure/reload invalidates
     the session.
 46. Dormant access is withdraw-only and requires owner/delegated authorization,
-    an allowed dormant lifecycle, and a current exact command-tool or bonded-
-    vessel link held by the actor; stale/profile-data/profile-ID-only evidence
+    an allowed dormant lifecycle, and a current exact command-tool or
+    owner-command-family link accessible to the actor; stale/profile-data/profile-ID-only evidence
     is denied.
 47. `CompanionInventoryPopulationEvidenceSource` is registered through
     `CustomContainerReconciliationRegistry`, discovers bounded SQLite slot/claim
