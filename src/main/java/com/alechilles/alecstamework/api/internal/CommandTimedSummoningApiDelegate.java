@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.items.CommandTimedSummoningService;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceReadExecutor;
 import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -28,17 +30,21 @@ import javax.annotation.Nullable;
 public final class CommandTimedSummoningApiDelegate implements CommandTimedSummoningApi {
     private final CommandTimedSummonRepository repository;
     private final CommandTimedSummoningService service;
+    private final PersistenceReadExecutor reads;
     private final RequestResolver resolver;
     private final LongSupplier clock;
     private final CopyOnWriteArrayList<Consumer<CommandTimedSummoningChangedEvent>> listeners =
             new CopyOnWriteArrayList<>();
+    private final java.util.Set<SessionKey> refreshes = ConcurrentHashMap.newKeySet();
 
     public CommandTimedSummoningApiDelegate(@Nonnull CommandTimedSummonRepository repository,
                                             @Nonnull CommandTimedSummoningService service,
+                                            @Nonnull PersistenceReadExecutor reads,
                                             @Nonnull RequestResolver resolver,
                                             @Nonnull LongSupplier clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.service = Objects.requireNonNull(service, "service");
+        this.reads = Objects.requireNonNull(reads, "reads");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -46,39 +52,38 @@ public final class CommandTimedSummoningApiDelegate implements CommandTimedSummo
     @Override
     public Optional<CommandTimedSummoningView> get(CommandTimedSummoningRequest identity) {
         Objects.requireNonNull(identity, "identity");
-        try {
-            return Optional.ofNullable(repository.findSession(
-                    identity.ownerUuid(), identity.commandFamilyId(), identity.profileId()))
-                    .map(session -> view(session, clock.getAsLong()));
-        } catch (Exception failure) {
-            return Optional.empty();
-        }
+        CommandTimedSummonSessionRecord cached = repository.cachedSession(
+                identity.ownerUuid(), identity.commandFamilyId(), identity.profileId());
+        if (cached == null) scheduleRefresh(identity);
+        return Optional.ofNullable(cached).map(session -> view(session, clock.getAsLong()));
     }
 
     @Override
     public CompletionStage<CommandTimedSummoningResult> summon(CommandTimedSummoningRequest request) {
         Objects.requireNonNull(request, "request");
-        ResolvedRequest resolved = resolver.resolve(request, Operation.SUMMON);
-        if (resolved == null) return denied("timed-summon-request-unresolvable");
         long nowMs = clock.getAsLong();
-        return service.summon(new CommandTimedSummoningService.SummonRequest(
+        return reads.submit(() -> resolver.resolve(request, Operation.SUMMON)).thenCompose(resolved -> {
+            if (resolved == null) return denied("timed-summon-request-unresolvable");
+            return service.summon(new CommandTimedSummoningService.SummonRequest(
                         request.ownerUuid(), request.commandFamilyId(), request.profileId(),
                         resolved.profileRevision(), resolved.roleId(), resolved.configId(),
                         resolved.configRevision(), resolved.policy(), request.idempotencyKey(), nowMs))
-                .thenApply(result -> publish(request, result, "summon", nowMs));
+                    .thenApply(result -> publish(request, result, "summon", nowMs));
+        });
     }
 
     @Override
     public CompletionStage<CommandTimedSummoningResult> dismiss(CommandTimedSummoningRequest request) {
         Objects.requireNonNull(request, "request");
-        ResolvedRequest resolved = resolver.resolve(request, Operation.DISMISS);
-        if (resolved == null) return denied("timed-dismiss-request-unresolvable");
         long nowMs = clock.getAsLong();
-        return service.dismiss(new CommandTimedSummoningService.DismissRequest(
+        return reads.submit(() -> resolver.resolve(request, Operation.DISMISS)).thenCompose(resolved -> {
+            if (resolved == null) return denied("timed-dismiss-request-unresolvable");
+            return service.dismiss(new CommandTimedSummoningService.DismissRequest(
                         request.ownerUuid(), request.commandFamilyId(), request.profileId(),
                         resolved.profileRevision(), resolved.projectionNpcUuid(),
                         request.idempotencyKey(), nowMs))
-                .thenApply(result -> publish(request, result, "dismiss", nowMs));
+                    .thenApply(result -> publish(request, result, "dismiss", nowMs));
+        });
     }
 
     @Override
@@ -108,14 +113,15 @@ public final class CommandTimedSummoningApiDelegate implements CommandTimedSummo
         CommandTimedSummoningRequest identity = new CommandTimedSummoningRequest(
                 provisioning.ownerUuid(), link.commandFamilyId(), provisioning.profileId(),
                 provisioning.idempotencyKey());
-        ResolvedRequest resolved = resolver.resolve(identity, Operation.SUMMON);
-        if (resolved == null) return denied("initial-timed-projection-unresolvable");
         long nowMs = clock.getAsLong();
-        return service.registerAndSummonInitial(new CommandTimedSummoningService.InitialSummonRequest(
+        return reads.submit(() -> resolver.resolve(identity, Operation.SUMMON)).thenCompose(resolved -> {
+            if (resolved == null) return denied("initial-timed-projection-unresolvable");
+            return service.registerAndSummonInitial(new CommandTimedSummoningService.InitialSummonRequest(
                         provisioning.ownerUuid(), link.commandFamilyId(), provisioning.profileId(),
                         provisioning.profileRevision(), provisioning.roleId(), resolved.configId(),
                         resolved.configRevision(), resolved.policy(), provisioning.idempotencyKey(), nowMs))
-                .thenApply(result -> publish(identity, result, "initial-projection", nowMs));
+                    .thenApply(result -> publish(identity, result, "initial-projection", nowMs));
+        });
     }
 
     private CommandTimedSummoningResult publish(CommandTimedSummoningRequest request,
@@ -164,6 +170,18 @@ public final class CommandTimedSummoningApiDelegate implements CommandTimedSummo
     private static CompletionStage<CommandTimedSummoningResult> denied(String reason) {
         return CompletableFuture.completedFuture(new CommandTimedSummoningResult(
                 CommandTimedSummoningResult.Status.DENIED, reason, null));
+    }
+
+    private void scheduleRefresh(CommandTimedSummoningRequest identity) {
+        SessionKey key = new SessionKey(
+                identity.ownerUuid(), identity.commandFamilyId(), identity.profileId());
+        if (!refreshes.add(key)) return;
+        reads.submit(() -> repository.findSession(
+                        key.ownerUuid(), key.commandFamilyId(), key.profileId()))
+                .whenComplete((ignored, failure) -> refreshes.remove(key));
+    }
+
+    private record SessionKey(UUID ownerUuid, String commandFamilyId, String profileId) {
     }
 
     public enum Operation { SUMMON, DISMISS }

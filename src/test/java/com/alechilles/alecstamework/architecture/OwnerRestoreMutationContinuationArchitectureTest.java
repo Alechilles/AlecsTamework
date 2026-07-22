@@ -49,11 +49,13 @@ class OwnerRestoreMutationContinuationArchitectureTest {
     @Test
     void replacementRestoreSideEffectsRunAfterCanonicalAdmission() throws IOException {
         String respawn = readItem("CommandRespawnService.java");
-        int respawnPrepare = respawn.indexOf("preparedSpawnService.schedule(");
-        int respawnLive = respawn.indexOf("public void onSpawned", respawnPrepare);
+        int respawnLive = respawn.indexOf("public void onSpawned");
         int respawnFinalize = respawn.indexOf("public boolean finalizeSource", respawnLive);
         int clearDeathSnapshot = respawn.indexOf("deathService.clearDeadSnapshot", respawnFinalize);
-        assertTrue(respawnPrepare >= 0 && respawnLive > respawnPrepare);
+        int respawnSchedule = respawn.indexOf("preparedSpawnService.schedule(", respawnFinalize);
+        assertTrue(respawnLive >= 0 && respawnFinalize > respawnLive);
+        assertTrue(respawnSchedule > respawnFinalize,
+                "prepared callbacks must be installed before restore scheduling");
         assertTrue(clearDeathSnapshot > respawnFinalize, "death snapshot must survive admission/commit denial");
 
         String lost = readItem("CommandLostRecoveryCoordinator.java");

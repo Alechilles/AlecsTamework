@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicyS
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceReadExecutor;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -28,17 +29,20 @@ public final class CommandTimedSummoningService {
     private static final String CALLER_NAMESPACE = "Alechilles:Tamework:CommandTimedSummoning";
 
     private final CommandTimedSummonRepository repository;
+    private final PersistenceReadExecutor reads;
     private final RosterMembershipPort roster;
     private final PopulationPort population;
     private final ProjectionPort projections;
     private final WarningPort warnings;
 
     public CommandTimedSummoningService(@Nonnull CommandTimedSummonRepository repository,
+                                        @Nonnull PersistenceReadExecutor reads,
                                         @Nonnull RosterMembershipPort roster,
                                         @Nonnull PopulationPort population,
                                         @Nonnull ProjectionPort projections,
                                         @Nonnull WarningPort warnings) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.reads = Objects.requireNonNull(reads, "reads");
         this.roster = Objects.requireNonNull(roster, "roster");
         this.population = Objects.requireNonNull(population, "population");
         this.projections = Objects.requireNonNull(projections, "projections");
@@ -49,60 +53,63 @@ public final class CommandTimedSummoningService {
     @Nonnull
     public CompletionStage<ActionResult> registerActiveProjection(@Nonnull ActiveRegistration request) {
         Objects.requireNonNull(request, "request");
-        if (!roster.contains(request.ownerUuid(), request.commandFamilyId(), request.profileId())) {
-            return completed(ActionResult.denied("command-roster-membership-required"));
-        }
-        String sessionId = deterministicId("session", request.idempotencyKey());
-        Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
-        CommandTimedSummonSessionRecord session = new CommandTimedSummonSessionRecord(
-                request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
-                CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
-                request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
-                null, request.nowMs(), request.nowMs());
-        return write(repository.createSessionAsync(session)).thenApply(result ->
-                acceptedCreate(result)
-                        ? ActionResult.success(result.session(), "active-lease-registered")
-                        : ActionResult.fromRepository(result));
+        return membership(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                .thenCompose(member -> {
+                    if (!member) return completed(ActionResult.denied("command-roster-membership-required"));
+                    String sessionId = deterministicId("session", request.idempotencyKey());
+                    Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
+                    CommandTimedSummonSessionRecord session = new CommandTimedSummonSessionRecord(
+                            request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
+                            CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
+                            request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
+                            null, request.nowMs(), request.nowMs());
+                    return write(repository.createSessionAsync(session)).thenApply(result ->
+                            acceptedCreate(result)
+                                    ? ActionResult.success(result.session(), "active-lease-registered")
+                                    : ActionResult.fromRepository(result));
+                });
     }
 
     /** Paid-revival seam: resets the same snapshotted lease only after the live spawn commits. */
     @Nonnull
     public CompletionStage<ActionResult> registerRevivedProjection(@Nonnull ActiveRegistration request) {
         Objects.requireNonNull(request, "request");
-        if (!roster.contains(request.ownerUuid(), request.commandFamilyId(), request.profileId())) {
-            return completed(ActionResult.denied("command-roster-membership-required"));
-        }
-        String sessionId = deterministicId("revival-session", request.idempotencyKey());
-        Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
-        CommandTimedSummonSessionRecord active = new CommandTimedSummonSessionRecord(
-                request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
-                CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
-                request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
-                null, request.nowMs(), request.nowMs());
-        return write(repository.activateAfterRevivalAsync(active)).thenApply(result ->
-                result.status() == CommandTimedSummonRepository.Status.CREATED
-                        || result.status() == CommandTimedSummonRepository.Status.COMMITTED
-                        || result.status() == CommandTimedSummonRepository.Status.IDEMPOTENT
-                        ? ActionResult.success(result.session(), "revival-active-lease-registered")
-                        : ActionResult.fromRepository(result));
+        return membership(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                .thenCompose(member -> {
+                    if (!member) return completed(ActionResult.denied("command-roster-membership-required"));
+                    String sessionId = deterministicId("revival-session", request.idempotencyKey());
+                    Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
+                    CommandTimedSummonSessionRecord active = new CommandTimedSummonSessionRecord(
+                            request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
+                            CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
+                            request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
+                            null, request.nowMs(), request.nowMs());
+                    return write(repository.activateAfterRevivalAsync(active)).thenApply(result ->
+                            result.status() == CommandTimedSummonRepository.Status.CREATED
+                                    || result.status() == CommandTimedSummonRepository.Status.COMMITTED
+                                    || result.status() == CommandTimedSummonRepository.Status.IDEMPOTENT
+                                    ? ActionResult.success(result.session(), "revival-active-lease-registered")
+                                    : ActionResult.fromRepository(result));
+                });
     }
 
     /** Creates the dormant session row after roster membership is durably committed. */
     @Nonnull
     public CompletionStage<ActionResult> registerRosterStored(@Nonnull StoredRegistration request) {
         Objects.requireNonNull(request, "request");
-        if (!roster.contains(request.ownerUuid(), request.commandFamilyId(), request.profileId())) {
-            return completed(ActionResult.denied("command-roster-membership-required"));
-        }
-        CommandTimedSummonSessionRecord session = new CommandTimedSummonSessionRecord(
-                request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
-                CommandTimedSummonSessionRecord.State.ROSTER_STORED, null, null, 0L,
-                request.configId(), request.configRevision(), request.policy(), Set.of(), null,
-                null, request.nowMs(), request.nowMs());
-        return write(repository.createSessionAsync(session)).thenApply(result ->
-                acceptedCreate(result)
-                        ? ActionResult.success(result.session(), "roster-storage-registered")
-                        : ActionResult.fromRepository(result));
+        return membership(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                .thenCompose(member -> {
+                    if (!member) return completed(ActionResult.denied("command-roster-membership-required"));
+                    CommandTimedSummonSessionRecord session = new CommandTimedSummonSessionRecord(
+                            request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
+                            CommandTimedSummonSessionRecord.State.ROSTER_STORED, null, null, 0L,
+                            request.configId(), request.configRevision(), request.policy(), Set.of(), null,
+                            null, request.nowMs(), request.nowMs());
+                    return write(repository.createSessionAsync(session)).thenApply(result ->
+                            acceptedCreate(result)
+                                    ? ActionResult.success(result.session(), "roster-storage-registered")
+                                    : ActionResult.fromRepository(result));
+                });
     }
 
     /**
@@ -137,23 +144,19 @@ public final class CommandTimedSummoningService {
     @Nonnull
     public CompletionStage<ActionResult> summon(@Nonnull SummonRequest request) {
         Objects.requireNonNull(request, "request");
-        if (!roster.contains(request.ownerUuid(), request.commandFamilyId(), request.profileId())) {
-            return completed(ActionResult.denied("command-roster-membership-required"));
-        }
-        CommandTimedSummonSessionRecord session;
-        try {
-            session = repository.findSession(request.ownerUuid(), request.commandFamilyId(), request.profileId());
-        } catch (Exception failure) {
-            return completed(ActionResult.unavailable("timed-summon-session-read-failed"));
-        }
-        if (session == null) return completed(ActionResult.denied("timed-summon-session-not-found"));
-        if (session.state() != CommandTimedSummonSessionRecord.State.ROSTER_STORED) {
-            return completed(ActionResult.denied("companion-is-not-roster-stored"));
-        }
-        if (session.cooldownActive(request.nowMs())) {
-            return completed(ActionResult.cooldown(session, session.resummonCooldownUntilMs()));
-        }
-        return projections.planSpawnInFront(request.ownerUuid(), request.profileId())
+        return membership(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                .thenCompose(member -> member
+                        ? readSession(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                        : CompletableFuture.completedFuture(null))
+                .thenCompose(session -> {
+                    if (session == null) return completed(ActionResult.denied("timed-summon-session-not-found"));
+                    if (session.state() != CommandTimedSummonSessionRecord.State.ROSTER_STORED) {
+                        return completed(ActionResult.denied("companion-is-not-roster-stored"));
+                    }
+                    if (session.cooldownActive(request.nowMs())) {
+                        return completed(ActionResult.cooldown(session, session.resummonCooldownUntilMs()));
+                    }
+                    return projections.planSpawnInFront(request.ownerUuid(), request.profileId())
                 .thenCompose(plan -> {
                     if (!plan.success()) return completed(ActionResult.denied(plan.reason()));
                     PopulationContext context = new PopulationContext(
@@ -168,20 +171,17 @@ public final class CommandTimedSummoningService {
                         return beginSummon(request, session, plan, context, reservation);
                     });
                 });
+                });
     }
 
     /** Manual dismissal uses the same idempotent storage transaction as lease expiry. */
     @Nonnull
     public CompletionStage<ActionResult> dismiss(@Nonnull DismissRequest request) {
         Objects.requireNonNull(request, "request");
-        CommandTimedSummonSessionRecord session;
-        try {
-            session = repository.findSession(request.ownerUuid(), request.commandFamilyId(), request.profileId());
-        } catch (Exception failure) {
-            return completed(ActionResult.unavailable("timed-summon-session-read-failed"));
-        }
-        return storeSession(session, request.expectedProfileRevision(), request.projectionNpcUuid(),
-                request.nowMs(), "manual-dismiss", request.idempotencyKey());
+        return readSession(request.ownerUuid(), request.commandFamilyId(), request.profileId())
+                .thenCompose(session -> storeSession(
+                        session, request.expectedProfileRevision(), request.projectionNpcUuid(),
+                        request.nowMs(), "manual-dismiss", request.idempotencyKey()));
     }
 
     /** Chunk unload/load callbacks preserve the session and timer instead of starting a new lease. */
@@ -214,12 +214,7 @@ public final class CommandTimedSummoningService {
 
     @Nonnull
     private CompletionStage<TickResult> tickProjected(long nowMs) {
-        final List<CommandTimedSummonSessionRecord> projected;
-        try {
-            projected = repository.loadProjectedSessions();
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new TickResult(0, 0, 0, 1));
-        }
+        return reads.submit(repository::loadProjectedSessions).thenCompose(projected -> {
         CompletionStage<TickAccumulator> chain = CompletableFuture.completedFuture(new TickAccumulator());
         for (CommandTimedSummonSessionRecord session : projected) {
             if (session.state() != CommandTimedSummonSessionRecord.State.ACTIVE
@@ -228,17 +223,13 @@ public final class CommandTimedSummoningService {
                     .thenApply(accumulator::include));
         }
         return chain.thenApply(TickAccumulator::result);
+        }).exceptionally(failure -> new TickResult(0, 0, 0, 1));
     }
 
     /** Auto-stores only sessions whose snapshotted policy opted in. */
     @Nonnull
     public CompletionStage<TickResult> onOwnerLogout(@Nonnull UUID ownerUuid, long nowMs) {
-        final List<CommandTimedSummonSessionRecord> sessions;
-        try {
-            sessions = repository.loadSessionsForOwner(ownerUuid);
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new TickResult(0, 0, 0, 1));
-        }
+        return reads.submit(() -> repository.loadSessionsForOwner(ownerUuid)).thenCompose(sessions -> {
         CompletionStage<TickAccumulator> chain = CompletableFuture.completedFuture(new TickAccumulator());
         for (CommandTimedSummonSessionRecord session : sessions) {
             if ((session.state() != CommandTimedSummonSessionRecord.State.ACTIVE
@@ -249,17 +240,13 @@ public final class CommandTimedSummoningService {
                     session, null, null, nowMs, "owner-logout", key).thenApply(accumulator::include));
         }
         return chain.thenApply(TickAccumulator::result);
+        }).exceptionally(failure -> new TickResult(0, 0, 0, 1));
     }
 
     /** Replays interrupted prepare/apply boundaries before the public capability is activated. */
     @Nonnull
     public CompletionStage<RecoveryResult> recover(long nowMs) {
-        final List<CommandTimedSummonOperationRecord> operations;
-        try {
-            operations = repository.loadRecoverableOperations();
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new RecoveryResult(0, 0, 1));
-        }
+        return reads.submit(repository::loadRecoverableOperations).thenCompose(operations -> {
         CompletionStage<RecoveryAccumulator> chain =
                 CompletableFuture.completedFuture(new RecoveryAccumulator());
         for (CommandTimedSummonOperationRecord operation : operations) {
@@ -267,6 +254,7 @@ public final class CommandTimedSummoningService {
                     .thenApply(accumulator::include));
         }
         return chain.thenApply(RecoveryAccumulator::result);
+        }).exceptionally(failure -> new RecoveryResult(0, 0, 1));
     }
 
     private CompletionStage<ActionResult> recover(CommandTimedSummonOperationRecord operation, long nowMs) {
@@ -281,13 +269,14 @@ public final class CommandTimedSummoningService {
         if (operation.operationState() != CommandTimedSummonOperationRecord.OperationState.APPLYING) {
             return completed(ActionResult.recovering("quarantined-timed-operation"));
         }
-        CommandTimedSummonSessionRecord session;
-        try {
-            session = repository.findSession(
-                    operation.ownerUuid(), operation.commandFamilyId(), operation.profileId());
-        } catch (Exception failure) {
-            return completed(ActionResult.recovering("recovery-session-read-failed"));
-        }
+        return readSession(operation.ownerUuid(), operation.commandFamilyId(), operation.profileId())
+                .thenCompose(session -> recoverApplying(operation, session, nowMs));
+    }
+
+    private CompletionStage<ActionResult> recoverApplying(
+            CommandTimedSummonOperationRecord operation,
+            @Nullable CommandTimedSummonSessionRecord session,
+            long nowMs) {
         if (session == null || !Objects.equals(session.activeOperationId(), operation.operationId())) {
             return completed(ActionResult.recovering("recovery-session-operation-mismatch"));
         }
@@ -339,6 +328,15 @@ public final class CommandTimedSummoningService {
             }
             return completed(ActionResult.recovering("unsupported-recoverable-operation"));
         });
+    }
+
+    private CompletionStage<Boolean> membership(UUID ownerUuid, String commandFamilyId, String profileId) {
+        return reads.submit(() -> roster.contains(ownerUuid, commandFamilyId, profileId));
+    }
+
+    private CompletionStage<CommandTimedSummonSessionRecord> readSession(
+            UUID ownerUuid, String commandFamilyId, String profileId) {
+        return reads.submit(() -> repository.findSession(ownerUuid, commandFamilyId, profileId));
     }
 
     @Nonnull

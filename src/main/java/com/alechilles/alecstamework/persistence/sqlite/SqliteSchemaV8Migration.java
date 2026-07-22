@@ -5,7 +5,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import javax.annotation.Nonnull;
 
-/** Adds capture, bonded-vessel, population-group, and provisioning durability authorities. */
+/** Adds capture, population-group, and provisioning durability authorities. */
 final class SqliteSchemaV8Migration {
 
     void apply(@Nonnull Connection connection) throws Exception {

@@ -15,6 +15,8 @@ class TameworkCommandExecutionScopeTest {
                 TameworkDiagnoseCommand.class,
                 TameworkPersistenceCircuitCommand.class,
                 TameworkPatchesStatusCommand.class,
+                TameworkApiTestRunCommand.class,
+                TameworkApiTestStatusCommand.class,
                 TameworkCoopCommand.class,
                 TameworkDebugCrashTelemetryCommand.class,
                 TameworkDebugDbCommand.class,
@@ -67,8 +69,6 @@ class TameworkCommandExecutionScopeTest {
                 TameworkNewsCommand.class,
                 TameworkApiTestPrepareCommand.class,
                 TameworkApiTestResetCommand.class,
-                TameworkApiTestRunCommand.class,
-                TameworkApiTestStatusCommand.class,
                 TameworkNpcSpawnTamedCommand.class,
                 TameworkShowHitboxesCommand.class,
                 TameworkShowSpawnMarkersCommand.class

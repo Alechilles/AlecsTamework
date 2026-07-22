@@ -28,8 +28,8 @@ class SqliteSchemaV8MigrationTest {
         SqliteConnectionManager connections = connections("fresh.sqlite");
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
         try (Connection connection = connections.openConnection()) {
-            migrator.migrate(connection);
-            migrator.migrate(connection);
+            migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8);
+            migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8);
 
             assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
             assertTrue(tableExists(connection, "api_profile_data_operations"));

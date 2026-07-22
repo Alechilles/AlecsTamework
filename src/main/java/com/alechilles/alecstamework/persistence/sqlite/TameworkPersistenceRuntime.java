@@ -61,6 +61,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final PersistenceStorageHealthService storageHealthService;
     private final PersistenceHealthService healthService;
     private final SqliteConnectionManager connectionManager;
+    private final PersistenceReadExecutor readExecutor;
     private final PersistenceWriteQueue writeQueue;
     private final SqliteMaintenanceService maintenanceService;
     private final ApiProfileDataRepository apiProfileDataRepository;
@@ -97,6 +98,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull PersistenceStorageHealthService storageHealthService,
             @Nonnull PersistenceHealthService healthService,
             @Nonnull SqliteConnectionManager connectionManager,
+            @Nonnull PersistenceReadExecutor readExecutor,
             @Nonnull PersistenceWriteQueue writeQueue,
             @Nonnull SqliteMaintenanceService maintenanceService,
             @Nonnull ApiProfileDataRepository apiProfileDataRepository,
@@ -131,6 +133,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.storageHealthService = storageHealthService;
         this.healthService = healthService;
         this.connectionManager = connectionManager;
+        this.readExecutor = readExecutor;
         this.writeQueue = writeQueue;
         this.maintenanceService = maintenanceService;
         this.apiProfileDataRepository = apiProfileDataRepository;
@@ -220,6 +223,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             }
         }
 
+        PersistenceReadExecutor readExecutor = new PersistenceReadExecutor("tamework-persistence-read");
         PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
         PersistenceIncidentJournal incidentJournal = new PersistenceIncidentJournal(
                 normalizedDataDir.resolve("Diagnostics").resolve("Persistence"), bootId, logger);
@@ -306,6 +310,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 storageHealth,
                 health,
                 connectionManager,
+                readExecutor,
                 writeQueue,
                 maintenanceService,
                 apiProfileDataRepository,
@@ -581,6 +586,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         return commandTimedSummonRepository;
     }
 
+    /** Bounded executor for connection-opening reads that must not block world/event threads. */
+    @Nonnull
+    public PersistenceReadExecutor getReadExecutor() {
+        return readExecutor;
+    }
+
     /** Durable intent consumed by atomic dormant provision-and-link commits. */
     @Nonnull
     public CompanionProvisioningCommandLinkRepository getCompanionProvisioningCommandLinkRepository() {
@@ -785,6 +796,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         maintenanceService.close();
         storageRecoveryCoordinator.close();
         resilienceRuntime.close();
+        readExecutor.close();
         writeQueue.close();
         incidentJournal.close();
         storageHealthService.close();

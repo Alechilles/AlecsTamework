@@ -215,7 +215,33 @@ public final class CommandTimedSummonPopulationPort
         if (owner != null && owner.lifecycleState() == CompanionLifecycleState.ROSTER_STORED) {
             return completed(accepted("population-already-roster-stored"));
         }
-        return commitRosterStored(context);
+        if (owner == null || owner.lifecycleState() != CompanionLifecycleState.STORING) {
+            return completed(denied("population-roster-storage-recovery-source-missing"));
+        }
+        StorageTransition inMemory = storageTransitions.get(Key.of(context));
+        if (inMemory != null) return commitRosterStored(context);
+
+        // The prepared admission token is process-local, but its operation identity is durable and
+        // deterministic. Re-preparing with the same key returns/reconstructs the exact transition
+        // rather than leaving a crash-interrupted STORING profile permanently wedged.
+        return prepareTransition(context, owner, PopulationCompanionLifecycle.ROSTER_STORED,
+                context.idempotencyKey() + ":stored").thenCompose(prepared -> {
+            PopulationAdmissionDecision decision = prepared.decision();
+            if (!decision.accepted() || decision.token() == null) return completed(map(decision));
+            if (decision.status() == PopulationAdmissionDecision.Status.COMMITTED) {
+                return completed(accepted("population-roster-storage-recovery-already-committed"));
+            }
+            PopulationAdmissionDecision claimed = admissions.claimForApply(decision.token());
+            if (claimed.status() == PopulationAdmissionDecision.Status.COMMITTED) {
+                return completed(accepted("population-roster-storage-recovery-already-committed"));
+            }
+            if (claimed.status() != PopulationAdmissionDecision.Status.APPLYING) {
+                return completed(map(claimed));
+            }
+            return admissions.commit(decision.token()).thenApply(committed ->
+                    committed.status() == PopulationAdmissionDecision.Status.COMMITTED
+                            ? accepted("population-roster-storage-recovered") : map(committed));
+        });
     }
 
     private CompletionStage<CommandTimedSummoningService.PopulationDecision> transition(

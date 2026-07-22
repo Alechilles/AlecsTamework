@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMutationRequest;
@@ -7,10 +8,13 @@ import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
+import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -782,9 +786,12 @@ public final class SpawnerFeatureHandler {
             SpawnerTameAndCommandLinkService.Decision livePreparation =
                     tameAndCommandLinkService.preflight(
                             targetRef, worldStore, postCaptureRoleForAccess);
-            if (!commandAccess.allowed() || !livePreparation.allowed()) {
-                String reason = commandAccess.allowed()
-                        ? livePreparation.reason() : commandAccess.reason();
+            TimedLeasePreparation timedLease = prepareTimedLease(
+                    config, postCaptureRoleForAccess, commandAccess.accessItemId());
+            if (!commandAccess.allowed() || !livePreparation.allowed() || timedLease == null) {
+                String reason = !commandAccess.allowed() ? commandAccess.reason()
+                        : !livePreparation.allowed() ? livePreparation.reason()
+                        : "capture-command-timed-lease-unavailable";
                 captureLog.capture("capture denied reason=" + reason
                         + " player=" + player.getUuid());
                 return false;
@@ -809,7 +816,7 @@ public final class SpawnerFeatureHandler {
                                 expectedRequirementGeneration,
                                 new TameAndCommandLinkPreparation(
                                         livePreparation, commandAccess.accessItemId(),
-                                        commandAccess.maximumRosterMembers(), proof));
+                                        commandAccess.maximumRosterMembers(), proof, timedLease));
                     }));
             return true;
         } else if (tameAndCommandLink) {
@@ -818,13 +825,18 @@ public final class SpawnerFeatureHandler {
             SpawnerTameAndCommandLinkService.Decision livePreparation =
                     tameAndCommandLinkService.preflight(
                             targetRef, worldStore, postCaptureRoleForAccess);
+            TimedLeasePreparation timedLease = prepareTimedLease(
+                    config, postCaptureRoleForAccess, commandAccess.accessItemId());
             if (!commandAccess.allowed() || !livePreparation.allowed()
+                    || timedLease == null
                     || commandFamilyRosterService == null
                     || !commandFamilyRosterService.isCurrent(tameLinkPreparation.rosterProof())
                     || tameLinkPreparation.rosterProof().membershipCount()
                     >= tameLinkPreparation.maximumRosterMembers()
                     || !java.util.Objects.equals(
-                    tameLinkPreparation.accessItemId(), commandAccess.accessItemId())) {
+                    tameLinkPreparation.accessItemId(), commandAccess.accessItemId())
+                    || !sameTimedEvidence(
+                    tameLinkPreparation.timedLease().evidence(), timedLease.evidence())) {
                 captureLog.capture("capture denied reason=capture-command-final-fence-changed"
                         + " player=" + player.getUuid());
                 return false;
@@ -832,7 +844,7 @@ public final class SpawnerFeatureHandler {
             tameLinkPreparation = new TameAndCommandLinkPreparation(
                     livePreparation, tameLinkPreparation.accessItemId(),
                     tameLinkPreparation.maximumRosterMembers(),
-                    tameLinkPreparation.rosterProof());
+                    tameLinkPreparation.rosterProof(), tameLinkPreparation.timedLease());
         } else if (!tameAndCommandLink) {
             SpawnerCaptureCommandAccessService.Decision commandAccess =
                     captureCommandAccessService.validate(player, config, postCaptureRoleForAccess);
@@ -874,6 +886,8 @@ public final class SpawnerFeatureHandler {
             return captureAttemptRuntime.prepareAndResolve(
                     player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
                     attempt, detachPlan.durableContextJson(),
+                    durableTameLinkPreparation == null ? null
+                            : durableTameLinkPreparation.timedLease().evidence(),
                     () -> revalidateSourceSpend(
                             player, targetRef, durableConfig, durableTameLinkPreparation),
                     (resolvedHandle, mutation, record, generation) -> captureFromNpcAction(
@@ -1138,7 +1152,11 @@ public final class SpawnerFeatureHandler {
                                     .whenComplete((rosterResult, failure) -> {
                                         if (failure == null && rosterResult != null
                                                 && rosterResult.accepted()) {
-                                            captureAttemptRuntime.commit(finalizedAttemptId);
+                                            registerTimedLease(
+                                                    finalizedAttemptId, world,
+                                                    player.getUuid(), targetUuid,
+                                                    capturedProfileId.get(), profileRevision,
+                                                    finalizedTameLinkPreparation);
                                         } else {
                                             String reason = rosterResult == null
                                                     ? "capture-command-roster-write-failed"
@@ -1201,15 +1219,107 @@ public final class SpawnerFeatureHandler {
                 captureCommandAccessService.validate(player, config, targetRole);
         SpawnerTameAndCommandLinkService.Decision live =
                 tameAndCommandLinkService.preflight(targetRef, store, targetRole);
+        TimedLeasePreparation currentTimedLease =
+                prepareTimedLease(config, targetRole, access.accessItemId());
         return access.allowed() && live.allowed()
-                && java.util.Objects.equals(preparation.accessItemId(), access.accessItemId());
+                && java.util.Objects.equals(preparation.accessItemId(), access.accessItemId())
+                && currentTimedLease != null
+                && sameTimedEvidence(
+                preparation.timedLease().evidence(), currentTimedLease.evidence());
+    }
+
+    @Nullable
+    private TimedLeasePreparation prepareTimedLease(
+            @Nonnull ItemFeatureConfig config, @Nullable String targetRoleId,
+            @Nullable String accessItemId) {
+        Tamework plugin = Tamework.getInstance();
+        CommandTimedSummoningService service = plugin == null
+                ? null : plugin.getCommandTimedSummoningService();
+        if (service == null || targetRoleId == null || targetRoleId.isBlank()) return null;
+        TwCompanionConfig.SummonSettings settings =
+                TwCompanionConfig.resolveEffectiveForRole(targetRoleId).getSummon();
+        if (!settings.isEnabled()) return null;
+        TwCompanionConfig scoped = TwCompanionConfig.resolveForRole(targetRoleId);
+        if (scoped == null) scoped = TwCompanionConfig.resolveDefaultConfig();
+        CommandTimedSummonPolicySnapshot policy = new CommandTimedSummonPolicySnapshot(
+                settings.getActiveDurationMs(), settings.getResummonCooldownMs(),
+                settings.isAutoStoreOnOwnerLogout(), settings.getExpiryWarningThresholdsMs());
+        return new TimedLeasePreparation(service, new SpawnerTameLinkDurableContext.Evidence(
+                config.getCaptureMechanics().commandFamilyId(),
+                config.getCaptureMechanics().requiredCommandConfigId(), accessItemId,
+                targetRoleId, scoped == null ? null : scoped.getId(), null, policy));
+    }
+
+    private void registerTimedLease(
+            @Nonnull UUID attemptId, @Nonnull World world,
+            @Nonnull UUID ownerUuid, @Nonnull UUID projectionNpcUuid,
+            @Nonnull String profileId, long profileRevision,
+            @Nonnull TameAndCommandLinkPreparation preparation) {
+        SpawnerTameLinkDurableContext.Evidence evidence = preparation.timedLease().evidence();
+        preparation.timedLease().service().registerActiveProjection(
+                new CommandTimedSummoningService.ActiveRegistration(
+                        ownerUuid, evidence.commandFamilyId(), profileId, profileRevision,
+                        projectionNpcUuid, evidence.timedConfigId(), evidence.timedConfigRevision(),
+                        evidence.policy(), "tame-and-command-link:" + attemptId,
+                        System.currentTimeMillis()))
+                .whenComplete((leaseResult, failure) -> {
+                    if (failure == null && activeLeaseRegistered(leaseResult)) {
+                        captureAttemptRuntime.commit(attemptId);
+                        return;
+                    }
+                    String reason = failure == null && leaseResult != null
+                            ? leaseResult.reason() : "timed-lease-write-failed";
+                    // The live companion and its roster membership are already durable. Keep the
+                    // attempt nonterminal so restart convergence can idempotently retry the lease;
+                    // removing/refunding here would strand an active owned NPC outside its lease.
+                    captureAttemptRuntime.quarantineAsync(
+                            attemptId, "capture-timed-lease-registration-failed:" + reason)
+                            .whenComplete((quarantined, ignored) -> {
+                                if (Boolean.TRUE.equals(quarantined)
+                                        && captureSourceSpendRecoveryService != null) {
+                                    captureSourceSpendRecoveryService.recoverAfterWorldJoin(
+                                            world, ownerUuid);
+                                }
+                            });
+                });
+    }
+
+    private static boolean activeLeaseRegistered(
+            @Nullable CommandTimedSummoningService.ActionResult result) {
+        return result != null
+                && result.status() == CommandTimedSummoningService.Status.SUCCESS
+                && result.session() != null
+                && result.session().state()
+                == CommandTimedSummonSessionRecord.State.ACTIVE;
+    }
+
+    private static boolean sameTimedEvidence(
+            @Nonnull SpawnerTameLinkDurableContext.Evidence left,
+            @Nonnull SpawnerTameLinkDurableContext.Evidence right) {
+        return left.commandFamilyId().equals(right.commandFamilyId())
+                && java.util.Objects.equals(left.requiredCommandConfigId(), right.requiredCommandConfigId())
+                && java.util.Objects.equals(left.accessItemId(), right.accessItemId())
+                && left.targetRoleId().equals(right.targetRoleId())
+                && java.util.Objects.equals(left.timedConfigId(), right.timedConfigId())
+                && java.util.Objects.equals(left.timedConfigRevision(), right.timedConfigRevision())
+                && left.policy().activeDurationMs() == right.policy().activeDurationMs()
+                && left.policy().resummonCooldownMs() == right.policy().resummonCooldownMs()
+                && left.policy().autoStoreOnOwnerLogout() == right.policy().autoStoreOnOwnerLogout()
+                && java.util.Arrays.equals(left.policy().expiryWarningThresholdsMs(),
+                right.policy().expiryWarningThresholdsMs());
     }
 
     private record TameAndCommandLinkPreparation(
             @Nonnull SpawnerTameAndCommandLinkService.Decision livePreparation,
             @Nullable String accessItemId,
             int maximumRosterMembers,
-            @Nonnull CommandFamilyRosterService.RosterRevisionProof rosterProof) {
+            @Nonnull CommandFamilyRosterService.RosterRevisionProof rosterProof,
+            @Nonnull TimedLeasePreparation timedLease) {
+    }
+
+    private record TimedLeasePreparation(
+            @Nonnull CommandTimedSummoningService service,
+            @Nonnull SpawnerTameLinkDurableContext.Evidence evidence) {
     }
 
     @Nullable

@@ -24,17 +24,29 @@ final class CommandPanelActionService {
     private final CommandFeedbackService feedbackService;
     private final CommandGroupService groupService;
     private final CommandPanelGroupActionService groupActionService;
+    private final CommandRosterActionAuthority rosterAuthority;
 
     CommandPanelActionService(CommandLinkMutationService linkMutationService,
                               CommandToolInventoryService toolInventoryService,
                               CommandPanelPreferenceService panelPreferenceService,
                               CommandFeedbackService feedbackService,
                               CommandGroupService groupService) {
+        this(linkMutationService, toolInventoryService, panelPreferenceService, feedbackService,
+                groupService, null);
+    }
+
+    CommandPanelActionService(CommandLinkMutationService linkMutationService,
+                              CommandToolInventoryService toolInventoryService,
+                              CommandPanelPreferenceService panelPreferenceService,
+                              CommandFeedbackService feedbackService,
+                              CommandGroupService groupService,
+                              CommandRosterActionAuthority rosterAuthority) {
         this.linkMutationService = linkMutationService;
         this.toolInventoryService = toolInventoryService;
         this.panelPreferenceService = panelPreferenceService;
         this.feedbackService = feedbackService;
         this.groupService = groupService != null ? groupService : new CommandGroupService();
+        this.rosterAuthority = rosterAuthority;
         this.groupActionService = new CommandPanelGroupActionService(
                 linkMutationService,
                 toolInventoryService,
@@ -48,6 +60,12 @@ final class CommandPanelActionService {
                    TwCommandItemConfig config,
                    UUID npcUuid) {
         if (player == null || toolId == null || toolId.isBlank() || config == null || npcUuid == null) {
+            return;
+        }
+        if (config.usesOwnerCommandFamilyRoster()) {
+            // Canonical roster admission belongs to capture/integration flows. A command access
+            // item must never create or toggle membership in its per-tool metadata.
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.unavailable");
             return;
         }
         World world = player.getWorld();
@@ -105,6 +123,10 @@ final class CommandPanelActionService {
                                    Ref<EntityStore> targetRef,
                                    String toolId,
                                    TwCommandItemConfig config) {
+        if (config != null && config.usesOwnerCommandFamilyRoster()) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.unavailable");
+            return;
+        }
         LinkToggleResult[] resultHolder = new LinkToggleResult[1];
         boolean mutated = toolInventoryService.mutateToolStack(player, toolId, stack -> {
             LinkToggleResult result = linkMutationService.tryToggleLink(
@@ -142,6 +164,29 @@ final class CommandPanelActionService {
                            TwCommandItemConfig config,
                            UUID npcUuid) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        if (config != null && config.usesOwnerCommandFamilyRoster() && rosterAuthority != null) {
+            CommandRosterActionAuthority.Resolution roster =
+                    rosterAuthority.resolveCached(player.getUuid(), config, toolId);
+            CommandRosterActionAuthority.Member member = roster.snapshot() == null ? null
+                    : roster.snapshot().findByPresentationUuid(npcUuid);
+            if (member == null) {
+                feedbackService.showWarningKey(player,
+                        "tamework.ui.notifications.command.shared.notLinkedToTool");
+                return;
+            }
+            boolean active = !member.activeForBulkCommands();
+            ItemStack access = toolInventoryService.findToolStack(player, toolId);
+            rosterAuthority.updateMember(player.getUuid(), config,
+                    access == null ? null : access.getItemId(), npcUuid,
+                    CommandRosterActionAuthority.MemberUpdate.active(active)).thenAccept(updated -> {
+                if (updated) feedbackService.showSuccessKey(player, active
+                        ? "tamework.ui.notifications.command.toggleActive.enabled"
+                        : "tamework.ui.notifications.command.toggleActive.disabled");
+                else feedbackService.showWarningKey(player,
+                        "tamework.ui.notifications.persistence.authorityNotReady");
+            });
             return;
         }
         CommandLinkMutationService.ActiveToggleResult[] resultHolder =
@@ -340,8 +385,16 @@ final class CommandPanelActionService {
 
     void applySetLinkedNpcGroup(Player player,
                                 String toolId,
+                                TwCommandItemConfig config,
                                 UUID npcUuid,
                                 String groupId) {
+        if (config != null && config.usesOwnerCommandFamilyRoster() && rosterAuthority != null) {
+            ItemStack access = toolInventoryService.findToolStack(player, toolId);
+            rosterAuthority.updateMember(player.getUuid(), config,
+                    access == null ? null : access.getItemId(), npcUuid,
+                    CommandRosterActionAuthority.MemberUpdate.group(groupId));
+            return;
+        }
         groupActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
     }
 

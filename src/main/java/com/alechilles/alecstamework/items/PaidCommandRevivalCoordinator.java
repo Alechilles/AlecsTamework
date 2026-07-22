@@ -10,7 +10,10 @@ import com.alechilles.alecstamework.api.PaidCommandRevivalRequest;
 import com.alechilles.alecstamework.api.PaidCommandRevivalResult;
 import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
 import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalApplyCommit;
+import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalApplyPlan;
 import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceReadExecutor;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -27,15 +30,18 @@ import javax.annotation.Nullable;
 /** Server-authoritative paid revival state machine shared by the command panel and public API. */
 public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalApi {
     private final PaidCommandRevivalRepository repository;
+    private final PersistenceReadExecutor reads;
     private final Authority authority;
     private final Clock clock;
     private final Consumer<PaidCommandRevivedEvent> eventSink;
 
     public PaidCommandRevivalCoordinator(@Nonnull PaidCommandRevivalRepository repository,
+                                         @Nonnull PersistenceReadExecutor reads,
                                          @Nonnull Authority authority,
                                          @Nonnull Clock clock,
                                          @Nonnull Consumer<PaidCommandRevivedEvent> eventSink) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.reads = Objects.requireNonNull(reads, "reads");
         this.authority = Objects.requireNonNull(authority, "authority");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.eventSink = Objects.requireNonNull(eventSink, "eventSink");
@@ -51,27 +57,25 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
     @Override
     public CompletionStage<PaidCommandRevivalResult> revive(PaidCommandRevivalRequest request) {
         Objects.requireNonNull(request, "request");
-        try {
-            PaidCommandRevivalRecord existing = repository.findByIdempotency(
-                    request.callerNamespace(), request.idempotencyKey());
-            if (existing != null) return CompletableFuture.completedFuture(result(existing, true));
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(PaidCommandRevivalResult.unavailable(
-                    request.profileId(), "paid-revival-journal-read-failed"));
-        }
-        return authority.resolve(request.ownerUuid(), request.profileId(), request.commandFamilyId(), true)
-                .thenCompose(resolved -> begin(request, resolved));
+        return reads.submit(() -> repository.findByIdempotency(
+                        request.callerNamespace(), request.idempotencyKey()))
+                .handle((existing, failure) -> new ReadResult<>(existing, failure))
+                .thenCompose(read -> {
+                    if (read.failure() != null) return completedUnavailable(
+                            request.profileId(), "paid-revival-journal-read-failed");
+                    if (read.value() != null) return CompletableFuture.completedFuture(
+                            result(read.value(), true));
+                    return authority.resolve(request.ownerUuid(), request.profileId(),
+                                    request.commandFamilyId(), true)
+                            .thenCompose(resolved -> begin(request, resolved));
+                });
     }
 
     @Override
     public CompletionStage<Optional<PaidCommandRevivalOperationView>> findOperation(
             String callerNamespace, String idempotencyKey) {
-        try {
-            PaidCommandRevivalRecord record = repository.findByIdempotency(callerNamespace, idempotencyKey);
-            return CompletableFuture.completedFuture(Optional.ofNullable(record).map(PaidCommandRevivalCoordinator::view));
-        } catch (Exception failure) {
-            return CompletableFuture.failedFuture(failure);
-        }
+        return reads.submit(() -> repository.findByIdempotency(callerNamespace, idempotencyKey))
+                .thenApply(record -> Optional.ofNullable(record).map(PaidCommandRevivalCoordinator::view));
     }
 
     private CompletionStage<PaidCommandRevivalResult> begin(PaidCommandRevivalRequest request,
@@ -91,7 +95,7 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                 request.profileId(), request.commandFamilyId(), resolved.roleId(), resolved.configId(),
                 resolved.configRevision(), resolved.deathRevision(), resolved.profileRevision(),
                 "pending:" + operationId, resolved.placementFingerprint(),
-                resolved.reviveProjectionOperationId(), PaidCommandRevivalRecord.State.PREPARED,
+                "pending:" + operationId, PaidCommandRevivalRecord.State.PREPARED,
                 resolved.exactCost(), List.of(), null, now, now, null);
         return committed(repository.prepareAsync(prepared)).thenCompose(prepare -> {
             if (prepare == null || prepare.operation() == null) {
@@ -116,26 +120,28 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                     return cancel(prepared, "population-admission-operation-unavailable", activation);
                 }
                 return committed(repository.recordActivationAsync(operationId,
-                        activation.populationOperationId(), resolved.placementFingerprint(), clock.millis()))
+                        activation.populationOperationId(), resolved.placementFingerprint(),
+                        activation.projectionNpcUuid(), freezeTimedLease(
+                                resolved.timedLease(), operationId), clock.millis()))
                         .thenCompose(recorded -> {
                             PaidCommandRevivalRecord frozen = recorded != null ? recorded.operation() : null;
                             if (frozen == null) {
                                 return cancel(prepared, "population-admission-journal-failed", activation);
                             }
-                            CommandReviveInventoryPaymentService.PlanResult plan =
-                                    authority.plan(resolved, operationId);
-                            if (!plan.ready()) {
-                                return cancel(frozen,
-                                        plan.status() == CommandReviveInventoryPaymentService.Status.INSUFFICIENT
-                                                ? "insufficient-revival-cost"
-                                                : "inventory-reservation-unavailable",
-                                        activation);
-                            }
-                            return committed(repository.reserveAsync(
-                                    operationId, plan.reservations(), clock.millis()))
-                                    .thenCompose(reserved -> reserved == null || reserved.operation() == null
-                                            ? cancel(frozen, "inventory-reservation-persist-failed", activation)
-                                            : holdAndConsume(resolved, reserved, activation));
+                            return authority.plan(resolved, operationId).thenCompose(plan -> {
+                                if (!plan.ready()) {
+                                    return cancel(frozen,
+                                            plan.status() == CommandReviveInventoryPaymentService.Status.INSUFFICIENT
+                                                    ? "insufficient-revival-cost"
+                                                    : "inventory-reservation-unavailable",
+                                            activation);
+                                }
+                                return committed(repository.reserveAsync(
+                                        operationId, plan.reservations(), clock.millis()))
+                                        .thenCompose(reserved -> reserved == null || reserved.operation() == null
+                                                ? cancel(frozen, "inventory-reservation-persist-failed", activation)
+                                                : holdAndConsume(resolved, reserved, activation));
+                            });
                         });
             });
         });
@@ -203,28 +209,59 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                 return requireRefund(operation, "revival-apply-journal-failed", activation);
             }
             return authority.apply(context, operation, activation).thenCompose(outcome -> {
-                if (!outcome.succeeded()) {
-                    return requireRefund(applying.operation(),
-                            outcome.reason() == null ? "revival-apply-failed" : outcome.reason(), activation);
+                if (outcome.status() == ApplyOutcome.Status.PROJECTION_READY
+                        && outcome.projectionNpcUuid() != null) {
+                    return commitAppliedProjection(
+                            applying.operation(), outcome.projectionNpcUuid(), recovered);
                 }
-                return committed(repository.transitionAsync(operation.operationId(),
-                        PaidCommandRevivalRecord.State.APPLYING,
-                        PaidCommandRevivalRecord.State.SUCCEEDED, null, clock.millis())).thenApply(success -> {
-                    PaidCommandRevivalRecord committed = success != null ? success.operation() : null;
-                    if (committed == null) {
-                        return new PaidCommandRevivalResult(operation.operationId(),
-                                PaidCommandRevivalResult.Status.RECOVERY_PENDING, operation.profileId(),
-                                operation.exactCost(), "revival-success-journal-ambiguous", recovered);
-                    }
-                    long now = clock.millis();
-                    eventSink.accept(new PaidCommandRevivedEvent(
-                            committed.operationId(), committed.callerNamespace(), committed.idempotencyKey(),
-                            committed.ownerUuid(), committed.profileId(), committed.commandFamilyId(),
-                            committed.exactCost(), recovered, now, now));
-                    return result(committed, recovered);
-                });
+                if (outcome.status() == ApplyOutcome.Status.ABSENT_PROVEN) {
+                    return requireRefund(applying.operation(),
+                            outcome.reason() == null ? "revival-projection-absent" : outcome.reason(), activation);
+                }
+                return CompletableFuture.completedFuture(new PaidCommandRevivalResult(
+                        operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                        operation.profileId(), operation.exactCost(),
+                        outcome.reason() == null ? "revival-projection-ambiguous" : outcome.reason(), recovered));
             });
         });
+    }
+
+    private CompletionStage<PaidCommandRevivalResult> commitAppliedProjection(
+            PaidCommandRevivalRecord operation, UUID projectionNpcUuid, boolean recovered) {
+        return reads.submit(() -> repository.findApplyPlan(operation.operationId())).thenCompose(plan -> {
+            if (plan == null || !projectionNpcUuid.equals(plan.projectionNpcUuid())) {
+                return CompletableFuture.completedFuture(new PaidCommandRevivalResult(
+                        operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                        operation.profileId(), operation.exactCost(), "revival-apply-plan-unavailable", recovered));
+            }
+            PaidCommandRevivalApplyCommit commit = new PaidCommandRevivalApplyCommit(
+                    operation.operationId(), operation.ownerUuid(), operation.commandFamilyId(),
+                    operation.profileId(), plan.projectionNpcUuid(), operation.deathRevision(),
+                    plan.timedLease(), clock.millis());
+            return committed(repository.commitAppliedAsync(commit)).thenCompose(applied -> {
+                PaidCommandRevivalRecord terminal = applied != null ? applied.operation() : null;
+                if (terminal == null || (applied.status() != PaidCommandRevivalRepository.Status.APPLIED
+                        && applied.status() != PaidCommandRevivalRepository.Status.IDEMPOTENT)
+                        || terminal.state() != PaidCommandRevivalRecord.State.SUCCEEDED) {
+                    return CompletableFuture.completedFuture(new PaidCommandRevivalResult(
+                            operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                            operation.profileId(), operation.exactCost(),
+                            applied == null || applied.reason() == null
+                                    ? "revival-atomic-commit-pending" : applied.reason(), recovered));
+                }
+                return authority.afterAppliedCommit(terminal, projectionNpcUuid)
+                        .handle((ignored, cacheFailure) -> {
+                            long now = clock.millis();
+                            eventSink.accept(new PaidCommandRevivedEvent(
+                                    terminal.operationId(), terminal.callerNamespace(), terminal.idempotencyKey(),
+                                    terminal.ownerUuid(), terminal.profileId(), terminal.commandFamilyId(),
+                                    terminal.exactCost(), recovered, now, now));
+                            return result(terminal, recovered);
+                        });
+            });
+        }).exceptionally(failure -> new PaidCommandRevivalResult(
+                operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                operation.profileId(), operation.exactCost(), "revival-atomic-commit-failed", recovered));
     }
 
     private CompletionStage<PaidCommandRevivalResult> cancel(PaidCommandRevivalRecord operation,
@@ -263,21 +300,28 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
             PaidCommandRevivalRecord operation,
             String reason,
             @Nullable ActivationPreparation activation) {
-        return cancelActivation(operation, activation).thenCompose(canceled -> committed(
+        return cancelActivation(operation, activation).thenCompose(canceled -> {
+            if (!canceled) {
+                return CompletableFuture.completedFuture(new PaidCommandRevivalResult(
+                        operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                        operation.profileId(), operation.exactCost(),
+                        "revival-projection-rollback-unproven", true));
+            }
+            return committed(
                 repository.transitionAsync(operation.operationId(), operation.state(),
                 PaidCommandRevivalRecord.State.REFUND_REQUIRED, reason, clock.millis())).thenCompose(required -> {
             PaidCommandRevivalRecord marked = required != null ? required.operation() : null;
             if (marked == null) return quarantineAfterAmbiguousCharge(
                     operation, reason, false, activation);
             return deliverRefund(marked, reason, false);
-        }));
+        });
+        });
     }
 
     /** Bounded startup classification; owner-bound inventory/world work resumes on player join. */
     @Nonnull
     public CompletionStage<RecoveryReport> recoverStartup(int limit) {
-        try {
-            List<PaidCommandRevivalRecord> rows = repository.loadRecoverable();
+        return reads.submit(repository::loadRecoverable).thenCompose(rows -> {
             int bounded = Math.min(Math.max(0, limit), rows.size());
             CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
             int[] canceled = {0};
@@ -293,17 +337,15 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
             return chain.handle((ignored, failure) -> new RecoveryReport(
                     failure == null, bounded, canceled[0], bounded - canceled[0],
                     failure == null ? null : "startup-recovery-failed"));
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new RecoveryReport(
-                    false, 0, 0, 0, "startup-recovery-read-failed"));
-        }
+        }).exceptionally(failure -> new RecoveryReport(
+                false, 0, 0, 0, "startup-recovery-read-failed"));
     }
 
     /** Resumes all journal rows for an owner once their authoritative inventory/world is online. */
     @Nonnull
     public CompletionStage<RecoveryReport> recoverOwner(@Nonnull UUID ownerUuid, int limit) {
-        try {
-            List<PaidCommandRevivalRecord> rows = repository.loadRecoverable().stream()
+        return reads.submit(repository::loadRecoverable).thenCompose(allRows -> {
+            List<PaidCommandRevivalRecord> rows = allRows.stream()
                     .filter(row -> ownerUuid.equals(row.ownerUuid())).limit(Math.max(0, limit)).toList();
             CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
             int[] recovered = {0};
@@ -313,10 +355,8 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
             return chain.handle((ignored, failure) -> new RecoveryReport(
                     failure == null, rows.size(), recovered[0], rows.size() - recovered[0],
                     failure == null ? null : "owner-recovery-failed"));
-        } catch (Exception failure) {
-            return CompletableFuture.completedFuture(new RecoveryReport(
-                    false, 0, 0, 0, "owner-recovery-read-failed"));
-        }
+        }).exceptionally(failure -> new RecoveryReport(
+                false, 0, 0, 0, "owner-recovery-read-failed"));
     }
 
     private CompletionStage<PaidCommandRevivalResult> recover(PaidCommandRevivalRecord operation) {
@@ -359,25 +399,43 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
 
     private CompletionStage<PaidCommandRevivalResult> recoverApplying(PaidCommandRevivalRecord operation) {
         return authority.inspectProjection(operation).thenCompose(evidence -> {
-            if (evidence == ProjectionEvidence.REVIVED) return commitRecoveredSuccess(operation);
+            if (evidence == ProjectionEvidence.REVIVED) {
+                UUID projection = expectedProjectionUuid(operation);
+                return projection == null
+                        ? quarantineAfterAmbiguousCharge(operation,
+                        "projection-identity-unavailable", false, null)
+                        : commitAppliedProjection(operation, projection, true);
+            }
             if (evidence == ProjectionEvidence.DEAD) return resolveForRecovery(operation)
                     .thenCompose(context -> authority.apply(context, operation, null))
-                    .thenCompose(outcome -> outcome.succeeded()
-                            ? commitRecoveredSuccess(operation)
-                            : requireRefund(operation, outcome.reason(), null));
+                    .thenCompose(outcome -> resumeApplyingOutcome(operation, outcome));
             return quarantineAfterAmbiguousCharge(
                     operation, "projection-evidence-ambiguous", false, null);
         });
     }
 
+    private CompletionStage<PaidCommandRevivalResult> resumeApplyingOutcome(
+            PaidCommandRevivalRecord operation, ApplyOutcome outcome) {
+        if (outcome.status() == ApplyOutcome.Status.PROJECTION_READY
+                && outcome.projectionNpcUuid() != null) {
+            return commitAppliedProjection(operation, outcome.projectionNpcUuid(), true);
+        }
+        if (outcome.status() == ApplyOutcome.Status.ABSENT_PROVEN) {
+            return requireRefund(operation,
+                    outcome.reason() == null ? "recovered-projection-absent" : outcome.reason(), null);
+        }
+        return CompletableFuture.completedFuture(new PaidCommandRevivalResult(
+                operation.operationId(), PaidCommandRevivalResult.Status.RECOVERY_PENDING,
+                operation.profileId(), operation.exactCost(),
+                outcome.reason() == null ? "recovered-projection-ambiguous" : outcome.reason(), true));
+    }
+
     private CompletionStage<PaidCommandRevivalResult> recoverQuarantined(PaidCommandRevivalRecord operation) {
         return authority.inspectProjection(operation).thenCompose(evidence ->
                 evidence == ProjectionEvidence.REVIVED
-                        ? committed(repository.transitionAsync(operation.operationId(),
-                        PaidCommandRevivalRecord.State.QUARANTINED,
-                        PaidCommandRevivalRecord.State.SUCCEEDED,
-                        "recovered-projection-proof", clock.millis()))
-                        .thenApply(done -> recoveredSuccessResult(operation, done))
+                        ? expectedProjectionUuid(operation) == null
+                        ? CompletableFuture.completedFuture(result(operation, true))
+                        : commitAppliedProjection(operation, expectedProjectionUuid(operation), true)
                         : CompletableFuture.completedFuture(result(operation, true)));
     }
 
@@ -437,27 +495,25 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
         });
     }
 
-    private CompletionStage<PaidCommandRevivalResult> commitRecoveredSuccess(
-            PaidCommandRevivalRecord operation) {
-        return committed(repository.transitionAsync(operation.operationId(),
-                PaidCommandRevivalRecord.State.APPLYING,
-                PaidCommandRevivalRecord.State.SUCCEEDED, "recovered-success", clock.millis()))
-                .thenApply(done -> recoveredSuccessResult(operation, done));
+    @Nullable
+    private static UUID expectedProjectionUuid(PaidCommandRevivalRecord operation) {
+        try {
+            return operation.reviveProjectionOperationId() == null ? null
+                    : UUID.fromString(operation.reviveProjectionOperationId());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
-    private PaidCommandRevivalResult recoveredSuccessResult(
-            PaidCommandRevivalRecord fallback,
-            @Nullable PaidCommandRevivalRepository.MutationResult mutation) {
-        PaidCommandRevivalRecord committed = mutation != null && mutation.operation() != null
-                ? mutation.operation() : fallback;
-        if (committed.state() == PaidCommandRevivalRecord.State.SUCCEEDED) {
-            long now = clock.millis();
-            eventSink.accept(new PaidCommandRevivedEvent(
-                    committed.operationId(), committed.callerNamespace(), committed.idempotencyKey(),
-                    committed.ownerUuid(), committed.profileId(), committed.commandFamilyId(),
-                    committed.exactCost(), true, now, now));
-        }
-        return result(committed, true);
+    @Nullable
+    private static PaidCommandRevivalApplyCommit.TimedLease freezeTimedLease(
+            @Nullable PaidCommandRevivalApplyCommit.TimedLease template, UUID operationId) {
+        if (template == null) return null;
+        String sessionId = UUID.nameUUIDFromBytes(("paid-revival-session\u0000" + operationId)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        return new PaidCommandRevivalApplyCommit.TimedLease(
+                sessionId, template.remainingMs(), template.configId(),
+                template.configRevision(), template.policy());
     }
 
     private CompletionStage<PaidCommandRevivalResult> quarantineAfterAmbiguousCharge(
@@ -541,7 +597,7 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                                                           @Nonnull String commandFamilyId,
                                                           boolean forCommit);
 
-        @Nonnull CommandReviveInventoryPaymentService.PlanResult plan(
+        @Nonnull CompletionStage<CommandReviveInventoryPaymentService.PlanResult> plan(
                 @Nonnull ResolvedRevival resolved, @Nonnull UUID operationId);
 
         @Nonnull CompletionStage<ActivationPreparation> prepareActivation(
@@ -570,6 +626,12 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                 @Nonnull PaidCommandRevivalRecord operation,
                 @Nullable ActivationPreparation activation);
 
+        /** Post-commit cache cleanup only; failure cannot roll back the durable revival. */
+        @Nonnull default CompletionStage<Boolean> afterAppliedCommit(
+                @Nonnull PaidCommandRevivalRecord operation, @Nonnull UUID projectionNpcUuid) {
+            return CompletableFuture.completedFuture(true);
+        }
+
         @Nonnull CompletionStage<CommandReviveInventoryPaymentService.ConsumeResult> refund(
                 @Nonnull PaidCommandRevivalRecord operation);
 
@@ -595,7 +657,7 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
                                   @Nullable String reason,
                                   @Nullable String populationAdmissionOperationId,
                                   @Nullable String placementFingerprint,
-                                  @Nullable String reviveProjectionOperationId,
+                                  @Nullable PaidCommandRevivalApplyCommit.TimedLease timedLease,
                                   @Nullable Object runtimeContext) {
         public ResolvedRevival {
             profileId = requireText(profileId, "profileId");
@@ -626,17 +688,47 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
         }
     }
 
-    public record ApplyOutcome(boolean succeeded, @Nullable String reason) {
-        public static ApplyOutcome applied() { return new ApplyOutcome(true, null); }
-        public static ApplyOutcome failed(String reason) { return new ApplyOutcome(false, reason); }
+    public record ApplyOutcome(@Nonnull Status status,
+                               @Nullable UUID projectionNpcUuid,
+                               @Nullable String reason) {
+        public ApplyOutcome {
+            status = Objects.requireNonNull(status, "status");
+            if (status == Status.PROJECTION_READY && projectionNpcUuid == null) {
+                throw new IllegalArgumentException("projection-ready outcome requires its exact UUID");
+            }
+        }
+
+        public static ApplyOutcome projected(UUID projectionNpcUuid) {
+            return new ApplyOutcome(Status.PROJECTION_READY,
+                    Objects.requireNonNull(projectionNpcUuid, "projectionNpcUuid"), null);
+        }
+
+        public static ApplyOutcome absent(String reason) {
+            return new ApplyOutcome(Status.ABSENT_PROVEN, null, reason);
+        }
+
+        public static ApplyOutcome ambiguous(String reason) {
+            return new ApplyOutcome(Status.AMBIGUOUS, null, reason);
+        }
+
+        public enum Status { PROJECTION_READY, ABSENT_PROVEN, AMBIGUOUS }
     }
 
     public record ActivationPreparation(boolean accepted,
                                         @Nullable String reason,
                                         @Nullable String populationOperationId,
+                                        @Nullable UUID projectionNpcUuid,
                                         @Nullable Object runtimeHandle) {
+        public ActivationPreparation {
+            if (accepted && (populationOperationId == null || populationOperationId.isBlank()
+                    || projectionNpcUuid == null)) {
+                throw new IllegalArgumentException(
+                        "accepted activation requires population operation and projection UUID");
+            }
+        }
+
         public static ActivationPreparation denied(@Nullable String reason) {
-            return new ActivationPreparation(false, reason, null, null);
+            return new ActivationPreparation(false, reason, null, null, null);
         }
     }
 
@@ -644,6 +736,8 @@ public final class PaidCommandRevivalCoordinator implements PaidCommandRevivalAp
 
     public record RecoveryReport(boolean healthy, int examined, int recovered,
                                  int pending, @Nullable String reason) { }
+
+    private record ReadResult<T>(@Nullable T value, @Nullable Throwable failure) { }
 
     private static String requireText(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();

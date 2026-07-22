@@ -53,6 +53,7 @@ public final class CommandLinkedNpcStateSnapshotService {
     private final NpcProfileRepository profileRepository;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
     @Nullable private volatile ProjectionUnloadSnapshotSink projectionUnloadSnapshotSink;
+    @Nullable private volatile ProjectionLoadSink projectionLoadSink;
 
     public CommandLinkedNpcStateSnapshotService() {
         this(null, new LoadedNpcIdentityIndex());
@@ -74,10 +75,22 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         indexNpcAdded(reference, store);
         refreshFromEntity(reference, store);
+        ProjectionLoadSink loadSink = projectionLoadSink;
+        TameworkProjectionIdentityComponent marker = projectionIdentity(reference, store);
+        UUID npcUuid = resolveNpcUuid(reference, store);
+        if (loadSink != null && npcUuid != null && marker != null
+                && TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(
+                marker.getProjectionKind())) {
+            loadSink.loaded(npcUuid, marker);
+        }
     }
 
     public void installProjectionUnloadSnapshotSink(@Nullable ProjectionUnloadSnapshotSink sink) {
         projectionUnloadSnapshotSink = sink;
+    }
+
+    public void installProjectionLoadSink(@Nullable ProjectionLoadSink sink) {
+        projectionLoadSink = sink;
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference,
@@ -308,10 +321,32 @@ public final class CommandLinkedNpcStateSnapshotService {
                 || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind);
     }
 
+    @Nullable
+    private UUID resolveNpcUuid(@Nonnull Ref<EntityStore> reference,
+                                @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        UUID componentUuid = resolveComponentUuid(reference, store);
+        return npc != null && npc.getUuid() != null ? npc.getUuid() : componentUuid;
+    }
+
+    @Nullable
+    private TameworkProjectionIdentityComponent projectionIdentity(
+            @Nonnull Ref<EntityStore> reference, @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        return markerType == null ? null : store.getComponent(reference, markerType);
+    }
+
     @FunctionalInterface
     public interface ProjectionUnloadSnapshotSink {
         void capture(@Nonnull UUID npcUuid,
                      @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot);
+    }
+
+    @FunctionalInterface
+    public interface ProjectionLoadSink {
+        void loaded(@Nonnull UUID npcUuid,
+                    @Nonnull TameworkProjectionIdentityComponent marker);
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {

@@ -45,12 +45,12 @@ class CommandTimedSummonRepositoryTest {
             HydragonPersistenceTestHarness.await(repository.claimAsync(
                     new CommandTimedSummonRepository.ClaimMutation(
                             "store-snapshot", "session-snapshot", 900L,
-                            null, null, policy, 200L)));
+                            null, null, policy, 700L)));
 
             CommandTimedSummonRepository.ProjectionSnapshot expected =
                     new CommandTimedSummonRepository.ProjectionSnapshot(
                             owner, family, profile, sourceNpc, "{\"version\":\"1\"}",
-                            "0".repeat(64), 210L);
+                            "0".repeat(64), 710L);
             HydragonPersistenceTestHarness.await(repository.saveProjectionSnapshotAsync(expected));
 
             assertEquals(expected, repository.findProjectionSnapshot(owner, family, profile));
@@ -173,8 +173,9 @@ class CommandTimedSummonRepositoryTest {
                      """);
              PreparedStatement membership = connection.prepareStatement("""
                      INSERT INTO command_family_roster_memberships
-                         (owner_uuid, command_family_id, profile_id, active, created_at_ms, updated_at_ms)
-                     VALUES (?, ?, ?, 1, 1, 1)
+                         (owner_uuid, command_family_id, profile_id, role_id, profile_revision,
+                          command_state, created_at_ms, updated_at_ms)
+                     VALUES (?, ?, ?, 'TestDragon', 1, 'ROSTER_STORED', 1, 1)
                      """)) {
             roster.setString(1, owner.toString());
             roster.setString(2, family);

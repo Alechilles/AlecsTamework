@@ -52,6 +52,23 @@ final class CommandOwnerCullService {
         this.npcNameResolver = npcNameResolver;
     }
 
+    /** Pure world-thread preflight used before a canonical roster membership is removed. */
+    boolean canCullNow(@Nullable Player player,
+                       @Nullable TwCommandItemConfig config,
+                       @Nullable UUID npcUuid) {
+        if (player == null || npcUuid == null || resolveScheduler() == null) {
+            return false;
+        }
+        World world = player.getWorld();
+        LiveCullTarget target = world == null ? null : findLiveTarget(world, npcUuid);
+        UUID playerUuid = target == null
+                ? null
+                : resolveEntityUuid(player.getReference(), target.store());
+        DamageCause cause = DamageCause.COMMAND != null ? DamageCause.COMMAND : DamageCause.PHYSICAL;
+        return target != null && playerUuid != null && cause != null
+                && canCull(playerUuid, config, target.reference(), target.store());
+    }
+
     void cull(@Nullable Player player,
               @Nullable String toolId,
               @Nullable TwCommandItemConfig config,

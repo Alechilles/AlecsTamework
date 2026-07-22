@@ -28,7 +28,7 @@ class TameworkPersistenceRuntimeMigrationTest {
     Path tempDir;
 
     @Test
-    void backsUpV7DatabaseBeforeV8MigrationAndWritesManifest() throws Exception {
+    void backsUpV7DatabaseBeforeLatestMigrationAndWritesManifest() throws Exception {
         Path sqlitePath = tempDir.resolve(TameworkPersistenceRuntime.SQLITE_FILENAME);
         SqliteConnectionManager connections = new SqliteConnectionManager(sqlitePath);
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
@@ -44,7 +44,7 @@ class TameworkPersistenceRuntimeMigrationTest {
         List<Path> backups;
         try (Stream<Path> files = Files.list(tempDir)) {
             backups = files
-                    .filter(path -> path.getFileName().toString().startsWith("tamework_pre_v8_"))
+                    .filter(path -> path.getFileName().toString().startsWith("tamework_pre_v9_"))
                     .filter(path -> path.getFileName().toString().endsWith(".sqlite.bak"))
                     .toList();
         }
@@ -54,18 +54,18 @@ class TameworkPersistenceRuntimeMigrationTest {
                 Files.readString(SqliteMigrationBackupService.manifestPath(backup))).getAsJsonObject();
         assertEquals(SqliteSchemaMigrator.SCHEMA_VERSION_V7,
                 manifest.get("sourceSchemaVersion").getAsInt());
-        assertEquals(SqliteSchemaMigrator.SCHEMA_VERSION_V8,
+        assertEquals(SqliteSchemaMigrator.SCHEMA_VERSION_V9,
                 manifest.get("targetSchemaVersion").getAsInt());
 
         try (Connection backupConnection = DriverManager.getConnection("jdbc:sqlite:" + backup)) {
             assertTrue(migrator.isVersionApplied(
                     backupConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V7));
             assertFalse(migrator.isVersionApplied(
-                    backupConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+                    backupConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V9));
         }
         try (Connection upgradedConnection = connections.openConnection()) {
             assertTrue(migrator.isVersionApplied(
-                    upgradedConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+                    upgradedConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V9));
         }
     }
 

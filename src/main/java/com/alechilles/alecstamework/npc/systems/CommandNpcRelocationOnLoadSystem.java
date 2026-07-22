@@ -71,7 +71,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
             ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
                     TameworkProjectionIdentityComponent.getComponentType();
             if (markerType != null) {
-                store.putComponent(reference, markerType,
+                commandBuffer.putComponent(reference, markerType,
                         new TameworkProjectionIdentityComponent(
                                 retirement.profileId(), retirement.operationId(),
                                 TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,

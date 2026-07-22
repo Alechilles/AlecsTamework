@@ -2,7 +2,10 @@ package com.alechilles.alecstamework;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -307,6 +310,7 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
+    private ExecutorService commandRosterReadExecutor;
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
@@ -1180,6 +1184,12 @@ public class Tamework extends JavaPlugin {
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
+        commandRosterReadExecutor = new ThreadPoolExecutor(
+                1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(64), runnable -> {
+                    Thread thread = new Thread(runnable, "tamework-command-roster-read");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new ThreadPoolExecutor.AbortPolicy());
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
                 commandNpcRelocationService,
@@ -1189,7 +1199,9 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcLostService,
                 commandLinkedNpcStateSnapshotService,
                 persistenceRuntime,
-                ownerPopulationRuntime.identityResolver()
+                ownerPopulationRuntime.identityResolver(),
+                commandFamilyRosterService,
+                commandRosterReadExecutor
         );
         if (api instanceof TameworkApiImpl implementation) {
             paidCommandRevivalCoordinator = commandItemFeatureHandler.createPaidCommandRevivalRuntime(
@@ -1546,8 +1558,13 @@ public class Tamework extends JavaPlugin {
         commandTimedSummoningService = null;
         paidCommandRevivalCoordinator = null;
         commandTimedSummoningRecoveryReady = false;
+        if (commandRosterReadExecutor != null) {
+            commandRosterReadExecutor.shutdownNow();
+            commandRosterReadExecutor = null;
+        }
         if (commandLinkedNpcStateSnapshotService != null) {
             commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(null);
+            commandLinkedNpcStateSnapshotService.installProjectionLoadSink(null);
         }
         CommandTimedProjectionRetirementIndex.clear();
         if (commandTimedSummoningTickSystem != null) {
@@ -2846,10 +2863,11 @@ public class Tamework extends JavaPlugin {
                     });
             HytaleCommandTimedSummonProjectionPort projection =
                     new HytaleCommandTimedSummonProjectionPort(
-                            ownerPopulationRuntime, profiles, repository, population,
+                            ownerPopulationRuntime, profiles, repository,
+                            persistenceRuntime.getReadExecutor(), population,
                             coopResidentStateSnapshotService);
             CommandTimedSummoningService service = new CommandTimedSummoningService(
-                    repository,
+                    repository, persistenceRuntime.getReadExecutor(),
                     new CommandFamilyRosterMembershipPort(commandFamilyRosterService),
                     population,
                     projection,
@@ -2857,7 +2875,7 @@ public class Tamework extends JavaPlugin {
                             "Timed command summon nearing expiry owner=" + ownerUuid
                                     + " profile=" + profileId + " remainingMs=" + remainingMs));
             CommandTimedSummoningApiDelegate runtime = new CommandTimedSummoningApiDelegate(
-                    repository, service, (request, operation) -> {
+                    repository, service, persistenceRuntime.getReadExecutor(), (request, operation) -> {
                         var profile = profiles.loadProfileById(request.profileId());
                         var populationEntry = ownerPopulationRuntime.index()
                                 .entry(request.profileId()).orElse(null);
@@ -2878,8 +2896,10 @@ public class Tamework extends JavaPlugin {
                                         settings.isAutoStoreOnOwnerLogout(),
                                         settings.getExpiryWarningThresholdsMs()),
                                 ownerPopulationRuntime.identityResolver()
-                                        .currentNpcUuid(request.profileId()).orElse(null));
+                                    .currentNpcUuid(request.profileId()).orElse(null));
                     }, System::currentTimeMillis);
+            persistenceRuntime.getReadExecutor().submit(repository::loadAllSessions)
+                    .toCompletableFuture().join();
             var recovery = service.recover(System.currentTimeMillis()).toCompletableFuture().join();
             commandTimedSummoningRecoveryReady = recovery.ready();
             if (!commandTimedSummoningRecoveryReady || !projection.available()) {
@@ -2889,9 +2909,12 @@ public class Tamework extends JavaPlugin {
             }
             commandTimedSummoningService = service;
             commandTimedSummoningApi = runtime;
-            projection.recoverRetirementTombstones();
+            projection.installLifecycleService(service);
+            projection.recoverRetirementTombstones().toCompletableFuture().join();
             commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(
                     projection::captureUnloadedSnapshot);
+            commandLinkedNpcStateSnapshotService.installProjectionLoadSink(
+                    projection::projectionLoaded);
             commandTimedSummoningTickSystem.install(service);
             if (companionProvisioningApi != null) {
                 companionProvisioningApi.installInitialProjectionHook(runtime.initialProjectionHook());
@@ -2949,8 +2972,8 @@ public class Tamework extends JavaPlugin {
             Throwable failure) {
         if (failure != null || progress == null
                 || progress.status() != CompanionPopulationReconciliationProgress.Status.READY) {
-            String message = "Bonded-vessel runtime remains unavailable because canonical "
-                    + "population recovery did not become ready."
+            String message = "Population-backed companion capabilities remain unavailable because "
+                    + "canonical population recovery did not become ready."
                     + (progress == null ? "" : " Reason: " + progress.reason());
             if (failure == null) {
                 getLogger().at(Level.WARNING).log(message);

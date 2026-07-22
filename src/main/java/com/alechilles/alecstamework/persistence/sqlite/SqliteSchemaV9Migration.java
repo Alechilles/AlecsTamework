@@ -386,5 +386,22 @@ final class SqliteSchemaV9Migration {
                     updated_at_ms INTEGER NOT NULL
                 )
                 """);
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS paid_command_revival_apply_plans (
+                    operation_id TEXT PRIMARY KEY REFERENCES paid_command_revival_operations(operation_id)
+                        ON DELETE CASCADE,
+                    projection_npc_uuid TEXT NOT NULL,
+                    summon_session_id TEXT,
+                    summon_remaining_ms INTEGER CHECK (
+                        summon_remaining_ms IS NULL OR summon_remaining_ms >= 0),
+                    summon_config_id TEXT,
+                    summon_config_revision INTEGER CHECK (
+                        summon_config_revision IS NULL OR summon_config_revision >= 0),
+                    summon_policy_json TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    CHECK ((summon_session_id IS NULL AND summon_policy_json IS NULL)
+                        OR (summon_session_id IS NOT NULL AND summon_policy_json IS NOT NULL))
+                )
+                """);
     }
 }

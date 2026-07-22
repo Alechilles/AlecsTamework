@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,7 @@ class CaptureAttemptRepositoryTest {
             UUID actor = UUID.randomUUID();
             CaptureAttemptRecord unreceipted = tameLinkAttempt(
                     "attempt-unreceipted", actor, "profile-unreceipted");
+            insertProfile(harness, actor, unreceipted.identity().profileId());
             await(repository.prepareAsync(unreceipted));
             await(repository.resolveAsync(successResolution("attempt-unreceipted")));
             assertTrue(await(repository.cancelUnreceiptedSuccessAsync(
@@ -39,10 +42,14 @@ class CaptureAttemptRepositoryTest {
 
             CaptureAttemptRecord charged = tameLinkAttempt(
                     "attempt-charged", actor, "profile-charged");
+            insertProfile(harness, actor, charged.identity().profileId());
             await(repository.prepareAsync(charged));
             await(repository.resolveAsync(successResolution("attempt-charged")));
             await(repository.markSourceReceiptedAsync("attempt-charged", 200L));
             await(repository.markSourceConsumedAsync("attempt-charged", 210L));
+            assertEquals(1, repository.loadPendingTameLinkConvergence(actor).size());
+            assertEquals("attempt-charged", repository.loadPendingTameLinkConvergence(actor)
+                    .get(0).identity().attemptId());
             assertTrue(await(repository.requireSourceRefundAsync(
                     "attempt-charged", "restart-live-continuation-lost", 220L)));
             assertEquals(1, repository.loadPendingSourceRefunds(actor).size());
@@ -294,6 +301,21 @@ class CaptureAttemptRepositoryTest {
                         "legacy-config", 1L, null, null, true, true),
                 CaptureAttemptRecord.State.PREPARED, null, null, null,
                 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
+    }
+
+    private void insertProfile(HydragonPersistenceTestHarness harness,
+                               UUID ownerUuid, String profileId) throws Exception {
+        try (Connection connection = harness.connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO npc_profiles (
+                         profile_id, owner_uuid, role_id, last_world_name,
+                         created_at_ms, updated_at_ms, last_active_at_ms
+                     ) VALUES (?, ?, 'wild-dragon', 'default', 1, 1, 1)
+                     """)) {
+            statement.setString(1, profileId);
+            statement.setString(2, ownerUuid.toString());
+            statement.executeUpdate();
+        }
     }
 
     private HydragonPersistenceTestHarness harness(String filename) throws Exception {

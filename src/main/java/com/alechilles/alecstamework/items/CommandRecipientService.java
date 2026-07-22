@@ -83,7 +83,10 @@ final class CommandRecipientService {
                 if (npcRef == null || !npcRef.isValid()) {
                     continue;
                 }
-                if (!linkPolicyService.matchesMembership(
+                UUID npcUuid = npc.getUuid();
+                boolean canonicalRosterMember = context.config.usesOwnerCommandFamilyRoster()
+                        && npcUuid != null && linkedRecordByUuid.containsKey(npcUuid);
+                if (!canonicalRosterMember && !linkPolicyService.matchesMembership(
                         recipientMembershipMode,
                         requireOwner,
                         npcRef,
@@ -107,7 +110,6 @@ final class CommandRecipientService {
                 if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
                     continue;
                 }
-                UUID npcUuid = npc.getUuid();
                 if (isInactiveLinkedRecord(linkedRecordByUuid, npcUuid)) {
                     continue;
                 }

@@ -95,7 +95,8 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("ownerPopulationRuntime.publishPopulationGroupLimitChanges("));
         assertTrue(plugin.contains("activatePopulationGroupsIfReady()"));
         assertTrue(plugin.contains(".whenComplete(this::onPopulationRecoveryFinished)"));
-        assertTrue(plugin.contains("runtime.bootstrap().recoverAndActivate()"));
+        assertTrue(plugin.contains(
+                "companionProvisioningRecoveryReady = populationRecovery.ready()"));
         int reviveBootstrap = plugin.indexOf("reviveEligibility.bootstrap(");
         int reviveEvents = plugin.indexOf(
                 "reviveEligibility.setEventSink(apiEventBus::emitCanonicalCompanionLifecycleEvent)");
@@ -104,8 +105,7 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(reviveEvents > reviveBootstrap && deathSystems > reviveEvents);
         assertTrue(api.contains("activateCompanionProvisioningRuntime("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING)"));
-        assertTrue(api.contains("boolean exactEvidenceAuthorityReady"));
-        assertTrue(api.contains("boolean mutationAuthorityReady"));
+        assertTrue(api.contains("boolean recoveryReady"));
         assertTrue(api.contains("boolean allPositivePathsInstalled"));
     }
 }

@@ -43,6 +43,24 @@ final class CommandOwnerReleaseService {
         this.npcNameResolver = npcNameResolver;
     }
 
+    /** Pure world-thread preflight used before a canonical roster membership is removed. */
+    boolean canReleaseNow(@Nullable Player player,
+                          @Nullable TwCommandItemConfig config,
+                          @Nullable UUID npcUuid) {
+        if (player == null || npcUuid == null || resolveScheduler() == null) {
+            return false;
+        }
+        World world = player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null
+                : world.getEntityStore().getStore();
+        Ref<EntityStore> npcRef = store == null ? null : world.getEntityRef(npcUuid);
+        NPCEntity npc = npcRef == null || !npcRef.isValid()
+                ? null
+                : store.getComponent(npcRef, NPCEntity.getComponentType());
+        return npc != null && canRelease(player, config, npcRef, store);
+    }
+
     void release(Player player,
                  String toolId,
                  TwCommandItemConfig config,

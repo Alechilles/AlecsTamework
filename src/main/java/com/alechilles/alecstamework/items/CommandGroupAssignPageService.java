@@ -68,7 +68,7 @@ final class CommandGroupAssignPageService {
         if (groupId != null && !isNpcLinkedToTool(player, toolId, config, npcUuid)) {
             panelActionService.applyLink(player, toolId, config, npcUuid);
         }
-        panelActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
+        panelActionService.applySetLinkedNpcGroup(player, toolId, config, npcUuid, groupId);
     }
 
     private boolean isNpcLinkedToTool(Player player,

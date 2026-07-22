@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceReadExecutor;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -34,6 +35,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -46,6 +49,7 @@ public final class HytaleCommandTimedSummonProjectionPort
     private final OwnerPopulationRuntime ownerRuntime;
     private final NpcProfileRepository profiles;
     private final CommandTimedSummonRepository repository;
+    private final PersistenceReadExecutor reads;
     private final CommandTimedSummonPopulationPort population;
     private final CoopResidentStateSnapshotService snapshots;
     private final CoopResidentStateSnapshotCodec snapshotCodec = new CoopResidentStateSnapshotCodec();
@@ -54,18 +58,27 @@ public final class HytaleCommandTimedSummonProjectionPort
     private final CommandCompanionPlacementService placement = new CommandCompanionPlacementService();
     private final CompanionProjectionSpawnPositionService spawnPosition =
             new CompanionProjectionSpawnPositionService();
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> lifecycleChains =
+            new ConcurrentHashMap<>();
+    @Nullable private volatile CommandTimedSummoningService lifecycleService;
 
     public HytaleCommandTimedSummonProjectionPort(
             @Nonnull OwnerPopulationRuntime ownerRuntime,
             @Nonnull NpcProfileRepository profiles,
             @Nonnull CommandTimedSummonRepository repository,
+            @Nonnull PersistenceReadExecutor reads,
             @Nonnull CommandTimedSummonPopulationPort population,
             @Nonnull CoopResidentStateSnapshotService snapshots) {
         this.ownerRuntime = Objects.requireNonNull(ownerRuntime, "ownerRuntime");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.reads = Objects.requireNonNull(reads, "reads");
         this.population = Objects.requireNonNull(population, "population");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
+    }
+
+    public void installLifecycleService(@Nullable CommandTimedSummoningService service) {
+        lifecycleService = service;
     }
 
     public boolean available() {
@@ -81,55 +94,116 @@ public final class HytaleCommandTimedSummonProjectionPort
         String profileId = ownerRuntime.identityResolver().resolveProfileId(npcUuid).orElse(null);
         if (profileId == null) return;
         String json = snapshotCodec.encode(snapshot);
-        repository.saveProjectedSnapshotAsync(
-                profileId, npcUuid, json, sha256(json), System.currentTimeMillis());
+        enqueueLifecycle(profileId, () -> repository.saveProjectedSnapshotAsync(
+                        profileId, npcUuid, json, sha256(json), System.currentTimeMillis())
+                .completion().thenCompose(outcome -> outcome != null && outcome.isCommitted()
+                        ? transitionProjection(profileId, null, null, false)
+                        : CompletableFuture.failedFuture(new IllegalStateException(
+                        "timed-summon-unload-snapshot-not-committed"))));
+    }
+
+    /** Load callback consumes marker identity synchronously, then performs persistence work off-thread. */
+    public void projectionLoaded(@Nonnull UUID npcUuid,
+                                 @Nonnull TameworkProjectionIdentityComponent marker) {
+        String profileId = marker.getProfileId();
+        String familyId = marker.getSlotKey();
+        String sessionId = marker.getOperationId();
+        if (profileId == null || profileId.isBlank() || familyId == null || familyId.isBlank()
+                || sessionId == null || sessionId.isBlank()) return;
+        enqueueLifecycle(profileId,
+                () -> transitionProjection(profileId, familyId, sessionId, true));
+    }
+
+    private CompletionStage<?> transitionProjection(
+            String profileId, @Nullable String expectedFamilyId,
+            @Nullable String expectedSessionId, boolean loaded) {
+        return reads.submit(() -> repository.findProjectedSession(profileId)).thenCompose(session -> {
+            CommandTimedSummoningService service = lifecycleService;
+            if (service == null || session == null || session.summonSessionId() == null
+                    || (expectedFamilyId != null
+                    && !expectedFamilyId.equals(session.commandFamilyId()))
+                    || (expectedSessionId != null
+                    && !expectedSessionId.equals(session.summonSessionId()))) {
+                return CompletableFuture.completedFuture(null);
+            }
+            if (loaded && session.state()
+                    == com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord.State.ACTIVE) {
+                return CompletableFuture.completedFuture(null);
+            }
+            if (!loaded && session.state()
+                    == com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord.State.UNLOADED) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return service.setProjectionLoaded(
+                    session.ownerUuid(), session.commandFamilyId(), session.profileId(),
+                    session.rowRevision(), session.summonSessionId(), loaded,
+                    System.currentTimeMillis());
+        });
+    }
+
+    private void enqueueLifecycle(String profileId, Supplier<CompletionStage<?>> work) {
+        lifecycleChains.compute(profileId, (ignored, prior) -> {
+            CompletableFuture<Void> base = prior == null
+                    ? CompletableFuture.completedFuture(null)
+                    : prior.handle((value, failure) -> null);
+            CompletableFuture<Void> next = base
+                    .thenCompose(value -> work.get().thenApply(ignoredValue -> (Void) null))
+                    .handle((value, failure) -> (Void) null)
+                    .toCompletableFuture();
+            next.whenComplete((value, failure) -> lifecycleChains.remove(profileId, next));
+            return next;
+        });
     }
 
     /** Rehydrates tombstones so an old persisted chunk cannot resurrect a stored projection. */
-    public void recoverRetirementTombstones() throws Exception {
-        CommandTimedProjectionRetirementIndex.clear();
-        for (CommandTimedSummonRepository.ProjectionSnapshot snapshot
-                : repository.loadProjectionSnapshots()) {
-            var session = repository.findSession(
-                    snapshot.ownerUuid(), snapshot.commandFamilyId(), snapshot.profileId());
-            if (session != null && session.state()
-                    == com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord.State.ROSTER_STORED) {
-                CommandTimedProjectionRetirementIndex.retire(
-                        snapshot.sourceNpcUuid(), snapshot.profileId(), snapshot.commandFamilyId(),
-                        "startup-roster-storage");
+    public CompletionStage<Void> recoverRetirementTombstones() {
+        return reads.submit(() -> {
+            CommandTimedProjectionRetirementIndex.clear();
+            for (CommandTimedSummonRepository.ProjectionSnapshot snapshot
+                    : repository.loadProjectionSnapshots()) {
+                var session = repository.findSession(
+                        snapshot.ownerUuid(), snapshot.commandFamilyId(), snapshot.profileId());
+                if (session != null && session.state()
+                        == com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord.State.ROSTER_STORED) {
+                    CommandTimedProjectionRetirementIndex.retire(
+                            snapshot.sourceNpcUuid(), snapshot.profileId(), snapshot.commandFamilyId(),
+                            "startup-roster-storage");
+                }
             }
-        }
+            return null;
+        });
     }
 
     @Nonnull
     @Override
     public CompletionStage<CommandTimedSummoningService.SpawnPlan> planSpawnInFront(
             @Nonnull UUID ownerUuid, @Nonnull String profileId) {
-        String roleId = role(profileId);
-        if (!available() || roleId == null) {
-            return CompletableFuture.completedFuture(new CommandTimedSummoningService.SpawnPlan(
-                    false, null, null, null, "timed-summon-projection-unavailable"));
-        }
-        List<World> worlds = worlds();
-        if (worlds.isEmpty()) return noOwnerPlan();
-        CompletableFuture<CommandTimedSummoningService.SpawnPlan> completion = new CompletableFuture<>();
-        AtomicInteger remaining = new AtomicInteger(worlds.size());
-        for (World world : worlds) {
-            LeaseBoundWorldDispatcher.execute(world, () -> {
-                if (!completion.isDone()) {
-                    WorldPlayerResolver.ResolvedPlayer player = WorldPlayerResolver.resolve(world, ownerUuid);
-                    Vector3d target = player == null ? null : placement.computeSafeRecallPosition(
-                            player.ref(), player.store(), FRONT_DISTANCE, roleId, null);
-                    if (target != null) {
-                        completion.complete(new CommandTimedSummoningService.SpawnPlan(
-                                true, world.getName(), ChunkUtil.chunkCoordinate(target.x),
-                                ChunkUtil.chunkCoordinate(target.z), "front-placement-ready"));
+        return reads.submit(() -> role(profileId)).thenCompose(roleId -> {
+            if (!available() || roleId == null) {
+                return CompletableFuture.completedFuture(new CommandTimedSummoningService.SpawnPlan(
+                        false, null, null, null, "timed-summon-projection-unavailable"));
+            }
+            List<World> worlds = worlds();
+            if (worlds.isEmpty()) return noOwnerPlan();
+            CompletableFuture<CommandTimedSummoningService.SpawnPlan> completion = new CompletableFuture<>();
+            AtomicInteger remaining = new AtomicInteger(worlds.size());
+            for (World world : worlds) {
+                LeaseBoundWorldDispatcher.execute(world, () -> {
+                    if (!completion.isDone()) {
+                        WorldPlayerResolver.ResolvedPlayer player = WorldPlayerResolver.resolve(world, ownerUuid);
+                        Vector3d target = player == null ? null : placement.computeSafeRecallPosition(
+                                player.ref(), player.store(), FRONT_DISTANCE, roleId, null);
+                        if (target != null) {
+                            completion.complete(new CommandTimedSummoningService.SpawnPlan(
+                                    true, world.getName(), ChunkUtil.chunkCoordinate(target.x),
+                                    ChunkUtil.chunkCoordinate(target.z), "front-placement-ready"));
+                        }
                     }
-                }
-                completeMissingOwner(completion, remaining);
-            }, () -> completeMissingOwner(completion, remaining));
-        }
-        return completion;
+                    completeMissingOwner(completion, remaining);
+                }, () -> completeMissingOwner(completion, remaining));
+            }
+            return completion;
+        });
     }
 
     @Nonnull
@@ -141,26 +215,36 @@ public final class HytaleCommandTimedSummonProjectionPort
             @Nonnull String summonSessionId) {
         PreparedCompanionSpawnBatch batch = population.claimedBatch(reservation.populationOperationId());
         World world = world(plan.destinationWorld());
-        String roleId = context.roleId() != null ? context.roleId() : role(context.profileId());
-        if (!available() || batch == null || world == null || roleId == null
+        if (!available() || batch == null || world == null
                 || plan.destinationChunkX() == null || plan.destinationChunkZ() == null) {
             return projection(CommandTimedSummoningService.ProjectionOutcome.NOT_APPLIED,
                     null, "timed-summon-spawn-context-unavailable");
         }
-        final SnapshotState snapshot;
-        try {
-            snapshot = loadSnapshot(context);
-        } catch (RuntimeException failure) {
-            return projection(CommandTimedSummoningService.ProjectionOutcome.NOT_APPLIED,
-                    null, "timed-summon-snapshot-invalid");
-        }
+        return reads.submit(() -> new SpawnState(
+                        context.roleId() != null ? context.roleId() : role(context.profileId()),
+                        loadSnapshot(context)))
+                .thenCompose(state -> spawnPrepared(
+                        plan, context, batch, summonSessionId, world, state))
+                .exceptionally(failure -> notApplied("timed-summon-snapshot-invalid"));
+    }
+
+    private CompletionStage<CommandTimedSummoningService.ProjectionResult> spawnPrepared(
+            CommandTimedSummoningService.SpawnPlan plan,
+            CommandTimedSummoningService.PopulationContext context,
+            PreparedCompanionSpawnBatch batch,
+            String summonSessionId,
+            World world,
+            SpawnState state) {
+        if (state.roleId() == null) return projection(
+                CommandTimedSummoningService.ProjectionOutcome.NOT_APPLIED,
+                null, "timed-summon-spawn-context-unavailable");
         CompletableFuture<CommandTimedSummoningService.ProjectionResult> completion =
                 new CompletableFuture<>();
         long chunkIndex = ChunkUtil.indexChunk(plan.destinationChunkX(), plan.destinationChunkZ());
         world.getChunkAsync(chunkIndex).whenComplete((chunk, failure) ->
                 LeaseBoundWorldDispatcher.execute(world,
-                        () -> spawnOnWorld(world, chunk, failure, plan, context, batch, roleId,
-                                summonSessionId, snapshot, completion),
+                        () -> spawnOnWorld(world, chunk, failure, plan, context, batch, state.roleId(),
+                                summonSessionId, state.snapshot(), completion),
                         () -> completion.complete(ambiguous("timed-summon-world-dispatch-rejected"))));
         return completion;
     }
@@ -237,6 +321,18 @@ public final class HytaleCommandTimedSummonProjectionPort
                 : ownerRuntime.identityResolver().currentNpcUuid(context.profileId()).orElse(null);
         if (npcUuid == null) return projection(CommandTimedSummoningService.ProjectionOutcome.NOT_APPLIED,
                 null, "timed-summon-live-identity-unavailable");
+        return reads.submit(() -> new StorageInspection(
+                        role(context.profileId()), hasDurableStoredSnapshot(context, npcUuid)))
+                .thenCompose(inspection -> snapshotAndDespawnPrepared(
+                        context, summonSessionId, npcUuid, inspection))
+                .exceptionally(failure -> ambiguous("timed-summon-storage-evidence-read-failed"));
+    }
+
+    private CompletionStage<CommandTimedSummoningService.ProjectionResult> snapshotAndDespawnPrepared(
+            CommandTimedSummoningService.PopulationContext context,
+            String summonSessionId,
+            UUID npcUuid,
+            StorageInspection inspection) {
         List<World> worlds = worlds();
         if (worlds.isEmpty()) return projection(CommandTimedSummoningService.ProjectionOutcome.AMBIGUOUS,
                 npcUuid, "timed-summon-worlds-unavailable");
@@ -244,13 +340,13 @@ public final class HytaleCommandTimedSummonProjectionPort
                 new CompletableFuture<>();
         AtomicInteger remaining = new AtomicInteger(worlds.size());
         AtomicBoolean matched = new AtomicBoolean();
-        boolean durableAbsence = hasDurableStoredSnapshot(context, npcUuid);
         for (World world : worlds) {
             LeaseBoundWorldDispatcher.execute(world,
                     () -> captureOnWorld(world, context, summonSessionId, npcUuid,
-                            completion, remaining, matched, durableAbsence),
+                            completion, remaining, matched, inspection.durableAbsence(),
+                            inspection.roleId()),
                     () -> finishAbsentSearch(
-                            completion, remaining, matched, durableAbsence, context, npcUuid));
+                            completion, remaining, matched, inspection.durableAbsence(), context, npcUuid));
         }
         return completion;
     }
@@ -259,7 +355,7 @@ public final class HytaleCommandTimedSummonProjectionPort
                                 String sessionId, UUID npcUuid,
                                 CompletableFuture<CommandTimedSummoningService.ProjectionResult> completion,
                                 AtomicInteger remaining, AtomicBoolean matched,
-                                boolean durableAbsence) {
+                                boolean durableAbsence, @Nullable String roleId) {
         if (completion.isDone() || world.getEntityStore() == null) {
             finishAbsentSearch(completion, remaining, matched,
                     durableAbsence, context, npcUuid);
@@ -276,7 +372,7 @@ public final class HytaleCommandTimedSummonProjectionPort
         }
         if (!matched.compareAndSet(false, true)) return;
         CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot =
-                snapshots.captureSnapshotForPersistence(ref, store, npcUuid, role(context.profileId()));
+                snapshots.captureSnapshotForPersistence(ref, store, npcUuid, roleId);
         if (snapshot == null) {
             completion.complete(notApplied("timed-summon-snapshot-capture-failed"));
             return;
@@ -342,7 +438,15 @@ public final class HytaleCommandTimedSummonProjectionPort
                 : ownerRuntime.identityResolver().currentNpcUuid(context.profileId()).orElse(null);
         if (npcUuid == null) return CompletableFuture.completedFuture(
                 CommandTimedSummoningService.ProjectionEvidence.ABSENT);
-        boolean durableAbsence = hasDurableStoredSnapshot(context, npcUuid);
+        return reads.submit(() -> hasDurableStoredSnapshot(context, npcUuid))
+                .thenCompose(durableAbsence -> inspectPrepared(context, npcUuid, durableAbsence))
+                .exceptionally(failure -> CommandTimedSummoningService.ProjectionEvidence.AMBIGUOUS);
+    }
+
+    private CompletionStage<CommandTimedSummoningService.ProjectionEvidence> inspectPrepared(
+            CommandTimedSummoningService.PopulationContext context,
+            UUID npcUuid,
+            boolean durableAbsence) {
         List<World> worlds = worlds();
         if (worlds.isEmpty()) return CompletableFuture.completedFuture(
                 CommandTimedSummoningService.ProjectionEvidence.AMBIGUOUS);
@@ -488,5 +592,15 @@ public final class HytaleCommandTimedSummonProjectionPort
     private record SnapshotState(
             @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
             @Nullable UUID sourceNpcUuid) {
+    }
+
+    private record SpawnState(
+            @Nullable String roleId,
+            @Nonnull SnapshotState snapshot) {
+    }
+
+    private record StorageInspection(
+            @Nullable String roleId,
+            boolean durableAbsence) {
     }
 }

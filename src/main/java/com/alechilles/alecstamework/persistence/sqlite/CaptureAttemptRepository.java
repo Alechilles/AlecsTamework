@@ -450,6 +450,25 @@ public final class CaptureAttemptRepository {
         }
     }
 
+    /** Blocking read intended only for background tame-link restart convergence. */
+    @Nonnull
+    public List<CaptureAttemptRecord> loadPendingTameLinkConvergence(@Nonnull UUID actorUuid)
+            throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     SELECT_COLUMNS + " WHERE actor_uuid = ? AND source_spend_state = 'CONSUMED' "
+                             + "AND success_disposition = 'TAME_AND_COMMAND_LINK' "
+                             + "AND state IN ('RESOLVED_SUCCESS','APPLYING','QUARANTINED') "
+                             + "ORDER BY resolved_at_ms, attempt_id")) {
+            statement.setString(1, Objects.requireNonNull(actorUuid, "actorUuid").toString());
+            try (ResultSet result = statement.executeQuery()) {
+                List<CaptureAttemptRecord> attempts = new ArrayList<>();
+                while (result.next()) attempts.add(read(result));
+                return List.copyOf(attempts);
+            }
+        }
+    }
+
     @Nonnull
     private PrepareResult prepareInTransaction(@Nonnull Connection connection,
                                                @Nonnull CaptureAttemptRecord attempt) throws Exception {

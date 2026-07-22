@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -45,6 +46,8 @@ public final class CommandTimedSummonRepository {
 
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    private final ConcurrentHashMap<SessionKey, CommandTimedSummonSessionRecord> sessionCache =
+            new ConcurrentHashMap<>();
 
     public CommandTimedSummonRepository(@Nonnull SqliteConnectionManager connectionManager,
                                         @Nonnull PersistenceWriteQueue writeQueue) {
@@ -200,6 +203,16 @@ public final class CommandTimedSummonRepository {
         }
     }
 
+    /** Pure in-memory API view; callers schedule an asynchronous refresh on a miss. */
+    @Nullable
+    public CommandTimedSummonSessionRecord cachedSession(@Nonnull UUID ownerUuid,
+                                                         @Nonnull String commandFamilyId,
+                                                         @Nonnull String profileId) {
+        return sessionCache.get(new SessionKey(ownerUuid,
+                requireText(commandFamilyId, "commandFamilyId"),
+                requireText(profileId, "profileId")));
+    }
+
     @Nullable
     public CommandTimedSummonOperationRecord findOperation(@Nonnull String operationId) throws Exception {
         try (Connection connection = connectionManager.openConnection()) {
@@ -216,7 +229,7 @@ public final class CommandTimedSummonRepository {
              ResultSet result = statement.executeQuery()) {
             List<CommandTimedSummonSessionRecord> sessions = new ArrayList<>();
             while (result.next()) {
-                sessions.add(readSession(result));
+                sessions.add(cache(readSession(result)));
             }
             return List.copyOf(sessions);
         }
@@ -231,9 +244,30 @@ public final class CommandTimedSummonRepository {
             statement.setString(1, Objects.requireNonNull(ownerUuid, "ownerUuid").toString());
             try (ResultSet result = statement.executeQuery()) {
                 List<CommandTimedSummonSessionRecord> sessions = new ArrayList<>();
-                while (result.next()) sessions.add(readSession(result));
+                while (result.next()) sessions.add(cache(readSession(result)));
                 return List.copyOf(sessions);
             }
+        }
+    }
+
+    /** Warms the synchronous public-API view before the capability is advertised. */
+    @Nonnull
+    public List<CommandTimedSummonSessionRecord> loadAllSessions() throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     SESSION_COLUMNS + " ORDER BY owner_uuid, command_family_id, profile_id");
+             ResultSet result = statement.executeQuery()) {
+            List<CommandTimedSummonSessionRecord> sessions = new ArrayList<>();
+            while (result.next()) sessions.add(cache(readSession(result)));
+            return List.copyOf(sessions);
+        }
+    }
+
+    /** Background-only profile lookup used by projection load/unload lifecycle fencing. */
+    @Nullable
+    public CommandTimedSummonSessionRecord findProjectedSession(@Nonnull String profileId) throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            return findProjectedSessionForProfile(connection, requireText(profileId, "profileId"));
         }
     }
 
@@ -331,7 +365,7 @@ public final class CommandTimedSummonRepository {
                         + "ORDER BY updated_at_ms DESC LIMIT 1")) {
             statement.setString(1, profileId);
             try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? readSession(result) : null;
+                return result.next() ? cache(readSession(result)) : null;
             }
         }
     }
@@ -399,7 +433,7 @@ public final class CommandTimedSummonRepository {
             bindSession(statement, requested);
             statement.executeUpdate();
         }
-        return result(Status.CREATED, requested, null, null);
+        return result(Status.CREATED, cache(requested), null, null);
     }
 
     private MutationResult prepare(Connection connection,
@@ -747,7 +781,7 @@ public final class CommandTimedSummonRepository {
             statement.setString(2, requireText(commandFamilyId, "commandFamilyId"));
             statement.setString(3, requireText(profileId, "profileId"));
             try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? readSession(result) : null;
+                return result.next() ? cache(readSession(result)) : null;
             }
         }
     }
@@ -867,6 +901,14 @@ public final class CommandTimedSummonRepository {
                 nullableLong(result, "summon_last_checkpoint_at_ms"),
                 result.getString("active_operation_id"), result.getLong("created_at_ms"),
                 result.getLong("updated_at_ms"));
+    }
+
+    private CommandTimedSummonSessionRecord cache(CommandTimedSummonSessionRecord session) {
+        SessionKey key = new SessionKey(
+                session.ownerUuid(), session.commandFamilyId(), session.profileId());
+        sessionCache.compute(key, (ignored, current) -> current == null
+                || session.rowRevision() >= current.rowRevision() ? session : current);
+        return sessionCache.get(key);
     }
 
     private CommandTimedSummonOperationRecord readOperation(ResultSet result) throws Exception {
@@ -1092,6 +1134,11 @@ public final class CommandTimedSummonRepository {
                                          @Nullable CommandTimedSummonOperationRecord operation,
                                          @Nullable String reason) {
         return new MutationResult(status, session, operation, reason);
+    }
+
+    private record SessionKey(@Nonnull UUID ownerUuid,
+                              @Nonnull String commandFamilyId,
+                              @Nonnull String profileId) {
     }
 
     public enum Status {

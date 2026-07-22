@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRepository;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +35,7 @@ class PaidCommandRevivalRecoveryTest {
             assertEquals(PaidCommandRevivalRecord.State.CANCELED,
                     fixture.repository.find(operation.operationId()).state());
             assertEquals(0, fixture.authority.consumeCalls);
-            assertEquals(1, fixture.authority.cancelActivationCalls);
+            assertEquals(0, fixture.authority.cancelActivationCalls);
         }
     }
 
@@ -134,15 +136,20 @@ class PaidCommandRevivalRecoveryTest {
             profile = harness.insertProfile(owner, "TestDragon",
                     CompanionLifecycleState.DEAD_REVIVABLE.name(), "world", 7L);
             repository = new PaidCommandRevivalRepository(harness.connections, harness.queue);
+            seedDeadRevivalAuthority();
             authority.resolved = resolved(profile);
+            authority.projectionProof = this::proveLiveProjection;
             coordinator = new PaidCommandRevivalCoordinator(
-                    repository, authority, Clock.systemUTC(), events::add);
+                    repository, harness.reads, authority, Clock.systemUTC(), events::add);
         }
 
         private PaidCommandRevivalRecord persist(PaidCommandRevivalRecord.State target) throws Exception {
             PaidCommandRevivalRecord operation = operation(owner, profile, target.name());
             HydragonPersistenceTestHarness.await(repository.prepareAsync(operation));
             if (target == PaidCommandRevivalRecord.State.PREPARED) return operation;
+            HydragonPersistenceTestHarness.await(repository.recordActivationAsync(
+                    operation.operationId(), "population-op", "placement-hash",
+                    projectionUuid(profile), null, 15L));
             HydragonPersistenceTestHarness.await(repository.reserveAsync(
                     operation.operationId(), reservations(), 20L));
             if (target == PaidCommandRevivalRecord.State.RESERVED) return operation;
@@ -158,6 +165,72 @@ class PaidCommandRevivalRecoveryTest {
                     operation.operationId(), PaidCommandRevivalRecord.State.APPLYING, target,
                     "restart-checkpoint", 50L));
             return operation;
+        }
+
+        private void seedDeadRevivalAuthority() throws Exception {
+            try (Connection connection = harness.connections.openConnection()) {
+                try (PreparedStatement roster = connection.prepareStatement("""
+                        INSERT INTO command_family_rosters(
+                            owner_uuid, command_family_id, row_revision, created_at_ms, updated_at_ms)
+                        VALUES (?, 'test:horn', 1, 1, 1)
+                        """)) {
+                    roster.setString(1, owner.toString());
+                    roster.executeUpdate();
+                }
+                try (PreparedStatement membership = connection.prepareStatement("""
+                        INSERT INTO command_family_roster_memberships(
+                            owner_uuid, command_family_id, profile_id, role_id, profile_revision,
+                            command_state, active_for_bulk_commands, created_at_ms, updated_at_ms)
+                        VALUES (?, 'test:horn', ?, 'TestDragon', 7, 'DEAD_REVIVABLE', 1, 1, 1)
+                        """)) {
+                    membership.setString(1, owner.toString());
+                    membership.setString(2, profile);
+                    membership.executeUpdate();
+                }
+                try (PreparedStatement death = connection.prepareStatement("""
+                        INSERT INTO npc_snapshots(
+                            profile_id, snapshot_type, snapshot_version, payload_json,
+                            is_active, created_at_ms)
+                        VALUES (?, 'death', 3, '{}', 1, 1)
+                        """)) {
+                    death.setString(1, profile);
+                    death.executeUpdate();
+                }
+                try (PreparedStatement state = connection.prepareStatement("""
+                        INSERT INTO profile_states(
+                            profile_id, capture_active, death_active, lost_active,
+                            in_coop, coop_key, updated_at_ms)
+                        VALUES (?, 0, 1, 0, 0, NULL, 1)
+                        """)) {
+                    state.setString(1, profile);
+                    state.executeUpdate();
+                }
+            }
+        }
+
+        private void proveLiveProjection() {
+            try (Connection connection = harness.connections.openConnection()) {
+                try (PreparedStatement current = connection.prepareStatement("""
+                        UPDATE npc_profiles SET current_npc_uuid = ?, updated_at_ms = 60
+                        WHERE profile_id = ?
+                        """)) {
+                    current.setString(1, projectionUuid(profile).toString());
+                    current.setString(2, profile);
+                    current.executeUpdate();
+                }
+                try (PreparedStatement population = connection.prepareStatement("""
+                        UPDATE companion_population_state
+                        SET lifecycle_state = 'ACTIVE', revision = 8,
+                            physical_world_name = 'world', physical_chunk_x = 1,
+                            physical_chunk_z = 2, updated_at_ms = 60
+                        WHERE profile_id = ?
+                        """)) {
+                    population.setString(1, profile);
+                    population.executeUpdate();
+                }
+            } catch (Exception failure) {
+                throw new AssertionError("Could not seed deterministic projection proof", failure);
+            }
         }
 
         private <T> T await(CompletionStage<T> stage) {
@@ -176,6 +249,7 @@ class PaidCommandRevivalRecoveryTest {
                 CommandReviveInventoryPaymentService.ReceiptEvidence.HELD;
         private PaidCommandRevivalCoordinator.ProjectionEvidence projectionEvidence =
                 PaidCommandRevivalCoordinator.ProjectionEvidence.DEAD;
+        private Runnable projectionProof = () -> { };
         private int consumeCalls;
         private int applyCalls;
         private int refundCalls;
@@ -189,17 +263,17 @@ class PaidCommandRevivalRecoveryTest {
         }
 
         @Override
-        public CommandReviveInventoryPaymentService.PlanResult plan(
+        public CompletionStage<CommandReviveInventoryPaymentService.PlanResult> plan(
                 PaidCommandRevivalCoordinator.ResolvedRevival resolved, UUID operationId) {
-            return new CommandReviveInventoryPaymentService.PlanResult(
-                    CommandReviveInventoryPaymentService.Status.READY, reservations(), null, 0);
+            return CompletableFuture.completedFuture(new CommandReviveInventoryPaymentService.PlanResult(
+                    CommandReviveInventoryPaymentService.Status.READY, reservations(), null, 0));
         }
 
         @Override
         public CompletionStage<PaidCommandRevivalCoordinator.ActivationPreparation> prepareActivation(
                 PaidCommandRevivalCoordinator.ResolvedRevival resolved, UUID operationId) {
             return CompletableFuture.completedFuture(new PaidCommandRevivalCoordinator.ActivationPreparation(
-                    true, null, operationId.toString(), new Object()));
+                    true, null, operationId.toString(), projectionUuid(resolved.profileId()), new Object()));
         }
 
         @Override
@@ -242,7 +316,9 @@ class PaidCommandRevivalRecoveryTest {
                 PaidCommandRevivalRecord operation,
                 PaidCommandRevivalCoordinator.ActivationPreparation activation) {
             applyCalls++;
-            return CompletableFuture.completedFuture(PaidCommandRevivalCoordinator.ApplyOutcome.applied());
+            projectionProof.run();
+            return CompletableFuture.completedFuture(PaidCommandRevivalCoordinator.ApplyOutcome.projected(
+                    projectionUuid(operation.profileId())));
         }
 
         @Override
@@ -268,6 +344,9 @@ class PaidCommandRevivalRecoveryTest {
         @Override
         public CompletionStage<PaidCommandRevivalCoordinator.ProjectionEvidence> inspectProjection(
                 PaidCommandRevivalRecord operation) {
+            if (projectionEvidence == PaidCommandRevivalCoordinator.ProjectionEvidence.REVIVED) {
+                projectionProof.run();
+            }
             return CompletableFuture.completedFuture(projectionEvidence);
         }
 
@@ -286,7 +365,7 @@ class PaidCommandRevivalRecoveryTest {
                                 "Life_Essence", 2, 99, "Life Essence", "Life_Essence"),
                         new PaidCommandRevivalCostQuoteView(
                                 "Gold_Bar", 7, 99, "Gold Bar", "Gold_Bar")),
-                null, null, null, null, "projection-op", null);
+                null, null, null, null, null, null);
     }
 
     private static PaidCommandRevivalRecord operation(UUID owner, String profile, String key) {
@@ -296,8 +375,13 @@ class PaidCommandRevivalRecoveryTest {
         return new PaidCommandRevivalRecord(
                 operationId, "test", key, owner, profile, "test:horn",
                 "TestDragon", "TestDragon", "config-hash", 3L, 7L,
-                populationOperationId, "placement-hash", "projection-op",
+                populationOperationId, "placement-hash", projectionUuid(profile).toString(),
                 PaidCommandRevivalRecord.State.PREPARED, costs(), List.of(), null, 10L, 10L, null);
+    }
+
+    private static UUID projectionUuid(String profile) {
+        return UUID.nameUUIDFromBytes(("paid-test:" + profile)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static List<ItemCostComponentView> costs() {

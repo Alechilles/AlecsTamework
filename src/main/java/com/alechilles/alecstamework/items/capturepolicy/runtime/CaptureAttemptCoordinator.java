@@ -294,6 +294,23 @@ public final class CaptureAttemptCoordinator {
         }).exceptionally(failure -> false);
     }
 
+    /** Closes a restart-replayed tame-link only after profile, roster, and lease proof converge. */
+    @Nonnull
+    public CompletableFuture<Boolean> commitRecoveredTameLink(
+            @Nonnull UUID attemptId, @Nonnull CaptureAttemptRecord.State expectedState) {
+        return journal.reconcileTerminal(
+                attemptId.toString(), Objects.requireNonNull(expectedState, "expectedState"),
+                CaptureAttemptRecord.State.COMMITTED,
+                "capture-recovery-tame-link-converged", clock.millis())
+                .thenCompose(result -> {
+                    if (result.attempt() == null || result.attempt().state()
+                            != CaptureAttemptRecord.State.COMMITTED) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                    return emitOnce(result.attempt()).thenApply(ignored -> true);
+                }).exceptionally(failure -> false);
+    }
+
     /** Contains an apply failure without changing or re-rolling its successful outcome. */
     @Nonnull
     public CompletableFuture<Boolean> quarantineApply(@Nonnull UUID attemptId, @Nonnull String reason) {

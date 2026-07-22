@@ -22,7 +22,8 @@ class PopulationGroupPolicyTest {
                     PopulationGroupLifecycleClassifier.consumesOwned(state), state.name());
             assertEquals(state == CompanionLifecycleState.ACTIVE
                             || state == CompanionLifecycleState.UNLOADED
-                            || state == CompanionLifecycleState.RESTORING,
+                            || state == CompanionLifecycleState.RESTORING
+                            || state == CompanionLifecycleState.STORING,
                     PopulationGroupLifecycleClassifier.consumesActive(state), state.name());
         }
     }

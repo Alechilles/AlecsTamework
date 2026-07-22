@@ -429,6 +429,17 @@ public final class CommandLinkedNpcDeathService {
         }
     }
 
+    /**
+     * Clears only world-memory caches after another SQLite transaction already deactivated death.
+     * Paid revival uses this after its atomic lease/roster/death commit; enqueueing a second delete
+     * would recreate the split durability boundary that the paid operation is designed to avoid.
+     */
+    public void clearDeadSnapshotAfterDurableCommit(UUID npcUuid) {
+        if (npcUuid == null) return;
+        if (stateSnapshotService != null) stateSnapshotService.clearSnapshot(npcUuid);
+        deadByNpc.remove(npcUuid);
+    }
+
     @Nonnull
     public RespawnReadyUpdateResult markOwnerDeadSnapshotsRespawnReady(@Nullable UUID ownerUuid) {
         if (!canStartNewMutation() || ownerUuid == null) {

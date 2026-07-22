@@ -49,13 +49,14 @@ final class CommandPanelEntrySourceService {
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     @Nullable private final CommandFamilyRosterRepository rosterRepository;
     @Nullable private final NpcProfileRepository profileRepository;
+    @Nullable private final CommandRosterActionAuthority rosterAuthority;
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandNpcNameResolver npcNameResolver) {
         this(linkedPanelEntryService, panelPreferenceService, linkPolicyService,
-                npcNameResolver, null, null);
+                npcNameResolver, null, null, null);
     }
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
@@ -64,6 +65,17 @@ final class CommandPanelEntrySourceService {
                                    CommandNpcNameResolver npcNameResolver,
                                    @Nullable CommandFamilyRosterRepository rosterRepository,
                                    @Nullable NpcProfileRepository profileRepository) {
+        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService, npcNameResolver,
+                rosterRepository, profileRepository, null);
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandFamilyRosterRepository rosterRepository,
+                                   @Nullable NpcProfileRepository profileRepository,
+                                   @Nullable CommandRosterActionAuthority rosterAuthority) {
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -78,6 +90,7 @@ final class CommandPanelEntrySourceService {
         );
         this.rosterRepository = rosterRepository;
         this.profileRepository = profileRepository;
+        this.rosterAuthority = rosterAuthority;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -196,9 +209,31 @@ final class CommandPanelEntrySourceService {
                                                      ItemStack stack,
                                                      TwCommandItemConfig config,
                                                      String toolId) {
-        if (player == null || rosterRepository == null || profileRepository == null
-                || config.getCommandFamilyId() == null) return List.of();
+        if (player == null || config.getCommandFamilyId() == null) return List.of();
         try {
+            if (rosterAuthority != null) {
+                CommandRosterActionAuthority.Resolution resolution =
+                        rosterAuthority.resolveCached(player.getUuid(), config, toolId);
+                if (resolution.snapshot() == null) return List.of();
+                List<LinkedNpcRecord> records = rosterAuthority.project(resolution.snapshot());
+                Map<UUID, CommandFamilyRosterMembershipView> memberships = new HashMap<>();
+                for (CommandRosterActionAuthority.Member member : resolution.snapshot().members()) {
+                    memberships.put(member.presentationUuid(), new CommandFamilyRosterMembershipView(
+                            member.ownerUuid(), member.commandFamilyId(), member.profileId(), member.roleId(),
+                            member.profileRevision(), member.state(), member.groupId(),
+                            member.activeForBulkCommands(), member.homePosition(), member.profileUpdatedAtMs()));
+                }
+                List<LinkedNpcEntry> entries = linkedPanelEntryService.buildEntriesFromRecords(
+                        player, store, stack, toolId, records);
+                ArrayList<LinkedNpcEntry> presented = new ArrayList<>(entries.size());
+                for (LinkedNpcEntry entry : entries) {
+                    CommandFamilyRosterMembershipView membership = memberships.get(entry.npcUuid());
+                    presented.add(membership == null ? entry : entry.withRosterStatusPresentation(
+                            rosterPresentation(player, membership)));
+                }
+                return List.copyOf(presented);
+            }
+            if (rosterRepository == null || profileRepository == null) return List.of();
             var roster = rosterRepository.find(player.getUuid(), config.getCommandFamilyId());
             if (roster == null || roster.memberships().isEmpty()) return List.of();
             List<LinkedNpcRecord> records = new ArrayList<>(roster.memberships().size());

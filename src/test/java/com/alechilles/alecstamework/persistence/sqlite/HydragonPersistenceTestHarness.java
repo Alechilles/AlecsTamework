@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 public final class HydragonPersistenceTestHarness implements AutoCloseable {
     public final SqliteConnectionManager connections;
     public final PersistenceWriteQueue queue;
+    public final PersistenceReadExecutor reads;
 
     public HydragonPersistenceTestHarness(Path databasePath) throws Exception {
         connections = new SqliteConnectionManager(databasePath);
@@ -19,6 +20,7 @@ public final class HydragonPersistenceTestHarness implements AutoCloseable {
             connection.commit();
         }
         queue = new PersistenceWriteQueue(connections, new PersistenceHealthService(), null);
+        reads = new PersistenceReadExecutor("hydragon-persistence-test-read");
     }
 
     public String insertProfile(UUID ownerUuid, String roleId, String lifecycle,
@@ -61,6 +63,7 @@ public final class HydragonPersistenceTestHarness implements AutoCloseable {
 
     @Override
     public void close() {
+        reads.close();
         queue.close();
     }
 }

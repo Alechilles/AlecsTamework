@@ -130,7 +130,7 @@ class CommandTimedSummoningServiceTest {
             harness = new HydragonPersistenceTestHarness(database);
             repository = new CommandTimedSummonRepository(harness.connections, harness.queue);
             population = new FakePopulation(maxActive);
-            service = new CommandTimedSummoningService(repository,
+            service = new CommandTimedSummoningService(repository, harness.reads,
                     (ownerUuid, commandFamilyId, profileId) -> roster.contains(profileId),
                     population, projections,
                     (ownerUuid, profileId, remainingMs, thresholdMs) -> warningCount.incrementAndGet());
@@ -260,8 +260,9 @@ class CommandTimedSummoningServiceTest {
             }
             try (PreparedStatement membership = connection.prepareStatement("""
                     INSERT INTO command_family_roster_memberships
-                        (owner_uuid, command_family_id, profile_id, active, created_at_ms, updated_at_ms)
-                    VALUES (?, ?, ?, 1, 1, 1)
+                        (owner_uuid, command_family_id, profile_id, role_id, profile_revision,
+                         command_state, created_at_ms, updated_at_ms)
+                    VALUES (?, ?, ?, 'TestDragon', 1, 'ROSTER_STORED', 1, 1)
                     """)) {
                 membership.setString(1, owner.toString());
                 membership.setString(2, family);

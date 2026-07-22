@@ -60,28 +60,55 @@ public final class PaidCommandRevivalRepository {
             @Nonnull UUID operationId,
             @Nonnull String populationOperationId,
             @Nullable String placementFingerprint,
+            @Nonnull UUID projectionNpcUuid,
+            @Nullable PaidCommandRevivalApplyCommit.TimedLease timedLease,
             long nowMs) {
         String frozenPopulation = requireText(populationOperationId, "populationOperationId");
         return writeQueue.submitTracked("paid_command_revival_activation", connection -> {
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
             PaidCommandRevivalRecord current = find(connection, operationId);
-            if (current == null) return new MutationResult(Status.NOT_FOUND, null, "operation-not-found");
+            if (current == null) {
+                connection.commit();
+                return new MutationResult(Status.NOT_FOUND, null, "operation-not-found");
+            }
             if (current.state() != PaidCommandRevivalRecord.State.PREPARED) {
+                connection.commit();
                 return new MutationResult(Status.CONFLICT, current, "operation-not-prepared");
             }
             try (PreparedStatement statement = connection.prepareStatement("""
                     UPDATE paid_command_revival_operations
-                    SET population_admission_operation_id = ?, placement_fingerprint = ?, updated_at_ms = ?
+                    SET population_admission_operation_id = ?, placement_fingerprint = ?,
+                        revive_projection_operation_id = ?, updated_at_ms = ?
                     WHERE operation_id = ? AND state = 'PREPARED'
                     """)) {
                 statement.setString(1, frozenPopulation);
                 setNullable(statement, 2, placementFingerprint);
-                statement.setLong(3, nowMs);
-                statement.setString(4, operationId.toString());
+                statement.setString(3, projectionNpcUuid.toString());
+                statement.setLong(4, nowMs);
+                statement.setString(5, operationId.toString());
                 if (statement.executeUpdate() != 1) {
+                    connection.commit();
                     return new MutationResult(Status.CONFLICT, current, "activation-fence-changed");
                 }
             }
+            insertApplyPlan(connection, operationId, projectionNpcUuid, timedLease, nowMs);
+            PaidCommandRevivalApplyPlan persisted = findApplyPlan(connection, operationId);
+            PaidCommandRevivalApplyPlan requested = new PaidCommandRevivalApplyPlan(
+                    operationId, projectionNpcUuid, timedLease);
+            if (!requested.equals(persisted)) {
+                connection.rollback();
+                return new MutationResult(Status.CONFLICT, current, "activation-apply-plan-changed");
+            }
+            connection.commit();
             return new MutationResult(Status.APPLIED, find(connection, operationId), null);
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            } finally {
+                connection.setAutoCommit(autoCommit);
+            }
         }, null);
     }
 
@@ -95,6 +122,22 @@ public final class PaidCommandRevivalRepository {
         validateTransition(expected, next);
         return writeQueue.submitTracked("paid_command_revival_transition",
                 connection -> transition(connection, operationId, expected, next, detail, nowMs), null);
+    }
+
+    /**
+     * Commits the positive paid-revival result as one durable boundary.
+     *
+     * <p>The caller must first prove the deterministic projection live. This transaction then fences
+     * that exact profile/owner/UUID and atomically installs the optional lease, deactivates the exact
+     * death revision, publishes the roster ACTIVE state, and terminalizes the paid operation. No
+     * caller may compose those writes independently.</p>
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> commitAppliedAsync(
+            @Nonnull PaidCommandRevivalApplyCommit commit) {
+        Objects.requireNonNull(commit, "commit");
+        return writeQueue.submitTracked("paid_command_revival_apply_commit",
+                connection -> commitApplied(connection, commit), null);
     }
 
     /** Claims exclusive delivery of a pending exact-cost refund before inventory mutation. */
@@ -158,6 +201,32 @@ public final class PaidCommandRevivalRepository {
     public PaidCommandRevivalRecord find(@Nonnull UUID operationId) throws Exception {
         try (Connection connection = connectionManager.openConnection()) {
             return find(connection, operationId);
+        }
+    }
+
+    @Nullable
+    public PaidCommandRevivalApplyPlan findApplyPlan(@Nonnull UUID operationId) throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            return findApplyPlan(connection, operationId);
+        }
+    }
+
+    /** Previous canonical UUID retained by the profile alias ledger for post-commit cache cleanup. */
+    @Nullable
+    public UUID findRevivedDeathSourceNpcUuid(@Nonnull UUID operationId) throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT a.npc_uuid
+                     FROM paid_command_revival_operations o
+                     JOIN npc_uuid_aliases a ON a.profile_id = o.profile_id
+                     WHERE o.operation_id = ? AND a.is_current = 0
+                       AND a.npc_uuid <> o.revive_projection_operation_id
+                     ORDER BY a.mapped_at_ms DESC LIMIT 1
+                     """)) {
+            statement.setString(1, operationId.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? UUID.fromString(result.getString(1)) : null;
+            }
         }
     }
 
@@ -323,6 +392,326 @@ public final class PaidCommandRevivalRepository {
             throw error;
         } finally {
             connection.setAutoCommit(autoCommit);
+        }
+    }
+
+    private MutationResult commitApplied(Connection connection,
+                                         PaidCommandRevivalApplyCommit commit) throws Exception {
+        boolean autoCommit = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try {
+            PaidCommandRevivalRecord operation = find(connection, commit.operationId());
+            if (operation == null) {
+                connection.commit();
+                return new MutationResult(Status.NOT_FOUND, null, "operation-not-found");
+            }
+            String mismatch = applyCommitMismatch(operation, commit);
+            if (mismatch != null) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation, mismatch);
+            }
+            PaidCommandRevivalApplyPlan frozenPlan = findApplyPlan(connection, commit.operationId());
+            if (frozenPlan == null
+                    || !frozenPlan.projectionNpcUuid().equals(commit.projectionNpcUuid())
+                    || !Objects.equals(frozenPlan.timedLease(), commit.timedLease())) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation, "apply-plan-changed");
+            }
+            if (operation.state() == PaidCommandRevivalRecord.State.SUCCEEDED) {
+                connection.commit();
+                return new MutationResult(Status.IDEMPOTENT, operation, null);
+            }
+            if (operation.state() != PaidCommandRevivalRecord.State.APPLYING
+                    && operation.state() != PaidCommandRevivalRecord.State.QUARANTINED) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation, "operation-not-applying");
+            }
+
+            ProjectionAuthority projection = findProjectionAuthority(connection, commit.profileId());
+            if (projection == null
+                    || !commit.ownerUuid().equals(projection.ownerUuid())
+                    || !commit.projectionNpcUuid().equals(projection.currentNpcUuid())
+                    || !"ACTIVE".equals(projection.lifecycleState())
+                    || projection.populationRevision() <= operation.profileRevision()) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation,
+                        "deterministic-live-projection-not-proven");
+            }
+            if (!hasExactActiveDeath(connection, commit.profileId(), commit.expectedDeathRevision())) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation, "death-revision-changed");
+            }
+            if (!hasRevivalRosterSource(connection, commit)) {
+                connection.commit();
+                return new MutationResult(Status.CONFLICT, operation, "roster-revival-source-changed");
+            }
+
+            if (commit.timedLease() != null) {
+                installRevivalLease(connection, commit);
+            }
+            deactivateExactDeath(connection, commit);
+            clearProfileDeathFlag(connection, commit.profileId(), commit.nowMs());
+            publishRosterActive(connection, commit, projection.populationRevision());
+            updateState(connection, commit.operationId(), operation.state(),
+                    PaidCommandRevivalRecord.State.SUCCEEDED, null, commit.nowMs());
+            updateReservationStates(connection, commit.operationId(), PaidCommandRevivalRecord.State.SUCCEEDED);
+            connection.commit();
+            return new MutationResult(Status.APPLIED, find(connection, commit.operationId()), null);
+        } catch (Exception failure) {
+            connection.rollback();
+            throw failure;
+        } finally {
+            connection.setAutoCommit(autoCommit);
+        }
+    }
+
+    @Nullable
+    private static String applyCommitMismatch(PaidCommandRevivalRecord operation,
+                                              PaidCommandRevivalApplyCommit commit) {
+        if (!operation.ownerUuid().equals(commit.ownerUuid())
+                || !operation.commandFamilyId().equals(commit.commandFamilyId())
+                || !operation.profileId().equals(commit.profileId())) {
+            return "apply-commit-operation-mismatch";
+        }
+        if (operation.deathRevision() != commit.expectedDeathRevision()) {
+            return "apply-commit-death-revision-mismatch";
+        }
+        if (operation.reviveProjectionOperationId() == null
+                || !operation.reviveProjectionOperationId().equals(commit.projectionNpcUuid().toString())) {
+            return "apply-commit-projection-identity-mismatch";
+        }
+        return null;
+    }
+
+    @Nullable
+    private ProjectionAuthority findProjectionAuthority(Connection connection, String profileId)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT p.owner_uuid, p.current_npc_uuid, s.lifecycle_state, s.revision
+                FROM npc_profiles p
+                JOIN companion_population_state s ON s.profile_id = p.profile_id
+                WHERE p.profile_id = ? LIMIT 1
+                """)) {
+            statement.setString(1, profileId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                String owner = result.getString("owner_uuid");
+                String npc = result.getString("current_npc_uuid");
+                return owner == null || npc == null ? null : new ProjectionAuthority(
+                        UUID.fromString(owner), UUID.fromString(npc),
+                        result.getString("lifecycle_state"), result.getLong("revision"));
+            }
+        }
+    }
+
+    private static boolean hasExactActiveDeath(Connection connection, String profileId,
+                                               long deathRevision) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT 1 FROM npc_snapshots
+                WHERE profile_id = ? AND snapshot_type = 'death'
+                  AND snapshot_version = ? AND is_active = 1
+                LIMIT 1
+                """)) {
+            statement.setString(1, profileId);
+            statement.setLong(2, deathRevision);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next();
+            }
+        }
+    }
+
+    private static boolean hasRevivalRosterSource(Connection connection,
+                                                  PaidCommandRevivalApplyCommit commit) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT command_state, profile_revision FROM command_family_roster_memberships
+                WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                LIMIT 1
+                """)) {
+            statement.setString(1, commit.ownerUuid().toString());
+            statement.setString(2, commit.commandFamilyId());
+            statement.setString(3, commit.profileId());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return false;
+                String state = result.getString("command_state");
+                return ("DEAD_REVIVABLE".equals(state) || "RESTORING".equals(state))
+                        && result.getLong("profile_revision") == operationProfileRevision(connection,
+                        commit.operationId());
+            }
+        }
+    }
+
+    private static long operationProfileRevision(Connection connection, UUID operationId)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT profile_revision FROM paid_command_revival_operations WHERE operation_id = ?
+                """)) {
+            statement.setString(1, operationId.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new IllegalStateException("paid revival operation missing");
+                return result.getLong("profile_revision");
+            }
+        }
+    }
+
+    private static void installRevivalLease(Connection connection,
+                                            PaidCommandRevivalApplyCommit commit) throws Exception {
+        PaidCommandRevivalApplyCommit.TimedLease lease = commit.timedLease();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO command_timed_summon_sessions (
+                    owner_uuid, command_family_id, profile_id, row_revision, summon_state,
+                    summon_session_id, summon_remaining_ms, resummon_cooldown_until_ms,
+                    summon_config_id, summon_config_revision, summon_policy_json,
+                    warning_receipts_json, summon_last_checkpoint_at_ms, active_operation_id,
+                    created_at_ms, updated_at_ms)
+                VALUES (?, ?, ?, 1, 'ACTIVE', ?, ?, 0, ?, ?, ?, '[]', ?, NULL, ?, ?)
+                ON CONFLICT(owner_uuid, command_family_id, profile_id) DO UPDATE SET
+                    row_revision = command_timed_summon_sessions.row_revision + 1,
+                    summon_state = 'ACTIVE', summon_session_id = excluded.summon_session_id,
+                    summon_remaining_ms = excluded.summon_remaining_ms,
+                    resummon_cooldown_until_ms = 0,
+                    summon_config_id = excluded.summon_config_id,
+                    summon_config_revision = excluded.summon_config_revision,
+                    summon_policy_json = excluded.summon_policy_json,
+                    warning_receipts_json = '[]',
+                    summon_last_checkpoint_at_ms = excluded.summon_last_checkpoint_at_ms,
+                    active_operation_id = NULL, updated_at_ms = excluded.updated_at_ms
+                """)) {
+            int index = 1;
+            statement.setString(index++, commit.ownerUuid().toString());
+            statement.setString(index++, commit.commandFamilyId());
+            statement.setString(index++, commit.profileId());
+            statement.setString(index++, lease.sessionId());
+            if (lease.remainingMs() == null) statement.setNull(index++, Types.BIGINT);
+            else statement.setLong(index++, lease.remainingMs());
+            setNullable(statement, index++, lease.configId());
+            if (lease.configRevision() == null) statement.setNull(index++, Types.BIGINT);
+            else statement.setLong(index++, lease.configRevision());
+            statement.setString(index++, CommandTimedSummonPolicySnapshot.toJson(lease.policy()));
+            statement.setLong(index++, commit.nowMs());
+            statement.setLong(index++, commit.nowMs());
+            statement.setLong(index, commit.nowMs());
+            statement.executeUpdate();
+        }
+    }
+
+    private static void deactivateExactDeath(Connection connection,
+                                             PaidCommandRevivalApplyCommit commit) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE npc_snapshots SET is_active = 0
+                WHERE profile_id = ? AND snapshot_type = 'death'
+                  AND snapshot_version = ? AND is_active = 1
+                """)) {
+            statement.setString(1, commit.profileId());
+            statement.setLong(2, commit.expectedDeathRevision());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("death snapshot changed during revival commit");
+            }
+        }
+    }
+
+    private static void clearProfileDeathFlag(Connection connection, String profileId, long nowMs)
+            throws Exception {
+        try (PreparedStatement ensure = connection.prepareStatement("""
+                INSERT INTO profile_states (
+                    profile_id, capture_active, death_active, lost_active, in_coop, coop_key, updated_at_ms)
+                VALUES (?, 0, 0, 0, 0, NULL, ?)
+                ON CONFLICT(profile_id) DO NOTHING
+                """)) {
+            ensure.setString(1, profileId);
+            ensure.setLong(2, nowMs);
+            ensure.executeUpdate();
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE profile_states SET death_active = 0, updated_at_ms = ? WHERE profile_id = ?
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, profileId);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void publishRosterActive(Connection connection,
+                                            PaidCommandRevivalApplyCommit commit,
+                                            long profileRevision) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE command_family_roster_memberships
+                SET command_state = 'ACTIVE', profile_revision = ?, updated_at_ms = ?
+                WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                  AND command_state IN ('DEAD_REVIVABLE','RESTORING')
+                """)) {
+            statement.setLong(1, profileRevision);
+            statement.setLong(2, commit.nowMs());
+            statement.setString(3, commit.ownerUuid().toString());
+            statement.setString(4, commit.commandFamilyId());
+            statement.setString(5, commit.profileId());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("roster source changed during revival commit");
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE command_family_rosters
+                SET row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE owner_uuid = ? AND command_family_id = ?
+                """)) {
+            statement.setLong(1, commit.nowMs());
+            statement.setString(2, commit.ownerUuid().toString());
+            statement.setString(3, commit.commandFamilyId());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("command roster missing during revival commit");
+            }
+        }
+    }
+
+    private record ProjectionAuthority(UUID ownerUuid, UUID currentNpcUuid,
+                                       String lifecycleState, long populationRevision) { }
+
+    private static void insertApplyPlan(Connection connection, UUID operationId,
+                                        UUID projectionNpcUuid,
+                                        @Nullable PaidCommandRevivalApplyCommit.TimedLease lease,
+                                        long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO paid_command_revival_apply_plans(
+                    operation_id, projection_npc_uuid, summon_session_id, summon_remaining_ms,
+                    summon_config_id, summon_config_revision, summon_policy_json, created_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(operation_id) DO NOTHING
+                """)) {
+            statement.setString(1, operationId.toString());
+            statement.setString(2, projectionNpcUuid.toString());
+            setNullable(statement, 3, lease == null ? null : lease.sessionId());
+            if (lease == null || lease.remainingMs() == null) statement.setNull(4, Types.BIGINT);
+            else statement.setLong(4, lease.remainingMs());
+            setNullable(statement, 5, lease == null ? null : lease.configId());
+            if (lease == null || lease.configRevision() == null) statement.setNull(6, Types.BIGINT);
+            else statement.setLong(6, lease.configRevision());
+            setNullable(statement, 7, lease == null ? null
+                    : CommandTimedSummonPolicySnapshot.toJson(lease.policy()));
+            statement.setLong(8, nowMs);
+            statement.executeUpdate();
+        }
+    }
+
+    @Nullable
+    private static PaidCommandRevivalApplyPlan findApplyPlan(Connection connection, UUID operationId)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT projection_npc_uuid, summon_session_id, summon_remaining_ms,
+                       summon_config_id, summon_config_revision, summon_policy_json
+                FROM paid_command_revival_apply_plans WHERE operation_id = ? LIMIT 1
+                """)) {
+            statement.setString(1, operationId.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                String sessionId = result.getString("summon_session_id");
+                PaidCommandRevivalApplyCommit.TimedLease lease = sessionId == null ? null
+                        : new PaidCommandRevivalApplyCommit.TimedLease(
+                        sessionId, nullableLong(result, "summon_remaining_ms"),
+                        result.getString("summon_config_id"),
+                        nullableLong(result, "summon_config_revision"),
+                        CommandTimedSummonPolicySnapshot.fromJson(result.getString("summon_policy_json")));
+                return new PaidCommandRevivalApplyPlan(operationId,
+                        UUID.fromString(result.getString("projection_npc_uuid")), lease);
+            }
         }
     }
 

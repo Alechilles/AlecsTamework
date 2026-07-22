@@ -274,7 +274,7 @@ final class CommandRespawnService {
                         if (result == null || !completion.onApplied(result)) {
                             return false;
                         }
-                        if (deathService != null) {
+                        if (deathService != null && completion.clearDeathSnapshotOnApplied()) {
                             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
                         }
                         return true;
@@ -754,6 +754,11 @@ final class CommandRespawnService {
 
     interface Completion {
         boolean onApplied(@Nonnull AppliedRespawn result);
+
+        /** Paid revival clears death only after its atomic database commit. */
+        default boolean clearDeathSnapshotOnApplied() {
+            return true;
+        }
 
         void onDenied(@Nonnull String reason);
 

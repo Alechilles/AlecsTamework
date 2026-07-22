@@ -1,10 +1,16 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMutationRequest;
+import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.google.gson.JsonElement;
@@ -58,13 +64,14 @@ final class SpawnerCaptureSourceSpendRecoveryService {
                     LeaseBoundWorldDispatcher.execute(
                             world,
                             () -> recoverOnWorld(world, playerUuid, batch,
-                                    persistence.getCaptureAttemptRepository()),
+                                    persistence.getCaptureAttemptRepository(), persistence),
                             () -> recovering.remove(playerUuid));
                 });
     }
 
     private void recoverOnWorld(World world, UUID playerUuid, RecoveryBatch batch,
-                                CaptureAttemptRepository repository) {
+                                CaptureAttemptRepository repository,
+                                TameworkPersistenceRuntime persistence) {
         WorldPlayerResolver.ResolvedPlayer resolved = WorldPlayerResolver.resolve(world, playerUuid);
         if (resolved == null) {
             recovering.remove(playerUuid);
@@ -77,6 +84,9 @@ final class SpawnerCaptureSourceSpendRecoveryService {
         }
         for (CaptureAttemptRecord attempt : batch.pendingSpends()) {
             chain = chain.thenCompose(ignored -> recoverOne(world, resolved.player(), attempt));
+        }
+        for (CaptureAttemptRecord attempt : batch.tameLinkConvergence()) {
+            chain = chain.thenCompose(ignored -> convergeTameLink(attempt, persistence));
         }
         chain.whenComplete((ignored, failure) -> {
             recovering.remove(playerUuid);
@@ -172,6 +182,102 @@ final class SpawnerCaptureSourceSpendRecoveryService {
                         ? attempts.requireSourceRefund(
                         attemptId, "capture-restart-live-continuation-unavailable")
                         : CompletableFuture.completedFuture(report.ready())));
+    }
+
+    private CompletableFuture<Boolean> convergeTameLink(
+            CaptureAttemptRecord attempt, TameworkPersistenceRuntime persistence) {
+        return CompletableFuture.supplyAsync(() -> loadTameLinkSnapshot(attempt, persistence))
+                .thenCompose(snapshot -> {
+                    if (snapshot == null) return CompletableFuture.completedFuture(false);
+                    CompanionPopulationOperationRecord operation = snapshot.operation();
+                    UUID attemptId = UUID.fromString(attempt.identity().attemptId());
+                    if (operation.state() == CompanionPopulationOperationRecord.State.PREPARED
+                            && attempt.state() == CaptureAttemptRecord.State.RESOLVED_SUCCESS) {
+                        // The source crossed the crash, but beginApply/live mutation never did.
+                        return attempts.requireSourceRefund(
+                                attemptId, "capture-restart-before-begin-apply");
+                    }
+                    if (operation.state() == CompanionPopulationOperationRecord.State.RETRYABLE
+                            || operation.state() == CompanionPopulationOperationRecord.State.FAILED) {
+                        return attempts.requireSourceRefund(
+                                attemptId, "capture-restart-population-compensated");
+                    }
+                    if (operation.state() != CompanionPopulationOperationRecord.State.COMMITTED
+                            || !snapshot.profileValid()) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                    return replayTameLink(attempt, operation, snapshot.profile());
+                }).exceptionally(failure -> false);
+    }
+
+    private CompletableFuture<Boolean> replayTameLink(
+            CaptureAttemptRecord attempt, CompanionPopulationOperationRecord operation,
+            NpcProfileRepository.ProfileRecord profile) {
+        Tamework plugin = Tamework.getInstance();
+        CommandFamilyRosterService rosters = plugin == null
+                ? null : plugin.getCommandFamilyRosterService();
+        CommandTimedSummoningService timed = plugin == null
+                ? null : plugin.getCommandTimedSummoningService();
+        SpawnerTameLinkDurableContext.Evidence evidence =
+                SpawnerTameLinkDurableContext.parse(attempt.identity().sourceContextJson());
+        if (rosters == null || timed == null || evidence == null
+                || !evidence.commandFamilyId().equals(attempt.config().commandFamilyId())
+                || !evidence.targetRoleId().equals(profile.roleId())
+                || profile.currentNpcUuid() == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        long profileRevision = operation.expectedRevision() + 1L;
+        UUID attemptId = UUID.fromString(attempt.identity().attemptId());
+        return rosters.loadRevisionProof(attempt.identity().actorUuid(), evidence.commandFamilyId())
+                .thenCompose(proof -> rosters.upsert(new CommandFamilyRosterMutationRequest(
+                        "alecstamework.capture-recovery",
+                        "tame-and-command-link-recovery:" + attemptId,
+                        attemptId, attempt.identity().actorUuid(), evidence.commandFamilyId(),
+                        profile.profileId(), evidence.requiredCommandConfigId(),
+                        evidence.accessItemId(), CommandFamilyRosterMemberState.ACTIVE,
+                        null, true, null, proof.revision(), profileRevision)))
+                .thenCompose(rosterResult -> {
+                    if (rosterResult == null || !rosterResult.accepted()) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                    return timed.registerActiveProjection(
+                            new CommandTimedSummoningService.ActiveRegistration(
+                                    attempt.identity().actorUuid(), evidence.commandFamilyId(),
+                                    profile.profileId(), profileRevision, profile.currentNpcUuid(),
+                                    evidence.timedConfigId(), evidence.timedConfigRevision(),
+                                    evidence.policy(), "tame-and-command-link:" + attemptId,
+                                    System.currentTimeMillis())).thenCompose(lease -> {
+                        if (lease == null
+                                || lease.status() != CommandTimedSummoningService.Status.SUCCESS
+                                || lease.session() == null
+                                || lease.session().state()
+                                != CommandTimedSummonSessionRecord.State.ACTIVE) {
+                            return CompletableFuture.completedFuture(false);
+                        }
+                        return attempts.commitRecoveredTameLink(attemptId, attempt.state());
+                    });
+                }).toCompletableFuture();
+    }
+
+    @Nullable
+    private static TameLinkSnapshot loadTameLinkSnapshot(
+            CaptureAttemptRecord attempt, TameworkPersistenceRuntime persistence) {
+        try {
+            CompanionPopulationOperationRecord operation = persistence
+                    .getCompanionPopulationRepository().findOperation(attempt.populationOperationId());
+            NpcProfileRepository.ProfileRecord profile = persistence.getNpcProfileRepository()
+                    .loadProfileById(attempt.identity().profileId());
+            boolean valid = operation != null && profile != null
+                    && java.util.Objects.equals(
+                    attempt.identity().profileId(), operation.profileId())
+                    && attempt.identity().actorUuid().equals(profile.ownerUuid())
+                    && Boolean.TRUE.equals(profile.tamed())
+                    && profile.currentNpcUuid() != null
+                    && profile.currentNpcUuid().equals(attempt.identity().targetNpcUuid());
+            return operation == null ? null : new TameLinkSnapshot(operation, profile, valid);
+        } catch (Exception failure) {
+            throw new CompletionException(failure);
+        }
     }
 
     private CompletableFuture<Boolean> deliverRefund(
@@ -275,7 +381,8 @@ final class SpawnerCaptureSourceSpendRecoveryService {
         try {
             return new RecoveryBatch(
                     repository.loadPendingSourceSpends(playerUuid),
-                    repository.loadPendingSourceRefunds(playerUuid));
+                    repository.loadPendingSourceRefunds(playerUuid),
+                    repository.loadPendingTameLinkConvergence(playerUuid));
         } catch (Exception failure) {
             throw new CompletionException(failure);
         }
@@ -283,11 +390,19 @@ final class SpawnerCaptureSourceSpendRecoveryService {
 
     private record RecoveryBatch(
             @Nonnull List<CaptureAttemptRecord> pendingSpends,
-            @Nonnull List<CaptureAttemptRepository.SourceRefundClaim> refunds) {
+            @Nonnull List<CaptureAttemptRepository.SourceRefundClaim> refunds,
+            @Nonnull List<CaptureAttemptRecord> tameLinkConvergence) {
         private RecoveryBatch {
             pendingSpends = List.copyOf(pendingSpends);
             refunds = List.copyOf(refunds);
+            tameLinkConvergence = List.copyOf(tameLinkConvergence);
         }
+    }
+
+    private record TameLinkSnapshot(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nullable NpcProfileRepository.ProfileRecord profile,
+            boolean profileValid) {
     }
 
     private record SourceContext(@Nonnull String world, int slot) {

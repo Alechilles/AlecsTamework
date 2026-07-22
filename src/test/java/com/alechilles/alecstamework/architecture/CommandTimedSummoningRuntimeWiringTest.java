@@ -18,6 +18,10 @@ class CommandTimedSummoningRuntimeWiringTest {
         assertTrue(plugin.contains("activateCommandTimedSummoningRuntime("));
         assertTrue(plugin.contains("installInitialProjectionHook(runtime.initialProjectionHook())"));
         assertTrue(plugin.contains("service.onOwnerLogout("));
+        assertTrue(plugin.contains("persistenceRuntime.getReadExecutor()"));
+        assertTrue(plugin.contains("submit(repository::loadAllSessions)"));
+        assertTrue(plugin.contains("projection.installLifecycleService(service)"));
+        assertTrue(plugin.contains("installProjectionLoadSink("));
     }
 
     @Test
@@ -31,6 +35,9 @@ class CommandTimedSummoningRuntimeWiringTest {
         assertTrue(projection.contains("CompanionPreparedSpawnService"));
         assertTrue(projection.contains("LeaseBoundWorldDispatcher"));
         assertTrue(projection.contains("restoreToHolder"));
+        assertTrue(projection.contains("repository.findProjectedSession(profileId)"));
+        assertTrue(projection.contains("session.rowRevision(), session.summonSessionId()"));
+        assertTrue(projection.contains("service.setProjectionLoaded("));
     }
 
     @Test

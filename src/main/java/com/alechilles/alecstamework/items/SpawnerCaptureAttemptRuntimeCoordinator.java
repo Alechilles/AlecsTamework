@@ -123,6 +123,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String durableDetachContextJson,
+            @Nullable SpawnerTameLinkDurableContext.Evidence tameLinkEvidence,
             @Nonnull BooleanSupplier successSourceSpendPreflight,
             @Nonnull ResolvedCaptureContinuation continuation) {
         if (attempts == null) return false;
@@ -136,6 +137,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                         if (!scheduleResolution(
                                 player, targetRef, itemStack, config,
                                 captureBurstParticleSystem, attempt, mutation,
+                                tameLinkEvidence,
                                 successSourceSpendPreflight, continuation)) {
                             mutation.cancel("capture-attempt-preparation-failed");
                         }
@@ -186,7 +188,19 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
     }
 
     void quarantine(@Nullable UUID attemptId, @Nonnull String reason) {
-        if (attempts != null && attemptId != null) attempts.quarantineApply(attemptId, reason);
+        quarantineAsync(attemptId, reason);
+    }
+
+    @Nonnull
+    CompletableFuture<Boolean> quarantineAsync(
+            @Nullable UUID attemptId, @Nonnull String reason) {
+        return attempts == null || attemptId == null
+                ? CompletableFuture.completedFuture(false)
+                : attempts.quarantineApply(attemptId, reason);
+    }
+
+    void requireSourceRefund(@Nullable UUID attemptId, @Nonnull String reason) {
+        if (attempts != null && attemptId != null) attempts.requireSourceRefund(attemptId, reason);
     }
 
     private boolean scheduleResolution(
@@ -197,6 +211,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             CaptureAttemptHandle attempt,
             SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation,
+            @Nullable SpawnerTameLinkDurableContext.Evidence tameLinkEvidence,
             BooleanSupplier successSourceSpendPreflight,
             ResolvedCaptureContinuation continuation) {
         UUID attemptId = attempt.attemptId();
@@ -227,6 +242,11 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                 itemStack.getItemId(),
                 health.currentHealth() / health.maximumHealth(),
                 CaptureRequirementContext.UNKNOWN_PROFILE_REVISION);
+        String sourceContextJson = attempt.sourceContextJson(world.getName());
+        if (tameLinkEvidence != null) {
+            sourceContextJson = SpawnerTameLinkDurableContext.merge(
+                    sourceContextJson, tameLinkEvidence);
+        }
         CaptureAttemptCoordinator.AttemptRequest request =
                 new CaptureAttemptCoordinator.AttemptRequest(
                         attemptId,
@@ -239,7 +259,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                         CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
                         itemStack.getItemId(),
                         roleId,
-                        attempt.sourceContextJson(world.getName()),
+                        sourceContextJson,
                         itemStack.getItemId(),
                         registry.revision(),
                         config.getCaptureMechanics(),
