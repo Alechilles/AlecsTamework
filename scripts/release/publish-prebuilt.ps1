@@ -7,6 +7,7 @@ param(
     [bool]$PublishGitHub = $true,
     [bool]$PublishCurseForge = $false,
     [bool]$PublishModtale = $false,
+    [bool]$PublishModifold = $false,
     [bool]$DryRun = $true
 )
 
@@ -61,6 +62,15 @@ if ($PublishCurseForge) {
 
 if ($PublishModtale) {
     .\scripts\release\publish-modtale.ps1 `
+        -Version $Version `
+        -ArtifactPath $artifactPath `
+        -ChangelogPath $changelogPath `
+        -ConfigPath $ConfigPath `
+        -DryRun $DryRun
+}
+
+if ($PublishModifold) {
+    .\scripts\release\publish-modifold.ps1 `
         -Version $Version `
         -ArtifactPath $artifactPath `
         -ChangelogPath $changelogPath `

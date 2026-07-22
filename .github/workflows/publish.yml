@@ -22,6 +22,11 @@ on:
         required: true
         default: false
         type: boolean
+      publish_modifold:
+        description: "Attempt Modifold upload (ignored when dry_run=true)."
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -63,15 +68,18 @@ jobs:
           $dry = "${{ github.event.inputs.dry_run }}".ToLowerInvariant()
           $publishCurseForge = "${{ github.event.inputs.publish_curseforge }}".ToLowerInvariant()
           $publishModtale = "${{ github.event.inputs.publish_modtale }}".ToLowerInvariant()
+          $publishModifold = "${{ github.event.inputs.publish_modifold }}".ToLowerInvariant()
 
           if ($dry -eq "true") {
             $publishCurseForge = "false"
             $publishModtale = "false"
+            $publishModifold = "false"
           }
 
           "dry_run=$dry" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "publish_curseforge=$publishCurseForge" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "publish_modtale=$publishModtale" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "publish_modifold=$publishModifold" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Validate release
         shell: pwsh
@@ -202,6 +210,18 @@ jobs:
           MODTALE_API_TOKEN: ${{ secrets.MODTALE_API_TOKEN }}
         run: |
           .\scripts\release\publish-modtale.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -ArtifactPath "${{ steps.build.outputs.artifact_path }}" `
+            -ChangelogPath "${{ steps.changelog.outputs.changelog_path }}" `
+            -DryRun $false
+
+      - name: Publish to Modifold
+        if: ${{ steps.flags.outputs.publish_modifold == 'true' }}
+        shell: pwsh
+        env:
+          MODIFOLD_API_TOKEN: ${{ secrets.MODIFOLD_API_TOKEN }}
+        run: |
+          .\scripts\release\publish-modifold.ps1 `
             -Version "${{ steps.version.outputs.version }}" `
             -ArtifactPath "${{ steps.build.outputs.artifact_path }}" `
             -ChangelogPath "${{ steps.changelog.outputs.changelog_path }}" `
