@@ -89,6 +89,10 @@ class CaptureAttemptCoordinatorTest {
         assertEquals(CaptureAttemptRecord.SourceSpendState.PENDING,
                 result.attempt().sourceSpend().state());
         assertEquals(0, events.get());
+        CaptureAttemptRecord receipted = coordinator.confirmSourceReceipted(
+                request.attemptId()).join();
+        assertTrue(receipted.sourceSpend().receiptedAtMs() > 0L);
+        assertEquals(0, events.get());
         CaptureAttemptRecord consumed = coordinator.confirmSourceConsumed(
                 request.attemptId()).join();
         assertEquals(CaptureAttemptRecord.SourceSpendState.CONSUMED,
@@ -452,6 +456,28 @@ class CaptureAttemptCoordinatorTest {
         }
 
         @Override
+        public CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceReceipted(
+                String attemptId, long receiptedAtMs) {
+            CaptureAttemptRecord current = rows.get(attemptId);
+            if (current == null) {
+                return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                        CaptureAttemptRepository.MutationStatus.NOT_FOUND, null, "not-found"));
+            }
+            CaptureAttemptRecord updated = new CaptureAttemptRecord(
+                    current.identity(), current.config(), current.state(), current.resolution(),
+                    current.populationOperationId(), current.captureOperationId(),
+                    current.eventEmittedAtMs(), current.recoveryStatus(), current.expiresAtMs(),
+                    current.createdAtMs(), receiptedAtMs, current.completedAtMs(), current.lastError(),
+                    new CaptureAttemptRecord.SourceSpend(
+                            CaptureAttemptRecord.SourceSpendState.PENDING,
+                            current.sourceSpend().beforeFingerprint(),
+                            current.sourceSpend().afterFingerprint(), receiptedAtMs, 0L));
+            rows.put(attemptId, updated);
+            return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                    CaptureAttemptRepository.MutationStatus.APPLIED, updated, null));
+        }
+
+        @Override
         public CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceConsumed(
                 String attemptId, long consumedAtMs) {
             CaptureAttemptRecord current = rows.get(attemptId);
@@ -469,10 +495,11 @@ class CaptureAttemptCoordinatorTest {
                     current.populationOperationId(), current.captureOperationId(),
                     current.eventEmittedAtMs(), current.recoveryStatus(), current.expiresAtMs(),
                     current.createdAtMs(), consumedAtMs, current.completedAtMs(), current.lastError(),
-                    new CaptureAttemptRecord.SourceSpend(
+                        new CaptureAttemptRecord.SourceSpend(
                             CaptureAttemptRecord.SourceSpendState.CONSUMED,
                             current.sourceSpend().beforeFingerprint(),
-                            current.sourceSpend().afterFingerprint(), consumedAtMs));
+                            current.sourceSpend().afterFingerprint(),
+                            current.sourceSpend().receiptedAtMs(), consumedAtMs));
             rows.put(attemptId, updated);
             return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
                     CaptureAttemptRepository.MutationStatus.APPLIED, updated, null));

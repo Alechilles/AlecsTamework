@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -122,6 +123,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String durableDetachContextJson,
+            @Nonnull BooleanSupplier successSourceSpendPreflight,
             @Nonnull ResolvedCaptureContinuation continuation) {
         if (attempts == null) return false;
         return finalizer.prepareCapture(
@@ -133,7 +135,8 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                             SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation) {
                         if (!scheduleResolution(
                                 player, targetRef, itemStack, config,
-                                captureBurstParticleSystem, attempt, mutation, continuation)) {
+                                captureBurstParticleSystem, attempt, mutation,
+                                successSourceSpendPreflight, continuation)) {
                             mutation.cancel("capture-attempt-preparation-failed");
                         }
                     }
@@ -194,6 +197,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             CaptureAttemptHandle attempt,
             SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation,
+            BooleanSupplier successSourceSpendPreflight,
             ResolvedCaptureContinuation continuation) {
         UUID attemptId = attempt.attemptId();
         World world = player.getWorld();
@@ -284,7 +288,9 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             resolvedHandle.set(effective);
             if (result.attempt().sourceSpend().state()
                     == CaptureAttemptRecord.SourceSpendState.PENDING) {
-                return consumeAndConfirm(world, player.getUuid(), itemStack, effective, result.attempt())
+                return consumeAndConfirm(
+                        world, player.getUuid(), itemStack, effective, result.attempt(),
+                        successSourceSpendPreflight)
                         .thenCompose(consumed -> consumed
                                 ? attempts.beginApply(effective.attemptId())
                                 : CompletableFuture.completedFuture(false));
@@ -293,6 +299,12 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
         }).whenComplete((applyReady, failure) -> {
             if (failure != null || !Boolean.TRUE.equals(applyReady)) {
                 mutation.cancel("capture-attempt-apply-fence-failed");
+                CaptureAttemptRecord successful = resolvedAttempt.get();
+                if (successful != null) {
+                    attempts.requireSourceRefund(
+                            resolvedHandle.get().attemptId(),
+                            "capture-attempt-apply-fence-failed");
+                }
                 return;
             }
             world.execute(() -> {
@@ -303,10 +315,15 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                         mutation.cancel("capture-terminal-revalidation-failed");
                         quarantine(resolvedHandle.get().attemptId(),
                                 "capture-terminal-revalidation-failed");
+                        attempts.requireSourceRefund(
+                                resolvedHandle.get().attemptId(),
+                                "capture-terminal-revalidation-failed");
                     }
                 } catch (RuntimeException | LinkageError failure) {
                     mutation.cancel("capture-terminal-apply-threw");
                     quarantine(resolvedHandle.get().attemptId(), "capture-terminal-apply-threw");
+                    attempts.requireSourceRefund(
+                            resolvedHandle.get().attemptId(), "capture-terminal-apply-threw");
                     debugLog.accept("capture denied reason=capture-terminal-apply-threw"
                             + " player=" + player.getUuid()
                             + " targetUuid=" + targetUuid
@@ -324,14 +341,32 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nonnull ItemStack source,
             @Nonnull CaptureAttemptHandle handle,
             @Nonnull CaptureAttemptRecord resolved) {
+        return consumeAndConfirm(world, playerUuid, source, handle, resolved, () -> true);
+    }
+
+    @Nonnull
+    private CompletableFuture<Boolean> consumeAndConfirm(
+            @Nonnull World world,
+            @Nonnull UUID playerUuid,
+            @Nonnull ItemStack source,
+            @Nonnull CaptureAttemptHandle handle,
+            @Nonnull CaptureAttemptRecord resolved,
+            @Nonnull BooleanSupplier worldPreflight) {
         CompletableFuture<Boolean> completion = new CompletableFuture<>();
         world.execute(() -> {
-            final SpawnerSourceItemTransaction transaction;
+            final SpawnerSourceItemTransaction receiptTransaction;
+            final ItemStack receipt;
             try {
-                transaction = new SpawnerSourceItemTransaction(
+                if (!worldPreflight.getAsBoolean()) {
+                    completion.complete(false);
+                    return;
+                }
+                UUID attemptId = UUID.fromString(resolved.identity().attemptId());
+                receipt = SpawnerCaptureSourceReceipt.mark(source, attemptId);
+                receiptTransaction = new SpawnerSourceItemTransaction(
                         inventory, world, playerUuid, handle.hotbarSlot(), source, null,
                         "Resolved capture attempt");
-                if (!transaction.consumeOne()) {
+                if (!receiptTransaction.prepare(receipt)) {
                     completion.complete(false);
                     return;
                 }
@@ -342,19 +377,43 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                 completion.complete(false);
                 return;
             }
-            attempts.confirmSourceConsumed(UUID.fromString(resolved.identity().attemptId()))
-                    .whenComplete((committed, failure) -> {
+            UUID attemptId = UUID.fromString(resolved.identity().attemptId());
+            attempts.confirmSourceReceipted(attemptId).whenComplete((receipted, receiptFailure) -> {
+                if (receiptFailure != null || receipted == null
+                        || receipted.sourceSpend().receiptedAtMs() <= 0L) {
+                    world.execute(() -> {
+                        receiptTransaction.compensate();
+                        completion.complete(false);
+                    });
+                    return;
+                }
+                world.execute(() -> {
+                    ItemStack replacement = SpawnerCaptureSourceReceipt.after(receipt);
+                    SpawnerSourceItemTransaction decrement = new SpawnerSourceItemTransaction(
+                            inventory, world, playerUuid, handle.hotbarSlot(), receipt, null,
+                            "Receipted capture source decrement");
+                    if (!decrement.prepare(replacement)) {
+                        receiptTransaction.commit();
+                        completion.complete(false);
+                        return;
+                    }
+                    attempts.confirmSourceConsumed(attemptId).whenComplete((committed, failure) -> {
                         if (failure == null && committed != null
                                 && committed.sourceSpend().state()
                                 == CaptureAttemptRecord.SourceSpendState.CONSUMED) {
-                            transaction.commit();
+                            receiptTransaction.commit();
+                            decrement.commit();
                             completion.complete(true);
                         } else {
-                            // Keep the durable PENDING record. Recovery compares its before/after
-                            // fingerprints and must never blindly decrement a second time.
+                            // The durable receipt proves whether recovery must finish the decrement
+                            // or merely confirm an already-applied after fingerprint.
+                            receiptTransaction.commit();
+                            decrement.commit();
                             completion.complete(false);
                         }
                     });
+                });
+            });
         });
         return completion;
     }

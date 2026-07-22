@@ -20,6 +20,41 @@ class CaptureAttemptRepositoryTest {
     Path tempDir;
 
     @Test
+    void crashRecoveryCancelsUnreceiptedSuccessOrCreatesOneReplacementClaimAfterCharge()
+            throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("capture-refund.sqlite")) {
+            CaptureAttemptRepository repository = new CaptureAttemptRepository(
+                    harness.connections, harness.queue);
+            UUID actor = UUID.randomUUID();
+            CaptureAttemptRecord unreceipted = tameLinkAttempt(
+                    "attempt-unreceipted", actor, "profile-unreceipted");
+            await(repository.prepareAsync(unreceipted));
+            await(repository.resolveAsync(successResolution("attempt-unreceipted")));
+            assertTrue(await(repository.cancelUnreceiptedSuccessAsync(
+                    "attempt-unreceipted", "restart-before-receipt", 100L)));
+            CaptureAttemptRecord canceled = repository.find("attempt-unreceipted");
+            assertEquals(CaptureAttemptRecord.State.CANCELED, canceled.state());
+            assertEquals(CaptureAttemptRecord.SourceSpendState.NOT_REQUIRED,
+                    canceled.sourceSpend().state());
+
+            CaptureAttemptRecord charged = tameLinkAttempt(
+                    "attempt-charged", actor, "profile-charged");
+            await(repository.prepareAsync(charged));
+            await(repository.resolveAsync(successResolution("attempt-charged")));
+            await(repository.markSourceReceiptedAsync("attempt-charged", 200L));
+            await(repository.markSourceConsumedAsync("attempt-charged", 210L));
+            assertTrue(await(repository.requireSourceRefundAsync(
+                    "attempt-charged", "restart-live-continuation-lost", 220L)));
+            assertEquals(1, repository.loadPendingSourceRefunds(actor).size());
+            assertTrue(await(repository.completeSourceRefundAsync("attempt-charged", 230L)));
+            assertEquals(CaptureAttemptRecord.State.CANCELED,
+                    repository.find("attempt-charged").state());
+            assertTrue(repository.loadPendingSourceRefunds(actor).stream()
+                    .allMatch(CaptureAttemptRepository.SourceRefundClaim::delivered));
+        }
+    }
+
+    @Test
     void resolvedAttemptFailurePublishesNothingUntilExactSourceSpendIsConfirmed() throws Exception {
         try (HydragonPersistenceTestHarness harness = harness("resolved-spend.sqlite")) {
             CaptureAttemptRepository repository = new CaptureAttemptRepository(
@@ -51,6 +86,12 @@ class CaptureAttemptRepositoryTest {
                     resolved.attempt().sourceSpend().state());
             assertNull(repository.findFailureCooldown(actor, "stone-config"));
             assertFalse(await(repository.markEventEmittedAsync("attempt-spend", 6_100L)));
+            assertEquals(CaptureAttemptRepository.MutationStatus.INVALID_STATE,
+                    await(repository.markSourceConsumedAsync(
+                            "attempt-spend", 6_150L)).status());
+            assertEquals(CaptureAttemptRepository.MutationStatus.APPLIED,
+                    await(repository.markSourceReceiptedAsync(
+                            "attempt-spend", 6_175L)).status());
 
             CaptureAttemptRepository.MutationResult consumed = await(
                     repository.markSourceConsumedAsync("attempt-spend", 6_200L));
@@ -216,6 +257,32 @@ class CaptureAttemptRepositoryTest {
                         "stone-config", 7L, "dragon-policy", 3L, false, false),
                 CaptureAttemptRecord.State.PREPARED, null, null, null,
                 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
+    }
+
+    private CaptureAttemptRecord tameLinkAttempt(
+            String attemptId, UUID actor, String profileId) {
+        return new CaptureAttemptRecord(
+                new CaptureAttemptRecord.Identity(
+                        attemptId, "hydragon", attemptId, actor, UUID.randomUUID(),
+                        profileId, 0L, "draconic-stone", "wild-dragon",
+                        "{\"version\":1,\"world\":\"default\",\"inventory\":\"hotbar\",\"slot\":2,\"fingerprint\":\"before\"}"),
+                new CaptureAttemptRecord.ConfigEvidence(
+                        "stone-config", 9L, "dragon-policy", 4L, false, false,
+                        CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                        CaptureSuccessDisposition.TAME_AND_COMMAND_LINK,
+                        "hydragon-dragons", "hydragon-horn", true),
+                CaptureAttemptRecord.State.PREPARED, null, "population-" + attemptId,
+                null, 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
+    }
+
+    private CaptureAttemptRepository.ResolutionMutation successResolution(String attemptId) {
+        return new CaptureAttemptRepository.ResolutionMutation(
+                attemptId, true,
+                new CaptureAttemptRecord.Resolution(
+                        5, 1, 1, 10, 0.9, 0.1, 1.0,
+                        null, "CAPTURED", "captured", 0L, 50L),
+                "population-" + attemptId, "capture-" + attemptId,
+                true, "before", "after");
     }
 
     private CaptureAttemptRecord guaranteedAttempt() {

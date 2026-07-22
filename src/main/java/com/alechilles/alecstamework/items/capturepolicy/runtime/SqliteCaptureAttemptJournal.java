@@ -36,6 +36,27 @@ public final class SqliteCaptureAttemptJournal implements CaptureAttemptJournal 
     }
 
     @Override
+    @Nonnull
+    public CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceReceipted(
+            @Nonnull String attemptId, long receiptedAtMs) {
+        return committed(repository.markSourceReceiptedAsync(attemptId, receiptedAtMs));
+    }
+
+    @Override
+    @Nonnull
+    public CompletableFuture<Boolean> requireSourceRefund(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return committed(repository.requireSourceRefundAsync(attemptId, reason, nowMs));
+    }
+
+    @Override
+    @Nonnull
+    public CompletableFuture<Boolean> cancelUnreceiptedSuccess(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return committed(repository.cancelUnreceiptedSuccessAsync(attemptId, reason, nowMs));
+    }
+
+    @Override
     public CompletableFuture<CaptureAttemptRepository.MutationResult> advance(
             String attemptId,
             CaptureAttemptRecord.State expected,

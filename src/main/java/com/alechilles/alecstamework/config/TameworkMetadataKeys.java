@@ -64,6 +64,12 @@ public final class TameworkMetadataKeys {
     public static final String NPC_NAME_SOURCE = "Tamework.NpcNameSource";
     public static final String CAPTURE_TOOLTIP_DISPLAY_NAME = "Tamework.CaptureTooltipDisplayName";
     public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
+    /** Durable exact-source receipt while a resolved capture spend crosses persistence. */
+    public static final String CAPTURE_SOURCE_SPEND_ATTEMPT_ID =
+            "Tamework.Capture.SourceSpendAttemptId";
+    /** Temporary owner refund receipt; cleared only after the claim commits DELIVERED. */
+    public static final String CAPTURE_SOURCE_REFUND_ATTEMPT_ID =
+            "Tamework.Capture.SourceRefundAttemptId";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
     public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";

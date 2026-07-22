@@ -59,6 +59,8 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCapturePolicyService capturePolicyService;
     private final SpawnerPreparedSpawnService preparedSpawnService;
     private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
+    @Nullable
+    private final SpawnerCaptureSourceSpendRecoveryService captureSourceSpendRecoveryService;
     private final SpawnerCaptureAttemptRuntimeCoordinator captureAttemptRuntime;
     private final SpawnerCaptureOperationalLog captureLog;
     private final SpawnerCaptureCommandAccessService captureCommandAccessService;
@@ -202,6 +204,9 @@ public final class SpawnerFeatureHandler {
                 coopService,
                 logger
         );
+        this.captureSourceSpendRecoveryService = captureAttemptCoordinator == null ? null
+                : new SpawnerCaptureSourceSpendRecoveryService(
+                captureAttemptCoordinator, logger);
         this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
@@ -222,6 +227,9 @@ public final class SpawnerFeatureHandler {
     /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
     public void recoverPendingSpawnerSources(World world, UUID playerUuid) {
         pendingSourceRecoveryService.recoverAfterWorldJoin(world, playerUuid);
+        if (captureSourceSpendRecoveryService != null) {
+            captureSourceSpendRecoveryService.recoverAfterWorldJoin(world, playerUuid);
+        }
     }
 
     public void onAddPlayerToWorld(AddPlayerToWorldEvent event) {
@@ -781,11 +789,49 @@ public final class SpawnerFeatureHandler {
                         + " player=" + player.getUuid());
                 return false;
             }
-            long expectedRosterRevision = commandFamilyRosterService.get(
-                    player.getUuid(), config.getCaptureMechanics().commandFamilyId())
-                    .map(roster -> roster.revision()).orElse(0L);
+            String commandFamilyId = config.getCaptureMechanics().commandFamilyId();
+            commandFamilyRosterService.loadRevisionProof(player.getUuid(), commandFamilyId)
+                    .whenComplete((proof, failure) -> world.execute(() -> {
+                        if (failure != null || proof == null
+                                || proof.membershipCount()
+                                >= commandAccess.maximumRosterMembers()) {
+                            captureLog.capture("capture denied reason="
+                                    + (failure == null
+                                    ? "capture-command-roster-cap-reached"
+                                    : "capture-command-roster-read-failed")
+                                    + " player=" + player.getUuid());
+                            return;
+                        }
+                        captureFromNpcAction(
+                                player, targetRef, itemStack, config, captureBurstParticleSystem,
+                                attempt, outcomeResolved, preparedMutation, resolvedAttempt,
+                                expectedRequirementGeneration,
+                                new TameAndCommandLinkPreparation(
+                                        livePreparation, commandAccess.accessItemId(),
+                                        commandAccess.maximumRosterMembers(), proof));
+                    }));
+            return true;
+        } else if (tameAndCommandLink) {
+            SpawnerCaptureCommandAccessService.Decision commandAccess =
+                    captureCommandAccessService.validate(player, config, postCaptureRoleForAccess);
+            SpawnerTameAndCommandLinkService.Decision livePreparation =
+                    tameAndCommandLinkService.preflight(
+                            targetRef, worldStore, postCaptureRoleForAccess);
+            if (!commandAccess.allowed() || !livePreparation.allowed()
+                    || commandFamilyRosterService == null
+                    || !commandFamilyRosterService.isCurrent(tameLinkPreparation.rosterProof())
+                    || tameLinkPreparation.rosterProof().membershipCount()
+                    >= tameLinkPreparation.maximumRosterMembers()
+                    || !java.util.Objects.equals(
+                    tameLinkPreparation.accessItemId(), commandAccess.accessItemId())) {
+                captureLog.capture("capture denied reason=capture-command-final-fence-changed"
+                        + " player=" + player.getUuid());
+                return false;
+            }
             tameLinkPreparation = new TameAndCommandLinkPreparation(
-                    livePreparation, commandAccess.accessItemId(), expectedRosterRevision);
+                    livePreparation, tameLinkPreparation.accessItemId(),
+                    tameLinkPreparation.maximumRosterMembers(),
+                    tameLinkPreparation.rosterProof());
         } else if (!tameAndCommandLink) {
             SpawnerCaptureCommandAccessService.Decision commandAccess =
                     captureCommandAccessService.validate(player, config, postCaptureRoleForAccess);
@@ -827,6 +873,8 @@ public final class SpawnerFeatureHandler {
             return captureAttemptRuntime.prepareAndResolve(
                     player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
                     attempt, detachPlan.durableContextJson(),
+                    () -> revalidateSourceSpend(
+                            player, targetRef, durableConfig, durableTameLinkPreparation),
                     (resolvedHandle, mutation, record, generation) -> captureFromNpcAction(
                             player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
                             resolvedHandle, true, mutation, record, generation,
@@ -1083,7 +1131,7 @@ public final class SpawnerFeatureHandler {
                                             null,
                                             true,
                                             null,
-                                            finalizedTameLinkPreparation.expectedRosterRevision(),
+                                            finalizedTameLinkPreparation.rosterProof().revision(),
                                             profileRevision);
                             commandFamilyRosterService.upsert(rosterRequest)
                                     .whenComplete((rosterResult, failure) -> {
@@ -1125,10 +1173,42 @@ public final class SpawnerFeatureHandler {
                 : preparedMutation.apply(callbacks);
     }
 
+    private boolean revalidateSourceSpend(
+            @Nonnull Player player,
+            @Nonnull Ref<EntityStore> targetRef,
+            @Nonnull ItemFeatureConfig config,
+            @Nullable TameAndCommandLinkPreparation preparation) {
+        if (config.getCaptureMechanics().successDisposition()
+                != CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            return true;
+        }
+        if (preparation == null || commandFamilyRosterService == null
+                || !commandFamilyRosterService.isCurrent(preparation.rosterProof())
+                || preparation.rosterProof().membershipCount()
+                >= preparation.maximumRosterMembers()) {
+            return false;
+        }
+        World world = player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        NPCEntity npc = store == null ? null
+                : store.getComponent(targetRef, NPCEntity.getComponentType());
+        String sourceRole = npc == null ? null : rolePolicyService.resolveRoleIdFromNpc(npc);
+        String targetRole = config.isCaptureTamesTarget()
+                ? config.resolveCaptureTamedRole(sourceRole) : sourceRole;
+        SpawnerCaptureCommandAccessService.Decision access =
+                captureCommandAccessService.validate(player, config, targetRole);
+        SpawnerTameAndCommandLinkService.Decision live =
+                tameAndCommandLinkService.preflight(targetRef, store, targetRole);
+        return access.allowed() && live.allowed()
+                && java.util.Objects.equals(preparation.accessItemId(), access.accessItemId());
+    }
+
     private record TameAndCommandLinkPreparation(
             @Nonnull SpawnerTameAndCommandLinkService.Decision livePreparation,
             @Nullable String accessItemId,
-            long expectedRosterRevision) {
+            int maximumRosterMembers,
+            @Nonnull CommandFamilyRosterService.RosterRevisionProof rosterProof) {
     }
 
     @Nullable

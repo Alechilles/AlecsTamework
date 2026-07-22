@@ -164,19 +164,26 @@ public record CaptureAttemptRecord(
     public record SourceSpend(@Nonnull SourceSpendState state,
                               @Nullable String beforeFingerprint,
                               @Nullable String afterFingerprint,
+                              long receiptedAtMs,
                               long consumedAtMs) {
         public static final SourceSpend NOT_REQUIRED = new SourceSpend(
-                SourceSpendState.NOT_REQUIRED, null, null, 0L);
+                SourceSpendState.NOT_REQUIRED, null, null, 0L, 0L);
+
+        public SourceSpend(SourceSpendState state, String beforeFingerprint,
+                           String afterFingerprint, long consumedAtMs) {
+            this(state, beforeFingerprint, afterFingerprint, 0L, consumedAtMs);
+        }
 
         public SourceSpend {
             state = Objects.requireNonNull(state, "state");
             beforeFingerprint = normalize(beforeFingerprint);
             afterFingerprint = normalize(afterFingerprint);
-            if (consumedAtMs < 0L) {
-                throw new IllegalArgumentException("consumedAtMs must be non-negative.");
+            if (receiptedAtMs < 0L || consumedAtMs < 0L) {
+                throw new IllegalArgumentException("source spend timestamps must be non-negative.");
             }
             if (state == SourceSpendState.NOT_REQUIRED
-                    && (beforeFingerprint != null || afterFingerprint != null || consumedAtMs != 0L)) {
+                    && (beforeFingerprint != null || afterFingerprint != null
+                    || receiptedAtMs != 0L || consumedAtMs != 0L)) {
                 throw new IllegalArgumentException("NOT_REQUIRED source spend cannot carry evidence.");
             }
             if (state != SourceSpendState.NOT_REQUIRED

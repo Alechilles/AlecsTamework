@@ -22,7 +22,8 @@ final class CaptureAttemptSqlSupport {
                    failure_cooldown_until_ms, event_emitted_at_ms, recovery_status, expires_at_ms,
                    resolved_at_ms, created_at_ms, updated_at_ms, completed_at_ms, last_error,
                    source_spend_state, source_spend_before_fingerprint,
-                   source_spend_after_fingerprint, source_spend_at_ms
+                   source_spend_after_fingerprint, source_spend_receipted_at_ms,
+                   source_spend_at_ms
             FROM capture_attempts
             """;
 
@@ -92,6 +93,7 @@ final class CaptureAttemptSqlSupport {
                                 result.getString("source_spend_state")),
                         result.getString("source_spend_before_fingerprint"),
                         result.getString("source_spend_after_fingerprint"),
+                        result.getLong("source_spend_receipted_at_ms"),
                         result.getLong("source_spend_at_ms"))
         );
     }

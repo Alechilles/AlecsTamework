@@ -65,6 +65,174 @@ public final class CaptureAttemptRepository {
                 null);
     }
 
+    /** Durably records that the exact source stack carries this attempt's receipt marker. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> markSourceReceiptedAsync(
+            @Nonnull String attemptId, long receiptedAtMs) {
+        if (receiptedAtMs <= 0L) {
+            throw new IllegalArgumentException("receiptedAtMs must be positive");
+        }
+        return writeQueue.submitTracked(
+                "capture_attempt_source_receipted",
+                connection -> markSourceReceiptedInTransaction(
+                        connection, attemptId, receiptedAtMs), null);
+    }
+
+    /** Atomically converts a consumed, non-committed successful capture into one refund claim. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> requireSourceRefundAsync(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return writeQueue.submitTracked("capture_source_refund_require", connection -> {
+            String normalizedId = requireText(attemptId, "attemptId");
+            CaptureAttemptRecord attempt = findInTransaction(connection, normalizedId);
+            if (attempt == null || attempt.sourceSpend().state()
+                    != CaptureAttemptRecord.SourceSpendState.CONSUMED
+                    || (attempt.state() != CaptureAttemptRecord.State.RESOLVED_SUCCESS
+                    && attempt.state() != CaptureAttemptRecord.State.APPLYING
+                    && attempt.state() != CaptureAttemptRecord.State.QUARANTINED
+                    && attempt.state() != CaptureAttemptRecord.State.COMPENSATING)) return false;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE capture_attempts
+                    SET state = 'COMPENSATING', recovery_status = 'SOURCE_REFUND_REQUIRED',
+                        last_error = ?, updated_at_ms = ?
+                    WHERE attempt_id = ? AND state IN (
+                        'RESOLVED_SUCCESS','APPLYING','QUARANTINED','COMPENSATING')
+                    """)) {
+                statement.setString(1, requireText(reason, "reason"));
+                statement.setLong(2, nowMs);
+                statement.setString(3, normalizedId);
+                statement.executeUpdate();
+            }
+            try (PreparedStatement population = connection.prepareStatement("""
+                    UPDATE companion_population_operations
+                    SET state = 'FAILED', last_error = ?, completed_at_ms = ?, updated_at_ms = ?
+                    WHERE operation_id = ? AND state = 'PREPARED'
+                    """)) {
+                population.setString(1, requireText(reason, "reason"));
+                population.setLong(2, nowMs);
+                population.setLong(3, nowMs);
+                population.setString(4, attempt.populationOperationId());
+                population.executeUpdate();
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO capture_source_refund_claims(
+                        attempt_id, owner_uuid, item_id, quantity, state, reason,
+                        created_at_ms, updated_at_ms)
+                    VALUES (?, ?, ?, 1, 'PENDING', ?, ?, ?)
+                    ON CONFLICT(attempt_id) DO NOTHING
+                    """)) {
+                statement.setString(1, normalizedId);
+                statement.setString(2, attempt.identity().actorUuid().toString());
+                statement.setString(3, attempt.identity().sourceItemId());
+                statement.setString(4, requireText(reason, "reason"));
+                statement.setLong(5, nowMs);
+                statement.setLong(6, nowMs);
+                statement.executeUpdate();
+            }
+            return true;
+        }, null);
+    }
+
+    /** Blocking read intended only for the background half of player-join recovery. */
+    @Nonnull
+    public List<SourceRefundClaim> loadPendingSourceRefunds(@Nonnull UUID ownerUuid)
+            throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT attempt_id, owner_uuid, item_id, quantity, state, reason,
+                            created_at_ms, updated_at_ms
+                     FROM capture_source_refund_claims
+                     WHERE owner_uuid = ?
+                     ORDER BY created_at_ms, attempt_id
+                     """)) {
+            statement.setString(1, Objects.requireNonNull(ownerUuid, "ownerUuid").toString());
+            try (ResultSet result = statement.executeQuery()) {
+                List<SourceRefundClaim> claims = new ArrayList<>();
+                while (result.next()) claims.add(new SourceRefundClaim(
+                        result.getString("attempt_id"),
+                        UUID.fromString(result.getString("owner_uuid")),
+                        result.getString("item_id"), result.getInt("quantity"),
+                        "DELIVERED".equals(result.getString("state")),
+                        result.getString("reason"), result.getLong("created_at_ms"),
+                        result.getLong("updated_at_ms")));
+                return List.copyOf(claims);
+            }
+        }
+    }
+
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> completeSourceRefundAsync(
+            @Nonnull String attemptId, long nowMs) {
+        return writeQueue.submitTracked("capture_source_refund_complete", connection -> {
+            String normalized = requireText(attemptId, "attemptId");
+            try (PreparedStatement claim = connection.prepareStatement("""
+                    UPDATE capture_source_refund_claims
+                    SET state = 'DELIVERED', updated_at_ms = ?
+                    WHERE attempt_id = ? AND state = 'PENDING'
+                    """)) {
+                claim.setLong(1, nowMs);
+                claim.setString(2, normalized);
+                if (claim.executeUpdate() != 1) return false;
+            }
+            try (PreparedStatement attempt = connection.prepareStatement("""
+                    UPDATE capture_attempts
+                    SET state = 'CANCELED', recovery_status = 'SOURCE_REFUNDED',
+                        completed_at_ms = ?, updated_at_ms = ?
+                    WHERE attempt_id = ? AND state = 'COMPENSATING'
+                    """)) {
+                attempt.setLong(1, nowMs);
+                attempt.setLong(2, nowMs);
+                attempt.setString(3, normalized);
+                if (attempt.executeUpdate() != 1) {
+                    throw new IllegalStateException("capture_source_refund_attempt_not_compensating");
+                }
+                return true;
+            }
+        }, null);
+    }
+
+    /** Cancels a recovered success before any durable receipt or physical decrement occurred. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> cancelUnreceiptedSuccessAsync(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return writeQueue.submitTracked("capture_unreceipted_success_cancel", connection -> {
+            String normalizedId = requireText(attemptId, "attemptId");
+            String normalizedReason = requireText(reason, "reason");
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE capture_attempts
+                    SET state = 'CANCELED', source_spend_state = 'NOT_REQUIRED',
+                        source_spend_before_fingerprint = NULL,
+                        source_spend_after_fingerprint = NULL,
+                        source_spend_receipted_at_ms = 0, source_spend_at_ms = 0,
+                        recovery_status = 'CANCELED_UNSPENT', reason_code = ?,
+                        completed_at_ms = ?, updated_at_ms = ?
+                    WHERE attempt_id = ? AND state = 'RESOLVED_SUCCESS'
+                      AND source_spend_state = 'PENDING'
+                      AND source_spend_receipted_at_ms = 0
+                    """)) {
+                statement.setString(1, normalizedReason);
+                statement.setLong(2, nowMs);
+                statement.setLong(3, nowMs);
+                statement.setString(4, normalizedId);
+                if (statement.executeUpdate() != 1) return false;
+            }
+            try (PreparedStatement population = connection.prepareStatement("""
+                    UPDATE companion_population_operations
+                    SET state = 'FAILED', last_error = ?, completed_at_ms = ?, updated_at_ms = ?
+                    WHERE operation_id = (
+                        SELECT population_operation_id FROM capture_attempts WHERE attempt_id = ?)
+                      AND state = 'PREPARED'
+                    """)) {
+                population.setString(1, normalizedReason);
+                population.setLong(2, nowMs);
+                population.setLong(3, nowMs);
+                population.setString(4, normalizedId);
+                population.executeUpdate();
+                return true;
+            }
+        }, null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> advanceAsync(
             @Nonnull String attemptId,
@@ -253,6 +421,7 @@ public final class CaptureAttemptRepository {
              PreparedStatement statement = connection.prepareStatement(
                      SELECT_COLUMNS + " WHERE state IN "
                              + "('PREPARED', 'RESOLVED_SUCCESS', 'APPLYING', 'COMPENSATING', 'QUARANTINED') "
+                             + "OR (state = 'RESOLVED_FAILURE' AND source_spend_state = 'PENDING') "
                              + "ORDER BY created_at_ms, attempt_id");
              ResultSet result = statement.executeQuery()) {
             List<CaptureAttemptRecord> attempts = new ArrayList<>();
@@ -260,6 +429,24 @@ public final class CaptureAttemptRepository {
                 attempts.add(read(result));
             }
             return List.copyOf(attempts);
+        }
+    }
+
+    /** Blocking read intended only for the background half of player-join recovery. */
+    @Nonnull
+    public List<CaptureAttemptRecord> loadPendingSourceSpends(@Nonnull UUID actorUuid)
+            throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     SELECT_COLUMNS + " WHERE actor_uuid = ? AND source_spend_state = 'PENDING' "
+                             + "AND state IN ('RESOLVED_FAILURE', 'RESOLVED_SUCCESS') "
+                             + "ORDER BY resolved_at_ms, attempt_id")) {
+            statement.setString(1, Objects.requireNonNull(actorUuid, "actorUuid").toString());
+            try (ResultSet result = statement.executeQuery()) {
+                List<CaptureAttemptRecord> attempts = new ArrayList<>();
+                while (result.next()) attempts.add(read(result));
+                return List.copyOf(attempts);
+            }
         }
     }
 
@@ -329,7 +516,7 @@ public final class CaptureAttemptRepository {
                     failure_cooldown_until_ms = ?, resolved_at_ms = ?, updated_at_ms = ?,
                     completed_at_ms = CASE WHEN ? = 'RESOLVED_FAILURE' THEN ? ELSE 0 END,
                     source_spend_state = ?, source_spend_before_fingerprint = ?,
-                    source_spend_after_fingerprint = ?
+                    source_spend_after_fingerprint = ?, source_spend_receipted_at_ms = 0
                 WHERE attempt_id = ? AND state = 'PREPARED'
                 """)) {
             CaptureAttemptRecord.Resolution resolution = mutation.resolution();
@@ -371,6 +558,35 @@ public final class CaptureAttemptRepository {
     }
 
     @Nonnull
+    private MutationResult markSourceReceiptedInTransaction(@Nonnull Connection connection,
+                                                            @Nonnull String attemptId,
+                                                            long receiptedAtMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE capture_attempts
+                SET source_spend_receipted_at_ms = ?, updated_at_ms = ?
+                WHERE attempt_id = ? AND source_spend_state = 'PENDING'
+                  AND source_spend_receipted_at_ms = 0
+                  AND state IN ('RESOLVED_FAILURE', 'RESOLVED_SUCCESS')
+                """)) {
+            statement.setLong(1, receiptedAtMs);
+            statement.setLong(2, receiptedAtMs);
+            statement.setString(3, requireText(attemptId, "attemptId"));
+            if (statement.executeUpdate() == 1) {
+                return new MutationResult(MutationStatus.APPLIED,
+                        findInTransaction(connection, attemptId), null);
+            }
+        }
+        CaptureAttemptRecord existing = findInTransaction(connection, attemptId);
+        if (existing == null) return new MutationResult(
+                MutationStatus.NOT_FOUND, null, "attempt_not_found");
+        return existing.sourceSpend().receiptedAtMs() > 0L
+                ? new MutationResult(MutationStatus.IDEMPOTENT, existing,
+                "source_already_receipted")
+                : new MutationResult(MutationStatus.INVALID_STATE, existing,
+                "source_receipt_not_pending");
+    }
+
+    @Nonnull
     private MutationResult markSourceConsumedInTransaction(@Nonnull Connection connection,
                                                            @Nonnull String attemptId,
                                                            long consumedAtMs) throws Exception {
@@ -378,6 +594,7 @@ public final class CaptureAttemptRepository {
                 UPDATE capture_attempts
                 SET source_spend_state = 'CONSUMED', source_spend_at_ms = ?, updated_at_ms = ?
                 WHERE attempt_id = ? AND source_spend_state = 'PENDING'
+                  AND source_spend_receipted_at_ms > 0
                   AND state IN ('RESOLVED_FAILURE', 'RESOLVED_SUCCESS')
                 """)) {
             statement.setLong(1, consumedAtMs);
@@ -515,6 +732,7 @@ public final class CaptureAttemptRepository {
                     reason_code = ?, recovery_status = ?, last_error = NULL,
                     updated_at_ms = ?, completed_at_ms = ?
                 WHERE attempt_id = ? AND state = ? AND resolved_at_ms > 0
+                  AND (? <> 'COMMITTED' OR source_spend_state IN ('NOT_REQUIRED','CONSUMED'))
                 """)) {
             statement.setString(1, terminal.name());
             statement.setString(2, terminal.name());
@@ -525,6 +743,7 @@ public final class CaptureAttemptRepository {
             statement.setLong(6, nowMs);
             statement.setString(7, requireText(attemptId, "attemptId"));
             statement.setString(8, expected.name());
+            statement.setString(9, terminal.name());
             if (statement.executeUpdate() == 1) {
                 return new MutationResult(MutationStatus.APPLIED,
                         findInTransaction(connection, attemptId), null);
@@ -796,6 +1015,20 @@ public final class CaptureAttemptRepository {
         IDEMPOTENT,
         TOMBSTONED,
         CONFLICT
+    }
+
+    public record SourceRefundClaim(@Nonnull String attemptId, @Nonnull UUID ownerUuid,
+                                    @Nonnull String itemId, int quantity,
+                                    boolean delivered,
+                                    @Nonnull String reason, long createdAtMs,
+                                    long updatedAtMs) {
+        public SourceRefundClaim {
+            attemptId = requireText(attemptId, "attemptId");
+            ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
+            itemId = requireText(itemId, "itemId");
+            reason = requireText(reason, "reason");
+            if (quantity != 1) throw new IllegalArgumentException("refund quantity must be one");
+        }
     }
 
     public enum MutationStatus {

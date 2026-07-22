@@ -1,9 +1,9 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import javax.annotation.Nonnull;
 
 /** Produces the exact durable fingerprint used by captured-item source finalization. */
@@ -14,15 +14,15 @@ final class SpawnerSourceFingerprint {
 
     @Nonnull
     static String of(@Nonnull ItemStack stack) {
-        UUID target = stack.getFromMetadataOrNull(
-                TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING
-        );
-        String profile = stack.getFromMetadataOrNull(
-                TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING
-        );
-        return stack.getItemId() + "|" + String.valueOf(target) + "|"
-                + String.valueOf(profile) + "|"
-                + Integer.toUnsignedString(stack.hashCode(), 16);
+        String canonical = "v2\u001f" + stack.getItemId() + "\u001f" + stack.getQuantity()
+                + "\u001f" + stack.getDurability() + "\u001f" + stack.getMaxDurability()
+                + "\u001f" + (stack.getMetadata() == null ? "" : stack.getMetadata().toJson());
+        try {
+            return "v2:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
     }
 
     @Nonnull

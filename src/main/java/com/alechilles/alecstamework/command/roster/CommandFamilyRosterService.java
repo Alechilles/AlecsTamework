@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -23,6 +24,8 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
     private final CommandFamilyRosterRepository repository;
     private final AccessValidator accessValidator;
     @Nullable private final TameworkEventBus eventBus;
+    private final ConcurrentHashMap<RosterKey, RosterRevisionProof> revisionProofs =
+            new ConcurrentHashMap<>();
 
     public CommandFamilyRosterService(@Nonnull CommandFamilyRosterRepository repository) {
         this(repository, AccessValidator.ALLOW_ALL, null);
@@ -45,6 +48,37 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
         } catch (Exception failure) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Loads an immutable roster revision off the world thread. Capture uses the returned proof
+     * for its final world-thread preflight instead of opening SQLite synchronously.
+     */
+    @Nonnull
+    public CompletionStage<RosterRevisionProof> loadRevisionProof(
+            @Nonnull UUID ownerUuid, @Nonnull String commandFamilyId) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        String familyId = requireText(commandFamilyId, "commandFamilyId");
+        RosterKey key = new RosterKey(ownerUuid, familyId);
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                CommandFamilyRosterView roster = repository.find(ownerUuid, familyId);
+                RosterRevisionProof proof = new RosterRevisionProof(
+                        ownerUuid, familyId, roster == null ? 0L : roster.revision(),
+                        roster == null ? 0 : roster.memberships().size());
+                revisionProofs.merge(key, proof, CommandFamilyRosterService::newerProof);
+                return proof;
+            } catch (Exception failure) {
+                throw new IllegalStateException("command-family-roster-read-failed", failure);
+            }
+        });
+    }
+
+    /** Pure cached comparison safe for the owning world thread. */
+    public boolean isCurrent(@Nonnull RosterRevisionProof proof) {
+        Objects.requireNonNull(proof, "proof");
+        return proof.equals(revisionProofs.get(
+                new RosterKey(proof.ownerUuid(), proof.commandFamilyId())));
     }
 
     @Override
@@ -90,10 +124,47 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
                                 : outcome.failureReason(), null, null, false);
             }
             CommandFamilyRosterRepository.MutationOutcome value = outcome.value();
+            cache(value.roster());
             emitChanged(value);
             return new CommandFamilyRosterMutationResult(value.status(), value.reason(), value.roster(),
                     value.currentMembership(), value.idempotentReplay());
         });
+    }
+
+    private void cache(@Nullable CommandFamilyRosterView roster) {
+        if (roster == null) return;
+        RosterRevisionProof proof = new RosterRevisionProof(
+                roster.ownerUuid(), roster.commandFamilyId(), roster.revision(),
+                roster.memberships().size());
+        revisionProofs.merge(new RosterKey(roster.ownerUuid(), roster.commandFamilyId()), proof,
+                CommandFamilyRosterService::newerProof);
+    }
+
+    private static RosterRevisionProof newerProof(
+            RosterRevisionProof left, RosterRevisionProof right) {
+        return left.revision() >= right.revision() ? left : right;
+    }
+
+    private static String requireText(String value, String field) {
+        String normalized = Objects.requireNonNull(value, field).trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required");
+        return normalized;
+    }
+
+    private record RosterKey(@Nonnull UUID ownerUuid, @Nonnull String commandFamilyId) {
+    }
+
+    public record RosterRevisionProof(@Nonnull UUID ownerUuid,
+                                      @Nonnull String commandFamilyId,
+                                      long revision,
+                                      int membershipCount) {
+        public RosterRevisionProof {
+            ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
+            commandFamilyId = requireText(commandFamilyId, "commandFamilyId");
+            if (revision < 0L || membershipCount < 0) {
+                throw new IllegalArgumentException("roster proof values cannot be negative");
+            }
+        }
     }
 
     private void emitChanged(CommandFamilyRosterRepository.MutationOutcome outcome) {

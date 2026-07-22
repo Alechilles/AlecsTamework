@@ -24,7 +24,7 @@ final class SpawnerCaptureCommandAccessService {
         if (requiredConfigId == null) {
             return mechanics.requireCommandAccessItem()
                     ? Decision.deny("capture-command-config-required")
-                    : Decision.allow(null);
+                    : Decision.allow(null, Integer.MAX_VALUE);
         }
         DefaultAssetMap<String, TwCommandItemConfig> map = TwCommandItemConfig.getAssetMap();
         TwCommandItemConfig command = map == null ? null : map.getAsset(requiredConfigId);
@@ -48,7 +48,7 @@ final class SpawnerCaptureCommandAccessService {
         if (mechanics.requireCommandAccessItem() && accessItemId == null) {
             return Decision.deny("capture-command-access-item-missing");
         }
-        return Decision.allow(accessItemId);
+        return Decision.allow(accessItemId, Math.max(1, command.getMaxTargets()));
     }
 
     @Nullable
@@ -72,13 +72,15 @@ final class SpawnerCaptureCommandAccessService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    record Decision(boolean allowed, @Nullable String accessItemId, @Nonnull String reason) {
-        private static Decision allow(@Nullable String accessItemId) {
-            return new Decision(true, accessItemId, "capture-command-access-allowed");
+    record Decision(boolean allowed, @Nullable String accessItemId,
+                    int maximumRosterMembers, @Nonnull String reason) {
+        private static Decision allow(@Nullable String accessItemId, int maximumRosterMembers) {
+            return new Decision(true, accessItemId, maximumRosterMembers,
+                    "capture-command-access-allowed");
         }
 
         private static Decision deny(@Nonnull String reason) {
-            return new Decision(false, null, reason);
+            return new Decision(false, null, 0, reason);
         }
     }
 }

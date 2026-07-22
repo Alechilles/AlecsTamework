@@ -26,6 +26,27 @@ public interface CaptureAttemptJournal {
     }
 
     @Nonnull
+    default CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceReceipted(
+            @Nonnull String attemptId, long receiptedAtMs) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("capture_source_receipt_unavailable"));
+    }
+
+    @Nonnull
+    default CompletableFuture<Boolean> requireSourceRefund(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("capture_source_refund_unavailable"));
+    }
+
+    @Nonnull
+    default CompletableFuture<Boolean> cancelUnreceiptedSuccess(
+            @Nonnull String attemptId, @Nonnull String reason, long nowMs) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("capture_unspent_cancel_unavailable"));
+    }
+
+    @Nonnull
     CompletableFuture<CaptureAttemptRepository.MutationResult> advance(
             @Nonnull String attemptId,
             @Nonnull CaptureAttemptRecord.State expected,

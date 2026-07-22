@@ -231,6 +231,41 @@ public final class CaptureAttemptCoordinator {
         });
     }
 
+    /** Confirms the exact inventory receipt marker before irreversible decrement. */
+    @Nonnull
+    public CompletableFuture<CaptureAttemptRecord> confirmSourceReceipted(
+            @Nonnull UUID attemptId) {
+        long receiptedAt = clock.millis();
+        return journal.markSourceReceipted(attemptId.toString(), receiptedAt).thenCompose(result -> {
+            CaptureAttemptRecord attempt = result.attempt();
+            if (attempt == null || attempt.sourceSpend().state()
+                    != CaptureAttemptRecord.SourceSpendState.PENDING
+                    || attempt.sourceSpend().receiptedAtMs() <= 0L) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("capture_source_receipt_not_committed"));
+            }
+            return CompletableFuture.completedFuture(attempt);
+        });
+    }
+
+    /** Creates one durable replacement-source claim after terminal successful-apply failure. */
+    @Nonnull
+    public CompletableFuture<Boolean> requireSourceRefund(
+            @Nonnull UUID attemptId, @Nonnull String reason) {
+        return journal.requireSourceRefund(
+                attemptId.toString(), requireText(reason, "reason"), clock.millis())
+                .exceptionally(failure -> false);
+    }
+
+    /** Restart compensation when a resolved success never acquired its exact inventory receipt. */
+    @Nonnull
+    public CompletableFuture<Boolean> cancelUnreceiptedSuccess(
+            @Nonnull UUID attemptId, @Nonnull String reason) {
+        return journal.cancelUnreceiptedSuccess(
+                attemptId.toString(), requireText(reason, "reason"), clock.millis())
+                .exceptionally(failure -> false);
+    }
+
     /** Fences a successful attempt before world/item/profile application starts. */
     @Nonnull
     public CompletableFuture<Boolean> beginApply(@Nonnull UUID attemptId) {
@@ -304,6 +339,11 @@ public final class CaptureAttemptCoordinator {
     }
 
     private CompletableFuture<RecoveryAction> recoverOne(CaptureAttemptRecord attempt) {
+        if (attempt.sourceSpend().state() == CaptureAttemptRecord.SourceSpendState.PENDING) {
+            // Physical inventory evidence is only authoritative once the owning player is loaded.
+            // Player-join recovery converges this exact pending spend before result publication.
+            return CompletableFuture.completedFuture(RecoveryAction.RESUMABLE);
+        }
         if (attempt.state() == CaptureAttemptRecord.State.PREPARED) {
             if (attempt.expiresAtMs() > 0L && attempt.expiresAtMs() <= clock.millis()) {
                 return journal.advance(

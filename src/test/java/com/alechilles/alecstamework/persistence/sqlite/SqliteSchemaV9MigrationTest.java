@@ -34,6 +34,9 @@ class SqliteSchemaV9MigrationTest {
             assertTrue(tableExists(connection, "command_timed_summon_sessions"));
             assertTrue(tableExists(connection, "paid_command_revival_operations"));
             assertTrue(columnExists(connection, "capture_attempts", "source_spend_state"));
+            assertTrue(columnExists(
+                    connection, "capture_attempts", "source_spend_receipted_at_ms"));
+            assertTrue(tableExists(connection, "capture_source_refund_claims"));
             assertFalse(tableExists(connection, "bonded_vessel_bindings"));
             assertFalse(tableExists(connection, "bonded_vessel_operations"));
         }
