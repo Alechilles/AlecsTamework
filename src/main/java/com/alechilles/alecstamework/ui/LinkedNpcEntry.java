@@ -58,6 +58,8 @@ public final class LinkedNpcEntry {
     private final boolean traitsActionEnabled;
     private final boolean talentsActionVisible;
     private final boolean talentsActionEnabled;
+    private final CommandReviveCostPresentation reviveCostPresentation;
+    private final CommandRosterStatusPresentation rosterStatusPresentation;
 
     public LinkedNpcEntry(UUID npcUuid,
                           String displayName,
@@ -481,6 +483,8 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = traitsActionEnabled;
         this.talentsActionVisible = talentsActionVisible;
         this.talentsActionEnabled = talentsActionEnabled;
+        this.reviveCostPresentation = null;
+        this.rosterStatusPresentation = null;
     }
 
     public boolean hasHealth() {
@@ -665,7 +669,25 @@ public final class LinkedNpcEntry {
 
     /** Returns an immutable presentation copy marked with its scoped recovery incident. */
     public LinkedNpcEntry withRecoveryHold(String incidentId) {
-        return new LinkedNpcEntry(this, incidentId);
+        return new LinkedNpcEntry(this, true, incidentId, reviveCostPresentation, rosterStatusPresentation);
+    }
+
+    /** Returns an immutable presentation copy with the latest server-side revival cost quote. */
+    public LinkedNpcEntry withReviveCostPresentation(CommandReviveCostPresentation presentation) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId, presentation, rosterStatusPresentation);
+    }
+
+    public CommandReviveCostPresentation reviveCostPresentation() {
+        return reviveCostPresentation;
+    }
+
+    public LinkedNpcEntry withRosterStatusPresentation(CommandRosterStatusPresentation presentation) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                reviveCostPresentation, presentation);
+    }
+
+    public CommandRosterStatusPresentation rosterStatusPresentation() {
+        return rosterStatusPresentation;
     }
 
     public double healthRatio() {
@@ -765,7 +787,11 @@ public final class LinkedNpcEntry {
         return out.isEmpty() ? LinkedNpcTraitIndicator.EMPTY : out.toArray(new LinkedNpcTraitIndicator[0]);
     }
 
-    private LinkedNpcEntry(LinkedNpcEntry source, String incidentId) {
+    private LinkedNpcEntry(LinkedNpcEntry source,
+                           boolean recoveryHeld,
+                           String incidentId,
+                           CommandReviveCostPresentation reviveCostPresentation,
+                           CommandRosterStatusPresentation rosterStatusPresentation) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -813,8 +839,10 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = source.traitsActionEnabled;
         this.talentsActionVisible = source.talentsActionVisible;
         this.talentsActionEnabled = source.talentsActionEnabled;
-        this.recoveryHeld = true;
-        this.recoveryIncidentId = normalizeIncidentId(incidentId);
+        this.recoveryHeld = recoveryHeld;
+        this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
+        this.reviveCostPresentation = reviveCostPresentation;
+        this.rosterStatusPresentation = rosterStatusPresentation;
     }
 
     private static String normalizeIncidentId(String incidentId) {
@@ -906,6 +934,8 @@ public final class LinkedNpcEntry {
                 && Objects.equals(groupColorHex, other.groupColorHex)
                 && Objects.equals(futureStatA, other.futureStatA)
                 && Objects.equals(futureStatB, other.futureStatB)
+                && Objects.equals(reviveCostPresentation, other.reviveCostPresentation)
+                && Objects.equals(rosterStatusPresentation, other.rosterStatusPresentation)
                 && Arrays.equals(traitIndicators, other.traitIndicators);
     }
 
@@ -957,7 +987,9 @@ public final class LinkedNpcEntry {
                 traitsActionVisible,
                 traitsActionEnabled,
                 talentsActionVisible,
-                talentsActionEnabled
+                talentsActionEnabled,
+                reviveCostPresentation,
+                rosterStatusPresentation
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
         return result;

@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
 import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
+import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
@@ -183,6 +184,11 @@ public final class TameworkEventBus
 
     /** Isolated post-commit delivery seam for canonical command-family roster events. */
     public void emitCommandFamilyRosterEvent(@Nonnull CommandFamilyRosterMembershipChangedEvent event) {
+        dispatch(Objects.requireNonNull(event, "event"));
+    }
+
+    /** Isolated post-commit delivery seam for exactly-once paid command revival. */
+    public void emitPaidCommandRevived(@Nonnull PaidCommandRevivedEvent event) {
         dispatch(Objects.requireNonNull(event, "event"));
     }
 

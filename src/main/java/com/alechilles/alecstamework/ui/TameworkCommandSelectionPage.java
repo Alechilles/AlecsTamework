@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -61,6 +63,8 @@ public final class TameworkCommandSelectionPage
     private static final String RELEASE_COMMAND_PREFIX = "__release__:";
     private static final String CULL_COMMAND_PREFIX = "__cull__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
+    private static final String SUMMON_COMMAND_PREFIX = "__roster_summon__:";
+    private static final String DISMISS_COMMAND_PREFIX = "__roster_dismiss__:";
     private static final String LOCATE_COMMAND_PREFIX = "__locate__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
@@ -72,6 +76,8 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final String PANEL_GROUP_ASSIGN_APPLY_COMMAND_ID = "__panel_group_assign_apply__";
     private static final String PANEL_GROUP_ASSIGN_CANCEL_COMMAND_ID = "__panel_group_assign_cancel__";
+    private static final String REVIVE_CONFIRM_COMMAND_ID = "__revive_confirm__";
+    private static final String REVIVE_CANCEL_COMMAND_ID = "__revive_cancel__";
     static final String PANEL_MODE_LINKED = "LinkedMode";
     static final String PANEL_MODE_NEARBY = "NearbyMode";
     static final String PANEL_SORT_DEFAULT = "Default";
@@ -130,6 +136,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetGroupActivationCallback;
     private final BiConsumer<UUID, String> panelAssignGroupCallback;
     private final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
+    private final LinkedNpcPanelReviveOverlayState reviveOverlay;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
@@ -227,6 +234,7 @@ public final class TameworkCommandSelectionPage
         this.panelAssignGroupCallback = panelAssignGroupCallback;
         this.selectionCallback = selectionCallback;
         this.groupAssignOverlay = new LinkedNpcPanelGroupAssignOverlayState(resolveLanguage());
+        this.reviveOverlay = new LinkedNpcPanelReviveOverlayState();
         this.refreshLoopStarted = false;
         this.dismissed = false;
         this.navigationPending = false;
@@ -264,6 +272,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
             commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
             applyGroupAssignOverlayState(commandBuilder);
+            reviveOverlay.applyTo(commandBuilder, resolveLanguage());
 
             buildCommandButtons(commandBuilder, eventBuilder);
             buildLinkedNpcPanel(commandBuilder, eventBuilder);
@@ -302,6 +311,29 @@ public final class TameworkCommandSelectionPage
             groupAssignOverlay.updateSelectedValue(data.panelGroupAssignValue);
         }
         String commandId = data.commandId == null ? "" : data.commandId.trim();
+        if (reviveOverlay.isVisible()) {
+            if (REVIVE_CANCEL_COMMAND_ID.equals(commandId)) {
+                reviveOverlay.clear();
+                sendCardRefreshUpdate();
+                return;
+            }
+            if (REVIVE_CONFIRM_COMMAND_ID.equals(commandId)) {
+                refreshLinkedNpcEntries();
+                refreshReviveOverlayQuote();
+                UUID npcUuid = reviveOverlay.consumeIfAffordable();
+                if (npcUuid != null && respawnCallback != null) {
+                    respawnCallback.accept(npcUuid);
+                }
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+                return;
+            }
+            if (CLOSE_COMMAND_ID.equals(commandId)) {
+                reviveOverlay.clear();
+                closePage();
+            }
+            return;
+        }
         if (!commandId.isBlank() && commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_GROUP_PICKER_COMMAND_PREFIX);
             if (npcUuid != null) {
@@ -532,11 +564,28 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RESPAWN_COMMAND_PREFIX);
             if (npcUuid != null) {
-                respawnCallback.accept(npcUuid);
-                pendingUnlinkNpcUuid = null;
-                refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
+                LinkedNpcEntry entry = resolveLinkedNpcEntry(npcUuid);
+                if (entry != null && entry.dead() && entry.reviveCostPresentation() != null) {
+                    pendingUnlinkNpcUuid = null;
+                    reviveOverlay.open(entry);
+                    sendCardRefreshUpdate();
+                } else {
+                    // Lost recovery remains a separate unpaid direct action.
+                    respawnCallback.accept(npcUuid);
+                    pendingUnlinkNpcUuid = null;
+                    refreshLinkedNpcEntries();
+                    sendCardRefreshUpdate();
+                }
             }
+            return;
+        }
+        if (commandId.startsWith(SUMMON_COMMAND_PREFIX)
+                || commandId.startsWith(DISMISS_COMMAND_PREFIX)) {
+            boolean summon = commandId.startsWith(SUMMON_COMMAND_PREFIX);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                    summon ? SUMMON_COMMAND_PREFIX : DISMISS_COMMAND_PREFIX);
+            LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
+            if (entry != null) requestTimedRosterAction(entry, summon);
             return;
         }
         if (commandId.startsWith(LOCATE_COMMAND_PREFIX)) {
@@ -754,6 +803,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         refreshLinkedNpcEntries();
+        refreshReviveOverlayQuote();
         sendCardRefreshUpdate();
         if (!dismissed) {
             scheduleRefreshTick();
@@ -784,6 +834,8 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolveAppliedPanelFilterInputValue());
         }
         applyGroupAssignOverlayState(commandBuilder);
+        refreshReviveOverlayQuote();
+        reviveOverlay.applyTo(commandBuilder, resolveLanguage());
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
@@ -926,6 +978,18 @@ public final class TameworkCommandSelectionPage
                 false
         );
         eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelReviveCancelButton",
+                EventData.of(EVENT_COMMAND_ID, REVIVE_CANCEL_COMMAND_ID),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelReviveConfirmButton",
+                EventData.of(EVENT_COMMAND_ID, REVIVE_CONFIRM_COMMAND_ID),
+                false
+        );
+        eventBuilder.addEventBinding(
                 CustomUIEventBindingType.ValueChanged,
                 "#TameworkLinkedPanelModeDropdown",
                 EventData.of(KEY_PANEL_MODE_VALUE, "#TameworkLinkedPanelModeDropdown.Value"),
@@ -1023,6 +1087,24 @@ public final class TameworkCommandSelectionPage
 
     private void applyGroupAssignOverlayState(@Nonnull UICommandBuilder commandBuilder) {
         groupAssignOverlay.applyTo(commandBuilder, resolveLanguage());
+    }
+
+    private void refreshReviveOverlayQuote() {
+        for (LinkedNpcEntry entry : linkedNpcEntries) {
+            if (entry != null) reviveOverlay.refresh(entry);
+        }
+    }
+
+    private void requestTimedRosterAction(@Nonnull LinkedNpcEntry entry, boolean summon) {
+        CommandRosterStatusPresentation status = entry.rosterStatusPresentation();
+        Tamework plugin = Tamework.getInstance();
+        if (status == null || plugin == null || plugin.getApi() == null || playerUuid == null) return;
+        String key = "command-panel:" + (summon ? "summon:" : "dismiss:")
+                + status.profileId() + ":" + status.state().name() + ":" + status.revision();
+        CommandTimedSummoningRequest request = new CommandTimedSummoningRequest(
+                playerUuid, status.commandFamilyId(), status.profileId(), key);
+        if (summon) plugin.getApi().commandTimedSummoning().summon(request);
+        else plugin.getApi().commandTimedSummoning().dismiss(request);
     }
 
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {
@@ -1278,6 +1360,8 @@ public final class TameworkCommandSelectionPage
                 RELEASE_COMMAND_PREFIX,
                 CULL_COMMAND_PREFIX,
                 RESPAWN_COMMAND_PREFIX,
+                SUMMON_COMMAND_PREFIX,
+                DISMISS_COMMAND_PREFIX,
                 LOCATE_COMMAND_PREFIX,
                 RECALL_COMMAND_PREFIX,
                 SET_HOME_COMMAND_PREFIX,

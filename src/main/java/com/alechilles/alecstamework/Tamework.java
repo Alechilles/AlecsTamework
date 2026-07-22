@@ -1173,6 +1173,22 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime,
                 ownerPopulationRuntime.identityResolver()
         );
+        if (api instanceof TameworkApiImpl implementation) {
+            boolean paidRecoveryReady;
+            try {
+                paidRecoveryReady = persistenceRuntime.getPaidCommandRevivalRepository()
+                        .loadRecoverable().isEmpty();
+            } catch (Exception failure) {
+                paidRecoveryReady = false;
+                getLogger().at(Level.WARNING).log(
+                        "Paid command revival recovery scan failed; capability remains unavailable.");
+            }
+            var paidRevivalRuntime = commandItemFeatureHandler.createPaidCommandRevivalRuntime(
+                    persistenceRuntime.getPaidCommandRevivalRepository(),
+                    apiEventBus::emitPaidCommandRevived);
+            implementation.activatePaidCommandRevivalRuntime(
+                    paidRevivalRuntime, paidRecoveryReady, true);
+        }
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         getEntityStoreRegistry().registerSystem(

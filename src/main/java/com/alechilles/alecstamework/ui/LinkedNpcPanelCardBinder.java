@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int CARD_HEIGHT = 92;
+    private static final int CARD_HEIGHT = 126;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -59,6 +59,11 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
+        String summonSelector = entrySelector + " #RosterSummonButton";
+        String dismissSelector = entrySelector + " #RosterDismissButton";
+        String rosterStateSelector = entrySelector + " #RosterState";
+        String rosterTimerSelector = entrySelector + " #RosterTimer";
+        String rosterCapacitySelector = entrySelector + " #RosterCapacity";
         String locateSelector = entrySelector + " #LocateButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -121,6 +126,8 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
+        CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
+        if (roster != null && roster.reviveCapBlocked()) showRespawn = false;
 
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
@@ -181,6 +188,8 @@ final class LinkedNpcPanelCardBinder {
                 showTalentPointAction
         );
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
+                rosterCapacitySelector, summonSelector, dismissSelector, roster, language);
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
@@ -302,6 +311,14 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
+        if (roster != null && roster.summonVisible()) {
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, summonSelector,
+                    EventData.of(config.eventCommandId(), config.summonCommandPrefix() + entry.npcUuid()), false);
+        }
+        if (roster != null && roster.dismissVisible()) {
+            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, dismissSelector,
+                    EventData.of(config.eventCommandId(), config.dismissCommandPrefix() + entry.npcUuid()), false);
+        }
         if (canOpenTalentsFromLevelIndicator) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -329,6 +346,50 @@ final class LinkedNpcPanelCardBinder {
         return anchor;
     }
 
+    private static void bindRosterStatus(UICommandBuilder builder, String stateSelector,
+                                         String timerSelector, String capacitySelector,
+                                         String summonSelector, String dismissSelector,
+                                         CommandRosterStatusPresentation roster, String language) {
+        boolean visible = roster != null;
+        builder.set(stateSelector + ".Visible", visible);
+        builder.set(timerSelector + ".Visible", visible);
+        builder.set(capacitySelector + ".Visible", visible);
+        builder.set(summonSelector + ".Visible", visible && roster.summonVisible());
+        builder.set(dismissSelector + ".Visible", visible && roster.dismissVisible());
+        if (!visible) return;
+        String stateKey = switch (roster.state()) {
+            case ACTIVE -> "active";
+            case UNLOADED -> "unloaded";
+            case RESTORING -> "restoring";
+            case STORING -> "storing";
+            case ROSTER_STORED -> "stored";
+            case DEAD_REVIVABLE -> "dead";
+            case LOST -> "lost";
+        };
+        builder.set(stateSelector + ".Text", LocalizedText.format(language,
+                "tamework.ui.linkedPanel.roster.state",
+                LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state." + stateKey)));
+        String timer = roster.remainingMs() != null
+                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.remaining",
+                LinkedNpcPanelStatusTextService.formatRemainingTime(roster.remainingMs(), language))
+                : roster.cooldownRemainingMs() > 0L
+                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.cooldown",
+                LinkedNpcPanelStatusTextService.formatRemainingTime(roster.cooldownRemainingMs(), language))
+                : LocalizedText.format(language, "tamework.ui.linkedPanel.roster.duration",
+                roster.unlimitedDuration()
+                        ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.unlimited")
+                        : LinkedNpcPanelStatusTextService.formatRemainingTime(
+                        roster.configuredDurationMs(), language));
+        builder.set(timerSelector + ".Text", timer);
+        builder.set(capacitySelector + ".Text", roster.capUnlimited()
+                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.capacityUnlimited",
+                roster.activeCount())
+                : LocalizedText.format(language, "tamework.ui.linkedPanel.roster.capacity",
+                roster.activeCount(), roster.activeLimit()));
+        builder.set(summonSelector + ".Enabled", roster.summonEnabled());
+        builder.set(dismissSelector + ".Enabled", roster.dismissEnabled());
+    }
+
     record CardBindingConfig(String linkedPanelCardUiPath,
                              String eventCommandId,
                              String linkCommandPrefix,
@@ -339,6 +400,8 @@ final class LinkedNpcPanelCardBinder {
                              String releaseCommandPrefix,
                              String cullCommandPrefix,
                              String respawnCommandPrefix,
+                             String summonCommandPrefix,
+                             String dismissCommandPrefix,
                              String locateCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,

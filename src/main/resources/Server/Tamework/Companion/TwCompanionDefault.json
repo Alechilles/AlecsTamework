@@ -20,7 +20,18 @@
         "Aggressive"
       ]
     },
-    "DeadRespawnCooldownMins": 10,
+    "Revive": {
+      "Enabled": true,
+      "GameplayCooldownMs": 600000,
+      "Costs": []
+    },
+    "Summon": {
+      "Enabled": false,
+      "ActiveDurationMs": 0,
+      "ResummonCooldownMs": 0,
+      "AutoStoreOnOwnerLogout": true,
+      "ExpiryWarningThresholdsMs": []
+    },
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,
     "DeadRespawnDistanceNear": 8.0,

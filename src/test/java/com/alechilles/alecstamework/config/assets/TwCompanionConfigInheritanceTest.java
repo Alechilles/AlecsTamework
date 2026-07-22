@@ -7,6 +7,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies parent fallback behavior for role-scoped companion config inheritance. */
@@ -90,6 +92,64 @@ class TwCompanionConfigInheritanceTest {
         assertTrue(settings.isInvulnerableIfOwned());
     }
 
+    @Test
+    void reviveNestedFieldsInheritWhileExplicitCostsReplace() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        Object parentRevive = getNestedObject(parent, "command", "revive");
+        Object childRevive = getNestedObject(child, "command", "revive");
+        setBooleanField(parentRevive, "enabled", false);
+        setLongField(parentRevive, "gameplayCooldownMs", 120_000L);
+        setField(parentRevive, "costs", new TwItemCostComponent[] {
+                new TwItemCostComponent("Life_Essence", 3)
+        });
+        setBooleanField(childRevive, "enabled", true);
+        setLongField(childRevive, "gameplayCooldownMs", 1L);
+        setField(childRevive, "costs", new TwItemCostComponent[] {
+                new TwItemCostComponent("Dragon_Essence", 2),
+                new TwItemCostComponent("Gold_Bar", 5)
+        });
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of("Revive", "Revive.Costs"))
+        );
+
+        TwCompanionConfig.ReviveSettings result = child.getCommand().getRevive();
+        assertFalse(result.isEnabled());
+        assertEquals(120_000L, result.getGameplayCooldownMs());
+        assertEquals(2, result.getCosts().length);
+        assertEquals("Dragon_Essence", result.getCosts()[0].getItemId());
+        assertEquals("Gold_Bar", result.getCosts()[1].getItemId());
+    }
+
+    @Test
+    void summonNestedFieldsAndWarningReplacementFollowContract() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        Object parentSummon = getNestedObject(parent, "command", "summon");
+        Object childSummon = getNestedObject(child, "command", "summon");
+        setBooleanField(parentSummon, "enabled", true);
+        setLongField(parentSummon, "activeDurationMs", 600_000L);
+        setLongField(parentSummon, "resummonCooldownMs", 60_000L);
+        setField(parentSummon, "expiryWarningThresholdsMs", new Long[] { 60_000L, 10_000L });
+        setLongField(childSummon, "activeDurationMs", 900_000L);
+        setField(childSummon, "expiryWarningThresholdsMs", new Long[] { 30_000L });
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of("Summon", "Summon.ActiveDurationMs", "Summon.ExpiryWarningThresholdsMs"))
+        );
+
+        TwCompanionConfig.SummonSettings result = child.getCommand().getSummon();
+        assertTrue(result.isEnabled());
+        assertEquals(900_000L, result.getActiveDurationMs());
+        assertEquals(60_000L, result.getResummonCooldownMs());
+        assertArrayEquals(new long[] { 30_000L }, result.getExpiryWarningThresholdsMs());
+    }
+
     private void setNestedIntField(Object target, String nestedFieldName, String fieldName, int value)
             throws Exception {
         Field nestedField = target.getClass().getDeclaredField(nestedFieldName);
@@ -105,6 +165,18 @@ class TwCompanionConfigInheritanceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setBoolean(target, value);
+    }
+
+    private void setLongField(Object target, String fieldName, long value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.setLong(target, value);
+    }
+
+    private void setField(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private void setNestedBooleanField(Object target, String nestedFieldName, String fieldName, boolean value)

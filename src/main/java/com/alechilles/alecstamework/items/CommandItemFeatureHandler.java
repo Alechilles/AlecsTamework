@@ -2,6 +2,10 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
+import com.alechilles.alecstamework.api.ItemCostComponentView;
+import com.alechilles.alecstamework.api.PaidCommandRevivalCostQuoteView;
+import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
+import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
 import com.alechilles.alecstamework.api.PaidCommandRevivalRequest;
 import com.alechilles.alecstamework.api.PaidCommandRevivalResult;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -39,6 +43,9 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRecord;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
@@ -83,6 +90,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Clock;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.function.Supplier;
@@ -102,6 +113,7 @@ public final class CommandItemFeatureHandler {
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
 
     private final CommandItemRegistry registry;
+    @Nullable private final TameworkPersistenceRuntime persistenceRuntime;
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
@@ -174,6 +186,7 @@ public final class CommandItemFeatureHandler {
                                      @Nullable TameworkPersistenceRuntime persistenceRuntime,
                                      @Nullable CompanionIdentityResolver populationIdentityResolver) {
         this.registry = registry;
+        this.persistenceRuntime = persistenceRuntime;
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -1219,12 +1232,215 @@ public final class CommandItemFeatureHandler {
             }
             if (result.status() == PaidCommandRevivalResult.Status.INSUFFICIENT_COST) {
                 feedbackService.showWarningKey(player,
-                        "tamework.ui.linkedPanel.revive.missingComponents");
+                        "tamework.ui.linkedPanel.revive.missingComponents",
+                        Math.max(1, result.exactCost().size()));
             } else if (!result.succeeded()
                     && result.status() != PaidCommandRevivalResult.Status.RECOVERY_PENDING) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
             }
         });
+    }
+
+    /** Composes the production paid-revival API after persistence and command services are ready. */
+    @Nonnull
+    public PaidCommandRevivalApi createPaidCommandRevivalRuntime(
+            @Nonnull PaidCommandRevivalRepository repository,
+            @Nonnull Consumer<PaidCommandRevivedEvent> eventSink) {
+        return new PaidCommandRevivalCoordinator(
+                repository, new PaidRevivalAuthority(), Clock.systemUTC(), eventSink);
+    }
+
+    private final class PaidRevivalAuthority implements PaidCommandRevivalCoordinator.Authority {
+        private final CommandReviveInventoryPaymentService payments =
+                new CommandReviveInventoryPaymentService();
+        private final CommandReviveCostQuoteService quotes = new CommandReviveCostQuoteService();
+
+        @Override
+        public CompletionStage<PaidCommandRevivalCoordinator.ResolvedRevival> resolve(
+                UUID ownerUuid, String profileId, String commandFamilyId, boolean forCommit) {
+            return onOwnerWorld(ownerUuid, player -> resolveOnWorld(
+                    player, ownerUuid, profileId, commandFamilyId));
+        }
+
+        @Override
+        public CommandReviveInventoryPaymentService.PlanResult plan(
+                PaidCommandRevivalCoordinator.ResolvedRevival resolved, UUID operationId) {
+            PaidRevivalContext context = (PaidRevivalContext) resolved.runtimeContext();
+            return payments.plan(context.player(), resolved.exactCost(), resolved.deathRevision());
+        }
+
+        @Override
+        public CompletionStage<CommandReviveInventoryPaymentService.ConsumeResult> consume(
+                PaidCommandRevivalCoordinator.ResolvedRevival resolved,
+                List<ItemCostComponentView> exactCost,
+                List<PaidCommandRevivalRecord.Reservation> reservations) {
+            PaidRevivalContext context = (PaidRevivalContext) resolved.runtimeContext();
+            return onOwnerWorld(context.player().getUuid(), player ->
+                    payments.consume(player, exactCost, reservations));
+        }
+
+        @Override
+        public CompletionStage<PaidCommandRevivalCoordinator.ApplyOutcome> apply(
+                PaidCommandRevivalCoordinator.ResolvedRevival resolved, UUID operationId) {
+            PaidRevivalContext context = (PaidRevivalContext) resolved.runtimeContext();
+            CompletableFuture<PaidCommandRevivalCoordinator.ApplyOutcome> future = new CompletableFuture<>();
+            World world = context.player().getWorld();
+            if (world == null) return CompletableFuture.completedFuture(
+                    PaidCommandRevivalCoordinator.ApplyOutcome.failed("owner-world-unavailable"));
+            world.execute(() -> applyPaidProjection(context, operationId, future));
+            return future;
+        }
+
+        @Override
+        public CompletionStage<CommandReviveInventoryPaymentService.ConsumeResult> refund(
+                PaidCommandRevivalCoordinator.ResolvedRevival resolved,
+                List<ItemCostComponentView> exactCost) {
+            PaidRevivalContext context = (PaidRevivalContext) resolved.runtimeContext();
+            return onOwnerWorld(context.player().getUuid(), player -> payments.refund(player, exactCost));
+        }
+
+        private PaidCommandRevivalCoordinator.ResolvedRevival resolveOnWorld(
+                Player player, UUID ownerUuid, String profileId, String familyId) {
+            if (persistenceRuntime == null) return unavailable(profileId, "persistence-unavailable");
+            NpcProfileRepository.ProfileRecord profile = persistenceRuntime.getNpcProfileRepository()
+                    .loadProfileById(profileId);
+            if (profile == null || !ownerUuid.equals(profile.ownerUuid()) || profile.currentNpcUuid() == null) {
+                return unavailable(profileId, "owned-profile-unavailable");
+            }
+            final com.alechilles.alecstamework.api.CommandFamilyRosterView roster;
+            try {
+                roster = persistenceRuntime.getCommandFamilyRosterRepository().find(ownerUuid, familyId);
+            } catch (Exception failure) {
+                return unavailable(profileId, "roster-read-failed");
+            }
+            var membership = roster == null ? null : roster.memberships().stream()
+                    .filter(row -> profileId.equals(row.profileId())).findFirst().orElse(null);
+            if (membership == null) return unavailable(profileId, "roster-membership-unavailable");
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot death =
+                    deathService != null ? deathService.getDeadSnapshot(profile.currentNpcUuid()) : null;
+            if (death == null) return unavailable(profileId, "death-record-unavailable");
+            String roleId = death.roleId() != null ? death.roleId() : membership.roleId();
+            TwCompanionConfig.EffectiveSettings effective = TwCompanionConfig.resolveEffectiveForRole(roleId);
+            TwCompanionConfig.ReviveSettings revive = effective.getRevive();
+            var presentation = quotes.quote(player, revive);
+            ArrayList<PaidCommandRevivalCostQuoteView> costLines = new ArrayList<>();
+            for (var line : presentation.costs()) {
+                costLines.add(new PaidCommandRevivalCostQuoteView(
+                        line.itemId(), line.requiredQuantity(), line.ownedQuantity(),
+                        line.localizedName(), line.iconAssetId()));
+            }
+            long cooldown = Math.max(0L, death.respawnAvailableAtMs() - System.currentTimeMillis());
+            PaidCommandRevivalQuote.Status status = !TameworkRuntimeSettings.reviveSystemEnabled(revive.isEnabled())
+                    ? PaidCommandRevivalQuote.Status.DISABLED
+                    : cooldown > 0L ? PaidCommandRevivalQuote.Status.COOLDOWN
+                    : presentation.affordable() ? PaidCommandRevivalQuote.Status.READY
+                    : PaidCommandRevivalQuote.Status.INSUFFICIENT_COST;
+            PaidRevivalContext context = new PaidRevivalContext(
+                    player, profile, death, familyId, roleId, membership.profileRevision());
+            return new PaidCommandRevivalCoordinator.ResolvedRevival(
+                    profileId, roleId, roleId, presentation.configRevision(),
+                    Math.max(1L, death.diedAtMs()), membership.profileRevision(), status, cooldown,
+                    costLines, revive.getInsufficientCostMessage(),
+                    status == PaidCommandRevivalQuote.Status.READY ? null : status.name().toLowerCase(Locale.ROOT),
+                    null, null, "command-respawn:" + profileId, context);
+        }
+
+        private PaidCommandRevivalCoordinator.ResolvedRevival unavailable(String profileId, String reason) {
+            return new PaidCommandRevivalCoordinator.ResolvedRevival(
+                    profileId, "unknown", null, "unavailable", 0L, 0L,
+                    PaidCommandRevivalQuote.Status.UNAVAILABLE, 0L, List.of(), null, reason,
+                    null, null, null, null);
+        }
+    }
+
+    private <T> CompletionStage<T> onOwnerWorld(UUID ownerUuid, java.util.function.Function<Player, T> work) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        try {
+            PlayerRef playerRef = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(ownerUuid);
+            Ref<EntityStore> ref = playerRef != null ? playerRef.getReference() : null;
+            Store<EntityStore> store = ref != null && ref.isValid() ? ref.getStore() : null;
+            World world = store != null && store.getExternalData() != null
+                    ? store.getExternalData().getWorld() : null;
+            if (world == null) return CompletableFuture.failedFuture(
+                    new IllegalStateException("paid-revival-owner-offline"));
+            world.execute(() -> {
+                try {
+                    WorldPlayerResolver.ResolvedPlayer resolved = WorldPlayerResolver.resolve(world, ownerUuid);
+                    if (resolved == null) throw new IllegalStateException("paid-revival-owner-unavailable");
+                    future.complete(work.apply(resolved.player()));
+                } catch (Throwable failure) {
+                    future.completeExceptionally(failure);
+                }
+            });
+        } catch (Throwable failure) {
+            future.completeExceptionally(failure);
+        }
+        return future;
+    }
+
+    private void applyPaidProjection(PaidRevivalContext context, UUID operationId,
+                                     CompletableFuture<PaidCommandRevivalCoordinator.ApplyOutcome> future) {
+        Player player = context.player();
+        WorldPlayerResolver.ResolvedPlayer resolved = WorldPlayerResolver.resolveCurrent(player);
+        if (resolved == null) {
+            future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed("owner-unavailable"));
+            return;
+        }
+        Inventory inventory = resolved.player().getInventory();
+        ItemContainer hotbar = inventory != null ? inventory.getHotbar() : null;
+        if (hotbar == null) {
+            future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed("command-access-item-unavailable"));
+            return;
+        }
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            TwCommandItemConfig config = stack == null ? null : registry.get(stack.getItemId());
+            if (stack == null || stack.isEmpty() || config == null
+                    || !config.usesOwnerCommandFamilyRoster()
+                    || !context.commandFamilyId().equals(config.getCommandFamilyId())) continue;
+            String toolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (toolId == null || toolId.isBlank()) continue;
+            ItemStack sourceStack = stack;
+            LinkedNpcRecord record = new LinkedNpcRecord(
+                    context.profile().currentNpcUuid(), context.profile().profileId(), null, null,
+                    context.death().homePosition(), context.profile().displayName(), null,
+                    context.roleId(), "DEAD_REVIVABLE", true, false, null);
+            TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(context.roleId());
+            double distance = resolvePositiveDouble(settings.getRecallSafeSpawnDistance(), RECALL_SAFE_SPAWN_DISTANCE);
+            long retry = resolvePositiveLong(settings.getDeadRespawnFollowRetryDelayMs(), RESPAWN_FOLLOW_RETRY_DELAY_MS);
+            short sourceSlot = slot;
+            boolean started = respawnService.respawnDeadLinkedNpc(
+                    resolved.player(), resolved.ref(), resolved.store(), toolId, sourceStack, record,
+                    context.death(), distance, retry, "paid_command_revival",
+                    new CommandRespawnService.Completion() {
+                        @Override
+                        public boolean onApplied(CommandRespawnService.AppliedRespawn result) {
+                            ItemStack current = hotbar.getItemStack(sourceSlot);
+                            if (!Objects.equals(current, sourceStack)) return false;
+                            hotbar.setItemStackForSlot(sourceSlot, result.updatedStack());
+                            future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.applied());
+                            return true;
+                        }
+
+                        @Override public void onDenied(String reason) {
+                            future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed(reason));
+                        }
+                        @Override public void onDurabilityDegraded(String reason) {
+                            future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed(reason));
+                        }
+                    });
+            if (!started) future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed("revival-not-started"));
+            return;
+        }
+        future.complete(PaidCommandRevivalCoordinator.ApplyOutcome.failed("command-access-item-unavailable"));
+    }
+
+    private record PaidRevivalContext(Player player,
+                                      NpcProfileRepository.ProfileRecord profile,
+                                      CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot death,
+                                      String commandFamilyId,
+                                      String roleId,
+                                      long profileRevision) {
     }
 
     void canonicalizePlayerCommandInventory(@Nullable Holder<EntityStore> holder) {
