@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.CompanionProvisioningOperationView;
 import com.alechilles.alecstamework.api.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.api.CompanionProvisioningResult;
+import com.alechilles.alecstamework.api.CompanionProvisioningLinkRequest;
+import com.alechilles.alecstamework.api.CompanionProvisioningLinkResult;
 import com.alechilles.alecstamework.api.ProvisionedCompanionTransitionRequest;
 import com.alechilles.alecstamework.api.ProvisionedCompanionView;
 import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
@@ -33,6 +35,18 @@ public final class CompanionProvisioningApiDelegate implements CompanionProvisio
     @Override
     public CompletionStage<CompanionProvisioningResult> provision(CompanionProvisioningRequest request) {
         return coordinator.provision(request);
+    }
+
+    @Override
+    public CompletionStage<CompanionProvisioningLinkResult> provisionAndLink(
+            CompanionProvisioningLinkRequest request) {
+        return coordinator.provisionAndLink(request);
+    }
+
+    /** Runtime composition seam; not part of the downstream public API. */
+    public void installInitialProjectionHook(
+            CompanionProvisioningCoordinator.InitialProjectionHook hook) {
+        coordinator.installInitialProjectionHook(hook);
     }
 
     @Override

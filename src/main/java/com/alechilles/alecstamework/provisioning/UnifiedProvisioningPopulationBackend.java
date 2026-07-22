@@ -14,6 +14,9 @@ import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
 import com.alechilles.alecstamework.ownership.groups.PopulationGroupTransition;
 import com.alechilles.alecstamework.ownership.groups.runtime.PopulationGroupAdmissionRuntime;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningCommandLinkRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CommandFamilyRosterRepository;
+import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
@@ -40,6 +43,9 @@ public final class UnifiedProvisioningPopulationBackend implements ProvisioningP
     private final NpcProfileRepository profileRepository;
     private final PopulationGroupAdmissionRuntime groupRuntime;
     private final ProvisionedCompanionProjectionPort projectionPort;
+    @Nullable private final CompanionProvisioningCommandLinkRepository commandLinkRepository;
+    @Nullable private final CommandFamilyRosterRepository commandFamilyRosterRepository;
+    @Nullable private final CommandFamilyRosterRepository.ProfilePolicyFence commandFamilyPolicyFence;
     private final ConcurrentHashMap<UUID, DormantRequest> dormantRequests = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Boolean> alreadyCommitted = new ConcurrentHashMap<>();
     private final AtomicBoolean recoveryReady = new AtomicBoolean(false);
@@ -55,6 +61,33 @@ public final class UnifiedProvisioningPopulationBackend implements ProvisioningP
         this.groupRepository = Objects.requireNonNull(groupRepository, "groupRepository");
         this.profileRepository = Objects.requireNonNull(profileRepository, "profileRepository");
         this.projectionPort = Objects.requireNonNull(projectionPort, "projectionPort");
+        this.commandLinkRepository = null;
+        this.commandFamilyRosterRepository = null;
+        this.commandFamilyPolicyFence = null;
+        this.groupRuntime = new PopulationGroupAdmissionRuntime(
+                ownerRuntime.admissionCoordinator(), groupRegistry, groupRepository, profileRepository);
+    }
+
+    /** Full constructor enabling atomic dormant profile plus command-family membership commits. */
+    public UnifiedProvisioningPopulationBackend(
+            @Nonnull OwnerPopulationRuntime ownerRuntime,
+            @Nonnull PopulationGroupRegistry groupRegistry,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull NpcProfileRepository profileRepository,
+            @Nonnull ProvisionedCompanionProjectionPort projectionPort,
+            @Nonnull CompanionProvisioningCommandLinkRepository commandLinkRepository,
+            @Nonnull CommandFamilyRosterRepository commandFamilyRosterRepository,
+            @Nonnull CommandFamilyRosterRepository.ProfilePolicyFence commandFamilyPolicyFence) {
+        this.ownerRuntime = Objects.requireNonNull(ownerRuntime, "ownerRuntime");
+        this.groupRegistry = Objects.requireNonNull(groupRegistry, "groupRegistry");
+        this.groupRepository = Objects.requireNonNull(groupRepository, "groupRepository");
+        this.profileRepository = Objects.requireNonNull(profileRepository, "profileRepository");
+        this.projectionPort = Objects.requireNonNull(projectionPort, "projectionPort");
+        this.commandLinkRepository = Objects.requireNonNull(commandLinkRepository, "commandLinkRepository");
+        this.commandFamilyRosterRepository = Objects.requireNonNull(
+                commandFamilyRosterRepository, "commandFamilyRosterRepository");
+        this.commandFamilyPolicyFence = Objects.requireNonNull(
+                commandFamilyPolicyFence, "commandFamilyPolicyFence");
         this.groupRuntime = new PopulationGroupAdmissionRuntime(
                 ownerRuntime.admissionCoordinator(), groupRegistry, groupRepository, profileRepository);
     }
@@ -244,7 +277,22 @@ public final class UnifiedProvisioningPopulationBackend implements ProvisioningP
                 new NpcProfileRepository.DormantProfileMutation(
                         profile.provisionalProfileId(), profile.ownerUuid(), profile.roleId(),
                         profile.ownershipWorldName(), profile.displayName(), initialJson(profile), nowMs);
-        return groupRuntime.commitDormant(populationOperationId, mutation, nowMs)
+        UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension extension =
+                commandLinkRepository == null
+                        ? UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension.NO_OP
+                        : (connection, committedProfile) -> {
+                            CompanionProvisioningCommandLinkRepository.CommitResult linked =
+                                    commandLinkRepository.commitInTransaction(
+                                            connection, request.provisioningOperationId(),
+                                            committedProfile.profileId(), commandFamilyRosterRepository,
+                                            commandFamilyPolicyFence);
+                            return linked.committed()
+                                    ? UnifiedPopulationCompositeStore.ExtensionResult.success()
+                                    : UnifiedPopulationCompositeStore.ExtensionResult.denied(
+                                            linked.reason() == null
+                                                    ? "provisioning-command-link-denied" : linked.reason());
+                        };
+        return groupRuntime.commitDormant(populationOperationId, mutation, nowMs, extension)
                 .thenApply(committed -> {
                     if (!committed.committed()) {
                         return new DormantCommit(DormantCommit.Status.QUARANTINED,

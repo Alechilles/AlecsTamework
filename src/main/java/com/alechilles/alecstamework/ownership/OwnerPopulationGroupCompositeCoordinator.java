@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
+import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import java.util.List;
@@ -137,6 +138,21 @@ public final class OwnerPopulationGroupCompositeCoordinator {
             @Nonnull String groupOperationId,
             @Nonnull PopulationGroupRepository.ClassificationMutation classification,
             long nowMs) {
+        return commitProvisionedDormantAsync(prepared, profileRepository, profileMutation,
+                groupRepository, groupOperationId, classification, nowMs,
+                UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension.NO_OP);
+    }
+
+    @Nonnull
+    public CompletableFuture<OwnerPopulationCommitResult> commitProvisionedDormantAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull NpcProfileRepository profileRepository,
+            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull String groupOperationId,
+            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
+            long nowMs,
+            @Nonnull UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension extension) {
         OwnerPopulationCommitResult invalid = beginCommit(
                 prepared, "provisioned_dormant_owner_index_commit_failed",
                 "provisioned-dormant-owner-index-commit-failed");
@@ -148,7 +164,7 @@ public final class OwnerPopulationGroupCompositeCoordinator {
                     UnifiedPopulationCompositeStore.ProvisionedDormantCommitResult> submission =
                     compositeStore.commitProvisionedDormantAsync(
                             ownerCommit, profileRepository, profileMutation, groupRepository,
-                            groupOperationId, classification, nowMs);
+                            groupOperationId, classification, nowMs, extension);
             if (submission == null || submission.completion() == null) {
                 return terminality.commitStartFailed(
                         prepared, "provisioned-dormant-commit-stage-missing");

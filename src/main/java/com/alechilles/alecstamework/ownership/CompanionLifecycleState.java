@@ -14,6 +14,10 @@ public enum CompanionLifecycleState {
     DEAD_REVIVABLE,
     LOST,
     RESTORING,
+    /** A command-roster profile whose projection is being durably removed. */
+    STORING,
+    /** An owned command-roster profile with no live or item-backed projection. */
+    ROSTER_STORED,
     UNKNOWN_DORMANT,
     PROVISIONED_DORMANT,
     RELEASED

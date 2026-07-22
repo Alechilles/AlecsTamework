@@ -1,10 +1,8 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
-import com.alechilles.alecstamework.api.BondedVesselBindingInvalidatedEvent;
-import com.alechilles.alecstamework.api.BondedVesselBoundEvent;
-import com.alechilles.alecstamework.api.BondedVesselStateChangedEvent;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
@@ -166,10 +164,9 @@ public final class TameworkEventBus
     public void emitCanonicalCompanionLifecycleEvent(@Nonnull TameworkEvent event) {
         Objects.requireNonNull(event, "event");
         if (!(event instanceof ProvisionedCompanionDeathRecordedEvent)
-                && !(event instanceof ProvisionedCompanionRevivedEvent)
-                && !(event instanceof BondedVesselStateChangedEvent)) {
+                && !(event instanceof ProvisionedCompanionRevivedEvent)) {
             throw new IllegalArgumentException(
-                    "Only canonical provisioned/bonded lifecycle events are accepted.");
+                    "Only canonical provisioned companion lifecycle events are accepted.");
         }
         dispatch(event);
     }
@@ -184,15 +181,9 @@ public final class TameworkEventBus
         dispatch(event);
     }
 
-    /** Isolated post-commit delivery seam for the bonded-vessel runtime. */
-    public void emitBondedVesselEvent(@Nonnull TameworkEvent event) {
-        Objects.requireNonNull(event, "event");
-        if (!(event instanceof BondedVesselBoundEvent)
-                && !(event instanceof BondedVesselStateChangedEvent)
-                && !(event instanceof BondedVesselBindingInvalidatedEvent)) {
-            throw new IllegalArgumentException("Only canonical bonded-vessel events are accepted.");
-        }
-        dispatch(event);
+    /** Isolated post-commit delivery seam for canonical command-family roster events. */
+    public void emitCommandFamilyRosterEvent(@Nonnull CommandFamilyRosterMembershipChangedEvent event) {
+        dispatch(Objects.requireNonNull(event, "event"));
     }
 
     @Override

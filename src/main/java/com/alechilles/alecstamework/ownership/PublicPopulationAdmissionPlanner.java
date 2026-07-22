@@ -208,7 +208,8 @@ final class PublicPopulationAdmissionPlanner {
         }
         CompanionLifecycleState lifecycle = currentOwner.lifecycleState();
         if (lifecycle == CompanionLifecycleState.ACTIVE
-                || lifecycle == CompanionLifecycleState.RESTORING) {
+                || lifecycle == CompanionLifecycleState.RESTORING
+                || lifecycle == CompanionLifecycleState.STORING) {
             return "population-admission-duplicate-active-profile";
         }
         if (lifecycle == CompanionLifecycleState.UNLOADED) {
@@ -219,6 +220,7 @@ final class PublicPopulationAdmissionPlanner {
                 || lifecycle == CompanionLifecycleState.DEAD_REVIVABLE
                 || lifecycle == CompanionLifecycleState.LOST
                 || lifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
+                || lifecycle == CompanionLifecycleState.ROSTER_STORED
                 ? null : "population-admission-restore-source-not-authoritative";
     }
 

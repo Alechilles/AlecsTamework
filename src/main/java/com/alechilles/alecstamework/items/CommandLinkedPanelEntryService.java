@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
+import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -50,6 +51,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandLinkedPanelLiveTargetResolver liveTargetResolver;
     private final PersistenceQuarantineRegistry quarantineRegistry;
+    private final CommandReviveCostQuoteService reviveCostQuoteService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -88,6 +90,7 @@ final class CommandLinkedPanelEntryService {
                 ? null
                 : new CommandLinkedPanelLiveTargetResolver(profileActionResolver);
         this.quarantineRegistry = quarantineRegistry;
+        this.reviveCostQuoteService = new CommandReviveCostQuoteService();
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -97,11 +100,23 @@ final class CommandLinkedPanelEntryService {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return List.of();
         }
-        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        return buildEntriesFromRecords(player, store, stack, toolId, linkedNpcRecordStore.read(stack));
+    }
+
+    /** Builds from canonical records when item metadata is merely a disposable projection. */
+    List<LinkedNpcEntry> buildEntriesFromRecords(Player player,
+                                                 Store<EntityStore> store,
+                                                 ItemStack stack,
+                                                 String toolId,
+                                                 List<LinkedNpcRecord> records) {
+        if (player == null || store == null || stack == null || stack.isEmpty()) {
+            return List.of();
+        }
         if (records.isEmpty()) {
             return List.of();
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
+        Map<String, Integer> reviveOwnedByItemId = reviveCostQuoteService.countInventory(player);
         World world = player.getWorld();
         String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
@@ -110,12 +125,13 @@ final class CommandLinkedPanelEntryService {
                 continue;
             }
             boolean loaded = false;
-            boolean dead = false;
+            boolean dead = "DEAD_REVIVABLE".equals(record.cachedCommandState);
             boolean captured = false;
             boolean inCoop = false;
-            boolean lost = false;
+            boolean lost = "LOST".equals(record.cachedCommandState);
             long deadRespawnRemainingMs = 0L;
             String deathCauseHint = null;
+            CommandReviveCostPresentation reviveCostPresentation = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
             String groupId = normalizeOptional(record.groupId);
@@ -184,11 +200,18 @@ final class CommandLinkedPanelEntryService {
                         speciesId = normalizedRoleId;
                         speciesLabel = normalizedRoleId;
                     }
+                    TwCompanionConfig.EffectiveSettings effectiveSettings =
+                            TwCompanionConfig.resolveEffectiveForRole(roleId);
                     boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
-                            TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled()
+                            effectiveSettings.getRevive().isEnabled()
                     );
                     if (deadRespawnEnabled) {
                         deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+                        reviveCostPresentation = reviveCostQuoteService.quote(
+                                reviveOwnedByItemId,
+                                player,
+                                effectiveSettings.getRevive()
+                        );
                     } else {
                         deadRespawnRemainingMs = -1L;
                     }
@@ -257,7 +280,7 @@ final class CommandLinkedPanelEntryService {
                     recallLostRemainingMs = pendingRecall.remainingUntilLostMs();
                 }
             }
-            entries.add(applyRecoveryHold(new LinkedNpcEntry(
+            LinkedNpcEntry entry = new LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
                     gender,
@@ -305,7 +328,11 @@ final class CommandLinkedPanelEntryService {
                     harvestCooldownKnown,
                     recallPending,
                     recallLostRemainingMs
-            ), record.profileId));
+            );
+            if (reviveCostPresentation != null) {
+                entry = entry.withReviveCostPresentation(reviveCostPresentation);
+            }
+            entries.add(applyRecoveryHold(entry, record.profileId));
         }
         return entries;
     }

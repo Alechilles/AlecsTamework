@@ -79,9 +79,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionIdentityRepository companionIdentityRepository;
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
     private final CaptureAttemptRepository captureAttemptRepository;
-    private final BondedVesselRepository bondedVesselRepository;
     private final CompanionProvisioningRepository companionProvisioningRepository;
     private final PopulationGroupRepository populationGroupRepository;
+    private final CommandFamilyRosterRepository commandFamilyRosterRepository;
+    private final CommandTimedSummonRepository commandTimedSummonRepository;
+    private final CompanionProvisioningCommandLinkRepository companionProvisioningCommandLinkRepository;
+    private final PaidCommandRevivalRepository paidCommandRevivalRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     private final PersistenceResilienceRuntime resilienceRuntime;
     private final StorageRecoveryCoordinator storageRecoveryCoordinator;
@@ -112,9 +115,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionIdentityRepository companionIdentityRepository,
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
             @Nonnull CaptureAttemptRepository captureAttemptRepository,
-            @Nonnull BondedVesselRepository bondedVesselRepository,
             @Nonnull CompanionProvisioningRepository companionProvisioningRepository,
             @Nonnull PopulationGroupRepository populationGroupRepository,
+            @Nonnull CommandFamilyRosterRepository commandFamilyRosterRepository,
+            @Nonnull CommandTimedSummonRepository commandTimedSummonRepository,
+            @Nonnull CompanionProvisioningCommandLinkRepository companionProvisioningCommandLinkRepository,
+            @Nonnull PaidCommandRevivalRepository paidCommandRevivalRepository,
             @Nonnull SqliteSchemaMigrator schemaMigrator,
             @Nonnull PersistenceResilienceRuntime resilienceRuntime,
             @Nonnull StorageRecoveryCoordinator storageRecoveryCoordinator,
@@ -143,9 +149,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.companionIdentityRepository = companionIdentityRepository;
         this.populationReconciliationPersistence = populationReconciliationPersistence;
         this.captureAttemptRepository = captureAttemptRepository;
-        this.bondedVesselRepository = bondedVesselRepository;
         this.companionProvisioningRepository = companionProvisioningRepository;
         this.populationGroupRepository = populationGroupRepository;
+        this.commandFamilyRosterRepository = commandFamilyRosterRepository;
+        this.commandTimedSummonRepository = commandTimedSummonRepository;
+        this.companionProvisioningCommandLinkRepository = companionProvisioningCommandLinkRepository;
+        this.paidCommandRevivalRepository = paidCommandRevivalRepository;
         this.schemaMigrator = schemaMigrator;
         this.resilienceRuntime = resilienceRuntime;
         this.storageRecoveryCoordinator = storageRecoveryCoordinator;
@@ -174,7 +183,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                     sqlitePath,
                     connectionManager,
                     schemaMigrator,
-                    SqliteSchemaMigrator.SCHEMA_VERSION_V8
+                    SqliteSchemaMigrator.SCHEMA_VERSION_V9
             );
             backupAndResetPreV2SqliteIfNeeded(sqlitePath, connectionManager, schemaMigrator);
             try (Connection connection = connectionManager.openConnection()) {
@@ -268,12 +277,18 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CompanionPopulationReconciliationPersistence(connectionManager, writeQueue);
         CaptureAttemptRepository captureAttemptRepository =
                 new CaptureAttemptRepository(connectionManager, writeQueue);
-        BondedVesselRepository bondedVesselRepository =
-                new BondedVesselRepository(connectionManager, writeQueue);
         CompanionProvisioningRepository companionProvisioningRepository =
                 new CompanionProvisioningRepository(connectionManager, writeQueue);
         PopulationGroupRepository populationGroupRepository =
                 new PopulationGroupRepository(connectionManager, writeQueue);
+        CommandFamilyRosterRepository commandFamilyRosterRepository =
+                new CommandFamilyRosterRepository(connectionManager, writeQueue);
+        CommandTimedSummonRepository commandTimedSummonRepository =
+                new CommandTimedSummonRepository(connectionManager, writeQueue);
+        CompanionProvisioningCommandLinkRepository companionProvisioningCommandLinkRepository =
+                new CompanionProvisioningCommandLinkRepository(connectionManager, writeQueue);
+        PaidCommandRevivalRepository paidCommandRevivalRepository =
+                new PaidCommandRevivalRepository(connectionManager, writeQueue);
         SqliteMaintenanceService maintenanceService =
                 new SqliteMaintenanceService(connectionManager, npcProfileRepository, logger);
         StorageRecoveryProbe storageRecoveryProbe = new StorageRecoveryProbe(
@@ -309,9 +324,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 companionIdentityRepository,
                 populationReconciliationPersistence,
                 captureAttemptRepository,
-                bondedVesselRepository,
                 companionProvisioningRepository,
                 populationGroupRepository,
+                commandFamilyRosterRepository,
+                commandTimedSummonRepository,
+                companionProvisioningCommandLinkRepository,
+                paidCommandRevivalRepository,
                 schemaMigrator,
                 resilienceRuntime,
                 storageRecoveryCoordinator,
@@ -539,12 +557,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         return captureAttemptRepository;
     }
 
-    /** Durable authority for generation-fenced bonded-vessel transitions. */
-    @Nonnull
-    public BondedVesselRepository getBondedVesselRepository() {
-        return bondedVesselRepository;
-    }
-
     /** Durable authority for idempotent companion-provisioning operations. */
     @Nonnull
     public CompanionProvisioningRepository getCompanionProvisioningRepository() {
@@ -555,6 +567,30 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PopulationGroupRepository getPopulationGroupRepository() {
         return populationGroupRepository;
+    }
+
+    /** Durable authority for owner/command-family/profile roster membership. */
+    @Nonnull
+    public CommandFamilyRosterRepository getCommandFamilyRosterRepository() {
+        return commandFamilyRosterRepository;
+    }
+
+    /** Durable lease/session authority for finite and unlimited command-family summons. */
+    @Nonnull
+    public CommandTimedSummonRepository getCommandTimedSummonRepository() {
+        return commandTimedSummonRepository;
+    }
+
+    /** Durable intent consumed by atomic dormant provision-and-link commits. */
+    @Nonnull
+    public CompanionProvisioningCommandLinkRepository getCompanionProvisioningCommandLinkRepository() {
+        return companionProvisioningCommandLinkRepository;
+    }
+
+    /** Durable authority for quoted, reserved, consumed, and refundable revival costs. */
+    @Nonnull
+    public PaidCommandRevivalRepository getPaidCommandRevivalRepository() {
+        return paidCommandRevivalRepository;
     }
 
     /** Restart-recovery view published only after a content-stable persisted-world scan. */

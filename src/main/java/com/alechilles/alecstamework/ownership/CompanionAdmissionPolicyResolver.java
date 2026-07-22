@@ -170,7 +170,8 @@ final class CompanionAdmissionPolicyResolver {
 
     private static boolean occupiesClaim(CompanionLifecycleState lifecycleState) {
         return lifecycleState == CompanionLifecycleState.ACTIVE
-                || lifecycleState == CompanionLifecycleState.UNLOADED;
+                || lifecycleState == CompanionLifecycleState.UNLOADED
+                || lifecycleState == CompanionLifecycleState.STORING;
     }
 
     private static ClaimAdmissionOperation claimOperation(OwnerPopulationOperation operation) {

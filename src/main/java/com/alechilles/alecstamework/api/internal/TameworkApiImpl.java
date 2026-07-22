@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
-import com.alechilles.alecstamework.api.BondedVesselReadinessView;
-import com.alechilles.alecstamework.api.BondedVesselsApi;
 import com.alechilles.alecstamework.api.CommandItemConfigView;
+import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
+import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
+import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
@@ -296,10 +297,13 @@ public final class TameworkApiImpl
     private volatile ItemFeatureRegistry captureItemConfigs;
     @Nullable
     private volatile CapturePolicyRegistry capturePolicies;
-    private volatile BondedVesselsApi bondedVesselsApi = BondedVesselsApi.unavailable();
     private volatile CompanionProvisioningApi companionProvisioningApi =
             CompanionProvisioningApi.unavailable();
     private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
+    private volatile CommandTimedSummoningApi commandTimedSummoningApi =
+            CommandTimedSummoningApi.unavailable();
+    private volatile PaidCommandRevivalApi paidCommandRevivalApi = PaidCommandRevivalApi.unavailable();
+    private volatile CommandFamilyRosterApi commandFamilyRosterApi = CommandFamilyRosterApi.unavailable();
 
     public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
                            @Nonnull TameworkEventBus eventBus,
@@ -377,24 +381,6 @@ public final class TameworkApiImpl
         }
     }
 
-    /** Publishes the durable vessel facade only after its restart recovery is authoritative. */
-    public boolean activateBondedVesselsRuntime(
-            @Nonnull BondedVesselsApiDelegate runtime,
-            boolean exactEvidenceAuthorityReady,
-            boolean mutationAuthorityReady) {
-        Objects.requireNonNull(runtime, "runtime");
-        if (!exactEvidenceAuthorityReady
-                || !mutationAuthorityReady
-                || runtime.readiness().readiness() != BondedVesselReadinessView.Readiness.READY) {
-            return false;
-        }
-        bondedVesselsApi = runtime;
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.BONDED_VESSELS);
-        }
-        return true;
-    }
-
     /** Publishes provisioning only after its journal recovery and backend reconciliation succeed. */
     public boolean activateCompanionProvisioningRuntime(
             @Nonnull CompanionProvisioningApiDelegate runtime,
@@ -410,6 +396,27 @@ public final class TameworkApiImpl
         return true;
     }
 
+    /** Publishes command-family rosters only after the durable repository is available. */
+    public void activateCommandFamilyRosterRuntime(@Nonnull CommandFamilyRosterApi runtime) {
+        commandFamilyRosterApi = Objects.requireNonNull(runtime, "runtime");
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.COMMAND_FAMILY_ROSTERS);
+        }
+    }
+
+    /** Advertises capture mutations only after their durable runtime authorities are composed. */
+    public void activateAdvancedCaptureRuntimes(boolean resolvedAttemptConsumptionReady,
+                                                boolean tameAndLinkReady) {
+        synchronized (capabilities) {
+            if (resolvedAttemptConsumptionReady) {
+                capabilities.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION);
+            }
+            if (tameAndLinkReady) {
+                capabilities.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK);
+            }
+        }
+    }
+
     /** Publishes group projections only after durable reconciliation reports READY. */
     public boolean activatePopulationGroupRuntime(
             @Nonnull PopulationGroupApiDelegate runtime,
@@ -423,6 +430,42 @@ public final class TameworkApiImpl
         populationGroupApi = runtime;
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
+        }
+        return true;
+    }
+
+    /** Publishes timed command summoning only after durable recovery and population wiring are ready. */
+    public boolean activateCommandTimedSummoningRuntime(@Nonnull CommandTimedSummoningApi runtime,
+                                                        boolean recoveryReady,
+                                                        boolean populationAuthorityReady,
+                                                        boolean projectionAuthorityReady) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (!recoveryReady || !populationAuthorityReady || !projectionAuthorityReady) {
+            return false;
+        }
+        commandTimedSummoningApi = runtime;
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.COMMAND_TIMED_SUMMONING);
+        }
+        return true;
+    }
+
+    @Override
+    public CommandTimedSummoningApi commandTimedSummoning() {
+        return commandTimedSummoningApi;
+    }
+
+    /** Publishes paid revival only after its journal recovery and exact inventory authority are ready. */
+    public boolean activatePaidCommandRevivalRuntime(@Nonnull PaidCommandRevivalApi runtime,
+                                                     boolean recoveryReady,
+                                                     boolean exactInventoryAuthorityReady) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (!recoveryReady || !exactInventoryAuthorityReady) {
+            return false;
+        }
+        paidCommandRevivalApi = runtime;
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.PAID_COMMAND_REVIVAL);
         }
         return true;
     }
@@ -469,13 +512,18 @@ public final class TameworkApiImpl
     }
 
     @Override
-    public BondedVesselsApi bondedVessels() {
-        return bondedVesselsApi;
+    public CompanionProvisioningApi companionProvisioning() {
+        return companionProvisioningApi;
     }
 
     @Override
-    public CompanionProvisioningApi companionProvisioning() {
-        return companionProvisioningApi;
+    public PaidCommandRevivalApi paidCommandRevival() {
+        return paidCommandRevivalApi;
+    }
+
+    @Override
+    public CommandFamilyRosterApi commandFamilyRosters() {
+        return commandFamilyRosterApi;
     }
 
     @Override
@@ -1153,6 +1201,7 @@ public final class TameworkApiImpl
     }
 
     @Nonnull
+    @Override
     @Override
     public PopulationGroupApi populationGroups() {
         return populationGroupApi;

@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassifica
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupCountEvidenceRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
+import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -152,6 +153,16 @@ public final class PopulationGroupAdmissionRuntime {
             @Nonnull UUID populationOperationId,
             @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
             long nowMs) {
+        return commitDormant(populationOperationId, profileMutation, nowMs,
+                UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension.NO_OP);
+    }
+
+    @Nonnull
+    public CompletionStage<Commit> commitDormant(
+            @Nonnull UUID populationOperationId,
+            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
+            long nowMs,
+            @Nonnull UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension extension) {
         PreparedAdmission prepared = preparedByPopulationOperation.get(
                 Objects.requireNonNull(populationOperationId, "populationOperationId"));
         if (prepared == null) {
@@ -165,7 +176,7 @@ public final class PopulationGroupAdmissionRuntime {
         return ownerCoordinator.groupCompositeCoordinator().commitProvisionedDormantAsync(
                 prepared.ownerAdmission(), profileRepository, profileMutation,
                 groupRepository, prepared.groupOperation().operationId(),
-                prepared.classification(), nowMs).thenApply(result -> {
+                prepared.classification(), nowMs, extension).thenApply(result -> {
             if (result == null || !result.committed()) {
                 return Commit.denied(result == null
                         ? "population-group-commit-missing" : result.reason());

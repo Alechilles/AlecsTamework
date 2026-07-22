@@ -41,6 +41,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
+import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -132,7 +133,6 @@ import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
-import com.alechilles.alecstamework.items.HytaleBondedVesselWorldProjectionPort;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
 import com.alechilles.alecstamework.items.HytaleProvisionedCompanionProjectionPort;
 import com.alechilles.alecstamework.items.RecoveryProjectionReconciliationService;
@@ -182,7 +182,6 @@ import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinato
 import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;
 import com.alechilles.alecstamework.provisioning.UnifiedProvisioningPopulationBackend;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
-import com.alechilles.alecstamework.ownership.BondedVesselUnifiedPopulationPort;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
@@ -195,12 +194,6 @@ import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
-import com.alechilles.alecstamework.vessels.runtime.LoadedNpcBondedVesselProjectionEvidencePort;
-import com.alechilles.alecstamework.vessels.runtime.NpcProfileBondedVesselProfilePort;
-import com.alechilles.alecstamework.vessels.runtime.ProductionBondedVesselRuntime;
-import com.alechilles.alecstamework.vessels.runtime.BondedVesselInteractionDispatcher;
-import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
-import com.alechilles.alecstamework.config.assets.TwSpawnerVesselConfigResolver;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
@@ -328,9 +321,9 @@ public class Tamework extends JavaPlugin {
     private PopulationGroupRegistry populationGroupRegistry;
     private PopulationGroupApiDelegate populationGroupApi;
     private boolean populationGroupRecoveryReady;
-    private volatile ProductionBondedVesselRuntime bondedVesselRuntime;
     private UnifiedProvisioningPopulationBackend companionProvisioningBackend;
     private CompanionProvisioningApiDelegate companionProvisioningApi;
+    private CommandFamilyRosterService commandFamilyRosterService;
     private boolean companionProvisioningRecoveryReady;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
@@ -887,7 +880,6 @@ public class Tamework extends JavaPlugin {
         CompanionReviveEligibilityService reviveEligibility =
                 new CompanionReviveEligibilityService();
         var reviveReport = reviveEligibility.bootstrap(
-                persistenceRuntime.getBondedVesselRepository(),
                 persistenceRuntime.getCompanionProvisioningRepository(),
                 persistenceRuntime.getNpcProfileRepository(),
                 ownerPopulationRuntime.index());
@@ -985,6 +977,20 @@ public class Tamework extends JavaPlugin {
                 damagePolicy,
                 ownerPopulationRuntime.populationPolicyAuthority()
         );
+        commandFamilyRosterService = new CommandFamilyRosterService(
+                persistenceRuntime.getCommandFamilyRosterRepository(),
+                (familyId, configId, itemId, roleId) -> {
+                    String denial = commandItemRegistry.validateOwnerFamilyAccess(
+                            familyId, configId, itemId, roleId);
+                    return denial == null
+                            ? CommandFamilyRosterService.AccessDecision.allowedDecision()
+                            : CommandFamilyRosterService.AccessDecision.denied(denial);
+                },
+                apiEventBus);
+        if (api instanceof TameworkApiImpl implementation) {
+            implementation.activateCommandFamilyRosterRuntime(commandFamilyRosterService);
+        }
+        retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
         if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl implementation) {
             implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
         }
@@ -1145,8 +1151,14 @@ public class Tamework extends JavaPlugin {
                 ),
                 captureAttemptRuntimeReady ? captureAttemptCoordinator : null,
                 interactionExtensionRegistry::captureRequirementGeneration,
-                persistenceRuntime.getCaptureRepository()
+                persistenceRuntime.getCaptureRepository(),
+                commandFamilyRosterService
         );
+        if (api instanceof TameworkApiImpl implementation) {
+            implementation.activateAdvancedCaptureRuntimes(
+                    captureAttemptRuntimeReady,
+                    captureAttemptRuntimeReady && commandFamilyRosterService != null);
+        }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
@@ -1450,7 +1462,6 @@ public class Tamework extends JavaPlugin {
             implementation.close();
         }
         api = null;
-        bondedVesselRuntime = null;
         populationGroupApi = null;
         populationGroupRecoveryReady = false;
         companionProvisioningApi = null;
@@ -1555,35 +1566,9 @@ public class Tamework extends JavaPlugin {
         if (event == null || event.getWorld() == null) {
             return;
         }
-        recoverPendingBondedVesselItems(event);
         if (configOverrideManager != null) {
             initializeOverridesForWorld(event.getWorld());
         }
-    }
-
-    private void recoverPendingBondedVesselItems(@Nonnull AddPlayerToWorldEvent event) {
-        ProductionBondedVesselRuntime runtime = bondedVesselRuntime;
-        if (runtime == null || event.getHolder() == null) {
-            return;
-        }
-        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
-        if (playerRef == null || playerRef.getUuid() == null) {
-            return;
-        }
-        runtime.lifecycleObserver().recoverPendingForOwner(playerRef.getUuid())
-                .whenComplete((report, failure) -> {
-                    if (failure != null) {
-                        getLogger().at(Level.WARNING).withCause(failure).log(
-                                "Pending bonded-vessel item recovery failed for owner "
-                                        + playerRef.getUuid() + ".");
-                    } else if (report != null && report.scanned() > 0) {
-                        getLogger().at(report.failed() == 0 ? Level.INFO : Level.WARNING).log(
-                                "Pending bonded-vessel item recovery for owner "
-                                        + playerRef.getUuid() + ": scanned=" + report.scanned()
-                                        + ", completed=" + report.completed()
-                                        + ", failed=" + report.failed() + ".");
-                    }
-                });
     }
 
     private void initializeOverridesForLoadedWorlds() {
@@ -2678,7 +2663,8 @@ public class Tamework extends JavaPlugin {
                 || !ownerPopulationRuntime.populationGroupsReady()
                 || populationGroupRegistry == null
                 || persistenceRuntime == null
-                || apiEventBus == null) {
+                || apiEventBus == null
+                || commandFamilyRosterService == null) {
             return;
         }
         initializeCompanionProvisioningRuntime();
@@ -2698,12 +2684,22 @@ public class Tamework extends JavaPlugin {
                             new HytaleProvisionedCompanionProjectionPort(
                                     ownerPopulationRuntime,
                                     persistenceRuntime.getNpcProfileRepository(),
-                                    commandNpcRelocationService));
+                                    commandNpcRelocationService),
+                            persistenceRuntime.getCompanionProvisioningCommandLinkRepository(),
+                            persistenceRuntime.getCommandFamilyRosterRepository(),
+                            (profileRoleId, request) -> {
+                                String denial = commandItemRegistry.validateOwnerFamilyAccess(
+                                        request.commandFamilyId(), request.requiredCommandConfigId(),
+                                        request.accessItemId(), profileRoleId);
+                                return denial;
+                            });
             var populationRecovery = backend.recover().toCompletableFuture().join();
             CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
                     new SqliteProvisioningOperationJournal(
                             persistenceRuntime.getCompanionProvisioningRepository()),
-                    backend, apiEventBus::emitCompanionProvisioned, System::currentTimeMillis);
+                    backend, apiEventBus::emitCompanionProvisioned, System::currentTimeMillis,
+                    persistenceRuntime.getCompanionProvisioningCommandLinkRepository(),
+                    commandFamilyRosterService);
             var provisioningRecovery = coordinator.recover().toCompletableFuture().join();
             companionProvisioningBackend = backend;
             companionProvisioningApi = new CompanionProvisioningApiDelegate(coordinator);
@@ -2812,89 +2808,6 @@ public class Tamework extends JavaPlugin {
             populationGroupRecoveryReady = false;
             getLogger().at(Level.WARNING).withCause(groupFailure).log(
                     "Population-group recovery retry failed after canonical owner recovery.");
-        }
-        activateBondedVesselRuntimeAfterRecovery();
-    }
-
-    private void activateBondedVesselRuntimeAfterRecovery() {
-        if (!(api instanceof TameworkApiImpl implementation)
-                || persistenceRuntime == null
-                || ownerPopulationRuntime == null
-                || itemFeatureRegistry == null
-                || apiEventBus == null
-                || !ownerPopulationRuntime.loadedNpcIdentityIndex().isInitializationComplete()) {
-            getLogger().at(Level.WARNING).log(
-                    "Bonded-vessel runtime remains unavailable because its production "
-                            + "authorities are not ready.");
-            return;
-        }
-        try {
-            BondedVesselUnifiedPopulationPort populations =
-                    new BondedVesselUnifiedPopulationPort(ownerPopulationRuntime);
-            ProductionBondedVesselRuntime runtime = ProductionBondedVesselRuntime.compose(
-                    implementation,
-                    persistenceRuntime.getBondedVesselRepository(),
-                    Universe.get(),
-                    itemFeatureRegistry,
-                    new LoadedNpcBondedVesselProjectionEvidencePort(
-                            ownerPopulationRuntime.loadedNpcIdentityIndex()),
-                    new NpcProfileBondedVesselProfilePort(
-                            persistenceRuntime.getNpcProfileRepository(),
-                            ownerPopulationRuntime.index(),
-                            ForkJoinPool.commonPool(),
-                            persistenceRuntime.getPopulationGroupRepository(),
-                            persistenceRuntime.getBondedVesselRepository(),
-                            itemFeatureRegistry,
-                            message -> getLogger().at(Level.INFO).log(message)),
-                    populations,
-                    new HytaleBondedVesselWorldProjectionPort(
-                            ownerPopulationRuntime, populations),
-                    apiEventBus::emitBondedVesselEvent,
-                    ForkJoinPool.commonPool(),
-                    System::currentTimeMillis,
-                    System::nanoTime);
-            bondedVesselRuntime = runtime;
-            ownerPopulationRuntime.installSealedProjectionObserver(
-                    runtime.itemProjectionReconciler()::reconcileSealed);
-            BondedVesselSpawnerBridge spawnerBridge = new BondedVesselSpawnerBridge(
-                    runtime.initialBindings(),
-                    new BondedVesselInteractionDispatcher(runtime.apiDelegate()),
-                    new TwSpawnerVesselConfigResolver(itemFeatureRegistry));
-            CompanionReviveEligibilityService.current().setBondedLifecycleSink(
-                    (observation, result, target) -> runtime.lifecycleObserver().observe(
-                            new com.alechilles.alecstamework.vessels.runtime
-                                    .BondedVesselLifecycleObserver.Observation(
-                                    observation.profileId(), observation.currentNpcUuid(),
-                                    result.revision(), target,
-                                    switch (target) {
-                                        case STORED -> "bonded-companion-despawn-stored";
-                                        case DEAD -> "bonded-companion-death-recorded";
-                                        case LOST -> "bonded-companion-lost-recorded";
-                                        default -> "bonded-companion-lifecycle-recorded";
-                                    },
-                                    observation.source())));
-            runtime.bootstrap().recoverAndActivate().whenComplete((activation, failure) -> {
-                if (failure != null || activation == null || !activation.active()) {
-                    String message = "Bonded-vessel runtime recovery failed; capability remains "
-                            + "unavailable."
-                            + (activation == null ? "" : " Reason: " + activation.reason());
-                    if (failure == null) {
-                        getLogger().at(Level.WARNING).log(message);
-                    } else {
-                        getLogger().at(Level.WARNING).withCause(failure).log(message);
-                    }
-                    return;
-                }
-                if (spawnerFeatureHandler != null) {
-                    spawnerFeatureHandler.installBondedVesselBridge(spawnerBridge);
-                }
-                getLogger().at(Level.INFO).log(
-                        "Bonded-vessel production runtime recovered and activated.");
-            });
-        } catch (RuntimeException | LinkageError failure) {
-            bondedVesselRuntime = null;
-            getLogger().at(Level.WARNING).withCause(failure).log(
-                    "Bonded-vessel runtime bootstrap failed; capability remains unavailable.");
         }
     }
 
@@ -3240,11 +3153,17 @@ public class Tamework extends JavaPlugin {
                 if (itemId == null || itemId.isBlank()) {
                     continue;
                 }
-                commandItemRegistry.register(itemId, asset);
+                commandItemRegistry.register(asset.getId(), itemId, asset);
                 loaded++;
             }
         }
         return loaded;
+    }
+
+    /** Focused durable roster seam for capture/provisioning runtime composition. */
+    @Nullable
+    public CommandFamilyRosterService getCommandFamilyRosterService() {
+        return commandFamilyRosterService;
     }
 
 

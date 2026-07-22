@@ -56,8 +56,26 @@ public final class UnifiedPopulationCompositeStore {
             @Nonnull String groupOperationId,
             @Nonnull PopulationGroupRepository.ClassificationMutation classification,
             long nowMs) {
+        return commitProvisionedDormantAsync(ownerCommit, profileRepository, profileMutation,
+                groupRepository, groupOperationId, classification, nowMs,
+                ProvisionedDormantCommitExtension.NO_OP);
+    }
+
+    /** Adds an optional domain commit to the same rollback boundary as profile creation. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<ProvisionedDormantCommitResult>
+    commitProvisionedDormantAsync(
+            @Nonnull PopulationPersistenceTransition.Commit ownerCommit,
+            @Nonnull NpcProfileRepository profileRepository,
+            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull String groupOperationId,
+            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
+            long nowMs,
+            @Nonnull ProvisionedDormantCommitExtension extension) {
         Objects.requireNonNull(profileRepository, "profileRepository");
         Objects.requireNonNull(groupRepository, "groupRepository");
+        Objects.requireNonNull(extension, "extension");
         AtomicReference<NpcProfileRepository.ProfileRecord> before = new AtomicReference<>();
         return writeQueue.submitTracked(
                 "provisioned_dormant_population_commit",
@@ -66,7 +84,7 @@ public final class UnifiedPopulationCompositeStore {
                             connection, profileMutation.profileId()));
                     return commitProvisionedDormantInTransaction(
                             connection, ownerCommit, profileRepository, profileMutation,
-                            groupRepository, groupOperationId, classification, nowMs);
+                            groupRepository, groupOperationId, classification, nowMs, extension);
                 },
                 result -> {
                     if (result != null && result.committed() && result.profileResult() != null) {
@@ -181,7 +199,8 @@ public final class UnifiedPopulationCompositeStore {
             PopulationGroupRepository groupRepository,
             String groupOperationId,
             PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs) throws Exception {
+            long nowMs,
+            ProvisionedDormantCommitExtension extension) throws Exception {
         Savepoint boundary = connection.setSavepoint();
         try {
             PopulationPersistenceTransition.Result owner =
@@ -205,6 +224,14 @@ public final class UnifiedPopulationCompositeStore {
                 rollback(connection, boundary);
                 return ProvisionedDormantCommitResult.denied(owner, profile, groups,
                         reason(groups.reason(), "population_group_commit_denied"));
+            }
+            ExtensionResult extensionResult = extension.commit(connection, profile.profile());
+            if (extensionResult == null || !extensionResult.committed()) {
+                rollback(connection, boundary);
+                return ProvisionedDormantCommitResult.denied(owner, profile, groups,
+                        extensionResult == null ? "provisioned-dormant-extension-missing"
+                                : reason(extensionResult.reason(),
+                                "provisioned-dormant-extension-denied"));
             }
             connection.releaseSavepoint(boundary);
             return new ProvisionedDormantCommitResult(
@@ -330,6 +357,22 @@ public final class UnifiedPopulationCompositeStore {
         }
 
         public boolean committed() { return status == CompositeStatus.COMMITTED; }
+    }
+
+    @FunctionalInterface
+    public interface ProvisionedDormantCommitExtension {
+        ProvisionedDormantCommitExtension NO_OP = (connection, profile) -> ExtensionResult.success();
+
+        @Nonnull ExtensionResult commit(@Nonnull Connection connection,
+                                        @Nonnull NpcProfileRepository.ProfileRecord profile)
+                throws Exception;
+    }
+
+    public record ExtensionResult(boolean committed, @Nullable String reason) {
+        public static ExtensionResult success() { return new ExtensionResult(true, null); }
+        public static ExtensionResult denied(String reason) {
+            return new ExtensionResult(false, Objects.requireNonNull(reason, "reason"));
+        }
     }
 
     public record PopulationGroupCompositeCommitResult(

@@ -11,6 +11,11 @@ public interface TameworkApi {
 
     CommandLinksApi commandLinks();
 
+    /** Timed roster operations; require {@link TameworkApiCapability#COMMAND_TIMED_SUMMONING}. */
+    default CommandTimedSummoningApi commandTimedSummoning() {
+        return CommandTimedSummoningApi.unavailable();
+    }
+
     ProgressionApi progression();
 
     PolicyApi policies();
@@ -27,12 +32,9 @@ public interface TameworkApi {
 
     DiagnosticsApi diagnostics();
 
-    /**
-     * Returns the mutation-bound bonded-vessel authority when advertised by
-     * {@link TameworkApiCapability#BONDED_VESSELS}.
-     */
-    default BondedVesselsApi bondedVessels() {
-        return BondedVesselsApi.unavailable();
+    /** Returns the durable owner/command-family roster authority when advertised. */
+    default CommandFamilyRosterApi commandFamilyRosters() {
+        return CommandFamilyRosterApi.unavailable();
     }
 
     /**
@@ -41,6 +43,16 @@ public interface TameworkApi {
      */
     default CompanionProvisioningApi companionProvisioning() {
         return CompanionProvisioningApi.unavailable();
+    }
+
+    /** Returns paid command revival when {@link TameworkApiCapability#PAID_COMMAND_REVIVAL} is advertised. */
+    default PaidCommandRevivalApi paidCommandRevival() {
+        return PaidCommandRevivalApi.unavailable();
+    }
+
+    /** Read-only population-group counts used by roster capacity presentation. */
+    default PopulationGroupApi populationGroups() {
+        return PopulationGroupApi.unavailable();
     }
 }
 

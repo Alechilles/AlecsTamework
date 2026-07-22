@@ -17,6 +17,18 @@ public interface CompanionProvisioningApi {
     @Nonnull
     CompletionStage<CompanionProvisioningResult> provision(@Nonnull CompanionProvisioningRequest request);
 
+    /** Atomically creates the dormant profile and its owner/family roster membership. */
+    @Nonnull
+    default CompletionStage<CompanionProvisioningLinkResult> provisionAndLink(
+            @Nonnull CompanionProvisioningLinkRequest request) {
+        if (request == null) throw new NullPointerException("request");
+        CompanionProvisioningResult unavailable = CompanionProvisioningResult.unavailable(
+                "companion-provisioning-link-authority-unavailable");
+        return CompletableFuture.completedFuture(new CompanionProvisioningLinkResult(
+                CompanionProvisioningLinkResult.Status.UNAVAILABLE,
+                "companion-provisioning-link-authority-unavailable", unavailable, null, null, null));
+    }
+
     @Nonnull
     CompletionStage<CompanionProvisioningResult> transition(
             @Nonnull ProvisionedCompanionTransitionRequest request

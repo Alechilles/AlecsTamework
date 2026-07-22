@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
+import com.alechilles.alecstamework.api.PaidCommandRevivalRequest;
+import com.alechilles.alecstamework.api.PaidCommandRevivalResult;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -212,7 +216,9 @@ public final class CommandItemFeatureHandler {
                 panelEntryService,
                 panelPreferenceService,
                 linkPolicyService,
-                npcNameResolver
+                npcNameResolver,
+                persistenceRuntime != null ? persistenceRuntime.getCommandFamilyRosterRepository() : null,
+                persistenceRuntime != null ? persistenceRuntime.getNpcProfileRepository() : null
         );
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
@@ -917,7 +923,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
                 npcUuid -> ownerReleaseService.release(player, toolId, config, npcUuid),
                 npcUuid -> ownerCullService.cull(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
+                npcUuid -> applyMenuRespawn(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuLocate(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
@@ -1062,6 +1068,7 @@ public final class CommandItemFeatureHandler {
 
     private void applyMenuRespawn(Player player,
                                   String toolId,
+                                  TwCommandItemConfig commandConfig,
                                   UUID npcUuid) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
@@ -1105,6 +1112,10 @@ public final class CommandItemFeatureHandler {
             CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
                     deathService != null ? deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) : null;
             if (deadSnapshot != null) {
+                if (commandConfig != null && commandConfig.usesOwnerCommandFamilyRoster()) {
+                    requestPaidMenuRevival(player, commandConfig, record, deadSnapshot);
+                    return;
+                }
                 String roleId = deadSnapshot.roleId();
                 if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
                     roleId = record.cachedRoleId;
@@ -1176,6 +1187,44 @@ public final class CommandItemFeatureHandler {
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
+    }
+
+    /** Re-enters the server-authoritative quote/payment path after panel confirmation. */
+    private void requestPaidMenuRevival(@Nonnull Player player,
+                                        @Nonnull TwCommandItemConfig commandConfig,
+                                        @Nonnull LinkedNpcRecord record,
+                                        @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot death) {
+        String familyId = commandConfig.getCommandFamilyId();
+        String profileId = record.profileId;
+        if ((profileId == null || profileId.isBlank()) && profileActionResolver != null) {
+            CommandNpcProfileActionResolver.ActionTarget target = profileActionResolver.resolveRelocation(record);
+            profileId = target.profileId();
+        }
+        Tamework plugin = Tamework.getInstance();
+        PaidCommandRevivalApi revival = plugin != null && plugin.getApi() != null
+                ? plugin.getApi().paidCommandRevival() : PaidCommandRevivalApi.unavailable();
+        if (familyId == null || familyId.isBlank() || profileId == null || profileId.isBlank()) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
+            return;
+        }
+        String finalProfileId = profileId;
+        String idempotencyKey = "command-panel:" + player.getUuid() + ":" + finalProfileId
+                + ":" + Math.max(0L, death.diedAtMs());
+        revival.revive(new PaidCommandRevivalRequest(
+                "Alechilles:Tamework:CommandPanel", idempotencyKey, player.getUuid(),
+                finalProfileId, familyId)).whenComplete((result, failure) -> {
+            if (failure != null || result == null) {
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
+                return;
+            }
+            if (result.status() == PaidCommandRevivalResult.Status.INSUFFICIENT_COST) {
+                feedbackService.showWarningKey(player,
+                        "tamework.ui.linkedPanel.revive.missingComponents");
+            } else if (!result.succeeded()
+                    && result.status() != PaidCommandRevivalResult.Status.RECOVERY_PENDING) {
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
+            }
+        });
     }
 
     void canonicalizePlayerCommandInventory(@Nullable Holder<EntityStore> holder) {

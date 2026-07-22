@@ -17,6 +17,7 @@ public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V6 = 6;
     public static final int SCHEMA_VERSION_V7 = 7;
     public static final int SCHEMA_VERSION_V8 = 8;
+    public static final int SCHEMA_VERSION_V9 = 9;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
     public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
@@ -25,20 +26,22 @@ public final class SqliteSchemaMigrator {
     public static final String MIGRATION_NAME_SCHEMA_V6 = "schema_v6_companion_population_integrity";
     public static final String MIGRATION_NAME_SCHEMA_V7 = "schema_v7_persistence_resilience";
     public static final String MIGRATION_NAME_SCHEMA_V8 = "schema_v8_hydragon_integration_foundations";
+    public static final String MIGRATION_NAME_SCHEMA_V9 = "schema_v9_command_family_authorities";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     private final SqliteLegacySchemaMigration legacySchemaMigration = new SqliteLegacySchemaMigration();
     private final SqliteSchemaV5Migration schemaV5Migration = new SqliteSchemaV5Migration();
     private final SqliteSchemaV7Migration schemaV7Migration = new SqliteSchemaV7Migration();
     private final SqliteSchemaV8Migration schemaV8Migration = new SqliteSchemaV8Migration();
+    private final SqliteSchemaV9Migration schemaV9Migration = new SqliteSchemaV9Migration();
 
     public void migrate(@Nonnull Connection connection) throws Exception {
-        migrateThrough(connection, SCHEMA_VERSION_V8);
+        migrateThrough(connection, SCHEMA_VERSION_V9);
     }
 
     /** Applies every Tamework-owned schema migration up to the requested version. */
     void migrateThrough(@Nonnull Connection connection, int targetVersion) throws Exception {
-        if (targetVersion < SCHEMA_VERSION_V2 || targetVersion > SCHEMA_VERSION_V8) {
+        if (targetVersion < SCHEMA_VERSION_V2 || targetVersion > SCHEMA_VERSION_V9) {
             throw new IllegalArgumentException("Unsupported schema target: " + targetVersion);
         }
         createMigrationsTable(connection);
@@ -92,6 +95,13 @@ public final class SqliteSchemaMigrator {
         schemaV8Migration.apply(connection);
         if (!isVersionApplied(connection, SCHEMA_VERSION_V8)) {
             recordMigration(connection, SCHEMA_VERSION_V8, MIGRATION_NAME_SCHEMA_V8);
+        }
+        if (targetVersion < SCHEMA_VERSION_V9) {
+            return;
+        }
+        schemaV9Migration.apply(connection);
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V9)) {
+            recordMigration(connection, SCHEMA_VERSION_V9, MIGRATION_NAME_SCHEMA_V9);
         }
     }
 

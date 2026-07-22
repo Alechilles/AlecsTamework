@@ -7,6 +7,10 @@ import com.alechilles.alecstamework.api.CompanionProvisioningOperationView;
 import com.alechilles.alecstamework.api.CompanionProvisioningProjectionStatus;
 import com.alechilles.alecstamework.api.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.api.CompanionProvisioningResult;
+import com.alechilles.alecstamework.api.CompanionProvisioningLinkRequest;
+import com.alechilles.alecstamework.api.CompanionProvisioningLinkResult;
+import com.alechilles.alecstamework.api.CommandTimedSummoningResult;
+import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
 import com.alechilles.alecstamework.api.ProvisionedCompanionTransitionRequest;
@@ -15,6 +19,7 @@ import com.alechilles.alecstamework.api.Vector3View;
 import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningCommandLinkRepository;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
@@ -35,26 +40,41 @@ public final class CompanionProvisioningCoordinator {
     private final ProvisioningPopulationBackend backend;
     private final ProvisioningEventSink eventSink;
     private final LongSupplier wallClockMs;
+    @Nullable private final CompanionProvisioningCommandLinkRepository commandLinkRepository;
+    @Nullable private final CommandFamilyRosterService commandFamilyRosterService;
+    private volatile InitialProjectionHook initialProjectionHook = InitialProjectionHook.UNAVAILABLE;
 
     public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
                                             @Nonnull ProvisioningPopulationBackend backend) {
-        this(journal, backend, ProvisioningEventSink.NO_OP, System::currentTimeMillis);
+        this(journal, backend, ProvisioningEventSink.NO_OP, System::currentTimeMillis, null, null);
     }
 
     public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
                                             @Nonnull ProvisioningPopulationBackend backend,
                                             @Nonnull LongSupplier wallClockMs) {
-        this(journal, backend, ProvisioningEventSink.NO_OP, wallClockMs);
+        this(journal, backend, ProvisioningEventSink.NO_OP, wallClockMs, null, null);
     }
 
     public CompanionProvisioningCoordinator(@Nonnull ProvisioningOperationJournal journal,
                                             @Nonnull ProvisioningPopulationBackend backend,
                                             @Nonnull ProvisioningEventSink eventSink,
                                             @Nonnull LongSupplier wallClockMs) {
+        this(journal, backend, eventSink, wallClockMs, null, null);
+    }
+
+    public CompanionProvisioningCoordinator(
+            @Nonnull ProvisioningOperationJournal journal,
+            @Nonnull ProvisioningPopulationBackend backend,
+            @Nonnull ProvisioningEventSink eventSink,
+            @Nonnull LongSupplier wallClockMs,
+            @Nonnull CompanionProvisioningCommandLinkRepository commandLinkRepository,
+            @Nonnull CommandFamilyRosterService commandFamilyRosterService) {
         this.journal = Objects.requireNonNull(journal, "journal");
         this.backend = Objects.requireNonNull(backend, "backend");
         this.eventSink = Objects.requireNonNull(eventSink, "eventSink");
         this.wallClockMs = Objects.requireNonNull(wallClockMs, "wallClockMs");
+        this.commandLinkRepository = commandLinkRepository;
+        this.commandFamilyRosterService = commandFamilyRosterService;
     }
 
     @Nonnull
@@ -116,6 +136,105 @@ public final class CompanionProvisioningCoordinator {
                 default -> completedUnavailable(reason(created.reason(), "provisioning-journal-create-failed"));
             };
         }).exceptionally(failure -> CompanionProvisioningResult.unavailable("provisioning-runtime-failed"));
+    }
+
+    /** Prepares durable link intent, then lets dormant profile and roster membership commit together. */
+    @Nonnull
+    public CompletionStage<CompanionProvisioningLinkResult> provisionAndLink(
+            @Nonnull CompanionProvisioningLinkRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (commandLinkRepository == null || commandFamilyRosterService == null) {
+            return CompletableFuture.completedFuture(linkUnavailable(
+                    "companion-provisioning-link-authority-unavailable"));
+        }
+        UUID operationId = stableOperationId("provision", request.provisioning().callerNamespace(),
+                request.provisioning().idempotencyKey());
+        long rosterRevision = commandFamilyRosterService.get(
+                request.provisioning().ownerUuid(), request.commandFamilyId())
+                .map(view -> view.revision()).orElse(0L);
+        var submission = commandLinkRepository.prepareAsync(operationId, request, rosterRevision);
+        if (!submission.accepted()) {
+            return CompletableFuture.completedFuture(linkUnavailable(
+                    "companion-provisioning-link-write-unavailable"));
+        }
+        return submission.completion().thenCompose(outcome -> {
+            if (!outcome.isCommitted() || outcome.value() == null) {
+                return CompletableFuture.completedFuture(linkUnavailable(
+                        "companion-provisioning-link-prepare-failed"));
+            }
+            var prepared = outcome.value();
+            if (prepared.status() == CompanionProvisioningCommandLinkRepository.Status.CONFLICT) {
+                CompanionProvisioningResult denied = CompanionProvisioningResult.unavailable(
+                        "companion-provisioning-link-idempotency-conflict");
+                return CompletableFuture.completedFuture(new CompanionProvisioningLinkResult(
+                        CompanionProvisioningLinkResult.Status.DENIED,
+                        "companion-provisioning-link-idempotency-conflict", denied, null, null, null));
+            }
+            return provision(request.provisioning()).thenCompose(provisioning -> {
+                CompanionProvisioningLinkResult committed = compoundResult(request, provisioning);
+                if (!committed.accepted() || !request.requestInitialProjection()) {
+                    return CompletableFuture.completedFuture(committed);
+                }
+                return initialProjectionHook.project(request, provisioning)
+                        .handle((projection, failure) -> new CompanionProvisioningLinkResult(
+                                committed.status(), committed.reason(), committed.provisioning(),
+                                committed.roster(), committed.membership(),
+                                failure == null ? projection : new CommandTimedSummoningResult(
+                                        CommandTimedSummoningResult.Status.UNAVAILABLE,
+                                        "initial-timed-projection-failed", null)));
+            });
+        }).exceptionally(failure -> linkUnavailable("companion-provisioning-link-failed"));
+    }
+
+    private CompanionProvisioningLinkResult compoundResult(
+            CompanionProvisioningLinkRequest request, CompanionProvisioningResult provisioning) {
+        if (!provisioning.accepted() || provisioning.profileId() == null) {
+            CompanionProvisioningLinkResult.Status status = provisioning.status()
+                    == CompanionProvisioningResult.Status.QUARANTINED
+                    ? CompanionProvisioningLinkResult.Status.QUARANTINED
+                    : CompanionProvisioningLinkResult.Status.DENIED;
+            return new CompanionProvisioningLinkResult(status, provisioning.reason(),
+                    provisioning, null, null, null);
+        }
+        var roster = commandFamilyRosterService.get(
+                request.provisioning().ownerUuid(), request.commandFamilyId()).orElse(null);
+        var membership = commandFamilyRosterService.getMembership(
+                request.provisioning().ownerUuid(), request.commandFamilyId(),
+                provisioning.profileId()).orElse(null);
+        if (roster == null || membership == null) {
+            return new CompanionProvisioningLinkResult(
+                    CompanionProvisioningLinkResult.Status.QUARANTINED,
+                    "companion-provisioning-link-commit-not-visible", provisioning, null, null, null);
+        }
+        boolean replay = provisioning.status() == CompanionProvisioningResult.Status.ALREADY_PROVISIONED;
+        return new CompanionProvisioningLinkResult(
+                replay ? CompanionProvisioningLinkResult.Status.ALREADY_COMMITTED
+                        : CompanionProvisioningLinkResult.Status.COMMITTED,
+                replay ? "companion-provisioning-link-already-committed"
+                        : "companion-provisioning-link-committed",
+                provisioning, roster, membership, null);
+    }
+
+    private CompanionProvisioningLinkResult linkUnavailable(String reason) {
+        return new CompanionProvisioningLinkResult(CompanionProvisioningLinkResult.Status.UNAVAILABLE,
+                reason, CompanionProvisioningResult.unavailable(reason), null, null, null);
+    }
+
+    /** Installs the Tamework-owned lease-aware initial projection after timed runtime recovery. */
+    public void installInitialProjectionHook(@Nonnull InitialProjectionHook hook) {
+        initialProjectionHook = Objects.requireNonNull(hook, "hook");
+    }
+
+    @FunctionalInterface
+    public interface InitialProjectionHook {
+        InitialProjectionHook UNAVAILABLE = (request, provisioning) ->
+                CompletableFuture.completedFuture(new CommandTimedSummoningResult(
+                        CommandTimedSummoningResult.Status.UNAVAILABLE,
+                        "initial-timed-projection-unavailable", null));
+
+        CompletionStage<CommandTimedSummoningResult> project(
+                @Nonnull CompanionProvisioningLinkRequest request,
+                @Nonnull CompanionProvisioningResult provisioning);
     }
 
     @Nonnull

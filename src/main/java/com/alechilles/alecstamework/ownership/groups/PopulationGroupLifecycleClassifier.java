@@ -16,6 +16,7 @@ public final class PopulationGroupLifecycleClassifier {
         Objects.requireNonNull(lifecycle, "lifecycle");
         return lifecycle == CompanionLifecycleState.ACTIVE
                 || lifecycle == CompanionLifecycleState.UNLOADED
-                || lifecycle == CompanionLifecycleState.RESTORING;
+                || lifecycle == CompanionLifecycleState.RESTORING
+                || lifecycle == CompanionLifecycleState.STORING;
     }
 }

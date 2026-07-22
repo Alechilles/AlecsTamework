@@ -190,13 +190,18 @@ final class CompanionSpawnAdmissionPlanner {
                     : "spawn-source-population-state-mismatch";
         }
         if (owner == null || (claim == null
-                && requiredLifecycle != CompanionLifecycleState.PROVISIONED_DORMANT)) {
+                && requiredLifecycle != CompanionLifecycleState.PROVISIONED_DORMANT
+                && requiredLifecycle != CompanionLifecycleState.ROSTER_STORED)) {
             return "spawn-source-population-profile-unavailable";
         }
         if (owner.lifecycleState() == CompanionLifecycleState.ACTIVE
                 || owner.lifecycleState() == CompanionLifecycleState.UNLOADED
+                || owner.lifecycleState() == CompanionLifecycleState.RESTORING
+                || owner.lifecycleState() == CompanionLifecycleState.STORING
                 || (claim != null && (claim.lifecycleState() == CompanionLifecycleState.ACTIVE
-                || claim.lifecycleState() == CompanionLifecycleState.UNLOADED))) {
+                || claim.lifecycleState() == CompanionLifecycleState.UNLOADED
+                || claim.lifecycleState() == CompanionLifecycleState.RESTORING
+                || claim.lifecycleState() == CompanionLifecycleState.STORING))) {
             return "spawn-source-duplicate-active-profile";
         }
         if (owner.lifecycleState() != requiredLifecycle

@@ -35,7 +35,7 @@ public record CompanionSpawnAdmissionRequest(
         Objects.requireNonNull(operation, "operation");
         boolean canonicalNullNpcRestore = previousNpcUuid == null
                 && canonicalProfileId != null
-                && requiredSourceLifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
+                && isCanonicalNullDormantSource(requiredSourceLifecycle)
                 && !allowLegacyAdoption
                 && operation == OwnerPopulationOperation.RESTORE;
         if (previousNpcUuid == null && !canonicalNullNpcRestore) {
@@ -54,7 +54,8 @@ public record CompanionSpawnAdmissionRequest(
             }
             if (requiredSourceLifecycle == CompanionLifecycleState.ACTIVE
                     || requiredSourceLifecycle == CompanionLifecycleState.UNLOADED
-                    || requiredSourceLifecycle == CompanionLifecycleState.RESTORING) {
+                    || requiredSourceLifecycle == CompanionLifecycleState.RESTORING
+                    || requiredSourceLifecycle == CompanionLifecycleState.STORING) {
                 throw new IllegalArgumentException("Replacement sources must be dormant.");
             }
         }
@@ -110,7 +111,12 @@ public record CompanionSpawnAdmissionRequest(
     public boolean canonicalNullNpcRestore() {
         return previousNpcUuid == null
                 && canonicalProfileId != null
-                && requiredSourceLifecycle == CompanionLifecycleState.PROVISIONED_DORMANT;
+                && isCanonicalNullDormantSource(requiredSourceLifecycle);
+    }
+
+    private static boolean isCanonicalNullDormantSource(@Nullable CompanionLifecycleState lifecycle) {
+        return lifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
+                || lifecycle == CompanionLifecycleState.ROSTER_STORED;
     }
 
     @Nullable
