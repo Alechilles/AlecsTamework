@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_HEIGHT = 126;
+    private static final int COMPACT_CARD_HEIGHT = 88;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -160,7 +162,9 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
+        boolean showRosterDetails = roster != null
+                && roster.state() != CommandTimedSummoningState.DEAD_REVIVABLE;
+        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor(showRosterDetails));
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -189,7 +193,8 @@ final class LinkedNpcPanelCardBinder {
         );
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
         bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
-                rosterCapacitySelector, summonSelector, dismissSelector, roster, language);
+                rosterCapacitySelector, summonSelector, dismissSelector,
+                showRosterDetails ? roster : null, language);
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
@@ -337,12 +342,12 @@ final class LinkedNpcPanelCardBinder {
         }
     }
 
-    private static Anchor buildCardAnchor() {
+    private static Anchor buildCardAnchor(boolean showRosterDetails) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(CARD_HEIGHT));
+        anchor.setHeight(Value.of(showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT));
         return anchor;
     }
 

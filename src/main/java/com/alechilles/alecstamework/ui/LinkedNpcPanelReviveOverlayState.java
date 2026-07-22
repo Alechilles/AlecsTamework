@@ -1,8 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.ui.ItemGridSlot;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.List;
 import java.util.UUID;
@@ -11,8 +11,6 @@ import javax.annotation.Nullable;
 
 /** Holds and renders the full arbitrary-length paid-revival confirmation quote. */
 final class LinkedNpcPanelReviveOverlayState {
-    static final String COST_LINE_UI_PATH = "TameworkReviveCostLine.ui";
-
     private boolean visible;
     private UUID npcUuid;
     private String npcName;
@@ -64,31 +62,14 @@ final class LinkedNpcPanelReviveOverlayState {
                 "#TameworkLinkedPanelReviveSubtitle.Text",
                 LocalizedText.format(language, "tamework.ui.linkedPanel.revive.subtitle", resolveNpcName(language))
         );
-        commandBuilder.clear("#TameworkLinkedPanelReviveCostList");
-        List<CommandReviveCostPresentation.CostLine> costs = presentation.costs();
-        for (int index = 0; index < costs.size(); index++) {
-            CommandReviveCostPresentation.CostLine line = costs.get(index);
-            commandBuilder.append("#TameworkLinkedPanelReviveCostList", COST_LINE_UI_PATH);
-            String root = "#TameworkLinkedPanelReviveCostList[" + index + "]";
-            commandBuilder.set(root + " #CostItem.Slots", List.of(itemSlot(line)));
-            commandBuilder.set(root + " #CostName.Text", line.localizedName());
-            String ownedRequired = line.ownedQuantity() + " / " + line.requiredQuantity();
-            commandBuilder.set(root + " #CostSatisfied.Text", ownedRequired);
-            commandBuilder.set(root + " #CostSatisfied.Visible", line.satisfied());
-            commandBuilder.set(root + " #CostInsufficient.Text", ownedRequired);
-            commandBuilder.set(root + " #CostInsufficient.Visible", !line.satisfied());
-            commandBuilder.set(root + " #CostShortage.Visible", !line.satisfied());
-            commandBuilder.set(
-                    root + " #CostShortage.Text",
-                    line.satisfied()
-                            ? ""
-                            : LocalizedText.format(
-                                    language,
-                                    "tamework.ui.linkedPanel.revive.shortage",
-                                    line.shortageQuantity()
-                            )
-            );
-        }
+        commandBuilder.set(
+                "#TameworkLinkedPanelReviveCostText.Text",
+                formatCostText(presentation.costs(), language)
+        );
+        commandBuilder.setObject(
+                "#TameworkLinkedPanelReviveCostText.Anchor",
+                buildCostTextAnchor(presentation.costs().size())
+        );
         boolean affordable = presentation.affordable();
         commandBuilder.set("#TameworkLinkedPanelReviveConfirmButton.Visible", affordable);
         commandBuilder.set("#TameworkLinkedPanelReviveBlockedButton.Visible", !affordable);
@@ -109,11 +90,37 @@ final class LinkedNpcPanelReviveOverlayState {
     }
 
     @Nonnull
-    private ItemGridSlot itemSlot(@Nonnull CommandReviveCostPresentation.CostLine line) {
-        ItemGridSlot slot = new ItemGridSlot(new ItemStack(line.itemId(), 1));
-        slot.setName(line.localizedName());
-        slot.setSkipItemQualityBackground(true);
-        return slot;
+    static String formatCostText(
+            @Nonnull List<CommandReviveCostPresentation.CostLine> costs,
+            @Nullable String language) {
+        StringBuilder text = new StringBuilder();
+        for (CommandReviveCostPresentation.CostLine line : costs) {
+            if (!text.isEmpty()) text.append('\n');
+            text.append(line.localizedName())
+                    .append("    ")
+                    .append(line.ownedQuantity())
+                    .append(" / ")
+                    .append(line.requiredQuantity());
+            if (!line.satisfied()) {
+                text.append("  (")
+                        .append(LocalizedText.format(
+                                language,
+                                "tamework.ui.linkedPanel.revive.shortage",
+                                line.shortageQuantity()
+                        ))
+                        .append(')');
+            }
+        }
+        return text.toString();
+    }
+
+    @Nonnull
+    private static Anchor buildCostTextAnchor(int costCount) {
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(0));
+        anchor.setRight(Value.of(8));
+        anchor.setHeight(Value.of(Math.max(224, Math.max(1, costCount) * 32)));
+        return anchor;
     }
 
     private String resolveNpcName(@Nullable String language) {

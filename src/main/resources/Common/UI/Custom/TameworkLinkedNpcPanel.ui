@@ -275,13 +275,16 @@ Group #TameworkLinkedPanelRoot {
 
                 Group #TameworkLinkedPanelReviveCostViewport {
                     Anchor: (Top: 88, Left: 14, Width: 354, Height: 240);
+                    Background: #0b1728;
+                    Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
                     KeepScrollPosition: true;
                     ScrollbarStyle: $C.@DefaultScrollbarStyle;
                     LayoutMode: TopScrolling;
 
-                    Group #TameworkLinkedPanelReviveCostList {
-                        LayoutMode: Top;
-                        Anchor: (Bottom: 4);
+                    Label #TameworkLinkedPanelReviveCostText {
+                        Anchor: (Left: 0, Right: 8, Height: 224);
+                        Text: "";
+                        Style: (Wrap: true, FontSize: 13, TextColor: #eef5ff, HorizontalAlignment: Start, VerticalAlignment: Start);
                     }
                 }
 

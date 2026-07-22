@@ -93,6 +93,14 @@ class LinkedNpcPanelCardLayoutTest {
                         + unquotedStringTextDefaults
         );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
+        assertTrue(
+                binder.contains("COMPACT_CARD_HEIGHT = 88"),
+                "Cards without actionable roster details should not retain a blank roster row."
+        );
+        assertTrue(
+                binder.contains("showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT"),
+                "Card height should only reserve the roster detail row when it is rendered."
+        );
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
         int xpRingLeft = Integer.parseInt(xpRing.group(2));
