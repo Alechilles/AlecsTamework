@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -81,7 +82,9 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("coordinator.recover().toCompletableFuture().join()"));
         assertTrue(plugin.contains("companionProvisioningBackend.recoveryReady()"));
         assertTrue(plugin.contains("new HytaleProvisionedCompanionProjectionPort("));
-        assertTrue(plugin.contains("companionProvisioningBackend.activeProjectionReady()"));
+        assertTrue(plugin.contains("companionProvisioningBackend.readiness()"));
+        assertFalse(plugin.contains("|| !companionProvisioningBackend.dormantReady()"));
+        assertFalse(plugin.contains("|| !companionProvisioningBackend.activeProjectionReady()"));
         assertTrue(plugin.contains("apiEventBus::emitCompanionProvisioned"));
         assertTrue(plugin.contains("ownerPopulationRuntime.installPopulationGroups("));
         assertTrue(plugin.contains("apiEventBus::emitPopulationGroupEvent"));

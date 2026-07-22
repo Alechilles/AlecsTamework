@@ -11,6 +11,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
@@ -2693,12 +2694,22 @@ public class Tamework extends JavaPlugin {
                 || companionProvisioningApi == null
                 || companionProvisioningBackend == null
                 || !companionProvisioningRecoveryReady
-                || !companionProvisioningBackend.dormantReady()
-                || !companionProvisioningBackend.activeProjectionReady()
                 || !companionProvisioningBackend.recoveryReady()) {
             return;
         }
-        implementation.activateCompanionProvisioningRuntime(companionProvisioningApi, true);
+        boolean alreadyActive = implementation.getCapabilities()
+                .contains(TameworkApiCapability.COMPANION_PROVISIONING);
+        boolean activated = implementation.activateCompanionProvisioningRuntime(
+                companionProvisioningApi, true);
+        if (activated && !alreadyActive) {
+            var readiness = companionProvisioningBackend.readiness();
+            getLogger().at(Level.INFO).log(
+                    "Companion-provisioning runtime recovered and activated "
+                            + "(dormantReady=" + readiness.dormantReady()
+                            + ", activeProjectionReady=" + readiness.activeProjectionReady()
+                            + ", recoveryReady=" + readiness.recoveryReady()
+                            + ", reason=" + readiness.reason() + ").");
+        }
     }
 
     private void initializePopulationGroupRuntime() {
