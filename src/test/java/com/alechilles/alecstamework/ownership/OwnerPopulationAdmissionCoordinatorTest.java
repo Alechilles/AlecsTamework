@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
+import com.alechilles.alecstamework.ownership.groups.PopulationGroupRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
@@ -69,6 +71,11 @@ class OwnerPopulationAdmissionCoordinatorTest {
     @Test
     void groupCompositePreservesSourceFinalizationPendingSemantics() throws Exception {
         try (Harness harness = harness("group-source-finalization.sqlite")) {
+            PopulationGroupRegistry installedRegistry = new PopulationGroupRegistry();
+            assertTrue(installedRegistry.replace(List.of(), 1L).applied());
+            harness.coordinator().installPopulationGroups(new PopulationGroupOwnerAdmissionExtension(
+                    harness.coordinator(), installedRegistry, harness.groups(),
+                    new NpcProfileRepository(harness.connections(), harness.queue())));
             UUID npcUuid = UUID.randomUUID();
             UUID ownerUuid = UUID.randomUUID();
             String profileId = UUID.randomUUID().toString();
@@ -94,7 +101,7 @@ class OwnerPopulationAdmissionCoordinatorTest {
                     .get(2, TimeUnit.SECONDS);
             assertTrue(preparation.allowed());
             PreparedOwnerPopulationAdmission prepared = preparation.preparedAdmission();
-            assertTrue(harness.coordinator().claimForApply(
+            assertTrue(harness.coordinator().groupCompositeCoordinator().claimForApply(
                     prepared, 12L, ClaimProviderGeneration.NONE));
             PopulationGroupClassificationRecord classification =
                     new PopulationGroupClassificationRecord(

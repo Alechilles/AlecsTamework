@@ -507,8 +507,8 @@ public final class SpawnerFeatureHandler {
                                           Ref<EntityStore> targetRef,
                                           ItemStack itemStack,
                                           @Nullable String captureBurstParticleSystem) {
-        CaptureAttemptHandle attempt = player == null
-                ? null : captureAttemptRuntime.takeChannel(player.getUuid());
+        UUID playerUuid = resolvePlayerUuid(player);
+        CaptureAttemptHandle attempt = captureAttemptRuntime.takeChannel(playerUuid);
         endCaptureChannel(player, targetRef, itemStack);
         if (attempt == null) {
             logSpawnerFlowDebug("capture denied reason=missing-channel-attempt-identity");
@@ -517,6 +517,17 @@ public final class SpawnerFeatureHandler {
         return captureFromItemInteraction(
                 player, itemStack, targetRef, captureBurstParticleSystem,
                 attempt);
+    }
+
+    @Nullable
+    private static UUID resolvePlayerUuid(@Nullable Player player) {
+        World world = player == null ? null : player.getWorld();
+        if (world == null || world.getEntityStore() == null || player.getReference() == null) {
+            return null;
+        }
+        UUIDComponent playerUuid = world.getEntityStore().getStore().getComponent(
+                player.getReference(), UUIDComponent.getComponentType());
+        return playerUuid == null ? null : playerUuid.getUuid();
     }
 
     public boolean canSpawnInteraction(ItemStack itemStack) {

@@ -50,7 +50,7 @@ public final class OwnerPopulationAdmissionCoordinator {
                 index, repository, terminality
         );
         this.groupCompositeCoordinator = new OwnerPopulationGroupCompositeCoordinator(
-                this, index, repository, terminality);
+                this, index, repository, persistenceHealth, terminality);
     }
 
     public OwnerPopulationAdmissionCoordinator(
@@ -70,7 +70,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.compensationCoordinator = new OwnerPopulationCompensationCoordinator(
                 index, repository, terminality);
         this.groupCompositeCoordinator = new OwnerPopulationGroupCompositeCoordinator(
-                this, index, repository, terminality);
+                this, index, repository, persistenceHealth, terminality);
     }
 
     @Nonnull

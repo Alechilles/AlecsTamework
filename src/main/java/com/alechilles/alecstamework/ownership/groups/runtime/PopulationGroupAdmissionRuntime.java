@@ -136,7 +136,7 @@ public final class PopulationGroupAdmissionRuntime {
             cancel(populationOperationId, "population-group-policy-revision-changed");
             return Claim.denied("population-group-policy-revision-changed");
         }
-        boolean claimed = ownerCoordinator.claimForApply(
+        boolean claimed = ownerCoordinator.groupCompositeCoordinator().claimForApply(
                 prepared.ownerAdmission(), currentOwnerSettingsRevision,
                 Objects.requireNonNull(currentProviderGeneration, "currentProviderGeneration"));
         if (!claimed) {
@@ -235,11 +235,18 @@ public final class PopulationGroupAdmissionRuntime {
     @Nonnull
     private CompletionStage<Boolean> cancelGroupOperation(
             PopulationGroupOperationRecord operation, String reason) {
-        if (operation.state() == PopulationGroupOperationRecord.State.PREPARED) {
-            return advance(operation.operationId(), PopulationGroupOperationRecord.State.PREPARED,
+        final PopulationGroupOperationRecord durable;
+        try {
+            durable = groupRepository.findOperation(operation.operationId());
+        } catch (Exception failure) {
+            return CompletableFuture.completedFuture(false);
+        }
+        if (durable == null) return CompletableFuture.completedFuture(false);
+        if (durable.state() == PopulationGroupOperationRecord.State.PREPARED) {
+            return advance(durable.operationId(), PopulationGroupOperationRecord.State.PREPARED,
                     PopulationGroupOperationRecord.State.CANCELED, reason);
         }
-        return compensate(operation, reason);
+        return compensate(durable, reason);
     }
 
     @Nonnull

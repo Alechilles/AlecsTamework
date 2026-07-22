@@ -48,8 +48,11 @@ class CaptureFlowBoundedWorkArchitectureTest {
         assertTrue(handler.contains("CaptureAttemptHandle attempt = prepareCaptureAttempt("));
         assertTrue(handler.contains("captureAttemptRuntime.rememberChannel(playerUuid.getUuid(), attempt)"));
         assertTrue(handler.contains(
-                "CaptureAttemptHandle attempt = player == null\n"
-                        + "                ? null : captureAttemptRuntime.takeChannel(player.getUuid())"));
+                "UUID playerUuid = resolvePlayerUuid(player);\n"
+                        + "        CaptureAttemptHandle attempt = captureAttemptRuntime.takeChannel(playerUuid)"));
+        assertTrue(handler.contains("getStore().getComponent(\n"
+                + "                player.getReference(), UUIDComponent.getComponentType())"));
+        assertFalse(handler.contains("takeChannel(player.getUuid())"));
         assertTrue(handler.contains("missing-channel-attempt-identity"));
         assertTrue(attempts.contains("attempts.resolve(request)"));
         assertFalse(handler.contains("attemptId == null ? UUID.randomUUID() : attemptId"));

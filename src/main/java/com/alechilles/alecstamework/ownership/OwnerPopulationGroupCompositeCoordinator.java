@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
@@ -17,6 +19,7 @@ import javax.annotation.Nonnull;
 public final class OwnerPopulationGroupCompositeCoordinator {
     private final OwnerPopulationAdmissionCoordinator ownerCoordinator;
     private final OwnerPopulationIndex index;
+    private final PersistenceHealthService persistenceHealth;
     private final UnifiedPopulationCompositeStore compositeStore;
     private final OwnerPopulationJournalTerminality terminality;
 
@@ -24,12 +27,38 @@ public final class OwnerPopulationGroupCompositeCoordinator {
             OwnerPopulationAdmissionCoordinator ownerCoordinator,
             OwnerPopulationIndex index,
             CompanionPopulationRepository repository,
+            PersistenceHealthService persistenceHealth,
             OwnerPopulationJournalTerminality terminality) {
         this.ownerCoordinator = Objects.requireNonNull(ownerCoordinator, "ownerCoordinator");
         this.index = Objects.requireNonNull(index, "index");
         this.compositeStore = Objects.requireNonNull(
                 repository, "repository").unifiedPopulationCompositeStore();
+        this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.terminality = Objects.requireNonNull(terminality, "terminality");
+    }
+
+    /** Claims a group operation owned by this composite coordinator, not the installed extension. */
+    public boolean claimForApply(@Nonnull PreparedOwnerPopulationAdmission prepared,
+                                 long currentSettingsRevision,
+                                 @Nonnull ClaimProviderGeneration currentProviderGeneration) {
+        Objects.requireNonNull(prepared, "prepared");
+        if (!persistenceHealth.isHealthy()) {
+            ownerCoordinator.cancelOwnerOnlyAsync(
+                    prepared, "owner-population-persistence-degraded-before-apply");
+            return false;
+        }
+        ClaimProviderGeneration generation = currentProviderGeneration == null
+                ? ClaimProviderGeneration.NONE : currentProviderGeneration;
+        if (prepared.settingsRevision() != currentSettingsRevision
+                || !prepared.plan().providerGeneration().equals(generation)) {
+            ownerCoordinator.cancelOwnerOnlyAsync(prepared, "owner-population-context-changed");
+            return false;
+        }
+        if (!prepared.transition(PreparedOwnerPopulationAdmission.State.PREPARED,
+                PreparedOwnerPopulationAdmission.State.APPLYING)) return false;
+        if (index.claimForApply(prepared.reservation())) return true;
+        ownerCoordinator.cancelOwnerOnlyAsync(prepared, "owner-population-reservation-expired");
+        return false;
     }
 
     @Nonnull
