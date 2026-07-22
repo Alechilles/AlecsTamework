@@ -1,27 +1,20 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.CaptureRequirementContext;
-import com.alechilles.alecstamework.api.CaptureRequirementPhase;
 import com.alechilles.alecstamework.api.BondedVesselMode;
-import com.alechilles.alecstamework.api.BondedVesselState;
-import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
-import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.vessels.runtime.BondedVesselInitialBindingService;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -34,11 +27,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -68,13 +58,8 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCapturePolicyService capturePolicyService;
     private final SpawnerPreparedSpawnService preparedSpawnService;
     private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
-    @Nullable
-    private final CaptureAttemptCoordinator captureAttemptCoordinator;
-    private final LongSupplier captureRequirementGeneration;
-    @Nullable
-    private volatile BondedVesselSpawnerBridge bondedVesselBridge;
-    private final ConcurrentHashMap<UUID, CaptureAttemptHandle> channelAttemptIds =
-            new ConcurrentHashMap<>();
+    private final SpawnerCaptureAttemptRuntimeCoordinator captureAttemptRuntime;
+    private final SpawnerBondedVesselCoordinator bondedVessels;
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -177,8 +162,19 @@ public final class SpawnerFeatureHandler {
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.managedCoopDetachService = managedCoopDetachService;
-        this.captureAttemptCoordinator = captureAttemptCoordinator;
-        this.captureRequirementGeneration = captureRequirementGeneration == null ? () -> 0L : captureRequirementGeneration;
+        this.captureAttemptRuntime = new SpawnerCaptureAttemptRuntimeCoordinator(
+                registry,
+                playerInventoryService,
+                captureFinalizerService,
+                capturePolicyService,
+                linkedNpcSyncService,
+                rolePolicyService,
+                effectService,
+                captureAttemptCoordinator,
+                captureRequirementGeneration,
+                this::logSpawnerFlowDebug);
+        this.bondedVessels = new SpawnerBondedVesselCoordinator(
+                logger, spawnPositionService, captureAttemptRuntime, this::logSpawnerFlowDebug);
     }
 
     /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
@@ -468,13 +464,13 @@ public final class SpawnerFeatureHandler {
                     store
             );
         }
-        channelAttemptIds.put(playerUuid.getUuid(), attempt);
+        captureAttemptRuntime.rememberChannel(playerUuid.getUuid(), attempt);
         return true;
     }
 
     /** Installs the production bridge only after bonded-vessel recovery activated successfully. */
     public void installBondedVesselBridge(@Nullable BondedVesselSpawnerBridge bridge) {
-        bondedVesselBridge = bridge;
+        bondedVessels.install(bridge);
     }
 
     public void endCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
@@ -488,7 +484,7 @@ public final class SpawnerFeatureHandler {
                 ? null
                 : store.getComponent(player.getReference(), UUIDComponent.getComponentType());
         if (playerUuid != null && playerUuid.getUuid() != null) {
-            channelAttemptIds.remove(playerUuid.getUuid());
+            captureAttemptRuntime.clearChannel(playerUuid.getUuid());
         }
         Ref<EntityStore> lockedTarget = playerUuid == null || playerUuid.getUuid() == null
                 ? null
@@ -511,7 +507,8 @@ public final class SpawnerFeatureHandler {
                                           Ref<EntityStore> targetRef,
                                           ItemStack itemStack,
                                           @Nullable String captureBurstParticleSystem) {
-        CaptureAttemptHandle attempt = player == null ? null : channelAttemptIds.remove(player.getUuid());
+        CaptureAttemptHandle attempt = player == null
+                ? null : captureAttemptRuntime.takeChannel(player.getUuid());
         endCaptureChannel(player, targetRef, itemStack);
         if (attempt == null) {
             logSpawnerFlowDebug("capture denied reason=missing-channel-attempt-identity");
@@ -532,7 +529,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (config.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
-            return bondedVesselBridge != null && hasUsableBondedProjection(itemStack);
+            return bondedVessels.canUse(itemStack);
         }
         if (itemStackMetadataService.isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
@@ -551,15 +548,7 @@ public final class SpawnerFeatureHandler {
     @Nullable
     public CaptureAttemptHandle prepareCaptureAttempt(
             Player player, ItemStack itemStack, @Nullable Integer hotbarSlot) {
-        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
-        if (player == null || itemStack == null || itemStack.isEmpty() || exactSlot == null) {
-            return null;
-        }
-        ItemStack current = playerInventoryService.getHotbarItem(player, exactSlot);
-        if (current == null || !Objects.equals(current, itemStack)) {
-            return null;
-        }
-        return CaptureAttemptHandle.forDispatch(exactSlot, current);
+        return captureAttemptRuntime.prepare(player, itemStack, hotbarSlot);
     }
 
     /** Public/direct callers must reuse the same namespace and key for every callback retry. */
@@ -567,16 +556,8 @@ public final class SpawnerFeatureHandler {
     public CaptureAttemptHandle prepareCaptureAttempt(
             Player player, ItemStack itemStack, @Nullable Integer hotbarSlot,
             @Nonnull String callerNamespace, @Nonnull String idempotencyKey) {
-        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
-        if (player == null || itemStack == null || itemStack.isEmpty() || exactSlot == null) {
-            return null;
-        }
-        ItemStack current = playerInventoryService.getHotbarItem(player, exactSlot);
-        if (current == null || !Objects.equals(current, itemStack)) {
-            return null;
-        }
-        return CaptureAttemptHandle.forCaller(
-                callerNamespace, idempotencyKey, exactSlot, current);
+        return captureAttemptRuntime.prepare(
+                player, itemStack, hotbarSlot, callerNamespace, idempotencyKey);
     }
 
     public boolean captureFromItemInteraction(Player player,
@@ -635,7 +616,7 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
         if (resolved != null
                 && resolved.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
-            return dispatchBondedToggle(player, itemStack, resolved, hotbarSlot);
+            return bondedVessels.toggle(player, itemStack, resolved, hotbarSlot);
         }
         return resolved != null && preparedSpawnService.schedule(
                 player, itemStack, resolved, hotbarSlot, emptyItemIdOverride
@@ -673,51 +654,8 @@ public final class SpawnerFeatureHandler {
                 null, null, 0L);
     }
 
-    private boolean dispatchBondedToggle(
-            Player player, ItemStack itemStack, ItemFeatureConfig config, Integer hotbarSlot) {
-        BondedVesselSpawnerBridge bridge = bondedVesselBridge;
-        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
-        if (bridge == null || exactSlot == null || !hasUsableBondedProjection(itemStack)) {
-            logSpawnerFlowDebug("bonded vessel denied reason=runtime-or-source-unavailable");
-            return false;
-        }
-        PopulationAdmissionLocation destination = null;
-        org.joml.Vector3d position = spawnPositionService.resolveSpawnPosition(player, config);
-        World world = player.getWorld();
-        if (position != null && world != null) {
-            destination = new PopulationAdmissionLocation(
-                    world.getName(), ChunkUtil.chunkCoordinate(position.x),
-                    ChunkUtil.chunkCoordinate(position.z));
-        }
-        bridge.toggle(player.getUuid(), exactSlot, itemStack.getItemId(), destination)
-                .whenComplete((result, failure) -> {
-                    if (failure != null || result == null
-                            || result.status()
-                            != com.alechilles.alecstamework.vessels.runtime
-                            .BondedVesselInteractionDispatcher.Status.COMMITTED) {
-                        logSpawnerFlowDebug("bonded vessel transition did not commit reason="
-                                + (failure != null ? "runtime-failure"
-                                : result == null ? "missing-result" : result.reason()));
-                    }
-                });
-        return true;
-    }
-
-    static boolean hasUsableBondedProjection(ItemStack itemStack) {
-        if (itemStack == null || itemStack.isEmpty() || itemStack.getQuantity() != 1) return false;
-        String bindingId = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.VESSEL_BINDING_ID, Codec.STRING);
-        String profileId = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.VESSEL_PROFILE_ID, Codec.STRING);
-        Long generation = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.VESSEL_GENERATION, Codec.LONG);
-        String configId = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.VESSEL_CONFIG_ID, Codec.STRING);
-        String state = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.VESSEL_STATE, Codec.STRING);
-        return bindingId != null && profileId != null && generation != null && generation > 0L
-                && configId != null && (BondedVesselState.STORED.name().equals(state)
-                || BondedVesselState.ACTIVE.name().equals(state));
+    static boolean hasUsableBondedProjection(@Nullable ItemStack itemStack) {
+        return SpawnerBondedVesselCoordinator.hasUsableProjection(itemStack);
     }
 
     private boolean captureFromNpcAction(Player player,
@@ -763,13 +701,11 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
-        if (!sourceMatches(player, attempt)) {
+        if (!captureAttemptRuntime.sourceMatches(player, attempt)) {
             logSpawnerFlowDebug("capture denied reason=source-attempt-fence-changed"
                     + " player=" + player.getUuid() + " attempt=" + attemptId);
-            if (outcomeResolved && captureAttemptCoordinator != null) {
-                captureAttemptCoordinator.quarantineApply(
-                        attemptId, "capture-source-attempt-fence-changed");
-            }
+            if (outcomeResolved) captureAttemptRuntime.quarantine(
+                    attemptId, "capture-source-attempt-fence-changed");
             return false;
         }
         World world = player.getWorld();
@@ -794,14 +730,18 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
-        if (!outcomeResolved && captureAttemptCoordinator != null) {
-            return prepareDurableCaptureAttempt(
-                    player, targetRef, itemStack, config, captureBurstParticleSystem,
-                    attempt, detachPlan);
+        if (!outcomeResolved && captureAttemptRuntime.durableRuntimeInstalled()) {
+            ItemFeatureConfig durableConfig = config;
+            return captureAttemptRuntime.prepareAndResolve(
+                    player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
+                    attempt, detachPlan.durableContextJson(),
+                    (resolvedHandle, mutation, record, generation) -> captureFromNpcAction(
+                            player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
+                            resolvedHandle, true, mutation, record, generation));
         }
         if (outcomeResolved) {
             if (preparedMutation == null || resolvedAttempt == null
-                    || captureAttemptCoordinator == null || worldStore == null) {
+                    || !captureAttemptRuntime.durableRuntimeInstalled() || worldStore == null) {
                 return false;
             }
             SpawnerCapturePolicyService.CaptureHealth currentHealth =
@@ -811,27 +751,14 @@ public final class SpawnerFeatureHandler {
             if (currentHealth == null || currentRoleId == null || currentRoleId.isBlank()
                     || targetUuid == null) {
                 preparedMutation.cancel("capture-terminal-revalidation-failed");
-                captureAttemptCoordinator.quarantineApply(
-                        attemptId, "capture-terminal-revalidation-failed");
+                captureAttemptRuntime.quarantine(attemptId, "capture-terminal-revalidation-failed");
                 return false;
             }
-            CaptureRequirementContext finalContext = new CaptureRequirementContext(
-                    attemptId,
-                    CaptureRequirementPhase.FINAL_REVALIDATION,
-                    player.getUuid(),
-                    targetUuid,
-                    preparedMutation.profileId(),
-                    currentRoleId,
-                    world.getName(),
-                    itemStack.getItemId(),
+            if (!captureAttemptRuntime.revalidateBeforeApply(
+                    attemptId, resolvedAttempt, player, targetUuid, preparedMutation.profileId(),
+                    currentRoleId, world, itemStack.getItemId(),
                     currentHealth.currentHealth() / currentHealth.maximumHealth(),
-                    CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
-            );
-            var customDecision = captureAttemptCoordinator.revalidateBeforeApply(
-                    resolvedAttempt, finalContext, expectedRequirementGeneration);
-            if (!customDecision.allowed()) {
-                preparedMutation.cancel(customDecision.reason());
-                captureAttemptCoordinator.quarantineApply(attemptId, customDecision.reason());
+                    expectedRequirementGeneration, preparedMutation)) {
                 return false;
             }
         }
@@ -939,9 +866,9 @@ public final class SpawnerFeatureHandler {
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
         ItemStack capturedItem = updated;
         boolean bondedCapture = config.getVesselMechanics().mode() == BondedVesselMode.BONDED;
-        BondedVesselSpawnerBridge captureBridge = bondedVesselBridge;
-        if (bondedCapture && (captureBridge == null
-                || !captureBridge.canBindSource(itemStack))) {
+        SpawnerBondedVesselCoordinator.InitialBindingAuthority bindingAuthority = bondedCapture
+                ? bondedVessels.prepareInitialBinding(itemStack) : null;
+        if (bondedCapture && bindingAuthority == null) {
             logSpawnerFlowDebug("capture denied reason=bonded-vessel-runtime-unavailable");
             if (preparedMutation != null) {
                 preparedMutation.cancel("bonded-vessel-runtime-unavailable");
@@ -981,9 +908,7 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onApplyCompensated(String profileId, String reason) {
                         if (!bondedCapture) sourceItem.compensate();
-                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
-                            captureAttemptCoordinator.quarantineApply(finalizedAttemptId, reason);
-                        }
+                        captureAttemptRuntime.quarantine(finalizedAttemptId, reason);
                     }
 
                     @Override
@@ -1023,9 +948,7 @@ public final class SpawnerFeatureHandler {
 
                     @Override
                     public void onDenied(String reason) {
-                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
-                            captureAttemptCoordinator.quarantineApply(finalizedAttemptId, reason);
-                        }
+                        captureAttemptRuntime.quarantine(finalizedAttemptId, reason);
                         logSpawnerFlowDebug(
                                 "capture denied reason=" + reason
                                         + " player=" + player.getUuid()
@@ -1037,18 +960,16 @@ public final class SpawnerFeatureHandler {
                     public void onPopulationCommitted(
                             com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
                         if (bondedCapture) {
-                            bindCapturedVessel(
-                                    captureBridge, sourceItem, itemStack,
+                            bondedVessels.bindInitialCapture(
+                                    bindingAuthority,
+                                    sourceItem, itemStack,
                                     profiledCaptureItem.get(), capturedProfileId.get(),
                                     world, player.getUuid(), sourceHotbarSlot, result,
                                     preparedMutation == null ? null
                                             : preparedMutation.populationOperationId(),
                                     finalizedAttemptId);
                         }
-                        if (!bondedCapture && finalizedAttemptId != null
-                                && captureAttemptCoordinator != null) {
-                            captureAttemptCoordinator.commit(finalizedAttemptId);
-                        }
+                        if (!bondedCapture) captureAttemptRuntime.commit(finalizedAttemptId);
                         if (detachPlan.requiresDetach()
                                 && (managedCoopDetachService == null
                                 || !managedCoopDetachService.refreshAfterCommit())) {
@@ -1072,212 +993,6 @@ public final class SpawnerFeatureHandler {
                 : preparedMutation.apply(callbacks);
     }
 
-    private boolean prepareDurableCaptureAttempt(
-            Player player,
-            Ref<EntityStore> targetRef,
-            ItemStack itemStack,
-            ItemFeatureConfig config,
-            @Nullable String captureBurstParticleSystem,
-            @Nonnull CaptureAttemptHandle attempt,
-            SpawnerManagedCoopCaptureDetachService.Plan detachPlan) {
-        return captureFinalizerService.prepareCapture(
-                player, config, targetRef, detachPlan.durableContextJson(),
-                "spawner-capture-attempt:" + attempt.attemptId(),
-                new SpawnerCaptureFinalizerService.CapturePreparationCallbacks() {
-                    @Override
-                    public void onPrepared(
-                            SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation) {
-                        if (!scheduleDurableCaptureAttempt(
-                                player, targetRef, itemStack, config,
-                                captureBurstParticleSystem, attempt, mutation)) {
-                            mutation.cancel("capture-attempt-preparation-failed");
-                        }
-                    }
-
-                    @Override
-                    public void onDenied(String reason) {
-                        logSpawnerFlowDebug("capture denied reason=" + reason
-                                + " player=" + player.getUuid());
-                    }
-                }
-        );
-    }
-
-    private boolean scheduleDurableCaptureAttempt(
-            Player player,
-            Ref<EntityStore> targetRef,
-            ItemStack itemStack,
-            ItemFeatureConfig config,
-            @Nullable String captureBurstParticleSystem,
-            @Nonnull CaptureAttemptHandle attempt,
-            SpawnerCaptureFinalizerService.PreparedCaptureMutation preparedMutation) {
-        UUID attemptId = attempt.attemptId();
-        World world = player.getWorld();
-        Store<EntityStore> store = world == null || world.getEntityStore() == null
-                ? null : world.getEntityStore().getStore();
-        NPCEntity npc = store == null ? null : store.getComponent(targetRef, NPCEntity.getComponentType());
-        UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
-        String roleId = npc == null ? null : rolePolicyService.resolveRoleIdFromNpc(npc);
-        SpawnerCapturePolicyService.CaptureHealth health =
-                capturePolicyService.resolveCaptureHealth(targetRef, store);
-        if (world == null || store == null || targetUuid == null || roleId == null || roleId.isBlank()
-                || health == null || attemptId == null) {
-            return false;
-        }
-        ItemStack exactSource = playerInventoryService.getHotbarItem(
-                player, attempt.hotbarSlot());
-        if (exactSource == null
-                || !attempt.sourceFingerprint().equals(SpawnerSourceFingerprint.of(exactSource))) {
-            return false;
-        }
-        double healthFraction = health.currentHealth() / health.maximumHealth();
-        long requirementGeneration = Math.max(0L, captureRequirementGeneration.getAsLong());
-        long expiresAt;
-        try {
-            expiresAt = Math.addExact(System.currentTimeMillis(), 120_000L);
-        } catch (ArithmeticException overflow) {
-            expiresAt = Long.MAX_VALUE;
-        }
-        CaptureRequirementContext requirementContext = new CaptureRequirementContext(
-                attemptId,
-                CaptureRequirementPhase.FINAL_REVALIDATION,
-                player.getUuid(),
-                targetUuid,
-                preparedMutation.profileId(),
-                roleId,
-                world.getName(),
-                itemStack.getItemId(),
-                healthFraction,
-                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
-        );
-        CaptureAttemptCoordinator.AttemptRequest request =
-                new CaptureAttemptCoordinator.AttemptRequest(
-                        attemptId,
-                        preparedMutation.populationOperationId(),
-                        attempt.callerNamespace(),
-                        attempt.idempotencyKey(),
-                        player.getUuid(),
-                        targetUuid,
-                        preparedMutation.profileId(),
-                        CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
-                        itemStack.getItemId(),
-                        roleId,
-                        attempt.sourceContextJson(world.getName()),
-                        itemStack.getItemId(),
-                        registry.revision(),
-                        config.getCaptureMechanics(),
-                        health.currentHealth(),
-                        health.maximumHealth(),
-                        requirementContext,
-                        requirementGeneration,
-                        preparedMutation.populationOperationId().toString(),
-                        expiresAt
-                );
-        AtomicReference<CaptureAttemptRecord> resolvedAttempt = new AtomicReference<>();
-        AtomicReference<CaptureAttemptHandle> resolvedHandle = new AtomicReference<>(attempt);
-        captureAttemptCoordinator.resolve(request).thenCompose(result -> {
-            if (result.status() == CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL) {
-                preparedMutation.cancel("capture-probability-failure");
-                world.execute(() -> effectService.playEffects(
-                        world, targetRef,
-                        config.getCaptureMechanics().failureParticleSystem(),
-                        config.getCaptureMechanics().failureSoundEvent()));
-                return java.util.concurrent.CompletableFuture.completedFuture(false);
-            }
-            if (result.status() != CaptureAttemptCoordinator.ResultStatus.SUCCESS) {
-                preparedMutation.cancel(result.reason());
-                logSpawnerFlowDebug("capture denied reason=" + result.reason()
-                        + " player=" + player.getUuid() + " targetUuid=" + targetUuid);
-                return java.util.concurrent.CompletableFuture.completedFuture(false);
-            }
-            resolvedAttempt.set(result.attempt());
-            CaptureAttemptHandle effective = attempt.withAttemptId(result.attemptId());
-            resolvedHandle.set(effective);
-            return captureAttemptCoordinator.beginApply(effective.attemptId());
-        }).whenComplete((applyReady, failure) -> {
-            if (failure != null || !Boolean.TRUE.equals(applyReady)) {
-                preparedMutation.cancel("capture-attempt-apply-fence-failed");
-                return;
-            }
-            world.execute(() -> {
-                boolean scheduled = captureFromNpcAction(
-                        player, targetRef, itemStack, config,
-                        captureBurstParticleSystem, resolvedHandle.get(), true,
-                        preparedMutation, resolvedAttempt.get(), requirementGeneration);
-                if (!scheduled) {
-                    preparedMutation.cancel("capture-terminal-revalidation-failed");
-                    captureAttemptCoordinator.quarantineApply(
-                            resolvedHandle.get().attemptId(), "capture-terminal-revalidation-failed");
-                }
-            });
-        });
-        return true;
-    }
-
-    private void bindCapturedVessel(
-            @Nullable BondedVesselSpawnerBridge bridge,
-            SpawnerSourceItemTransaction sourceItem,
-            ItemStack original,
-            @Nullable ItemStack captured,
-            @Nullable String profileId,
-            World world,
-            UUID ownerUuid,
-            @Nullable Integer sourceSlot,
-            com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result,
-            @Nullable UUID populationOperationId,
-            @Nullable UUID captureAttemptId) {
-        long revision = result == null || result.ownerCommit() == null
-                || result.ownerCommit().persistenceResult() == null
-                ? -1L : result.ownerCommit().persistenceResult().revision();
-        if (bridge == null || captured == null || profileId == null || sourceSlot == null
-                || revision < 0L) {
-            logger.at(Level.SEVERE).log(
-                    "Bonded capture committed its canonical profile but could not prepare "
-                            + "generation-one source finalization (profile=" + profileId + ").");
-            return;
-        }
-        BondedVesselSpawnerBridge.InitialCapturePlan plan = bridge.prepareInitialCapture(
-                ownerUuid, sourceSlot, original, captured, profileId, revision,
-                populationOperationId).orElse(null);
-        if (plan == null) {
-            logger.at(Level.SEVERE).log(
-                    "Bonded capture committed but its revision-pinned vessel config was unavailable "
-                            + "(profile=" + profileId + ").");
-            return;
-        }
-        bridge.bind(plan, (expected, replacement) -> {
-            CompletableFuture<Boolean> completion = new CompletableFuture<>();
-            try {
-                world.execute(() -> completion.complete(sourceItem.prepare(replacement)));
-            } catch (RuntimeException | LinkageError failure) {
-                completion.completeExceptionally(failure);
-            }
-            return completion;
-        }).whenComplete((binding, failure) -> {
-            if (failure == null && binding != null
-                    && binding.status() == BondedVesselInitialBindingService.Status.COMMITTED) {
-                sourceItem.commit();
-                if (captureAttemptId != null && captureAttemptCoordinator != null) {
-                    captureAttemptCoordinator.commit(captureAttemptId);
-                }
-                logSpawnerFlowDebug("bonded capture committed binding=" + binding.bindingId()
-                        + " profile=" + binding.profileId());
-                return;
-            }
-            if (captureAttemptId != null && captureAttemptCoordinator != null
-                    && binding != null
-                    && (binding.status() == BondedVesselInitialBindingService.Status.DENIED
-                    || binding.status() == BondedVesselInitialBindingService.Status.QUARANTINED)) {
-                captureAttemptCoordinator.quarantineApply(captureAttemptId, binding.reason());
-            }
-            logger.at(Level.SEVERE).log(
-                    "Bonded capture generation-one finalization remains pending or quarantined "
-                            + "(profile=" + profileId + ", reason="
-                            + (failure != null ? "runtime-failure"
-                            : binding == null ? "missing-result" : binding.reason()) + ").");
-        });
-    }
-
     private static void spawnCaptureSuccessParticle(
             @Nullable String particleSystem,
             com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
@@ -1292,22 +1007,6 @@ public final class SpawnerFeatureHandler {
             return;
         }
         ParticleUtil.spawnParticleEffect(particleSystem, transform.getPosition(), context.store());
-    }
-
-    @Nullable
-    private Integer resolveSourceHotbarSlot(Player player, @Nullable Integer explicitSlot) {
-        if (explicitSlot != null && explicitSlot >= 0) {
-            return explicitSlot;
-        }
-        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
-        return activeSlot < 0 ? null : (int) activeSlot;
-    }
-
-    private boolean sourceMatches(Player player, CaptureAttemptHandle attempt) {
-        if (player == null || attempt == null) return false;
-        ItemStack current = playerInventoryService.getHotbarItem(player, attempt.hotbarSlot());
-        return current != null && attempt.sourceFingerprint().equals(
-                SpawnerSourceFingerprint.of(current));
     }
 
     @Nullable

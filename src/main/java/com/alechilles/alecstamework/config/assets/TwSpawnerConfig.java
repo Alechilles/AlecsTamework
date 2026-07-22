@@ -209,133 +209,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     public static final MapCodec<SpawnerIconOverride[], Map<String, SpawnerIconOverride[]>> ICON_OVERRIDES_BY_ROLE_CODEC =
         new MapCodec<>(ICON_OVERRIDE_ARRAY_CODEC, Object2ObjectOpenHashMap::new);
 
-    public static final BuilderCodec<CaptureSettings> CAPTURE_CODEC = BuilderCodec.builder(
-            CaptureSettings.class, CaptureSettings::new
-        )
-        .<Boolean>append(
-            new KeyedCodec<>("ClearsOwner", Codec.BOOLEAN),
-            (settings, value) -> settings.clearsOwner = value,
-            settings -> settings.clearsOwner
-        )
-        .documentation("Clear owner data when capturing.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
-            (settings, value) -> settings.requireTamed = value,
-            settings -> settings.requireTamed
-        )
-        .documentation("Require the target NPC to be tamed.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("TamesTarget", Codec.BOOLEAN),
-            (settings, value) -> settings.tamesTarget = value,
-            settings -> settings.tamesTarget
-        )
-        .documentation("Capture an eligible wild NPC as a newly owned tamed companion.")
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("MaxHealthPercent", Codec.DOUBLE),
-            (settings, value) -> settings.maxHealthPercent = value,
-            settings -> settings.maxHealthPercent
-        )
-        .documentation("Optional maximum target health percent required for capture.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("RequiredEffectId", Codec.STRING),
-            (settings, value) -> settings.requiredEffectId = value,
-            settings -> settings.requiredEffectId
-        )
-        .documentation("Optional active entity effect required on the target.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("ChannelAuraEffectId", Codec.STRING),
-            (settings, value) -> settings.channelAuraEffectId = value,
-            settings -> settings.channelAuraEffectId
-        )
-        .documentation("Optional temporary entity effect applied while a capture channel is active.")
-        .add()
-        .<Map<String, String>>append(
-            new KeyedCodec<>("TamedRoleOverrides", MapCodec.STRING_HASH_MAP_CODEC),
-            (settings, value) -> settings.tamedRoleOverrides = value == null ? Collections.emptyMap() : value,
-            settings -> settings.tamedRoleOverrides
-        )
-        .documentation("Source-role to tamed-role mappings used when TamesTarget is enabled.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
-            (settings, value) -> settings.ownerRestricted = value,
-            settings -> settings.ownerRestricted
-        )
-        .documentation("Restrict capture to the owner.")
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
-            (settings, value) -> settings.requireOwner = value,
-            settings -> settings.requireOwner
-        )
-        .documentation("Require the NPC to have an owner set.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("ParticleSystem", Codec.STRING),
-            (settings, value) -> settings.particleSystem = value,
-            settings -> settings.particleSystem
-        )
-        .documentation("Particle system to play on capture.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("SoundEvent", Codec.STRING),
-            (settings, value) -> settings.soundEvent = value,
-            settings -> settings.soundEvent
-        )
-        .documentation("Sound event to play on capture.")
-        .add()
-        .<Integer>append(
-            new KeyedCodec<>("CooldownMs", Codec.INTEGER),
-            (settings, value) -> settings.cooldownMs = value,
-            settings -> settings.cooldownMs
-        )
-        .documentation("Cooldown after capture (milliseconds).")
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("MaxDistance", Codec.DOUBLE),
-            (settings, value) -> settings.maxDistance = value,
-            settings -> settings.maxDistance
-        )
-        .documentation("Maximum capture distance.")
-        .add()
-        .<String>append(
-            new KeyedCodec<>("ChanceMode", Codec.STRING),
-            (settings, value) -> settings.chanceMode = parseChanceMode(value),
-            settings -> settings.chanceMode == CaptureChanceMode.PROBABILITY ? "Probability" : "Guaranteed"
-        )
-        .documentation("Guaranteed preserves deterministic legacy capture and bypasses role policies; Probability opts in.")
-        .add()
-        .<Integer>append(new KeyedCodec<>("Power", Codec.INTEGER),
-            (settings, value) -> settings.power = value, settings -> settings.power)
-        .documentation("Generic non-negative capture power.").add()
-        .<Double>append(new KeyedCodec<>("BaseChance", Codec.DOUBLE),
-            (settings, value) -> settings.baseChance = value, settings -> settings.baseChance)
-        .documentation("Base success probability in [0,1].").add()
-        .<Double>append(new KeyedCodec<>("ChancePerPower", Codec.DOUBLE),
-            (settings, value) -> settings.chancePerPower = value, settings -> settings.chancePerPower)
-        .documentation("Finite non-negative chance added per power above the target minimum.").add()
-        .<Double>append(new KeyedCodec<>("MinimumChance", Codec.DOUBLE),
-            (settings, value) -> settings.minimumChance = value, settings -> settings.minimumChance)
-        .documentation("Inclusive lower probability clamp in [0,1].").add()
-        .<Double>append(new KeyedCodec<>("MaximumChance", Codec.DOUBLE),
-            (settings, value) -> settings.maximumChance = value, settings -> settings.maximumChance)
-        .documentation("Inclusive upper probability clamp in [0,1], not below MinimumChance.").add()
-        .<Integer>append(new KeyedCodec<>("FailureCooldownMs", Codec.INTEGER),
-            (settings, value) -> settings.failureCooldownMs = value, settings -> settings.failureCooldownMs)
-        .documentation("Non-negative cooldown applied only after a resolved failed probability roll.").add()
-        .<String>append(new KeyedCodec<>("FailureParticleSystem", Codec.STRING),
-            (settings, value) -> settings.failureParticleSystem = value, settings -> settings.failureParticleSystem)
-        .documentation("Optional failed-roll particle system.").add()
-        .<String>append(new KeyedCodec<>("FailureSoundEvent", Codec.STRING),
-            (settings, value) -> settings.failureSoundEvent = value, settings -> settings.failureSoundEvent)
-        .documentation("Optional failed-roll sound event.").add()
-        .build();
-
+    public static final BuilderCodec<CaptureSettings> CAPTURE_CODEC =
+            TwSpawnerCaptureSettingsCodec.CODEC;
     public static final BuilderCodec<SpawnSettings> SPAWN_CODEC = BuilderCodec.builder(
             SpawnSettings.class, SpawnSettings::new
         )
@@ -751,52 +626,26 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnerIconOverridesByRole(toOverridesByRole(iconOverridesByRole))
             .spawnerIconOverrideGroups(toOverrideGroups(iconOverrideGroups))
             .spawnerTooltipMode(tooltipMode)
-            .captureMechanics(captureSettings.toMechanics())
-            .vesselMechanics((vessel == null ? new TwSpawnerVesselSettings() : vessel)
-                    .toRuntimeMechanics(emptyItemId, filledItemId))
+            .captureMechanics(TwSpawnerConfigRuntimeAdapter.captureMechanics(captureSettings))
+            .vesselMechanics(TwSpawnerConfigRuntimeAdapter.vesselMechanics(
+                    vessel, emptyItemId, filledItemId))
             .build();
     }
 
     public SpawnerVesselConfigView toVesselConfigView(long revision) {
-        if (id == null || id.isBlank()) {
-            throw new IllegalArgumentException("Spawner config ID is required for vessel mechanics.");
-        }
-        return (vessel == null ? new TwSpawnerVesselSettings() : vessel)
-                .toView(id, revision, emptyItemId, filledItemId);
+        return TwSpawnerConfigRuntimeAdapter.vesselView(this, revision);
     }
 
     public boolean matchesVesselItemId(@Nullable String itemId) {
-        if (itemId == null || itemId.isBlank()) return false;
-        ItemFeatureConfig.VesselItemMechanics mechanics =
-                (vessel == null ? new TwSpawnerVesselSettings() : vessel)
-                        .toRuntimeMechanics(emptyItemId, filledItemId);
-        return itemId.equals(mechanics.emptyItemId())
-                || itemId.equals(mechanics.storedItemId())
-                || itemId.equals(mechanics.activeItemId())
-                || itemId.equals(mechanics.deadItemId())
-                || itemId.equals(mechanics.lostItemId())
-                || itemId.equals(mechanics.unavailableItemId());
+        return TwSpawnerConfigRuntimeAdapter.matchesVesselItemId(this, itemId);
     }
 
     public SpawnerCaptureMechanicsView toCaptureMechanicsView(long revision) {
-        ItemFeatureConfig.CaptureItemMechanics mechanics =
-                (capture == null ? new CaptureSettings() : capture).toMechanics();
-        if (id == null || id.isBlank() || emptyItemId == null || emptyItemId.isBlank()) {
-            throw new IllegalArgumentException("Spawner config ID and EmptyItemId are required for capture mechanics.");
-        }
-        return new SpawnerCaptureMechanicsView(
-                id, revision, emptyItemId, mechanics.chanceMode(), mechanics.power(), mechanics.baseChance(),
-                mechanics.chancePerPower(), mechanics.minimumChance(), mechanics.maximumChance(),
-                mechanics.failureCooldownMs(), mechanics.failureParticleSystem(), mechanics.failureSoundEvent()
-        );
+        return TwSpawnerConfigRuntimeAdapter.captureView(this, revision);
     }
 
-    private static CaptureChanceMode parseChanceMode(@Nullable String value) {
-        if (value == null || value.isBlank() || value.equalsIgnoreCase("Guaranteed")) {
-            return CaptureChanceMode.GUARANTEED;
-        }
-        if (value.equalsIgnoreCase("Probability")) return CaptureChanceMode.PROBABILITY;
-        throw new IllegalArgumentException("Unknown capture ChanceMode: " + value);
+    CaptureSettings captureSettings() {
+        return capture;
     }
 
     private static List<String> toList(String[] values) {
@@ -916,34 +765,31 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     }
 
     public static final class CaptureSettings {
-        private boolean clearsOwner = true;
-        private boolean requireTamed = true;
-        private boolean tamesTarget;
-        private Double maxHealthPercent;
-        private String requiredEffectId;
-        private String channelAuraEffectId;
-        private Map<String, String> tamedRoleOverrides = Collections.emptyMap();
-        private boolean ownerRestricted = true;
-        private Boolean requireOwner;
-        private String particleSystem;
-        private String soundEvent;
-        private int cooldownMs;
-        private double maxDistance;
-        private CaptureChanceMode chanceMode = CaptureChanceMode.GUARANTEED;
-        private int power;
-        private double baseChance = 1.0D;
-        private double chancePerPower;
-        private double minimumChance;
-        private double maximumChance = 1.0D;
-        private int failureCooldownMs;
-        private String failureParticleSystem;
-        private String failureSoundEvent;
+        boolean clearsOwner = true;
+        boolean requireTamed = true;
+        boolean tamesTarget;
+        Double maxHealthPercent;
+        String requiredEffectId;
+        String channelAuraEffectId;
+        Map<String, String> tamedRoleOverrides = Collections.emptyMap();
+        boolean ownerRestricted = true;
+        Boolean requireOwner;
+        String particleSystem;
+        String soundEvent;
+        int cooldownMs;
+        double maxDistance;
+        CaptureChanceMode chanceMode = CaptureChanceMode.GUARANTEED;
+        int power;
+        double baseChance = 1.0D;
+        double chancePerPower;
+        double minimumChance;
+        double maximumChance = 1.0D;
+        int failureCooldownMs;
+        String failureParticleSystem;
+        String failureSoundEvent;
 
         public ItemFeatureConfig.CaptureItemMechanics toMechanics() {
-            return new ItemFeatureConfig.CaptureItemMechanics(
-                    chanceMode, power, baseChance, chancePerPower, minimumChance, maximumChance,
-                    failureCooldownMs, failureParticleSystem, failureSoundEvent
-            );
+            return TwSpawnerConfigRuntimeAdapter.captureMechanics(this);
         }
     }
 

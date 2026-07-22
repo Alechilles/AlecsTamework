@@ -129,18 +129,21 @@ class SpawnerFeatureHandlerTest {
 
     @Test
     void bondedCaptureDefersSourceReplacementAndAttemptClosureUntilInitialBind() throws Exception {
-        String source = Files.readString(Path.of(
+        String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+        String bonded = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerBondedVesselCoordinator.java"));
 
-        int beforeApply = source.indexOf("public boolean beforeApply(String profileId)");
-        int bondedGuard = source.indexOf("return bondedCapture || sourceItem.prepare(profiledItem)",
+        int beforeApply = handler.indexOf("public boolean beforeApply(String profileId)");
+        int bondedGuard = handler.indexOf("return bondedCapture || sourceItem.prepare(profiledItem)",
                 beforeApply);
-        int populationCommitted = source.indexOf("public void onPopulationCommitted(", bondedGuard);
-        int bind = source.indexOf("bindCapturedVessel(", populationCommitted);
-        int nonBondedCommit = source.indexOf("if (!bondedCapture && finalizedAttemptId", bind);
-        int committedBinding = source.indexOf(
+        int populationCommitted = handler.indexOf("public void onPopulationCommitted(", bondedGuard);
+        int bind = handler.indexOf("bondedVessels.bindInitialCapture(", populationCommitted);
+        int nonBondedCommit = handler.indexOf(
+                "if (!bondedCapture) captureAttemptRuntime.commit(finalizedAttemptId)", bind);
+        int committedBinding = bonded.indexOf(
                 "binding.status() == BondedVesselInitialBindingService.Status.COMMITTED");
-        int attemptCommit = source.indexOf("captureAttemptCoordinator.commit(captureAttemptId)",
+        int attemptCommit = bonded.indexOf("captureAttempts.commit(captureAttemptId)",
                 committedBinding);
 
         assertTrue(beforeApply >= 0 && bondedGuard > beforeApply,

@@ -13,27 +13,32 @@ class CaptureAttemptRuntimeWiringTest {
                 "src/main/java/com/alechilles/alecstamework/Tamework.java"));
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+        String runtime = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/"
+                        + "SpawnerCaptureAttemptRuntimeCoordinator.java"));
         String api = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/api/internal/TameworkApiImpl.java"));
 
         assertTrue(plugin.contains("captureAttemptCoordinator.recover(128).join()"));
         assertTrue(plugin.contains("captureAttemptRuntimeReady ? captureAttemptCoordinator : null"));
         assertTrue(plugin.contains("if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl"));
-        assertTrue(handler.contains("captureAttemptCoordinator.resolve(request)"));
-        assertTrue(handler.contains("captureAttemptCoordinator.beginApply(effective.attemptId())"));
-        assertTrue(handler.contains("captureAttemptCoordinator.commit(finalizedAttemptId)"));
-        assertTrue(handler.contains("channelAttemptIds.put(playerUuid.getUuid(), attempt)"));
-        assertTrue(handler.contains("CaptureAttemptHandle.forDispatch"));
-        assertTrue(handler.contains("attempt.sourceContextJson(world.getName())"));
-        assertTrue(handler.contains("attempt.sourceFingerprint().equals"));
+        assertTrue(handler.contains("captureAttemptRuntime.prepareAndResolve("));
+        assertTrue(handler.contains("captureAttemptRuntime.revalidateBeforeApply("));
+        assertTrue(runtime.contains("attempts.resolve(request)"));
+        assertTrue(runtime.contains("attempts.beginApply(effective.attemptId())"));
+        assertTrue(runtime.contains("attempts.commit(attemptId)"));
+        assertTrue(runtime.contains("channelAttempts.put(playerUuid, attempt)"));
+        assertTrue(runtime.contains("CaptureAttemptHandle.forDispatch"));
+        assertTrue(runtime.contains("attempt.sourceContextJson(world.getName())"));
+        assertTrue(runtime.contains("attempt.sourceFingerprint().equals"));
         assertTrue(handler.contains("missing-channel-attempt-identity"));
-        assertTrue(!handler.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
+        assertTrue(!runtime.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
         assertTrue(!handler.contains("captureBurstParticleSystem, UUID.randomUUID()"));
-        int populationPrepare = handler.indexOf("captureFinalizerService.prepareCapture(");
-        int roll = handler.indexOf("captureAttemptCoordinator.resolve(request)");
+        int populationPrepare = runtime.indexOf("finalizer.prepareCapture(");
+        int roll = runtime.indexOf("attempts.resolve(request)");
         assertTrue(populationPrepare >= 0 && roll > populationPrepare);
-        assertTrue(handler.contains("preparedMutation.populationOperationId()"));
-        assertTrue(handler.contains("captureAttemptCoordinator.revalidateBeforeApply("));
+        assertTrue(runtime.contains("mutation.populationOperationId()"));
+        assertTrue(runtime.contains("attempts.revalidateBeforeApply("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_POLICY)"));
     }
 
