@@ -104,8 +104,11 @@ later positive admissions; Tamework does not delete or release them to fit a
 new limit.
 
 Group membership and count evidence are schema-v8 persistence authority.
-Unknown classification, reconciliation, stale revisions, and unavailable
-storage fail positive admission closed.
+Historical profiles without role metadata remain explicitly `UNRESOLVED`; a
+positive mutation against one still fails closed unless the operation supplies
+an authoritative target role. That profile-scoped gap does not disable the
+population-group runtime or unrelated explicit-role admissions. Reconciliation
+failures, stale revisions, and unavailable storage remain fail-closed.
 
 ## Related pages
 

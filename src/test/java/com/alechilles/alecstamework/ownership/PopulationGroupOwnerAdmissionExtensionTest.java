@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateR
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupCountEvidenceRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
@@ -348,6 +349,86 @@ class PopulationGroupOwnerAdmissionExtensionTest {
         }
     }
 
+    /** Regression: schema-v8 group configs must not globally fail on older role-less profiles. */
+    @Test
+    void rolelessHistoricalProfileDoesNotDisablePopulationGroupRecovery() throws Exception {
+        try (Harness harness = harness()) {
+            String profileId = UUID.randomUUID().toString();
+            insertHistoricalProfile(harness.connections(), profileId, UUID.randomUUID());
+
+            PopulationGroupOwnerAdmissionExtension.RecoveryReport report =
+                    restartExtension(harness).recover().get(2, TimeUnit.SECONDS);
+
+            assertTrue(report.ready());
+            assertEquals(0, report.failed());
+            PopulationGroupClassificationRecord classification =
+                    harness.groups().findClassification(profileId);
+            assertEquals(PopulationGroupClassificationRecord.Status.UNRESOLVED,
+                    classification.status());
+            assertEquals(List.of(), classification.groupIds());
+        }
+    }
+
+    /** A group classification is durable authority when older profile metadata lacks its role. */
+    @Test
+    void durableClassificationSurvivesMissingProfileRoleMetadata() throws Exception {
+        try (Harness harness = harness()) {
+            String profileId = UUID.randomUUID().toString();
+            UUID owner = UUID.randomUUID();
+            insertHistoricalProfile(harness.connections(), profileId, owner);
+            long now = System.currentTimeMillis();
+            var submission = harness.groups().replaceClassificationAsync(
+                    new PopulationGroupRepository.ClassificationMutation(null,
+                            new PopulationGroupClassificationRecord(
+                                    profileId, "Tamed_Wyvern_Mini",
+                                    List.of("hydragon:soulbound_mini"), 1L,
+                                    PopulationGroupClassificationRecord.Status.RESOLVED,
+                                    "owner_population_admission", now, now)));
+            assertTrue(submission.completion().get(2, TimeUnit.SECONDS).isCommitted());
+
+            PopulationGroupOwnerAdmissionExtension.RecoveryReport report =
+                    restartExtension(harness).recover().get(2, TimeUnit.SECONDS);
+
+            assertTrue(report.ready());
+            PopulationGroupClassificationRecord classification =
+                    harness.groups().findClassification(profileId);
+            assertEquals("Tamed_Wyvern_Mini", classification.roleId());
+            assertEquals(List.of("hydragon:soulbound_mini"), classification.groupIds());
+            assertEquals(PopulationGroupClassificationRecord.Status.RESOLVED,
+                    classification.status());
+            assertEquals(1, harness.groups().count(
+                    owner, "hydragon:soulbound_mini",
+                    PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL, null).committedOwned());
+        }
+    }
+
+    @Test
+    void positiveAdmissionWithoutTargetRoleStillFailsClosed() throws Exception {
+        try (Harness harness = harness()) {
+            long now = System.currentTimeMillis();
+            String profileId = UUID.randomUUID().toString();
+            UUID npc = UUID.randomUUID();
+            CompanionPopulationStateRecord baseline = new CompanionPopulationStateRecord(
+                    profileId, npc, null, "default", "default",
+                    CompanionLifecycleState.ACTIVE.name(), "default", 0, 0,
+                    0L, "test", now, now);
+            OwnerPopulationTransitionRequest transition = new OwnerPopulationTransitionRequest(
+                    profileId, OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION, null, null,
+                    UUID.randomUUID(), "default", CompanionLifecycleState.ACTIVE,
+                    OwnerPopulationOperation.NEW_OWNERSHIP, OwnerPopulationLimitScope.GLOBAL,
+                    100, false);
+            OwnerPopulationAdmissionPlan planWithoutRole = new OwnerPopulationAdmissionPlan(
+                    transition, baseline, npc, "default", 0, 0, "test",
+                    "{}", "{}", "{}", 1L, ClaimProviderGeneration.NONE);
+
+            OwnerPopulationPreparationResult result = harness.coordinator().prepareAsync(
+                    planWithoutRole).get(2, TimeUnit.SECONDS);
+
+            assertFalse(result.allowed());
+            assertEquals("population-group-target-role-unresolved", result.reason());
+        }
+    }
+
     private Harness harness() throws Exception {
         return harness(List.of(group()));
     }
@@ -492,6 +573,38 @@ class PopulationGroupOwnerAdmissionExtensionTest {
                      "DELETE FROM companion_population_group_event_receipts WHERE event_id = ?")) {
             statement.setString(1, eventId);
             statement.executeUpdate();
+        }
+    }
+
+    private static void insertHistoricalProfile(
+            SqliteConnectionManager connections, String profileId, UUID owner) throws Exception {
+        long now = System.currentTimeMillis();
+        try (Connection connection = connections.openConnection();
+             PreparedStatement profile = connection.prepareStatement("""
+                     INSERT INTO npc_profiles (
+                         profile_id, current_npc_uuid, owner_uuid, last_world_name,
+                         created_at_ms, updated_at_ms, last_active_at_ms
+                     ) VALUES (?, ?, ?, 'default', ?, ?, ?)
+                     """);
+             PreparedStatement population = connection.prepareStatement("""
+                     INSERT INTO companion_population_state (
+                         profile_id, ownership_world_name, lifecycle_state, physical_world_name,
+                         physical_chunk_x, physical_chunk_z, revision, source,
+                         created_at_ms, updated_at_ms
+                     ) VALUES (?, 'default', 'ACTIVE', 'default', 0, 0, 0,
+                         'historical-test', ?, ?)
+                     """)) {
+            profile.setString(1, profileId);
+            profile.setString(2, UUID.randomUUID().toString());
+            profile.setString(3, owner.toString());
+            profile.setLong(4, now);
+            profile.setLong(5, now);
+            profile.setLong(6, now);
+            profile.executeUpdate();
+            population.setString(1, profileId);
+            population.setLong(2, now);
+            population.setLong(3, now);
+            population.executeUpdate();
         }
     }
 

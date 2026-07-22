@@ -237,7 +237,9 @@ public final class PopulationGroupOwnerAdmissionExtension {
             boolean recovered) {
         var index = registry.snapshot();
         PopulationGroupClassificationRecord existing = classification(state.profileId());
-        String role = profileRole(state.profileId());
+        String role = first(
+                profileRole(state.profileId()),
+                existing == null ? null : existing.roleId());
         boolean resolved = role != null || index.definitions().isEmpty();
         List<String> groups = resolve(index, role);
         long now = System.currentTimeMillis();
@@ -264,7 +266,11 @@ public final class PopulationGroupOwnerAdmissionExtension {
                 return emitReconciledMembership(state.ownerUuid(), state.profileId(), role,
                         existing, groups, index.revision(), recovered).thenApply(ignored -> true);
             }
-            return CompletableFuture.completedFuture(committed && resolved);
+            // A missing historical role is a profile-scoped classification gap, not a failure to
+            // recover the population-group mutation authority. The row remains UNRESOLVED, and
+            // later positive mutations without an authoritative target role still fail closed in
+            // draft(...). Unrelated operations that do carry a role may proceed.
+            return CompletableFuture.completedFuture(committed);
         });
     }
 

@@ -82,6 +82,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed historical profiles without persisted role metadata preventing population-group, bonded-vessel, and companion-provisioning capabilities from activating. Those profiles remain explicitly unresolved until an authoritative role is supplied, while unrelated explicit-role operations remain available.
 - Fixed grounded AvatarFlight transformations crashing the client when a transformed model supplied a shorter footstep-interval array than the preceding player animation. Generated AvatarFlight model variants now remove unsafe footstep intervals, while fake riders once again attach the player's full skin, cosmetics, and equipment immediately by default.
 - Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer, reusing one keyed HUD across flight toggles, and throttling changed state instead of continuously resending unchanged UI commands.
 - Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
