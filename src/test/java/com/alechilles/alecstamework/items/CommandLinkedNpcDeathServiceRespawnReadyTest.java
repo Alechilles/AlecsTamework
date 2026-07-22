@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandLinkedNpcDeathServiceRespawnReadyTest {
@@ -43,6 +44,19 @@ class CommandLinkedNpcDeathServiceRespawnReadyTest {
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot untouchedOwnerSnapshot = snapshots.get(npcBOnCooldown);
         assertNotNull(untouchedOwnerSnapshot);
         assertFalse(untouchedOwnerSnapshot.isRespawnReady());
+    }
+
+    @Test
+    void rosterOwnerCanResolveDeathWithoutMatchingOnePhysicalTool() throws Exception {
+        CommandLinkedNpcDeathService service = new CommandLinkedNpcDeathService();
+        UUID owner = UUID.randomUUID();
+        UUID otherOwner = UUID.randomUUID();
+        UUID npc = UUID.randomUUID();
+        getSnapshotMap(service).put(npc, snapshot(npc, owner, System.currentTimeMillis()));
+
+        assertNotNull(service.getDeadSnapshotForOwner(npc, owner));
+        assertNull(service.getDeadSnapshotForOwner(npc, otherOwner));
+        assertNull(service.getDeadSnapshotForTool(npc, "different-copy", owner));
     }
 
     @SuppressWarnings("unchecked")

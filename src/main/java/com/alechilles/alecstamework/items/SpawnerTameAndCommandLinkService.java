@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
@@ -13,6 +15,8 @@ import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
+import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -40,19 +44,36 @@ final class SpawnerTameAndCommandLinkService {
         if (TameworkTamedComponent.getComponentType() == null) {
             return Decision.deny("capture-tame-link-tamed-component-unavailable");
         }
+        if (TameworkCommandLinksComponent.getComponentType() == null
+                || TameworkProjectionIdentityComponent.getComponentType() == null) {
+            return Decision.deny("capture-tame-link-lifecycle-components-unavailable");
+        }
         return Decision.allow(targetRoleId.trim(), plugin.getIndex(targetRoleId));
     }
 
     boolean apply(@Nonnull Ref<EntityStore> targetRef,
                   @Nonnull Store<EntityStore> store,
-                  @Nonnull Decision prepared) {
+                  @Nonnull Decision prepared,
+                  @Nonnull CommandLifecycle lifecycle) {
         if (!prepared.allowed()) return false;
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         ComponentType<EntityStore, TameworkTamedComponent> tamedType =
                 TameworkTamedComponent.getComponentType();
-        if (npc == null || npc.getRole() == null || tamedType == null) return false;
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> identityType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        if (npc == null || npc.getRole() == null || tamedType == null
+                || linksType == null || identityType == null) return false;
 
         store.putComponent(targetRef, tamedType, new TameworkTamedComponent(true));
+        String rosterLinkId = "roster:" + lifecycle.ownerUuid() + ":" + lifecycle.commandFamilyId();
+        store.putComponent(targetRef, linksType, new TameworkCommandLinksComponent(
+                lifecycle.ownerUuid(), new String[] {rosterLinkId}));
+        store.putComponent(targetRef, identityType, new TameworkProjectionIdentityComponent(
+                lifecycle.profileId(), lifecycle.operationId(),
+                TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
+                lifecycle.commandFamilyId(), lifecycle.sourceNpcUuid(), 0L));
         detachSpawnReferences(targetRef, store, npc);
         npc.setSpawnConfiguration(DISABLE_SPAWN_DRIVEN_DESPAWN);
         CompanionProgressionBootstrapService.ensureProgressionComponents(targetRef, store);
@@ -103,6 +124,26 @@ final class SpawnerTameAndCommandLinkService {
 
         private static Decision deny(String reason) {
             return new Decision(false, null, -1, reason);
+        }
+    }
+
+    record CommandLifecycle(@Nonnull String profileId,
+                            @Nonnull String operationId,
+                            @Nonnull UUID ownerUuid,
+                            @Nonnull String commandFamilyId,
+                            @Nonnull UUID sourceNpcUuid) {
+        CommandLifecycle {
+            profileId = requireText(profileId, "profileId");
+            operationId = requireText(operationId, "operationId");
+            ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
+            commandFamilyId = requireText(commandFamilyId, "commandFamilyId");
+            sourceNpcUuid = Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        }
+
+        private static String requireText(String value, String field) {
+            String normalized = Objects.requireNonNull(value, field).trim();
+            if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required");
+            return normalized;
         }
     }
 }

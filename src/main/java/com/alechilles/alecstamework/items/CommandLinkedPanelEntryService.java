@@ -176,11 +176,12 @@ final class CommandLinkedPanelEntryService {
             boolean talentsActionVisible = false;
             boolean talentsActionEnabled = false;
             if (!loaded && deathService != null) {
-                CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService.getDeadSnapshotForTool(
-                        record.npcUuid,
-                        toolId,
-                        player.getUuid()
-                );
+                CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
+                        record.profileId != null && !record.profileId.isBlank()
+                                ? deathService.getDeadSnapshotForOwner(
+                                        record.npcUuid, player.getUuid())
+                                : deathService.getDeadSnapshotForTool(
+                                        record.npcUuid, toolId, player.getUuid());
                 if (deadSnapshot != null) {
                     dead = true;
                     String deadName = npcNameResolver.resolveSnapshotDisplayName(

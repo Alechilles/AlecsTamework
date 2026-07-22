@@ -1064,11 +1064,20 @@ public final class SpawnerFeatureHandler {
                         if (tameAndCommandLink) {
                             boolean applied = tameAndCommandLinkService.apply(
                                     context.npcRef(), context.store(),
-                                    finalizedTameLinkPreparation.livePreparation());
+                                    finalizedTameLinkPreparation.livePreparation(),
+                                    new SpawnerTameAndCommandLinkService.CommandLifecycle(
+                                            profileId,
+                                            String.valueOf(finalizedAttemptId),
+                                            player.getUuid(),
+                                            finalizedConfig.getCaptureMechanics().commandFamilyId(),
+                                            context.npcUuid()));
                             liveTameLinkApplied.set(applied);
                             if (!applied) {
                                 captureAttemptRuntime.quarantine(
                                         finalizedAttemptId, "capture-tame-link-live-apply-failed");
+                            } else {
+                                linkedNpcSyncService.clearCapturedSnapshotIfPresent(
+                                        context.npcUuid());
                             }
                         } else {
                             sourceItem.commit();
@@ -1120,7 +1129,7 @@ public final class SpawnerFeatureHandler {
                                     finalizedAttemptId, "capture-tame-link-population-commit-failed");
                             return;
                         }
-                        boolean profileQueued = profilePersistence.persist(
+                        boolean profileQueued = tameAndCommandLink || profilePersistence.persist(
                                 targetUuid, finalizedOwnerToStore, finalizedCaptureRoleId,
                                 finalizedSnapshotDisplayName);
                         if (!profileQueued) {

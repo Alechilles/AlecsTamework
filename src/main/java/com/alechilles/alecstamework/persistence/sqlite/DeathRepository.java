@@ -203,7 +203,105 @@ public final class DeathRepository {
                 toPayloadJson(snapshot),
                 Math.max(1L, snapshot.diedAtMs())
         );
-        profileRepository.setProfileStateInTransaction(connection, profileId, null, true, null, null, null);
+        // A live companion cannot remain captured once its death becomes canonical. Leaving both
+        // flags active made relocation report "captured" before it ever considered the death.
+        profileRepository.deactivateSnapshotTypeInTransaction(connection, profileId, "capture");
+        profileRepository.setProfileStateInTransaction(
+                connection, profileId, false, true, null, null, null);
+        transitionCommandRosterDeath(connection, profileId, snapshot.diedAtMs());
+    }
+
+    /**
+     * Publishes the roster and lease half of a command companion death in the same transaction as
+     * the death snapshot. This prevents the UI and summon scheduler from observing an active lease
+     * for a companion whose canonical profile is already dead.
+     */
+    private static void transitionCommandRosterDeath(Connection connection,
+                                                      String profileId,
+                                                      long diedAtMs) throws Exception {
+        long nowMs = Math.max(1L, diedAtMs);
+        ArrayList<RosterKey> projectedRosters = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT owner_uuid, command_family_id
+                FROM command_family_roster_memberships
+                WHERE profile_id = ?
+                  AND command_state IN ('RESTORING','ACTIVE','UNLOADED','STORING')
+                """)) {
+            statement.setString(1, profileId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    projectedRosters.add(new RosterKey(
+                            result.getString("owner_uuid"),
+                            result.getString("command_family_id")));
+                }
+            }
+        }
+
+        for (RosterKey roster : projectedRosters) {
+            int changed;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE command_family_roster_memberships
+                    SET command_state = 'DEAD_REVIVABLE',
+                        profile_revision = COALESCE((
+                            SELECT revision FROM companion_population_state WHERE profile_id = ?
+                        ), profile_revision),
+                        active_for_bulk_commands = 0,
+                        updated_at_ms = ?
+                    WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                      AND command_state IN ('RESTORING','ACTIVE','UNLOADED','STORING')
+                    """)) {
+                statement.setString(1, profileId);
+                statement.setLong(2, nowMs);
+                statement.setString(3, roster.ownerUuid());
+                statement.setString(4, roster.commandFamilyId());
+                statement.setString(5, profileId);
+                changed = statement.executeUpdate();
+            }
+            if (changed == 1) {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE command_family_rosters
+                        SET row_revision = row_revision + 1, updated_at_ms = ?
+                        WHERE owner_uuid = ? AND command_family_id = ?
+                        """)) {
+                    statement.setLong(1, nowMs);
+                    statement.setString(2, roster.ownerUuid());
+                    statement.setString(3, roster.commandFamilyId());
+                    statement.executeUpdate();
+                }
+            }
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE command_timed_summon_operations
+                SET operation_state = 'CANCELED', result_state = 'DEAD_REVIVABLE',
+                    reason = 'projection-died', updated_at_ms = ?, completed_at_ms = 0
+                WHERE operation_id IN (
+                    SELECT active_operation_id FROM command_timed_summon_sessions
+                    WHERE profile_id = ? AND active_operation_id IS NOT NULL
+                ) AND operation_state IN ('PREPARED','APPLYING')
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, profileId);
+            statement.executeUpdate();
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE command_timed_summon_sessions
+                SET row_revision = row_revision + 1,
+                    summon_state = 'DEAD_REVIVABLE',
+                    summon_session_id = NULL,
+                    summon_remaining_ms = NULL,
+                    resummon_cooldown_until_ms = 0,
+                    warning_receipts_json = '[]',
+                    summon_last_checkpoint_at_ms = NULL,
+                    active_operation_id = NULL,
+                    updated_at_ms = ?
+                WHERE profile_id = ?
+                  AND summon_state IN ('RESTORING','ACTIVE','UNLOADED','STORING')
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, profileId);
+            statement.executeUpdate();
+        }
     }
 
     void deleteInTransaction(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
@@ -214,6 +312,9 @@ public final class DeathRepository {
         profileRepository.deactivateSnapshotTypeInTransaction(connection, profileId, SNAPSHOT_TYPE);
         profileRepository.replaceToolLinksInTransaction(connection, profileId, LINK_TYPE, new String[0]);
         profileRepository.setProfileStateInTransaction(connection, profileId, null, false, null, null, null);
+    }
+
+    private record RosterKey(String ownerUuid, String commandFamilyId) {
     }
 
     @Nonnull

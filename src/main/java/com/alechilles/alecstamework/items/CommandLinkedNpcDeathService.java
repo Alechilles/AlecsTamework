@@ -417,6 +417,20 @@ public final class CommandLinkedNpcDeathService {
         return snapshot;
     }
 
+    /** Roster-backed command items share owner/family authority instead of one physical tool ID. */
+    @Nullable
+    public DeadLinkedNpcSnapshot getDeadSnapshotForOwner(UUID npcUuid, @Nullable UUID ownerUuid) {
+        DeadLinkedNpcSnapshot snapshot = getDeadSnapshot(npcUuid);
+        if (snapshot == null) {
+            return null;
+        }
+        if (snapshot.ownerId() != null && ownerUuid != null
+                && !snapshot.ownerId().equals(ownerUuid)) {
+            return null;
+        }
+        return snapshot;
+    }
+
     public void clearDeadSnapshot(UUID npcUuid) {
         if (npcUuid == null) {
             return;
