@@ -50,7 +50,10 @@ Operator commands remain:
 
 - `/tw diagnose`
 - `/tw diagnose population`
-- `/tw diagnose vessel <binding-or-profile>`
+- `/tw diagnose command-family [owner-uuid] [family]`
+- `/tw diagnose timed [operation-or-profile]`
+- `/tw diagnose provision <operation-id>`
+- `/tw diagnose revive [operation-or-profile]`
 - `/tw diagnose provisioning <caller-namespace> <idempotency-key>`
 - `/tw debugdb health`
 - `/tw debugdb incidents [open|all]`
@@ -64,11 +67,13 @@ manufacture missing source evidence. Support exports are redacted and do not
 include the SQLite database or complete Hytale save.
 
 `/tw diagnose` prints a bounded summary of API capabilities, capture recovery,
-bonded-vessel/group/provisioning readiness and operation counts, persistence
-incidents/quarantines, and relevant evidence coverage. The focused population,
-vessel, and provisioning forms provide sanitized correlation and recovery
-details without exposing raw item JSON or owner UUIDs. All diagnose forms are
-read-only; they do not mutate, repair, or retry an operation.
+population-group/provisioning readiness, command-family roster membership,
+timed-summoning state, paid-revival/refund state, persistence
+incidents/quarantines, and relevant evidence coverage. Focused forms provide
+sanitized correlation and recovery details without exposing raw item JSON.
+When an owner UUID is supplied to `command-family`, that same operator-supplied
+UUID is echoed to identify the result. All diagnose forms are read-only; they
+do not mutate, repair, or retry an operation.
 
 ## `PersistenceDiagnosticsView`
 - `databasePath`

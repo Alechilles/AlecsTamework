@@ -27,6 +27,12 @@ Available commands:
 
 These commands are intended for trusted operators and use the `tamework.api.test` permission node with the usual OP/Admin/Operator fallback groups.
 
+`status` and the fixture-free `core`, `diagnostics`, and
+`hydragon-integrations` suites can run from the server console. Console
+`run all` is a read-only aggregate of exactly those three suites. Suites that
+need a player, world, or prepared fixtures are rejected from console;
+`prepare` and `reset` remain player-scoped.
+
 ## What `prepare` creates
 `prepare` provisions a deterministic fixture set for the invoking player in the current world:
 - one owned linked example NPC
@@ -44,8 +50,9 @@ Each fixture is marked with an internal self-test component, linked to the gener
 
 For API 0.9 builds, `run core` proves only the baseline capabilities it
 explicitly requires. `run hydragon-integrations` separately requires capture
-policy, bonded-vessel readiness, population-group reconciliation,
-provisioning, and transactional profile-data capability evidence from the
+policy, command-family roster, timed-summoning, paid-revival,
+population-group reconciliation, provisioning, capture-finalization, and
+transactional profile-data capability evidence from the
 packaged runtime. It also runs isolated deterministic behavioral fixtures and
 does not require `prepare`, a live profile, player inventory, world fixture, or
 database fixture. The suite never makes an unavailable authority available;
@@ -53,7 +60,8 @@ an absent or degraded capability is a failed assertion.
 
 Use `/tw diagnose` alongside the self-tests. It reports the API version and
 advertised capabilities, capture-policy recovery readiness, the current
-bonded-vessel/group/provisioning availability, and persistence health.
+command-family roster/timed-summoning/paid-revival capability availability,
+population-group/provisioning readiness, and persistence health.
 
 `run profile` checks:
 - profile id resolution
@@ -107,14 +115,14 @@ bonded-vessel/group/provisioning availability, and persistence health.
 
 `run hydragon-integrations` checks:
 - capture-policy capability and bundled capture-mechanics resolution
-- bonded-vessel capability plus `READY` vessel recovery state
+- command-family roster, timed-summoning, and paid-revival capabilities
+- resolved-attempt source consumption and capture tame-and-link capabilities
 - population-group capability plus `READY` reconciliation state
 - companion-provisioning capability
 - transactional profile-data capability
 - guaranteed capture commits without invoking entropy
-- failed probabilistic capture leaves its source/target immutable, emits once,
-  applies nothing, and reuses the original result for a duplicate callback
-- current bonded generation validates while a stale generation is rejected
+- a failed probabilistic capture emits once, applies no target mutation, and
+  reuses the original result for a duplicate callback
 - a population-group admission at the configured boundary rejects overflow
 - dormant and active provisioning each commit exactly one profile
 - failed active projection retains one durable `PARTIAL_DORMANT` profile that a
@@ -133,7 +141,9 @@ Add `verbose` to print each individual assertion instead of only the suite summa
 If you want to repro a clean setup, always run `reset` before `prepare` again.
 
 ## Notes
-- `run` is read-only. Only `prepare` and `reset` mutate state.
+- Console `run all` and the three console-safe suites are read-only. A player's
+  full `run all` includes controlled progression mutations and best-effort
+  baseline restoration; `prepare` and `reset` also mutate their owned fixtures.
 - The suite is intentionally narrow and is meant to validate the public API contract, not replace the Maven/JUnit test suite.
 - The fixture content is bundled with Tamework, so the self-tests do not depend on downstream mods like Animal Husbandry.
 - Maven tests for schema/config/API records are source-level evidence; they do

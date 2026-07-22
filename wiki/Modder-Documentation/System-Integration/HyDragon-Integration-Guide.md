@@ -10,7 +10,8 @@ Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder D
 
 This guide describes the supported boundary between HyDragon and Tamework
 3.0.0. It is also a reference pattern for other companion-expansion plugins
-that need capture, durable item bindings, group limits, or ritual provisioning.
+that need probabilistic capture, durable command rosters, timed summons,
+data-driven paid revival, group limits, or ritual provisioning.
 
 ## Version and bootstrap
 
@@ -33,8 +34,10 @@ experimental; version equality is not an authority check.
 
 | HyDragon feature | Required capabilities | Missing result |
 | --- | --- | --- |
-| Probabilistic Draconic Stone capture | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `CAPTURE_POLICY`, `POPULATION_GROUPS` | Disable before entropy or mutation; retain item and target unchanged. |
-| Soul Bond Miniwyvern provisioning | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, `COMPANION_PROVISIONING`; shipped ritual also needs `INTERACTION_EXTENSIONS` | Do not create a HyDragon-local profile. |
+| Probabilistic Draconic Stone capture | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `CAPTURE_POLICY`, `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `CAPTURE_TAME_AND_LINK`, `POPULATION_GROUPS`, `COMMAND_FAMILY_ROSTERS`, `COMMAND_TIMED_SUMMONING` | Disable before entropy or mutation; do not consume an item or alter the target. |
+| Wyvern Egg provisioning and Dragon Horn link | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, `COMPANION_PROVISIONING`, `COMMAND_FAMILY_ROSTERS`, `COMMAND_TIMED_SUMMONING`; shipped ritual also needs `INTERACTION_EXTENSIONS` | Do not consume the egg or create a HyDragon-local profile. |
+| Dragon Horn summon/storage | `COMMAND_FAMILY_ROSTERS`, `COMMAND_TIMED_SUMMONING` | Keep the profile durably stored and disable summon. |
+| Data-driven revival | `COMMAND_FAMILY_ROSTERS`, `PAID_COMMAND_REVIVAL` | Show revival as unavailable without consuming any configured cost. |
 | Elemental/profile-scoped transactional state | `PROFILE_DATA`, and `PROFILE_DATA_TRANSACTIONS` when the state participates in an idempotent gameplay transaction | Disable the affected persistence-dependent behavior; do not treat queued legacy writes as committed. |
 | Post-commit presentation | `EVENTS` | Disable listeners/presentation; never reinterpret mutation status. |
 | Operator health bridge | `DIAGNOSTICS` | Warn that integrated diagnostics are unavailable. |
@@ -62,18 +65,16 @@ source of truth for the packaged server.
 - HyDragon has no released legacy data, so this integration requires no
   HyDragon-specific item-ID or inventory migration path.
 
-## Command delivery limitation
+## Command-family model
 
-Tamework's current shipped command-tool path is the example-only
-`Tamework_Command_Whistle_Example` / `TwCommandExample` pair. It can exercise
-the HyDragon-relevant `Follow`, `Hold`, `Recall`, and `AttackTarget` commands,
-but it has no recipe or other polished player-acquisition path. In its shipped
-form it is an operator-given or development-config item.
+HyDragon ships its own localized Dragon Horn and maps it to one stable command
+family. The physical item is an access tool; roster membership is canonical per
+owner, command family, and profile. A replaced Horn therefore resolves the same
+roster instead of stranding companions in item-local metadata.
 
-HyDragon must therefore either ship its own localized production command item,
-config, and recipe/acquisition path, or explicitly document that an operator
-must give the example item. The integration must not imply that Tamework 3.0.0
-already provides a finished player acquisition flow.
+The roster's `activeForBulkCommands` flag controls selection for group commands.
+It does not mean the companion currently has a live world projection. Timed
+summoning owns that separate state.
 
 ## Ownership boundary
 
@@ -81,8 +82,11 @@ Tamework owns:
 
 - canonical profile identity, owner, role, lifecycle, and revision;
 - population membership, counts, reservations, and reconciliation;
-- bonded-vessel binding, generation, state, projection evidence, and operation
-  journal; and
+- owner/command-family roster membership and bulk-command selection;
+- summon leases, per-family active caps, remaining-time checkpoints, storage,
+  cooldowns, and restart recovery;
+- revival quotes, exact multi-item reservations, consumption, and refund
+  claims; and
 - exactly-one companion provisioning and recovery.
 
 HyDragon owns:
@@ -90,7 +94,7 @@ HyDragon owns:
 - dragon roles/assets, Draconic Stone tiers, capture values, altar recipes, and
   encounter policy;
 - Soul Bond player entitlement and ritual presentation;
-- Revitalizing Essence consumption/refund as an idempotent HyDragon saga;
+- data assets selecting role-appropriate revival costs;
 - elemental archetypes and ability state under its own profile-data namespace;
   and
 - localized English, Brazilian Portuguese, German, French, and Spanish player
@@ -98,7 +102,7 @@ HyDragon owns:
 
 HyDragon does not read `tamework.sqlite`, import internal implementation
 classes, cache mutable `Tw*Config` objects, or use item metadata as canonical
-binding state.
+roster state.
 
 When HyDragon must coordinate a profile-scoped value with another durable
 effect, it uses a revisioned read plus idempotent compare-and-set and queries
@@ -113,31 +117,34 @@ assigned to `hydragon:full_dragons`, normally with unlimited owned profiles and
 one active profile per owner.
 
 The capture runtime performs final live revalidation before its one terminal
-roll. A failed roll retains the source item and leaves NPC state unchanged.
+roll. Every eligible resolved attempt consumes exactly one stone, whether the
+roll succeeds or fails. A successful roll tames the existing NPC in place,
+commits its canonical profile to the owner's Dragon Horn roster, and does not
+create a filled stone. A failed roll leaves the NPC unchanged and applies the
+configured retry cooldown.
 
-## Bonded stones and repair
+## Dragon Horn summoning and revival
 
-A bonded stone represents one profile across stored, active, dead, lost, and
-released states. Binding generation increments fence stale or copied item
-projections.
+Each linked dragon remains one durable profile in the Horn roster. Summoning
+uses a persisted lease with a configured maximum active count and per-profile
+duration. When the lease expires, Tamework stores/despawns the live projection
+and returns the profile to the effectively captured state. Remaining time is
+checkpointed so unloads and restarts cannot reset the limit.
 
-Repair uses one stable HyDragon idempotency key. If material consumption and a
-Tamework transition straddle a restart, HyDragon queries/resumes the original
-operation. It never refunds after `APPLIED`, and it never invents a new key
-because the result is unavailable or timed out. Only a proven pre-apply
-`TERMINAL_DENIED` authorizes compensation.
-
-To start a damaged-stone repair from a held item, HyDragon first calls
-`resolveHeldItemProjection` with exact holder/container/slot revision and
-fingerprint evidence and requires an authoritative `DEAD` binding result. It
-does not parse private metadata into a binding ID or profile revision.
+Dead profiles stay in the roster. Paid revival resolves a data-driven quote
+that can contain any number of item types and quantities. The UI displays every
+required component and owned/required count before confirmation. Tamework then
+reserves and consumes the exact quoted items idempotently; a proven partial
+failure creates durable exact refund claims instead of granting a free revive.
 
 ## Soul Bond and Miniwyverns
 
-Soul Bond calls generic companion provisioning with a stable origin. The role
-belongs to `hydragon:soulbound_mini`, limited to one owned and one active per
-owner. An active projection failure may leave the one profile as recoverable
-`PARTIAL_DORMANT`; retry resumes it instead of creating a second Miniwyvern.
+The Wyvern Egg calls generic provision-and-link with a stable origin. The role
+belongs to `hydragon:soulbound_mini`, limited to one owned profile per owner and
+subject to the Dragon Horn's active cap and summon duration. A projection
+failure may leave the one profile as recoverable `PARTIAL_DORMANT`; retry
+resumes it instead of creating a second Miniwyvern. No separate Soul Bound
+Wyvern item is created.
 
 HyDragon entitlement remains player-scoped HyDragon data. The Miniwyvern
 profile and population capacity remain Tamework authority.
@@ -157,16 +164,16 @@ Before enabling a gameplay surface:
 Operators can use `/tw debugdb health`, `/tw debugdb integrity`, incident
 inspection/retry, and redacted exports. `/tw api test run
 hydragon-integrations` needs no prepared live fixture: it validates the
-packaged API 0.9 capabilities and isolated capture, stale-vessel, group-limit,
-and provisioning/recovery behaviors. Only suites present in the command's
+packaged API 0.9 capabilities and isolated capture, group-limit, and
+provisioning/recovery behaviors. Only suites present in the command's
 usage output are available in that build.
 
 Use `/tw diagnose population` for group reconciliation and owner/claim
-reservation evidence, `/tw diagnose vessel <binding-or-profile>` for one
-binding's generation/lifecycle/evidence and active-operation correlation, and
-`/tw diagnose provisioning <caller-namespace> <idempotency-key>` for one
-durable provisioning origin. These exact lookups are bounded, sanitized, and
-read-only.
+reservation evidence, `/tw diagnose command-family [owner-uuid] [family]` for
+roster membership, `/tw diagnose timed [operation-or-profile]` for summon
+leases, `/tw diagnose revive [operation-or-profile]` for paid revival/refunds,
+and either provisioning form for a durable provisioning origin. These lookups
+are bounded, sanitized, and read-only.
 
 ## Related pages
 

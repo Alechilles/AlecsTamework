@@ -89,11 +89,13 @@ snapshot is a migration safeguard for Tamework-owned data; it is not a
 complete-world backup and cannot restore world/entity files by itself. No
 snapshot is created on an ordinary startup when schema v8 is already applied.
 
-Unique indexes fence one caller/idempotency origin, one active vessel per
-profile, one nonterminal vessel generation, one nonterminal group operation per
-profile, and one canonical profile per provisioning origin. Operation rows
-retain config/policy revisions and exact recovery evidence so restart handling
-does not re-resolve changed live config or invent a second attempt.
+Unique indexes fence one caller/idempotency origin, one nonterminal
+population-group operation per profile, and one canonical profile per
+provisioning origin. Schema-v9 indexes additionally fence command-family roster
+membership, one summon session per roster profile, nonterminal summon
+operations, and active paid-revival operations. Operation rows retain
+config/policy revisions and exact recovery evidence so restart handling does
+not re-resolve changed live config or invent a second attempt.
 
 The storage recovery probe requires the schema-v8 migration marker and performs
 a real transactional write/readback before returning storage to healthy state.

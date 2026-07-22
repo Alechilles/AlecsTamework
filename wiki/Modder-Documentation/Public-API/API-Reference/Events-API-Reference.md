@@ -37,6 +37,9 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `CaptureAttemptResolvedEvent` when `CAPTURE_POLICY` is advertised
 - `PopulationGroupMembershipChangedEvent` and
   `PopulationGroupLimitChangedEvent` when `POPULATION_GROUPS` is advertised
+- `CommandFamilyRosterMembershipChangedEvent` when `COMMAND_FAMILY_ROSTERS` is advertised
+- `CommandTimedSummoningChangedEvent` when `COMMAND_TIMED_SUMMONING` is advertised
+- `PaidCommandRevivedEvent` when `PAID_COMMAND_REVIVAL` is advertised
 - `CompanionProvisionedEvent`, `ProvisionedCompanionDeathRecordedEvent`, and
   `ProvisionedCompanionRevivedEvent` when `COMPANION_PROVISIONING` is advertised
 

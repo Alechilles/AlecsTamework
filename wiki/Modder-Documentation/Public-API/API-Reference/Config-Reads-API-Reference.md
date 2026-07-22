@@ -34,7 +34,7 @@ Item-scoped config families:
 - `getNameItemConfigById(...)` / `resolveNameItemConfigForItemId(...)`
 - `getCommandItemConfigById(...)` / `resolveCommandItemConfigForItemId(...)`
 
-API 0.9 capture and bonded-vessel views:
+API 0.9 capture views:
 
 - `getSpawnerCaptureMechanicsById(...)` / `resolveSpawnerCaptureMechanicsForItemId(...)`
 - `getCapturePolicyById(...)` / `resolveCapturePolicyForRole(...)`

@@ -41,6 +41,9 @@ Root API entrypoints:
 - `getCapabilities()`
 - `profiles()`
 - `commandLinks()`
+- `commandFamilyRosters()` (capability-gated; unavailable facade by default)
+- `commandTimedSummoning()` (capability-gated; unavailable facade by default)
+- `paidCommandRevival()` (capability-gated; unavailable facade by default)
 - `progression()`
 - `policies()`
 - `interactionExtensions()`
@@ -72,15 +75,22 @@ API 0.9 also declares independently gated capabilities:
 - `POPULATION_GROUPS`
 - `COMPANION_PROVISIONING`
 - `PROFILE_DATA_TRANSACTIONS`
+- `COMMAND_FAMILY_ROSTERS`
+- `COMMAND_TIMED_SUMMONING`
+- `PAID_COMMAND_REVIVAL`
+- `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`
+- `CAPTURE_TAME_AND_LINK`
 
-Tamework 3.0.0 includes production implementations for all five API 0.9
+Tamework 3.0.0 includes production implementations for these API 0.9
 capabilities, but adds each capability only after its own authoritative runtime
 reports ready. This includes repository and recovery checks for transactional
 profile data and capture; group reconciliation plus canonical mutation-path
 installation for population groups; recovered profile/population/projection
-authority for provisioning. A degraded prerequisite omits only the affected capability and
-leaves its public facade fail closed. Use `/tw diagnose` to inspect the exact
-packaged runtime rather than copying a capability list from documentation.
+authority for provisioning; and migrated command-roster, summon-lease, and
+paid-revival repositories for their respective command lifecycle APIs. A
+degraded prerequisite omits only the affected capability and leaves its public
+facade fail closed. Use `/tw diagnose` to inspect the exact packaged runtime
+rather than copying a capability list from documentation.
 
 The Java enum, DTO, or default accessor may exist even when a capability is not
 advertised. This is intentional binary compatibility, not partial success.
