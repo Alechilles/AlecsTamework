@@ -3,11 +3,14 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import java.util.List;
 
 /**
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
@@ -15,6 +18,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_HEIGHT = 126;
     private static final int COMPACT_CARD_HEIGHT = 88;
+    private static final int MAX_INLINE_REVIVE_COSTS = 3;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -61,6 +65,7 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
+        String reviveCostPanelSelector = entrySelector + " #ReviveCostPanel";
         String summonSelector = entrySelector + " #RosterSummonButton";
         String dismissSelector = entrySelector + " #RosterDismissButton";
         String rosterStateSelector = entrySelector + " #RosterState";
@@ -80,11 +85,11 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
-        boolean showRespawn = isLinked
+        boolean showReviveAction = isLinked
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showLocate = isLinked && !pendingUnlink;
+        boolean showLocate = isLinked && !entry.dead() && !entry.lost() && !pendingUnlink;
         boolean showRecall = isLinked
                 && config.recallActionEnabled()
                 && !entry.dead()
@@ -119,7 +124,7 @@ final class LinkedNpcPanelCardBinder {
                 isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
                 isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
+        boolean showInactiveBadge = isLinked && !entry.active() && !showReviveAction && !pendingUnlink;
         boolean showRecallCountdown = isLinked
                 && entry.recallPending()
                 && !entry.loaded()
@@ -129,9 +134,10 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.lost()
                 && !pendingUnlink;
         CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
-        if (roster != null && roster.reviveCapBlocked()) showRespawn = false;
+        boolean reviveBlocked = roster != null && roster.reviveCapBlocked();
+        boolean showRespawn = showReviveAction && !reviveBlocked;
 
-        commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
+        commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showReviveAction);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
         commandBuilder.set(
@@ -191,7 +197,14 @@ final class LinkedNpcPanelCardBinder {
                 entry.futureStatB(),
                 showTalentPointAction
         );
-        commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        commandBuilder.set(respawnSelector + ".Visible", showReviveAction);
+        commandBuilder.set(respawnSelector + ".Enabled", !reviveBlocked);
+        bindReviveCosts(
+                commandBuilder,
+                reviveCostPanelSelector,
+                entry.reviveCostPresentation(),
+                showReviveAction
+        );
         bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
                 rosterCapacitySelector, summonSelector, dismissSelector,
                 showRosterDetails ? roster : null, language);
@@ -349,6 +362,49 @@ final class LinkedNpcPanelCardBinder {
         anchor.setRight(Value.of(0));
         anchor.setHeight(Value.of(showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT));
         return anchor;
+    }
+
+    private static void bindReviveCosts(UICommandBuilder builder,
+                                        String panelSelector,
+                                        CommandReviveCostPresentation presentation,
+                                        boolean reviveActionVisible) {
+        List<CommandReviveCostPresentation.CostLine> costs = presentation == null
+                ? List.of()
+                : presentation.costs();
+        int visibleCostCount = reviveActionVisible
+                ? Math.min(MAX_INLINE_REVIVE_COSTS, costs.size())
+                : 0;
+        builder.set(panelSelector + ".Visible", visibleCostCount > 0);
+        if (visibleCostCount > 0) {
+            builder.setObject(panelSelector + ".Anchor", buildReviveCostAnchor(visibleCostCount));
+        }
+        for (int costIndex = 0; costIndex < MAX_INLINE_REVIVE_COSTS; costIndex++) {
+            String rowSelector = panelSelector + " #ReviveCost" + costIndex;
+            boolean rowVisible = costIndex < visibleCostCount;
+            builder.set(rowSelector + ".Visible", rowVisible);
+            if (!rowVisible) continue;
+
+            CommandReviveCostPresentation.CostLine line = costs.get(costIndex);
+            builder.set(rowSelector + " #RequiredQuantity.Text", Integer.toString(line.requiredQuantity()));
+            builder.set(rowSelector + " #CostName.Text", line.localizedName());
+            builder.set(rowSelector + " #CostItem.Slots", List.of(reviveCostSlot(line)));
+        }
+    }
+
+    private static Anchor buildReviveCostAnchor(int visibleCostCount) {
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(43 - ((visibleCostCount - 1) * 8)));
+        anchor.setRight(Value.of(0));
+        anchor.setWidth(Value.of(132));
+        anchor.setHeight(Value.of(54));
+        return anchor;
+    }
+
+    private static ItemGridSlot reviveCostSlot(CommandReviveCostPresentation.CostLine line) {
+        ItemGridSlot slot = new ItemGridSlot(new ItemStack(line.itemId(), 1));
+        slot.setName(line.localizedName());
+        slot.setSkipItemQualityBackground(true);
+        return slot;
     }
 
     private static void bindRosterStatus(UICommandBuilder builder, String stateSelector,

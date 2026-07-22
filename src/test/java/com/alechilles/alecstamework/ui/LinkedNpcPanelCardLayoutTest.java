@@ -49,6 +49,7 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path LINKED_PANEL_ICONS = Paths.get(
             "src", "main", "resources", "Common", "UI", "Custom", "Tamework", "LinkedPanelIcons"
     );
+    private static final Path REVIVE_HEARTBEAT_ICON = LINKED_PANEL_ICONS.resolve("Revive_Heartbeat.png");
 
     @Test
     void compactLinkedPanelCardContainsProgressionControls() throws IOException {
@@ -148,6 +149,39 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(
                 cardUi.contains("FontSize: 8"),
                 "Talent point count should preserve the original readable text size."
+        );
+    }
+
+    @Test
+    void deadCompanionCardShowsThreeInlineReviveCostsAndLargeHeartbeatAction() throws IOException {
+        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
+        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+        BufferedImage heartbeat = ImageIO.read(REVIVE_HEARTBEAT_ICON.toFile());
+
+        assertNotNull(heartbeat, "Revive heartbeat icon must be a readable PNG.");
+        assertEquals(41, heartbeat.getWidth(), "Revive heartbeat should retain the supplied 41px width.");
+        assertEquals(41, heartbeat.getHeight(), "Revive heartbeat should retain the supplied 41px height.");
+        assertTrue(
+                cardUi.contains("Anchor: (Top: 33, Right: 136, Width: 41, Height: 41);"),
+                "The dead-card revive action should use the larger heartbeat control from the mockup."
+        );
+        assertTrue(cardUi.contains("Group #ReviveCostPanel"), "Dead cards need a dedicated inline cost panel.");
+        for (int index = 0; index < 3; index++) {
+            assertTrue(cardUi.contains("Group #ReviveCost" + index),
+                    "The card should provide a static cost row for mockup layout " + (index + 1) + ".");
+        }
+        assertTrue(
+                binder.contains("#RequiredQuantity.Text")
+                        && binder.contains("line.requiredQuantity()")
+                        && binder.contains("#CostName.Text")
+                        && binder.contains("line.localizedName()")
+                        && binder.contains("#CostItem.Slots")
+                        && binder.contains("new ItemStack(line.itemId(), 1)"),
+                "Each visible revive component must bind its quantity, localized name, and actual item icon."
+        );
+        assertTrue(
+                binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),
+                "Dead-card costs should replace the inactive badge and locate action instead of overlapping them."
         );
     }
 
