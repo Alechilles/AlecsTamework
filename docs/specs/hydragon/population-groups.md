@@ -1,6 +1,6 @@
 # Owner population groups
 
-Status: Implementation complete; release verification pending
+Status: Implementation and automated release verification complete
 Depends on: existing canonical owner/claim population admission and persistence
 HyDragon counterparts: [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) and
 [dragon content and encounters](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/dragon-content-encounters.md)

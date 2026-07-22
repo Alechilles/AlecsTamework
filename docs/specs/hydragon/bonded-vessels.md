@@ -1,6 +1,6 @@
 # Bonded companion vessels
 
-Status: Implementation complete; release verification pending
+Status: Implementation and automated release verification complete
 Depends on: [capture policy](capture-policy.md), canonical profiles, population
 admission, and [population groups](population-groups.md) for production use
 HyDragon counterpart: [capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)

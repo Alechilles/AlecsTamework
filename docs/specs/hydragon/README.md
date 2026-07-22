@@ -1,6 +1,6 @@
 # HyDragon enablement specifications
 
-Status: Implementation complete; release verification pending
+Status: Implementation and automated release verification complete
 Target: Tamework 3.0.0 / experimental Public API 0.9.0
 Consumer: HyDragon plugin, requiring Tamework `>=3.0.0 <4.0.0`
 
@@ -165,11 +165,12 @@ events, matching existing Tamework behavior. Invalid assets are excluded from
 resolution with an asset-ID-specific warning; the last valid compiled index
 remains authoritative during an unsuccessful hot reload.
 
-## Implemented surfaces and pending release gates
+## Implemented and verified surfaces
 
 The implementation landed as coordinated slices across the following surfaces.
-Final clean-build, packaged integration, documentation, and live-server gates
-must still prove that they agree before release:
+The final clean build, packaged HyDragon integration, and documentation gates
+have verified that they agree. A live-server playtest remains a release
+operation rather than an implementation prerequisite:
 
 - one backup-first, transactional, idempotent schema v8 plan for attempt,
   binding, group-classification, provisioning, and operation data; inventory

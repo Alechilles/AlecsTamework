@@ -1,6 +1,6 @@
 # Tamework-HyDragon integration contract
 
-Status: Implementation complete; release verification pending
+Status: Implementation and automated release verification complete
 Related Tamework specs: [index](README.md), [capture policy](capture-policy.md),
 [bonded vessels](bonded-vessels.md), [population groups](population-groups.md),
 and deferred [companion inventory](companion-inventory.md)

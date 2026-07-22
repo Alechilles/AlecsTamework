@@ -1,6 +1,6 @@
 # Configurable capture policy
 
-Status: Implementation complete; release verification pending
+Status: Implementation and automated release verification complete
 Runtime: Public API `0.9.0` / Tamework 3.0.0; capability activation remains capture-journal-recovery-gated
 Depends on: existing `TwSpawnerConfig`, `TameworkSpawn`, canonical profiles, and
 population admission
