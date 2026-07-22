@@ -47,6 +47,16 @@ public interface BondedVesselJournal {
             @Nonnull BondedVesselRepository.AppliedTransition transition
     );
 
+    /** Persists the exact replacement item evidence before closing an applied operation. */
+    @Nonnull
+    CompletionStage<BondedVesselRepository.MutationResult> finalizeItemProjection(
+            @Nonnull String operationId,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs
+    );
+
     @Nonnull
     CompletionStage<BondedVesselRepository.MutationResult> commit(
             @Nonnull String operationId,

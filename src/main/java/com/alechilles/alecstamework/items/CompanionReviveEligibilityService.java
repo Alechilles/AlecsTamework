@@ -200,6 +200,10 @@ public final class CompanionReviveEligibilityService {
                 && eligibility.authority() == Authority.BONDED_VESSEL) {
             observeBondedLifecycle(observation, result, BondedVesselState.LOST);
             remap(observation.profileId(), null);
+        } else if (observation.lifecycleState() == CompanionLifecycleState.CAPTURED
+                && eligibility.authority() == Authority.BONDED_VESSEL) {
+            observeBondedLifecycle(observation, result, BondedVesselState.STORED);
+            remap(observation.profileId(), null);
         }
     }
 
@@ -278,9 +282,12 @@ public final class CompanionReviveEligibilityService {
                     binding.ownerUuid(), binding.configId(), binding.generation() - 1L,
                     binding.generation(), BondedVesselState.ACTIVE, target,
                     result.revision(), binding.cooldownUntilMs(),
-                    target == BondedVesselState.DEAD
-                            ? "bonded-companion-death-recorded"
-                            : "bonded-companion-lost-recorded",
+                    switch (target) {
+                        case DEAD -> "bonded-companion-death-recorded";
+                        case LOST -> "bonded-companion-lost-recorded";
+                        case STORED -> "bonded-companion-despawn-stored";
+                        default -> "bonded-companion-lifecycle-recorded";
+                    },
                     false, binding.updatedAtMs(), now));
         } catch (Exception | LinkageError ignored) {
             // Notification lookup cannot change the already-committed lifecycle transaction.

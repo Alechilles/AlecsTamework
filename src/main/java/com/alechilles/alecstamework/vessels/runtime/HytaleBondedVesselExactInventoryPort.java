@@ -264,10 +264,21 @@ public final class HytaleBondedVesselExactInventoryPort implements ExactInventor
     }
 
     private ItemStack replacementStack(ItemStack source, ReplacementProjection replacement) {
+        MetadataRead sourceMetadata = readMetadata(source);
+        double assetMaxDurability = new ItemStack(replacement.itemId()).getMaxDurability();
+        double maxDurability = source.getMaxDurability() > 0.0D
+                ? source.getMaxDurability() : assetMaxDurability;
+        double durability = replacementDurability(
+                source.getDurability(), maxDurability,
+                sourceMetadata.metadata() == null ? null
+                        : sourceMetadata.metadata().state(),
+                replacement.state());
         ItemStack target = replacement.itemId().equals(source.getItemId())
+                && Double.compare(source.getDurability(), durability) == 0
+                && Double.compare(source.getMaxDurability(), maxDurability) == 0
                 ? source
-                : new ItemStack(replacement.itemId(), 1, source.getDurability(),
-                        source.getMaxDurability(), source.getMetadata());
+                : new ItemStack(replacement.itemId(), 1, durability,
+                        maxDurability, source.getMetadata());
         target = target
                 .withMetadata(TameworkMetadataKeys.VESSEL_BINDING_ID,
                         Codec.STRING, replacement.bindingId().toString().toLowerCase())
@@ -280,6 +291,23 @@ public final class HytaleBondedVesselExactInventoryPort implements ExactInventor
                 .withMetadata(TameworkMetadataKeys.VESSEL_STATE,
                         Codec.STRING, replacement.state().name());
         return target;
+    }
+
+    static double replacementDurability(
+            double sourceDurability,
+            double maxDurability,
+            @Nullable BondedVesselState sourceState,
+            BondedVesselBindingRecord.LifecycleState targetState) {
+        if (targetState == BondedVesselBindingRecord.LifecycleState.DEAD
+                && maxDurability > 0.0D) {
+            return 0.0D;
+        }
+        if (sourceState == BondedVesselState.DEAD
+                && targetState == BondedVesselBindingRecord.LifecycleState.STORED
+                && maxDurability > 0.0D) {
+            return maxDurability;
+        }
+        return Math.min(sourceDurability, maxDurability);
     }
 
     private boolean singleVessel(ItemStack stack) {

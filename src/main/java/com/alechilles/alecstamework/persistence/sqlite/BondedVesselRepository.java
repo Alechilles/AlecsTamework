@@ -112,6 +112,29 @@ public final class BondedVesselRepository {
     }
 
     /**
+     * Completes the item rewrite for a lifecycle observation that already advanced the binding in
+     * the same transaction as canonical population state.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> finalizeCommittedItemProjectionAsync(
+            @Nonnull String bindingId,
+            long expectedGeneration,
+            @Nonnull BondedVesselBindingRecord.LifecycleState expectedLifecycle,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs) {
+        Objects.requireNonNull(expectedLifecycle, "expectedLifecycle");
+        Objects.requireNonNull(projectionStatus, "projectionStatus");
+        return writeQueue.submitTracked(
+                "bonded_vessel_finalize_committed_item_projection",
+                connection -> finalizeCommittedItemProjectionInTransaction(
+                        connection, bindingId, expectedGeneration, expectedLifecycle,
+                        projectionStatus, itemEvidenceJson, reason, nowMs),
+                null);
+    }
+
+    /**
      * Reconciles only the durable item projection after a complete sealed inventory scan.
      * Vessel lifecycle and generation are immutable at this boundary.
      */
@@ -390,6 +413,53 @@ public final class BondedVesselRepository {
         }
         return result(Status.APPLIED, findBinding(connection, operation.bindingId()),
                 operation, reason);
+    }
+
+    @Nonnull
+    private MutationResult finalizeCommittedItemProjectionInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String bindingId,
+            long expectedGeneration,
+            @Nonnull BondedVesselBindingRecord.LifecycleState expectedLifecycle,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs) throws Exception {
+        BondedVesselBindingRecord binding = findBinding(connection, bindingId);
+        if (binding == null) return result(Status.NOT_FOUND, null, null, "binding_not_found");
+        if (binding.generation() != expectedGeneration
+                || binding.lifecycleState() != expectedLifecycle) {
+            return result(Status.CONFLICT, binding, null, "binding_lifecycle_changed");
+        }
+        if (binding.itemProjectionStatus() == projectionStatus
+                && Objects.equals(binding.itemEvidenceJson(), itemEvidenceJson)) {
+            return result(Status.IDEMPOTENT, binding, null, reason);
+        }
+        if (binding.itemProjectionStatus()
+                != BondedVesselBindingRecord.ItemProjectionStatus.REISSUE_PENDING) {
+            return result(Status.INVALID_STATE, binding, null,
+                    "item_projection_not_pending_reissue");
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_vessel_bindings
+                SET item_projection_status = ?, item_evidence_json = ?, diagnostic_reason = ?,
+                    row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE binding_id = ? AND generation = ? AND lifecycle_state = ?
+                  AND item_projection_status = 'REISSUE_PENDING'
+                """)) {
+            statement.setString(1, projectionStatus.name());
+            statement.setString(2, itemEvidenceJson);
+            statement.setString(3, reason);
+            statement.setLong(4, nowMs);
+            statement.setString(5, bindingId);
+            statement.setLong(6, expectedGeneration);
+            statement.setString(7, expectedLifecycle.name());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException(
+                        "Binding changed during committed item projection finalization.");
+            }
+        }
+        return result(Status.APPLIED, findBinding(connection, bindingId), null, reason);
     }
 
     @Nonnull

@@ -663,20 +663,36 @@ public final class BondedVesselCoordinator {
                         finalization.reason(), null,
                         token != null ? token : tokenVault.issue(operation, context)));
             }
-            return journal.commit(operation.operationId(), wallClockMs.getAsLong()).thenApply(result -> {
-                BondedVesselOperationRecord durable = requireOperation(result, operation);
-                if (result.status() == BondedVesselRepository.Status.COMMITTED) {
-                    tokenVault.revokeOperation(UUID.fromString(operation.operationId()));
-                    emitCommitted(durable, recovery);
-                    return closedResult(BondedVesselOperationResult.Status.COMMITTED,
-                            "transition-committed", durable);
+            return journal.finalizeItemProjection(
+                    operation.operationId(),
+                    BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                    finalization.itemEvidenceJson(), finalization.reason(),
+                    wallClockMs.getAsLong()).thenCompose(projected -> {
+                if (projected.status() != BondedVesselRepository.Status.APPLIED
+                        && projected.status() != BondedVesselRepository.Status.IDEMPOTENT) {
+                    return completed(fromMutation(projected, token));
                 }
-                if (result.status() == BondedVesselRepository.Status.IDEMPOTENT) {
-                    tokenVault.revokeOperation(UUID.fromString(operation.operationId()));
-                    return closedResult(BondedVesselOperationResult.Status.COMMITTED,
-                            "transition-already-committed", durable);
-                }
-                return fromMutation(result, token);
+                return journal.commit(operation.operationId(), wallClockMs.getAsLong())
+                        .thenApply(result -> {
+                            BondedVesselOperationRecord durable = requireOperation(
+                                    result, operation);
+                            if (result.status() == BondedVesselRepository.Status.COMMITTED) {
+                                tokenVault.revokeOperation(UUID.fromString(
+                                        operation.operationId()));
+                                emitCommitted(durable, recovery);
+                                return closedResult(
+                                        BondedVesselOperationResult.Status.COMMITTED,
+                                        "transition-committed", durable);
+                            }
+                            if (result.status() == BondedVesselRepository.Status.IDEMPOTENT) {
+                                tokenVault.revokeOperation(UUID.fromString(
+                                        operation.operationId()));
+                                return closedResult(
+                                        BondedVesselOperationResult.Status.COMMITTED,
+                                        "transition-already-committed", durable);
+                            }
+                            return fromMutation(result, token);
+                        });
             });
         });
     }

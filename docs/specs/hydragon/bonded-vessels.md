@@ -209,11 +209,20 @@ Tamework attempts to rewrite the current item to its dead state. If the item is
 offline or not discoverable, the durable binding still invalidates the prior
 generation; the missing projection is queued for evidence-based repair.
 
+An ordinary non-death runtime despawn of an active bonded projection is treated
+as an implicit store: the profile becomes `CAPTURED`, the binding advances to
+`STORED`, and the exact active vessel is rewritten to its stored state. It is
+not classified as `LOST` merely because the engine removed the live entity.
+
 `LOST` follows the same authority pattern. Neither state automatically creates
 a replacement item. HyDragon's repair interaction consumes Revitalizing Essence
 and requests the supported `DEAD -> STORED` transition through the public API;
 Tamework owns the binding/profile mutation, while HyDragon owns the material
 transaction and cracked-stone presentation.
+
+When a vessel asset declares durability, the `ACTIVE -> DEAD` item projection
+sets durability to zero and `DEAD -> STORED` restores it to the asset-backed
+maximum. Other summon/store projections preserve current durability.
 
 Repair is a cross-plugin saga, not an assumed distributed transaction:
 
@@ -443,10 +452,13 @@ the implementation must not expand either into a larger multi-domain class.
 16. Pending `RESTORING` prevents a concurrent second active-group summon.
 17. Spawn denial leaves stored state/item/generation unchanged.
 18. Successful summon produces one exact canonical live projection and active
-    item generation.
+    item generation at a visible, terrain-safe position in the player's front
+    arc; companion recall/relocation also searches the front arc before side or
+    rear fallbacks.
 19. Store targets only the linked canonical profile and never reruns capture
     chance.
-20. Active occupancy releases only after durable store/death/lost transition.
+20. Active occupancy releases only after durable store/death/lost transition;
+    an ordinary non-death engine despawn converges through the store transition.
 21. Death creates one `DEAD` binding generation even with duplicate death
     callbacks and an offline vessel item.
 22. Revive/repair cannot bypass group admission or stale-generation checks.

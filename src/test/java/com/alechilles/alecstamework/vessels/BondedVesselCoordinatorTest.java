@@ -81,6 +81,8 @@ class BondedVesselCoordinatorTest {
         assertEquals(GENERATION + 1L, journal.binding.generation());
         assertEquals(BondedVesselBindingRecord.LifecycleState.STORED,
                 journal.binding.lifecycleState());
+        assertEquals(1, journal.finalizeProjectionCalls,
+                "The final held-item evidence must be durable before transition closure.");
         assertEquals(BondedVesselOperationRecord.State.COMMITTED,
                 journal.onlyOperation().state());
     }
@@ -390,6 +392,7 @@ class BondedVesselCoordinatorTest {
     private static final class InMemoryJournal implements BondedVesselJournal {
         private BondedVesselBindingRecord binding;
         private final Map<String, BondedVesselOperationRecord> operations = new HashMap<>();
+        private int finalizeProjectionCalls;
         private final Map<String, String> origins = new HashMap<>();
         private BondedVesselRepository.ApplyAbsenceProof lastDenialProof;
 
@@ -484,6 +487,18 @@ class BondedVesselCoordinatorTest {
                     operation.targetLifecycleState(), transition.committedProfileRevision(),
                     operation.operationId());
             return completed(result(BondedVesselRepository.Status.APPLIED, applied, null));
+        }
+
+        @Override
+        public CompletionStage<BondedVesselRepository.MutationResult> finalizeItemProjection(
+                String operationId,
+                BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+                String itemEvidenceJson,
+                String reason,
+                long nowMs) {
+            finalizeProjectionCalls++;
+            BondedVesselOperationRecord operation = operations.get(operationId);
+            return completed(result(BondedVesselRepository.Status.APPLIED, operation, reason));
         }
 
         @Override

@@ -107,7 +107,7 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
                 && eligibility != null
                 && eligibility.authority()
                 == CompanionReviveEligibilityService.Authority.BONDED_VESSEL) {
-            classified = CompanionLifecycleState.LOST;
+            classified = CompanionLifecycleState.CAPTURED;
         }
         if (classified == CompanionLifecycleState.UNLOADED) {
             reconciler.observePhysical(

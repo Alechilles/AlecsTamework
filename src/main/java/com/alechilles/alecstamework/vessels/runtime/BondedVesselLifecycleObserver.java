@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.vessels.BondedVesselEventSink;
 import com.alechilles.alecstamework.vessels.BondedVesselEvidenceAuthority;
 import com.google.gson.Gson;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -86,6 +87,57 @@ public final class BondedVesselLifecycleObserver {
                         "bonded-lifecycle-observer-failed", observation.profileId()));
     }
 
+    /**
+     * Repairs item projections that an atomic population transition committed while the owner
+     * was offline. This is intentionally owner-scoped so exact inventory evidence is available.
+     */
+    @Nonnull
+    public CompletionStage<RecoveryReport> recoverPendingForOwner(@Nonnull UUID ownerUuid) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return repository.loadNonReleasedBindings().stream()
+                        .filter(binding -> ownerUuid.equals(binding.ownerUuid()))
+                        .filter(binding -> binding.itemProjectionStatus()
+                                == BondedVesselBindingRecord.ItemProjectionStatus.REISSUE_PENDING)
+                        .filter(binding -> binding.lifecycleState()
+                                == BondedVesselBindingRecord.LifecycleState.STORED
+                                || binding.lifecycleState()
+                                == BondedVesselBindingRecord.LifecycleState.DEAD
+                                || binding.lifecycleState()
+                                == BondedVesselBindingRecord.LifecycleState.LOST)
+                        .limit(128L)
+                        .toList();
+            } catch (Exception failure) {
+                throw new IllegalStateException(
+                        "Pending bonded-vessel item projection lookup failed", failure);
+            }
+        }, executor).thenCompose(bindings -> recoverNext(bindings, 0,
+                new RecoveryReport(bindings.size(), 0, 0)))
+                .exceptionally(failure -> new RecoveryReport(0, 0, 1));
+    }
+
+    private CompletionStage<RecoveryReport> recoverNext(
+            List<BondedVesselBindingRecord> bindings,
+            int index,
+            RecoveryReport report) {
+        if (index >= bindings.size()) return CompletableFuture.completedFuture(report);
+        BondedVesselBindingRecord binding = bindings.get(index);
+        BondedVesselState target = BondedVesselState.valueOf(binding.lifecycleState().name());
+        UUID removedNpcUuid = UUID.nameUUIDFromBytes(("bonded-projection-recovery:"
+                + binding.bindingId() + ":" + binding.generation())
+                .getBytes(StandardCharsets.UTF_8));
+        Observation observation = new Observation(
+                binding.profileId(), removedNpcUuid, binding.expectedProfileRevision(), target,
+                "bonded-item-projection-recovered-on-owner-join", "owner-join-recovery");
+        return finishCommittedProjection(observation, binding)
+                .handle((result, failure) -> failure == null && result != null
+                        && (result.status() == Status.COMMITTED
+                        || result.status() == Status.IDEMPOTENT)
+                        ? report.completedOne() : report.failedOne())
+                .thenCompose(next -> recoverNext(bindings, index + 1, next));
+    }
+
     private Loaded load(Observation observation) {
         try {
             String key = idempotencyKey(observation);
@@ -106,6 +158,10 @@ public final class BondedVesselLifecycleObserver {
         BondedVesselBindingRecord.LifecycleState target = targetLifecycle(observation.target());
         if (binding.lifecycleState() == target
                 && binding.expectedProfileRevision() >= observation.committedProfileRevision()) {
+            if (binding.itemProjectionStatus()
+                    == BondedVesselBindingRecord.ItemProjectionStatus.REISSUE_PENDING) {
+                return finishCommittedProjection(observation, binding);
+            }
             return CompletableFuture.completedFuture(Result.idempotent(
                     "bonded-lifecycle-already-observed", observation.profileId()));
         }
@@ -227,6 +283,48 @@ public final class BondedVesselLifecycleObserver {
         });
     }
 
+    /** Finishes the item half of a population transaction that already advanced lifecycle. */
+    private CompletionStage<Result> finishCommittedProjection(
+            Observation observation,
+            BondedVesselBindingRecord binding) {
+        SpawnerVesselConfigView config = configs.resolve(
+                binding.configId(), binding.configRevision()).orElse(null);
+        if (config == null) return CompletableFuture.completedFuture(Result.indeterminate(
+                "bonded-lifecycle-config-revision-unavailable", observation.profileId()));
+        BondedVesselOperationRecord projection = projectionOperation(observation, binding, config);
+        BondedVesselTransitionContext context = sourceContext(binding);
+        CompletionStage<BondedVesselEvidenceAuthority.SourceFinalization> stage;
+        try {
+            stage = context == null ? null : evidence.finalizeSource(projection, context);
+        } catch (RuntimeException | LinkageError failure) {
+            stage = null;
+        }
+        CompletionStage<BondedVesselEvidenceAuthority.SourceFinalization> safe = stage == null
+                ? CompletableFuture.completedFuture(null) : stage;
+        return safe.thenCompose(finalization -> {
+            boolean present = finalization != null
+                    && (finalization.status()
+                    == BondedVesselEvidenceAuthority.FinalizationStatus.FINALIZED
+                    || finalization.status()
+                    == BondedVesselEvidenceAuthority.FinalizationStatus.ALREADY_FINALIZED);
+            String itemEvidence = present ? finalization.itemEvidenceJson() : null;
+            String reason = present ? finalization.reason()
+                    : finalization == null ? "bonded-lifecycle-item-evidence-missing"
+                    : finalization.reason();
+            return submit(repository.finalizeCommittedItemProjectionAsync(
+                    binding.bindingId(), binding.generation(), binding.lifecycleState(),
+                    present ? BondedVesselBindingRecord.ItemProjectionStatus.PRESENT
+                            : BondedVesselBindingRecord.ItemProjectionStatus.MISSING,
+                    itemEvidence, reason, now()));
+        }).thenApply(projected -> {
+            if (!accepted(projected, BondedVesselRepository.Status.APPLIED)) {
+                return fromMutation(projected, observation.profileId());
+            }
+            return Result.committed("bonded-lifecycle-item-projection-finalized",
+                    observation.profileId());
+        });
+    }
+
     @Nonnull
     private BondedVesselOperationRecord operation(
             Observation observation,
@@ -234,8 +332,7 @@ public final class BondedVesselLifecycleObserver {
             SpawnerVesselConfigView config) {
         long now = now();
         BondedVesselState target = observation.target();
-        String targetItem = target == BondedVesselState.DEAD
-                ? config.deadItemId() : config.lostItemId();
+        String targetItem = targetItem(config, target);
         long candidate = Math.addExact(binding.generation(), 1L);
         String replacement = fingerprints.fingerprint(
                 new BondedVesselItemFingerprintCodec.VesselItemMetadata(
@@ -245,9 +342,7 @@ public final class BondedVesselLifecycleObserver {
         return new BondedVesselOperationRecord(
                 operationId(observation).toString(), CALLER, idempotencyKey(observation),
                 observation.removedNpcUuid().toString(), binding.bindingId(), binding.profileId(),
-                target == BondedVesselState.DEAD
-                        ? BondedVesselOperationRecord.Action.MARK_DEAD
-                        : BondedVesselOperationRecord.Action.MARK_LOST,
+                action(target),
                 BondedVesselOperationRecord.State.PREPARED, binding.generation(), candidate,
                 binding.expectedProfileRevision(), binding.configId(), binding.configRevision(),
                 BondedVesselBindingRecord.LifecycleState.ACTIVE,
@@ -265,6 +360,41 @@ public final class BondedVesselLifecycleObserver {
                 "LIFECYCLE_ITEM_FINALIZATION_PENDING", 0L, now, now, 0L, 0L);
     }
 
+    private BondedVesselOperationRecord projectionOperation(
+            Observation observation,
+            BondedVesselBindingRecord binding,
+            SpawnerVesselConfigView config) {
+        BondedVesselTransitionContext source = sourceContext(binding);
+        long candidate = binding.generation();
+        String targetItem = targetItem(config, observation.target());
+        String replacement = fingerprints.fingerprint(
+                new BondedVesselItemFingerprintCodec.VesselItemMetadata(
+                        targetItem, UUID.fromString(binding.bindingId()), binding.profileId(),
+                        candidate, binding.configId(), observation.target()));
+        long prior = Math.max(1L, candidate - 1L);
+        long now = now();
+        return new BondedVesselOperationRecord(
+                operationId(observation).toString(), CALLER, idempotencyKey(observation),
+                observation.removedNpcUuid().toString(), binding.bindingId(), binding.profileId(),
+                action(observation.target()), BondedVesselOperationRecord.State.COMMITTED,
+                prior, candidate, binding.expectedProfileRevision(), binding.configId(),
+                binding.configRevision(), BondedVesselBindingRecord.LifecycleState.ACTIVE,
+                BondedVesselBindingRecord.LifecycleState.ACTIVE, binding.lifecycleState(),
+                BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                binding.cooldownUntilMs(), binding.cooldownUntilMs(),
+                source == null ? Objects.requireNonNullElse(binding.lastItemId(), targetItem)
+                        : source.sourceItemId(),
+                targetItem, source == null ? "missing-source-fingerprint"
+                        : source.sourceItemFingerprint(), replacement,
+                source == null ? missingSourceContext(binding) : sourceContextJson(source),
+                gson.toJson(Map.of("schema", 1, "projectionOnly", true,
+                        "transition", observation.target().name())),
+                observation.populationOperationId(), observation.removedNpcUuid(),
+                observation.reason(), "COMMITTED_ITEM_PROJECTION_PENDING",
+                0L, now, now, now, now);
+    }
+
     @Nullable
     private BondedVesselTransitionContext sourceContext(BondedVesselBindingRecord binding) {
         if (binding.lastItemId() == null || binding.itemEvidenceJson() == null) return null;
@@ -273,8 +403,9 @@ public final class BondedVesselLifecycleObserver {
                     binding.itemEvidenceJson(), BondedVesselSourceItemEvidence.class);
             if (location == null) return null;
             return new BondedVesselTransitionContext(
-                    binding.lastItemId(), location.holderEvidenceId(), location.containerPath(),
-                    location.inventorySlot(), binding.generation(), currentFingerprint(binding),
+                    location.itemId(), location.holderEvidenceId(), location.containerPath(),
+                    location.inventorySlot(), location.inventoryRevision(),
+                    location.itemFingerprint(),
                     binding.activeNpcUuid(), null);
         } catch (RuntimeException invalid) {
             return null;
@@ -393,9 +524,7 @@ public final class BondedVesselLifecycleObserver {
     }
 
     private static boolean matches(Observation observation, BondedVesselOperationRecord operation) {
-        BondedVesselOperationRecord.Action action = observation.target() == BondedVesselState.DEAD
-                ? BondedVesselOperationRecord.Action.MARK_DEAD
-                : BondedVesselOperationRecord.Action.MARK_LOST;
+        BondedVesselOperationRecord.Action action = action(observation.target());
         return operation.callerNamespace().equals(CALLER)
                 && operation.idempotencyKey().equals(idempotencyKey(observation))
                 && operation.profileId().equals(observation.profileId())
@@ -414,9 +543,33 @@ public final class BondedVesselLifecycleObserver {
 
     private static BondedVesselBindingRecord.LifecycleState targetLifecycle(
             BondedVesselState state) {
-        return state == BondedVesselState.DEAD
-                ? BondedVesselBindingRecord.LifecycleState.DEAD
-                : BondedVesselBindingRecord.LifecycleState.LOST;
+        return switch (state) {
+            case STORED -> BondedVesselBindingRecord.LifecycleState.STORED;
+            case DEAD -> BondedVesselBindingRecord.LifecycleState.DEAD;
+            case LOST -> BondedVesselBindingRecord.LifecycleState.LOST;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported observed bonded lifecycle " + state);
+        };
+    }
+
+    private static BondedVesselOperationRecord.Action action(BondedVesselState state) {
+        return switch (state) {
+            case STORED -> BondedVesselOperationRecord.Action.STORE;
+            case DEAD -> BondedVesselOperationRecord.Action.MARK_DEAD;
+            case LOST -> BondedVesselOperationRecord.Action.MARK_LOST;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported observed bonded lifecycle " + state);
+        };
+    }
+
+    private static String targetItem(SpawnerVesselConfigView config, BondedVesselState state) {
+        return switch (state) {
+            case STORED -> config.storedItemId();
+            case DEAD -> config.deadItemId();
+            case LOST -> config.lostItemId();
+            default -> throw new IllegalArgumentException(
+                    "Unsupported observed bonded lifecycle " + state);
+        };
     }
 
     private static String reason(BondedVesselOperationRecord operation, String fallback) {
@@ -450,13 +603,32 @@ public final class BondedVesselLifecycleObserver {
                     || populationOperationId.isBlank() ? null : populationOperationId.trim();
             if (committedProfileRevision < 0L) throw new IllegalArgumentException(
                     "committedProfileRevision cannot be negative");
-            if (target != BondedVesselState.DEAD && target != BondedVesselState.LOST) {
-                throw new IllegalArgumentException("Lifecycle observer supports only DEAD or LOST");
+            if (target != BondedVesselState.STORED
+                    && target != BondedVesselState.DEAD
+                    && target != BondedVesselState.LOST) {
+                throw new IllegalArgumentException(
+                        "Lifecycle observer supports only STORED, DEAD, or LOST");
             }
         }
     }
 
     public enum Status { COMMITTED, IDEMPOTENT, SKIPPED, QUARANTINED, INDETERMINATE }
+
+    public record RecoveryReport(int scanned, int completed, int failed) {
+        public RecoveryReport {
+            if (scanned < 0 || completed < 0 || failed < 0) {
+                throw new IllegalArgumentException("Recovery counters cannot be negative");
+            }
+        }
+
+        private RecoveryReport completedOne() {
+            return new RecoveryReport(scanned, completed + 1, failed);
+        }
+
+        private RecoveryReport failedOne() {
+            return new RecoveryReport(scanned, completed, failed + 1);
+        }
+    }
 
     public record Result(@Nonnull Status status, @Nonnull String reason,
                          @Nonnull String profileId) {

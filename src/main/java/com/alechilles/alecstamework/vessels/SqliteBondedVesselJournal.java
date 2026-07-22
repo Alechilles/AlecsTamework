@@ -77,6 +77,18 @@ public final class SqliteBondedVesselJournal implements BondedVesselJournal {
     }
 
     @Override
+    public CompletionStage<BondedVesselRepository.MutationResult> finalizeItemProjection(
+            String operationId,
+            BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs
+    ) {
+        return bridge(repository.finalizeAppliedItemProjectionAsync(
+                operationId, projectionStatus, itemEvidenceJson, reason, nowMs));
+    }
+
+    @Override
     public CompletionStage<BondedVesselRepository.MutationResult> commit(String operationId, long nowMs) {
         return bridge(repository.commitAsync(operationId, nowMs));
     }

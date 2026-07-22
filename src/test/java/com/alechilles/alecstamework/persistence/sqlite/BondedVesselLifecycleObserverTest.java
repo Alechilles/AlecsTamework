@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.api.BondedVesselSourceItemEvidence;
 import com.alechilles.alecstamework.api.BondedVesselState;
 import com.alechilles.alecstamework.api.BondedVesselBindingInvalidatedEvent;
 import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
+import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationObservation;
 import com.alechilles.alecstamework.vessels.BondedVesselEvidenceAuthority;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselLifecycleObserver;
 import com.google.gson.Gson;
@@ -87,6 +89,103 @@ class BondedVesselLifecycleObserverTest {
         }
     }
 
+    @Test
+    void atomicDeathObservationFinishesPendingDamagedItemProjection() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("vessel-atomic-death.sqlite")) {
+            Fixture fixture = activeFixture(harness);
+            CompanionPopulationObservationRepository populations =
+                    new CompanionPopulationObservationRepository(harness.queue);
+            var populationResult = populations.persistAsync(new CompanionPopulationObservation(
+                    fixture.profileId(), fixture.npcUuid(), fixture.ownerUuid(), "world",
+                    CompanionLifecycleState.DEAD_REVIVABLE,
+                    null, null, null, 8L, "test-death")).join();
+            assertEquals(9L, populationResult.revision());
+
+            BondedVesselBindingRecord pending = fixture.repository()
+                    .findBinding(fixture.bindingId().toString());
+            assertEquals(BondedVesselBindingRecord.LifecycleState.DEAD,
+                    pending.lifecycleState());
+            assertEquals(BondedVesselBindingRecord.ItemProjectionStatus.REISSUE_PENDING,
+                    pending.itemProjectionStatus());
+
+            PresentEvidence evidence = new PresentEvidence();
+            BondedVesselLifecycleObserver observer = observer(
+                    fixture.repository(), evidence, new ArrayList<>());
+            var observation = new BondedVesselLifecycleObserver.Observation(
+                    fixture.profileId(), fixture.npcUuid(), 9L, BondedVesselState.DEAD,
+                    "death-recorded", "population-death-9");
+
+            assertEquals(BondedVesselLifecycleObserver.Status.COMMITTED,
+                    observer.observe(observation).toCompletableFuture().join().status());
+            BondedVesselBindingRecord finalized = fixture.repository()
+                    .findBinding(fixture.bindingId().toString());
+            assertEquals(BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                    finalized.itemProjectionStatus());
+            assertEquals("{\"generation\":3}", finalized.itemEvidenceJson());
+            assertEquals(1, evidence.finalizations.get());
+        }
+    }
+
+    @Test
+    void ownerJoinRecoversPendingAtomicDeathItemProjection() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("vessel-owner-join-recovery.sqlite")) {
+            Fixture fixture = activeFixture(harness);
+            CompanionPopulationObservationRepository populations =
+                    new CompanionPopulationObservationRepository(harness.queue);
+            populations.persistAsync(new CompanionPopulationObservation(
+                    fixture.profileId(), fixture.npcUuid(), fixture.ownerUuid(), "world",
+                    CompanionLifecycleState.DEAD_REVIVABLE,
+                    null, null, null, 8L, "test-death")).join();
+
+            PresentEvidence evidence = new PresentEvidence();
+            BondedVesselLifecycleObserver observer = observer(
+                    fixture.repository(), evidence, new ArrayList<>());
+            BondedVesselLifecycleObserver.RecoveryReport report = observer
+                    .recoverPendingForOwner(fixture.ownerUuid()).toCompletableFuture().join();
+
+            assertEquals(1, report.scanned());
+            assertEquals(1, report.completed());
+            assertEquals(0, report.failed());
+            BondedVesselBindingRecord finalized = fixture.repository()
+                    .findBinding(fixture.bindingId().toString());
+            assertEquals(BondedVesselBindingRecord.LifecycleState.DEAD,
+                    finalized.lifecycleState());
+            assertEquals(BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                    finalized.itemProjectionStatus());
+            assertEquals(1, evidence.finalizations.get());
+        }
+    }
+
+    @Test
+    void ordinaryBondedDespawnReturnsVesselToStoredState() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("vessel-despawn-store.sqlite")) {
+            Fixture fixture = activeFixture(harness);
+            CompanionPopulationObservationRepository populations =
+                    new CompanionPopulationObservationRepository(harness.queue);
+            var populationResult = populations.persistAsync(new CompanionPopulationObservation(
+                    fixture.profileId(), fixture.npcUuid(), fixture.ownerUuid(), "world",
+                    CompanionLifecycleState.CAPTURED,
+                    null, null, null, 8L, "test-despawn")).join();
+
+            PresentEvidence evidence = new PresentEvidence();
+            BondedVesselLifecycleObserver observer = observer(
+                    fixture.repository(), evidence, new ArrayList<>());
+            var observation = new BondedVesselLifecycleObserver.Observation(
+                    fixture.profileId(), fixture.npcUuid(), populationResult.revision(),
+                    BondedVesselState.STORED, "despawn-stored", "population-store-9");
+            assertEquals(BondedVesselLifecycleObserver.Status.COMMITTED,
+                    observer.observe(observation).toCompletableFuture().join().status());
+
+            BondedVesselBindingRecord finalized = fixture.repository()
+                    .findBinding(fixture.bindingId().toString());
+            assertEquals(BondedVesselBindingRecord.LifecycleState.STORED,
+                    finalized.lifecycleState());
+            assertEquals(BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                    finalized.itemProjectionStatus());
+            assertNull(finalized.activeNpcUuid());
+        }
+    }
+
     private BondedVesselLifecycleObserver observer(
             BondedVesselRepository repository,
             BondedVesselEvidenceAuthority evidence,
@@ -148,12 +247,15 @@ class BondedVesselLifecycleObserverTest {
                 0L, 3L, 3L, 0L, 0L);
         join(repository.prepareTransitionAsync(summon));
         join(repository.claimForApplyAsync(summonId.toString(), 4L));
+        String activeEvidence = new Gson().toJson(new BondedVesselSourceItemEvidence(
+                "active-stone", "player:" + owner.toString().toLowerCase(), "hotbar",
+                2, 2L, "active-fingerprint"));
         join(repository.applyAsync(new BondedVesselRepository.AppliedTransition(
                 summonId.toString(), 8L, npcUuid,
                 new BondedVesselBindingRecord.PhysicalLocation("world", 0, 0),
-                evidence, "summoned", 5L)));
+                activeEvidence, "summoned", 5L)));
         join(repository.commitAsync(summonId.toString(), 6L));
-        return new Fixture(repository, bindingId, profile, npcUuid);
+        return new Fixture(repository, bindingId, profile, npcUuid, owner);
     }
 
     private static BondedVesselRepository.MutationResult join(
@@ -166,7 +268,7 @@ class BondedVesselLifecycleObserverTest {
     }
 
     private record Fixture(BondedVesselRepository repository, UUID bindingId,
-                           String profileId, UUID npcUuid) { }
+                           String profileId, UUID npcUuid, UUID ownerUuid) { }
 
     private static class OfflineEvidence implements BondedVesselEvidenceAuthority {
         @Override public java.util.concurrent.CompletionStage<SourceObservation> observe(

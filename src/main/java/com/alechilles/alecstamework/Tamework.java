@@ -274,6 +274,7 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Int
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
@@ -1551,10 +1552,38 @@ public class Tamework extends JavaPlugin {
     }
 
     private void onPlayerAddedToWorldForOverrides(@Nonnull AddPlayerToWorldEvent event) {
-        if (event == null || event.getWorld() == null || configOverrideManager == null) {
+        if (event == null || event.getWorld() == null) {
             return;
         }
-        initializeOverridesForWorld(event.getWorld());
+        recoverPendingBondedVesselItems(event);
+        if (configOverrideManager != null) {
+            initializeOverridesForWorld(event.getWorld());
+        }
+    }
+
+    private void recoverPendingBondedVesselItems(@Nonnull AddPlayerToWorldEvent event) {
+        ProductionBondedVesselRuntime runtime = bondedVesselRuntime;
+        if (runtime == null || event.getHolder() == null) {
+            return;
+        }
+        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
+        if (playerRef == null || playerRef.getUuid() == null) {
+            return;
+        }
+        runtime.lifecycleObserver().recoverPendingForOwner(playerRef.getUuid())
+                .whenComplete((report, failure) -> {
+                    if (failure != null) {
+                        getLogger().at(Level.WARNING).withCause(failure).log(
+                                "Pending bonded-vessel item recovery failed for owner "
+                                        + playerRef.getUuid() + ".");
+                    } else if (report != null && report.scanned() > 0) {
+                        getLogger().at(report.failed() == 0 ? Level.INFO : Level.WARNING).log(
+                                "Pending bonded-vessel item recovery for owner "
+                                        + playerRef.getUuid() + ": scanned=" + report.scanned()
+                                        + ", completed=" + report.completed()
+                                        + ", failed=" + report.failed() + ".");
+                    }
+                });
     }
 
     private void initializeOverridesForLoadedWorlds() {
@@ -2837,9 +2866,12 @@ public class Tamework extends JavaPlugin {
                                     .BondedVesselLifecycleObserver.Observation(
                                     observation.profileId(), observation.currentNpcUuid(),
                                     result.revision(), target,
-                                    target == com.alechilles.alecstamework.api.BondedVesselState.DEAD
-                                            ? "bonded-companion-death-recorded"
-                                            : "bonded-companion-lost-recorded",
+                                    switch (target) {
+                                        case STORED -> "bonded-companion-despawn-stored";
+                                        case DEAD -> "bonded-companion-death-recorded";
+                                        case LOST -> "bonded-companion-lost-recorded";
+                                        default -> "bonded-companion-lifecycle-recorded";
+                                    },
                                     observation.source())));
             runtime.bootstrap().recoverAndActivate().whenComplete((activation, failure) -> {
                 if (failure != null || activation == null || !activation.active()) {

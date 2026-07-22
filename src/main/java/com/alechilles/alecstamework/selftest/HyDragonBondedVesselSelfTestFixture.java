@@ -176,6 +176,16 @@ final class HyDragonBondedVesselSelfTestFixture {
         }
 
         @Override
+        public CompletionStage<BondedVesselRepository.MutationResult> finalizeItemProjection(
+                String operationId,
+                BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+                String itemEvidenceJson,
+                String reason,
+                long nowMs) {
+            return unsupported();
+        }
+
+        @Override
         public CompletionStage<BondedVesselRepository.MutationResult> commit(String operationId, long nowMs) {
             return unsupported();
         }

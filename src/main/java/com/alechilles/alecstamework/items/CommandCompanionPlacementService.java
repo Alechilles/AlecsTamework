@@ -17,11 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -33,9 +29,10 @@ final class CommandCompanionPlacementService {
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
     private static final double RESPAWN_DISTANCE_MID = 12.0;
     private static final double RESPAWN_DISTANCE_FAR = 16.0;
-    private static final double OUT_OF_VIEW_MIN_ANGLE_DEGREES = 70.0;
+    /** Front arc first; side and rear positions are terrain fallbacks only. */
     private static final double[] PLACEMENT_ANGLE_OFFSETS = {
-            180.0, -180.0, 150.0, -150.0, 120.0, -120.0, 90.0, -90.0, 60.0, -60.0, 45.0, -45.0, 30.0, -30.0, 0.0
+            0.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0,
+            90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0
     };
     private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
@@ -195,28 +192,8 @@ final class CommandCompanionPlacementService {
         };
     }
 
-    private double[] resolvePlacementAngleOffsets() {
-        List<Double> offCamera = new ArrayList<>();
-        List<Double> fallback = new ArrayList<>();
-        for (double angleOffset : PLACEMENT_ANGLE_OFFSETS) {
-            if (Math.abs(angleOffset) >= OUT_OF_VIEW_MIN_ANGLE_DEGREES) {
-                offCamera.add(angleOffset);
-                continue;
-            }
-            fallback.add(angleOffset);
-        }
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        Collections.shuffle(offCamera, random);
-        Collections.shuffle(fallback, random);
-        double[] ordered = new double[offCamera.size() + fallback.size()];
-        int index = 0;
-        for (double value : offCamera) {
-            ordered[index++] = value;
-        }
-        for (double value : fallback) {
-            ordered[index++] = value;
-        }
-        return ordered;
+    static double[] resolvePlacementAngleOffsets() {
+        return PLACEMENT_ANGLE_OFFSETS.clone();
     }
 
     private double resolvePlacementMinRelativeY(@Nullable TwCompanionConfig.EffectiveSettings companionSettings) {

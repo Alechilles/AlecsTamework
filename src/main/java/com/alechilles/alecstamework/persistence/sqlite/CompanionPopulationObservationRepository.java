@@ -132,6 +132,7 @@ public final class CompanionPopulationObservationRepository
             long committedProfileRevision
     ) throws Exception {
         BondedVesselBindingRecord.LifecycleState target = switch (observation.lifecycleState()) {
+            case CAPTURED -> BondedVesselBindingRecord.LifecycleState.STORED;
             case DEAD_REVIVABLE -> BondedVesselBindingRecord.LifecycleState.DEAD;
             case LOST -> BondedVesselBindingRecord.LifecycleState.LOST;
             default -> null;
@@ -155,10 +156,12 @@ public final class CompanionPopulationObservationRepository
         String operationId = UUID.nameUUIDFromBytes(
                 ("tamework:bonded-observation:" + logicalKey)
                         .getBytes(StandardCharsets.UTF_8)).toString();
-        BondedVesselOperationRecord.Action action = target
-                == BondedVesselBindingRecord.LifecycleState.DEAD
-                ? BondedVesselOperationRecord.Action.MARK_DEAD
-                : BondedVesselOperationRecord.Action.MARK_LOST;
+        BondedVesselOperationRecord.Action action = switch (target) {
+            case STORED -> BondedVesselOperationRecord.Action.STORE;
+            case DEAD -> BondedVesselOperationRecord.Action.MARK_DEAD;
+            case LOST -> BondedVesselOperationRecord.Action.MARK_LOST;
+            default -> throw new IllegalStateException("Unsupported bonded observation " + target);
+        };
         BondedVesselOperationRecord operation = new BondedVesselOperationRecord(
                 operationId, "tamework.lifecycle", logicalKey, null,
                 binding.bindingId(), binding.profileId(), action,
@@ -171,9 +174,13 @@ public final class CompanionPopulationObservationRepository
                 binding.cooldownUntilMs(), binding.cooldownUntilMs(), binding.lastItemId(),
                 binding.lastItemId(), null, null,
                 "{\"source\":\"canonical_population_observation\"}", "{}", null,
-                observation.currentNpcUuid(), observation.lifecycleState() ==
-                com.alechilles.alecstamework.ownership.CompanionLifecycleState.DEAD_REVIVABLE
-                ? "bonded-companion-death-recorded" : "bonded-companion-lost-recorded",
+                observation.currentNpcUuid(), switch (observation.lifecycleState()) {
+                    case CAPTURED -> "bonded-companion-despawn-stored";
+                    case DEAD_REVIVABLE -> "bonded-companion-death-recorded";
+                    case LOST -> "bonded-companion-lost-recorded";
+                    default -> throw new IllegalStateException(
+                            "Unsupported bonded lifecycle " + observation.lifecycleState());
+                },
                 "COMMITTED", 0L, now, now, now, now);
         BondedVesselTransitionStore.insertOperation(connection, operation);
         try (PreparedStatement statement = connection.prepareStatement("""
