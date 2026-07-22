@@ -75,6 +75,19 @@ class CompanionProvisioningCoordinatorTest {
         assertEquals(2, backend.dormantCommits);
     }
 
+    /** Regression: HyDragon and the live profile runtime require canonical UUID profile IDs. */
+    @Test
+    void provisionedProfileIdentityUsesTheCanonicalUuidShape() throws Exception {
+        CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
+                new InMemoryJournal(), new FakeBackend(), () -> 100L);
+
+        CompanionProvisioningResult result = await(coordinator.provision(
+                dormantRequest("Alechilles:HyDragon", "soul-bond-profile-shape")));
+
+        assertEquals(CompanionProvisioningResult.Status.PROVISIONED_DORMANT, result.status());
+        assertEquals(result.operationId(), UUID.fromString(result.profileId()));
+    }
+
     @Test
     void committedProvisioningEmitsOnePostCommitEventAndIdempotentReplayDoesNotRepeatIt()
             throws Exception {

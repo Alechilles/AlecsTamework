@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
@@ -107,7 +106,11 @@ public final class SpawnerCapturePolicyService {
             }
         }
         if (enforceTerminalRequirements && !meetsHealthRequirement(targetRef, config, store)) {
+            CaptureHealth health = resolveCaptureHealth(targetRef, store);
+            String currentPercent = health == null ? "unavailable"
+                    : Double.toString((health.currentHealth() / health.maximumHealth()) * 100.0D);
             logCaptureDebug("denied reason=health-threshold player=" + player.getUuid()
+                    + " currentHealthPercent=" + currentPercent
                     + " maxHealthPercent=" + config.getCaptureMaxHealthPercent());
             return false;
         }
@@ -190,11 +193,10 @@ public final class SpawnerCapturePolicyService {
     }
 
     private void logCaptureDebug(String message) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || !instance.isDebugSpawnerEnabled()) {
-            return;
-        }
-        logger.at(Level.INFO).log("Spawner capture debug: " + message);
+        // Capture interactions previously failed silently unless the global spawner-debug flag
+        // happened to be enabled. One bounded line per evaluated interaction is operationally
+        // useful and makes terminal channel failures diagnosable from ordinary server logs.
+        logger.at(Level.INFO).log("Spawner capture eligibility: " + message);
     }
 
     private boolean isWithinCaptureDistance(Player player,

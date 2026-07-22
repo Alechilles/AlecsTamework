@@ -735,7 +735,9 @@ public final class CompanionProvisioningCoordinator {
     }
 
     private static String provisionalProfileId(UUID operationId) {
-        return "provisioned:" + operationId;
+        // Keep provisioned profile identifiers on the same canonical UUID shape used by
+        // captured/live profiles and downstream integrations.
+        return operationId.toString();
     }
 
     private long nowMs() {

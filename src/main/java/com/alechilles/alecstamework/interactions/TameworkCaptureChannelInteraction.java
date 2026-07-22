@@ -222,11 +222,20 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
         Ref<EntityStore> targetRef = resolveTarget(parsedPhase, context, playerRef, player);
         if (commandBuffer == null || player == null || heldItem == null
                 || heldItem.isEmpty() || handler == null || parsedPhase == null) {
+            if (handler != null) {
+                handler.logCaptureChannelDiagnostic("reason=invalid-context"
+                        + " phase=" + parsedPhase
+                        + " item=" + (heldItem == null ? null : heldItem.getItemId()));
+            }
             fail(context, time, type, cooldownHandler);
             return;
         }
 
         if (parsedPhase != Phase.CANCEL && targetRef == null) {
+            handler.logCaptureChannelDiagnostic("reason=locked-target-unavailable"
+                    + " phase=" + parsedPhase
+                    + " player=" + player.getUuid()
+                    + " item=" + heldItem.getItemId());
             fail(context, time, type, cooldownHandler);
             return;
         }
@@ -237,6 +246,11 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             case CANCEL -> true;
         };
         if (!captureAllowed) {
+            handler.logCaptureChannelDiagnostic("reason=eligibility-denied"
+                    + " phase=" + parsedPhase
+                    + " player=" + player.getUuid()
+                    + " item=" + heldItem.getItemId()
+                    + " targetValid=" + (targetRef != null && targetRef.isValid()));
             fail(context, time, type, cooldownHandler);
             return;
         }

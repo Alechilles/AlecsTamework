@@ -60,6 +60,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
     private final SpawnerCaptureAttemptRuntimeCoordinator captureAttemptRuntime;
     private final SpawnerBondedVesselCoordinator bondedVessels;
+    private final SpawnerCaptureOperationalLog captureLog;
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -162,6 +163,7 @@ public final class SpawnerFeatureHandler {
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.managedCoopDetachService = managedCoopDetachService;
+        this.captureLog = new SpawnerCaptureOperationalLog(logger);
         this.captureAttemptRuntime = new SpawnerCaptureAttemptRuntimeCoordinator(
                 registry,
                 playerInventoryService,
@@ -172,9 +174,9 @@ public final class SpawnerFeatureHandler {
                 effectService,
                 captureAttemptCoordinator,
                 captureRequirementGeneration,
-                this::logSpawnerFlowDebug);
+                captureLog::capture);
         this.bondedVessels = new SpawnerBondedVesselCoordinator(
-                logger, spawnPositionService, captureAttemptRuntime, this::logSpawnerFlowDebug);
+                logger, spawnPositionService, captureAttemptRuntime, captureLog::capture);
     }
 
     /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
@@ -432,6 +434,7 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig config = resolveConfigForItem(itemStack);
         World world = player.getWorld();
         if (config == null || world == null || world.getEntityStore() == null) {
+            captureLog.channelBeginRuntimeDenied(player.getUuid(), itemStack);
             return false;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
@@ -454,6 +457,9 @@ public final class SpawnerFeatureHandler {
                         config.getCaptureChannelAuraEffectId(),
                         homingProjectileSettings
                 )) {
+            captureLog.channelBeginSessionDenied(
+                    playerUuid == null ? null : playerUuid.getUuid(),
+                    targetUuid == null ? null : targetUuid.getUuid(), itemStack, attempt);
             return false;
         }
         String auraEffectId = config.getCaptureChannelAuraEffectId();
@@ -465,6 +471,8 @@ public final class SpawnerFeatureHandler {
             );
         }
         captureAttemptRuntime.rememberChannel(playerUuid.getUuid(), attempt);
+        captureLog.channelBeginAccepted(
+                playerUuid.getUuid(), targetUuid.getUuid(), itemStack, attempt);
         return true;
     }
 
@@ -511,12 +519,14 @@ public final class SpawnerFeatureHandler {
         CaptureAttemptHandle attempt = captureAttemptRuntime.takeChannel(playerUuid);
         endCaptureChannel(player, targetRef, itemStack);
         if (attempt == null) {
-            logSpawnerFlowDebug("capture denied reason=missing-channel-attempt-identity");
+            captureLog.channelCompleteMissing(playerUuid, itemStack); // missing-channel-attempt-identity
             return false;
         }
-        return captureFromItemInteraction(
+        boolean scheduled = captureFromItemInteraction(
                 player, itemStack, targetRef, captureBurstParticleSystem,
                 attempt);
+        captureLog.channelComplete(scheduled, playerUuid, itemStack, attempt, targetRef);
+        return scheduled;
     }
 
     @Nullable
@@ -694,7 +704,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (itemStack.getQuantity() != 1) {
-            logSpawnerFlowDebug(
+            captureLog.capture(
                     "capture denied reason=stacked-spawner-item player=" + player.getUuid()
                             + " item=" + itemStack.getItemId()
                             + " quantity=" + itemStack.getQuantity()
@@ -702,7 +712,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (!capturePolicyService.canCapture(player, targetRef, config, itemStack)) {
-            logSpawnerFlowDebug(
+            captureLog.capture(
                     "capture denied by policy item=" + itemStack.getItemId()
                             + " player=" + player.getUuid()
                             + " targetRef=" + targetRef
@@ -713,7 +723,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (!captureAttemptRuntime.sourceMatches(player, attempt)) {
-            logSpawnerFlowDebug("capture denied reason=source-attempt-fence-changed"
+            captureLog.capture("capture denied reason=source-attempt-fence-changed"
                     + " player=" + player.getUuid() + " attempt=" + attemptId);
             if (outcomeResolved) captureAttemptRuntime.quarantine(
                     attemptId, "capture-source-attempt-fence-changed");
@@ -734,7 +744,7 @@ public final class SpawnerFeatureHandler {
                 )
                 : managedCoopDetachService.prepare(targetUuid);
         if (!detachPlan.accepted()) {
-            logSpawnerFlowDebug(
+            captureLog.capture(
                     "capture denied reason=" + detachPlan.detail()
                             + " player=" + player.getUuid()
                             + " targetUuid=" + targetUuid
@@ -880,7 +890,7 @@ public final class SpawnerFeatureHandler {
         SpawnerBondedVesselCoordinator.InitialBindingAuthority bindingAuthority = bondedCapture
                 ? bondedVessels.prepareInitialBinding(itemStack) : null;
         if (bondedCapture && bindingAuthority == null) {
-            logSpawnerFlowDebug("capture denied reason=bonded-vessel-runtime-unavailable");
+            captureLog.capture("capture denied reason=bonded-vessel-runtime-unavailable");
             if (preparedMutation != null) {
                 preparedMutation.cancel("bonded-vessel-runtime-unavailable");
             }
@@ -891,7 +901,7 @@ public final class SpawnerFeatureHandler {
         UUID finalizedOwnerToStore = ownerToStore;
         Integer sourceHotbarSlot = attempt.hotbarSlot();
         if (bondedCapture && sourceHotbarSlot == null) {
-            logSpawnerFlowDebug("capture denied reason=bonded-source-slot-unavailable");
+            captureLog.capture("capture denied reason=bonded-source-slot-unavailable");
             if (preparedMutation != null) {
                 preparedMutation.cancel("bonded-source-slot-unavailable");
             }
@@ -947,7 +957,7 @@ public final class SpawnerFeatureHandler {
                                         + " targetUuid=" + targetUuid
                                         + " captureClearsOwner=" + finalizedConfig.isCaptureClearsOwner()
                         );
-                        logSpawnerFlowDebug(
+                        captureLog.capture(
                                 "capture success item=" + itemStack.getItemId()
                                         + " player=" + player.getUuid()
                                         + " targetUuid=" + targetUuid
@@ -960,7 +970,7 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onDenied(String reason) {
                         captureAttemptRuntime.quarantine(finalizedAttemptId, reason);
-                        logSpawnerFlowDebug(
+                        captureLog.capture(
                                 "capture denied reason=" + reason
                                         + " player=" + player.getUuid()
                                         + " targetUuid=" + targetUuid
@@ -1030,6 +1040,10 @@ public final class SpawnerFeatureHandler {
             return;
         }
         logger.at(Level.INFO).log("Spawner flow debug: " + message);
+    }
+
+    public void logCaptureChannelDiagnostic(String message) {
+        captureLog.capture("interaction status=denied " + message);
     }
 
 }
