@@ -287,9 +287,18 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             UUIDComponent playerUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
             if (playerUuid != null && playerUuid.getUuid() != null) {
                 Ref<EntityStore> locked = CaptureChannelVfxSystem.resolveTarget(playerUuid.getUuid(), world);
-                if (locked != null) {
+                if (phase == Phase.CANCEL && locked != null) {
                     return locked;
                 }
+                if (phase == Phase.COMPLETE) {
+                    Ref<EntityStore> visible = playerRef == null || !playerRef.isValid()
+                            ? null
+                            : TargetUtil.getTargetEntity(playerRef, 32.0F, store);
+                    return isSameEntity(locked, visible, store) ? locked : null;
+                }
+            }
+            if (phase == Phase.COMPLETE) {
+                return null;
             }
         }
         Ref<EntityStore> explicit = context.getTargetEntity();
@@ -303,6 +312,20 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> raycast = TargetUtil.getTargetEntity(playerRef, 32.0F, store);
         return raycast != null && raycast.isValid() ? raycast : null;
+    }
+
+    private static boolean isSameEntity(Ref<EntityStore> expected,
+                                        Ref<EntityStore> visible,
+                                        Store<EntityStore> store) {
+        if (expected == null || visible == null || store == null
+                || !expected.isValid() || !visible.isValid()) {
+            return false;
+        }
+        UUIDComponent expectedUuid = store.getComponent(expected, UUIDComponent.getComponentType());
+        UUIDComponent visibleUuid = store.getComponent(visible, UUIDComponent.getComponentType());
+        return expectedUuid != null && visibleUuid != null
+                && expectedUuid.getUuid() != null
+                && expectedUuid.getUuid().equals(visibleUuid.getUuid());
     }
 
     @Override

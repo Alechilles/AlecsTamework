@@ -134,6 +134,25 @@ class SpawnerWildCaptureArchitectureTest {
     }
 
     @Test
+    void channelCompletionRevalidatesLineOfInteractionAgainstLockedTarget() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        )).replace("\r\n", "\n");
+
+        int completeBranch = source.indexOf("phase == Phase.COMPLETE");
+        int freshRaycast = source.indexOf("TargetUtil.getTargetEntity(playerRef, 32.0F, store)", completeBranch);
+        int identityCheck = source.indexOf("isSameEntity(locked, visible, store)", freshRaycast);
+        int terminalFailClosed = source.indexOf("if (phase == Phase.COMPLETE) {\n                return null;", identityCheck);
+
+        assertTrue(completeBranch >= 0, "Completion must have a dedicated terminal branch.");
+        assertTrue(freshRaycast > completeBranch, "Completion must obtain fresh line-of-interaction evidence.");
+        assertTrue(identityCheck > freshRaycast, "Fresh evidence must identify the originally locked target.");
+        assertTrue(terminalFailClosed > identityCheck, "Missing lock/world evidence must fail terminal capture closed.");
+        assertTrue(source.contains("expectedUuid.getUuid().equals(visibleUuid.getUuid())"),
+                "Entity identity must use canonical UUID evidence rather than Ref object identity.");
+    }
+
+    @Test
     void channelBeginsBeforeTerminalHealthAndTranquilizerRequirementsPass() throws Exception {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
