@@ -854,11 +854,12 @@ public final class SpawnerFeatureHandler {
                 return false;
             }
         }
-        if (!captureAttemptRuntime.sourceMatches(player, attempt)) {
+        // A resolved attempt has already durably receipted and consumed its source item.
+        // Requiring the prepare-time hotbar fingerprint again at terminal apply would reject
+        // every consumable TAME_AND_COMMAND_LINK capture after a successful roll.
+        if (!outcomeResolved && !captureAttemptRuntime.sourceMatches(player, attempt)) {
             captureLog.capture("capture denied reason=source-attempt-fence-changed"
                     + " player=" + player.getUuid() + " attempt=" + attemptId);
-            if (outcomeResolved) captureAttemptRuntime.quarantine(
-                    attemptId, "capture-source-attempt-fence-changed");
             return false;
         }
         if (world == null) {

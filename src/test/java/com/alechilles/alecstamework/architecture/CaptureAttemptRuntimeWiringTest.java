@@ -48,6 +48,18 @@ class CaptureAttemptRuntimeWiringTest {
     }
 
     @Test
+    void terminalApplyDoesNotRequireAConsumedCaptureSourceToRemainInTheHotbar() throws Exception {
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+
+        assertTrue(handler.contains(
+                "if (!outcomeResolved && !captureAttemptRuntime.sourceMatches(player, attempt))"));
+        assertFalse(handler.contains(
+                "if (!captureAttemptRuntime.sourceMatches(player, attempt))"));
+        assertTrue(handler.contains("captureAttemptRuntime.revalidateBeforeApply("));
+    }
+
+    @Test
     void diagnoseCommandPublishesIntegrationReadiness() throws Exception {
         String root = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/commands/TameworkCommandRoot.java"));
