@@ -2815,7 +2815,8 @@ public class Tamework extends JavaPlugin {
                             ForkJoinPool.commonPool(),
                             persistenceRuntime.getPopulationGroupRepository(),
                             persistenceRuntime.getBondedVesselRepository(),
-                            itemFeatureRegistry),
+                            itemFeatureRegistry,
+                            message -> getLogger().at(Level.INFO).log(message)),
                     populations,
                     new HytaleBondedVesselWorldProjectionPort(
                             ownerPopulationRuntime, populations),

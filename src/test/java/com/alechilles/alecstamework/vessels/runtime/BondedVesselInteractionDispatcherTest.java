@@ -8,7 +8,9 @@ import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BondedVesselInteractionDispatcherTest {
     private static final UUID ACTOR = UUID.randomUUID();
@@ -28,11 +30,27 @@ class BondedVesselInteractionDispatcherTest {
         assertEquals(BondedVesselInteractionDispatcher.Status.COMMITTED, result.status());
         assertEquals(BondedVesselTransition.SUMMON, result.transition());
         assertEquals(BondedVesselTransition.SUMMON, api.prepared.transition());
-        assertEquals("toggle:" + BINDING + ":3", api.prepared.idempotencyKey());
+        assertTrue(api.prepared.idempotencyKey().startsWith(
+                "toggle:" + BINDING + ":3:"));
         assertEquals(new PopulationAdmissionLocation("world", 4, -2),
                 api.prepared.context().destination());
         assertNull(api.prepared.context().expectedNpcUuid());
         assertEquals(1, api.commitCalls);
+    }
+
+    @Test
+    void correctedRetryGetsANewDurableAttemptKey() {
+        FakeApi api = new FakeApi(BondedVesselState.STORED);
+        BondedVesselInteractionDispatcher dispatcher = new BondedVesselInteractionDispatcher(api);
+        var request = new BondedVesselInteractionDispatcher.Request(
+                ACTOR, 2, "stored-stone",
+                new PopulationAdmissionLocation("world", 4, -2));
+
+        dispatcher.toggle(request).toCompletableFuture().join();
+        String first = api.prepared.idempotencyKey();
+        dispatcher.toggle(request).toCompletableFuture().join();
+
+        assertNotEquals(first, api.prepared.idempotencyKey());
     }
 
     @Test

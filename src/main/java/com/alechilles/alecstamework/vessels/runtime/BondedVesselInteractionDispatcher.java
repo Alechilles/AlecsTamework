@@ -31,7 +31,8 @@ public final class BondedVesselInteractionDispatcher {
 
     /**
      * Dispatches SUMMON or STORE according to the authoritative metadata in the exact held slot.
-     * The deterministic generation key makes a repeated packet/callback converge on one operation.
+     * Each click receives a durable attempt key. Generation and source-evidence fences reject
+     * duplicate packets while allowing a corrected retry after a terminal denial.
      */
     @Nonnull
     public CompletionStage<Result> toggle(@Nonnull Request request) {
@@ -96,7 +97,8 @@ public final class BondedVesselInteractionDispatcher {
                 transition == BondedVesselTransition.SUMMON ? request.destination() : null);
         BondedVesselTransitionRequest transitionRequest = new BondedVesselTransitionRequest(
                 CALLER_NAMESPACE,
-                "toggle:" + vessel.bindingId() + ":" + vessel.generation(),
+                "toggle:" + vessel.bindingId() + ":" + vessel.generation()
+                        + ":" + UUID.randomUUID(),
                 request.actorUuid(), vessel.bindingId(), vessel.generation(),
                 vessel.profileRevision(), transition, context);
         CompletionStage<BondedVesselOperationResult> preparation;

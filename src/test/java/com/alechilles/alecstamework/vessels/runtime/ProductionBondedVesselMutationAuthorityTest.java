@@ -121,6 +121,44 @@ class ProductionBondedVesselMutationAuthorityTest {
         assertEquals("vessel-coordination-test", populations.commitThread);
     }
 
+    /** Regression for 2026-07-22 Nordic Drake captures advancing revision on entity removal. */
+    @Test
+    void storedCaptureAcceptsCanonicalRevisionAdvancedByPhysicalRemoval() {
+        List<String> sequence = new ArrayList<>();
+        FakeProfiles profiles = new FakeProfiles(sequence);
+        profiles.revision = 12L;
+        profiles.lifecycle = CompanionLifecycleState.CAPTURED;
+        FakePopulations populations = new FakePopulations(sequence);
+        ProductionBondedVesselMutationAuthority authority =
+                new ProductionBondedVesselMutationAuthority(
+                        profiles, populations, new FakeWorld(sequence), Runnable::run);
+
+        var result = authority.apply(
+                summonOperation(4L), storedBinding(4L), false).toCompletableFuture().join();
+
+        assertEquals(BondedVesselMutationAuthority.Status.APPLIED, result.status());
+        assertEquals(12L, populations.lastRequest.profile().revision());
+        assertEquals(List.of("profile", "prepare", "claim", "world", "commit"), sequence);
+    }
+
+    @Test
+    void activeVesselStillRejectsUnexpectedCanonicalRevisionAdvance() {
+        List<String> sequence = new ArrayList<>();
+        FakeProfiles profiles = new FakeProfiles(sequence);
+        profiles.revision = 12L;
+        ProductionBondedVesselMutationAuthority authority =
+                new ProductionBondedVesselMutationAuthority(
+                        profiles, new FakePopulations(sequence),
+                        new FakeWorld(sequence), Runnable::run);
+
+        var result = authority.apply(
+                operation(4L), binding(4L), false).toCompletableFuture().join();
+
+        assertEquals(BondedVesselMutationAuthority.Status.TERMINAL_DENIED, result.status());
+        assertEquals("canonical-profile-revision-changed", result.reason());
+        assertEquals(List.of("profile"), sequence);
+    }
+
     private static BondedVesselBindingRecord binding(long generation) {
         return new BondedVesselBindingRecord(
                 BINDING.toString(), "profile-1", generation, "dragon-vessel", 3L,
@@ -148,6 +186,31 @@ class ProductionBondedVesselMutationAuthorityTest {
                 NPC, null, "APPLYING", 0L, 100L, 110L, 0L, 0L);
     }
 
+    private static BondedVesselBindingRecord storedBinding(long generation) {
+        return new BondedVesselBindingRecord(
+                BINDING.toString(), "profile-1", generation, "dragon-vessel", 3L,
+                BondedVesselBindingRecord.LifecycleState.SUMMONING,
+                BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                OWNER, 11L, null, null, 0L, "dragon-stone-stored", "{}",
+                OPERATION, null, 2L, 100L, 110L, 0L);
+    }
+
+    private static BondedVesselOperationRecord summonOperation(long generation) {
+        return new BondedVesselOperationRecord(
+                OPERATION, "hydragon", "summon-1", null,
+                BINDING.toString(), "profile-1", BondedVesselOperationRecord.Action.SUMMON,
+                BondedVesselOperationRecord.State.APPLYING,
+                generation, generation + 1L, 11L, "dragon-vessel", 3L,
+                BondedVesselBindingRecord.LifecycleState.STORED,
+                BondedVesselBindingRecord.LifecycleState.SUMMONING,
+                BondedVesselBindingRecord.LifecycleState.ACTIVE,
+                BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                BondedVesselBindingRecord.ItemProjectionStatus.PRESENT,
+                0L, 100L, "dragon-stone-stored", "dragon-stone-active",
+                "stored-g4", "active-g5", "{}", "{}", "population-1",
+                null, null, "APPLYING", 0L, 100L, 110L, 0L, 0L);
+    }
+
     private static ProductionBondedVesselMutationAuthority.PopulationHandle handle() {
         return new ProductionBondedVesselMutationAuthority.PopulationHandle(
                 OPERATION, BINDING.toString(), "profile-1", 4L, 5L, "capability-1");
@@ -157,6 +220,8 @@ class ProductionBondedVesselMutationAuthorityTest {
             implements ProductionBondedVesselMutationAuthority.CanonicalProfilePort {
         private final List<String> sequence;
         private String invocationThread;
+        private long revision = 11L;
+        private CompanionLifecycleState lifecycle = CompanionLifecycleState.ACTIVE;
 
         private FakeProfiles(List<String> sequence) {
             this.sequence = sequence;
@@ -169,8 +234,8 @@ class ProductionBondedVesselMutationAuthorityTest {
             invocationThread = Thread.currentThread().getName();
             return CompletableFuture.completedFuture(
                     new ProductionBondedVesselMutationAuthority.CanonicalProfileSnapshot(
-                            "profile-1", OWNER, "dragon-role", 11L,
-                            CompanionLifecycleState.ACTIVE, NPC));
+                            "profile-1", OWNER, "dragon-role", revision,
+                            lifecycle, NPC));
         }
 
         @Override

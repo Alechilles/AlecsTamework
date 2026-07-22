@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -26,12 +27,13 @@ public final class NpcProfileBondedVesselProfilePort
     @Nullable private final PopulationGroupRepository groups;
     @Nullable private final BondedVesselRepository vessels;
     @Nullable private final ItemFeatureRegistry itemFeatures;
+    private final Consumer<String> diagnostics;
 
     public NpcProfileBondedVesselProfilePort(
             @Nonnull NpcProfileRepository profiles,
             @Nonnull OwnerPopulationIndex populations,
             @Nonnull Executor executor) {
-        this(profiles, populations, executor, null, null, null);
+        this(profiles, populations, executor, null, null, null, ignored -> { });
     }
 
     public NpcProfileBondedVesselProfilePort(
@@ -41,12 +43,24 @@ public final class NpcProfileBondedVesselProfilePort
             @Nullable PopulationGroupRepository groups,
             @Nullable BondedVesselRepository vessels,
             @Nullable ItemFeatureRegistry itemFeatures) {
+        this(profiles, populations, executor, groups, vessels, itemFeatures, ignored -> { });
+    }
+
+    public NpcProfileBondedVesselProfilePort(
+            @Nonnull NpcProfileRepository profiles,
+            @Nonnull OwnerPopulationIndex populations,
+            @Nonnull Executor executor,
+            @Nullable PopulationGroupRepository groups,
+            @Nullable BondedVesselRepository vessels,
+            @Nullable ItemFeatureRegistry itemFeatures,
+            @Nonnull Consumer<String> diagnostics) {
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.populations = Objects.requireNonNull(populations, "populations");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.groups = groups;
         this.vessels = vessels;
         this.itemFeatures = itemFeatures;
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
     }
 
     @Nonnull
@@ -62,6 +76,13 @@ public final class NpcProfileBondedVesselProfilePort
                     || roleId == null
                     || population.ownerId() == null
                     || !profile.ownerUuid().equals(population.ownerId())) {
+                diagnostics.accept("Bonded canonical profile unavailable profile=" + normalized
+                        + " profilePresent=" + (profile != null)
+                        + " populationPresent=" + (population != null)
+                        + " ownerPresent=" + (profile != null && profile.ownerUuid() != null)
+                        + " populationOwnerPresent=" + (population != null
+                        && population.ownerId() != null)
+                        + " role=" + roleId);
                 return null;
             }
             return new ProductionBondedVesselMutationAuthority.CanonicalProfileSnapshot(
@@ -76,20 +97,32 @@ public final class NpcProfileBondedVesselProfilePort
         String direct = normalize(profile == null ? null : profile.roleId());
         if (direct != null) return direct;
         if (groups == null) return null;
+        PopulationGroupClassificationRecord classification;
         try {
-            PopulationGroupClassificationRecord classification = groups.findClassification(profileId);
-            String classified = normalize(classification == null ? null : classification.roleId());
-            if (classified == null) return null;
-            String repaired = resolveCapturedRole(profileId, classified);
-            if (profile != null && profile.currentNpcUuid() != null) {
-                profiles.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
-                        profile.currentNpcUuid(), null, null, repaired, null,
-                        null, null, null, null, null, null));
-            }
-            return repaired;
-        } catch (Exception ignored) {
+            classification = groups.findClassification(profileId);
+        } catch (Exception failure) {
+            diagnostics.accept("Bonded captured-role classification lookup failed profile="
+                    + profileId + " failure=" + failure.getClass().getSimpleName());
             return null;
         }
+        String classified = normalize(classification == null ? null : classification.roleId());
+        if (classified == null) return null;
+        String repaired = classified;
+        try {
+            repaired = resolveCapturedRole(profileId, classified);
+        } catch (Exception failure) {
+            diagnostics.accept("Bonded captured-role mapping lookup failed profile="
+                    + profileId + " classifiedRole=" + classified
+                    + " failure=" + failure.getClass().getSimpleName());
+        }
+        if (profile != null && profile.currentNpcUuid() != null) {
+            profiles.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
+                    profile.currentNpcUuid(), null, null, repaired, null,
+                    null, null, null, null, null, null));
+        }
+        diagnostics.accept("Bonded captured-role recovered profile=" + profileId
+                + " classifiedRole=" + classified + " canonicalRole=" + repaired);
+        return repaired;
     }
 
     private String resolveCapturedRole(String profileId, String classifiedRole) throws Exception {

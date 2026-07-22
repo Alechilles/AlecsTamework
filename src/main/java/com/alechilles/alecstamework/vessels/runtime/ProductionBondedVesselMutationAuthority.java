@@ -305,11 +305,12 @@ public final class ProductionBondedVesselMutationAuthority
         if (profile == null) return "canonical-profile-not-found";
         if (!profile.profileId().equals(operation.profileId())) return "canonical-profile-id-mismatch";
         if (!profile.ownerUuid().equals(binding.ownerUuid())) return "canonical-profile-owner-changed";
-        if (profile.revision() != operation.expectedProfileRevision()) {
-            return "canonical-profile-revision-changed";
-        }
         CompanionLifecycleState expected = sourceProfileLifecycle(operation.priorLifecycleState());
         if (profile.lifecycle() != expected) return "canonical-profile-lifecycle-changed";
+        if (profile.revision() != operation.expectedProfileRevision()
+                && !allowsStoredProfileRevisionAdvance(operation, profile)) {
+            return "canonical-profile-revision-changed";
+        }
         if ((operation.action() == BondedVesselOperationRecord.Action.STORE
                 || operation.action() == BondedVesselOperationRecord.Action.MARK_DEAD
                 || operation.action() == BondedVesselOperationRecord.Action.MARK_LOST)
@@ -317,6 +318,20 @@ public final class ProductionBondedVesselMutationAuthority
             return "canonical-live-projection-changed";
         }
         return null;
+    }
+
+    /**
+     * Capture finalization removes the physical NPC after generation-one binding is committed.
+     * That removal may advance the canonical CAPTURED revision without changing vessel state.
+     */
+    private static boolean allowsStoredProfileRevisionAdvance(
+            BondedVesselOperationRecord operation,
+            CanonicalProfileSnapshot profile) {
+        return operation.action() == BondedVesselOperationRecord.Action.SUMMON
+                && operation.priorLifecycleState()
+                == BondedVesselBindingRecord.LifecycleState.STORED
+                && profile.lifecycle() == CompanionLifecycleState.CAPTURED
+                && profile.revision() > operation.expectedProfileRevision();
     }
 
     private ProfileReadiness safeProfileReadiness() {
