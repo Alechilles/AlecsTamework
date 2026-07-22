@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.BondedVesselMode;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMutationRequest;
+import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -9,7 +12,6 @@ import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCo
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -26,6 +28,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
@@ -57,9 +60,12 @@ public final class SpawnerFeatureHandler {
     private final SpawnerPreparedSpawnService preparedSpawnService;
     private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
     private final SpawnerCaptureAttemptRuntimeCoordinator captureAttemptRuntime;
-    private final SpawnerBondedVesselCoordinator bondedVessels;
     private final SpawnerCaptureOperationalLog captureLog;
+    private final SpawnerCaptureCommandAccessService captureCommandAccessService;
+    private final SpawnerTameAndCommandLinkService tameAndCommandLinkService;
     private final SpawnerCapturedProfilePersistenceService profilePersistence;
+    @Nullable
+    private final CommandFamilyRosterService commandFamilyRosterService;
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -112,7 +118,7 @@ public final class SpawnerFeatureHandler {
                                  LongSupplier captureRequirementGeneration) {
         this(logger, registry, captureService, coopService, relocationService, lostService,
                 translationRegistry, managedCoopDetachService, captureAttemptCoordinator,
-                captureRequirementGeneration, null);
+                captureRequirementGeneration, null, null);
     }
 
     public SpawnerFeatureHandler(HytaleLogger logger,
@@ -126,6 +132,23 @@ public final class SpawnerFeatureHandler {
                                  @Nullable CaptureAttemptCoordinator captureAttemptCoordinator,
                                  LongSupplier captureRequirementGeneration,
                                  @Nullable CaptureRepository captureRepository) {
+        this(logger, registry, captureService, coopService, relocationService, lostService,
+                translationRegistry, managedCoopDetachService, captureAttemptCoordinator,
+                captureRequirementGeneration, captureRepository, null);
+    }
+
+    public SpawnerFeatureHandler(HytaleLogger logger,
+                                 ItemFeatureRegistry registry,
+                                 CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandLinkedNpcCoopService coopService,
+                                 @Nullable CommandNpcRelocationService relocationService,
+                                 @Nullable CommandLinkedNpcLostService lostService,
+                                 @Nullable TranslationRegistry translationRegistry,
+                                 @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService,
+                                 @Nullable CaptureAttemptCoordinator captureAttemptCoordinator,
+                                 LongSupplier captureRequirementGeneration,
+                                 @Nullable CaptureRepository captureRepository,
+                                 @Nullable CommandFamilyRosterService commandFamilyRosterService) {
         this.logger = logger;
         this.registry = registry;
         this.profilePersistence = new SpawnerCapturedProfilePersistenceService(logger, captureRepository);
@@ -155,6 +178,9 @@ public final class SpawnerFeatureHandler {
                 npcIdentityService
         );
         this.captureLog = new SpawnerCaptureOperationalLog(logger);
+        this.captureCommandAccessService = new SpawnerCaptureCommandAccessService();
+        this.tameAndCommandLinkService = new SpawnerTameAndCommandLinkService();
+        this.commandFamilyRosterService = commandFamilyRosterService;
         this.preparedSpawnService = new SpawnerPreparedSpawnService(
                 spawnPositionService,
                 rolePolicyService,
@@ -191,8 +217,6 @@ public final class SpawnerFeatureHandler {
                 captureAttemptCoordinator,
                 captureRequirementGeneration,
                 captureLog::capture);
-        this.bondedVessels = new SpawnerBondedVesselCoordinator(
-                logger, spawnPositionService, captureAttemptRuntime, captureLog::capture);
     }
 
     /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
@@ -492,11 +516,6 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 
-    /** Installs the production bridge only after bonded-vessel recovery activated successfully. */
-    public void installBondedVesselBridge(@Nullable BondedVesselSpawnerBridge bridge) {
-        bondedVessels.install(bridge);
-    }
-
     public void endCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
         ItemFeatureConfig config = resolveConfigForItem(itemStack);
         World world = player == null ? null : player.getWorld();
@@ -565,9 +584,6 @@ public final class SpawnerFeatureHandler {
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
         }
-        if (config.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
-            return bondedVessels.canUse(itemStack);
-        }
         if (itemStackMetadataService.isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
         }
@@ -624,7 +640,7 @@ public final class SpawnerFeatureHandler {
         }
         return captureFromNpcAction(
                 player, targetRef, itemStack, config, captureBurstParticleSystem, attempt, false,
-                null, null, 0L);
+                null, null, 0L, null);
     }
 
     // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
@@ -651,10 +667,6 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
-        if (resolved != null
-                && resolved.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
-            return bondedVessels.toggle(player, itemStack, resolved, hotbarSlot);
-        }
         return resolved != null && preparedSpawnService.schedule(
                 player, itemStack, resolved, hotbarSlot, emptyItemIdOverride
         );
@@ -688,11 +700,7 @@ public final class SpawnerFeatureHandler {
                                         ItemStack itemStack, ItemFeatureConfig config,
                                         @Nonnull CaptureAttemptHandle attempt) {
         return captureFromNpcAction(player, targetRef, itemStack, config, null, attempt, false,
-                null, null, 0L);
-    }
-
-    static boolean hasUsableBondedProjection(@Nullable ItemStack itemStack) {
-        return SpawnerBondedVesselCoordinator.hasUsableProjection(itemStack);
+                null, null, 0L, null);
     }
 
     private boolean captureFromNpcAction(Player player,
@@ -704,7 +712,8 @@ public final class SpawnerFeatureHandler {
                                          boolean outcomeResolved,
                                          @Nullable SpawnerCaptureFinalizerService.PreparedCaptureMutation preparedMutation,
                                          @Nullable CaptureAttemptRecord resolvedAttempt,
-                                         long expectedRequirementGeneration) {
+                                         long expectedRequirementGeneration,
+                                         @Nullable TameAndCommandLinkPreparation tameLinkPreparation) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
@@ -719,7 +728,9 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
-        if (itemStack.getQuantity() != 1) {
+        if (itemStack.getQuantity() != 1
+                && config.getCaptureMechanics().successDisposition()
+                == CaptureSuccessDisposition.CAPTURED_ITEM) {
             captureLog.capture(
                     "capture denied reason=stacked-spawner-item player=" + player.getUuid()
                             + " item=" + itemStack.getItemId()
@@ -738,6 +749,52 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
+        World world = player.getWorld();
+        Store<EntityStore> worldStore = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        String sourceRoleForAccess = null;
+        if (worldStore != null) {
+            NPCEntity accessNpc = worldStore.getComponent(
+                    targetRef, NPCEntity.getComponentType());
+            sourceRoleForAccess = accessNpc == null
+                    ? null : rolePolicyService.resolveRoleIdFromNpc(accessNpc);
+        }
+        String postCaptureRoleForAccess = config.isCaptureTamesTarget()
+                ? config.resolveCaptureTamedRole(sourceRoleForAccess) : sourceRoleForAccess;
+        boolean tameAndCommandLink = config.getCaptureMechanics().successDisposition()
+                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
+        if (tameAndCommandLink && tameLinkPreparation == null) {
+            if (outcomeResolved || commandFamilyRosterService == null || worldStore == null) {
+                captureLog.capture("capture denied reason=capture-command-roster-unavailable"
+                        + " player=" + player.getUuid());
+                return false;
+            }
+            SpawnerCaptureCommandAccessService.Decision commandAccess =
+                    captureCommandAccessService.validate(player, config, postCaptureRoleForAccess);
+            SpawnerTameAndCommandLinkService.Decision livePreparation =
+                    tameAndCommandLinkService.preflight(
+                            targetRef, worldStore, postCaptureRoleForAccess);
+            if (!commandAccess.allowed() || !livePreparation.allowed()) {
+                String reason = commandAccess.allowed()
+                        ? livePreparation.reason() : commandAccess.reason();
+                captureLog.capture("capture denied reason=" + reason
+                        + " player=" + player.getUuid());
+                return false;
+            }
+            long expectedRosterRevision = commandFamilyRosterService.get(
+                    player.getUuid(), config.getCaptureMechanics().commandFamilyId())
+                    .map(roster -> roster.revision()).orElse(0L);
+            tameLinkPreparation = new TameAndCommandLinkPreparation(
+                    livePreparation, commandAccess.accessItemId(), expectedRosterRevision);
+        } else if (!tameAndCommandLink) {
+            SpawnerCaptureCommandAccessService.Decision commandAccess =
+                    captureCommandAccessService.validate(player, config, postCaptureRoleForAccess);
+            if (!commandAccess.allowed()) {
+                captureLog.capture("capture denied reason=" + commandAccess.reason()
+                        + " player=" + player.getUuid());
+                return false;
+            }
+        }
         if (!captureAttemptRuntime.sourceMatches(player, attempt)) {
             captureLog.capture("capture denied reason=source-attempt-fence-changed"
                     + " player=" + player.getUuid() + " attempt=" + attemptId);
@@ -745,12 +802,9 @@ public final class SpawnerFeatureHandler {
                     attemptId, "capture-source-attempt-fence-changed");
             return false;
         }
-        World world = player.getWorld();
         if (world == null) {
             return false;
         }
-        Store<EntityStore> worldStore = world != null && world.getEntityStore() != null
-                ? world.getEntityStore().getStore() : null;
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
         SpawnerManagedCoopCaptureDetachService.Plan detachPlan = managedCoopDetachService == null
                 ? new SpawnerManagedCoopCaptureDetachService.Plan(
@@ -769,12 +823,14 @@ public final class SpawnerFeatureHandler {
         }
         if (!outcomeResolved && captureAttemptRuntime.durableRuntimeInstalled()) {
             ItemFeatureConfig durableConfig = config;
+            TameAndCommandLinkPreparation durableTameLinkPreparation = tameLinkPreparation;
             return captureAttemptRuntime.prepareAndResolve(
                     player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
                     attempt, detachPlan.durableContextJson(),
                     (resolvedHandle, mutation, record, generation) -> captureFromNpcAction(
                             player, targetRef, itemStack, durableConfig, captureBurstParticleSystem,
-                            resolvedHandle, true, mutation, record, generation));
+                            resolvedHandle, true, mutation, record, generation,
+                            durableTameLinkPreparation));
         }
         if (outcomeResolved) {
             if (preparedMutation == null || resolvedAttempt == null
@@ -850,114 +906,111 @@ public final class SpawnerFeatureHandler {
                 ? config.resolveCaptureTamedRole(snapshotRoleId)
                 : snapshotRoleId;
         CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot preparedLinkedSnapshot =
-                linkedNpcSyncService.prepareCapturedLinkedNpcSnapshot(
-                        targetRef,
-                        world,
-                        targetUuid,
-                        ownerToStore,
-                        captureRoleId,
-                        snapshotDisplayName
-                );
-        ItemStack updated = itemStackMetadataService.swapItemId(itemStack, config.getSpawnerFilledItemId())
-                .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
-                .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING, targetUuid);
-        if (attachmentsJson != null) {
-            updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
-        }
-        boolean tamed = config.isCaptureTamesTarget() || npcStateService.resolveTamedState(targetRef, world);
-        if (tamed) {
-            updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
-        }
-        updated = itemStackMetadataService.applyOwnerMetadata(updated, ownerToStore);
-        updated = updated.withMetadata(
-                TameworkMetadataKeys.CAPTURE_OWNER_CLEARED,
-                Codec.BOOLEAN,
-                config.isCaptureClearsOwner() && !config.isCaptureTamesTarget()
-        );
-        if (existingOwner != null) {
-            updated = updated.withMetadata(
-                    TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
-                    Codec.UUID_STRING,
-                    existingOwner
-            );
-        } else {
-            updated = itemStackMetadataService.clearMetadataKey(
-                    updated,
-                    TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID
-            );
-        }
-        if (captureRoleId != null && !captureRoleId.isBlank()) {
-            updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureRoleId);
-        } else {
-            updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
-        }
-        updated = captureMetadataService.applyCaptureNameKeyMetadata(updated, captureInfo);
-        updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
-        updated = captureMetadataService.applyCapturedModelMetadata(updated, captureInfo);
-        updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
-        updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
-        if (worldStore != null) {
-            updated = progressionMetadataService.applyNpcProgressionMetadata(updated, targetRef, worldStore);
-        }
-        updated = itemDisplayMetadataService.applyCapturedDisplayMetadata(updated, config);
-        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
-        ItemStack capturedItem = updated;
-        boolean bondedCapture = config.getVesselMechanics().mode() == BondedVesselMode.BONDED;
-        SpawnerBondedVesselCoordinator.InitialBindingAuthority bindingAuthority = bondedCapture
-                ? bondedVessels.prepareInitialBinding(itemStack) : null;
-        if (bondedCapture && bindingAuthority == null) {
-            captureLog.capture("capture denied reason=bonded-vessel-runtime-unavailable");
-            if (preparedMutation != null) {
-                preparedMutation.cancel("bonded-vessel-runtime-unavailable");
+                tameAndCommandLink ? null : linkedNpcSyncService.prepareCapturedLinkedNpcSnapshot(
+                        targetRef, world, targetUuid, ownerToStore, captureRoleId, snapshotDisplayName);
+        ItemStack capturedItemValue = itemStack;
+        if (!tameAndCommandLink) {
+            ItemStack updated = itemStackMetadataService.swapItemId(
+                            itemStack, config.getSpawnerFilledItemId())
+                    .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
+                    .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING, targetUuid);
+            if (attachmentsJson != null) {
+                updated = updated.withMetadata(
+                        TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
             }
-            return false;
+            boolean tamed = config.isCaptureTamesTarget()
+                    || npcStateService.resolveTamedState(targetRef, world);
+            if (tamed) {
+                updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
+            }
+            updated = itemStackMetadataService.applyOwnerMetadata(updated, ownerToStore);
+            updated = updated.withMetadata(
+                    TameworkMetadataKeys.CAPTURE_OWNER_CLEARED,
+                    Codec.BOOLEAN,
+                    config.isCaptureClearsOwner() && !config.isCaptureTamesTarget());
+            if (existingOwner != null) {
+                updated = updated.withMetadata(
+                        TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                        Codec.UUID_STRING,
+                        existingOwner);
+            } else {
+                updated = itemStackMetadataService.clearMetadataKey(
+                        updated, TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID);
+            }
+            if (captureRoleId != null && !captureRoleId.isBlank()) {
+                updated = updated.withMetadata(
+                        TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureRoleId);
+            } else {
+                updated = itemStackMetadataService.clearMetadataKey(
+                        updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
+            }
+            updated = captureMetadataService.applyCaptureNameKeyMetadata(updated, captureInfo);
+            updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+            updated = captureMetadataService.applyCapturedModelMetadata(updated, captureInfo);
+            updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
+            updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
+            if (worldStore != null) {
+                updated = progressionMetadataService.applyNpcProgressionMetadata(
+                        updated, targetRef, worldStore);
+            }
+            updated = itemDisplayMetadataService.applyCapturedDisplayMetadata(updated, config);
+            capturedItemValue = itemStackMetadataService.applyCooldown(
+                    updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
+                    config.getCaptureCooldownMs());
         }
+        ItemStack capturedItem = capturedItemValue;
         ItemFeatureConfig finalizedConfig = config;
         UUID finalizedAttemptId = outcomeResolved ? attemptId : null;
         UUID finalizedOwnerToStore = ownerToStore;
         String finalizedCaptureRoleId = captureRoleId;
         String finalizedSnapshotDisplayName = snapshotDisplayName;
+        TameAndCommandLinkPreparation finalizedTameLinkPreparation = tameLinkPreparation;
         Integer sourceHotbarSlot = attempt.hotbarSlot();
-        if (bondedCapture && sourceHotbarSlot == null) {
-            captureLog.capture("capture denied reason=bonded-source-slot-unavailable");
-            if (preparedMutation != null) {
-                preparedMutation.cancel("bonded-source-slot-unavailable");
-            }
-            return false;
-        }
         SpawnerSourceItemTransaction sourceItem = new SpawnerSourceItemTransaction(
                 playerInventoryService, world, player.getUuid(), sourceHotbarSlot,
                 itemStack, logger, "Spawner capture");
         AtomicReference<String> capturedProfileId = new AtomicReference<>();
-        AtomicReference<ItemStack> profiledCaptureItem = new AtomicReference<>();
+        AtomicBoolean liveTameLinkApplied = new AtomicBoolean(!tameAndCommandLink);
         SpawnerCaptureFinalizerService.CaptureCallbacks callbacks =
                 new SpawnerCaptureFinalizerService.CaptureCallbacks() {
                     @Override
                     public boolean beforeApply(String profileId) {
+                        capturedProfileId.set(profileId);
+                        if (tameAndCommandLink) {
+                            return finalizedTameLinkPreparation != null
+                                    && commandFamilyRosterService != null;
+                        }
                         ItemStack profiledItem = capturedItem.withMetadata(
                                 TameworkMetadataKeys.COMPANION_PROFILE_ID,
                                 Codec.STRING,
                                 profileId
                         );
-                        capturedProfileId.set(profileId);
-                        profiledCaptureItem.set(profiledItem);
-                        return bondedCapture || sourceItem.prepare(profiledItem);
+                        return sourceItem.prepare(profiledItem);
                     }
 
                     @Override
                     public void onApplyCompensated(String profileId, String reason) {
-                        if (!bondedCapture) sourceItem.compensate();
+                        if (!tameAndCommandLink) sourceItem.compensate();
                         captureAttemptRuntime.quarantine(finalizedAttemptId, reason);
                     }
 
                     @Override
                     public void onApplied(String profileId,
                                           com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
-                        if (!bondedCapture) sourceItem.commit();
-                        linkedNpcSyncService.publishPreparedCapturedLinkedNpcSnapshot(
-                                preparedLinkedSnapshot,
-                                context.npcUuid()
-                        );
+                        if (tameAndCommandLink) {
+                            boolean applied = tameAndCommandLinkService.apply(
+                                    context.npcRef(), context.store(),
+                                    finalizedTameLinkPreparation.livePreparation());
+                            liveTameLinkApplied.set(applied);
+                            if (!applied) {
+                                captureAttemptRuntime.quarantine(
+                                        finalizedAttemptId, "capture-tame-link-live-apply-failed");
+                            }
+                        } else {
+                            sourceItem.commit();
+                            linkedNpcSyncService.publishPreparedCapturedLinkedNpcSnapshot(
+                                    preparedLinkedSnapshot, context.npcUuid());
+                        }
                         UUID liveUuid = context.npcUuid();
                         if (relocationService != null) {
                             relocationService.cancelPendingRelocation(liveUuid);
@@ -998,20 +1051,57 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onPopulationCommitted(
                             com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
-                        profilePersistence.persist(
+                        if (!result.committed() || !liveTameLinkApplied.get()) {
+                            captureAttemptRuntime.quarantine(
+                                    finalizedAttemptId, "capture-tame-link-population-commit-failed");
+                            return;
+                        }
+                        boolean profileQueued = profilePersistence.persist(
                                 targetUuid, finalizedOwnerToStore, finalizedCaptureRoleId,
                                 finalizedSnapshotDisplayName);
-                        if (bondedCapture) {
-                            bondedVessels.bindInitialCapture(
-                                    bindingAuthority,
-                                    sourceItem, itemStack,
-                                    profiledCaptureItem.get(), capturedProfileId.get(),
-                                    world, player.getUuid(), sourceHotbarSlot, result,
-                                    preparedMutation == null ? null
-                                            : preparedMutation.populationOperationId(),
-                                    finalizedAttemptId);
+                        if (!profileQueued) {
+                            captureAttemptRuntime.quarantine(
+                                    finalizedAttemptId, "capture-profile-persistence-unavailable");
+                            return;
                         }
-                        if (!bondedCapture) captureAttemptRuntime.commit(finalizedAttemptId);
+                        if (tameAndCommandLink) {
+                            long profileRevision = result.ownerCommit() == null
+                                    || result.ownerCommit().persistenceResult() == null
+                                    ? 0L : result.ownerCommit().persistenceResult().revision();
+                            CommandFamilyRosterMutationRequest rosterRequest =
+                                    new CommandFamilyRosterMutationRequest(
+                                            "alecstamework.capture",
+                                            "tame-and-command-link:" + finalizedAttemptId,
+                                            finalizedAttemptId,
+                                            player.getUuid(),
+                                            finalizedConfig.getCaptureMechanics().commandFamilyId(),
+                                            capturedProfileId.get(),
+                                            finalizedConfig.getCaptureMechanics()
+                                                    .requiredCommandConfigId(),
+                                            finalizedTameLinkPreparation.accessItemId(),
+                                            CommandFamilyRosterMemberState.ACTIVE,
+                                            null,
+                                            true,
+                                            null,
+                                            finalizedTameLinkPreparation.expectedRosterRevision(),
+                                            profileRevision);
+                            commandFamilyRosterService.upsert(rosterRequest)
+                                    .whenComplete((rosterResult, failure) -> {
+                                        if (failure == null && rosterResult != null
+                                                && rosterResult.accepted()) {
+                                            captureAttemptRuntime.commit(finalizedAttemptId);
+                                        } else {
+                                            String reason = rosterResult == null
+                                                    ? "capture-command-roster-write-failed"
+                                                    : "capture-command-roster-"
+                                                    + rosterResult.status().name().toLowerCase();
+                                            captureAttemptRuntime.quarantine(
+                                                    finalizedAttemptId, reason);
+                                        }
+                                    });
+                            return;
+                        }
+                        captureAttemptRuntime.commit(finalizedAttemptId);
                         if (detachPlan.requiresDetach()
                                 && (managedCoopDetachService == null
                                 || !managedCoopDetachService.refreshAfterCommit())) {
@@ -1033,6 +1123,12 @@ public final class SpawnerFeatureHandler {
                         player, finalizedConfig, targetRef,
                         detachPlan.durableContextJson(), callbacks)
                 : preparedMutation.apply(callbacks);
+    }
+
+    private record TameAndCommandLinkPreparation(
+            @Nonnull SpawnerTameAndCommandLinkService.Decision livePreparation,
+            @Nullable String accessItemId,
+            long expectedRosterRevision) {
     }
 
     @Nullable

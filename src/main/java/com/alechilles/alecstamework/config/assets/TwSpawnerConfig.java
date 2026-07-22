@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
-import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
@@ -285,7 +286,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .add()
         .<String>append(
             new KeyedCodec<>("FilledItemId", Codec.STRING),
-            (asset, value) -> asset.filledItemId = value,
+            (asset, value) -> {
+                asset.filledItemId = value;
+                asset.filledItemIdExplicit = true;
+            },
             asset -> asset.filledItemId
         )
         .documentation("Item ID for the filled spawner variant.")
@@ -320,15 +324,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         )
         .documentation("Spawn settings for spawner items. Inheritance: omitted section inherits from parent; when "
                 + "present, only explicitly defined nested fields override parent.")
-        .add()
-        .<TwSpawnerVesselSettings>append(
-            new KeyedCodec<>("Vessel", TwSpawnerVesselSettings.CODEC),
-            (asset, value) -> asset.vessel = value == null ? new TwSpawnerVesselSettings() : value,
-            asset -> asset.vessel
-        )
-        .documentation("Vessel lifecycle settings. Inheritance: an omitted section inherits the parent section; "
-                + "an explicit object inherits missing nested scalar fields, while explicit StateItemIds replaces "
-                + "the parent map. Mode defaults to Disposable.")
         .add()
         .<SpawnerIconOverride[]>append(
             new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
@@ -373,6 +368,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private String emptyItemId;
     private AllowedRoles allowedRoles = new AllowlistRoles();
     private String filledItemId;
+    private boolean filledItemIdExplicit;
     private String iconDefault;
     private SpawnerIconOverride[] iconOverrides = EMPTY_OVERRIDES;
     private Map<String, SpawnerIconOverride[]> iconOverridesByRole = Collections.emptyMap();
@@ -380,7 +376,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private ItemFeatureConfig.SpawnerTooltipMode tooltipMode = ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
     private CaptureSettings capture = new CaptureSettings();
     private SpawnSettings spawn = new SpawnSettings();
-    private TwSpawnerVesselSettings vessel = new TwSpawnerVesselSettings();
 
     public static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -462,11 +457,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         } else {
             inheritSpawnSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Spawn"));
         }
-        if (!explicitTopLevelKeys.contains("Vessel")) {
-            vessel = parent.vessel;
-        } else {
-            inheritVesselSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Vessel"));
-        }
         if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
         if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
         if (!explicitTopLevelKeys.contains("IconOverrideGroups")) iconOverrideGroups = parent.iconOverrideGroups;
@@ -529,6 +519,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("FailureCooldownMs")) capture.failureCooldownMs = parent.capture.failureCooldownMs;
         if (!nestedExplicitKeys.contains("FailureParticleSystem")) capture.failureParticleSystem = parent.capture.failureParticleSystem;
         if (!nestedExplicitKeys.contains("FailureSoundEvent")) capture.failureSoundEvent = parent.capture.failureSoundEvent;
+        if (!nestedExplicitKeys.contains("SourceConsumption")) capture.sourceConsumption = parent.capture.sourceConsumption;
+        if (!nestedExplicitKeys.contains("SuccessDisposition")) capture.successDisposition = parent.capture.successDisposition;
+        if (!nestedExplicitKeys.contains("CommandFamilyId")) capture.commandFamilyId = parent.capture.commandFamilyId;
+        if (!nestedExplicitKeys.contains("RequiredCommandConfigId")) capture.requiredCommandConfigId = parent.capture.requiredCommandConfigId;
+        if (!nestedExplicitKeys.contains("RequireCommandAccessItem")) capture.requireCommandAccessItem = parent.capture.requireCommandAccessItem;
     }
 
     private void inheritSpawnSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -551,15 +546,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("MaxDistance")) spawn.maxDistance = parent.spawn.maxDistance;
     }
 
-    private void inheritVesselSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
-        if (nestedExplicitKeys == null) return;
-        if (vessel == null) {
-            vessel = parent.vessel;
-            return;
-        }
-        if (parent.vessel != null) vessel.inheritMissingFrom(parent.vessel, nestedExplicitKeys);
-    }
-
     @Nullable
     private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
                                                      @Nonnull String topLevelKey) {
@@ -577,8 +563,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         return filledItemId;
     }
 
-    public TwSpawnerVesselSettings getVessel() {
-        return vessel;
+    public boolean isFilledItemIdExplicit() {
+        return filledItemIdExplicit;
     }
 
     public ItemFeatureConfig toItemFeatureConfig() {
@@ -627,17 +613,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnerIconOverrideGroups(toOverrideGroups(iconOverrideGroups))
             .spawnerTooltipMode(tooltipMode)
             .captureMechanics(TwSpawnerConfigRuntimeAdapter.captureMechanics(captureSettings))
-            .vesselMechanics(TwSpawnerConfigRuntimeAdapter.vesselMechanics(
-                    vessel, emptyItemId, filledItemId))
             .build();
-    }
-
-    public SpawnerVesselConfigView toVesselConfigView(long revision) {
-        return TwSpawnerConfigRuntimeAdapter.vesselView(this, revision);
-    }
-
-    public boolean matchesVesselItemId(@Nullable String itemId) {
-        return TwSpawnerConfigRuntimeAdapter.matchesVesselItemId(this, itemId);
     }
 
     public SpawnerCaptureMechanicsView toCaptureMechanicsView(long revision) {
@@ -787,6 +763,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         int failureCooldownMs;
         String failureParticleSystem;
         String failureSoundEvent;
+        CaptureSourceConsumption sourceConsumption = CaptureSourceConsumption.SUCCESS_ONLY;
+        CaptureSuccessDisposition successDisposition = CaptureSuccessDisposition.CAPTURED_ITEM;
+        String commandFamilyId;
+        String requiredCommandConfigId;
+        boolean requireCommandAccessItem;
 
         public ItemFeatureConfig.CaptureItemMechanics toMechanics() {
             return TwSpawnerConfigRuntimeAdapter.captureMechanics(this);

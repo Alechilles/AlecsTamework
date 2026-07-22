@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +18,51 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CaptureAttemptRepositoryTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void resolvedAttemptFailurePublishesNothingUntilExactSourceSpendIsConfirmed() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("resolved-spend.sqlite")) {
+            CaptureAttemptRepository repository = new CaptureAttemptRepository(
+                    harness.connections, harness.queue);
+            UUID actor = UUID.randomUUID();
+            CaptureAttemptRecord prepared = new CaptureAttemptRecord(
+                    new CaptureAttemptRecord.Identity(
+                            "attempt-spend", "hydragon", "capture-spend", actor,
+                            UUID.randomUUID(), null, null, "draconic-stone", "wild-dragon",
+                            "{\"slot\":2}"),
+                    new CaptureAttemptRecord.ConfigEvidence(
+                            "stone-config", 8L, "dragon-policy", 3L, false, false,
+                            CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                            CaptureSuccessDisposition.CAPTURED_ITEM, null, null, false),
+                    CaptureAttemptRecord.State.PREPARED, null, null, null,
+                    0L, "NONE", 5_000L, 1L, 1L, 0L, null);
+            await(repository.prepareAsync(prepared));
+
+            CaptureAttemptRepository.MutationResult resolved = await(repository.resolveAsync(
+                    new CaptureAttemptRepository.ResolutionMutation(
+                            "attempt-spend", false,
+                            new CaptureAttemptRecord.Resolution(
+                                    1, 2, 4, 10, 0.6, 0.2, 0.45,
+                                    0.91, null, "failed_roll", 7_000L, 6_000L),
+                            "population-spend", null, true,
+                            "before-fingerprint", "after-fingerprint")));
+
+            assertEquals(CaptureAttemptRecord.SourceSpendState.PENDING,
+                    resolved.attempt().sourceSpend().state());
+            assertNull(repository.findFailureCooldown(actor, "stone-config"));
+            assertFalse(await(repository.markEventEmittedAsync("attempt-spend", 6_100L)));
+
+            CaptureAttemptRepository.MutationResult consumed = await(
+                    repository.markSourceConsumedAsync("attempt-spend", 6_200L));
+            assertEquals(CaptureAttemptRecord.SourceSpendState.CONSUMED,
+                    consumed.attempt().sourceSpend().state());
+            assertEquals(7_000L, repository.findFailureCooldown(
+                    actor, "stone-config").cooldownUntilMs());
+            assertTrue(await(repository.markEventEmittedAsync("attempt-spend", 6_300L)));
+            assertEquals(CaptureAttemptRepository.MutationStatus.IDEMPOTENT,
+                    await(repository.markSourceConsumedAsync("attempt-spend", 6_400L)).status());
+        }
+    }
 
     @Test
     void duplicateFailedRollReusesResultAndWritesOneNegativeWorldTimeCooldown() throws Exception {

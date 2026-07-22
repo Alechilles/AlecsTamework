@@ -14,11 +14,15 @@ final class CaptureAttemptSqlSupport {
                    profile_id, expected_profile_revision, source_item_id, source_role_id,
                    source_context_json, spawner_config_id, spawner_config_revision,
                    target_policy_config_id, target_policy_config_revision, target_policy_bypassed,
+                   source_consumption, success_disposition, command_family_id,
+                   required_command_config_id, require_command_access_item,
                    state, population_operation_id, capture_operation_id, power, minimum_power,
                    current_health, maximum_health, missing_health_fraction, condition_bonus,
                    effective_chance, entropy_sample, guaranteed, outcome, reason_code,
                    failure_cooldown_until_ms, event_emitted_at_ms, recovery_status, expires_at_ms,
-                   resolved_at_ms, created_at_ms, updated_at_ms, completed_at_ms, last_error
+                   resolved_at_ms, created_at_ms, updated_at_ms, completed_at_ms, last_error,
+                   source_spend_state, source_spend_before_fingerprint,
+                   source_spend_after_fingerprint, source_spend_at_ms
             FROM capture_attempts
             """;
 
@@ -45,7 +49,14 @@ final class CaptureAttemptSqlSupport {
                 result.getString("target_policy_config_id"),
                 nullableLong(result, "target_policy_config_revision"),
                 result.getInt("target_policy_bypassed") != 0,
-                result.getInt("guaranteed") != 0
+                result.getInt("guaranteed") != 0,
+                com.alechilles.alecstamework.api.CaptureSourceConsumption.valueOf(
+                        result.getString("source_consumption")),
+                com.alechilles.alecstamework.api.CaptureSuccessDisposition.valueOf(
+                        result.getString("success_disposition")),
+                result.getString("command_family_id"),
+                result.getString("required_command_config_id"),
+                result.getInt("require_command_access_item") != 0
         );
         Double power = nullableDouble(result, "power");
         CaptureAttemptRecord.Resolution resolution = power == null ? null : new CaptureAttemptRecord.Resolution(
@@ -75,7 +86,13 @@ final class CaptureAttemptSqlSupport {
                 result.getLong("created_at_ms"),
                 result.getLong("updated_at_ms"),
                 result.getLong("completed_at_ms"),
-                result.getString("last_error")
+                result.getString("last_error"),
+                new CaptureAttemptRecord.SourceSpend(
+                        CaptureAttemptRecord.SourceSpendState.valueOf(
+                                result.getString("source_spend_state")),
+                        result.getString("source_spend_before_fingerprint"),
+                        result.getString("source_spend_after_fingerprint"),
+                        result.getLong("source_spend_at_ms"))
         );
     }
 

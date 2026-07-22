@@ -188,7 +188,10 @@ public final class CaptureAttemptCoordinator {
                         success,
                         evidence,
                         request.populationOperationId(),
-                        request.operationId().toString()
+                        request.operationId().toString(),
+                        requiresSourceSpend(request.itemMechanics(), success),
+                        request.sourceSpendBeforeFingerprint(),
+                        request.sourceSpendAfterFingerprint()
                 );
         return journal.resolve(mutation).thenCompose(result -> {
             if (result.attempt() == null
@@ -199,9 +202,32 @@ public final class CaptureAttemptCoordinator {
             }
             CaptureAttemptRecord resolved = result.attempt();
             if (resolved.state() == CaptureAttemptRecord.State.RESOLVED_FAILURE) {
+                if (resolved.sourceSpend().state()
+                        == CaptureAttemptRecord.SourceSpendState.PENDING) {
+                    return CompletableFuture.completedFuture(ResolutionResult.failed(resolved));
+                }
                 return emitOnce(resolved).thenApply(ignored -> ResolutionResult.failed(resolved));
             }
             return CompletableFuture.completedFuture(ResolutionResult.success(resolved));
+        });
+    }
+
+    /** Records one already-applied exact-stack decrement and releases result publication/apply. */
+    @Nonnull
+    public CompletableFuture<CaptureAttemptRecord> confirmSourceConsumed(@Nonnull UUID attemptId) {
+        Objects.requireNonNull(attemptId, "attemptId");
+        long consumedAt = clock.millis();
+        return journal.markSourceConsumed(attemptId.toString(), consumedAt).thenCompose(result -> {
+            CaptureAttemptRecord attempt = result.attempt();
+            if (attempt == null || attempt.sourceSpend().state()
+                    != CaptureAttemptRecord.SourceSpendState.CONSUMED) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("capture_source_spend_not_committed"));
+            }
+            if (attempt.state() == CaptureAttemptRecord.State.RESOLVED_FAILURE) {
+                return emitOnce(attempt).thenApply(ignored -> attempt);
+            }
+            return CompletableFuture.completedFuture(attempt);
         });
     }
 
@@ -362,7 +388,12 @@ public final class CaptureAttemptCoordinator {
                         request.spawnerConfigId(), request.spawnerConfigRevision(),
                         policy == null ? null : policy.configId(),
                         policy == null ? null : policy.configRevision(),
-                        bypass, bypass),
+                        bypass, bypass,
+                        request.itemMechanics().sourceConsumption(),
+                        request.itemMechanics().successDisposition(),
+                        request.itemMechanics().commandFamilyId(),
+                        request.itemMechanics().requiredCommandConfigId(),
+                        request.itemMechanics().requireCommandAccessItem()),
                 CaptureAttemptRecord.State.PREPARED, null, request.populationOperationId(),
                 request.operationId().toString(), 0L, "READY",
                 request.expiresAtMs(), now, now, 0L, null);
@@ -407,6 +438,15 @@ public final class CaptureAttemptCoordinator {
         } catch (ArithmeticException overflow) {
             return Long.MAX_VALUE;
         }
+    }
+
+    private static boolean requiresSourceSpend(
+            ItemFeatureConfig.CaptureItemMechanics mechanics, boolean success) {
+        return success
+                ? mechanics.successDisposition()
+                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                : mechanics.sourceConsumption()
+                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
     }
 
     private static String requireText(String value, String field) {
@@ -461,7 +501,27 @@ public final class CaptureAttemptCoordinator {
             @Nonnull CaptureRequirementContext requirementContext,
             long expectedRequirementGeneration,
             @Nullable String populationOperationId,
-            long expiresAtMs) {
+            long expiresAtMs,
+            @Nullable String sourceSpendBeforeFingerprint,
+            @Nullable String sourceSpendAfterFingerprint) {
+        /** Source-compatible constructor for attempts which do not require a pre-result spend. */
+        public AttemptRequest(UUID attemptId, UUID operationId, String callerNamespace,
+                              String idempotencyKey, UUID actorUuid, UUID targetNpcUuid,
+                              String profileId, long expectedProfileRevision, String sourceItemId,
+                              String roleId, String sourceContextJson, String spawnerConfigId,
+                              long spawnerConfigRevision,
+                              ItemFeatureConfig.CaptureItemMechanics itemMechanics,
+                              double currentHealth, double maximumHealth,
+                              CaptureRequirementContext requirementContext,
+                              long expectedRequirementGeneration, String populationOperationId,
+                              long expiresAtMs) {
+            this(attemptId, operationId, callerNamespace, idempotencyKey, actorUuid,
+                    targetNpcUuid, profileId, expectedProfileRevision, sourceItemId, roleId,
+                    sourceContextJson, spawnerConfigId, spawnerConfigRevision, itemMechanics,
+                    currentHealth, maximumHealth, requirementContext,
+                    expectedRequirementGeneration, populationOperationId, expiresAtMs, null, null);
+        }
+
         public AttemptRequest {
             attemptId = Objects.requireNonNull(attemptId, "attemptId");
             operationId = Objects.requireNonNull(operationId, "operationId");
@@ -473,6 +533,19 @@ public final class CaptureAttemptCoordinator {
             spawnerConfigId = requireText(spawnerConfigId, "spawnerConfigId");
             itemMechanics = Objects.requireNonNull(itemMechanics, "itemMechanics");
             requirementContext = Objects.requireNonNull(requirementContext, "requirementContext");
+            sourceSpendBeforeFingerprint = normalizeFingerprint(
+                    sourceSpendBeforeFingerprint, "sourceSpendBeforeFingerprint");
+            sourceSpendAfterFingerprint = normalizeFingerprint(
+                    sourceSpendAfterFingerprint, "sourceSpendAfterFingerprint");
+            boolean mayNeedSpend = itemMechanics.sourceConsumption()
+                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT
+                    || itemMechanics.successDisposition()
+                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
+            if (mayNeedSpend && (sourceSpendBeforeFingerprint == null
+                    || sourceSpendAfterFingerprint == null)) {
+                throw new IllegalArgumentException(
+                        "Capture mechanics that may spend before apply require source fingerprints");
+            }
             if ((callerNamespace == null) != (idempotencyKey == null)) {
                 throw new IllegalArgumentException("caller namespace and idempotency key must be paired");
             }
@@ -484,6 +557,16 @@ public final class CaptureAttemptCoordinator {
                     || currentHealth < 0.0D || maximumHealth <= 0.0D || currentHealth > maximumHealth) {
                 throw new IllegalArgumentException("capture health evidence is invalid");
             }
+        }
+
+        @Nullable
+        private static String normalizeFingerprint(@Nullable String value, String field) {
+            if (value == null) return null;
+            String normalized = value.trim();
+            if (normalized.isEmpty() || normalized.length() > 512) {
+                throw new IllegalArgumentException(field + " must contain 1..512 characters");
+            }
+            return normalized;
         }
     }
 

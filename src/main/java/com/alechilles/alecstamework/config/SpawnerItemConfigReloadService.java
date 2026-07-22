@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.config;
 
-import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,7 +44,6 @@ public final class SpawnerItemConfigReloadService {
                 .toList();
         List<String> errors = new ArrayList<>();
         List<ItemFeatureRegistry.CompiledSpawnerConfig> compiled = new ArrayList<>();
-        List<SpawnerVesselConfigView> vessels = new ArrayList<>();
         Map<String, String> configByEmptyItem = new LinkedHashMap<>();
         Map<String, String> seenConfigIds = new LinkedHashMap<>();
 
@@ -71,30 +69,25 @@ public final class SpawnerItemConfigReloadService {
                 continue;
             }
             try {
+                ItemFeatureConfig itemFeature = source.toItemFeatureConfig();
+                List<String> captureErrors = SpawnerCaptureConfigValidator.validate(
+                        source, itemFeature);
+                if (!captureErrors.isEmpty()) {
+                    errors.addAll(captureErrors);
+                    continue;
+                }
                 ItemFeatureRegistry.CompiledSpawnerConfig entry =
                         new ItemFeatureRegistry.CompiledSpawnerConfig(
                                 configId,
                                 emptyItemId,
-                                source.toItemFeatureConfig(),
-                                source.toCaptureMechanicsView(candidateRevision),
-                                source.toVesselConfigView(candidateRevision));
+                                itemFeature,
+                                source.toCaptureMechanicsView(candidateRevision));
                 compiled.add(entry);
-                vessels.add(entry.vessel());
             } catch (RuntimeException | LinkageError failure) {
                 errors.add("spawner-config-invalid:" + configId + ":" + safeReason(failure));
             }
         }
 
-        if (errors.isEmpty()) {
-            BondedSpawnerConfigValidator.ValidationResult vesselValidation =
-                    BondedSpawnerConfigValidator.validate(vessels, itemId -> {
-                        OptionalInt maxStack = items.maxStackSize(itemId);
-                        return maxStack.isEmpty() ? java.util.Optional.empty()
-                                : java.util.Optional.of(new BondedSpawnerConfigValidator.ItemDefinition(
-                                maxStack.getAsInt(), configByEmptyItem.get(itemId)));
-                    });
-            errors.addAll(vesselValidation.errors());
-        }
         if (!errors.isEmpty()) return ReloadResult.rejected(activeRevision, errors);
 
         try {
@@ -148,12 +141,10 @@ public final class SpawnerItemConfigReloadService {
 
         /**
          * Returns whether this rejected generation should be retried after Item assets load.
-         * Missing vessel items can be transient while asset packs are still loading; all other
-         * validation failures remain terminal until the spawner config itself changes.
+         * Spawner compilation failures remain terminal until the config generation changes.
          */
         public boolean retryableAfterItemAssetsLoad() {
-            return !applied && !errors.isEmpty()
-                    && errors.stream().allMatch(error -> error.startsWith("vessel-item-missing:"));
+            return false;
         }
 
         private static ReloadResult rejected(long activeRevision, List<String> errors) {

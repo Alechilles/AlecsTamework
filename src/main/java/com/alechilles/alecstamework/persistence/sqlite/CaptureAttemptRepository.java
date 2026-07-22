@@ -52,6 +52,19 @@ public final class CaptureAttemptRepository {
         );
     }
 
+    /** Confirms the physical exact-stack decrement after the durable pending fence. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> markSourceConsumedAsync(
+            @Nonnull String attemptId, long consumedAtMs) {
+        if (consumedAtMs <= 0L) {
+            throw new IllegalArgumentException("consumedAtMs must be positive");
+        }
+        return writeQueue.submitTracked(
+                "capture_attempt_source_consumed",
+                connection -> markSourceConsumedInTransaction(connection, attemptId, consumedAtMs),
+                null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> advanceAsync(
             @Nonnull String attemptId,
@@ -301,6 +314,11 @@ public final class CaptureAttemptRepository {
                     : new MutationResult(MutationStatus.INVALID_STATE, existing, "attempt_not_prepared");
         }
         validateResolution(existing, mutation);
+        boolean expectedSourceSpend = requiresSourceSpend(existing.config(), mutation.success());
+        if (mutation.sourceSpendRequired() != expectedSourceSpend) {
+            throw new IllegalArgumentException(
+                    "Resolution source-spend requirement does not match pinned config.");
+        }
         int changed;
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE capture_attempts
@@ -309,7 +327,9 @@ public final class CaptureAttemptRepository {
                     missing_health_fraction = ?, condition_bonus = ?, effective_chance = ?,
                     entropy_sample = ?, outcome = ?, reason_code = ?,
                     failure_cooldown_until_ms = ?, resolved_at_ms = ?, updated_at_ms = ?,
-                    completed_at_ms = CASE WHEN ? = 'RESOLVED_FAILURE' THEN ? ELSE 0 END
+                    completed_at_ms = CASE WHEN ? = 'RESOLVED_FAILURE' THEN ? ELSE 0 END,
+                    source_spend_state = ?, source_spend_before_fingerprint = ?,
+                    source_spend_after_fingerprint = ?
                 WHERE attempt_id = ? AND state = 'PREPARED'
                 """)) {
             CaptureAttemptRecord.Resolution resolution = mutation.resolution();
@@ -331,18 +351,57 @@ public final class CaptureAttemptRepository {
             statement.setLong(16, resolution.resolvedAtMs());
             statement.setString(17, target.name());
             statement.setLong(18, resolution.resolvedAtMs());
-            statement.setString(19, mutation.attemptId());
+            boolean spendPending = mutation.sourceSpendRequired();
+            statement.setString(19, spendPending ? "PENDING" : "NOT_REQUIRED");
+            setText(statement, 20, spendPending ? mutation.sourceSpendBeforeFingerprint() : null);
+            setText(statement, 21, spendPending ? mutation.sourceSpendAfterFingerprint() : null);
+            statement.setString(22, mutation.attemptId());
             changed = statement.executeUpdate();
         }
         if (changed != 1) {
             return new MutationResult(MutationStatus.CONFLICT,
                     findInTransaction(connection, mutation.attemptId()), "attempt_changed");
         }
-        if (!mutation.success() && mutation.resolution().failureCooldownUntilMs() != 0L) {
+        if (!mutation.success() && !expectedSourceSpend
+                && mutation.resolution().failureCooldownUntilMs() != 0L) {
             upsertCooldown(connection, existing, mutation.resolution());
         }
         return new MutationResult(MutationStatus.APPLIED,
                 findInTransaction(connection, mutation.attemptId()), null);
+    }
+
+    @Nonnull
+    private MutationResult markSourceConsumedInTransaction(@Nonnull Connection connection,
+                                                           @Nonnull String attemptId,
+                                                           long consumedAtMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE capture_attempts
+                SET source_spend_state = 'CONSUMED', source_spend_at_ms = ?, updated_at_ms = ?
+                WHERE attempt_id = ? AND source_spend_state = 'PENDING'
+                  AND state IN ('RESOLVED_FAILURE', 'RESOLVED_SUCCESS')
+                """)) {
+            statement.setLong(1, consumedAtMs);
+            statement.setLong(2, consumedAtMs);
+            statement.setString(3, requireText(attemptId, "attemptId"));
+            if (statement.executeUpdate() == 1) {
+                CaptureAttemptRecord consumed = findInTransaction(connection, attemptId);
+                if (consumed != null
+                        && consumed.state() == CaptureAttemptRecord.State.RESOLVED_FAILURE
+                        && consumed.resolution() != null
+                        && consumed.resolution().failureCooldownUntilMs() != 0L) {
+                    upsertCooldown(connection, consumed, consumed.resolution());
+                }
+                return new MutationResult(MutationStatus.APPLIED, consumed, null);
+            }
+        }
+        CaptureAttemptRecord existing = findInTransaction(connection, attemptId);
+        if (existing == null) {
+            return new MutationResult(MutationStatus.NOT_FOUND, null, "attempt_not_found");
+        }
+        return existing.sourceSpend().state() == CaptureAttemptRecord.SourceSpendState.CONSUMED
+                ? new MutationResult(MutationStatus.IDEMPOTENT, existing, "source_already_consumed")
+                : new MutationResult(MutationStatus.INVALID_STATE, existing,
+                "source_spend_not_pending");
     }
 
     private void validateResolution(@Nonnull CaptureAttemptRecord existing,
@@ -363,6 +422,15 @@ public final class CaptureAttemptRepository {
         if (mutation.success() && resolution.failureCooldownUntilMs() != 0L) {
             throw new IllegalArgumentException("Successful attempts cannot start a failure cooldown.");
         }
+    }
+
+    private static boolean requiresSourceSpend(
+            @Nonnull CaptureAttemptRecord.ConfigEvidence config, boolean success) {
+        return success
+                ? config.successDisposition()
+                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                : config.sourceConsumption()
+                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
     }
 
     private void upsertCooldown(@Nonnull Connection connection,
@@ -402,6 +470,7 @@ public final class CaptureAttemptRepository {
                     reason_code = COALESCE(?, reason_code), last_error = ?, updated_at_ms = ?,
                     completed_at_ms = CASE WHEN ? IN ('COMMITTED', 'CANCELED') THEN ? ELSE 0 END
                 WHERE attempt_id = ? AND state = ?
+                  AND (? <> 'APPLYING' OR source_spend_state IN ('NOT_REQUIRED', 'CONSUMED'))
                 """)) {
             statement.setString(1, next.name());
             statement.setString(2, next.name());
@@ -412,6 +481,7 @@ public final class CaptureAttemptRepository {
             statement.setLong(7, nowMs);
             statement.setString(8, requireText(attemptId, "attemptId"));
             statement.setString(9, expected.name());
+            statement.setString(10, next.name());
             if (statement.executeUpdate() == 1) {
                 return new MutationResult(MutationStatus.APPLIED,
                         findInTransaction(connection, attemptId), null);
@@ -480,6 +550,7 @@ public final class CaptureAttemptRepository {
                 UPDATE capture_attempts SET event_emitted_at_ms = ?, updated_at_ms = ?
                 WHERE attempt_id = ? AND event_emitted_at_ms = 0
                   AND state IN ('RESOLVED_FAILURE', 'COMMITTED')
+                  AND source_spend_state IN ('NOT_REQUIRED', 'CONSUMED')
                 """)) {
             statement.setLong(1, emittedAtMs);
             statement.setLong(2, emittedAtMs);
@@ -496,8 +567,11 @@ public final class CaptureAttemptRepository {
                     profile_id, expected_profile_revision, source_item_id, source_role_id,
                     source_context_json, spawner_config_id, spawner_config_revision,
                     target_policy_config_id, target_policy_config_revision, target_policy_bypassed,
+                    source_consumption, success_disposition, command_family_id,
+                    required_command_config_id, require_command_access_item,
                     state, guaranteed, recovery_status, expires_at_ms, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PREPARED', ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                          'PREPARED', ?, ?, ?, ?, ?)
                 """)) {
             CaptureAttemptRecord.Identity identity = attempt.identity();
             CaptureAttemptRecord.ConfigEvidence config = attempt.config();
@@ -516,11 +590,16 @@ public final class CaptureAttemptRepository {
             setText(statement, 13, config.targetPolicyConfigId());
             setLong(statement, 14, config.targetPolicyConfigRevision());
             statement.setInt(15, config.targetPolicyBypassed() ? 1 : 0);
-            statement.setInt(16, config.guaranteed() ? 1 : 0);
-            statement.setString(17, attempt.recoveryStatus());
-            statement.setLong(18, attempt.expiresAtMs());
-            statement.setLong(19, attempt.createdAtMs());
-            statement.setLong(20, attempt.updatedAtMs());
+            statement.setString(16, config.sourceConsumption().name());
+            statement.setString(17, config.successDisposition().name());
+            setText(statement, 18, config.commandFamilyId());
+            setText(statement, 19, config.requiredCommandConfigId());
+            statement.setInt(20, config.requireCommandAccessItem() ? 1 : 0);
+            statement.setInt(21, config.guaranteed() ? 1 : 0);
+            statement.setString(22, attempt.recoveryStatus());
+            statement.setLong(23, attempt.expiresAtMs());
+            statement.setLong(24, attempt.createdAtMs());
+            statement.setLong(25, attempt.updatedAtMs());
             statement.executeUpdate();
         }
     }
@@ -705,6 +784,13 @@ public final class CaptureAttemptRepository {
         return normalized;
     }
 
+    @Nullable
+    private static String normalize(@Nullable String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     public enum PrepareStatus {
         PREPARED,
         IDEMPOTENT,
@@ -735,10 +821,27 @@ public final class CaptureAttemptRepository {
                                      boolean success,
                                      @Nonnull CaptureAttemptRecord.Resolution resolution,
                                      @Nullable String populationOperationId,
-                                     @Nullable String captureOperationId) {
+                                     @Nullable String captureOperationId,
+                                     boolean sourceSpendRequired,
+                                     @Nullable String sourceSpendBeforeFingerprint,
+                                     @Nullable String sourceSpendAfterFingerprint) {
+        public ResolutionMutation(String attemptId, boolean success,
+                                  CaptureAttemptRecord.Resolution resolution,
+                                  String populationOperationId, String captureOperationId) {
+            this(attemptId, success, resolution, populationOperationId, captureOperationId,
+                    false, null, null);
+        }
+
         public ResolutionMutation {
             attemptId = requireText(attemptId, "attemptId");
             resolution = Objects.requireNonNull(resolution, "resolution");
+            sourceSpendBeforeFingerprint = normalize(sourceSpendBeforeFingerprint);
+            sourceSpendAfterFingerprint = normalize(sourceSpendAfterFingerprint);
+            if (sourceSpendRequired && (sourceSpendBeforeFingerprint == null
+                    || sourceSpendAfterFingerprint == null)) {
+                throw new IllegalArgumentException(
+                        "Required source spend needs before and after fingerprints");
+            }
         }
     }
 

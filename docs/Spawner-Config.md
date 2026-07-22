@@ -58,6 +58,27 @@ Fields:
 - `FailureCooldownMs` (default `0`). Cooldown applied after one resolved failed
   probability roll.
 - `FailureParticleSystem` / `FailureSoundEvent` (optional). Failure feedback.
+- `SourceConsumption` (default `SuccessOnly`). `SuccessOnly` preserves filled-item
+  capture behavior. `ResolvedAttempt` spends exactly one fenced source item after
+  either a successful or failed terminal roll; preflight denial and cancellation
+  do not spend it.
+- `SuccessDisposition` (default `CapturedItem`). `CapturedItem` creates the
+  configured filled item. `TameAndCommandLink` keeps the existing NPC live,
+  assigns/tames it in place, preserves its canonical profile, and links that
+  profile to `CommandFamilyId`.
+- `CommandFamilyId` (optional). Required non-blank command-family namespace for
+  `TameAndCommandLink`.
+- `RequiredCommandConfigId` (optional). Exact command config used to validate a
+  compatible access item and the post-capture role.
+- `RequireCommandAccessItem` (default `false`). When true, the required command
+  item must be present before the roll and source spend.
+
+All five fields are nested-inherited scalars: omission inherits the parent and
+an explicit value, including `false`, overrides it. `TameAndCommandLink`
+requires `TamesTarget: true`, at least one valid `TamedRoleOverrides` result,
+and a non-blank `CommandFamilyId`. It ignores an inherited `FilledItemId`, but
+an explicitly authored non-blank `FilledItemId` is contradictory and rejects
+the config generation.
 
 Role-side minimum power, resistance, multiplier, missing-health bonus,
 guaranteed power, and custom requirements live in

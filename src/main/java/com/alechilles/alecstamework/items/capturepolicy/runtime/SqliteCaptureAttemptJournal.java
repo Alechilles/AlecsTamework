@@ -30,6 +30,12 @@ public final class SqliteCaptureAttemptJournal implements CaptureAttemptJournal 
     }
 
     @Override
+    public CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceConsumed(
+            String attemptId, long consumedAtMs) {
+        return committed(repository.markSourceConsumedAsync(attemptId, consumedAtMs));
+    }
+
+    @Override
     public CompletableFuture<CaptureAttemptRepository.MutationResult> advance(
             String attemptId,
             CaptureAttemptRecord.State expected,

@@ -128,32 +128,27 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void bondedCaptureDefersSourceReplacementAndAttemptClosureUntilInitialBind() throws Exception {
+    void tameAndCommandLinkKeepsNpcLiveAndCommitsRosterWithoutCreatingFilledItem() throws Exception {
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
-        String bonded = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerBondedVesselCoordinator.java"));
+        String finalizer = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureFinalizerService.java"));
 
-        int beforeApply = handler.indexOf("public boolean beforeApply(String profileId)");
-        int bondedGuard = handler.indexOf("return bondedCapture || sourceItem.prepare(profiledItem)",
-                beforeApply);
-        int populationCommitted = handler.indexOf("public void onPopulationCommitted(", bondedGuard);
-        int bind = handler.indexOf("bondedVessels.bindInitialCapture(", populationCommitted);
-        int nonBondedCommit = handler.indexOf(
-                "if (!bondedCapture) captureAttemptRuntime.commit(finalizedAttemptId)", bind);
-        int committedBinding = bonded.indexOf(
-                "binding.status() == BondedVesselInitialBindingService.Status.COMMITTED");
-        int attemptCommit = bonded.indexOf("captureAttempts.commit(captureAttemptId)",
-                committedBinding);
+        int itemBranch = handler.indexOf("if (!tameAndCommandLink) {");
+        int filledSwap = handler.indexOf("itemStackMetadataService.swapItemId(", itemBranch);
+        int tameApply = handler.indexOf("tameAndCommandLinkService.apply(");
+        int rosterUpsert = handler.indexOf("commandFamilyRosterService.upsert(rosterRequest)");
+        int attemptCommit = handler.indexOf(
+                "captureAttemptRuntime.commit(finalizedAttemptId)", rosterUpsert);
 
-        assertTrue(beforeApply >= 0 && bondedGuard > beforeApply,
-                "bonded capture must leave the empty source untouched before profile apply");
-        assertTrue(bind > populationCommitted,
-                "initial binding must start only after canonical population commit");
-        assertTrue(nonBondedCommit > bind,
-                "legacy capture attempt closure must be explicitly excluded for bonded sources");
-        assertTrue(attemptCommit > committedBinding,
-                "bonded capture attempt must close only after generation-one binding closure");
+        assertTrue(itemBranch >= 0 && filledSwap > itemBranch,
+                "only CapturedItem may create filled-item metadata");
+        assertTrue(tameApply > filledSwap, "live tame/role mutation must be explicit");
+        assertTrue(rosterUpsert > tameApply, "roster membership follows live population commit");
+        assertTrue(attemptCommit > rosterUpsert,
+                "capture must remain recoverable until the roster write is accepted");
+        assertTrue(finalizer.contains("? CompanionLifecycleState.ACTIVE"));
+        assertTrue(finalizer.contains("if (!keepsLiveNpc(prepared.config()))"));
     }
 
     @Test

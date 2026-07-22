@@ -1,7 +1,8 @@
 package com.alechilles.alecstamework.config;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
-import com.alechilles.alecstamework.api.BondedVesselMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 
 import java.util.Collections;
 import java.util.List;
@@ -84,7 +85,6 @@ public final class ItemFeatureConfig {
     private final List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups;
     private final SpawnerTooltipMode spawnerTooltipMode;
     private final CaptureItemMechanics captureMechanics;
-    private final VesselItemMechanics vesselMechanics;
 
     private ItemFeatureConfig(Builder builder) {
         this.spawnerEnabled = builder.spawnerEnabled;
@@ -120,7 +120,6 @@ public final class ItemFeatureConfig {
         this.spawnerIconOverrideGroups = builder.spawnerIconOverrideGroups;
         this.spawnerTooltipMode = builder.spawnerTooltipMode;
         this.captureMechanics = builder.captureMechanics;
-        this.vesselMechanics = builder.vesselMechanics;
     }
 
     public static Builder builder() {
@@ -274,10 +273,6 @@ public final class ItemFeatureConfig {
         return captureMechanics;
     }
 
-    public VesselItemMechanics getVesselMechanics() {
-        return vesselMechanics;
-    }
-
     /** Immutable compiled item-side capture chance mechanics. */
     public record CaptureItemMechanics(CaptureChanceMode chanceMode,
                                        int power,
@@ -287,15 +282,44 @@ public final class ItemFeatureConfig {
                                        double maximumChance,
                                        int failureCooldownMs,
                                        String failureParticleSystem,
-                                       String failureSoundEvent) {
+                                       String failureSoundEvent,
+                                       CaptureSourceConsumption sourceConsumption,
+                                       CaptureSuccessDisposition successDisposition,
+                                       String commandFamilyId,
+                                       String requiredCommandConfigId,
+                                       boolean requireCommandAccessItem) {
         public static final CaptureItemMechanics GUARANTEED_DEFAULT = new CaptureItemMechanics(
-                CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null
+                CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null,
+                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
+                null, null, false
         );
+
+        /** Source-compatible constructor for the original capture-policy mechanics. */
+        public CaptureItemMechanics(CaptureChanceMode chanceMode,
+                                    int power,
+                                    double baseChance,
+                                    double chancePerPower,
+                                    double minimumChance,
+                                    double maximumChance,
+                                    int failureCooldownMs,
+                                    String failureParticleSystem,
+                                    String failureSoundEvent) {
+            this(chanceMode, power, baseChance, chancePerPower, minimumChance, maximumChance,
+                    failureCooldownMs, failureParticleSystem, failureSoundEvent,
+                    CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
+                    null, null, false);
+        }
 
         public CaptureItemMechanics {
             chanceMode = chanceMode == null ? CaptureChanceMode.GUARANTEED : chanceMode;
+            sourceConsumption = sourceConsumption == null
+                    ? CaptureSourceConsumption.SUCCESS_ONLY : sourceConsumption;
+            successDisposition = successDisposition == null
+                    ? CaptureSuccessDisposition.CAPTURED_ITEM : successDisposition;
             failureParticleSystem = normalizeBlank(failureParticleSystem);
             failureSoundEvent = normalizeBlank(failureSoundEvent);
+            commandFamilyId = normalizeBlank(commandFamilyId);
+            requiredCommandConfigId = normalizeBlank(requiredCommandConfigId);
             if (power < 0 || failureCooldownMs < 0) {
                 throw new IllegalArgumentException("Capture power and failure cooldown cannot be negative.");
             }
@@ -308,54 +332,20 @@ public final class ItemFeatureConfig {
             if (minimumChance > maximumChance) {
                 throw new IllegalArgumentException("MinimumChance cannot exceed MaximumChance.");
             }
+            if (successDisposition == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                    && commandFamilyId == null) {
+                throw new IllegalArgumentException(
+                        "TameAndCommandLink requires a non-blank CommandFamilyId.");
+            }
+            if (requireCommandAccessItem && requiredCommandConfigId == null) {
+                throw new IllegalArgumentException(
+                        "RequireCommandAccessItem requires RequiredCommandConfigId.");
+            }
         }
 
         private static void requireProbability(double value, String field) {
             if (!Double.isFinite(value) || value < 0.0D || value > 1.0D) {
                 throw new IllegalArgumentException(field + " must be finite and between zero and one.");
-            }
-        }
-
-        private static String normalizeBlank(String value) {
-            return value == null || value.isBlank() ? null : value.trim();
-        }
-    }
-
-    /** Immutable spawner-side vessel configuration pinned by an item registry revision. */
-    public record VesselItemMechanics(BondedVesselMode mode,
-                                      String emptyItemId,
-                                      String storedItemId,
-                                      String activeItemId,
-                                      String deadItemId,
-                                      String lostItemId,
-                                      String unavailableItemId,
-                                      long transitionCooldownMs,
-                                      double storeMaxDistance,
-                                      String storeParticleSystem,
-                                      String storeSoundEvent,
-                                      boolean requireOwner,
-                                      boolean allowStoreInCombat) {
-        public static final VesselItemMechanics DISPOSABLE_DEFAULT = new VesselItemMechanics(
-                BondedVesselMode.DISPOSABLE, null, null, null, null, null, null,
-                0L, 0.0D, null, null, true, false);
-
-        public VesselItemMechanics {
-            mode = mode == null ? BondedVesselMode.DISPOSABLE : mode;
-            emptyItemId = normalizeBlank(emptyItemId);
-            storedItemId = normalizeBlank(storedItemId);
-            activeItemId = normalizeBlank(activeItemId);
-            deadItemId = normalizeBlank(deadItemId);
-            lostItemId = normalizeBlank(lostItemId);
-            unavailableItemId = normalizeBlank(unavailableItemId);
-            storeParticleSystem = normalizeBlank(storeParticleSystem);
-            storeSoundEvent = normalizeBlank(storeSoundEvent);
-            if (transitionCooldownMs < 0L || !Double.isFinite(storeMaxDistance)
-                    || storeMaxDistance < 0.0D) {
-                throw new IllegalArgumentException("Vessel cooldown and store distance must be non-negative.");
-            }
-            if (mode == BondedVesselMode.BONDED && (emptyItemId == null || storedItemId == null
-                    || activeItemId == null || deadItemId == null || lostItemId == null)) {
-                throw new IllegalArgumentException("Bonded vessel mechanics require all canonical lifecycle item IDs.");
             }
         }
 
@@ -458,7 +448,6 @@ public final class ItemFeatureConfig {
         private List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups = Collections.emptyList();
         private SpawnerTooltipMode spawnerTooltipMode = SpawnerTooltipMode.ADDITIVE;
         private CaptureItemMechanics captureMechanics = CaptureItemMechanics.GUARANTEED_DEFAULT;
-        private VesselItemMechanics vesselMechanics = VesselItemMechanics.DISPOSABLE_DEFAULT;
 
         private Builder() {
         }
@@ -690,12 +679,6 @@ public final class ItemFeatureConfig {
             return this;
         }
 
-        public Builder vesselMechanics(VesselItemMechanics vesselMechanics) {
-            this.vesselMechanics = vesselMechanics == null
-                    ? VesselItemMechanics.DISPOSABLE_DEFAULT : vesselMechanics;
-            return this;
-        }
-
         public ItemFeatureConfig build() {
             return new ItemFeatureConfig(this);
         }
@@ -742,8 +725,7 @@ public final class ItemFeatureConfig {
                 && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole)
                 && Objects.equals(spawnerIconOverrideGroups, other.spawnerIconOverrideGroups)
                 && spawnerTooltipMode == other.spawnerTooltipMode
-                && Objects.equals(captureMechanics, other.captureMechanics)
-                && Objects.equals(vesselMechanics, other.vesselMechanics);
+                && Objects.equals(captureMechanics, other.captureMechanics);
     }
 
     @Override
@@ -781,8 +763,7 @@ public final class ItemFeatureConfig {
                 spawnerIconOverridesByRole,
                 spawnerIconOverrideGroups,
                 spawnerTooltipMode,
-                captureMechanics,
-                vesselMechanics
+                captureMechanics
         );
     }
 }

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.CaptureChanceMode;
 import com.alechilles.alecstamework.api.CaptureRequirementContext;
 import com.alechilles.alecstamework.api.CaptureRequirementDecision;
 import com.alechilles.alecstamework.api.CaptureRequirementPhase;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
@@ -55,6 +56,46 @@ class CaptureAttemptCoordinatorTest {
         assertEquals(1, entropyCalls.get());
         assertEquals(1, events.get());
         assertTrue(first.attempt().resolution().failureCooldownUntilMs() > NOW);
+    }
+
+    @Test
+    void resolvedAttemptFailureWaitsForConfirmedSourceSpendBeforePublishing() {
+        FakeJournal journal = new FakeJournal();
+        AtomicInteger events = new AtomicInteger();
+        CaptureAttemptCoordinator coordinator = coordinator(
+                journal, ignored -> 0.9D, ignored -> events.incrementAndGet());
+        ItemFeatureConfig.CaptureItemMechanics mechanics =
+                new ItemFeatureConfig.CaptureItemMechanics(
+                        CaptureChanceMode.PROBABILITY, 1, 0.5D, 0.0D,
+                        0.0D, 1.0D, 2_000, null, null,
+                        CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                        com.alechilles.alecstamework.api.CaptureSuccessDisposition.CAPTURED_ITEM,
+                        null, null, false);
+        CaptureAttemptCoordinator.AttemptRequest baseline = request(
+                ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT);
+        CaptureAttemptCoordinator.AttemptRequest request = new CaptureAttemptCoordinator.AttemptRequest(
+                baseline.attemptId(), baseline.operationId(), baseline.callerNamespace(),
+                baseline.idempotencyKey(), baseline.actorUuid(), baseline.targetNpcUuid(),
+                baseline.profileId(), baseline.expectedProfileRevision(), baseline.sourceItemId(),
+                baseline.roleId(), baseline.sourceContextJson(), baseline.spawnerConfigId(),
+                baseline.spawnerConfigRevision(), mechanics, baseline.currentHealth(),
+                baseline.maximumHealth(), baseline.requirementContext(),
+                baseline.expectedRequirementGeneration(), baseline.populationOperationId(),
+                baseline.expiresAtMs(), "before-fingerprint", "after-fingerprint");
+
+        CaptureAttemptCoordinator.ResolutionResult result = coordinator.resolve(request).join();
+
+        assertEquals(CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL, result.status());
+        assertEquals(CaptureAttemptRecord.SourceSpendState.PENDING,
+                result.attempt().sourceSpend().state());
+        assertEquals(0, events.get());
+        CaptureAttemptRecord consumed = coordinator.confirmSourceConsumed(
+                request.attemptId()).join();
+        assertEquals(CaptureAttemptRecord.SourceSpendState.CONSUMED,
+                consumed.sourceSpend().state());
+        assertEquals(1, events.get());
+        coordinator.confirmSourceConsumed(request.attemptId()).join();
+        assertEquals(1, events.get());
     }
 
     @Test
@@ -393,7 +434,46 @@ class CaptureAttemptCoordinatorTest {
                     ? CaptureAttemptRecord.State.RESOLVED_SUCCESS
                     : CaptureAttemptRecord.State.RESOLVED_FAILURE;
             CaptureAttemptRecord updated = withState(current, state, mutation.resolution());
+            if (mutation.sourceSpendRequired()) {
+                updated = new CaptureAttemptRecord(
+                        updated.identity(), updated.config(), updated.state(), updated.resolution(),
+                        updated.populationOperationId(), updated.captureOperationId(),
+                        updated.eventEmittedAtMs(), updated.recoveryStatus(), updated.expiresAtMs(),
+                        updated.createdAtMs(), updated.updatedAtMs(), updated.completedAtMs(),
+                        updated.lastError(),
+                        new CaptureAttemptRecord.SourceSpend(
+                                CaptureAttemptRecord.SourceSpendState.PENDING,
+                                mutation.sourceSpendBeforeFingerprint(),
+                                mutation.sourceSpendAfterFingerprint(), 0L));
+            }
             rows.put(mutation.attemptId(), updated);
+            return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                    CaptureAttemptRepository.MutationStatus.APPLIED, updated, null));
+        }
+
+        @Override
+        public CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceConsumed(
+                String attemptId, long consumedAtMs) {
+            CaptureAttemptRecord current = rows.get(attemptId);
+            if (current == null) {
+                return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                        CaptureAttemptRepository.MutationStatus.NOT_FOUND, null, "not-found"));
+            }
+            if (current.sourceSpend().state()
+                    == CaptureAttemptRecord.SourceSpendState.CONSUMED) {
+                return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
+                        CaptureAttemptRepository.MutationStatus.IDEMPOTENT, current, "consumed"));
+            }
+            CaptureAttemptRecord updated = new CaptureAttemptRecord(
+                    current.identity(), current.config(), current.state(), current.resolution(),
+                    current.populationOperationId(), current.captureOperationId(),
+                    current.eventEmittedAtMs(), current.recoveryStatus(), current.expiresAtMs(),
+                    current.createdAtMs(), consumedAtMs, current.completedAtMs(), current.lastError(),
+                    new CaptureAttemptRecord.SourceSpend(
+                            CaptureAttemptRecord.SourceSpendState.CONSUMED,
+                            current.sourceSpend().beforeFingerprint(),
+                            current.sourceSpend().afterFingerprint(), consumedAtMs));
+            rows.put(attemptId, updated);
             return CompletableFuture.completedFuture(new CaptureAttemptRepository.MutationResult(
                     CaptureAttemptRepository.MutationStatus.APPLIED, updated, null));
         }
@@ -455,7 +535,8 @@ class CaptureAttemptCoordinatorTest {
                     current.identity(), current.config(), state, resolution,
                     current.populationOperationId(), current.captureOperationId(),
                     current.eventEmittedAtMs(), current.recoveryStatus(), current.expiresAtMs(),
-                    current.createdAtMs(), NOW, state.isTerminal() ? NOW : 0, current.lastError());
+                    current.createdAtMs(), NOW, state.isTerminal() ? NOW : 0, current.lastError(),
+                    current.sourceSpend());
         }
     }
 }

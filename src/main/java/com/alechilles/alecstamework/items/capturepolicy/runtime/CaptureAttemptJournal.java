@@ -19,6 +19,13 @@ public interface CaptureAttemptJournal {
             @Nonnull CaptureAttemptRepository.ResolutionMutation mutation);
 
     @Nonnull
+    default CompletableFuture<CaptureAttemptRepository.MutationResult> markSourceConsumed(
+            @Nonnull String attemptId, long consumedAtMs) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("capture_source_spend_unavailable"));
+    }
+
+    @Nonnull
     CompletableFuture<CaptureAttemptRepository.MutationResult> advance(
             @Nonnull String attemptId,
             @Nonnull CaptureAttemptRecord.State expected,

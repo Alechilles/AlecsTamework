@@ -16,13 +16,42 @@ public record SpawnerCaptureMechanicsView(@Nonnull String configId,
                                          double maximumChance,
                                          long failureCooldownMs,
                                          @Nullable String failureParticleSystem,
-                                         @Nullable String failureSoundEvent) {
+                                         @Nullable String failureSoundEvent,
+                                         @Nonnull CaptureSourceConsumption sourceConsumption,
+                                         @Nonnull CaptureSuccessDisposition successDisposition,
+                                         @Nullable String commandFamilyId,
+                                         @Nullable String requiredCommandConfigId,
+                                         boolean requireCommandAccessItem) {
+    /** Source-compatible constructor for API 0.9 consumers. */
+    public SpawnerCaptureMechanicsView(String configId,
+                                      long configRevision,
+                                      String sourceItemId,
+                                      CaptureChanceMode chanceMode,
+                                      int power,
+                                      double baseChance,
+                                      double chancePerPower,
+                                      double minimumChance,
+                                      double maximumChance,
+                                      long failureCooldownMs,
+                                      String failureParticleSystem,
+                                      String failureSoundEvent) {
+        this(configId, configRevision, sourceItemId, chanceMode, power, baseChance,
+                chancePerPower, minimumChance, maximumChance, failureCooldownMs,
+                failureParticleSystem, failureSoundEvent,
+                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
+                null, null, false);
+    }
+
     public SpawnerCaptureMechanicsView {
         configId = requireText(configId, "configId");
         sourceItemId = requireText(sourceItemId, "sourceItemId");
         chanceMode = Objects.requireNonNull(chanceMode, "chanceMode");
+        sourceConsumption = Objects.requireNonNull(sourceConsumption, "sourceConsumption");
+        successDisposition = Objects.requireNonNull(successDisposition, "successDisposition");
         failureParticleSystem = normalizeBlank(failureParticleSystem);
         failureSoundEvent = normalizeBlank(failureSoundEvent);
+        commandFamilyId = normalizeBlank(commandFamilyId);
+        requiredCommandConfigId = normalizeBlank(requiredCommandConfigId);
         if (configRevision < 0L || power < 0 || failureCooldownMs < 0L) {
             throw new IllegalArgumentException("Capture revision, power, and cooldown cannot be negative.");
         }
@@ -34,6 +63,14 @@ public record SpawnerCaptureMechanicsView(@Nonnull String configId,
         }
         if (minimumChance > maximumChance) {
             throw new IllegalArgumentException("minimumChance cannot exceed maximumChance.");
+        }
+        if (successDisposition == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                && commandFamilyId == null) {
+            throw new IllegalArgumentException("TameAndCommandLink requires commandFamilyId.");
+        }
+        if (requireCommandAccessItem && requiredCommandConfigId == null) {
+            throw new IllegalArgumentException(
+                    "requireCommandAccessItem requires requiredCommandConfigId.");
         }
     }
 

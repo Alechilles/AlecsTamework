@@ -244,12 +244,28 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                         requirementContext,
                         generation,
                         mutation.populationOperationId().toString(),
-                        expiresAt());
+                        expiresAt(),
+                        attempt.sourceFingerprint(),
+                        SpawnerSourceFingerprint.afterConsumingOne(itemStack));
 
         AtomicReference<CaptureAttemptRecord> resolvedAttempt = new AtomicReference<>();
         AtomicReference<CaptureAttemptHandle> resolvedHandle = new AtomicReference<>(attempt);
         attempts.resolve(request).thenCompose(result -> {
             if (result.status() == CaptureAttemptCoordinator.ResultStatus.FAILED_ROLL) {
+                if (result.attempt() != null && result.attempt().sourceSpend().state()
+                        == CaptureAttemptRecord.SourceSpendState.PENDING) {
+                    return consumeAndConfirm(world, player.getUuid(), itemStack, attempt, result.attempt())
+                            .thenApply(consumed -> {
+                                if (consumed) {
+                                    mutation.cancel("capture-probability-failure");
+                                    world.execute(() -> effects.playEffects(
+                                            world, targetRef,
+                                            config.getCaptureMechanics().failureParticleSystem(),
+                                            config.getCaptureMechanics().failureSoundEvent()));
+                                }
+                                return false;
+                            });
+                }
                 mutation.cancel("capture-probability-failure");
                 world.execute(() -> effects.playEffects(
                         world, targetRef,
@@ -266,6 +282,13 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             resolvedAttempt.set(result.attempt());
             CaptureAttemptHandle effective = attempt.withAttemptId(result.attemptId());
             resolvedHandle.set(effective);
+            if (result.attempt().sourceSpend().state()
+                    == CaptureAttemptRecord.SourceSpendState.PENDING) {
+                return consumeAndConfirm(world, player.getUuid(), itemStack, effective, result.attempt())
+                        .thenCompose(consumed -> consumed
+                                ? attempts.beginApply(effective.attemptId())
+                                : CompletableFuture.completedFuture(false));
+            }
             return attempts.beginApply(effective.attemptId());
         }).whenComplete((applyReady, failure) -> {
             if (failure != null || !Boolean.TRUE.equals(applyReady)) {
@@ -273,16 +296,67 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                 return;
             }
             world.execute(() -> {
-                boolean scheduled = continuation.apply(
-                        resolvedHandle.get(), mutation, resolvedAttempt.get(), generation);
-                if (!scheduled) {
-                    mutation.cancel("capture-terminal-revalidation-failed");
-                    quarantine(resolvedHandle.get().attemptId(),
-                            "capture-terminal-revalidation-failed");
+                try {
+                    boolean scheduled = continuation.apply(
+                            resolvedHandle.get(), mutation, resolvedAttempt.get(), generation);
+                    if (!scheduled) {
+                        mutation.cancel("capture-terminal-revalidation-failed");
+                        quarantine(resolvedHandle.get().attemptId(),
+                                "capture-terminal-revalidation-failed");
+                    }
+                } catch (RuntimeException | LinkageError failure) {
+                    mutation.cancel("capture-terminal-apply-threw");
+                    quarantine(resolvedHandle.get().attemptId(), "capture-terminal-apply-threw");
+                    debugLog.accept("capture denied reason=capture-terminal-apply-threw"
+                            + " player=" + player.getUuid()
+                            + " targetUuid=" + targetUuid
+                            + " failure=" + failure.getClass().getSimpleName());
                 }
             });
         });
         return true;
+    }
+
+    @Nonnull
+    private CompletableFuture<Boolean> consumeAndConfirm(
+            @Nonnull World world,
+            @Nonnull UUID playerUuid,
+            @Nonnull ItemStack source,
+            @Nonnull CaptureAttemptHandle handle,
+            @Nonnull CaptureAttemptRecord resolved) {
+        CompletableFuture<Boolean> completion = new CompletableFuture<>();
+        world.execute(() -> {
+            final SpawnerSourceItemTransaction transaction;
+            try {
+                transaction = new SpawnerSourceItemTransaction(
+                        inventory, world, playerUuid, handle.hotbarSlot(), source, null,
+                        "Resolved capture attempt");
+                if (!transaction.consumeOne()) {
+                    completion.complete(false);
+                    return;
+                }
+            } catch (RuntimeException | LinkageError failure) {
+                debugLog.accept("capture denied reason=capture-source-spend-threw"
+                        + " player=" + playerUuid
+                        + " failure=" + failure.getClass().getSimpleName());
+                completion.complete(false);
+                return;
+            }
+            attempts.confirmSourceConsumed(UUID.fromString(resolved.identity().attemptId()))
+                    .whenComplete((committed, failure) -> {
+                        if (failure == null && committed != null
+                                && committed.sourceSpend().state()
+                                == CaptureAttemptRecord.SourceSpendState.CONSUMED) {
+                            transaction.commit();
+                            completion.complete(true);
+                        } else {
+                            // Keep the durable PENDING record. Recovery compares its before/after
+                            // fingerprints and must never blindly decrement a second time.
+                            completion.complete(false);
+                        }
+                    });
+        });
+        return completion;
     }
 
     @Nullable

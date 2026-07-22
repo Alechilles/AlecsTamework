@@ -8,6 +8,7 @@ import javax.annotation.Nonnull;
 
 /** Produces the exact durable fingerprint used by captured-item source finalization. */
 final class SpawnerSourceFingerprint {
+    static final String EMPTY_AFTER_CONSUMPTION = "EMPTY";
     private SpawnerSourceFingerprint() {
     }
 
@@ -22,5 +23,15 @@ final class SpawnerSourceFingerprint {
         return stack.getItemId() + "|" + String.valueOf(target) + "|"
                 + String.valueOf(profile) + "|"
                 + Integer.toUnsignedString(stack.hashCode(), 16);
+    }
+
+    @Nonnull
+    static String afterConsumingOne(@Nonnull ItemStack stack) {
+        if (stack.getQuantity() <= 0) {
+            throw new IllegalArgumentException("Source stack must contain at least one item");
+        }
+        return stack.getQuantity() == 1
+                ? EMPTY_AFTER_CONSUMPTION
+                : of(stack.withQuantity(stack.getQuantity() - 1));
     }
 }

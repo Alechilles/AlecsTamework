@@ -5,131 +5,65 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
-import com.alechilles.alecstamework.config.assets.TwSpawnerVesselConfigResolver;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 class SpawnerItemConfigReloadServiceTest {
     @Test
-    void validBondedGenerationIndexesEveryExactConfiguredAndFallbackItemId() throws Exception {
+    void tameAndCommandLinkRejectsContradictoryExplicitFilledItem() throws Exception {
         ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        Map<String, Integer> items = new HashMap<>();
-        for (String itemId : List.of("PlainOrb", "RestingOrb", "AwakeOrb", "CrackedOrb")) {
-            items.put(itemId, 1);
-        }
-        SpawnerItemConfigReloadService service = service(registry, items);
-        TwSpawnerConfig config = bonded("DragonVessel", "PlainOrb", "RestingOrb",
-                "\"Active\":\"AwakeOrb\",\"Dead\":\"CrackedOrb\"");
+        SpawnerItemConfigReloadService service = service(registry, Map.of("Stone", 64));
+        TwSpawnerConfig config = config("DragonStone", """
+                "EmptyItemId":"Stone",
+                "FilledItemId":"FilledStone",
+                "Capture":{
+                  "RequireTamed":false,
+                  "TamesTarget":true,
+                  "TamedRoleOverrides":{"WildDragon":"TamedDragon"},
+                  "SuccessDisposition":"TameAndCommandLink",
+                  "CommandFamilyId":"hydragon:dragon_horn"
+                }
+                """);
 
         SpawnerItemConfigReloadService.ReloadResult result = service.reload(List.of(config));
-        TwSpawnerVesselConfigResolver resolver = new TwSpawnerVesselConfigResolver(registry);
+
+        assertFalse(result.applied());
+        assertEquals(List.of(
+                "capture-tame-link-contradicts-explicit-filled-item:DragonStone"),
+                result.errors());
+    }
+
+    @Test
+    void tameAndCommandLinkAcceptsInheritedFilledItemBecauseDispositionIgnoresIt() throws Exception {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        SpawnerItemConfigReloadService service = service(registry, Map.of("Stone", 64));
+        TwSpawnerConfig parent = config("Parent", """
+                "EmptyItemId":"ParentStone", "FilledItemId":"FilledStone"
+                """);
+        TwSpawnerConfig child = config("DragonStone", """
+                "EmptyItemId":"Stone",
+                "Capture":{
+                  "RequireTamed":false,
+                  "TamesTarget":true,
+                  "TamedRoleOverrides":{"WildDragon":"TamedDragon"},
+                  "SuccessDisposition":"TameAndCommandLink",
+                  "CommandFamilyId":"hydragon:dragon_horn"
+                }
+                """);
+        child.inheritMissingTopLevelFrom(parent, Set.of("EmptyItemId", "Capture"),
+                Map.of("Capture", Set.of("RequireTamed", "TamesTarget", "TamedRoleOverrides",
+                        "SuccessDisposition", "CommandFamilyId")));
+
+        SpawnerItemConfigReloadService.ReloadResult result = service.reload(List.of(child));
 
         assertTrue(result.applied());
-        assertEquals(1L, result.activeRevision());
-        assertEquals("DragonVessel", resolver.resolveForItemId("PlainOrb").orElseThrow().configId());
-        assertEquals("DragonVessel", resolver.resolveForItemId("RestingOrb").orElseThrow().configId());
-        assertEquals("DragonVessel", resolver.resolveForItemId("AwakeOrb").orElseThrow().configId());
-        assertEquals("DragonVessel", resolver.resolveForItemId("CrackedOrb").orElseThrow().configId());
-        // Lost and unavailable both fall back to the filled item and therefore resolve directly.
-        assertEquals("RestingOrb", resolver.getById("DragonVessel").orElseThrow().lostItemId());
-        assertEquals("RestingOrb", resolver.getById("DragonVessel").orElseThrow().unavailableItemId());
-        assertTrue(resolver.resolveForItemId("RestingOrb").isPresent());
-        assertTrue(resolver.resolveForItemId("Anything_State_Awake").isEmpty());
-    }
-
-    @Test
-    void failedProductionValidationRetainsTheCompleteLastValidGeneration() throws Exception {
-        ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        Map<String, Integer> items = new HashMap<>(Map.of(
-                "PlainOrb", 1, "RestingOrb", 1, "AwakeOrb", 1, "CrackedOrb", 1));
-        SpawnerItemConfigReloadService service = service(registry, items);
-        TwSpawnerConfig initial = bonded("DragonVessel", "PlainOrb", "RestingOrb",
-                "\"Active\":\"AwakeOrb\",\"Dead\":\"CrackedOrb\"");
-        assertTrue(service.reload(List.of(initial)).applied());
-        long validRevision = registry.revision();
-        ItemFeatureConfig validFeature = registry.get("PlainOrb");
-
-        items.put("CrackedOrb", 2);
-        SpawnerItemConfigReloadService.ReloadResult rejected = service.reload(List.of(initial));
-
-        assertFalse(rejected.applied());
-        assertTrue(rejected.errors().contains(
-                "vessel-item-must-be-non-stackable:DragonVessel:CrackedOrb"));
-        assertEquals(validRevision, registry.revision());
-        assertEquals(validFeature, registry.get("PlainOrb"));
-        assertEquals("DragonVessel", registry.resolveVesselForItemId("CrackedOrb")
-                .orElseThrow().configId());
-        assertEquals(validRevision, registry.getCaptureByConfigId("DragonVessel")
-                .orElseThrow().configRevision());
-    }
-
-    @Test
-    void duplicateEmptyBindingsRejectDeterministicallyWithoutPublishingAPartialMap() throws Exception {
-        ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        Map<String, Integer> items = new HashMap<>(Map.of("SharedOrb", 1, "FirstStored", 1,
-                "SecondStored", 1));
-        SpawnerItemConfigReloadService service = service(registry, items);
-        TwSpawnerConfig alpha = bonded("Alpha", "SharedOrb", "FirstStored", "");
-        TwSpawnerConfig beta = bonded("Beta", "SharedOrb", "SecondStored", "");
-
-        SpawnerItemConfigReloadService.ReloadResult forward = service.reload(List.of(beta, alpha));
-        SpawnerItemConfigReloadService.ReloadResult reverse = service.reload(List.of(alpha, beta));
-
-        assertFalse(forward.applied());
-        assertEquals(forward.errors(), reverse.errors());
-        assertEquals(List.of("spawner-empty-item-collision:SharedOrb:Alpha:Beta"), forward.errors());
-        assertEquals(0L, registry.revision());
-        assertTrue(registry.snapshot().isEmpty());
-    }
-
-    @Test
-    void missingItemsAreRetryableAfterItemAssetsLoadAndPublishOnceAvailable() throws Exception {
-        // Regression: downstream TwSpawnerConfig assets can load before their Item assets.
-        ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        Map<String, Integer> items = new HashMap<>();
-        SpawnerItemConfigReloadService service = service(registry, items);
-        TwSpawnerConfig config = bonded("DragonVessel", "PlainOrb", "RestingOrb",
-                "\"Active\":\"AwakeOrb\",\"Dead\":\"CrackedOrb\"");
-
-        SpawnerItemConfigReloadService.ReloadResult initial = service.reload(List.of(config));
-
-        assertFalse(initial.applied());
-        assertTrue(initial.retryableAfterItemAssetsLoad());
-        assertEquals(0L, registry.revision());
-        assertTrue(registry.snapshot().isEmpty());
-
-        for (String itemId : List.of("PlainOrb", "RestingOrb", "AwakeOrb", "CrackedOrb")) {
-            items.put(itemId, 1);
-        }
-        SpawnerItemConfigReloadService.ReloadResult recovered = service.reload(List.of(config));
-
-        assertTrue(recovered.applied());
-        assertFalse(recovered.retryableAfterItemAssetsLoad());
-        assertEquals(1L, registry.revision());
-        assertEquals("DragonVessel", registry.resolveVesselForItemId("RestingOrb")
-                .orElseThrow().configId());
-    }
-
-    @Test
-    void hardValidationFailureIsNotRetriedMerelyBecauseItemsLoaded() throws Exception {
-        ItemFeatureRegistry registry = new ItemFeatureRegistry();
-        Map<String, Integer> items = new HashMap<>(Map.of("PlainOrb", 1, "RestingOrb", 2));
-        SpawnerItemConfigReloadService service = service(registry, items);
-        TwSpawnerConfig config = bonded("DragonVessel", "PlainOrb", "RestingOrb", "");
-
-        SpawnerItemConfigReloadService.ReloadResult rejected = service.reload(List.of(config));
-
-        assertFalse(rejected.applied());
-        assertFalse(rejected.retryableAfterItemAssetsLoad());
-        assertTrue(rejected.errors().contains(
-                "vessel-item-must-be-non-stackable:DragonVessel:RestingOrb"));
-        assertEquals(0L, registry.revision());
+        assertEquals("FilledStone", registry.get("Stone").getSpawnerFilledItemId());
     }
 
     private static SpawnerItemConfigReloadService service(ItemFeatureRegistry registry,
@@ -140,15 +74,9 @@ class SpawnerItemConfigReloadServiceTest {
         });
     }
 
-    private static TwSpawnerConfig bonded(String id,
-                                           String emptyItemId,
-                                           String filledItemId,
-                                           String stateEntries) throws Exception {
-        String states = stateEntries.isBlank() ? "" : ",\"StateItemIds\":{" + stateEntries + "}";
-        TwSpawnerConfig config = TwSpawnerConfig.CODEC.decode(BsonDocument.parse("{"
-                + "\"EmptyItemId\":\"" + emptyItemId + "\","
-                + "\"FilledItemId\":\"" + filledItemId + "\","
-                + "\"Vessel\":{\"Mode\":\"Bonded\"" + states + "}}"), new ExtraInfo());
+    private static TwSpawnerConfig config(String id, String entries) throws Exception {
+        TwSpawnerConfig config = TwSpawnerConfig.CODEC.decode(
+                BsonDocument.parse("{" + entries + "}"), new ExtraInfo());
         Field field = TwSpawnerConfig.class.getDeclaredField("id");
         field.setAccessible(true);
         field.set(config, id);

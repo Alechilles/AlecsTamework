@@ -19,13 +19,13 @@ final class SpawnerCapturedProfilePersistenceService {
         this.repository = repository;
     }
 
-    void persist(
+    boolean persist(
             @Nullable UUID npcUuid,
             @Nullable UUID ownerUuid,
             @Nullable String roleId,
             @Nullable String displayName) {
         if (repository == null || npcUuid == null || roleId == null || roleId.isBlank()) {
-            return;
+            return false;
         }
         boolean queued = repository.upsertAsync(
                 new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
@@ -36,5 +36,6 @@ final class SpawnerCapturedProfilePersistenceService {
                     "Spawner capture could not enqueue its canonical profile snapshot "
                             + "(npc=" + npcUuid + ", role=" + roleId + ").");
         }
+        return queued;
     }
 }
