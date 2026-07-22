@@ -42,6 +42,18 @@ class CommandRosterMenuAuthorityArchitectureTest {
                 "ownerCullService.cull(");
     }
 
+    @Test
+    void coldRosterMenuRefreshReturnsToWorldThreadBeforeOpeningUi() throws Exception {
+        String handler = source("CommandItemFeatureHandler.java");
+
+        assertOrdered(handler, "private boolean queueRosterMenuAfterRefresh(",
+                "rosterActionAuthority.refreshAsync(", "world.execute(",
+                "WorldPlayerResolver.resolve(world, ownerUuid)");
+        assertOrdered(handler, "private boolean queueRosterMenuAfterRefresh(",
+                "world.execute(", "WorldPlayerResolver.resolve(world, ownerUuid)",
+                "openSelectionMenu(");
+    }
+
     private static void assertOrdered(String source, String method, String removal,
                                       String worldContinuation, String mutation) {
         int methodStart = source.indexOf(method);

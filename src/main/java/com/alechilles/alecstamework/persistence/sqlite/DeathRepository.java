@@ -8,7 +8,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
@@ -176,6 +180,172 @@ public final class DeathRepository {
         );
     }
 
+    /**
+     * Repairs the narrow crash-era state where a command-roster companion was permanently
+     * released before its revivable death snapshot could be written. The committed owner-clear
+     * operation is required as durable death evidence; an ownerless profile by itself is never
+     * enough to infer ownership or death.
+     *
+     * <p>This repair is idempotent and intentionally runs before command-roster caches become
+     * available. It restores the roster owner, publishes a minimal death snapshot, and moves the
+     * population, roster, and timed lease to {@code DEAD_REVIVABLE} in one transaction.</p>
+     */
+    @Nonnull
+    public OrphanedRosterDeathRecovery recoverOrphanedCommandRosterDeaths() throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                RecoveryCandidates candidates = loadOrphanedRosterDeathCandidates(connection);
+                int recovered = 0;
+                for (OrphanedRosterDeath candidate : candidates.recoverable().values()) {
+                    recoverOrphanedRosterDeath(connection, candidate);
+                    recovered++;
+                }
+                connection.commit();
+                return new OrphanedRosterDeathRecovery(
+                        recovered,
+                        candidates.conflictedProfileIds().size()
+                );
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        }
+    }
+
+    @Nonnull
+    private RecoveryCandidates loadOrphanedRosterDeathCandidates(Connection connection)
+            throws Exception {
+        LinkedHashMap<String, OrphanedRosterDeath> recoverable = new LinkedHashMap<>();
+        Set<String> conflicted = new HashSet<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT m.owner_uuid, m.command_family_id, m.profile_id, m.role_id,
+                       m.home_x, m.home_y, m.home_z,
+                       p.current_npc_uuid,
+                       o.old_state_json, o.new_state_json, o.target_context_json,
+                       o.updated_at_ms
+                FROM command_family_roster_memberships m
+                INNER JOIN npc_profiles p ON p.profile_id = m.profile_id
+                INNER JOIN companion_population_state s ON s.profile_id = m.profile_id
+                INNER JOIN companion_population_operations o ON o.profile_id = m.profile_id
+                WHERE p.owner_uuid IS NULL
+                  AND p.current_npc_uuid IS NOT NULL
+                  AND p.role_id = m.role_id
+                  AND s.lifecycle_state = 'RELEASED'
+                  AND m.command_state IN ('RESTORING','ACTIVE','UNLOADED','STORING')
+                  AND o.operation_type = 'OWNER_CLEAR'
+                  AND o.state = 'COMMITTED'
+                ORDER BY m.profile_id, o.updated_at_ms DESC
+                """)) {
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    OrphanedRosterDeath candidate = parseOrphanedRosterDeath(result);
+                    if (candidate == null || conflicted.contains(candidate.profileId())) continue;
+                    OrphanedRosterDeath current = recoverable.get(candidate.profileId());
+                    if (current == null) {
+                        recoverable.put(candidate.profileId(), candidate);
+                    } else if (!current.sameRosterIdentity(candidate)) {
+                        recoverable.remove(candidate.profileId());
+                        conflicted.add(candidate.profileId());
+                    }
+                }
+            }
+        }
+        return new RecoveryCandidates(Map.copyOf(recoverable), Set.copyOf(conflicted));
+    }
+
+    @Nullable
+    private OrphanedRosterDeath parseOrphanedRosterDeath(ResultSet result) throws Exception {
+        String profileId = result.getString("profile_id");
+        String ownerText = result.getString("owner_uuid");
+        String familyId = result.getString("command_family_id");
+        String roleId = result.getString("role_id");
+        UUID ownerUuid = SqliteValueCodec.parseUuid(ownerText);
+        UUID npcUuid = SqliteValueCodec.parseUuid(result.getString("current_npc_uuid"));
+        JsonObject oldState = parseJsonObject(result.getString("old_state_json"));
+        JsonObject newState = parseJsonObject(result.getString("new_state_json"));
+        JsonObject context = parseJsonObject(result.getString("target_context_json"));
+        if (profileId == null || profileId.isBlank() || ownerUuid == null || npcUuid == null
+                || familyId == null || familyId.isBlank() || roleId == null || roleId.isBlank()
+                || oldState == null || newState == null || context == null
+                || !getBoolean(context, "permanentDeath", false)
+                || !ownerText.equals(getString(oldState, "ownerUuid"))
+                || getString(newState, "ownerUuid") != null
+                || !"RELEASED".equals(getString(newState, "lifecycleState"))) {
+            return null;
+        }
+        String contextNpc = getString(context, "npcUuid");
+        if (!npcUuid.toString().equals(contextNpc)) return null;
+        Double homeX = nullableDouble(result, "home_x");
+        Double homeY = nullableDouble(result, "home_y");
+        Double homeZ = nullableDouble(result, "home_z");
+        Vector3d home = homeX == null || homeY == null || homeZ == null
+                ? null : new Vector3d(homeX, homeY, homeZ);
+        return new OrphanedRosterDeath(
+                ownerUuid, familyId, profileId, roleId, npcUuid, home,
+                Math.max(1L, result.getLong("updated_at_ms"))
+        );
+    }
+
+    private void recoverOrphanedRosterDeath(Connection connection,
+                                             OrphanedRosterDeath candidate) throws Exception {
+        NpcProfileRepository.ProfileRecord profile =
+                profileRepository.loadProfileByIdInTransaction(connection, candidate.profileId());
+        if (profile == null || profile.ownerUuid() != null
+                || !candidate.npcUuid().equals(profile.currentNpcUuid())) {
+            throw new IllegalStateException("orphaned-command-roster-death-profile-changed");
+        }
+        profileRepository.upsertProfileInTransaction(
+                connection,
+                new NpcProfileRepository.ProfileUpdate(
+                        candidate.npcUuid(), candidate.ownerUuid(), profile.ownerName(),
+                        candidate.roleId(), profile.displayName(), profile.customName(), true,
+                        profile.coopId(), profile.coopSlot(), null, profile.toolIds()),
+                ProfileOwnerMutation.set(candidate.ownerUuid())
+        );
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE companion_population_state
+                SET lifecycle_state = 'DEAD_REVIVABLE',
+                    physical_world_name = NULL, physical_chunk_x = NULL, physical_chunk_z = NULL,
+                    revision = revision + 1, source = 'command-roster-death-recovery',
+                    updated_at_ms = ?
+                WHERE profile_id = ? AND lifecycle_state = 'RELEASED'
+                """)) {
+            statement.setLong(1, Math.max(System.currentTimeMillis(), candidate.diedAtMs()));
+            statement.setString(2, candidate.profileId());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("orphaned-command-roster-death-population-changed");
+            }
+        }
+        upsertInTransaction(connection, minimalRecoveredDeath(candidate, profile));
+    }
+
+    @Nonnull
+    private static CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot minimalRecoveredDeath(
+            OrphanedRosterDeath candidate,
+            NpcProfileRepository.ProfileRecord profile) {
+        return new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+                candidate.npcUuid(), candidate.ownerUuid(), profile.ownerName(),
+                new String[] {"roster:" + candidate.ownerUuid() + ":" + candidate.familyId()},
+                candidate.roleId(), true, profile.customName(), profile.displayName(),
+                candidate.homePosition(), candidate.homePosition(),
+                candidate.diedAtMs(), candidate.diedAtMs(),
+                null, null, 0L, null, null, 0L, null, null, null, 0L,
+                null, 0L, 0L, 0L, 0L, 0.55, 0.80, 0.80, 0.80, 1.0, 1.0,
+                false, null, null, false, null, 1, 0.0, null, 0, null,
+                CommandLinkedNpcDeathService.DeathCauseKind.UNKNOWN,
+                "recovered-command-roster-death", null
+        );
+    }
+
+    @Nullable
+    private static Double nullableDouble(ResultSet result, String column) throws Exception {
+        double value = result.getDouble(column);
+        return result.wasNull() ? null : value;
+    }
+
     void upsertInTransaction(@Nonnull Connection connection,
                              @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) throws Exception {
         if (snapshot.npcUuid() == null) {
@@ -315,6 +485,27 @@ public final class DeathRepository {
     }
 
     private record RosterKey(String ownerUuid, String commandFamilyId) {
+    }
+
+    public record OrphanedRosterDeathRecovery(int recovered, int conflicted) {
+    }
+
+    private record RecoveryCandidates(
+            Map<String, OrphanedRosterDeath> recoverable,
+            Set<String> conflictedProfileIds) {
+    }
+
+    private record OrphanedRosterDeath(
+            UUID ownerUuid,
+            String familyId,
+            String profileId,
+            String roleId,
+            UUID npcUuid,
+            Vector3d homePosition,
+            long diedAtMs) {
+        boolean sameRosterIdentity(OrphanedRosterDeath other) {
+            return ownerUuid.equals(other.ownerUuid) && familyId.equals(other.familyId);
+        }
     }
 
     @Nonnull

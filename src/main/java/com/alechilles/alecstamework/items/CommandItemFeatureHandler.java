@@ -677,6 +677,10 @@ public final class CommandItemFeatureHandler {
         if (config.usesOwnerCommandFamilyRoster()) {
             CommandRosterActionAuthority.Resolution roster = resolveRoster(player, config, tool.toolId);
             if (roster.snapshot() == null) {
+                if (isOpenSelectionMenuCommand(commandIdOverride)) {
+                    if (updateHeldItem) updateHeldItem(player, working);
+                    if (queueRosterMenuAfterRefresh(player, config, tool.toolId)) return true;
+                }
                 feedbackService.showWarningKey(
                         player, "tamework.ui.notifications.persistence.authorityNotReady");
                 if (updateHeldItem) updateHeldItem(player, working);
@@ -1050,6 +1054,50 @@ public final class CommandItemFeatureHandler {
             );
             return false;
         }
+    }
+
+    /**
+     * Completes a cold roster-cache menu open without blocking the world thread. Only immutable
+     * player identity is carried across the persistence read; the live player is resolved again
+     * inside the owning world's executor before inventory or UI access.
+     */
+    private boolean queueRosterMenuAfterRefresh(@Nonnull Player player,
+                                                @Nonnull TwCommandItemConfig config,
+                                                @Nonnull String toolId) {
+        WorldPlayerResolver.ResolvedPlayer current = WorldPlayerResolver.resolveCurrent(player);
+        if (current == null || rosterActionAuthority == null) return false;
+        World world = current.world();
+        UUID ownerUuid = current.player().getUuid();
+        rosterActionAuthority.refreshAsync(ownerUuid, config).whenComplete((refresh, failure) ->
+                world.execute(() -> {
+                    WorldPlayerResolver.ResolvedPlayer live =
+                            WorldPlayerResolver.resolve(world, ownerUuid);
+                    if (live == null) return;
+                    CommandRosterActionAuthority.Resolution roster =
+                            resolveRoster(live.player(), config, toolId);
+                    if (failure != null || refresh == null || roster.snapshot() == null) {
+                        feedbackService.showWarningKey(live.player(),
+                                "tamework.ui.notifications.persistence.authorityNotReady");
+                        return;
+                    }
+                    ItemStack stack = findCommandToolStack(live.player(), toolId);
+                    Store<EntityStore> store = live.world().getEntityStore() == null
+                            ? null : live.world().getEntityStore().getStore();
+                    if (stack == null || stack.isEmpty() || store == null) {
+                        feedbackService.showWarningKey(live.player(),
+                                "tamework.ui.notifications.command.shared.itemNotFound");
+                        return;
+                    }
+                    ItemStack projected = linkMutationService.writeLinkedNpcRecords(
+                            stack, rosterActionAuthority.project(roster.snapshot()));
+                    toolInventoryService.mutateToolStack(
+                            live.player(), toolId, ignored -> projected);
+                    if (!openSelectionMenu(live.player(), store, config, projected, toolId)) {
+                        feedbackService.showWarningKey(live.player(),
+                                "tamework.ui.notifications.command.selection.reopenFailed");
+                    }
+                }));
+        return true;
     }
 
     private void openGroupManagerFromSelection(Player player,

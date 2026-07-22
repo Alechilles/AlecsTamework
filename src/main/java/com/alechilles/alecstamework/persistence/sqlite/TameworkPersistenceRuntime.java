@@ -343,6 +343,21 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
+            try {
+                DeathRepository.OrphanedRosterDeathRecovery recovery =
+                        deathRepository.recoverOrphanedCommandRosterDeaths();
+                if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
+                    logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
+                            "Command-roster death recovery completed: recovered="
+                                    + recovery.recovered() + ", conflicted=" + recovery.conflicted());
+                }
+            } catch (Exception failure) {
+                if (logger != null) {
+                    logger.at(Level.WARNING).log(
+                            "Command-roster death recovery failed; roster authority will remain fail-closed: "
+                                    + failure.getMessage());
+                }
+            }
             boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
             if (health.isHealthy()) {
                 if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();

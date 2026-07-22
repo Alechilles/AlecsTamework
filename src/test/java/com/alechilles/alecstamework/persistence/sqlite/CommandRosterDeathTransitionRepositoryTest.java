@@ -83,6 +83,77 @@ class CommandRosterDeathTransitionRepositoryTest {
         }
     }
 
+    @Test
+    void startupRecoveryRestoresOwnerAndRevivableDeathAfterPermanentRelease() throws Exception {
+        try (HydragonPersistenceTestHarness harness = new HydragonPersistenceTestHarness(
+                tempDir.resolve("command-roster-orphaned-death.sqlite"))) {
+            String profileId = harness.insertProfile(
+                    OWNER, ROLE, "ACTIVE", "default", 7L);
+            seedCapturedActiveRoster(harness, profileId);
+            try (Connection connection = harness.connections.openConnection()) {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE npc_profiles SET owner_uuid = NULL WHERE profile_id = ?
+                        """)) {
+                    statement.setString(1, profileId);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE companion_population_state
+                        SET lifecycle_state = 'RELEASED', revision = 8, source = 'test-release'
+                        WHERE profile_id = ?
+                        """)) {
+                    statement.setString(1, profileId);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO companion_population_operations(
+                            operation_id, profile_id, operation_type, state, expected_revision,
+                            old_state_json, new_state_json, target_context_json,
+                            created_at_ms, updated_at_ms, completed_at_ms)
+                        VALUES ('death-release', ?, 'OWNER_CLEAR', 'COMMITTED', 7,
+                            ?, ?, ?, 100, 100, 100)
+                        """)) {
+                    statement.setString(1, profileId);
+                    statement.setString(2, "{\"ownerUuid\":\"" + OWNER
+                            + "\",\"lifecycleState\":\"ACTIVE\"}");
+                    statement.setString(3,
+                            "{\"ownerUuid\":null,\"lifecycleState\":\"RELEASED\"}");
+                    statement.setString(4, "{\"npcUuid\":\"" + NPC
+                            + "\",\"permanentDeath\":true,\"deathSource\":\"lethal-damage\"}");
+                    statement.executeUpdate();
+                }
+            }
+
+            DeathRepository deaths = new DeathRepository(
+                    harness.connections, harness.queue,
+                    new NpcProfileRepository(harness.connections, harness.queue));
+            assertEquals(1, deaths.recoverOrphanedCommandRosterDeaths().recovered());
+            assertEquals(0, deaths.recoverOrphanedCommandRosterDeaths().recovered());
+
+            try (Connection connection = harness.connections.openConnection()) {
+                assertEquals(OWNER.toString(), text(connection,
+                        "SELECT owner_uuid FROM npc_profiles WHERE profile_id = ?", profileId));
+                assertEquals("DEAD_REVIVABLE", text(connection, """
+                        SELECT lifecycle_state FROM companion_population_state WHERE profile_id = ?
+                        """, profileId));
+                assertEquals("DEAD_REVIVABLE", text(connection, """
+                        SELECT command_state FROM command_family_roster_memberships
+                        WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                        """, OWNER.toString(), FAMILY, profileId));
+                assertEquals("DEAD_REVIVABLE", text(connection, """
+                        SELECT summon_state FROM command_timed_summon_sessions
+                        WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
+                        """, OWNER.toString(), FAMILY, profileId));
+                assertEquals(0L, number(connection,
+                        "SELECT capture_active FROM profile_states WHERE profile_id = ?", profileId));
+                assertEquals(1L, number(connection,
+                        "SELECT death_active FROM profile_states WHERE profile_id = ?", profileId));
+                assertFalse(activeSnapshot(connection, profileId, "capture"));
+                assertTrue(activeSnapshot(connection, profileId, "death"));
+            }
+        }
+    }
+
     private static void seedCapturedActiveRoster(HydragonPersistenceTestHarness harness,
                                                   String profileId) throws Exception {
         try (Connection connection = harness.connections.openConnection()) {
