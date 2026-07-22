@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.EnumSet;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -17,69 +16,9 @@ class TameworkApiV09ContractTest {
         TameworkApi legacy = new LegacyApiImplementation();
 
         assertEquals(
-                BondedVesselReadinessView.Readiness.UNAVAILABLE,
-                legacy.bondedVessels().readiness().readiness()
-        );
-        assertEquals(
                 CompanionProvisioningResult.Status.UNAVAILABLE,
                 legacy.companionProvisioning().provision(request()).toCompletableFuture().join().status()
         );
-    }
-
-    @Test
-    void signedWorldTimeCooldownsArePreserved() {
-        assertDoesNotThrow(() -> new BondedVesselView(
-                UUID.randomUUID(),
-                "profile-1",
-                UUID.randomUUID(),
-                "Vessel_Config",
-                BondedVesselState.STORED,
-                3L,
-                7L,
-                -4_000L,
-                BondedVesselProjectionStatus.PRESENT,
-                null,
-                12L
-        ));
-
-        assertDoesNotThrow(() -> new BondedVesselStateChangedEvent(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                "profile-1",
-                UUID.randomUUID(),
-                "Vessel_Config",
-                3L,
-                4L,
-                BondedVesselState.DEAD,
-                BondedVesselState.STORED,
-                8L,
-                -4_000L,
-                "repaired",
-                false,
-                100L,
-                101L
-        ));
-    }
-
-    @Test
-    void transitionContextNamesEveryFencedApplyInput() {
-        BondedVesselTransitionContext summon = new BondedVesselTransitionContext(
-                "Stored_Vessel",
-                "player:inventory",
-                "hotbar",
-                2,
-                11L,
-                "sha256:abc",
-                null,
-                new PopulationAdmissionLocation("default", 4, 5)
-        );
-        assertDoesNotThrow(() -> summon.validateFor(BondedVesselTransition.SUMMON));
-        assertThrows(IllegalArgumentException.class, () -> summon.validateFor(BondedVesselTransition.STORE));
-
-        BondedVesselTransitionContext repair = new BondedVesselTransitionContext(
-                "Dead_Vessel", "player:inventory", "hotbar", 2, 12L, "sha256:def", null, null
-        );
-        assertDoesNotThrow(() -> repair.validateFor(BondedVesselTransition.REPAIR_DEAD_TO_STORED));
     }
 
     @Test

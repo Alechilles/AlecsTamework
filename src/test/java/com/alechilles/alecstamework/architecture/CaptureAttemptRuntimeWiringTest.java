@@ -41,6 +41,10 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(runtime.contains("mutation.populationOperationId()"));
         assertTrue(runtime.contains("attempts.revalidateBeforeApply("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_POLICY)"));
+        assertTrue(api.contains(
+                "capabilities.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION)"));
+        assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK)"));
+        assertTrue(plugin.contains("captureAttemptRuntimeReady && commandFamilyRosterService != null"));
     }
 
     @Test
@@ -58,7 +62,6 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(diagnose.contains("diagnostics.captureAttempt(arguments.get(1))"));
         assertTrue(diagnostics.contains("Integration readiness:"));
         assertTrue(diagnostics.contains("capturePolicy="));
-        assertTrue(diagnostics.contains("bondedVessels="));
         assertTrue(diagnostics.contains("populationGroups="));
         assertTrue(diagnostics.contains("provisioning="));
         assertTrue(diagnostics.contains("Capture attempts:"));
@@ -92,12 +95,7 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("ownerPopulationRuntime.publishPopulationGroupLimitChanges("));
         assertTrue(plugin.contains("activatePopulationGroupsIfReady()"));
         assertTrue(plugin.contains(".whenComplete(this::onPopulationRecoveryFinished)"));
-        assertTrue(plugin.contains("ProductionBondedVesselRuntime.compose("));
-        assertTrue(plugin.contains("new BondedVesselUnifiedPopulationPort(ownerPopulationRuntime)"));
-        assertTrue(plugin.contains("new LoadedNpcBondedVesselProjectionEvidencePort("));
-        assertTrue(plugin.contains("new HytaleBondedVesselWorldProjectionPort("));
         assertTrue(plugin.contains("runtime.bootstrap().recoverAndActivate()"));
-        assertTrue(plugin.contains("apiEventBus::emitBondedVesselEvent"));
         int reviveBootstrap = plugin.indexOf("reviveEligibility.bootstrap(");
         int reviveEvents = plugin.indexOf(
                 "reviveEligibility.setEventSink(apiEventBus::emitCanonicalCompanionLifecycleEvent)");

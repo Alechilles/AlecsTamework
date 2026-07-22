@@ -24,7 +24,6 @@ public final class TameworkProjectionIdentityComponent implements Component<Enti
     public static final String KIND_MANAGED_COOP_CAPTURE_SOURCE = "MANAGED_COOP_CAPTURE_SOURCE";
     public static final String KIND_MANAGED_COOP_IMPORT_ADOPTION = "MANAGED_COOP_IMPORT_ADOPTION";
     public static final String KIND_BREEDING_CHILD = "BREEDING_CHILD";
-    public static final String KIND_BONDED_VESSEL = "BONDED_VESSEL";
 
     public static final BuilderCodec<TameworkProjectionIdentityComponent> CODEC = BuilderCodec.builder(
             TameworkProjectionIdentityComponent.class,

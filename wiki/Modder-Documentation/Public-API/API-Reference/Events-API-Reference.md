@@ -35,8 +35,6 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `ConfigReloadedEvent`
 - `CompanionXpAwardedEvent`
 - `CaptureAttemptResolvedEvent` when `CAPTURE_POLICY` is advertised
-- `BondedVesselBoundEvent`, `BondedVesselStateChangedEvent`, and
-  `BondedVesselBindingInvalidatedEvent` when `BONDED_VESSELS` is advertised
 - `PopulationGroupMembershipChangedEvent` and
   `PopulationGroupLimitChangedEvent` when `POPULATION_GROUPS` is advertised
 - `CompanionProvisionedEvent`, `ProvisionedCompanionDeathRecordedEvent`, and

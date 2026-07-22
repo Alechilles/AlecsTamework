@@ -95,7 +95,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
             readCoopOperations(connection, rows);
             readRecoveryOperations(connection, rows);
             readCaptureAttemptOperations(connection, rows);
-            readBondedVesselOperations(connection, rows);
             readPopulationGroupOperations(connection, rows);
             readProvisioningOperations(connection, rows);
             rows.sort(java.util.Comparator.comparingLong(OperationRow::updatedAtMs).reversed());
@@ -153,20 +152,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
                          updated_at_ms DESC LIMIT 100
                 """;
         readOperations(connection, sql, "capture_policy", out);
-    }
-
-    private void readBondedVesselOperations(Connection connection, List<OperationRow> out) throws Exception {
-        String sql = """
-                SELECT operation_id, profile_id, action AS operation_type, state,
-                       created_at_ms, updated_at_ms, completed_at_ms,
-                       source_context_json IS NOT NULL AS has_source
-                FROM bonded_vessel_operations
-                ORDER BY CASE state WHEN 'PREPARED' THEN 0 WHEN 'APPLYING' THEN 0
-                         WHEN 'APPLIED' THEN 0 WHEN 'COMPENSATING' THEN 0
-                         WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
-                         updated_at_ms DESC LIMIT 100
-                """;
-        readOperations(connection, sql, "bonded_vessel", out);
     }
 
     private void readPopulationGroupOperations(Connection connection, List<OperationRow> out) throws Exception {
@@ -241,16 +226,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
                     SELECT COUNT(*) FROM (SELECT profile_id FROM companion_population_operations
                     WHERE state IN ('PREPARED','APPLYING','APPLIED','COMPENSATING')
                     GROUP BY profile_id HAVING COUNT(*) > 1)
-                    """);
-            duplicateCheck(connection, issues, "duplicate_active_vessel_profile", """
-                    SELECT COUNT(*) FROM (SELECT profile_id FROM bonded_vessel_bindings
-                    WHERE lifecycle_state <> 'RELEASED'
-                    GROUP BY profile_id HAVING COUNT(*) > 1)
-                    """);
-            duplicateCheck(connection, issues, "duplicate_nonterminal_vessel_generation", """
-                    SELECT COUNT(*) FROM (SELECT binding_id, prior_generation FROM bonded_vessel_operations
-                    WHERE state IN ('PREPARED','APPLYING','APPLIED','COMPENSATING','QUARANTINED')
-                    GROUP BY binding_id, prior_generation HAVING COUNT(*) > 1)
                     """);
             duplicateCheck(connection, issues, "duplicate_nonterminal_population_group_profile", """
                     SELECT COUNT(*) FROM (SELECT profile_id FROM companion_population_group_operations

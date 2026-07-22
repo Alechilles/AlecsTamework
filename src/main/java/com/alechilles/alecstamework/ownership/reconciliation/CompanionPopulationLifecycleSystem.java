@@ -101,14 +101,6 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
                 observation.npcUuid(), reason, current,
                 isPermanentDeath(ref, store, observation.npcUuid())
         );
-        CompanionReviveEligibilityService.Eligibility eligibility =
-                CompanionReviveEligibilityService.current().findByNpc(observation.npcUuid());
-        if (classified == CompanionLifecycleState.UNKNOWN_DORMANT
-                && eligibility != null
-                && eligibility.authority()
-                == CompanionReviveEligibilityService.Authority.BONDED_VESSEL) {
-            classified = CompanionLifecycleState.CAPTURED;
-        }
         if (classified == CompanionLifecycleState.UNLOADED) {
             reconciler.observePhysical(
                     observation.npcUuid(), observation.ownerUuid(), observation.worldName(),

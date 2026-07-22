@@ -70,7 +70,6 @@ Tamework 3.0.0 applies the additive, idempotent
 authority for:
 
 - `capture_attempts` and `capture_failure_cooldowns`;
-- `bonded_vessel_bindings` and `bonded_vessel_operations`;
 - population-group classifications, assignments, operations, and count
   evidence; and
 - `companion_provisioning_operations`.

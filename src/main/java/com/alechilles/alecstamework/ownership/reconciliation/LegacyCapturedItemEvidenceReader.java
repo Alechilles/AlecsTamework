@@ -18,9 +18,6 @@ import javax.annotation.Nullable;
 public final class LegacyCapturedItemEvidenceReader {
     @Nullable
     private final ItemFeatureRegistry itemFeatures;
-    private final BondedVesselInventoryEvidence vesselItems =
-            new BondedVesselInventoryEvidence();
-
     public LegacyCapturedItemEvidenceReader(@Nullable ItemFeatureRegistry itemFeatures) {
         this.itemFeatures = itemFeatures;
     }
@@ -62,9 +59,8 @@ public final class LegacyCapturedItemEvidenceReader {
             @Nonnull String evidenceKey,
             @Nonnull String source
     ) {
-        List<CompanionPopulationEvidence> evidence = new ArrayList<>(2);
+        List<CompanionPopulationEvidence> evidence = new ArrayList<>(1);
         read(stack, evidenceKey, source).ifPresent(evidence::add);
-        vesselItems.read(stack, evidenceKey, source).ifPresent(evidence::add);
         return List.copyOf(evidence);
     }
 

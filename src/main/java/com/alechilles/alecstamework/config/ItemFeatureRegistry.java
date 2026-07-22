@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.config;
 
-import com.alechilles.alecstamework.api.BondedVesselMode;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
-import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,7 +11,7 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
- * Atomic registry for item feature configs and their compiled capture/vessel projections.
+ * Atomic registry for item feature configs and their compiled capture projections.
  */
 public final class ItemFeatureRegistry {
     private volatile State state = State.empty();
@@ -35,23 +33,9 @@ public final class ItemFeatureRegistry {
         Map<String, ItemFeatureConfig> configs = state.configsByItemId();
         ItemFeatureConfig config = configs.get(itemId);
         if (config != null) return config;
-        // Preserve legacy disposable state-item normalization. Bonded dispatch uses the exact
-        // compiled vessel index below and never depends on this naming convention.
+        // Preserve legacy disposable captured-item state normalization.
         String normalized = normalizeStateItemId(itemId);
         return normalized != null && !normalized.equals(itemId) ? configs.get(normalized) : null;
-    }
-
-    @Nonnull
-    public Optional<SpawnerVesselConfigView> getVesselByConfigId(@Nonnull String configId) {
-        Objects.requireNonNull(configId, "configId");
-        return Optional.ofNullable(state.vesselsByConfigId().get(configId));
-    }
-
-    @Nonnull
-    public Optional<SpawnerVesselConfigView> resolveVesselForItemId(@Nonnull String itemId) {
-        Objects.requireNonNull(itemId, "itemId");
-        return itemId.isBlank()
-                ? Optional.empty() : Optional.ofNullable(state.vesselsByItemId().get(itemId));
     }
 
     @Nonnull
@@ -79,11 +63,8 @@ public final class ItemFeatureRegistry {
         Map<String, ItemFeatureConfig> byEmptyItem = new LinkedHashMap<>();
         Map<String, SpawnerCaptureMechanicsView> captureByConfig = new LinkedHashMap<>();
         Map<String, SpawnerCaptureMechanicsView> captureByItem = new LinkedHashMap<>();
-        Map<String, SpawnerVesselConfigView> vesselByConfig = new LinkedHashMap<>();
-        Map<String, SpawnerVesselConfigView> vesselByItem = new LinkedHashMap<>();
         for (CompiledSpawnerConfig compiled : configs) {
-            if (compiled.capture().configRevision() != nextRevision
-                    || compiled.vessel().configRevision() != nextRevision) {
+            if (compiled.capture().configRevision() != nextRevision) {
                 throw new IllegalArgumentException("Compiled spawner revision does not match install generation.");
             }
             putUnique(byEmptyItem, compiled.emptyItemId(), compiled.itemFeature(),
@@ -95,34 +76,13 @@ public final class ItemFeatureRegistry {
             if (filledItemId != null && !filledItemId.isBlank()) {
                 captureByItem.putIfAbsent(filledItemId, compiled.capture());
             }
-            putUnique(vesselByConfig, compiled.configId(), compiled.vessel(),
-                    "Duplicate spawner config ID: ");
-            if (compiled.vessel().mode() == BondedVesselMode.BONDED) {
-                indexVesselItem(vesselByItem, compiled.vessel().emptyItemId(), compiled.vessel());
-                indexVesselItem(vesselByItem, compiled.vessel().storedItemId(), compiled.vessel());
-                indexVesselItem(vesselByItem, compiled.vessel().activeItemId(), compiled.vessel());
-                indexVesselItem(vesselByItem, compiled.vessel().deadItemId(), compiled.vessel());
-                indexVesselItem(vesselByItem, compiled.vessel().lostItemId(), compiled.vessel());
-                indexVesselItem(vesselByItem, compiled.vessel().unavailableItemId(), compiled.vessel());
-            }
         }
-        state = new State(nextRevision, byEmptyItem, captureByConfig, captureByItem,
-                vesselByConfig, vesselByItem);
+        state = new State(nextRevision, byEmptyItem, captureByConfig, captureByItem);
         return true;
     }
 
     private static <T> void putUnique(Map<String, T> target, String id, T value, String message) {
         if (target.putIfAbsent(id, value) != null) throw new IllegalArgumentException(message + id);
-    }
-
-    private static void indexVesselItem(Map<String, SpawnerVesselConfigView> target,
-                                        String itemId,
-                                        SpawnerVesselConfigView config) {
-        if (itemId == null || itemId.isBlank()) return;
-        SpawnerVesselConfigView previous = target.putIfAbsent(itemId, config);
-        if (previous != null && !previous.configId().equals(config.configId())) {
-            throw new IllegalArgumentException("Duplicate bonded vessel item binding: " + itemId);
-        }
     }
 
     public static String normalizeStateItemId(String itemId) {
@@ -152,30 +112,24 @@ public final class ItemFeatureRegistry {
     public record CompiledSpawnerConfig(@Nonnull String configId,
                                         @Nonnull String emptyItemId,
                                         @Nonnull ItemFeatureConfig itemFeature,
-                                        @Nonnull SpawnerCaptureMechanicsView capture,
-                                        @Nonnull SpawnerVesselConfigView vessel) {
+                                        @Nonnull SpawnerCaptureMechanicsView capture) {
         public CompiledSpawnerConfig {
             configId = requireText(configId, "configId");
             emptyItemId = requireText(emptyItemId, "emptyItemId");
             Objects.requireNonNull(itemFeature, "itemFeature");
             Objects.requireNonNull(capture, "capture");
-            Objects.requireNonNull(vessel, "vessel");
         }
     }
 
     private record State(long revision,
                          @Nonnull Map<String, ItemFeatureConfig> configsByItemId,
                          @Nonnull Map<String, SpawnerCaptureMechanicsView> captureByConfigId,
-                         @Nonnull Map<String, SpawnerCaptureMechanicsView> captureByItemId,
-                         @Nonnull Map<String, SpawnerVesselConfigView> vesselsByConfigId,
-                         @Nonnull Map<String, SpawnerVesselConfigView> vesselsByItemId) {
+                         @Nonnull Map<String, SpawnerCaptureMechanicsView> captureByItemId) {
         private State {
             if (revision < 0L) throw new IllegalArgumentException("revision cannot be negative");
             configsByItemId = immutable(configsByItemId);
             captureByConfigId = immutable(captureByConfigId);
             captureByItemId = immutable(captureByItemId);
-            vesselsByConfigId = immutable(vesselsByConfigId);
-            vesselsByItemId = immutable(vesselsByItemId);
         }
 
         private static State empty() {
@@ -183,12 +137,11 @@ public final class ItemFeatureRegistry {
         }
 
         private static State empty(long revision) {
-            return new State(revision, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+            return new State(revision, Map.of(), Map.of(), Map.of());
         }
 
         private State withItemConfigs(Map<String, ItemFeatureConfig> configs) {
-            return new State(revision, configs, captureByConfigId, captureByItemId,
-                    vesselsByConfigId, vesselsByItemId);
+            return new State(revision, configs, captureByConfigId, captureByItemId);
         }
 
         private static <K, V> Map<K, V> immutable(Map<K, V> values) {

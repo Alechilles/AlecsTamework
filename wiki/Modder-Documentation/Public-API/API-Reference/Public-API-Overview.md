@@ -49,7 +49,6 @@ Root API entrypoints:
 - `events()`
 - `configs()`
 - `diagnostics()`
-- `bondedVessels()` (capability-gated; unavailable facade by default)
 - `companionProvisioning()` (capability-gated; unavailable facade by default)
 
 Always-advertised baseline capability set:
@@ -70,7 +69,6 @@ Always-advertised baseline capability set:
 API 0.9 also declares independently gated capabilities:
 
 - `CAPTURE_POLICY`
-- `BONDED_VESSELS`
 - `POPULATION_GROUPS`
 - `COMPANION_PROVISIONING`
 - `PROFILE_DATA_TRANSACTIONS`
@@ -80,8 +78,7 @@ capabilities, but adds each capability only after its own authoritative runtime
 reports ready. This includes repository and recovery checks for transactional
 profile data and capture; group reconciliation plus canonical mutation-path
 installation for population groups; recovered profile/population/projection
-authority for provisioning; and all exact evidence and mutation ports for
-bonded vessels. A degraded prerequisite omits only the affected capability and
+authority for provisioning. A degraded prerequisite omits only the affected capability and
 leaves its public facade fail closed. Use `/tw diagnose` to inspect the exact
 packaged runtime rather than copying a capability list from documentation.
 
@@ -103,7 +100,6 @@ disabled. Never infer runtime authority from the API version alone.
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
-- [Bonded Vessels API Reference](/mod/alecs-tamework/bonded-vessels-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
 - [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 

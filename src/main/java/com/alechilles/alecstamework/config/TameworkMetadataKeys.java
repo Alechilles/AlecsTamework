@@ -86,17 +86,6 @@ public final class TameworkMetadataKeys {
     public static final String API_SELF_TEST_FIXTURE_SET_ID = "Tamework.ApiSelfTest.FixtureSetId";
     public static final String API_SELF_TEST_OWNER_UUID = "Tamework.ApiSelfTest.OwnerUuid";
     public static final String API_SELF_TEST_WORLD_NAME = "Tamework.ApiSelfTest.WorldName";
-    /** Durable identity of the canonical bonded-vessel binding projected by this item. */
-    public static final String VESSEL_BINDING_ID = "Tamework.Vessel.BindingId";
-    /** Durable companion profile referenced by the bonded-vessel binding. */
-    public static final String VESSEL_PROFILE_ID = "Tamework.Vessel.ProfileId";
-    /** Monotonic binding generation; also fences exact held-slot evidence across restarts. */
-    public static final String VESSEL_GENERATION = "Tamework.Vessel.Generation";
-    /** Immutable vessel policy/configuration identifier for this generation. */
-    public static final String VESSEL_CONFIG_ID = "Tamework.Vessel.ConfigId";
-    /** Canonical {@code BondedVesselState} name for the item projection. */
-    public static final String VESSEL_STATE = "Tamework.Vessel.State";
-
     private TameworkMetadataKeys() {
     }
 }

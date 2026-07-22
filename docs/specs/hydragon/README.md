@@ -37,7 +37,6 @@ The unreleased bonded-vessel design is withdrawn. Draconic Stones are consumable
 | [Population groups](population-groups.md) | Per-owner owned/active limits and recovery admission | HyDragon capture and Miniwyvern specs |
 | [Integration contract](integration-contract.md) | Capability/version boundary, transaction ownership, event ordering, diagnostics | [Plugin architecture](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/plugin-architecture.md) |
 | Deferred: [Companion inventory](companion-inventory.md) | Later profile-scoped Miniwyvern backpack | [Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) |
-| [Bonded vessels — withdrawn](bonded-vessels.md) | Non-normative retirement notice | None |
 
 HyDragon's suite begins at its [specification index](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/README.md).
 

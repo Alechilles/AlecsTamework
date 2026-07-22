@@ -38,8 +38,6 @@ class SqliteSchemaV8MigrationTest {
                     "capture_attempts",
                     "capture_attempt_tombstones",
                     "capture_failure_cooldowns",
-                    "bonded_vessel_bindings",
-                    "bonded_vessel_operations",
                     "companion_population_group_classifications",
                     "companion_population_group_assignments",
                     "companion_population_group_operations",
@@ -51,7 +49,7 @@ class SqliteSchemaV8MigrationTest {
     }
 
     @Test
-    void upgradePreservesV7PopulationAndRejectsDuplicateLiveBindings() throws Exception {
+    void upgradePreservesV7Population() throws Exception {
         SqliteConnectionManager connections = connections("upgrade.sqlite");
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
         try (Connection connection = connections.openConnection()) {
@@ -62,14 +60,6 @@ class SqliteSchemaV8MigrationTest {
 
             assertEquals(1L, scalarLong(connection,
                     "SELECT COUNT(*) FROM companion_population_state WHERE profile_id = '" + profileId + "'"));
-            insertBinding(connection, "binding-a", profileId, "STORED");
-            assertThrows(SQLException.class,
-                    () -> insertBinding(connection, "binding-b", profileId, "ACTIVE"));
-            try (Statement statement = connection.createStatement()) {
-                statement.executeUpdate("UPDATE bonded_vessel_bindings SET lifecycle_state = 'RELEASED' "
-                        + "WHERE binding_id = 'binding-a'");
-            }
-            insertBinding(connection, "binding-b", profileId, "ACTIVE");
         }
     }
 
@@ -122,22 +112,6 @@ class SqliteSchemaV8MigrationTest {
         return profileId;
     }
 
-    private void insertBinding(Connection connection, String bindingId,
-                               String profileId, String lifecycle) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO bonded_vessel_bindings (
-                    binding_id, profile_id, generation, config_id, config_revision,
-                    lifecycle_state, item_projection_status, owner_uuid,
-                    expected_profile_revision, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, 1, 'stone', 1, ?, 'PRESENT', 'owner-a', 4, 1, 1)
-                """)) {
-            statement.setString(1, bindingId);
-            statement.setString(2, profileId);
-            statement.setString(3, lifecycle);
-            statement.executeUpdate();
-        }
-    }
-
     private void insertProvisioning(Connection connection, String operationId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO companion_provisioning_operations (
@@ -178,7 +152,6 @@ class SqliteSchemaV8MigrationTest {
                 SELECT name FROM sqlite_master
                 WHERE type = 'table'
                   AND (name LIKE 'capture_%'
-                    OR name LIKE 'bonded_vessel_%'
                     OR name LIKE 'companion_population_group_%'
                     OR name = 'companion_provisioning_operations')
                 """);

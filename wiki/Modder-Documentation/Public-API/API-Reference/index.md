@@ -27,7 +27,6 @@ This subsection contains the reference contract for each public API family.
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
-- [Bonded Vessels API Reference](/mod/alecs-tamework/bonded-vessels-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
 - [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 

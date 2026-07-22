@@ -25,7 +25,7 @@ class CompanionReviveEligibilityServiceTest {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         service.replace(List.of(new CompanionReviveEligibilityService.Eligibility(
-                "profile-dragon", CompanionReviveEligibilityService.Authority.BONDED_VESSEL,
+                "profile-dragon", CompanionReviveEligibilityService.Authority.PROVISIONED,
                 first)));
 
         assertTrue(service.ready());
@@ -41,17 +41,4 @@ class CompanionReviveEligibilityServiceTest {
         assertEquals(null, service.findByProfile("profile-dragon"));
     }
 
-    @Test
-    void conflictingAuthorityForOneProfileFailsClosed() {
-        CompanionReviveEligibilityService service = new CompanionReviveEligibilityService();
-        UUID npc = UUID.randomUUID();
-        service.replace(List.of(
-                new CompanionReviveEligibilityService.Eligibility(
-                        "profile", CompanionReviveEligibilityService.Authority.BONDED_VESSEL, npc),
-                new CompanionReviveEligibilityService.Eligibility(
-                        "profile", CompanionReviveEligibilityService.Authority.PROVISIONED, npc)));
-
-        assertFalse(service.supports(npc));
-        assertEquals(null, service.findByProfile("profile"));
-    }
 }

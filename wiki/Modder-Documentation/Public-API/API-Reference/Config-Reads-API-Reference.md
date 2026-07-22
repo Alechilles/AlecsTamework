@@ -38,7 +38,6 @@ API 0.9 capture and bonded-vessel views:
 
 - `getSpawnerCaptureMechanicsById(...)` / `resolveSpawnerCaptureMechanicsForItemId(...)`
 - `getCapturePolicyById(...)` / `resolveCapturePolicyForRole(...)`
-- `getSpawnerVesselConfigById(...)` / `resolveSpawnerVesselConfigForItemId(...)`
 
 API 0.9 population-group views:
 
@@ -54,7 +53,6 @@ API 0.9 population-group views:
 - `CommandItemConfigView`
 - `SpawnerCaptureMechanicsView`
 - `CapturePolicyConfigView`
-- `SpawnerVesselConfigView`
 - `PopulationGroupDefinitionView`
 
 ## Notes

@@ -34,7 +34,6 @@ experimental; version equality is not an authority check.
 | HyDragon feature | Required capabilities | Missing result |
 | --- | --- | --- |
 | Probabilistic Draconic Stone capture | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `CAPTURE_POLICY`, `POPULATION_GROUPS` | Disable before entropy or mutation; retain item and target unchanged. |
-| Bonded summon/store/repair | Shared capabilities plus `BONDED_VESSELS` | Retain durable binding/profile/item state; do not emulate locally. |
 | Soul Bond Miniwyvern provisioning | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, `COMPANION_PROVISIONING`; shipped ritual also needs `INTERACTION_EXTENSIONS` | Do not create a HyDragon-local profile. |
 | Elemental/profile-scoped transactional state | `PROFILE_DATA`, and `PROFILE_DATA_TRANSACTIONS` when the state participates in an idempotent gameplay transaction | Disable the affected persistence-dependent behavior; do not treat queued legacy writes as committed. |
 | Post-commit presentation | `EVENTS` | Disable listeners/presentation; never reinterpret mutation status. |
@@ -48,8 +47,7 @@ but does not advertise them optimistically. Transactional profile data requires
 its migrated repository; capture policy requires bounded attempt recovery;
 population groups require group recovery, reconciliation, and canonical-path
 installation; provisioning requires its recovered journals and requested
-projection authority; bonded vessels require recovered operations and every
-exact evidence/mutation port. A failed prerequisite omits only that capability
+projection authority. A failed prerequisite omits only that capability
 and leaves its facade fail closed. `/tw diagnose` is the operator's concise
 source of truth for the packaged server.
 
@@ -173,7 +171,6 @@ read-only.
 ## Related pages
 
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
-- [Bonded Vessels API Reference](/mod/alecs-tamework/bonded-vessels-api-reference)
 - [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
 - [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

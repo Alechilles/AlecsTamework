@@ -81,9 +81,7 @@ class ProvisionedCompanionDeathReviveIntegrationTest {
                     PROFILE, OWNER, "default", CompanionLifecycleState.ACTIVE, 0L)),
                     OwnerPopulationReadiness.READY);
             CompanionReviveEligibilityService eligibility = new CompanionReviveEligibilityService();
-            assertTrue(eligibility.bootstrap(
-                    new BondedVesselRepository(harness.connections, harness.queue), provisioning,
-                    profiles, ownerIndex).ready());
+            assertTrue(eligibility.bootstrap(provisioning, profiles, ownerIndex).ready());
             List<TameworkEvent> events = new ArrayList<>();
             eligibility.setEventSink(event -> {
                 events.add(event);

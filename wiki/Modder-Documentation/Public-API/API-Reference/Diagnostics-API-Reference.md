@@ -37,9 +37,8 @@ Older implementations retain binary compatibility through default methods: the r
 ## API 0.9 and schema-v8 diagnostics
 
 The bounded persistence snapshot and integrity audit include operation rows for
-capture policy, bonded vessels, population groups, and companion provisioning.
-Integrity checks detect duplicate capture/provisioning origins, duplicate
-active vessel profiles, duplicate nonterminal vessel generations, and duplicate
+capture policy, population groups, and companion provisioning.
+Integrity checks detect duplicate capture/provisioning origins and duplicate
 nonterminal population-group operations for one profile.
 
 This persistence visibility does not advertise a gameplay capability. A schema

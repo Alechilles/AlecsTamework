@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.BondedVesselState;
-import com.alechilles.alecstamework.api.BondedVesselStateChangedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
 import com.alechilles.alecstamework.api.ProvisionedCompanionTransition;
@@ -12,8 +10,6 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationObservation;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationObservationPersistResult;
-import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
-import com.alechilles.alecstamework.persistence.sqlite.BondedVesselRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
@@ -29,7 +25,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Memory-only death/revive qualification derived from durable vessel and provisioning authority.
+ * Memory-only death/revive qualification derived from durable companion authority.
  *
  * <p>The snapshot is loaded before death systems become authoritative and is refreshed by the
  * lifecycle coordinators after durable commits. World-thread callers never read SQLite.</p>
@@ -43,11 +39,9 @@ public final class CompanionReviveEligibilityService {
     private final ConcurrentHashMap<UUID, Boolean> emittedOperations = new ConcurrentHashMap<>();
     private volatile boolean ready;
     private volatile String reason;
-    private volatile BondedVesselRepository vesselRepository;
     private volatile CompanionProvisioningRepository provisioningRepository;
     private volatile NpcProfileRepository profileRepository;
     private volatile EventSink eventSink = EventSink.NO_OP;
-    private volatile BondedLifecycleSink bondedLifecycleSink = BondedLifecycleSink.NO_OP;
 
     public CompanionReviveEligibilityService() {
         this(false, "revive-eligibility-not-loaded");
@@ -70,34 +64,18 @@ public final class CompanionReviveEligibilityService {
     /** Loads one authoritative snapshot off the world thread. */
     @Nonnull
     public BootstrapReport bootstrap(
-            @Nonnull BondedVesselRepository vessels,
             @Nonnull CompanionProvisioningRepository provisioning,
             @Nonnull NpcProfileRepository profiles,
             @Nonnull OwnerPopulationIndex population
     ) {
-        Objects.requireNonNull(vessels, "vessels");
         Objects.requireNonNull(provisioning, "provisioning");
         Objects.requireNonNull(profiles, "profiles");
         Objects.requireNonNull(population, "population");
         try {
-            Collection<BondedVesselBindingRecord> vesselRows = vessels.loadNonReleasedBindings();
             Collection<CompanionProvisioningOperationRecord> provisionedRows =
                     provisioning.loadAuthoritativeProfiles();
             ConcurrentHashMap<UUID, Eligibility> nextNpc = new ConcurrentHashMap<>();
             ConcurrentHashMap<String, Eligibility> nextProfile = new ConcurrentHashMap<>();
-            for (BondedVesselBindingRecord binding : vesselRows) {
-                if (binding == null
-                        || binding.lifecycleState() == BondedVesselBindingRecord.LifecycleState.RELEASED) {
-                    continue;
-                }
-                OwnerPopulationEntry owner = population.entry(binding.profileId()).orElse(null);
-                if (owner == null || owner.lifecycleState() == CompanionLifecycleState.RELEASED) {
-                    continue;
-                }
-                Eligibility eligibility = new Eligibility(
-                        binding.profileId(), Authority.BONDED_VESSEL, binding.activeNpcUuid());
-                put(nextNpc, nextProfile, eligibility);
-            }
             for (CompanionProvisioningOperationRecord operation : provisionedRows) {
                 String profileId = operation == null ? null : operation.canonicalProfileId();
                 if (profileId == null) continue;
@@ -114,7 +92,6 @@ public final class CompanionReviveEligibilityService {
             byProfile.clear();
             byNpc.putAll(nextNpc);
             byProfile.putAll(nextProfile);
-            vesselRepository = vessels;
             provisioningRepository = provisioning;
             profileRepository = profiles;
             ready = true;
@@ -176,11 +153,6 @@ public final class CompanionReviveEligibilityService {
         this.eventSink = eventSink == null ? EventSink.NO_OP : eventSink;
     }
 
-    /** Installs the command-link-independent durable vessel lifecycle writer. */
-    public void setBondedLifecycleSink(@Nullable BondedLifecycleSink sink) {
-        bondedLifecycleSink = sink == null ? BondedLifecycleSink.NO_OP : sink;
-    }
-
     /** Called by the population writer only after its SQLite transaction committed. */
     public void onPopulationCommitted(
             @Nonnull CompanionPopulationObservation observation,
@@ -190,31 +162,8 @@ public final class CompanionReviveEligibilityService {
         Eligibility eligibility = findByProfile(observation.profileId());
         if (eligibility == null) return;
         if (observation.lifecycleState() == CompanionLifecycleState.DEAD_REVIVABLE) {
-            if (eligibility.authority() == Authority.PROVISIONED) {
-                emitProvisionedDeath(observation, result);
-            } else {
-                observeBondedLifecycle(observation, result, BondedVesselState.DEAD);
-            }
+            emitProvisionedDeath(observation, result);
             remap(observation.profileId(), null);
-        } else if (observation.lifecycleState() == CompanionLifecycleState.LOST
-                && eligibility.authority() == Authority.BONDED_VESSEL) {
-            observeBondedLifecycle(observation, result, BondedVesselState.LOST);
-            remap(observation.profileId(), null);
-        } else if (observation.lifecycleState() == CompanionLifecycleState.CAPTURED
-                && eligibility.authority() == Authority.BONDED_VESSEL) {
-            observeBondedLifecycle(observation, result, BondedVesselState.STORED);
-            remap(observation.profileId(), null);
-        }
-    }
-
-    private void observeBondedLifecycle(
-            CompanionPopulationObservation observation,
-            CompanionPopulationObservationPersistResult result,
-            BondedVesselState target) {
-        try {
-            bondedLifecycleSink.observe(observation, result, target);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Population authority is already committed; reconciliation may retry this observation.
         }
     }
 
@@ -259,39 +208,6 @@ public final class CompanionReviveEligibilityService {
                 observation.profileId(), observation.ownerUuid(), profile.roleId(),
                 observation.currentNpcUuid(), observation.expectedRevision(), result.revision(),
                 false, now, now));
-    }
-
-    private void emitBondedLifecycle(
-            CompanionPopulationObservation observation,
-            CompanionPopulationObservationPersistResult result,
-            BondedVesselState target
-    ) {
-        BondedVesselRepository repository = vesselRepository;
-        if (repository == null || result.revision() <= observation.expectedRevision()) return;
-        try {
-            BondedVesselBindingRecord binding = repository.findBindingByProfile(
-                    observation.profileId());
-            if (binding == null || binding.generation() <= 1L
-                    || BondedVesselState.valueOf(binding.lifecycleState().name()) != target) return;
-            UUID operationId = logicalOperationId(
-                    "bonded-" + target.name().toLowerCase(java.util.Locale.ROOT),
-                    observation.profileId(), result.revision());
-            long now = System.currentTimeMillis();
-            emitOnce(operationId, new BondedVesselStateChangedEvent(
-                    operationId, UUID.fromString(binding.bindingId()), binding.profileId(),
-                    binding.ownerUuid(), binding.configId(), binding.generation() - 1L,
-                    binding.generation(), BondedVesselState.ACTIVE, target,
-                    result.revision(), binding.cooldownUntilMs(),
-                    switch (target) {
-                        case DEAD -> "bonded-companion-death-recorded";
-                        case LOST -> "bonded-companion-lost-recorded";
-                        case STORED -> "bonded-companion-despawn-stored";
-                        default -> "bonded-companion-lifecycle-recorded";
-                    },
-                    false, binding.updatedAtMs(), now));
-        } catch (Exception | LinkageError ignored) {
-            // Notification lookup cannot change the already-committed lifecycle transaction.
-        }
     }
 
     @Nullable
@@ -346,8 +262,7 @@ public final class CompanionReviveEligibilityService {
                             Eligibility eligibility) {
         Eligibility previous = profile.put(eligibility.profileId(), eligibility);
         if (previous != null && previous.authority() != eligibility.authority()) {
-            // A profile cannot be provisioned and vessel-bound simultaneously. Preserve neither
-            // classification rather than guessing which durable authority should win.
+            // Conflicting durable authorities must not be guessed from an in-memory snapshot.
             profile.remove(eligibility.profileId());
             if (previous.currentNpcUuid() != null) npc.remove(previous.currentNpcUuid());
             return;
@@ -367,7 +282,7 @@ public final class CompanionReviveEligibilityService {
         return normalized;
     }
 
-    public enum Authority { BONDED_VESSEL, PROVISIONED }
+    public enum Authority { PROVISIONED }
 
     public record Eligibility(@Nonnull String profileId,
                               @Nonnull Authority authority,
@@ -394,11 +309,4 @@ public final class CompanionReviveEligibilityService {
         void emit(@Nonnull TameworkEvent event);
     }
 
-    @FunctionalInterface
-    public interface BondedLifecycleSink {
-        BondedLifecycleSink NO_OP = (observation, result, target) -> { };
-        void observe(@Nonnull CompanionPopulationObservation observation,
-                     @Nonnull CompanionPopulationObservationPersistResult result,
-                     @Nonnull BondedVesselState target);
-    }
 }

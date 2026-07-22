@@ -14,30 +14,21 @@ class SpawnerHyDragonDomainBoundaryArchitectureTest {
             "src/main/java/com/alechilles/alecstamework/config/assets");
 
     @Test
-    void legacyHandlerRemainsAnOrchestratorForNewCaptureAndVesselDomains() throws Exception {
+    void legacyHandlerRemainsAnOrchestratorForCaptureDomain() throws Exception {
         String handler = read(ITEMS.resolve("SpawnerFeatureHandler.java"));
         String attempts = read(ITEMS.resolve("SpawnerCaptureAttemptRuntimeCoordinator.java"));
-        String vessels = read(ITEMS.resolve("SpawnerBondedVesselCoordinator.java"));
 
         assertTrue(handler.lines().count() <= 1050,
                 "legacy spawner handler must not absorb new domain implementations");
         assertTrue(attempts.lines().count() <= 400,
                 "capture attempt lifecycle must remain a focused coordinator");
-        assertTrue(vessels.lines().count() <= 250,
-                "bonded vessel integration must remain a focused coordinator");
         assertTrue(handler.contains("captureAttemptRuntime.prepareAndResolve("));
-        assertTrue(handler.contains("bondedVessels.bindInitialCapture("));
         assertFalse(handler.contains("ConcurrentHashMap<"));
         assertFalse(handler.contains("attempts.resolve(request)"));
-        assertFalse(handler.contains("prepareInitialCapture("));
-        assertFalse(handler.contains("BondedVesselInitialBindingService.Status"));
 
         assertTrue(attempts.contains("attempts.resolve(request)"));
         assertTrue(attempts.contains("attempts.beginApply(effective.attemptId())"));
         assertTrue(attempts.contains("attempts.revalidateBeforeApply("));
-        assertTrue(vessels.contains("current.prepareInitialCapture("));
-        assertTrue(vessels.contains("current.bind(plan"));
-        assertTrue(vessels.contains("current.toggle("));
     }
 
     @Test
@@ -54,7 +45,6 @@ class SpawnerHyDragonDomainBoundaryArchitectureTest {
                 "runtime projection adapter should remain independently reviewable");
         assertTrue(config.contains("TwSpawnerCaptureSettingsCodec.CODEC"));
         assertTrue(config.contains("TwSpawnerConfigRuntimeAdapter.captureMechanics("));
-        assertTrue(config.contains("TwSpawnerConfigRuntimeAdapter.vesselMechanics("));
         assertFalse(config.contains("private static CaptureChanceMode parseChanceMode"));
         assertFalse(config.contains("new SpawnerCaptureMechanicsView("));
         assertFalse(config.contains(".toRuntimeMechanics(emptyItemId, filledItemId)"));

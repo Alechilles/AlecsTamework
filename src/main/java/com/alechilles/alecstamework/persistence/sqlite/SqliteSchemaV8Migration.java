@@ -12,7 +12,6 @@ final class SqliteSchemaV8Migration {
         ensureApiProfileDataTransactions(connection);
         try (Statement statement = connection.createStatement()) {
             createCaptureAttempts(statement);
-            createBondedVessels(statement);
             createPopulationGroups(statement);
             createProvisioningOperations(statement);
         }
@@ -183,108 +182,6 @@ final class SqliteSchemaV8Migration {
         statement.execute("""
                 CREATE INDEX IF NOT EXISTS idx_capture_attempt_tombstones_retention
                 ON capture_attempt_tombstones(retain_until_ms, attempt_id)
-                """);
-    }
-
-    private void createBondedVessels(@Nonnull Statement statement) throws Exception {
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS bonded_vessel_bindings (
-                    binding_id TEXT PRIMARY KEY,
-                    profile_id TEXT NOT NULL,
-                    generation INTEGER NOT NULL CHECK (generation > 0),
-                    config_id TEXT NOT NULL,
-                    config_revision INTEGER NOT NULL CHECK (config_revision >= 0),
-                    lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN (
-                        'STORED', 'SUMMONING', 'ACTIVE', 'STORING', 'DEAD',
-                        'LOST', 'RELEASING', 'RELEASED')),
-                    item_projection_status TEXT NOT NULL CHECK (item_projection_status IN (
-                        'PRESENT', 'MISSING', 'AMBIGUOUS', 'REISSUE_PENDING', 'QUARANTINED')),
-                    owner_uuid TEXT NOT NULL,
-                    expected_profile_revision INTEGER NOT NULL CHECK (expected_profile_revision >= 0),
-                    active_npc_uuid TEXT,
-                    active_world_name TEXT,
-                    active_chunk_x INTEGER,
-                    active_chunk_z INTEGER,
-                    cooldown_until_ms INTEGER NOT NULL DEFAULT 0,
-                    last_item_id TEXT,
-                    item_evidence_json TEXT,
-                    active_operation_id TEXT,
-                    diagnostic_reason TEXT,
-                    row_revision INTEGER NOT NULL DEFAULT 0 CHECK (row_revision >= 0),
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    released_at_ms INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE RESTRICT,
-                    CHECK ((active_world_name IS NULL AND active_chunk_x IS NULL AND active_chunk_z IS NULL)
-                        OR (active_world_name IS NOT NULL AND active_chunk_x IS NOT NULL AND active_chunk_z IS NOT NULL))
-                )
-                """);
-        statement.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_bonded_vessel_active_profile
-                ON bonded_vessel_bindings(profile_id)
-                WHERE lifecycle_state <> 'RELEASED'
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_bonded_vessel_owner_state
-                ON bonded_vessel_bindings(owner_uuid, lifecycle_state)
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_bonded_vessel_active_npc
-                ON bonded_vessel_bindings(active_npc_uuid)
-                WHERE active_npc_uuid IS NOT NULL
-                """);
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS bonded_vessel_operations (
-                    operation_id TEXT PRIMARY KEY,
-                    caller_namespace TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    correlation_id TEXT,
-                    binding_id TEXT NOT NULL,
-                    profile_id TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    state TEXT NOT NULL CHECK (state IN (
-                        'PREPARED', 'APPLYING', 'APPLIED', 'COMMITTED', 'CANCELED',
-                        'COMPENSATING', 'QUARANTINED', 'TERMINAL_DENIED')),
-                    prior_generation INTEGER NOT NULL CHECK (prior_generation >= 0),
-                    candidate_generation INTEGER NOT NULL CHECK (candidate_generation = prior_generation + 1),
-                    expected_profile_revision INTEGER NOT NULL CHECK (expected_profile_revision >= 0),
-                    config_id TEXT NOT NULL,
-                    config_revision INTEGER NOT NULL CHECK (config_revision >= 0),
-                    prior_lifecycle_state TEXT NOT NULL,
-                    applying_lifecycle_state TEXT NOT NULL,
-                    target_lifecycle_state TEXT NOT NULL,
-                    prior_projection_status TEXT NOT NULL,
-                    target_projection_status TEXT NOT NULL,
-                    prior_cooldown_until_ms INTEGER NOT NULL,
-                    target_cooldown_until_ms INTEGER NOT NULL,
-                    source_item_id TEXT,
-                    target_item_id TEXT,
-                    source_fingerprint TEXT,
-                    replacement_fingerprint TEXT,
-                    source_context_json TEXT,
-                    policy_snapshot_json TEXT NOT NULL,
-                    population_operation_id TEXT,
-                    actual_npc_uuid TEXT,
-                    reason_code TEXT,
-                    recovery_status TEXT NOT NULL DEFAULT 'NONE',
-                    lease_expires_at_ms INTEGER NOT NULL,
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    applied_at_ms INTEGER NOT NULL DEFAULT 0,
-                    completed_at_ms INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (binding_id) REFERENCES bonded_vessel_bindings(binding_id) ON DELETE RESTRICT,
-                    FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE RESTRICT,
-                    UNIQUE (caller_namespace, idempotency_key)
-                )
-                """);
-        statement.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_bonded_vessel_nonterminal_generation
-                ON bonded_vessel_operations(binding_id, prior_generation)
-                WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING', 'QUARANTINED')
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_bonded_vessel_operations_recovery
-                ON bonded_vessel_operations(state, updated_at_ms, operation_id)
                 """);
     }
 

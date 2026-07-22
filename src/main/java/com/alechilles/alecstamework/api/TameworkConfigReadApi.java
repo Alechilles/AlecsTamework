@@ -67,14 +67,6 @@ public interface TameworkConfigReadApi {
         return Optional.empty();
     }
 
-    default Optional<SpawnerVesselConfigView> getSpawnerVesselConfigById(String id) {
-        return Optional.empty();
-    }
-
-    default Optional<SpawnerVesselConfigView> resolveSpawnerVesselConfigForItemId(String itemId) {
-        return Optional.empty();
-    }
-
     default Optional<PopulationGroupDefinitionView> getPopulationGroupById(String groupId) {
         return Optional.empty();
     }

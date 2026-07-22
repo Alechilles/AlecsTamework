@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,20 +37,8 @@ class ApiV08BinaryCompatibilityTest {
         assertEquals(Boolean.TRUE, legacyCaller.invoke(null, legacyApi));
         assertEquals("0.8.0", legacyApi.getApiVersion());
 
-        // Added to TameworkApi in 0.9: old implementors must inherit fail-closed authorities.
-        BondedVesselsApi bondedVessels = legacyApi.bondedVessels();
-        assertInstanceOf(BondedVesselsApi.class, bondedVessels);
-        assertEquals(
-                BondedVesselReadinessView.Readiness.UNAVAILABLE,
-                bondedVessels.readiness().readiness()
-        );
-        assertThrows(NullPointerException.class, () -> bondedVessels.prepareTransition(null));
-        assertInstanceOf(CompanionProvisioningApi.class, legacyApi.companionProvisioning());
-
         // Added to existing API 0.8 interfaces: the methods themselves must remain defaults so a
         // frozen third-party implementor does not gain new abstract methods at link time.
-        assertTrue(BondedVesselsApi.class.getMethod(
-                "resolveHeldItemProjection", BondedVesselHeldItemProjectionRequest.class).isDefault());
         assertTrue(ProfileDataApi.class.getMethod(
                 "getVersioned", String.class, String.class, String.class).isDefault());
         assertTrue(ProfileDataApi.class.getMethod(
@@ -60,7 +47,7 @@ class ApiV08BinaryCompatibilityTest {
                 "findOperation", String.class, String.class).isDefault());
 
         // Added to PolicyApi in 0.9.
-        assertInstanceOf(PopulationGroupApi.class, legacyApi.policies().populationGroups());
+        assertTrue(legacyApi.policies().populationGroups() instanceof PopulationGroupApi);
 
         // Added to InteractionExtensionApi in 0.9.
         InteractionExtensionApi extensions = legacyApi.interactionExtensions();
@@ -84,8 +71,6 @@ class ApiV08BinaryCompatibilityTest {
         assertEquals(Optional.empty(), configs.resolveSpawnerCaptureMechanicsForItemId("fixture"));
         assertEquals(Optional.empty(), configs.getCapturePolicyById("fixture"));
         assertEquals(Optional.empty(), configs.resolveCapturePolicyForRole("fixture"));
-        assertEquals(Optional.empty(), configs.getSpawnerVesselConfigById("fixture"));
-        assertEquals(Optional.empty(), configs.resolveSpawnerVesselConfigForItemId("fixture"));
         assertEquals(Optional.empty(), configs.getPopulationGroupById("fixture"));
         assertEquals(List.of(), configs.resolvePopulationGroupsForRole("fixture"));
     }
