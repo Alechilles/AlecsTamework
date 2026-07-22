@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.vessels.runtime;
 
 import com.alechilles.alecstamework.api.internal.BondedVesselsApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
+import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwSpawnerVesselConfigResolver;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselRepository;
 import com.alechilles.alecstamework.vessels.BondedVesselEventSink;
@@ -47,7 +48,7 @@ public final class ProductionBondedVesselRuntime {
             @Nonnull TameworkApiImpl api,
             @Nonnull BondedVesselRepository repository,
             @Nonnull Universe universe,
-            @Nonnull LongSupplier itemConfigRevision,
+            @Nonnull ItemFeatureRegistry itemConfigs,
             @Nonnull ProductionBondedVesselEvidenceAuthority.ProjectionEvidencePort projections,
             @Nonnull ProductionBondedVesselMutationAuthority.CanonicalProfilePort profiles,
             @Nonnull ProductionBondedVesselMutationAuthority.UnifiedPopulationPort populations,
@@ -59,7 +60,7 @@ public final class ProductionBondedVesselRuntime {
         Objects.requireNonNull(api, "api");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(universe, "universe");
-        Objects.requireNonNull(itemConfigRevision, "itemConfigRevision");
+        Objects.requireNonNull(itemConfigs, "itemConfigs");
         Objects.requireNonNull(executor, "executor");
         ProductionBondedVesselEvidenceAuthority evidence =
                 new ProductionBondedVesselEvidenceAuthority(
@@ -69,7 +70,7 @@ public final class ProductionBondedVesselRuntime {
                         profiles, populations, world, executor);
         ProductionBondedVesselTransitionPlanner planner =
                 new ProductionBondedVesselTransitionPlanner(
-                        new TwSpawnerVesselConfigResolver(itemConfigRevision),
+                        new TwSpawnerVesselConfigResolver(itemConfigs),
                         new BondedVesselItemFingerprintCodec());
         BondedVesselsApiDelegate delegate = BondedVesselsApiDelegate.journalBacked(
                 repository, planner, evidence, mutation, events, executor,
@@ -80,7 +81,7 @@ public final class ProductionBondedVesselRuntime {
                         events, executor, wallClockMs);
         BondedVesselLifecycleObserver lifecycleObserver =
                 new BondedVesselLifecycleObserver(
-                        repository, new TwSpawnerVesselConfigResolver(itemConfigRevision),
+                        repository, new TwSpawnerVesselConfigResolver(itemConfigs),
                         evidence, events, executor, wallClockMs);
         BondedVesselItemProjectionReconciler itemProjectionReconciler =
                 new BondedVesselItemProjectionReconciler(

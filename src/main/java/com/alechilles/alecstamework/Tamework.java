@@ -43,6 +43,7 @@ import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
+import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
@@ -287,6 +288,7 @@ public class Tamework extends JavaPlugin {
     private static Tamework instance;
 
     private ItemFeatureRegistry itemFeatureRegistry;
+    private SpawnerItemConfigReloadService spawnerItemConfigReloadService;
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetEditorPackService assetEditorPackService;
@@ -499,6 +501,15 @@ public class Tamework extends JavaPlugin {
 
     private void setupInternal() {
         itemFeatureRegistry = new ItemFeatureRegistry();
+        spawnerItemConfigReloadService = new SpawnerItemConfigReloadService(
+                itemFeatureRegistry,
+                itemId -> {
+                    DefaultAssetMap<String, Item> itemMap = Item.getAssetMap();
+                    Item item = itemMap == null ? null : itemMap.getAsset(itemId);
+                    return item == null || item.getMaxStack() <= 0
+                            ? java.util.OptionalInt.empty()
+                            : java.util.OptionalInt.of(item.getMaxStack());
+                });
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         capturePolicyRegistry = new CapturePolicyRegistry();
@@ -1867,8 +1878,6 @@ public class Tamework extends JavaPlugin {
         if (itemFeatureRegistry == null) {
             return 0;
         }
-        itemFeatureRegistry.clear();
-        itemFeatureRegistry.registerDefaults();
         registerSpawnerItemAssets();
         registerNamesAssets();
         registerCommandItemAssets();
@@ -2760,7 +2769,7 @@ public class Tamework extends JavaPlugin {
                     implementation,
                     persistenceRuntime.getBondedVesselRepository(),
                     Universe.get(),
-                    itemFeatureRegistry::revision,
+                    itemFeatureRegistry,
                     new LoadedNpcBondedVesselProjectionEvidencePort(
                             ownerPopulationRuntime.loadedNpcIdentityIndex()),
                     new NpcProfileBondedVesselProfilePort(
@@ -2780,7 +2789,7 @@ public class Tamework extends JavaPlugin {
             BondedVesselSpawnerBridge spawnerBridge = new BondedVesselSpawnerBridge(
                     runtime.initialBindings(),
                     new BondedVesselInteractionDispatcher(runtime.apiDelegate()),
-                    new TwSpawnerVesselConfigResolver(itemFeatureRegistry::revision));
+                    new TwSpawnerVesselConfigResolver(itemFeatureRegistry));
             CompanionReviveEligibilityService.current().setBondedLifecycleSink(
                     (observation, result, target) -> runtime.lifecycleObserver().observe(
                             new com.alechilles.alecstamework.vessels.runtime
@@ -3092,26 +3101,24 @@ public class Tamework extends JavaPlugin {
     }
 
     private int loadSpawnerItemAssets() {
-        if (itemFeatureRegistry == null) {
+        if (itemFeatureRegistry == null || spawnerItemConfigReloadService == null) {
             return 0;
         }
         DefaultAssetMap<String, TwSpawnerConfig> assetMap = TwSpawnerConfig.getAssetMap();
-        if (assetMap == null) {
+        if (assetMap == null || assetMap.getAssetMap() == null) {
             return 0;
         }
-        int loaded = 0;
-        for (TwSpawnerConfig asset : assetMap.getAssetMap().values()) {
-            if (asset == null) {
-                continue;
+        SpawnerItemConfigReloadService.ReloadResult result =
+                spawnerItemConfigReloadService.reload(assetMap.getAssetMap().values());
+        if (!result.applied()) {
+            for (String error : result.errors()) {
+                getLogger().at(Level.WARNING).log(
+                        "Spawner config reload rejected at active revision "
+                                + result.activeRevision() + "; retaining last-valid registry: " + error);
             }
-            String emptyItemId = asset.getEmptyItemId();
-            if (emptyItemId == null || emptyItemId.isBlank()) {
-                continue;
-            }
-            itemFeatureRegistry.register(emptyItemId, asset.toItemFeatureConfig());
-            loaded++;
+            return 0;
         }
-        return loaded;
+        return result.loadedCount();
     }
 
     private int loadNameItemAssets() {

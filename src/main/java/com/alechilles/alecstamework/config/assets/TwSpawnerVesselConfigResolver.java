@@ -1,38 +1,35 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
+import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.vessels.runtime.ProductionBondedVesselTransitionPlanner;
-import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** Revision-aware read adapter over the inherited TwSpawner asset map. */
+/** Revision-aware read adapter over the last-valid compiled spawner registry. */
 public final class TwSpawnerVesselConfigResolver
         implements ProductionBondedVesselTransitionPlanner.ConfigResolver {
-    private final LongSupplier currentRevision;
+    private final ItemFeatureRegistry registry;
 
-    public TwSpawnerVesselConfigResolver(@Nonnull LongSupplier currentRevision) {
-        this.currentRevision = Objects.requireNonNull(currentRevision, "currentRevision");
+    public TwSpawnerVesselConfigResolver(@Nonnull ItemFeatureRegistry registry) {
+        this.registry = Objects.requireNonNull(registry, "registry");
     }
 
     @Nonnull
     @Override
     public Optional<SpawnerVesselConfigView> resolve(@Nonnull String configId, long configRevision) {
         Objects.requireNonNull(configId, "configId");
-        if (configRevision < 0L || currentRevision.getAsLong() != configRevision) {
+        if (configRevision < 0L || registry.revision() != configRevision) {
             return Optional.empty();
         }
-        DefaultAssetMap<String, TwSpawnerConfig> assetMap = TwSpawnerConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) return Optional.empty();
-        TwSpawnerConfig config = assetMap.getAssetMap().get(configId);
-        return config == null ? Optional.empty() : Optional.of(config.toVesselConfigView(configRevision));
+        return registry.getVesselByConfigId(configId)
+                .filter(config -> config.configRevision() == configRevision);
     }
 
     @Nonnull
     public Optional<SpawnerVesselConfigView> getById(@Nonnull String configId) {
-        long revision = currentRevision.getAsLong();
+        long revision = registry.revision();
         return resolve(configId, revision);
     }
 
@@ -40,14 +37,8 @@ public final class TwSpawnerVesselConfigResolver
     public Optional<SpawnerVesselConfigView> resolveForItemId(@Nonnull String itemId) {
         Objects.requireNonNull(itemId, "itemId");
         if (itemId.isBlank()) return Optional.empty();
-        long revision = currentRevision.getAsLong();
-        DefaultAssetMap<String, TwSpawnerConfig> assetMap = TwSpawnerConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) return Optional.empty();
-        for (TwSpawnerConfig config : assetMap.getAssetMap().values()) {
-            if (config != null && config.matchesVesselItemId(itemId)) {
-                return Optional.of(config.toVesselConfigView(revision));
-            }
-        }
-        return Optional.empty();
+        long revision = registry.revision();
+        return registry.resolveVesselForItemId(itemId)
+                .filter(config -> config.configRevision() == revision);
     }
 }

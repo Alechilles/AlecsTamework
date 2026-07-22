@@ -865,26 +865,15 @@ public final class TameworkApiImpl
     @Override
     public Optional<SpawnerCaptureMechanicsView> getSpawnerCaptureMechanicsById(String id) {
         ItemFeatureRegistry itemConfigs = captureItemConfigs;
-        if (itemConfigs == null) return Optional.empty();
-        return configById(id, TwSpawnerConfig.getAssetMap() != null
-                        ? TwSpawnerConfig.getAssetMap().getAssetMap() : Map.of())
-                .map(config -> config.toCaptureMechanicsView(itemConfigs.revision()));
+        if (itemConfigs == null || isBlank(id)) return Optional.empty();
+        return itemConfigs.getCaptureByConfigId(id.trim());
     }
 
     @Override
     public Optional<SpawnerCaptureMechanicsView> resolveSpawnerCaptureMechanicsForItemId(String itemId) {
         ItemFeatureRegistry itemConfigs = captureItemConfigs;
-        if (itemConfigs == null || isBlank(itemId) || TwSpawnerConfig.getAssetMap() == null) {
-            return Optional.empty();
-        }
-        String normalizedItemId = normalizeItemId(itemId);
-        for (TwSpawnerConfig config : TwSpawnerConfig.getAssetMap().getAssetMap().values()) {
-            if (config != null && (matchesItemId(config.getEmptyItemId(), normalizedItemId)
-                    || matchesItemId(config.getFilledItemId(), normalizedItemId))) {
-                return Optional.of(config.toCaptureMechanicsView(itemConfigs.revision()));
-            }
-        }
-        return Optional.empty();
+        if (itemConfigs == null || isBlank(itemId)) return Optional.empty();
+        return itemConfigs.resolveCaptureForItemId(itemId.trim());
     }
 
     @Override
