@@ -134,22 +134,26 @@ class SpawnerWildCaptureArchitectureTest {
     }
 
     @Test
-    void channelCompletionRevalidatesLineOfInteractionAgainstLockedTarget() throws Exception {
+    void channelCompletionUsesServerLockedTargetAndTerminalPolicyRevalidation() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
         )).replace("\r\n", "\n");
 
         int completeBranch = source.indexOf("phase == Phase.COMPLETE");
-        int freshRaycast = source.indexOf("TargetUtil.getTargetEntity(playerRef, 32.0F, store)", completeBranch);
-        int identityCheck = source.indexOf("isSameEntity(locked, visible, store)", freshRaycast);
-        int terminalFailClosed = source.indexOf("if (phase == Phase.COMPLETE) {\n                return null;", identityCheck);
+        int lockedTarget = source.indexOf("return locked;", completeBranch);
+        int terminalFailClosed = source.indexOf(
+                "if (phase == Phase.COMPLETE) {\n                return null;", lockedTarget);
 
         assertTrue(completeBranch >= 0, "Completion must have a dedicated terminal branch.");
-        assertTrue(freshRaycast > completeBranch, "Completion must obtain fresh line-of-interaction evidence.");
-        assertTrue(identityCheck > freshRaycast, "Fresh evidence must identify the originally locked target.");
-        assertTrue(terminalFailClosed > identityCheck, "Missing lock/world evidence must fail terminal capture closed.");
-        assertTrue(source.contains("expectedUuid.getUuid().equals(visibleUuid.getUuid())"),
-                "Entity identity must use canonical UUID evidence rather than Ref object identity.");
+        assertTrue(lockedTarget > completeBranch,
+                "Completion must use the target identity retained by the server channel session.");
+        assertTrue(terminalFailClosed > lockedTarget,
+                "Missing lock/world evidence must fail terminal capture closed.");
+        assertTrue(source.contains(
+                "case COMPLETE -> handler.canCaptureInteraction(player, targetRef, heldItem)"),
+                "Completion must still apply terminal range, health, effect, role, and ownership policy.");
+        assertTrue(!source.contains("isSameEntity(locked, visible, store)"),
+                "Completion must not silently discard a valid channel because final-tick aim shifted.");
     }
 
     @Test

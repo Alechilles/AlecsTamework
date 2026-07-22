@@ -291,10 +291,10 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     return locked;
                 }
                 if (phase == Phase.COMPLETE) {
-                    Ref<EntityStore> visible = playerRef == null || !playerRef.isValid()
-                            ? null
-                            : TargetUtil.getTargetEntity(playerRef, 32.0F, store);
-                    return isSameEntity(locked, visible, store) ? locked : null;
+                    // Completion belongs to the server-created channel session, not to a new
+                    // client aim sample. The terminal policy check below still revalidates the
+                    // locked NPC's range, health, effect, role, and ownership requirements.
+                    return locked;
                 }
             }
             if (phase == Phase.COMPLETE) {
@@ -312,20 +312,6 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> raycast = TargetUtil.getTargetEntity(playerRef, 32.0F, store);
         return raycast != null && raycast.isValid() ? raycast : null;
-    }
-
-    private static boolean isSameEntity(Ref<EntityStore> expected,
-                                        Ref<EntityStore> visible,
-                                        Store<EntityStore> store) {
-        if (expected == null || visible == null || store == null
-                || !expected.isValid() || !visible.isValid()) {
-            return false;
-        }
-        UUIDComponent expectedUuid = store.getComponent(expected, UUIDComponent.getComponentType());
-        UUIDComponent visibleUuid = store.getComponent(visible, UUIDComponent.getComponentType());
-        return expectedUuid != null && visibleUuid != null
-                && expectedUuid.getUuid() != null
-                && expectedUuid.getUuid().equals(visibleUuid.getUuid());
     }
 
     @Override
