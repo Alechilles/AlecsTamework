@@ -74,7 +74,8 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                          COALESCE((SELECT MAX(updated_at_ms) FROM coop_slots), 0),
                          COALESCE((SELECT MAX(updated_at_ms) FROM profile_states), 0),
                          COALESCE((SELECT MAX(mapped_at_ms) FROM npc_uuid_aliases), 0),
-                         COALESCE((SELECT MAX(updated_at_ms) FROM managed_coop_residents), 0)
+                         COALESCE((SELECT MAX(updated_at_ms) FROM managed_coop_residents), 0),
+                         COALESCE((SELECT MAX(updated_at_ms) FROM companion_population_state), 0)
                      """);
              ResultSet resultSet = statement.executeQuery()) {
             if (!resultSet.next()) {
@@ -87,7 +88,8 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                     + ":" + resultSet.getLong(4)
                     + ":" + resultSet.getLong(5)
                     + ":" + resultSet.getLong(6)
-                    + ":" + resultSet.getLong(7);
+                    + ":" + resultSet.getLong(7)
+                    + ":" + resultSet.getLong(8);
             return new SnapshotDescriptor(total, generation);
         }
     }
@@ -158,9 +160,11 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                                  SELECT 1 FROM managed_coop_residents m
                                  WHERE m.profile_id = p.profile_id AND m.active = 1
                                    AND m.state IN ('HOUSED', 'RELEASING')
-                             ) THEN 1 ELSE 0 END AS coop_active
+                             ) THEN 1 ELSE 0 END AS coop_active,
+                         cps.lifecycle_state AS population_lifecycle
                      FROM npc_profiles p
                      LEFT JOIN profile_states ps ON ps.profile_id = p.profile_id
+                     LEFT JOIN companion_population_state cps ON cps.profile_id = p.profile_id
                      ORDER BY p.profile_id
                      LIMIT ? OFFSET ?
                      """)) {
@@ -173,7 +177,19 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                             resultSet.getString("evidence_npc_uuid")
                     );
                     String profileId = resultSet.getString("profile_id");
+                    boolean captureActive = resultSet.getInt("capture_active") != 0;
+                    boolean deathActive = resultSet.getInt("death_active") != 0;
+                    boolean lostActive = resultSet.getInt("lost_active") != 0;
+                    boolean coopActive = resultSet.getInt("coop_active") != 0;
                     if (npcUuid == null) {
+                        if ("PROVISIONED_DORMANT".equals(resultSet.getString("population_lifecycle"))
+                                && !captureActive && !deathActive && !lostActive && !coopActive) {
+                            // Provisioning intentionally creates an authoritative profile before
+                            // any physical NPC exists. It is a scanned unit, but has no UUID-based
+                            // legacy evidence to contribute.
+                            profiles.add(List.of());
+                            continue;
+                        }
                         throw new IllegalStateException(
                                 "Profile has no resolvable current, alias, or coop UUID: " + profileId
                         );
@@ -190,22 +206,22 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                             CompanionPopulationEvidence.Kind.PROFILE_RECORD, source
                     ));
                     addActiveEvidence(
-                            evidence, resultSet.getInt("capture_active") != 0,
+                            evidence, captureActive,
                             profileId, npcUuid, ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT, source
                     );
                     addActiveEvidence(
-                            evidence, resultSet.getInt("death_active") != 0,
+                            evidence, deathActive,
                             profileId, npcUuid, ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.DEATH_SNAPSHOT, source
                     );
                     addActiveEvidence(
-                            evidence, resultSet.getInt("lost_active") != 0,
+                            evidence, lostActive,
                             profileId, npcUuid, ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.LOST_SNAPSHOT, source
                     );
                     addActiveEvidence(
-                            evidence, resultSet.getInt("coop_active") != 0,
+                            evidence, coopActive,
                             profileId, managedCoopUuid == null ? npcUuid : managedCoopUuid,
                             ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.COOP_SNAPSHOT, source
