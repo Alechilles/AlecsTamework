@@ -18,6 +18,11 @@ Thumbs.db
 *.tmp
 *.bak
 *.cache
+**/__pycache__/
+*.py[cod]
+
+# Focused verification compiler output
+/outputs/*-check/
 
 # IDE settings
 .settings/

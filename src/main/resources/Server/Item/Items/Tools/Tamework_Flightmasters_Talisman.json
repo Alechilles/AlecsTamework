@@ -31,7 +31,7 @@
   },
   "Model": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman.blockymodel",
   "Texture": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman_Texture.png",
-  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "Icon": "Icons/ItemsGenerated/Tamework_Flightmasters_Talisman.png",
   "IconProperties": {
     "Scale": 0.82,
     "Translation": [
