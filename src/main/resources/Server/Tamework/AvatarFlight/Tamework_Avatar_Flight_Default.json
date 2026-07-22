@@ -181,7 +181,7 @@
     "HideOwnerArmor": true,
     "HideOwnerHands": true,
     "ShowRider": false,
-    "IncludeAppearanceAttachments": false,
+    "IncludeAppearanceAttachments": true,
     "SeatOffsetX": 0.0,
     "SeatOffsetY": 1.35,
     "SeatOffsetZ": -0.25,

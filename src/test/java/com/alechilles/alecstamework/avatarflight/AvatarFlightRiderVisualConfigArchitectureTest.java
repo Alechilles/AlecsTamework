@@ -44,7 +44,7 @@ class AvatarFlightRiderVisualConfigArchitectureTest {
         assertTrue(json.contains("\"RiderVisual\""));
         assertTrue(json.contains("\"HideOwnerEquipment\": true"));
         assertTrue(json.contains("\"ShowRider\": false"));
-        assertTrue(json.contains("\"IncludeAppearanceAttachments\": false"));
+        assertTrue(json.contains("\"IncludeAppearanceAttachments\": true"));
         assertTrue(json.contains("\"SeatOffsetX\": 0.0"));
         assertTrue(json.contains("\"SeatOffsetY\": 1.35"));
         assertTrue(json.contains("\"SeatOffsetZ\": -0.25"));

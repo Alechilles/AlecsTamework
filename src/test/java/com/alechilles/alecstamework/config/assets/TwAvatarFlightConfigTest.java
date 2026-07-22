@@ -71,7 +71,7 @@ class TwAvatarFlightConfigTest {
         assertFalse(config.getRiderVisual().isHideOwnerArmor());
         assertFalse(config.getRiderVisual().isHideOwnerHands());
         assertFalse(config.getRiderVisual().isShowRider());
-        assertFalse(config.getRiderVisual().isIncludeAppearanceAttachments());
+        assertTrue(config.getRiderVisual().isIncludeAppearanceAttachments());
     }
 
     @Test

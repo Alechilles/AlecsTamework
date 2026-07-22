@@ -88,20 +88,17 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemStagesInitialFakeRiderThenRefreshesOnArmorChanges() throws Exception {
+    void visualSystemRefreshesImmediateFakeRiderOnArmorChanges() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("long attachAfterMs = visual.getRiderAttachAfterMs()"));
-        assertTrue(source.contains("boolean pendingInitialAttachment = attachAfterMs != 0L"));
-        assertTrue(source.contains("System.currentTimeMillis() < attachAfterMs"));
+        assertFalse(source.contains("getRiderAttachAfterMs()"));
+        assertFalse(source.contains("pendingInitialAttachment"));
         assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ref, commandBuffer)"));
-        assertTrue(source.contains("if (!pendingInitialAttachment"));
         assertTrue(source.contains("equipment.armorSignature().equals(visual.getEquipmentSignature())"));
         assertTrue(source.contains("modelService.savedModelCopy(ownerUuid)"));
         assertTrue(source.contains("settings.isIncludeAppearanceAttachments()"));
         assertTrue(source.contains("riderVisualService.refresh("));
         assertTrue(source.contains("updated.setEquipmentSignature(equipment.armorSignature())"));
-        assertTrue(source.contains("updated.setRiderAttachAfterMs(0L)"));
         assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));
     }
 }
