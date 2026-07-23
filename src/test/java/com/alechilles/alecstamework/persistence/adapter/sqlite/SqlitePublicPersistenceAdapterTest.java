@@ -86,6 +86,7 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.commandRosterOperations());
         assertNotNull(adapter.commandRosterTransitionOperations());
         assertNotNull(adapter.timedSummonOperations());
+        assertNotNull(adapter.timedSummonTransitionOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -294,7 +295,9 @@ class SqlitePublicPersistenceAdapterTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed("coop_capture").completed(),
                 (request, operation) ->
-                        LiveOperationResult.confirmed("coop_release").completed()
+                        LiveOperationResult.confirmed("coop_release").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("timed").completed()
         );
     }
 

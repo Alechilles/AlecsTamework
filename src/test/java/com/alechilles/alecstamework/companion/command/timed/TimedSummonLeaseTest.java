@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -108,6 +109,47 @@ class TimedSummonLeaseTest {
                         2_000,
                         true,
                         List.of(5_000L, 5_000L)
+                )
+        );
+    }
+
+    @Test
+    void signedCooldownAdditionAndMonotonicCountdownDoNotUseEpochTime() {
+        assertEquals(-500, TimedSummonTime.saturatingAdd(-2_000, 1_500));
+        assertEquals(
+                Long.MAX_VALUE,
+                TimedSummonTime.saturatingAdd(Long.MAX_VALUE - 5, 10)
+        );
+        assertEquals(
+                8_500,
+                TimedSummonTime.remaining(
+                        10_000,
+                        20_000_000_000L,
+                        21_500_000_000L
+                )
+        );
+        assertEquals(
+                10_000,
+                TimedSummonTime.remaining(
+                        10_000,
+                        30_000_000_000L,
+                        30_000_000_000L
+                )
+        );
+        assertEquals(
+                9_000,
+                TimedSummonTime.remaining(
+                        10_000,
+                        -2_000_000_000L,
+                        -1_000_000_000L
+                )
+        );
+        assertEquals(
+                9_999,
+                TimedSummonTime.remaining(
+                        10_000,
+                        Long.MAX_VALUE - 500_000L,
+                        Long.MIN_VALUE + 499_999L
                 )
         );
     }

@@ -266,7 +266,9 @@ class PublicPersistenceRuntimeTest {
                 (request, operation) -> LiveOperationResult
                         .confirmed("coop_capture_confirmed").completed(),
                 (request, operation) -> LiveOperationResult
-                        .confirmed("coop_release_confirmed").completed()
+                        .confirmed("coop_release_confirmed").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("timed_confirmed").completed()
         );
     }
 

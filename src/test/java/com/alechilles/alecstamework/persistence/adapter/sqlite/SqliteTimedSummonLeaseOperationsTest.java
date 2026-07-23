@@ -4,7 +4,19 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonPolicy;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonSessionId;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
@@ -12,6 +24,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Shared-envelope mutation, projection, and recovery tests for timed leases. */
 class SqliteTimedSummonLeaseOperationsTest
-        extends CommandRosterTestSupport {
+        extends TimedSummonTestSupport {
     @Test
     void registrationAndPolicyRefreshUseOneDatabaseProtocol()
             throws Exception {
@@ -161,56 +174,4 @@ class SqliteTimedSummonLeaseOperationsTest
         );
     }
 
-    private OperationWorkflowResult submit(
-            TimedSummonLeaseMutationRequest mutation,
-            int operation
-    ) throws Exception {
-        return adapter.timedSummonOperations().submit(
-                operationId(operation),
-                new IdempotencyKey("timed:" + operation),
-                mutation
-        ).completion().toCompletableFuture()
-                .get(10, TimeUnit.SECONDS);
-    }
-
-    private TimedSummonLease lease() throws Exception {
-        PersistenceReadResult.Found<TimedSummonLease> found =
-                assertInstanceOf(
-                        PersistenceReadResult.Found.class,
-                        adapter.timedSummonReader().find(PROFILE_A)
-                                .toCompletableFuture()
-                                .get(10, TimeUnit.SECONDS)
-                );
-        return found.value();
-    }
-
-    private TimedSummonLease dormant(
-            long revision,
-            TimedSummonPolicy policy,
-            long changedAtMs
-    ) {
-        return new TimedSummonLease(
-                PROFILE_A,
-                revision,
-                null,
-                null,
-                -1_000L,
-                policy,
-                Set.of(),
-                null,
-                -5_000,
-                changedAtMs
-        );
-    }
-
-    private TimedSummonPolicy policy(long duration) {
-        return new TimedSummonPolicy(
-                "role:timed",
-                1L,
-                duration,
-                2_000,
-                true,
-                List.of(5_000L, 1_000L)
-        );
-    }
 }

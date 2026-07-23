@@ -168,7 +168,7 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void publicRuntimeFacadeDeclaresExactlyTheNineReleasedOperations() {
+    void publicRuntimeFacadeDeclaresOnlyRegisteredReplacementOperations() {
         List<String> operations = Stream.of(
                         com.alechilles.alecstamework.persistence.runtime
                                 .PublicPersistenceOperations.class
@@ -186,10 +186,12 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "makeDormant",
                         "mutateExtension",
                         "mutateProfile",
+                        "mutateTimedSummonLease",
                         "registerCoopSlot",
                         "releaseFromCoop",
                         "restore",
-                        "rotateAlias"
+                        "rotateAlias",
+                        "transitionTimedSummon"
                 ),
                 operations
         );

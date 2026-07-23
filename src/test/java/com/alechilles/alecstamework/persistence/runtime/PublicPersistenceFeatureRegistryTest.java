@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -46,7 +47,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(15, operationKinds.size());
+        assertEquals(16, operationKinds.size());
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS
@@ -122,6 +123,16 @@ class PublicPersistenceFeatureRegistryTest {
                 Set.of(OperationScopeType.PROFILE),
                 timed.operationScopes().get(
                         TimedSummonLeaseMutationDefinition.INSTANCE.kind()
+                )
+        );
+        assertEquals(
+                Set.of(
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
+                ),
+                timed.operationScopes().get(
+                        TimedSummonTransitionDefinition.INSTANCE.kind()
                 )
         );
         assertEquals(

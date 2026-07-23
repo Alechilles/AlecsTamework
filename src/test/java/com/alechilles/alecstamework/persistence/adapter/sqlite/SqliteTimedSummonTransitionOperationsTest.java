@@ -1,0 +1,130 @@
+package com.alechilles.alecstamework.persistence.adapter.sqlite;
+
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Live round-trip and late-world recovery tests for timed transitions. */
+class SqliteTimedSummonTransitionOperationsTest
+        extends TimedSummonTestSupport {
+    @Test
+    void summonAndStoreCommitOneLeaseLifecycleAndAliasPath()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(80);
+        CompanionLifecycle stored = lifecycleRead(PROFILE_A);
+        TimedSummonTransitionRequest start = startRequest(
+                prepared, stored, -3_000
+        );
+
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(84),
+                new IdempotencyKey("timed:start"),
+                start,
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed(
+                                        request.receiptKey()
+                                ).completed()
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+
+        CompanionLifecycle active = lifecycleRead(PROFILE_A);
+        assertEquals(LifecycleState.ACTIVE, active.state());
+        assertEquals(2, active.revision().value());
+        assertTrue(lease().activeSession());
+        assertEquals(0, reservationCount(operationId(84)));
+        assertTrue(adapter.timedSummonIndex()
+                .laggingProfiles().isEmpty());
+
+        TimedSummonTransitionRequest store = storeRequest(
+                prepared, active, lease(), -2_000
+        );
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(85),
+                new IdempotencyKey("timed:store"),
+                store,
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed(
+                                        request.receiptKey()
+                                ).completed()
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+
+        CompanionLifecycle restored = lifecycleRead(PROFILE_A);
+        assertEquals(LifecycleState.ROSTER_STORED, restored.state());
+        assertEquals(4, restored.revision().value());
+        assertEquals(-500L, lease().cooldownUntilMs());
+        try (var connection = connections.openReadConnection()) {
+            assertEquals(
+                    store.snapshot(),
+                    new SqliteCompanionSnapshotStore(connection)
+                            .findCurrent(
+                                    PROFILE_A,
+                                    TimedSummonTransitionRequest.SNAPSHOT_KIND
+                            ).orElseThrow()
+            );
+            assertEquals(
+                    com.alechilles.alecstamework.companion.identity
+                            .CompanionAlias.State.RETIRED,
+                    new SqliteCompanionIdentityStore(connection)
+                            .resolveAlias(prepared.alias())
+                            .orElseThrow().state()
+            );
+        }
+        assertTrue(adapter.timedSummonIndex()
+                .laggingProfiles().isEmpty());
+    }
+
+    @Test
+    void unavailableWorldLeavesExactFencesAndResumes()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(90);
+        TimedSummonTransitionRequest start = startRequest(
+                prepared, lifecycleRead(PROFILE_A), -3_000
+        );
+        var operationId = operationId(94);
+
+        OperationWorkflowResult retryable =
+                adapter.timedSummonTransitionOperations().submit(
+                        operationId,
+                        new IdempotencyKey("timed:late-world"),
+                        start,
+                        (request, operation) ->
+                                com.alechilles.alecstamework.persistence
+                                        .operation.LiveOperationResult
+                                        .retryable(
+                                                "world_not_loaded",
+                                                null
+                                        ).completed()
+                ).completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.LIVE_RETRYABLE,
+                retryable.status()
+        );
+        assertEquals(1, lifecycleRead(PROFILE_A).revision().value());
+        assertEquals(1, reservationCount(operationId));
+
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId,
+                new IdempotencyKey("timed:late-world"),
+                start,
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed("spawned")
+                                .completed()
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+        assertEquals(2, lifecycleRead(PROFILE_A).revision().value());
+        assertEquals(0, reservationCount(operationId));
+    }
+}

@@ -377,6 +377,11 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed(
                                         "coop_release"
+                                ).completed(),
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed(
+                                        "timed"
                                 ).completed()
         );
     }
