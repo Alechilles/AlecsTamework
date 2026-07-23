@@ -233,8 +233,6 @@ CREATE TABLE owner_population_reservation (
     PRIMARY KEY (operation_id, scope_kind, owner_uuid, owner_world_key),
     FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id)
         ON DELETE CASCADE,
-    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
-        ON DELETE CASCADE,
     CHECK (
         (scope_kind = 'GLOBAL' AND owner_world_key = '')
         OR (scope_kind = 'PER_WORLD' AND length(trim(owner_world_key)) > 0)
@@ -333,8 +331,9 @@ CREATE INDEX idx_population_group_membership_group
 CREATE TABLE population_group_reservation (
     operation_id TEXT NOT NULL,
     profile_id TEXT NOT NULL,
-    expected_lifecycle_revision INTEGER NOT NULL CHECK (
-        expected_lifecycle_revision >= 0
+    expected_lifecycle_revision INTEGER CHECK (
+        expected_lifecycle_revision IS NULL
+        OR expected_lifecycle_revision >= 0
     ),
     owner_uuid TEXT NOT NULL,
     group_id TEXT NOT NULL,
@@ -354,8 +353,6 @@ CREATE TABLE population_group_reservation (
         operation_id, owner_uuid, group_id, scope_kind, owner_world_key
     ),
     FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
         ON DELETE CASCADE,
     CHECK (owned_delta > 0 OR active_delta > 0),
     CHECK (
@@ -461,6 +458,21 @@ CREATE TABLE timed_summon_lease (
                     AND remaining_ms <= active_duration_ms)
             ))
     )
+);
+
+CREATE TABLE provisioning_record (
+    profile_id TEXT PRIMARY KEY,
+    caller_namespace TEXT NOT NULL,
+    caller_key TEXT NOT NULL,
+    correlation_id TEXT,
+    policy_revision INTEGER NOT NULL CHECK (policy_revision >= 0),
+    creation_operation_id TEXT NOT NULL UNIQUE,
+    created_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (creation_operation_id)
+        REFERENCES operation_envelope(operation_id),
+    UNIQUE (caller_namespace, caller_key)
 );
 
 CREATE TABLE refund_claim (

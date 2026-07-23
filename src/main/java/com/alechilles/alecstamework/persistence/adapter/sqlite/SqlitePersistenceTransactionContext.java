@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationPort;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationEvidencePort;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPort;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningPort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaimPort;
 import com.alechilles.alecstamework.persistence.incidents.IncidentStore;
@@ -40,6 +41,7 @@ public final class SqlitePersistenceTransactionContext {
     private final PopulationGroupPort populationGroups;
     private final CommandRosterPort commandRosters;
     private final TimedSummonLeasePort timedSummons;
+    private final ProvisioningPort provisioning;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -60,6 +62,7 @@ public final class SqlitePersistenceTransactionContext {
         populationGroups = new SqlitePopulationGroupStore(connection);
         commandRosters = new SqliteCommandRosterStore(connection);
         timedSummons = new SqliteTimedSummonLeaseStore(connection);
+        provisioning = new SqliteProvisioningStore(connection);
     }
 
     @Nonnull
@@ -139,5 +142,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     TimedSummonLeasePort timedSummons() {
         return timedSummons;
+    }
+
+    @Nonnull
+    ProvisioningPort provisioning() {
+        return provisioning;
     }
 }

@@ -285,9 +285,16 @@ final class SqlitePopulationGroupAdmissionStore {
                         && !OperationPhase.valueOf(
                         row.getString("phase")
                 ).isTerminal()
-                        && row.getLong("expected_lifecycle_revision")
-                        == reservation.expectedLifecycleRevision().value()
-                        && !row.wasNull();
+                        && java.util.Objects.equals(
+                        nullableLong(
+                                row,
+                                "expected_lifecycle_revision"
+                        ),
+                        reservation.expectedLifecycleRevision() == null
+                                ? null
+                                : reservation
+                                .expectedLifecycleRevision().value()
+                );
             }
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure(
@@ -303,9 +310,13 @@ final class SqlitePopulationGroupAdmissionStore {
     ) throws SQLException {
         statement.setString(1, reservation.operationId().toString());
         statement.setString(2, reservation.profileId().toString());
-        statement.setLong(
-                3, reservation.expectedLifecycleRevision().value()
-        );
+        if (reservation.expectedLifecycleRevision() == null) {
+            statement.setNull(3, java.sql.Types.BIGINT);
+        } else {
+            statement.setLong(
+                    3, reservation.expectedLifecycleRevision().value()
+            );
+        }
         bindBucket(statement, reservation.bucket(), 4);
         statement.setInt(8, reservation.ownedDelta());
         statement.setInt(9, reservation.activeDelta());
@@ -339,12 +350,15 @@ final class SqlitePopulationGroupAdmissionStore {
                         ? null
                         : row.getString("owner_world_key")
         );
+        Long expected = nullableLong(
+                row, "expected_lifecycle_revision"
+        );
         return new PopulationGroupReservation(
                 OperationId.parse(row.getString("operation_id")),
                 ProfileId.parse(row.getString("profile_id")),
-                new LifecycleRevision(
-                        row.getLong("expected_lifecycle_revision")
-                ),
+                expected == null
+                        ? null
+                        : new LifecycleRevision(expected),
                 bucket,
                 row.getInt("owned_delta"),
                 row.getInt("active_delta"),
@@ -353,6 +367,12 @@ final class SqlitePopulationGroupAdmissionStore {
                 row.getLong("policy_revision"),
                 row.getLong("created_at_ms")
         );
+    }
+
+    private Long nullableLong(ResultSet row, String column)
+            throws SQLException {
+        long value = row.getLong(column);
+        return row.wasNull() ? null : value;
     }
 
     private PopulationGroupAdmission result(
