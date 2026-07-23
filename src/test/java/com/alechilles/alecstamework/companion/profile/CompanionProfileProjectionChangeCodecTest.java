@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.companion.profile;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
+import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
@@ -61,11 +63,18 @@ class CompanionProfileProjectionChangeCodecTest {
                 -70,
                 null
         );
+        CoopSlot coopSlot = CoopSlot.unoccupied(
+                new CoopSlotKey("world", "coop-a", 1, 2, 3, 3)
+        );
         CompanionLifecycle lifecycle = new CompanionLifecycle(
                 PROFILE,
                 OWNER,
-                LifecycleState.UNLOADED,
-                LifecycleLocation.none(),
+                LifecycleState.COOP,
+                LifecycleLocation.keyed(
+                        com.alechilles.alecstamework.companion.lifecycle
+                                .LifecycleLocationKind.COOP_SLOT,
+                        coopSlot.key().toString()
+                ),
                 new LifecycleRevision(4),
                 null,
                 -60,
@@ -97,7 +106,8 @@ class CompanionProfileProjectionChangeCodecTest {
                         alias,
                         lifecycle,
                         List.of(link),
-                        List.of(snapshot)
+                        List.of(snapshot),
+                        coopSlot
                 );
         CompanionProfileProjectionChange expected =
                 new CompanionProfileProjectionChange(
@@ -162,7 +172,8 @@ class CompanionProfileProjectionChangeCodecTest {
                         null,
                         lifecycle,
                         List.of(),
-                        List.of()
+                        List.of(),
+                        null
                 );
 
         assertNull(state.ownerName());

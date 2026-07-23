@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -28,12 +29,19 @@ final class SqliteCompanionProfileProjectionComposer {
                 .orElseThrow(() -> new IllegalStateException(
                         "profile_projection_lifecycle_missing"
                 ));
+        CoopSlot coopSlot = transaction.coops()
+                .findResidencyByProfile(profileId)
+                .flatMap(residency -> transaction.coops().findSlot(
+                        residency.slotKey()
+                ))
+                .orElse(null);
         return CompanionProfileProjectionState.compose(
                 identity,
                 transaction.identities().findCurrentAlias(profileId).orElse(null),
                 lifecycle,
                 transaction.toolLinks().findByProfile(profileId),
-                transaction.snapshots().findCurrentByProfile(profileId)
+                transaction.snapshots().findCurrentByProfile(profileId),
+                coopSlot
         );
     }
 

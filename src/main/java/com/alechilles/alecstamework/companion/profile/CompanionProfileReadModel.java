@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.profile;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
@@ -20,7 +21,8 @@ public record CompanionProfileReadModel(
         @Nullable CompanionAlias currentAlias,
         @Nonnull CompanionLifecycle lifecycle,
         @Nonnull List<CompanionToolLink> toolLinks,
-        @Nonnull List<CompanionSnapshot> currentSnapshots
+        @Nonnull List<CompanionSnapshot> currentSnapshots,
+        @Nullable CoopSlot currentCoopSlot
 ) {
     public CompanionProfileReadModel {
         if (identity == null || lifecycle == null) {
@@ -41,6 +43,13 @@ public record CompanionProfileReadModel(
         if (currentSnapshots.stream().anyMatch(snapshot ->
                 !snapshot.profileId().equals(identity.profileId()) || !snapshot.current())) {
             throw new IllegalArgumentException("Current snapshot identity mismatch");
+        }
+        boolean cooped = lifecycle.state()
+                == com.alechilles.alecstamework.companion.lifecycle.LifecycleState.COOP;
+        if (cooped != (currentCoopSlot != null)
+                || (currentCoopSlot != null && !lifecycle.location().key()
+                .equals(currentCoopSlot.key().toString()))) {
+            throw new IllegalArgumentException("Profile coop detail/lifecycle mismatch");
         }
     }
 }

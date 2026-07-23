@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -95,13 +96,18 @@ public final class SqliteCompanionProfileReader {
                     null
             ));
         }
+        SqliteCompanionCoopStore coops = new SqliteCompanionCoopStore(connection);
+        CoopSlot coopSlot = coops.findResidencyByProfile(profileId)
+                .flatMap(residency -> coops.findSlot(residency.slotKey()))
+                .orElse(null);
         CompanionProfileReadModel model = new CompanionProfileReadModel(
                 identity,
                 identities.findCurrentAlias(profileId).orElse(null),
                 lifecycle,
                 new SqliteCompanionToolLinkStore(connection).findByProfile(profileId),
                 new SqliteCompanionSnapshotStore(connection)
-                        .findCurrentByProfile(profileId)
+                        .findCurrentByProfile(profileId),
+                coopSlot
         );
         return PersistenceReadResult.found(
                 model,

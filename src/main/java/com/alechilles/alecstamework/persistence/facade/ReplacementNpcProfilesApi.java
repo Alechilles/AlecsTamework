@@ -108,7 +108,8 @@ public final class ReplacementNpcProfilesApi implements NpcProfilesApi {
                         model.currentAlias(),
                         model.lifecycle(),
                         model.toolLinks(),
-                        model.currentSnapshots()
+                        model.currentSnapshots(),
+                        model.currentCoopSlot()
                 )
         );
     }

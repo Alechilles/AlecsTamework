@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.profile;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
@@ -61,7 +62,8 @@ public record CompanionProfileProjectionState(
             @Nullable CompanionAlias currentAlias,
             @Nonnull CompanionLifecycle lifecycle,
             @Nonnull List<CompanionToolLink> toolLinks,
-            @Nonnull List<CompanionSnapshot> currentSnapshots
+            @Nonnull List<CompanionSnapshot> currentSnapshots,
+            @Nullable CoopSlot currentCoopSlot
     ) {
         if (identity == null || lifecycle == null
                 || toolLinks == null || currentSnapshots == null
@@ -105,8 +107,12 @@ public record CompanionProfileProjectionState(
                 identity.displayName(),
                 metadata.customName(),
                 metadata.tamed(),
-                metadata.coopId(),
-                metadata.coopSlot(),
+                currentCoopSlot == null
+                        ? null
+                        : currentCoopSlot.key().coopId(),
+                currentCoopSlot == null
+                        ? null
+                        : currentCoopSlot.key().residentSlot(),
                 tools,
                 snapshots,
                 latestUpdate(identity, currentAlias, lifecycle, toolLinks, currentSnapshots)
