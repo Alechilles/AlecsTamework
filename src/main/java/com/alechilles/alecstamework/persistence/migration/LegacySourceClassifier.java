@@ -96,13 +96,30 @@ public final class LegacySourceClassifier {
             return result(LegacySourceKind.NO_SOURCE, 0, "NO_SOURCE", Optional.empty(), Set.of());
         }
         try (SqliteReadOnlySnapshotter.Snapshot snapshot = snapshotter.create(source, workspace)) {
-            return inspect(snapshot);
+            return classifySnapshot(snapshot);
         } catch (Exception failure) {
             return result(
                     LegacySourceKind.MALFORMED,
                     0,
                     "SOURCE_SNAPSHOT_FAILED",
                     Optional.empty(),
+                    Set.of()
+            );
+        }
+    }
+
+    LegacySourceClassification classifySnapshot(SqliteReadOnlySnapshotter.Snapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException("Source snapshot is required");
+        }
+        try {
+            return inspect(snapshot);
+        } catch (Exception failure) {
+            return result(
+                    LegacySourceKind.MALFORMED,
+                    0,
+                    "SOURCE_INSPECTION_FAILED",
+                    Optional.of(snapshot.fingerprint()),
                     Set.of()
             );
         }
