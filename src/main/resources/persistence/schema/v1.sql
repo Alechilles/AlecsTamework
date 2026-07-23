@@ -301,6 +301,77 @@ CREATE INDEX idx_population_evidence_profile
         profile_id, boot_id, world_key, reconciliation_generation
     );
 
+CREATE TABLE population_group_classification (
+    profile_id TEXT PRIMARY KEY,
+    role_id TEXT,
+    policy_revision INTEGER NOT NULL CHECK (policy_revision >= 0),
+    source_metadata_revision INTEGER NOT NULL CHECK (
+        source_metadata_revision >= 0
+    ),
+    source_lifecycle_revision INTEGER NOT NULL CHECK (
+        source_lifecycle_revision >= 0
+    ),
+    assignment_revision INTEGER NOT NULL CHECK (assignment_revision > 0),
+    assigned_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE population_group_membership (
+    profile_id TEXT NOT NULL,
+    group_id TEXT NOT NULL,
+    scope_kind TEXT NOT NULL CHECK (scope_kind IN ('GLOBAL', 'PER_WORLD')),
+    PRIMARY KEY (profile_id, group_id),
+    FOREIGN KEY (profile_id)
+        REFERENCES population_group_classification(profile_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX idx_population_group_membership_group
+    ON population_group_membership(group_id, scope_kind, profile_id);
+
+CREATE TABLE population_group_reservation (
+    operation_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    expected_lifecycle_revision INTEGER NOT NULL CHECK (
+        expected_lifecycle_revision >= 0
+    ),
+    owner_uuid TEXT NOT NULL,
+    group_id TEXT NOT NULL,
+    scope_kind TEXT NOT NULL CHECK (scope_kind IN ('GLOBAL', 'PER_WORLD')),
+    owner_world_key TEXT NOT NULL,
+    owned_delta INTEGER NOT NULL CHECK (owned_delta >= 0),
+    active_delta INTEGER NOT NULL CHECK (
+        active_delta >= 0 AND active_delta <= owned_delta
+    ),
+    snapshotted_max_owned INTEGER NOT NULL CHECK (
+        snapshotted_max_owned >= 0
+    ),
+    snapshotted_max_active INTEGER NOT NULL CHECK (
+        snapshotted_max_active >= 0
+    ),
+    policy_revision INTEGER NOT NULL CHECK (policy_revision >= 0),
+    created_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (
+        operation_id, owner_uuid, group_id, scope_kind, owner_world_key
+    ),
+    FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    CHECK (owned_delta > 0 OR active_delta > 0),
+    CHECK (
+        (scope_kind = 'GLOBAL' AND owner_world_key = '')
+        OR (scope_kind = 'PER_WORLD'
+            AND length(trim(owner_world_key)) > 0)
+    )
+);
+
+CREATE INDEX idx_population_group_reservation_scope
+    ON population_group_reservation(
+        owner_uuid, group_id, scope_kind, owner_world_key, operation_id
+    );
+
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,
