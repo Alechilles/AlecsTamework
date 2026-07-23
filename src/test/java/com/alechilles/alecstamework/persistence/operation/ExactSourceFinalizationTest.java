@@ -161,6 +161,9 @@ class ExactSourceFinalizationTest {
                         () -> -400
                 ),
                 () -> -400,
+                (claim, operation) -> LiveOperationResult.confirmed(
+                        "refund_receipt_confirmed"
+                ),
                 List.of()
         );
     }

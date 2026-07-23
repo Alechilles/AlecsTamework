@@ -95,7 +95,7 @@ class SqliteCompensationCoordinatorTest {
                 OperationWorkflowResult.Status.COMPENSATION_RETRYABLE,
                 first.status()
         );
-        assertEquals(OperationPhase.RETRYABLE, first.operation().phase());
+        assertEquals(OperationPhase.COMPENSATING, first.operation().phase());
         assertFalse(readClaim().delivered());
 
         OperationWorkflowResult second = compensations.resume(

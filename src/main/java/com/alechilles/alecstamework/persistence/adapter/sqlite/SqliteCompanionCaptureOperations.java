@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -43,19 +44,26 @@ public final class SqliteCompanionCaptureOperations {
             new ProjectionEventType("companion_captured");
 
     private final SqliteLiveOperationCoordinator workflow;
+    private final SqliteCaptureCompensation compensation;
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCompanionCaptureOperations(
             @Nonnull SqliteOperationEngine operations,
             @Nonnull SqliteOperationPublisher publisher,
             @Nonnull LongSupplier clock,
+            @Nonnull RefundDeliveryBoundary refunds,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
         if (operations == null || publisher == null || clock == null
-                || requiredConsumers == null) {
+                || refunds == null || requiredConsumers == null) {
             throw new IllegalArgumentException("Companion capture dependencies are required");
         }
         workflow = new SqliteLiveOperationCoordinator(operations, publisher, clock);
+        compensation = new SqliteCaptureCompensation(
+                operations,
+                clock,
+                refunds
+        );
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -94,7 +102,21 @@ public final class SqliteCompanionCaptureOperations {
                 requiredConsumers,
                 "companion_capture"
         );
-        return new Submission(submission.acceptance(), submission.completion());
+        CompletionStage<OperationWorkflowResult> completion =
+                submission.completion().thenCompose(result -> {
+                    OperationEnvelope operation = result.operation();
+                    if (operation != null
+                            && (result.status()
+                            == OperationWorkflowResult.Status.COMPENSATION_REQUIRED
+                            || operation.phase() == OperationPhase.COMPENSATING
+                            || operation.phase() == OperationPhase.COMPENSATED)) {
+                        return compensation.resume(operation, capture);
+                    }
+                    return java.util.concurrent.CompletableFuture.completedFuture(
+                            result
+                    );
+                });
+        return new Submission(submission.acceptance(), completion);
     }
 
     private List<ProjectionEventDraft> commitCapture(
@@ -268,6 +290,14 @@ public final class SqliteCompanionCaptureOperations {
             if (lifecycle.revision().equals(
                     capture.expectedLifecycleRevision().next()
             ) && operation.operationId().equals(lifecycle.activeOperationId())) {
+                return true;
+            }
+            if (operation.phase() == OperationPhase.COMPENSATED
+                    && SqliteCaptureCompensation.matchesCompleted(
+                    transaction,
+                    operation,
+                    capture
+            )) {
                 return true;
             }
             return (operation.phase() == OperationPhase.DURABLE

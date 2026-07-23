@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionRes
 import com.alechilles.alecstamework.persistence.operation.LiveOperationBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
-import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -179,56 +178,32 @@ public final class SqliteCompensationCoordinator {
             );
             case RETRYABLE -> transitionFailure(
                     operation,
-                    OperationPhase.RETRYABLE,
                     OperationWorkflowResult.Status.COMPENSATION_RETRYABLE,
-                    live,
-                    code
+                    live
             );
             case UNKNOWN, COMPENSATE -> transitionFailure(
                     operation,
-                    OperationPhase.UNKNOWN,
                     OperationWorkflowResult.Status.COMPENSATION_UNKNOWN,
-                    live,
-                    code
+                    live
             );
         };
     }
 
     private CompletionStage<OperationWorkflowResult> transitionFailure(
             OperationEnvelope operation,
-            OperationPhase phase,
             OperationWorkflowResult.Status status,
-            LiveOperationResult live,
-            String code
+            LiveOperationResult live
     ) {
-        return operations.transition(
-                operation,
-                phase,
-                "compensation",
-                live.code(),
-                clock.getAsLong()
-        ).completion().thenApply(result -> {
-            if (result instanceof PersistenceTransactionResult.Committed<?> committed
-                    && committed.value() instanceof OperationEnvelope transitioned) {
-                return SqliteOperationResults.failed(
+        return SqliteOperationResults.completed(
+                SqliteOperationResults.failed(
                         status,
-                        transitioned,
+                        operation,
                         List.of(),
                         live.cause() == null
                                 ? new IllegalStateException(live.code())
                                 : live.cause()
-                );
-            }
-            return SqliteOperationResults.failed(
-                    OperationWorkflowResult.Status.TRANSITION_FAILED,
-                    operation,
-                    List.of(),
-                    SqliteOperationResults.transactionFailure(
-                            result,
-                            code + "_failure_transition_failed"
-                    )
-            );
-        });
+                )
+        );
     }
 
     private <T> CompletionStage<OperationWorkflowResult> commit(

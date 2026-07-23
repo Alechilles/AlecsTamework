@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileProjection
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -62,6 +64,7 @@ class SqliteCompanionCaptureOperationsTest {
     private SqliteSingleWriter writer;
     private SqliteReadExecutor reads;
     private SqliteCompanionCaptureOperations captures;
+    private AtomicInteger refundDeliveries;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -72,6 +75,7 @@ class SqliteCompanionCaptureOperationsTest {
         seedLiveProfile();
         writer = new SqliteSingleWriter(connections);
         reads = new SqliteReadExecutor(connections);
+        refundDeliveries = new AtomicInteger();
         SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
         SqliteOperationEngine engine = new SqliteOperationEngine(
                 new OperationDefinitionRegistry(
@@ -92,6 +96,17 @@ class SqliteCompanionCaptureOperationsTest {
                         () -> -400
                 ),
                 () -> -400,
+                (claim, operation) -> {
+                    refundDeliveries.incrementAndGet();
+                    assertFalse(claim.delivered());
+                    assertEquals(
+                            OperationPhase.COMPENSATING,
+                            operation.phase()
+                    );
+                    return LiveOperationResult.confirmed(
+                            "refund_receipt_confirmed"
+                    );
+                },
                 List.of()
         );
     }
@@ -215,6 +230,62 @@ class SqliteCompanionCaptureOperationsTest {
         assertEquals(LifecycleState.CAPTURED, lifecycle().state());
     }
 
+    @Test
+    void exactRefundCompensatesOnceAndRestoresFencedLiveLifecycle()
+            throws Exception {
+        AtomicInteger captureResolutions = new AtomicInteger();
+
+        OperationWorkflowResult first = submit(
+                5,
+                (capture, operation) -> {
+                    captureResolutions.incrementAndGet();
+                    return LiveOperationResult.compensate(
+                            "source_spent_target_proven_live",
+                            null
+                    );
+                }
+        );
+
+        assertEquals(OperationWorkflowResult.Status.COMPENSATED, first.status());
+        assertEquals(OperationPhase.COMPENSATED, first.operation().phase());
+        assertTrue(first.events().isEmpty());
+        assertEquals(1, captureResolutions.get());
+        assertEquals(1, refundDeliveries.get());
+        RefundClaim delivered = refundClaim(operationId(5));
+        assertTrue(delivered.delivered());
+        assertEquals("capture-device", delivered.itemId());
+        assertEquals(1, delivered.quantity());
+        assertEquals(
+                "refund_receipt_confirmed",
+                delivered.deliveryEvidence()
+        );
+        CompanionLifecycle restored = lifecycle();
+        assertEquals(LifecycleState.ACTIVE, restored.state());
+        assertEquals(new LifecycleRevision(2), restored.revision());
+        assertNull(restored.activeOperationId());
+        assertEquals(
+                LifecycleLocation.liveEntity(ALIAS.toString(), "world"),
+                restored.location()
+        );
+        assertTrue(snapshot().isEmpty());
+
+        OperationWorkflowResult replay = submit(
+                5,
+                (capture, operation) -> {
+                    captureResolutions.incrementAndGet();
+                    return LiveOperationResult.confirmed("must_not_run");
+                }
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED,
+                replay.status()
+        );
+        assertEquals(1, captureResolutions.get());
+        assertEquals(1, refundDeliveries.get());
+        assertEquals(delivered, refundClaim(operationId(5)));
+    }
+
     private OperationWorkflowResult submit(
             int number,
             com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary boundary
@@ -323,6 +394,14 @@ class SqliteCompanionCaptureOperationsTest {
                             PROFILE,
                             CompanionCaptureRequest.SNAPSHOT_KIND
                     );
+        }
+    }
+
+    private RefundClaim refundClaim(OperationId operationId) throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteRefundClaimStore(connection)
+                    .findByOperation(operationId)
+                    .orElseThrow();
         }
     }
 
