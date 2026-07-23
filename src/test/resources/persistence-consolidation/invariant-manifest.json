@@ -80,7 +80,7 @@
     {
       "id": "unknown-commit-readback",
       "contract": "An unknown commit outcome is read back exactly before retry or compensation.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.UnknownCommitReadbackTest",
       "currentTests": [
