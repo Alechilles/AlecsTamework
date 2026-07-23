@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
+import com.alechilles.alecstamework.persistence.compensation.PreparedCompensationDetail;
+import com.alechilles.alecstamework.persistence.compensation.TimedCompensatedOperationWork;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -37,9 +39,9 @@ public final class SqliteOperationEngine {
             new PersistenceReadKind("operation_transition_readback");
     private static final PersistenceReadKind DURABLE_READBACK =
             new PersistenceReadKind("operation_durable_readback");
-
     private final OperationDefinitionRegistry definitions;
     private final SqliteUnitOfWorkRunner units;
+    private final SqliteOperationCompensationEngine compensations;
 
     public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
                                  @Nonnull SqliteUnitOfWorkRunner units) {
@@ -48,6 +50,7 @@ public final class SqliteOperationEngine {
         }
         this.definitions = definitions;
         this.units = units;
+        this.compensations = new SqliteOperationCompensationEngine(units);
     }
 
     /** Encodes and durably prepares one idempotent operation. */
@@ -191,6 +194,36 @@ public final class SqliteOperationEngine {
                 DURABLE_READBACK,
                 connection -> exactDurableReadback(connection, expected)
         ));
+    }
+
+    /**
+     * Atomically records typed compensation detail and enters the shared compensating phase.
+     */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> beginCompensation(
+            @Nonnull OperationEnvelope expected,
+            @Nonnull PreparedCompensationDetail detail,
+            long preparedAtMs
+    ) {
+        return compensations.begin(expected, detail, preparedAtMs);
+    }
+
+    /** Atomically commits compensation evidence, domain cleanup, and the terminal phase. */
+    @Nonnull
+    public <T> SqliteUnitOfWorkRunner.Submission<OperationEnvelope> commitCompensated(
+            @Nonnull OperationEnvelope expected,
+            @Nonnull T payload,
+            @Nonnull String liveEvidence,
+            @Nonnull TimedCompensatedOperationWork<T> work,
+            long compensatedAtMs
+    ) {
+        return compensations.commit(
+                expected,
+                payload,
+                liveEvidence,
+                work,
+                compensatedAtMs
+        );
     }
 
     private DurableCommitEvidence commitDurableTransaction(

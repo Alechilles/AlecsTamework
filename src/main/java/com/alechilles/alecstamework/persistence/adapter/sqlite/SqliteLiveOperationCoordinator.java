@@ -186,6 +186,16 @@ public final class SqliteLiveOperationCoordinator {
             case CONFIRMED -> commit(
                     operation, payload, durableWork, consumers, code
             );
+            case COMPENSATE -> SqliteOperationResults.completed(
+                    SqliteOperationResults.failed(
+                            OperationWorkflowResult.Status.COMPENSATION_REQUIRED,
+                            operation,
+                            List.of(),
+                            live.cause() == null
+                                    ? new IllegalStateException(live.code())
+                                    : live.cause()
+                    )
+            );
             case RETRYABLE -> transitionLiveFailure(
                     operation,
                     OperationPhase.RETRYABLE,

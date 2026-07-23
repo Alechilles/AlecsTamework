@@ -27,25 +27,39 @@ public record OperationWorkflowResult(
             throw new IllegalArgumentException("Operation workflow events are required");
         }
         events = List.copyOf(events);
-        if (status == Status.PUBLISHED && operation == null) {
-            throw new IllegalArgumentException("Published result requires an operation");
+        boolean success = status == Status.PUBLISHED
+                || status == Status.COMPENSATED;
+        if (success && operation == null) {
+            throw new IllegalArgumentException("Successful result requires an operation");
         }
         if (status == Status.PUBLISHED && operation.phase() != OperationPhase.PUBLISHED) {
             throw new IllegalArgumentException("Published result requires a published envelope");
         }
-        if (status != Status.PUBLISHED && failure == null) {
+        if (status == Status.COMPENSATED
+                && operation.phase() != OperationPhase.COMPENSATED) {
+            throw new IllegalArgumentException(
+                    "Compensated result requires a compensated envelope"
+            );
+        }
+        if (!success && failure == null) {
             throw new IllegalArgumentException("Incomplete operation workflow requires a failure");
         }
-        if (status == Status.PUBLISHED && failure != null) {
-            throw new IllegalArgumentException("Published result cannot carry a failure");
+        if (success && failure != null) {
+            throw new IllegalArgumentException("Successful result cannot carry a failure");
         }
     }
 
     /** Stable workflow outcomes used by feature facades and recovery. */
     public enum Status {
         PUBLISHED,
+        COMPENSATED,
         PREPARE_FAILED,
         TRANSITION_FAILED,
+        COMPENSATION_REQUIRED,
+        COMPENSATION_PREPARE_FAILED,
+        COMPENSATION_RETRYABLE,
+        COMPENSATION_UNKNOWN,
+        COMPENSATION_COMMIT_FAILED,
         LIVE_RETRYABLE,
         LIVE_UNKNOWN,
         DURABLE_READ_FAILED,

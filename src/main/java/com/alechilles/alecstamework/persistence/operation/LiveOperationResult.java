@@ -32,6 +32,15 @@ public record LiveOperationResult(@Nonnull Status status,
         return new LiveOperationResult(Status.RETRYABLE, code, cause);
     }
 
+    /** Returns exact evidence that normal completion is impossible and compensation is required. */
+    @Nonnull
+    public static LiveOperationResult compensate(
+            @Nonnull String code,
+            @Nullable Throwable cause
+    ) {
+        return new LiveOperationResult(Status.COMPENSATE, code, cause);
+    }
+
     /** Returns ambiguous evidence that must fail closed until recovery can prove an outcome. */
     @Nonnull
     public static LiveOperationResult unknown(
@@ -43,6 +52,7 @@ public record LiveOperationResult(@Nonnull Status status,
 
     public enum Status {
         CONFIRMED,
+        COMPENSATE,
         RETRYABLE,
         UNKNOWN
     }
