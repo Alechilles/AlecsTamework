@@ -29,6 +29,9 @@ public interface IncidentStore {
     );
 
     @Nonnull
+    List<ScopeQuarantine> findAllActiveQuarantines();
+
+    @Nonnull
     PersistenceMutationResult<ScopeQuarantine> quarantine(@Nonnull ScopeQuarantine quarantine);
 
     @Nonnull

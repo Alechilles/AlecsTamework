@@ -150,6 +150,26 @@ public final class SqliteIncidentStore implements IncidentStore {
     }
 
     @Override
+    public List<ScopeQuarantine> findAllActiveQuarantines() {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT scope_type, scope_key, incident_id, state, reason_code,
+                       created_at_ms, released_at_ms
+                FROM persistence_quarantine
+                WHERE state = 'ACTIVE'
+                ORDER BY scope_type, scope_key
+                """);
+             ResultSet rows = statement.executeQuery()) {
+            ArrayList<ScopeQuarantine> active = new ArrayList<>();
+            while (rows.next()) {
+                active.add(readQuarantine(rows));
+            }
+            return List.copyOf(active);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("quarantine_find_all_active", failure);
+        }
+    }
+
+    @Override
     public PersistenceMutationResult<ScopeQuarantine> quarantine(
             ScopeQuarantine quarantine
     ) {

@@ -77,6 +77,14 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
         return state.get();
     }
 
+    SqliteReadExecutor reads() {
+        return reads;
+    }
+
+    SqliteUnitOfWorkRunner units() {
+        return units;
+    }
+
     /** Stops admission and closes components in writer, checkpoint, then read order. */
     @Nonnull
     public synchronized SqliteKernelShutdownReport shutdown(@Nonnull Duration timeout) {
