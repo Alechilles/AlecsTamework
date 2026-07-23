@@ -19,6 +19,7 @@ public record PersistenceShutdownResult(Status status, int outstandingOperations
     public enum Status {
         DRAINED,
         TIMED_OUT,
+        DEFERRED,
         ALREADY_CLOSED
     }
 }
