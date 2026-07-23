@@ -120,7 +120,11 @@ public final class PublicPersistenceFeatureRegistry {
         return descriptor(
                 OWNER_POPULATION,
                 PersistenceFeatureDomain.POPULATION,
-                Set.of("owner_population_reservation"),
+                Set.of(
+                        "owner_population_reservation",
+                        "population_evidence_batch",
+                        "population_evidence_observation"
+                ),
                 List.of(OwnerPopulationTransitionDefinition.INSTANCE),
                 scopes(
                         OwnerPopulationTransitionDefinition.INSTANCE,

@@ -246,6 +246,61 @@ CREATE INDEX idx_owner_population_reservation_scope
         scope_kind, owner_uuid, owner_world_key, operation_id
     );
 
+CREATE TABLE population_evidence_batch (
+    boot_id TEXT NOT NULL,
+    world_key TEXT NOT NULL,
+    reconciliation_generation INTEGER NOT NULL CHECK (
+        reconciliation_generation >= 0
+    ),
+    source_kind TEXT NOT NULL CHECK (source_kind IN ('DISK', 'LIVE')),
+    status TEXT NOT NULL CHECK (status IN ('OPEN', 'SEALED', 'FAILED')),
+    opened_at_ms INTEGER NOT NULL,
+    closed_at_ms INTEGER,
+    failure_code TEXT,
+    PRIMARY KEY (
+        boot_id, world_key, reconciliation_generation, source_kind
+    ),
+    CHECK (
+        (status = 'OPEN' AND closed_at_ms IS NULL AND failure_code IS NULL)
+        OR (status = 'SEALED' AND closed_at_ms IS NOT NULL
+            AND failure_code IS NULL)
+        OR (status = 'FAILED' AND closed_at_ms IS NOT NULL
+            AND length(trim(failure_code)) > 0)
+    )
+);
+
+CREATE TABLE population_evidence_observation (
+    boot_id TEXT NOT NULL,
+    world_key TEXT NOT NULL,
+    reconciliation_generation INTEGER NOT NULL,
+    source_kind TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    owner_observed INTEGER NOT NULL CHECK (owner_observed IN (0, 1)),
+    owner_uuid TEXT,
+    owner_world_key TEXT,
+    observed_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (
+        boot_id, world_key, reconciliation_generation, source_kind, profile_id
+    ),
+    FOREIGN KEY (
+        boot_id, world_key, reconciliation_generation, source_kind
+    ) REFERENCES population_evidence_batch(
+        boot_id, world_key, reconciliation_generation, source_kind
+    ) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    CHECK (
+        owner_observed = 1
+        OR (owner_uuid IS NULL AND owner_world_key IS NULL)
+    ),
+    CHECK (owner_uuid IS NOT NULL OR owner_world_key IS NULL)
+);
+
+CREATE INDEX idx_population_evidence_profile
+    ON population_evidence_observation(
+        profile_id, boot_id, world_key, reconciliation_generation
+    );
+
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,

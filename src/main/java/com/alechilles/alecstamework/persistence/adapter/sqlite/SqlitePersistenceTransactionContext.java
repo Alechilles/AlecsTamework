@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationPort;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationEvidencePort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaimPort;
 import com.alechilles.alecstamework.persistence.incidents.IncidentStore;
@@ -32,6 +33,7 @@ public final class SqlitePersistenceTransactionContext {
     private final RefundClaimPort refunds;
     private final CompanionCoopPort coops;
     private final OwnerPopulationPort population;
+    private final OwnerPopulationEvidencePort populationEvidence;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -48,6 +50,7 @@ public final class SqlitePersistenceTransactionContext {
         refunds = new SqliteRefundClaimStore(connection);
         coops = new SqliteCompanionCoopStore(connection);
         population = new SqliteOwnerPopulationStore(connection);
+        populationEvidence = new SqliteOwnerPopulationEvidenceStore(connection);
     }
 
     @Nonnull
@@ -107,5 +110,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     OwnerPopulationPort population() {
         return population;
+    }
+
+    @Nonnull
+    OwnerPopulationEvidencePort populationEvidence() {
+        return populationEvidence;
     }
 }
