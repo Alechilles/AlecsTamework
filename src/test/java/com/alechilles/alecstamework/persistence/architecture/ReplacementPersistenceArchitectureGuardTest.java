@@ -166,6 +166,34 @@ class ReplacementPersistenceArchitectureGuardTest {
         );
     }
 
+    @Test
+    void publicRuntimeFacadeDeclaresExactlyTheNineReleasedOperations() {
+        List<String> operations = Stream.of(
+                        com.alechilles.alecstamework.persistence.runtime
+                                .PublicPersistenceOperations.class
+                                .getDeclaredMethods()
+                )
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .map(Method::getName)
+                .sorted()
+                .toList();
+
+        assertEquals(
+                List.of(
+                        "capture",
+                        "captureToCoop",
+                        "makeDormant",
+                        "mutateExtension",
+                        "mutateProfile",
+                        "registerCoopSlot",
+                        "releaseFromCoop",
+                        "restore",
+                        "rotateAlias"
+                ),
+                operations
+        );
+    }
+
     private List<Path> javaFiles(Path root) throws Exception {
         if (!Files.isDirectory(root)) {
             return List.of();
