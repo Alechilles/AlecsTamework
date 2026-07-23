@@ -1,6 +1,6 @@
 # ADR 0008: Owner Population Authority and Admission
 
-- Status: Accepted for Phase 5A implementation
+- Status: Implemented
 - Date: 2026-07-23
 
 ## Context
@@ -112,3 +112,44 @@ remain rejected.
 - Per-world dormant ownership is explicit rather than inferred from a physical
   location or metadata hint.
 - Projection equivalence and sealed-absence rules are independently testable.
+
+## Implementation evidence
+
+Phase 5A is implemented without copying the unreleased population runtime:
+
+- `companion_lifecycle` is the only committed owner and owner-world row;
+- `OwnerPopulationProjectionIndex` rebuilds from canonical lifecycle and consumes
+  the same self-contained lifecycle events emitted by every lifecycle-changing
+  operation;
+- `owner_population_reservation` is an envelope-owned preparation participant
+  with no phase, lease, attempt, readiness, or recovery state;
+- `population_evidence_batch` and `population_evidence_observation` contain only
+  source results and exact observations;
+- `owner_population_transition` and `owner_population_reconciliation` are
+  registry-owned shared operations with the normal recovery and publication
+  paths;
+- a matching exact positive observation advances only the canonical lifecycle
+  reconciliation generation;
+- sealed absence and owner contradictions retain the canonical population count
+  and write the existing incident, profile quarantine, and affected owner
+  quarantine records;
+- same-generation evidence that arrives after an earlier positive observation
+  can still contain a contradiction, while older or duplicate matching evidence
+  is stale.
+
+The July invariants were retained by behavior rather than by repository shape:
+
+| Invariant | Replacement proof |
+| --- | --- |
+| Dormant owned profiles count globally and per owner world | canonical store and projection-index tests |
+| Concurrent requests cannot over-admit | serialized transition-operation test |
+| Preparation and finalization are exact and idempotent | reservation participant and transition-operation tests |
+| Restart recovery owns pending work | registry-routed recovery tests |
+| Process crashes do not duplicate or lose admission | three-boundary forked-JVM crash test |
+| Failed, open, stale, or mixed evidence cannot prove absence | sealed-evidence store tests |
+| Conflicts do not silently choose an owner or free capacity | reconciliation containment tests |
+| A bounded conflict blocks the affected owner, not global persistence | owner-scope quarantine test |
+
+The focused Phase 5A aggregate contains 37 passing tests, including three
+forked-JVM crash boundaries. The final full-suite and architecture gates remain
+part of Phase 8.
