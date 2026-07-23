@@ -2,6 +2,9 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProjection;
+import com.alechilles.alecstamework.companion.command.CommandRoster;
+import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
+import com.alechilles.alecstamework.companion.command.CommandRosterProjectionSeed;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -34,6 +37,7 @@ final class SqlitePublicProjectionSet {
     private final CoopResidencyProjectionIndex coopIndex;
     private final OwnerPopulationProjectionIndex ownerPopulationIndex;
     private final PopulationGroupProjectionIndex populationGroupIndex;
+    private final CommandRosterProjectionIndex commandRosterIndex;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
 
     SqlitePublicProjectionSet(
@@ -62,6 +66,7 @@ final class SqlitePublicProjectionSet {
         this.coopIndex = new CoopResidencyProjectionIndex();
         this.ownerPopulationIndex = new OwnerPopulationProjectionIndex();
         this.populationGroupIndex = new PopulationGroupProjectionIndex();
+        this.commandRosterIndex = new CommandRosterProjectionIndex();
         this.consumers = Map.of(
                 profileObserver.consumerId(),
                 profileObserver,
@@ -70,7 +75,9 @@ final class SqlitePublicProjectionSet {
                 ownerPopulationIndex.consumerId(),
                 ownerPopulationIndex,
                 populationGroupIndex.consumerId(),
-                populationGroupIndex
+                populationGroupIndex,
+                commandRosterIndex.consumerId(),
+                commandRosterIndex
         );
         requireExactRegistryConsumers();
     }
@@ -93,6 +100,11 @@ final class SqlitePublicProjectionSet {
     @Nonnull
     PopulationGroupProjectionIndex populationGroupIndex() {
         return populationGroupIndex;
+    }
+
+    @Nonnull
+    CommandRosterProjectionIndex commandRosterIndex() {
+        return commandRosterIndex;
     }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
@@ -126,10 +138,12 @@ final class SqlitePublicProjectionSet {
     CompletionStage<SqlitePublicProjectionStartupResult> rebuildAndCatchUp(
             @Nonnull SqliteCompanionCoopReader coopReader,
             @Nonnull SqliteCompanionLifecycleReader lifecycleReader,
-            @Nonnull SqlitePopulationGroupReader populationGroupReader
+            @Nonnull SqlitePopulationGroupReader populationGroupReader,
+            @Nonnull SqliteCommandRosterReader commandRosterReader
     ) {
         if (coopReader == null || lifecycleReader == null
-                || populationGroupReader == null) {
+                || populationGroupReader == null
+                || commandRosterReader == null) {
             throw new IllegalArgumentException(
                     "Canonical projection readers are required"
             );
@@ -155,7 +169,9 @@ final class SqlitePublicProjectionSet {
                 );
             }
             return rebuildOwnerPopulation(
-                    lifecycleReader, populationGroupReader
+                    lifecycleReader,
+                    populationGroupReader,
+                    commandRosterReader
             );
         });
     }
@@ -163,7 +179,8 @@ final class SqlitePublicProjectionSet {
     private CompletionStage<SqlitePublicProjectionStartupResult>
     rebuildOwnerPopulation(
             SqliteCompanionLifecycleReader lifecycleReader,
-            SqlitePopulationGroupReader populationGroupReader
+            SqlitePopulationGroupReader populationGroupReader,
+            SqliteCommandRosterReader commandRosterReader
     ) {
         return lifecycleReader.findAll().thenCompose(read -> {
             if (!(read instanceof PersistenceReadResult.Found<
@@ -186,7 +203,9 @@ final class SqlitePublicProjectionSet {
                 );
             }
             return rebuildPopulationGroups(
-                    populationGroupReader, found.value()
+                    populationGroupReader,
+                    commandRosterReader,
+                    found.value()
             );
         });
     }
@@ -194,6 +213,7 @@ final class SqlitePublicProjectionSet {
     private CompletionStage<SqlitePublicProjectionStartupResult>
     rebuildPopulationGroups(
             SqlitePopulationGroupReader populationGroupReader,
+            SqliteCommandRosterReader commandRosterReader,
             List<CompanionLifecycle> lifecycles
     ) {
         return populationGroupReader.findAllAssignments().thenCompose(
@@ -219,9 +239,71 @@ final class SqlitePublicProjectionSet {
                                 failure
                         );
                     }
-                    return catchUp(all(), 0, new ArrayList<>());
+                    return rebuildCommandRosters(
+                            commandRosterReader, lifecycles
+                    );
                 }
         );
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult>
+    rebuildCommandRosters(
+            SqliteCommandRosterReader commandRosterReader,
+            List<CompanionLifecycle> lifecycles
+    ) {
+        return commandRosterReader.findAllRosters().thenCompose(
+                rosterRead -> {
+                    if (!(rosterRead instanceof PersistenceReadResult.Found<
+                            List<CommandRoster>> foundRosters)) {
+                        return completed(
+                                SqlitePublicProjectionStartupResult.Status
+                                        .CANONICAL_READ_FAILED,
+                                List.of(),
+                                readFailure(
+                                        "command_rosters", rosterRead
+                                )
+                        );
+                    }
+                    return commandRosterReader
+                            .findAllProjectionSeeds()
+                            .thenCompose(seedRead -> rebuildCommandRosters(
+                                    foundRosters.value(),
+                                    seedRead,
+                                    lifecycles
+                            ));
+                }
+        );
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult>
+    rebuildCommandRosters(
+            List<CommandRoster> rosters,
+            PersistenceReadResult<List<CommandRosterProjectionSeed>>
+                    seedRead,
+            List<CompanionLifecycle> lifecycles
+    ) {
+        if (!(seedRead instanceof PersistenceReadResult.Found<
+                List<CommandRosterProjectionSeed>> foundSeeds)) {
+            return completed(
+                    SqlitePublicProjectionStartupResult.Status
+                            .CANONICAL_READ_FAILED,
+                    List.of(),
+                    readFailure("command_roster_seeds", seedRead)
+            );
+        }
+        try {
+            commandRosterIndex.rebuild(
+                    rosters, foundSeeds.value(), lifecycles
+            );
+        } catch (Throwable failure) {
+            return completed(
+                    SqlitePublicProjectionStartupResult.Status
+                            .CANONICAL_REBUILD_FAILED,
+                    List.of(),
+                    failure
+            );
+        }
+        return catchUp(all(), 0, new ArrayList<>());
     }
 
     private CompletionStage<SqlitePublicProjectionStartupResult> catchUp(

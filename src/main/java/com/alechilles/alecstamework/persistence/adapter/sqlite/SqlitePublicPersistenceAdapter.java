@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
+import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
@@ -31,6 +32,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteCompanionCoopReader coops;
     private final SqliteProfileExtensionReader extensions;
     private final SqlitePopulationGroupReader populationGroups;
+    private final SqliteCommandRosterReader commandRosters;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
 
@@ -83,6 +85,7 @@ public final class SqlitePublicPersistenceAdapter {
         coops = new SqliteCompanionCoopReader(kernel.reads());
         extensions = new SqliteProfileExtensionReader(kernel.reads());
         populationGroups = new SqlitePopulationGroupReader(kernel.reads());
+        commandRosters = new SqliteCommandRosterReader(kernel.reads());
     }
 
     @Nonnull
@@ -111,6 +114,18 @@ public final class SqlitePublicPersistenceAdapter {
     public SqlitePopulationGroupAssignmentOperations
     populationGroupOperations() {
         return publicOperations.populationGroups();
+    }
+
+    @Nonnull
+    public SqliteCommandRosterMembershipOperations
+    commandRosterOperations() {
+        return publicOperations.commandRosters();
+    }
+
+    @Nonnull
+    public SqliteCommandRosterTransitionOperations
+    commandRosterTransitionOperations() {
+        return publicOperations.commandTransitions();
     }
 
     @Nonnull
@@ -174,6 +189,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteCommandRosterReader commandRosterReader() {
+        return commandRosters;
+    }
+
+    @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
     }
@@ -188,6 +208,11 @@ public final class SqlitePublicPersistenceAdapter {
         return projections.populationGroupIndex();
     }
 
+    @Nonnull
+    public CommandRosterProjectionIndex commandRosterIndex() {
+        return projections.commandRosterIndex();
+    }
+
     /** Loads the complete canonical startup evidence through the read lane. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>
@@ -200,7 +225,7 @@ public final class SqlitePublicPersistenceAdapter {
     public CompletionStage<SqlitePublicProjectionStartupResult>
     buildProjections() {
         return projections.rebuildAndCatchUp(
-                coops, lifecycles, populationGroups
+                coops, lifecycles, populationGroups, commandRosters
         );
     }
 

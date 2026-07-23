@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -27,6 +29,8 @@ final class SqlitePublicOperationSet {
     private final SqliteOwnerPopulationReconciliationOperations
             ownerPopulationReconciliation;
     private final SqlitePopulationGroupAssignmentOperations populationGroups;
+    private final SqliteCommandRosterMembershipOperations commandRosters;
+    private final SqliteCommandRosterTransitionOperations commandTransitions;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -101,6 +105,18 @@ final class SqlitePublicOperationSet {
                 database,
                 projections.requiredFor(
                         PopulationGroupAssignmentDefinition.INSTANCE.kind()
+                )
+        );
+        commandRosters = new SqliteCommandRosterMembershipOperations(
+                database,
+                projections.requiredFor(
+                        CommandRosterMembershipDefinition.INSTANCE.kind()
+                )
+        );
+        commandTransitions = new SqliteCommandRosterTransitionOperations(
+                database,
+                projections.requiredFor(
+                        CommandRosterTransitionDefinition.INSTANCE.kind()
                 )
         );
         captures = new SqliteCompanionCaptureOperations(
@@ -182,6 +198,14 @@ final class SqlitePublicOperationSet {
 
     SqlitePopulationGroupAssignmentOperations populationGroups() {
         return populationGroups;
+    }
+
+    SqliteCommandRosterMembershipOperations commandRosters() {
+        return commandRosters;
+    }
+
+    SqliteCommandRosterTransitionOperations commandTransitions() {
+        return commandTransitions;
     }
 
     SqliteCompanionCaptureOperations captures() {

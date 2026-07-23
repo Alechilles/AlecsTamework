@@ -1,6 +1,10 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
@@ -99,6 +103,28 @@ final class SqlitePublicRecoveryRegistry {
                                 payload(
                                         claim,
                                         PopulationGroupAssignmentRequest.class
+                                )
+                        ).completion()
+                ),
+                Map.entry(
+                        CommandRosterMembershipDefinition.INSTANCE.kind(),
+                        claim -> operations.commandRosters().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        CommandRosterMembershipRequest.class
+                                )
+                        ).completion()
+                ),
+                Map.entry(
+                        CommandRosterTransitionDefinition.INSTANCE.kind(),
+                        claim -> operations.commandTransitions().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        CommandRosterTransitionRequest.class
                                 )
                         ).completion()
                 ),

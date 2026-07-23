@@ -8,5 +8,6 @@ public enum PersistenceFeatureDomain {
     CAPTURE,
     DORMANT,
     COOP,
+    COMMAND,
     EXTENSION
 }
