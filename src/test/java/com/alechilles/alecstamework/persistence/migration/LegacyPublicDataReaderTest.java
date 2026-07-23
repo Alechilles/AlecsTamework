@@ -34,6 +34,12 @@ class LegacyPublicDataReaderTest {
             assertEquals(7, data.aliases().size());
             assertEquals(2, data.toolLinks().size());
             assertEquals(3, data.snapshots().size());
+            assertEquals(
+                    List.of(3, 2, 4),
+                    data.snapshots().stream()
+                            .map(LegacyPublicData.Snapshot::sourceRevision)
+                            .toList()
+            );
             assertEquals(1, data.coopSlots().size());
             assertEquals(6, data.profileStates().size());
             assertEquals(1, data.extensionData().size());

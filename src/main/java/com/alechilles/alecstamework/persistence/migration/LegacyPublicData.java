@@ -55,11 +55,12 @@ record LegacyPublicData(
     ) {
     }
 
+    /** Public snapshot row whose source revision is an aggregate counter, not a codec version. */
     record Snapshot(
             long sourceSnapshotId,
             String profileId,
             String kind,
-            int version,
+            int sourceRevision,
             String payloadJson,
             int active,
             long createdAtMs

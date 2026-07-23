@@ -135,6 +135,15 @@ class LegacyPersistenceFixtureTest {
                                     + " FROM api_profile_data WHERE data_key = 'unicode'"
                     )
             );
+            assertEquals(
+                    3,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM npc_snapshots WHERE snapshot_version > 1"
+                    )
+            );
+            assertRepresentativeLostPayload(connection);
+            assertRepresentativeCoopPayload(connection);
         }
     }
 
@@ -226,6 +235,98 @@ class LegacyPersistenceFixtureTest {
             }
         }
         return false;
+    }
+
+    private void assertRepresentativeLostPayload(Connection connection) throws Exception {
+        JsonObject payload = JsonParser.parseString(queryString(
+                connection,
+                "SELECT payload_json FROM npc_snapshots WHERE snapshot_type = 'lost'"
+        )).getAsJsonObject();
+
+        assertEquals(
+                Set.of(
+                        "lastRelocationQueuedAtMs",
+                        "lostAtMs",
+                        "relocationRetryAttempts",
+                        "recoveredAtMs"
+                ),
+                payload.keySet()
+        );
+        assertFalse(payload.has("sourceNpcUuid"));
+        assertEquals(270L, payload.get("lostAtMs").getAsLong());
+        assertEquals(0L, payload.get("recoveredAtMs").getAsLong());
+    }
+
+    private void assertRepresentativeCoopPayload(Connection connection) throws Exception {
+        JsonObject payload = JsonParser.parseString(queryString(
+                connection,
+                "SELECT state_snapshot_json FROM coop_slots WHERE coop_id = 'fixture-coop'"
+        )).getAsJsonObject();
+
+        assertEquals(
+                Set.of(
+                        "version", "npcUuid", "coopId", "residentSlot", "roleId",
+                        "capturedAtMs", "commandLinks", "owner", "tamed", "npcName",
+                        "happiness", "needs", "breeding", "leveling", "traits",
+                        "talents", "lifeStage", "attachments", "healthPercent"
+                ),
+                payload.keySet()
+        );
+        assertEquals("1", payload.get("version").getAsString());
+        assertEquals("00000000-0000-0000-0000-000000000005",
+                payload.get("npcUuid").getAsString());
+        assertEquals("fixture-coop", payload.get("coopId").getAsString());
+        assertEquals(0, payload.get("residentSlot").getAsInt());
+        assertEquals(280L, payload.get("capturedAtMs").getAsLong());
+        assertEquals(37.5, payload.get("healthPercent").getAsDouble());
+
+        assertJsonObjectKeys(payload, "commandLinks",
+                "ownerId", "toolIds", "hasHome", "homeX", "homeY", "homeZ");
+        assertJsonObjectKeys(payload, "owner", "ownerId", "ownerName");
+        assertJsonObjectKeys(payload, "tamed", "tamed");
+        assertJsonObjectKeys(payload, "npcName",
+                "name", "ownerId", "lastUpdatedMs", "source");
+        assertJsonObjectKeys(payload, "happiness",
+                "configId", "value", "lastUpdateMs", "activeImpulses");
+        assertJsonObjectKeys(payload, "needs",
+                "configId", "hunger", "thirst", "appliedHappinessPenalty",
+                "pendingNeedsDamage", "lastUpdateMs", "lastPassiveSweepMs",
+                "regenSuppressionBaselineHealth", "regenSuppressionAllowedHeal",
+                "lastManagedHealth");
+        assertJsonObjectKeys(payload, "breeding",
+                "configId", "happiness", "lastHappinessUpdateMs", "ready", "enabled",
+                "cooldownUntilMs", "cooldownStartedAtMs", "cooldownDurationMs",
+                "manualBreedingUntilMs");
+        assertJsonObjectKeys(payload, "leveling",
+                "configId", "level", "currentXp", "totalXp", "lastFeedXpAwardedAtMs");
+        assertJsonObjectKeys(payload, "traits", "configId", "rollSeed", "traitValues");
+        assertJsonObjectKeys(payload, "talents",
+                "configId", "spentPoints", "purchasedTalentIds");
+        assertJsonObjectKeys(payload, "lifeStage",
+                "stage", "bornAtMs", "adolescentAtMs", "adultAtMs",
+                "fullyGrownAtMs", "babyScale", "adolescentScale",
+                "adolescentSwitchScale", "adultStartScale", "adultSwitchScale",
+                "adultScale", "growthScalingEnabled", "adultRoleId", "babyRoleId",
+                "adolescentRoleId", "gender");
+        assertJsonObjectKeys(payload, "attachments", "configId", "attachmentIds");
+
+        JsonObject impulse = payload.getAsJsonObject("happiness")
+                .getAsJsonArray("activeImpulses").get(0).getAsJsonObject();
+        assertEquals(Set.of("key", "label", "value", "expiresAtMs", "itemId"),
+                impulse.keySet());
+        JsonObject trait = payload.getAsJsonObject("traits")
+                .getAsJsonArray("traitValues").get(0).getAsJsonObject();
+        assertEquals(Set.of("id", "value"), trait.keySet());
+        assertEquals(Set.of("head"), payload.getAsJsonObject("attachments")
+                .getAsJsonObject("attachmentIds").keySet());
+    }
+
+    private void assertJsonObjectKeys(
+            JsonObject parent,
+            String field,
+            String... expectedKeys
+    ) {
+        assertEquals(Set.of(expectedKeys), parent.getAsJsonObject(field).keySet(), field);
     }
 
     private int countRows(Connection connection, String sql) throws Exception {

@@ -47,6 +47,11 @@ class PublicImportSqlWriterTest {
                 "SELECT payload_version FROM profile_extension_data"));
         assertEquals(1, queryLong(target,
                 "SELECT revision FROM profile_extension_data"));
+        assertEquals(3, queryLong(target, """
+                SELECT COUNT(*) FROM companion_snapshot
+                WHERE snapshot_kind IN ('capture', 'death', 'lost')
+                  AND payload_version = 1
+                """));
         assertEquals(
                 Sha256Hash.ofUtf8(
                         "{\"message\":\"preserve Ω and negative time\",\"worldTimeMs\":-3000}"

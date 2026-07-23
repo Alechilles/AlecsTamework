@@ -29,7 +29,7 @@
     },
     {
       "resource": "public-v4-representative.sql",
-      "normalizedLfSha256": "932e026b332f86e0b19b7438f4fa25fa9c0c51af618523aa52732b2f30757cdc"
+      "normalizedLfSha256": "0de2bd712c248650838ad59c67c0db65272e518b5cb095d4ed8366b8d3290903"
     },
     {
       "resource": "public-v4-conflicting-flags.sql",

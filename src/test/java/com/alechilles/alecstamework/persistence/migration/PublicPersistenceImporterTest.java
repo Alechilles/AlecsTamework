@@ -92,6 +92,32 @@ class PublicPersistenceImporterTest {
     }
 
     @Test
+    void publicSnapshotRevisionCountersDoNotBecomeTargetPayloadVersions() throws Exception {
+        ImportCase testCase = importCase("public-v4-representative.sql");
+
+        assertInstanceOf(
+                PublicImportResult.Imported.class,
+                importer.importSource(testCase.source(), testCase.target())
+        );
+
+        assertEquals(3, queryLong(testCase.source(), """
+                SELECT COUNT(*) FROM npc_snapshots
+                WHERE snapshot_type IN ('capture', 'death', 'lost')
+                  AND snapshot_version > 1
+                """));
+        assertEquals(3, queryLong(testCase.target(), """
+                SELECT COUNT(*) FROM companion_snapshot
+                WHERE snapshot_kind IN ('capture', 'death', 'lost')
+                  AND payload_version = 1
+                """));
+        assertEquals(0, queryLong(testCase.target(), """
+                SELECT COUNT(*) FROM companion_snapshot
+                WHERE snapshot_kind IN ('capture', 'death', 'lost')
+                  AND source_lifecycle_revision <> 0
+                """));
+    }
+
+    @Test
     void refusesCorruptAndDevelopmentSourcesWithNoTargetSideEffects() throws Exception {
         Map<String, ExpectedRefusal> fixtures = Map.of(
                 "public-v4-corrupt-foreign-key.sql",

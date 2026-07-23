@@ -19,6 +19,8 @@ import static com.alechilles.alecstamework.persistence.migration.PublicImportPla
 
 /** Resolves snapshots, coop detail, lifecycle, and bounded quarantine from public evidence. */
 final class PublicImportLifecyclePlanner {
+    private static final int RELEASED_SNAPSHOT_PAYLOAD_VERSION = 1;
+
     @Nonnull
     PublicImportPlanningModel.Lifecycle plan(
             @Nonnull LegacyPublicData source,
@@ -73,7 +75,7 @@ final class PublicImportLifecyclePlanner {
 
     private boolean invalidSnapshotHeader(LegacyPublicData.Snapshot snapshot) {
         return snapshot.kind() == null || snapshot.kind().isBlank()
-                || snapshot.version() <= 0
+                || snapshot.sourceRevision() <= 0
                 || (snapshot.active() != 0 && snapshot.active() != 1);
     }
 
@@ -86,12 +88,19 @@ final class PublicImportLifecyclePlanner {
                         "snapshot:" + snapshot.sourceSnapshotId()),
                 snapshot.profileId(),
                 snapshot.kind(),
-                snapshot.version(),
+                payloadVersion(snapshot),
                 snapshot.payloadJson(),
                 sha256(snapshot.payloadJson()),
                 snapshot.active() == 1,
                 snapshot.createdAtMs()
         );
+    }
+
+    private int payloadVersion(LegacyPublicData.Snapshot snapshot) {
+        return switch (snapshot.kind()) {
+            case "capture", "death", "lost" -> RELEASED_SNAPSHOT_PAYLOAD_VERSION;
+            default -> snapshot.sourceRevision();
+        };
     }
 
     private PublicImportPlanningModel.CoopAnalysis coops(

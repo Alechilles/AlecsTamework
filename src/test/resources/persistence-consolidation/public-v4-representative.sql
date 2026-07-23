@@ -158,7 +158,7 @@ INSERT INTO npc_snapshots(
     (
         '20000000-0000-0000-0000-000000000002',
         'capture',
-        1,
+        3,
         '{"roleId":"Tamework_Captured","displayName":"Captured","capturedAtMs":250,"lastKnownPosition":{"x":1.0,"y":64.0,"z":2.0}}',
         1,
         250
@@ -166,7 +166,7 @@ INSERT INTO npc_snapshots(
     (
         '20000000-0000-0000-0000-000000000003',
         'death',
-        1,
+        2,
         '{"ownerId":"10000000-0000-0000-0000-000000000001","roleId":"Tamework_Dead","displayName":"Dead","diedAtMs":260,"respawnAvailableAtMs":-1000,"breedingCooldownUntilMs":-2000}',
         1,
         260
@@ -174,8 +174,8 @@ INSERT INTO npc_snapshots(
     (
         '20000000-0000-0000-0000-000000000004',
         'lost',
-        1,
-        '{"sourceNpcUuid":"00000000-0000-0000-0000-000000000004","lostAtMs":270,"lastRelocationQueuedAtMs":0,"relocationRetryAttempts":2}',
+        4,
+        '{"lastRelocationQueuedAtMs":0,"lostAtMs":270,"relocationRetryAttempts":2,"recoveredAtMs":0}',
         1,
         270
     );
@@ -197,7 +197,7 @@ INSERT INTO coop_slots(
     280,
     0,
     280,
-    '{"roleId":"Tamework_Coop","displayName":"Cooped","storedAtMs":280}'
+    '{"version":"1","npcUuid":"00000000-0000-0000-0000-000000000005","coopId":"fixture-coop","residentSlot":0,"roleId":"tamework_coop","capturedAtMs":280,"commandLinks":{"ownerId":"10000000-0000-0000-0000-000000000001","toolIds":[],"hasHome":false,"homeX":0.0,"homeY":0.0,"homeZ":0.0},"owner":{"ownerId":"10000000-0000-0000-0000-000000000001","ownerName":"Owner"},"tamed":{"tamed":true},"npcName":{"name":"Cooped","ownerId":"10000000-0000-0000-0000-000000000001","lastUpdatedMs":-100,"source":"Player"},"happiness":{"configId":"happy","value":0.75,"lastUpdateMs":-101,"activeImpulses":[{"key":"fed","label":"Fed","value":0.25,"expiresAtMs":-110,"itemId":"Food_Seeds"}]},"needs":{"configId":"needs","hunger":0.2,"thirst":0.3,"appliedHappinessPenalty":0.1,"pendingNeedsDamage":0.0,"lastUpdateMs":-102,"lastPassiveSweepMs":-103,"regenSuppressionBaselineHealth":-1.0,"regenSuppressionAllowedHeal":0.0,"lastManagedHealth":-1.0},"breeding":{"configId":"breed","happiness":0.8,"lastHappinessUpdateMs":-111,"ready":true,"enabled":true,"cooldownUntilMs":-104,"cooldownStartedAtMs":-105,"cooldownDurationMs":4000,"manualBreedingUntilMs":0},"leveling":{"configId":"level","level":4,"currentXp":20.0,"totalXp":50.0,"lastFeedXpAwardedAtMs":111},"traits":{"configId":"traits","rollSeed":112,"traitValues":[{"id":"friendly","value":1.0}]},"talents":{"configId":"talents","spentPoints":1,"purchasedTalentIds":["swift"]},"lifeStage":{"stage":"Adult","bornAtMs":-106,"adolescentAtMs":-107,"adultAtMs":-108,"fullyGrownAtMs":-109,"babyScale":0.55,"adolescentScale":0.8,"adolescentSwitchScale":0.8,"adultStartScale":0.8,"adultSwitchScale":1.0,"adultScale":1.0,"growthScalingEnabled":true,"adultRoleId":"Tamework_Coop","babyRoleId":"Tamework_Coop_Baby","adolescentRoleId":"Tamework_Coop_Adolescent","gender":"Female"},"attachments":{"configId":"attachments","attachmentIds":{"head":"crest"}},"healthPercent":37.5}'
 );
 
 INSERT INTO profile_states(

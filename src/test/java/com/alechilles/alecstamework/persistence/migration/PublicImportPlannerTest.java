@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.migration;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -76,12 +77,74 @@ class PublicImportPlannerTest {
         assertTrue(plan.incidents().isEmpty());
     }
 
+    @Test
+    void releasedSnapshotRevisionCountersNormalizeWithoutChangingIdentityOrContentEvidence()
+            throws Exception {
+        LegacyPublicData source = read("public-v4-representative.sql", 4);
+        PublicImportPlan plan = new PublicImportPlanner().plan(source, FINGERPRINT, -500);
+        Map<String, PublicImportPlan.Snapshot> targets = plan.snapshots().stream()
+                .filter(snapshot -> !snapshot.kind().equals("coop"))
+                .collect(Collectors.toMap(PublicImportPlan.Snapshot::kind, value -> value));
+
+        for (LegacyPublicData.Snapshot snapshot : source.snapshots()) {
+            PublicImportPlan.Snapshot target = targets.get(snapshot.kind());
+            assertTrue(snapshot.sourceRevision() > 1, snapshot.kind());
+            assertEquals(1, target.payloadVersion(), snapshot.kind());
+            assertEquals(
+                    PublicImportPlanningSupport.deterministicId(
+                            FINGERPRINT.snapshotSha256(),
+                            "snapshot:" + snapshot.sourceSnapshotId()
+                    ),
+                    target.snapshotId(),
+                    snapshot.kind()
+            );
+            assertEquals(snapshot.payloadJson(), target.payloadJson(), snapshot.kind());
+            assertEquals(
+                    PublicImportPlanningSupport.sha256(snapshot.payloadJson()),
+                    target.payloadHash(),
+                    snapshot.kind()
+            );
+        }
+    }
+
+    @Test
+    void unknownSnapshotKindKeepsItsSourceRevisionInsteadOfBeingSilentlyRelabeled()
+            throws Exception {
+        LegacyPublicData source = read("public-v4-representative.sql", 4);
+        ArrayList<LegacyPublicData.Snapshot> snapshots = new ArrayList<>(source.snapshots());
+        snapshots.add(new LegacyPublicData.Snapshot(
+                99,
+                profile(1),
+                "future-kind",
+                7,
+                "{\"future\":true}",
+                0,
+                -200
+        ));
+        LegacyPublicData expanded = new LegacyPublicData(
+                source.profiles(), source.aliases(), source.toolLinks(), snapshots,
+                source.coopSlots(), source.profileStates(), source.extensionData()
+        );
+
+        PublicImportPlan plan = new PublicImportPlanner().plan(expanded, FINGERPRINT, -500);
+
+        PublicImportPlan.Snapshot future = plan.snapshots().stream()
+                .filter(snapshot -> snapshot.kind().equals("future-kind"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(7, future.payloadVersion());
+        assertEquals("{\"future\":true}", future.payloadJson());
+    }
+
     private PublicImportPlan plan(String resource, int version) throws Exception {
+        return new PublicImportPlanner().plan(read(resource, version), FINGERPRINT, -500);
+    }
+
+    private LegacyPublicData read(String resource, int version) throws Exception {
         Path source = tempDir.resolve(resource + ".sqlite");
         PersistenceConsolidationFixtureDatabase.materialize(resource, source);
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + source)) {
-            LegacyPublicData data = new LegacyPublicDataReader().read(connection, version);
-            return new PublicImportPlanner().plan(data, FINGERPRINT, -500);
+            return new LegacyPublicDataReader().read(connection, version);
         }
     }
 
