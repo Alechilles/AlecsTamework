@@ -1,6 +1,6 @@
 # ADR 0010: Command Family and Roster Authority
 
-- Status: Accepted for Phase 5C implementation
+- Status: Implemented in Phase 5C
 - Date: 2026-07-23
 
 ## Context
@@ -70,11 +70,12 @@ change never requires rewriting a membership merely to refresh copied columns.
 Two typed operation kinds use the shared envelope:
 
 1. `command_roster_membership`
-   - create, update, move, or remove one slot;
-   - exact family, membership, metadata, lifecycle, owner, and policy evidence;
+   - create, update, or remove one slot;
+   - exact family, membership, metadata, lifecycle, and owner evidence;
    - removal is rejected while canonical lifecycle is roster-stored in that
      slot;
-   - a move atomically advances both affected family revisions.
+   - changing families is an explicit remove then add while the profile is not
+     roster-stored; there is no second atomic-move protocol.
 2. `command_roster_transition`
    - compare-and-transition canonical lifecycle for an existing exact slot;
    - permits only explicit command-compatible lifecycle pairs;
@@ -130,3 +131,28 @@ locations.
 - The unreleased roster operation table, command-state column, revision-proof
   cache, repository listener list, and direct cross-repository update seams are
   not ported.
+
+## Implementation Evidence
+
+- `command_family` and `command_roster_membership` are the only new command
+  authorities. Neither copies role, owner-world, lifecycle, operation phase,
+  retry, readiness, or count state.
+- Membership and roster/live transition payloads are versioned shared-envelope
+  operations with profile, owner, and command-family participant scopes.
+- Exact metadata, lifecycle, slot, family, and owner evidence is checked during
+  preparation, so stale requests leave no recoverable envelope.
+- Roster-to-live activation composes the existing population-group transition
+  participant and reserves only the positive active delta. Live-to-roster needs
+  no reservation.
+- Membership mutation, lifecycle transition, durable operation evidence,
+  self-contained outbox events, and reservation retirement commit in their
+  respective shared transactions.
+- Startup rebuild joins canonical rosters, profiles, aliases, and lifecycles.
+  Torn seed/lifecycle evidence is rejected; missing or conflicting joins remain
+  fail-closed lag and are omitted from action views.
+- Both operation kinds are routed through the same typed startup recovery
+  registry. Tests recover prepared membership and prepared activation,
+  including preserved admission evidence and exact reservation retirement.
+- The broader command/group composition matrix passes 41 tests across schema,
+  transaction context, stores, codecs, projections, operations, concurrency,
+  startup composition, and recovery.
