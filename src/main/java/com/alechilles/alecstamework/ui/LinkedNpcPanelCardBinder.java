@@ -197,8 +197,7 @@ final class LinkedNpcPanelCardBinder {
                 entry.futureStatB(),
                 showTalentPointAction
         );
-        commandBuilder.set(respawnSelector + ".Visible", showReviveAction);
-        commandBuilder.set(respawnSelector + ".Enabled", !reviveBlocked);
+        commandBuilder.set(respawnSelector + ".Visible", showRespawn);
         bindReviveCosts(
                 commandBuilder,
                 reviveCostPanelSelector,

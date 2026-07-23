@@ -183,6 +183,14 @@ class LinkedNpcPanelCardLayoutTest {
                 binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),
                 "Dead-card costs should replace the inactive badge and locate action instead of overlapping them."
         );
+        assertFalse(
+                binder.contains("respawnSelector + \".Enabled\""),
+                "TextButton has no runtime-settable Enabled markup property; binding it disconnects the client."
+        );
+        assertTrue(
+                binder.contains("respawnSelector + \".Visible\", showRespawn"),
+                "A cap-blocked revive action should be hidden rather than bound through unsupported Enabled state."
+        );
     }
 
     @Test
