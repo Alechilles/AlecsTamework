@@ -9,6 +9,12 @@ CREATE TABLE companion_profile (
     profile_id TEXT PRIMARY KEY,
     display_name TEXT,
     role_id TEXT,
+    metadata_json TEXT CHECK (metadata_json IS NULL OR json_valid(metadata_json)),
+    metadata_hash TEXT CHECK (
+        (metadata_json IS NULL AND metadata_hash IS NULL)
+        OR (metadata_json IS NOT NULL AND length(metadata_hash) = 64)
+    ),
+    last_known_world_key TEXT,
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
     last_active_at_ms INTEGER NOT NULL,
@@ -20,7 +26,7 @@ CREATE TABLE operation_envelope (
     idempotency_key TEXT NOT NULL,
     operation_kind TEXT NOT NULL,
     payload_version INTEGER NOT NULL CHECK (payload_version > 0),
-    payload_json TEXT NOT NULL,
+    payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
     phase TEXT NOT NULL CHECK (phase IN (
         'PREPARED', 'LIVE_APPLYING', 'DURABLE', 'PUBLISHED',
         'COMPENSATING', 'COMPENSATED', 'RETRYABLE', 'FAILED', 'UNKNOWN'
@@ -48,7 +54,7 @@ CREATE TABLE persistence_incident (
     failure_code TEXT NOT NULL,
     state TEXT NOT NULL CHECK (state IN ('OPEN', 'RESOLVED')),
     summary TEXT NOT NULL,
-    evidence_json TEXT NOT NULL,
+    evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json)),
     created_at_ms INTEGER NOT NULL,
     resolved_at_ms INTEGER
 );
@@ -152,7 +158,7 @@ CREATE TABLE companion_snapshot (
     profile_id TEXT NOT NULL,
     snapshot_kind TEXT NOT NULL,
     payload_version INTEGER NOT NULL CHECK (payload_version > 0),
-    payload_json TEXT NOT NULL,
+    payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
     payload_hash TEXT NOT NULL CHECK (length(payload_hash) = 64),
     source_lifecycle_revision INTEGER NOT NULL CHECK (source_lifecycle_revision >= 0),
     is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
@@ -182,7 +188,7 @@ CREATE TABLE profile_extension_data (
     profile_id TEXT NOT NULL,
     namespace TEXT NOT NULL,
     data_key TEXT NOT NULL,
-    json_payload TEXT NOT NULL,
+    json_payload TEXT NOT NULL CHECK (json_valid(json_payload)),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
     PRIMARY KEY (profile_id, namespace, data_key),
@@ -213,7 +219,7 @@ CREATE TABLE projection_outbox (
     aggregate_id TEXT NOT NULL,
     aggregate_revision INTEGER NOT NULL CHECK (aggregate_revision >= 0),
     payload_version INTEGER NOT NULL CHECK (payload_version > 0),
-    payload_json TEXT NOT NULL,
+    payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
     created_at_ms INTEGER NOT NULL,
     FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id),
     UNIQUE (operation_id, event_type, aggregate_id, aggregate_revision)
@@ -266,7 +272,7 @@ CREATE TABLE import_manifest (
     source_schema_version INTEGER NOT NULL CHECK (source_schema_version BETWEEN 2 AND 4),
     importer_version INTEGER NOT NULL CHECK (importer_version > 0),
     source_snapshot_name TEXT NOT NULL,
-    counts_json TEXT NOT NULL,
+    counts_json TEXT NOT NULL CHECK (json_valid(counts_json)),
     completed_at_ms INTEGER NOT NULL,
     UNIQUE (source_sha256, source_schema_version, importer_version)
 );

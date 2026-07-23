@@ -81,6 +81,41 @@ class SqliteSchemaV1ManagerTest {
     }
 
     @Test
+    void canonicalJsonAndMetadataHashesAreDatabaseEnforced() throws Exception {
+        schemas.initialize();
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO companion_profile(
+                         profile_id, display_name, role_id, metadata_json, metadata_hash,
+                         last_known_world_key, created_at_ms, updated_at_ms,
+                         last_active_at_ms, metadata_revision
+                     ) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, 0)
+                     """)) {
+            statement.setString(1, PROFILE_A);
+            statement.setString(2, "{\"worldTimeMs\":-3000}");
+            statement.setString(3, "a".repeat(64));
+            statement.setString(4, "world-a");
+            statement.setLong(5, -5_000);
+            statement.setLong(6, -4_000);
+            statement.setLong(7, -3_000);
+            statement.executeUpdate();
+        }
+        assertEquals("world-a", queryString(
+                "SELECT last_known_world_key FROM companion_profile WHERE profile_id = '" + PROFILE_A + "'"
+        ));
+
+        assertThrows(SQLException.class, () -> execute("""
+                INSERT INTO companion_profile(
+                    profile_id, metadata_json, metadata_hash, created_at_ms,
+                    updated_at_ms, last_active_at_ms, metadata_revision
+                ) VALUES (
+                    '20000000-0000-0000-0000-000000000002',
+                    'not-json', 'short', 0, 0, 0, 0
+                )
+                """));
+    }
+
+    @Test
     void aliasAndSnapshotUniquenessAreDatabaseEnforced() throws Exception {
         schemas.initialize();
         insertProfile(PROFILE_A, 0);
