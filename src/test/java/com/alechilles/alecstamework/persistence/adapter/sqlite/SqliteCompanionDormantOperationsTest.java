@@ -106,7 +106,7 @@ class SqliteCompanionDormantOperationsTest {
         OperationWorkflowResult result = submit(1, request);
 
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
-        assertEquals(2, result.events().size());
+        assertEquals(3, result.events().size());
         CompanionDormantTransitionOutcome outcome =
                 CompanionDormantTransitionEventCodec.decode(
                         result.events().getFirst().payloadVersion(),

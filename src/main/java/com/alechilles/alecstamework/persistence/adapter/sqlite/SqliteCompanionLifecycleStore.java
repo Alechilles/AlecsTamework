@@ -48,6 +48,17 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
     }
 
     @Override
+    public List<CompanionLifecycle> findAll() {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + SELECT_COLUMNS
+                        + " FROM companion_lifecycle ORDER BY profile_id")) {
+            return readRows(statement);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("lifecycle_find_all", failure);
+        }
+    }
+
+    @Override
     public Optional<CompanionLifecycle> findByProfile(ProfileId profileId) {
         require(profileId, "Profile ID");
         try (PreparedStatement statement = connection.prepareStatement(

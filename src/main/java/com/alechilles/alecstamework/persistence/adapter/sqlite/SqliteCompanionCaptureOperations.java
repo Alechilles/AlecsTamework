@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -198,6 +199,12 @@ public final class SqliteCompanionCaptureOperations {
                 SqliteCompanionProfileProjectionComposer.event(
                         operation.operationId(),
                         change
+                ),
+                CompanionLifecycleProjectionChangeCodec.draft(
+                        operation.operationId(),
+                        fenced,
+                        captured,
+                        capturedAtMs
                 )
         );
     }

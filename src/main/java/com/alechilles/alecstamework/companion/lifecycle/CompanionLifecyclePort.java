@@ -14,6 +14,9 @@ import javax.annotation.Nonnull;
  */
 public interface CompanionLifecyclePort {
     @Nonnull
+    List<CompanionLifecycle> findAll();
+
+    @Nonnull
     Optional<CompanionLifecycle> findByProfile(@Nonnull ProfileId profileId);
 
     @Nonnull

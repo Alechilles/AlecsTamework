@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProjection;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -28,6 +30,7 @@ final class SqlitePublicProjectionSet {
     private final PersistenceFeatureRegistry registry;
     private final ProjectionCoordinator coordinator;
     private final CoopResidencyProjectionIndex coopIndex;
+    private final OwnerPopulationProjectionIndex ownerPopulationIndex;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
 
     SqlitePublicProjectionSet(
@@ -54,11 +57,14 @@ final class SqlitePublicProjectionSet {
         CompanionProfileObserverProjection profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.coopIndex = new CoopResidencyProjectionIndex();
+        this.ownerPopulationIndex = new OwnerPopulationProjectionIndex();
         this.consumers = Map.of(
                 profileObserver.consumerId(),
                 profileObserver,
                 coopIndex.consumerId(),
-                coopIndex
+                coopIndex,
+                ownerPopulationIndex.consumerId(),
+                ownerPopulationIndex
         );
         requireExactRegistryConsumers();
     }
@@ -71,6 +77,11 @@ final class SqlitePublicProjectionSet {
     @Nonnull
     CoopResidencyProjectionIndex coopIndex() {
         return coopIndex;
+    }
+
+    @Nonnull
+    OwnerPopulationProjectionIndex ownerPopulationIndex() {
+        return ownerPopulationIndex;
     }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
@@ -102,10 +113,13 @@ final class SqlitePublicProjectionSet {
     /** Rebuilds canonical indexes before catching every declared consumer up. */
     @Nonnull
     CompletionStage<SqlitePublicProjectionStartupResult> rebuildAndCatchUp(
-            @Nonnull SqliteCompanionCoopReader coopReader
+            @Nonnull SqliteCompanionCoopReader coopReader,
+            @Nonnull SqliteCompanionLifecycleReader lifecycleReader
     ) {
-        if (coopReader == null) {
-            throw new IllegalArgumentException("Canonical coop reader is required");
+        if (coopReader == null || lifecycleReader == null) {
+            throw new IllegalArgumentException(
+                    "Canonical projection readers are required"
+            );
         }
         return coopReader.findAllOccupancies().thenCompose(read -> {
             if (!(read instanceof
@@ -114,11 +128,37 @@ final class SqlitePublicProjectionSet {
                         SqlitePublicProjectionStartupResult.Status
                                 .CANONICAL_READ_FAILED,
                         List.of(),
-                        readFailure(read)
+                        readFailure("coop", read)
                 );
             }
             try {
                 coopIndex.rebuild(found.value());
+            } catch (Throwable failure) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_REBUILD_FAILED,
+                        List.of(),
+                        failure
+                );
+            }
+            return rebuildOwnerPopulation(lifecycleReader);
+        });
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult>
+    rebuildOwnerPopulation(SqliteCompanionLifecycleReader lifecycleReader) {
+        return lifecycleReader.findAll().thenCompose(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<
+                    List<CompanionLifecycle>> found)) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_READ_FAILED,
+                        List.of(),
+                        readFailure("lifecycle", read)
+                );
+            }
+            try {
+                ownerPopulationIndex.rebuild(found.value());
             } catch (Throwable failure) {
                 return completed(
                         SqlitePublicProjectionStartupResult.Status
@@ -174,7 +214,10 @@ final class SqlitePublicProjectionSet {
         );
     }
 
-    private Throwable readFailure(PersistenceReadResult<?> read) {
+    private Throwable readFailure(
+            String authority,
+            PersistenceReadResult<?> read
+    ) {
         if (read instanceof PersistenceReadResult.Failed<?> failed) {
             return new IllegalStateException(
                     failed.failure().code(),
@@ -182,7 +225,7 @@ final class SqlitePublicProjectionSet {
             );
         }
         return new IllegalStateException(
-                "canonical_coop_rebuild_read_absent"
+                "canonical_" + authority + "_rebuild_read_absent"
         );
     }
 

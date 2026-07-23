@@ -164,7 +164,7 @@ class SqliteCompanionCoopOperationsTest {
         );
 
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, captured.status());
-        assertEquals(3, captured.events().size());
+        assertEquals(4, captured.events().size());
         assertEquals(LifecycleState.COOP, lifecycle().state());
         assertEquals(new LifecycleRevision(2), lifecycle().revision());
         assertEquals(SLOT.toString(), lifecycle().location().key());

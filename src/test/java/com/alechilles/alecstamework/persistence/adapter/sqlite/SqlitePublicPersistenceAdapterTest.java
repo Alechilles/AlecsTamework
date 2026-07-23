@@ -88,21 +88,23 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.coopReleaseOperations());
         assertNotNull(adapter.extensionOperations());
         assertNotNull(adapter.profileReader());
+        assertNotNull(adapter.lifecycleReader());
         assertNotNull(adapter.coopReader());
         assertNotNull(adapter.extensionReader());
         assertNotNull(adapter.coopIndex());
+        assertNotNull(adapter.ownerPopulationIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
         );
         assertEquals(
-                1,
+                2,
                 adapter.projections().requiredFor(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                2,
+                3,
                 adapter.projections().requiredFor(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 ).size()
@@ -128,8 +130,9 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(2, result.catchUps().size());
+        assertEquals(3, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
+        assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
     }
 
     @Test

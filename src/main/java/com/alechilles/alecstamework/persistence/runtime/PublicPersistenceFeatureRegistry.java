@@ -24,12 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** The complete static descriptor set for released v2-v4 persistence behavior. */
+/** The complete static descriptor set for replacement public persistence behavior. */
 public final class PublicPersistenceFeatureRegistry {
     public static final PersistenceFeatureId IDENTITY =
             new PersistenceFeatureId("core_identity");
     public static final PersistenceFeatureId LIFECYCLE =
             new PersistenceFeatureId("core_lifecycle");
+    public static final PersistenceFeatureId OWNER_POPULATION =
+            new PersistenceFeatureId("owner_population");
     public static final PersistenceFeatureId CAPTURE =
             new PersistenceFeatureId("capture");
     public static final PersistenceFeatureId DORMANT =
@@ -42,6 +44,8 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("public_profile_observer");
     public static final ProjectionConsumerId COOP_INDEX =
             new ProjectionConsumerId("coop_residency_index");
+    public static final ProjectionConsumerId OWNER_POPULATION_INDEX =
+            new ProjectionConsumerId("owner_population_index");
 
     private PublicPersistenceFeatureRegistry() {
     }
@@ -50,6 +54,7 @@ public final class PublicPersistenceFeatureRegistry {
         return new PersistenceFeatureRegistry(List.of(
                 identity(),
                 lifecycle(),
+                ownerPopulation(),
                 capture(),
                 dormant(),
                 coop(),
@@ -77,7 +82,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(),
-                Set.of(PROFILE_OBSERVER),
+                Set.of(PROFILE_OBSERVER, OWNER_POPULATION_INDEX),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
                         PersistenceStartupNode.RECOVER_OPERATIONS,
@@ -98,7 +103,7 @@ public final class PublicPersistenceFeatureRegistry {
                 List.of(),
                 Map.of(),
                 Set.of(IDENTITY),
-                Set.of(PROFILE_OBSERVER),
+                Set.of(PROFILE_OBSERVER, OWNER_POPULATION_INDEX),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
                         PersistenceStartupNode.RECONCILE_WORLD
@@ -106,6 +111,29 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE
+                )
+        );
+    }
+
+    private static PersistenceFeatureDescriptor ownerPopulation() {
+        return descriptor(
+                OWNER_POPULATION,
+                PersistenceFeatureDomain.POPULATION,
+                Set.of("owner_population_reservation"),
+                List.of(),
+                Map.of(),
+                Set.of(IDENTITY, LIFECYCLE),
+                Set.of(OWNER_POPULATION_INDEX),
+                Set.of(
+                        PersistenceStartupNode.LOAD_CANONICAL,
+                        PersistenceStartupNode.RECOVER_OPERATIONS,
+                        PersistenceStartupNode.BUILD_PROJECTIONS,
+                        PersistenceStartupNode.RECONCILE_WORLD
+                ),
+                Set.of(
+                        OperationScopeType.OPERATION,
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER
                 )
         );
     }
@@ -124,7 +152,7 @@ public final class PublicPersistenceFeatureRegistry {
                         )
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
-                Set.of(PROFILE_OBSERVER),
+                Set.of(PROFILE_OBSERVER, OWNER_POPULATION_INDEX),
                 worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
@@ -150,7 +178,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
-                Set.of(PROFILE_OBSERVER),
+                Set.of(PROFILE_OBSERVER, OWNER_POPULATION_INDEX),
                 worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
@@ -184,7 +212,11 @@ public final class PublicPersistenceFeatureRegistry {
                         )
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
-                Set.of(PROFILE_OBSERVER, COOP_INDEX),
+                Set.of(
+                        PROFILE_OBSERVER,
+                        COOP_INDEX,
+                        OWNER_POPULATION_INDEX
+                ),
                 worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,

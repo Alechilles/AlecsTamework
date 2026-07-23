@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChange;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEventCodec;
@@ -130,7 +132,11 @@ public final class SqliteCompanionProfileOperations {
                 outcome,
                 null,
                 after,
-                CompanionProfileProjectionChange.Source.METADATA
+                CompanionProfileProjectionChange.Source.METADATA,
+                new CompanionLifecycleProjectionChange(
+                        null,
+                        create.lifecycle()
+                )
         );
     }
 
@@ -247,20 +253,28 @@ public final class SqliteCompanionProfileOperations {
             OperationId operationId,
             AppliedMutation applied
     ) {
-        ProjectionEventDraft result = event(operationId, applied.outcome());
-        return applied.change() == null
-                ? List.of(result)
-                : List.of(
-                        result,
-                        SqliteCompanionProfileProjectionComposer.event(
-                                operationId,
-                                applied.change()
-                        )
-                );
+        java.util.ArrayList<ProjectionEventDraft> events =
+                new java.util.ArrayList<>();
+        events.add(event(operationId, applied.outcome()));
+        if (applied.change() != null) {
+            events.add(SqliteCompanionProfileProjectionComposer.event(
+                    operationId,
+                    applied.change()
+            ));
+        }
+        if (applied.lifecycleChange() != null) {
+            events.add(CompanionLifecycleProjectionChangeCodec.draft(
+                    operationId,
+                    applied.lifecycleChange().before(),
+                    applied.lifecycleChange().after(),
+                    applied.outcome().updatedAtMs()
+            ));
+        }
+        return List.copyOf(events);
     }
 
     private AppliedMutation unchanged(CompanionProfileMutationOutcome outcome) {
-        return new AppliedMutation(outcome, null);
+        return new AppliedMutation(outcome, null, null);
     }
 
     private AppliedMutation changed(
@@ -268,6 +282,16 @@ public final class SqliteCompanionProfileOperations {
             CompanionProfileProjectionState before,
             CompanionProfileProjectionState after,
             CompanionProfileProjectionChange.Source source
+    ) {
+        return changed(outcome, before, after, source, null);
+    }
+
+    private AppliedMutation changed(
+            CompanionProfileMutationOutcome outcome,
+            CompanionProfileProjectionState before,
+            CompanionProfileProjectionState after,
+            CompanionProfileProjectionChange.Source source,
+            CompanionLifecycleProjectionChange lifecycleChange
     ) {
         return new AppliedMutation(
                 outcome,
@@ -278,7 +302,8 @@ public final class SqliteCompanionProfileOperations {
                         before,
                         after,
                         outcome.updatedAtMs()
-                )
+                ),
+                lifecycleChange
         );
     }
 
@@ -298,7 +323,8 @@ public final class SqliteCompanionProfileOperations {
 
     private record AppliedMutation(
             CompanionProfileMutationOutcome outcome,
-            CompanionProfileProjectionChange change
+            CompanionProfileProjectionChange change,
+            CompanionLifecycleProjectionChange lifecycleChange
     ) {
     }
 }

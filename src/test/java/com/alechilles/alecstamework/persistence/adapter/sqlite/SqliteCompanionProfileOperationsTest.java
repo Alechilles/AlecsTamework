@@ -198,7 +198,13 @@ class SqliteCompanionProfileOperationsTest {
         );
         if (outcome.status() == CompanionProfileMutationOutcome.Status.CREATED
                 || outcome.status() == CompanionProfileMutationOutcome.Status.UPDATED) {
-            assertEquals(2, result.events().size());
+            assertEquals(
+                    outcome.status()
+                            == CompanionProfileMutationOutcome.Status.CREATED
+                            ? 3
+                            : 2,
+                    result.events().size()
+            );
             CompanionProfileProjectionChange change =
                     CompanionProfileProjectionChangeCodec.decode(
                             result.events().get(1).payloadVersion(),

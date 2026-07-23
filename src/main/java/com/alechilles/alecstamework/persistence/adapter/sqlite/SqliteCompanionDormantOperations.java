@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
@@ -171,6 +172,12 @@ public final class SqliteCompanionDormantOperations {
                 ),
                 SqliteCompanionProfileProjectionComposer.event(
                         operation.operationId(), change
+                ),
+                CompanionLifecycleProjectionChangeCodec.draft(
+                        operation.operationId(),
+                        current,
+                        transitioned,
+                        dormant.source().observedAtMs()
                 )
         );
     }

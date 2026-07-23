@@ -10,13 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Completeness and dependency gates for every released persistence feature. */
+/** Completeness and dependency gates for every public persistence feature. */
 class PublicPersistenceFeatureRegistryTest {
     @Test
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(6, registry.descriptors().size());
+        assertEquals(7, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()

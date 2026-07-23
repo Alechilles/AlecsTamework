@@ -142,7 +142,7 @@ class SqliteCompanionCaptureOperationsTest {
 
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(1, liveCalls.get());
-        assertEquals(2, result.events().size());
+        assertEquals(3, result.events().size());
         CompanionCaptureOutcome outcome = CompanionCaptureEventCodec.decode(
                 result.events().getFirst().payloadVersion(),
                 result.events().getFirst().payloadJson()

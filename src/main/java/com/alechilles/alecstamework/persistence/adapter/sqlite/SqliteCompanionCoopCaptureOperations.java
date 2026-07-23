@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.coop.CoopResidency;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionChange;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionCodec;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
@@ -163,13 +164,15 @@ public final class SqliteCompanionCoopCaptureOperations {
                         transaction, capture.profileId()
                 );
         return events(
-                operation, capture, cooped, occupancy, before, after, capturedAtMs
+                operation, capture, fenced, cooped, occupancy, before, after,
+                capturedAtMs
         );
     }
 
     private List<ProjectionEventDraft> events(
             OperationEnvelope operation,
             CompanionCoopCaptureRequest capture,
+            CompanionLifecycle fenced,
             CompanionLifecycle cooped,
             CoopOccupancy occupancy,
             CompanionProfileProjectionState before,
@@ -225,6 +228,12 @@ public final class SqliteCompanionCoopCaptureOperations {
                 ),
                 SqliteCompanionProfileProjectionComposer.event(
                         operation.operationId(), profileChange
+                ),
+                CompanionLifecycleProjectionChangeCodec.draft(
+                        operation.operationId(),
+                        fenced,
+                        cooped,
+                        capturedAtMs
                 )
         );
     }

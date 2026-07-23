@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
@@ -224,6 +225,12 @@ public final class SqliteCompanionRestorationOperations {
                 ),
                 SqliteCompanionProfileProjectionComposer.event(
                         operation.operationId(), change
+                ),
+                CompanionLifecycleProjectionChangeCodec.draft(
+                        operation.operationId(),
+                        fenced,
+                        active,
+                        restoredAtMs
                 )
         );
     }
