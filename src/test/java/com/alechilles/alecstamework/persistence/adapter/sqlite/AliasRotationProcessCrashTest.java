@@ -83,7 +83,7 @@ class AliasRotationProcessCrashTest {
                 assertEquals(CompanionAlias.State.RETIRED, oldAlias.state(), output);
                 assertEquals(CompanionAlias.State.CURRENT, target.state(), output);
                 assertEquals(
-                        1,
+                        2,
                         transaction.outbox()
                                 .findByOperation(AliasRotationProcessCrashChild.OPERATION)
                                 .size(),

@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationEventCodec;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationOutcome;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
@@ -247,6 +249,11 @@ public final class SqliteCompanionAliasRotationOperations {
         return operations.commitDurable(
                 operation,
                 (transaction, current) -> {
+                    CompanionProfileProjectionState before =
+                            SqliteCompanionProfileProjectionComposer.compose(
+                                    transaction,
+                                    rotation.profileId()
+                            );
                     PersistenceMutationResult<CompanionAlias> promoted =
                             transaction.identities().promoteAlias(
                                     rotation.targetAlias(),
@@ -267,15 +274,35 @@ public final class SqliteCompanionAliasRotationOperations {
                                     alias.generation(),
                                     promotedAtMs
                             );
-                    return List.of(new ProjectionEventDraft(
-                            current.operationId(),
-                            EVENT_TYPE,
-                            alias.profileId().toString(),
-                            alias.generation(),
-                            CompanionAliasRotationEventCodec.VERSION,
-                            CompanionAliasRotationEventCodec.encode(outcome),
-                            promotedAtMs
-                    ));
+                    CompanionProfileProjectionState after =
+                            SqliteCompanionProfileProjectionComposer.compose(
+                                    transaction,
+                                    rotation.profileId()
+                            );
+                    CompanionProfileProjectionChange change =
+                            new CompanionProfileProjectionChange(
+                                    CompanionProfileProjectionChange.Source.ALIAS,
+                                    alias.profileId(),
+                                    alias.generation(),
+                                    before,
+                                    after,
+                                    promotedAtMs
+                            );
+                    return List.of(
+                            new ProjectionEventDraft(
+                                    current.operationId(),
+                                    EVENT_TYPE,
+                                    "alias-rotation-result:" + alias.profileId(),
+                                    alias.generation(),
+                                    CompanionAliasRotationEventCodec.VERSION,
+                                    CompanionAliasRotationEventCodec.encode(outcome),
+                                    promotedAtMs
+                            ),
+                            SqliteCompanionProfileProjectionComposer.event(
+                                    current.operationId(),
+                                    change
+                            )
+                    );
                 },
                 promotedAtMs
         ).completion().thenCompose(result -> {

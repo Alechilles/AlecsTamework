@@ -14,6 +14,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -152,7 +154,10 @@ class SqliteCompanionAliasRotationOperationsTest {
         assertEquals(1, second.generation());
         assertEquals(CompanionAlias.State.RETIRED, alias(ALIAS_A).state());
         assertEquals(CompanionAlias.State.CURRENT, alias(ALIAS_B).state());
-        assertEquals(1L, consumer.revisions.get(PROFILE.toString()));
+        assertEquals(
+                1L,
+                consumer.revisions.get("alias-rotation-result:" + PROFILE)
+        );
     }
 
     @Test
@@ -225,11 +230,26 @@ class SqliteCompanionAliasRotationOperationsTest {
     private CompanionAliasRotationOutcome published(OperationWorkflowResult result) {
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
-        assertEquals(1, result.events().size());
-        return CompanionAliasRotationEventCodec.decode(
-                result.events().getFirst().payloadVersion(),
-                result.events().getFirst().payloadJson()
+        assertEquals(2, result.events().size());
+        assertEquals(
+                SqliteCompanionAliasRotationOperations.EVENT_TYPE,
+                result.events().getFirst().eventType()
         );
+        CompanionAliasRotationOutcome outcome =
+                CompanionAliasRotationEventCodec.decode(
+                        result.events().getFirst().payloadVersion(),
+                        result.events().getFirst().payloadJson()
+                );
+        CompanionProfileProjectionChange change =
+                CompanionProfileProjectionChangeCodec.decode(
+                        result.events().get(1).payloadVersion(),
+                        result.events().get(1).payloadJson()
+        );
+        assertEquals(CompanionProfileProjectionChange.Source.ALIAS, change.source());
+        assertEquals(PROFILE, change.profileId());
+        assertEquals(outcome.generation(), change.sourceRevision());
+        assertEquals(outcome.currentAlias(), change.after().currentAlias());
+        return outcome;
     }
 
     private CompanionAlias alias(NpcAlias alias) throws Exception {
