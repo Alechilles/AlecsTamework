@@ -35,4 +35,12 @@ public interface CompanionSnapshotPort {
     PersistenceMutationResult<CompanionSnapshot> replaceCurrent(
             @Nonnull CompanionSnapshot snapshot
     );
+
+    /**
+     * Retires one exact current snapshot after its restoration source is positively finalized.
+     */
+    @Nonnull
+    PersistenceMutationResult<CompanionSnapshot> retireCurrent(
+            @Nonnull SnapshotId snapshotId
+    );
 }

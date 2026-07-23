@@ -146,6 +146,47 @@ public final class SqliteCompanionSnapshotStore implements CompanionSnapshotPort
         }
     }
 
+    @Override
+    public PersistenceMutationResult<CompanionSnapshot> retireCurrent(
+            SnapshotId snapshotId
+    ) {
+        require(snapshotId, "Snapshot ID");
+        CompanionSnapshot existing = findById(snapshotId).orElse(null);
+        if (existing == null) {
+            return PersistenceMutationResult.rejected(
+                    PersistenceMutationStatus.NOT_FOUND
+            );
+        }
+        if (!existing.current()) {
+            return PersistenceMutationResult.applied(existing);
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE companion_snapshot
+                SET is_current = 0
+                WHERE snapshot_id = ? AND is_current = 1
+                """)) {
+            statement.setString(1, snapshotId.toString());
+            if (statement.executeUpdate() != 1) {
+                return PersistenceMutationResult.rejected(
+                        PersistenceMutationStatus.CONFLICT
+                );
+            }
+            return PersistenceMutationResult.applied(new CompanionSnapshot(
+                    existing.snapshotId(),
+                    existing.profileId(),
+                    existing.kind(),
+                    existing.payloadVersion(),
+                    existing.payloadJson(),
+                    existing.payloadHash(),
+                    existing.sourceLifecycleRevision(),
+                    false,
+                    existing.createdAtMs()
+            ));
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("snapshot_retire_current", failure);
+        }
+    }
+
     private PersistenceMutationStatus lifecycleCorrelation(CompanionSnapshot snapshot) {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT revision

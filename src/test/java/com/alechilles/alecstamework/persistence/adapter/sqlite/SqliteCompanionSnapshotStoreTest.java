@@ -112,6 +112,33 @@ class SqliteCompanionSnapshotStoreTest {
         }
     }
 
+    @Test
+    void retiresOneExactCurrentSnapshotIdempotently() throws Exception {
+        try (Connection connection = transaction()) {
+            createProfileAndLifecycle(connection);
+            SqliteCompanionSnapshotStore store =
+                    new SqliteCompanionSnapshotStore(connection);
+            CompanionSnapshot snapshot = snapshot(
+                    SNAPSHOT_A,
+                    "{\"generation\":1}",
+                    0,
+                    -9_000
+            );
+            assertTrue(store.replaceCurrent(snapshot).applied());
+
+            CompanionSnapshot retired = store.retireCurrent(
+                    snapshot.snapshotId()
+            ).value();
+
+            assertFalse(retired.current());
+            assertFalse(store.findById(snapshot.snapshotId())
+                    .orElseThrow()
+                    .current());
+            assertTrue(store.retireCurrent(snapshot.snapshotId()).applied());
+            connection.commit();
+        }
+    }
+
     private Connection transaction() throws Exception {
         Connection connection = connections.openWriterConnection();
         connection.setAutoCommit(false);
