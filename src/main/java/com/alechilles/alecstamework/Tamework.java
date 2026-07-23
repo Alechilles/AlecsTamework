@@ -190,6 +190,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryWiring;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
 import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;
@@ -954,7 +955,12 @@ public class Tamework extends JavaPlugin {
             getLogger().at(Level.WARNING).log(
                     "Capture-attempt recovery did not become ready; CAPTURE_POLICY remains unavailable.");
         }
-        traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
+        traitEffectRegistry = new TraitEffectRegistry(
+                getLogger(),
+                new LegacyNpcProfilesApi(
+                        persistenceRuntime.getNpcProfileRepository()
+                )
+        );
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = TameworkPopulationRuntimeLifecycle
                 .createStateSnapshotService(persistenceRuntime, ownerPopulationRuntime);

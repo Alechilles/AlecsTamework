@@ -4,10 +4,10 @@ import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.api.TraitEffectContext;
 import com.alechilles.alecstamework.api.TraitEffectContribution;
 import com.alechilles.alecstamework.api.TraitEffectHandler;
+import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -34,12 +34,15 @@ public final class TraitEffectRegistry implements TraitEffectApi, TraitEffectRun
     @Nullable
     private final HytaleLogger logger;
     @Nullable
-    private final NpcProfileRepository profileRepository;
+    private final NpcProfilesApi profiles;
     private final ConcurrentHashMap<String, TraitEffectHandler> handlers = new ConcurrentHashMap<>();
 
-    public TraitEffectRegistry(@Nullable HytaleLogger logger, @Nullable NpcProfileRepository profileRepository) {
+    public TraitEffectRegistry(
+            @Nullable HytaleLogger logger,
+            @Nullable NpcProfilesApi profiles
+    ) {
         this.logger = logger;
-        this.profileRepository = profileRepository;
+        this.profiles = profiles;
     }
 
     @Override
@@ -198,10 +201,10 @@ public final class TraitEffectRegistry implements TraitEffectApi, TraitEffectRun
 
     @Nullable
     private String resolveProfileId(@Nullable UUID npcUuid) {
-        if (npcUuid == null || profileRepository == null) {
+        if (npcUuid == null || profiles == null) {
             return null;
         }
-        return profileRepository.resolveProfileId(npcUuid);
+        return profiles.resolveProfileId(npcUuid).orElse(null);
     }
 
     private static Map<String, TwTraitConfig.TraitDefinition> buildDefinitionMap(TwTraitConfig config) {

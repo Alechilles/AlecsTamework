@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import org.joml.Vector3d;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
@@ -55,7 +56,12 @@ class TameworkApiImplTest {
                     bus,
                     stateSnapshotService,
                     new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
+                    new TraitEffectRegistry(
+                            null,
+                            new LegacyNpcProfilesApi(
+                                    runtime.getNpcProfileRepository()
+                            )
+                    )
             );
 
             assertEquals("0.9.0", api.getApiVersion());

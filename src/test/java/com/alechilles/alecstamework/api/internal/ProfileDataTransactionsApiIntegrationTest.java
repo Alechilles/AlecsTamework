@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,12 @@ class ProfileDataTransactionsApiIntegrationTest {
                     new TameworkEventBus(null),
                     null,
                     new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository()));
+                    new TraitEffectRegistry(
+                            null,
+                            new LegacyNpcProfilesApi(
+                                    runtime.getNpcProfileRepository()
+                            )
+                    ));
 
             assertTrue(api.getCapabilities().contains(
                     TameworkApiCapability.PROFILE_DATA_TRANSACTIONS));

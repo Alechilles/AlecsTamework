@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.World
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsDamageBridgeFixture;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -69,7 +70,12 @@ class SimpleClaimsDamageAdapterParityTest {
                     new TameworkEventBus(null),
                     null,
                     new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository()),
+                    new TraitEffectRegistry(
+                            null,
+                            new LegacyNpcProfilesApi(
+                                    runtime.getNpcProfileRepository()
+                            )
+                    ),
                     policyFixture.policy()
             );
             DamagePolicyDecisionView apiDecision = apiAdapter.evaluateDamage(
