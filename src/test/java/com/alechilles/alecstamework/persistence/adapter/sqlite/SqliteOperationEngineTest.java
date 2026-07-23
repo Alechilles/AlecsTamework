@@ -37,6 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end tests for staged canonical operation transactions and exact readback. */
@@ -129,6 +130,28 @@ class SqliteOperationEngineTest {
 
         assertEquals(OperationPhase.DURABLE, durable.operation().phase());
         assertEquals(1, durable.events().size());
+    }
+
+    @Test
+    void publicAdmissionIsCheckedBeforeWriterSubmission() {
+        AtomicInteger admissions = new AtomicInteger();
+        SqliteOperationEngine gated = new SqliteOperationEngine(
+                definitions,
+                new SqliteUnitOfWorkRunner(writer, reads),
+                (kind, featureScope, participants) -> {
+                    admissions.incrementAndGet();
+                    throw new IllegalStateException("startup_not_ready");
+                }
+        );
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> gated.prepare(definition, request())
+        );
+
+        assertEquals("startup_not_ready", failure.getMessage());
+        assertEquals(1, admissions.get());
+        assertEquals(0, writer.outstandingOperations());
     }
 
     @Test

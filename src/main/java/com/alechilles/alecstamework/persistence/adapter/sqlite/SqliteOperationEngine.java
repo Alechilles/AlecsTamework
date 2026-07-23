@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
+import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.compensation.PreparedCompensationDetail;
 import com.alechilles.alecstamework.persistence.compensation.TimedCompensatedOperationWork;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
@@ -41,16 +42,30 @@ public final class SqliteOperationEngine {
             new PersistenceReadKind("operation_durable_readback");
     private final OperationDefinitionRegistry definitions;
     private final SqliteUnitOfWorkRunner units;
+    private final PersistenceOperationAdmissionGate admission;
     private final SqliteOperationCompensationEngine compensations;
     private final SqliteOperationContainmentEngine containment;
 
     public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
                                  @Nonnull SqliteUnitOfWorkRunner units) {
-        if (definitions == null || units == null) {
+        this(
+                definitions,
+                units,
+                PersistenceOperationAdmissionGate.allowAll()
+        );
+    }
+
+    public SqliteOperationEngine(
+            @Nonnull OperationDefinitionRegistry definitions,
+            @Nonnull SqliteUnitOfWorkRunner units,
+            @Nonnull PersistenceOperationAdmissionGate admission
+    ) {
+        if (definitions == null || units == null || admission == null) {
             throw new IllegalArgumentException("Operation engine dependencies are required");
         }
         this.definitions = definitions;
         this.units = units;
+        this.admission = admission;
         this.compensations = new SqliteOperationCompensationEngine(units);
         this.containment = new SqliteOperationContainmentEngine(units);
     }
@@ -79,6 +94,11 @@ public final class SqliteOperationEngine {
         if (detail == null) {
             throw new IllegalArgumentException("Prepared operation detail is required");
         }
+        admission.requireAdmission(
+                definition.kind(),
+                request.featureScope(),
+                request.participants()
+        );
         OperationDefinitionRegistry.EncodedOperation encoded =
                 definitions.encode(definition, request.payload());
         PreparedOperation prepared = new PreparedOperation(
