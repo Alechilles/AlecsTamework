@@ -76,6 +76,29 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.targetOrigin();
     }
 
+    /** Returns the one typed mutation facade after the target is open. */
+    @Nonnull
+    public PublicPersistenceOperations operations() {
+        return state.requireOperations();
+    }
+
+    /**
+     * Returns typed reads after canonical startup state has been validated.
+     * Reads remain available if a later bounded startup step fails closed.
+     */
+    @Nonnull
+    public PublicPersistenceQueries queries() {
+        if (!startup.report().completedNodes().contains(
+                com.alechilles.alecstamework.persistence.control
+                        .PersistenceStartupNode.LOAD_CANONICAL
+        )) {
+            throw new IllegalStateException(
+                    "public_persistence_canonical_reads_not_ready"
+            );
+        }
+        return state.requireQueries();
+    }
+
     /** Executes or resumes the ordered, bounded shutdown protocol. */
     @Nonnull
     public PublicPersistenceShutdownReport shutdown(

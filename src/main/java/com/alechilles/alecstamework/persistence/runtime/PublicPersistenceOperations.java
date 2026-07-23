@@ -1,0 +1,187 @@
+package com.alechilles.alecstamework.persistence.runtime;
+
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseRequest;
+import com.alechilles.alecstamework.companion.coop.CoopSlotRegistration;
+import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
+import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmission;
+import java.util.concurrent.CompletionStage;
+import javax.annotation.Nonnull;
+
+/**
+ * Adapter-neutral mutation facade for all released public persistence behavior.
+ *
+ * <p>Every method enters the same admission, envelope, projection, recovery,
+ * and shutdown workflow.</p>
+ */
+public final class PublicPersistenceOperations {
+    private final SqlitePublicPersistenceAdapter adapter;
+    private final PublicPersistenceLiveBoundaries boundaries;
+    private final PublicPersistenceWorkflowTracker workflows;
+
+    PublicPersistenceOperations(
+            SqlitePublicPersistenceAdapter adapter,
+            PublicPersistenceLiveBoundaries boundaries,
+            PublicPersistenceWorkflowTracker workflows
+    ) {
+        this.adapter = adapter;
+        this.boundaries = boundaries;
+        this.workflows = workflows;
+    }
+
+    @Nonnull
+    public PublicOperationSubmission mutateProfile(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionProfileMutation mutation
+    ) {
+        var submitted = adapter.profileOperations().submit(
+                operationId, idempotencyKey, mutation
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission rotateAlias(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionAliasRotation rotation
+    ) {
+        var submitted = adapter.aliasOperations().submit(
+                operationId,
+                idempotencyKey,
+                rotation,
+                boundaries.aliases()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission capture(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionCaptureRequest capture
+    ) {
+        var submitted = adapter.captureOperations().submit(
+                operationId,
+                idempotencyKey,
+                capture,
+                boundaries.captures()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission makeDormant(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionDormantTransitionRequest dormant
+    ) {
+        var submitted = adapter.dormantOperations().submit(
+                operationId, idempotencyKey, dormant
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission restore(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionRestorationRequest restoration
+    ) {
+        var submitted = adapter.restorationOperations().submit(
+                operationId,
+                idempotencyKey,
+                restoration,
+                boundaries.restorations()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission registerCoopSlot(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CoopSlotRegistration registration
+    ) {
+        var submitted = adapter.coopSlotOperations().submit(
+                operationId, idempotencyKey, registration
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission captureToCoop(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionCoopCaptureRequest capture
+    ) {
+        var submitted = adapter.coopCaptureOperations().submit(
+                operationId,
+                idempotencyKey,
+                capture,
+                boundaries.coopCaptures()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission releaseFromCoop(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionCoopReleaseRequest release
+    ) {
+        var submitted = adapter.coopReleaseOperations().submit(
+                operationId,
+                idempotencyKey,
+                release,
+                boundaries.coopReleases()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission mutateExtension(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull ProfileExtensionMutation mutation
+    ) {
+        SqliteDatabaseOperationCoordinator.Submission submitted =
+                adapter.extensionOperations().submit(
+                        operationId, idempotencyKey, mutation
+                );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    private PublicOperationSubmission submission(
+            SqliteSingleWriter.WriteAcceptance acceptance,
+            CompletionStage<OperationWorkflowResult> completion
+    ) {
+        PublicOperationSubmission.Admission publicAdmission =
+                switch (acceptance) {
+                    case ACCEPTED ->
+                            PublicOperationSubmission.Admission.ACCEPTED;
+                    case CANCELLED_BEFORE_ACCEPTANCE ->
+                            PublicOperationSubmission.Admission
+                                    .CANCELLED_BEFORE_ACCEPTANCE;
+                    case REJECTED ->
+                            PublicOperationSubmission.Admission.REJECTED;
+                };
+        CompletionStage<OperationWorkflowResult> tracked =
+                publicAdmission == PublicOperationSubmission.Admission.ACCEPTED
+                        ? workflows.track(completion)
+                        : completion;
+        return new PublicOperationSubmission(publicAdmission, tracked);
+    }
+}

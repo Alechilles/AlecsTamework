@@ -38,6 +38,8 @@ final class PublicPersistenceRuntimeState {
     private SqliteSchemaV1Manager schemas;
     private SqlitePersistenceKernel kernel;
     private SqlitePublicPersistenceAdapter adapter;
+    private PublicPersistenceOperations operations;
+    private PublicPersistenceQueries queries;
     private SqlitePublicCanonicalSnapshot canonical;
     private boolean worldQuiesced;
     private PublicPersistenceShutdownReport terminalShutdown;
@@ -98,6 +100,16 @@ final class PublicPersistenceRuntimeState {
             );
         }
         return adapter;
+    }
+
+    PublicPersistenceOperations requireOperations() {
+        requireAdapter();
+        return operations;
+    }
+
+    PublicPersistenceQueries requireQueries() {
+        requireAdapter();
+        return queries;
     }
 
     PublicPersistenceWorkflowTracker workflows() {
@@ -188,6 +200,12 @@ final class PublicPersistenceRuntimeState {
                 configuration.refunds(),
                 configuration.profileListener()
         );
+        operations = new PublicPersistenceOperations(
+                adapter,
+                configuration.liveBoundaries(),
+                workflows
+        );
+        queries = new PublicPersistenceQueries(adapter);
         return complete();
     }
 
