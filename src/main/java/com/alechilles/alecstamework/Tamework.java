@@ -2903,7 +2903,13 @@ public class Tamework extends JavaPlugin {
             persistenceRuntime.getReadExecutor().submit(repository::loadAllSessions)
                     .toCompletableFuture().join();
             var recovery = service.recover(System.currentTimeMillis()).toCompletableFuture().join();
-            commandTimedSummoningRecoveryReady = recovery.ready();
+            var storedConvergence = service.convergeStoredPopulation().toCompletableFuture().join();
+            commandTimedSummoningRecoveryReady = recovery.ready() && storedConvergence.ready();
+            if (storedConvergence.converged() > 0) {
+                getLogger().at(Level.INFO).log(
+                        "Repaired " + storedConvergence.converged()
+                                + " stored command companion population projection(s).");
+            }
             if (!commandTimedSummoningRecoveryReady || !projection.available()) {
                 getLogger().at(Level.WARNING).log(
                         "Timed command summoning recovery/projection is not ready; capability remains unavailable.");

@@ -244,6 +244,25 @@ public final class CommandTimedSummonPopulationPort
         });
     }
 
+    @Override
+    public CompletionStage<CommandTimedSummoningService.PopulationDecision> convergeRosterStored(
+            CommandTimedSummoningService.PopulationContext context) {
+        OwnerPopulationEntry owner = owner(context);
+        if (owner == null) return completed(denied("population-stored-convergence-profile-missing"));
+        if (owner.lifecycleState() == CompanionLifecycleState.ROSTER_STORED) {
+            return completed(accepted("population-already-roster-stored"));
+        }
+        if (owner.lifecycleState() == CompanionLifecycleState.STORING) {
+            return recoverRosterStored(context, null);
+        }
+        if (owner.lifecycleState() != CompanionLifecycleState.ACTIVE
+                && owner.lifecycleState() != CompanionLifecycleState.UNLOADED) {
+            return completed(denied("population-stored-convergence-source-invalid"));
+        }
+        return beginStoring(context).thenCompose(storing -> storing.accepted()
+                ? commitRosterStored(context) : completed(storing));
+    }
+
     private CompletionStage<CommandTimedSummoningService.PopulationDecision> transition(
             CommandTimedSummoningService.PopulationContext context,
             OwnerPopulationEntry owner,

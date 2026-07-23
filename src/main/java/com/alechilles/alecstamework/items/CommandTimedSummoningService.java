@@ -209,7 +209,7 @@ public final class CommandTimedSummoningService {
     /** Checkpoints leases, emits each threshold once, and stores every expired active projection. */
     @Nonnull
     public CompletionStage<TickResult> tick(long nowMs) {
-        return recover(nowMs).thenCompose(ignored -> tickProjected(nowMs));
+        return tickProjected(nowMs);
     }
 
     @Nonnull
@@ -254,6 +254,34 @@ public final class CommandTimedSummoningService {
                     .thenApply(accumulator::include));
         }
         return chain.thenApply(RecoveryAccumulator::result);
+        }).exceptionally(failure -> new RecoveryResult(0, 0, 1));
+    }
+
+    /**
+     * Reasserts the dormant population invariant for already-committed stored sessions.
+     * This repairs a crash or an older runtime race that committed the timed session before
+     * its population projection stopped occupying active capacity.
+     */
+    @Nonnull
+    public CompletionStage<RecoveryResult> convergeStoredPopulation() {
+        return reads.submit(repository::loadAllSessions).thenCompose(sessions -> {
+            CompletionStage<RecoveryAccumulator> chain =
+                    CompletableFuture.completedFuture(new RecoveryAccumulator());
+            for (CommandTimedSummonSessionRecord session : sessions) {
+                if (session.state() != CommandTimedSummonSessionRecord.State.ROSTER_STORED) continue;
+                PopulationContext context = new PopulationContext(
+                        session.ownerUuid(), session.commandFamilyId(), session.profileId(),
+                        null, null, null, null, null, null,
+                        "startup-stored-convergence:" + session.profileId());
+                chain = chain.thenCompose(accumulator ->
+                        population.convergeRosterStored(context).thenApply(decision ->
+                                accumulator.include(decision.accepted()
+                                        ? "population-already-roster-stored".equals(decision.reason())
+                                                ? ActionResult.noop(session, decision.reason())
+                                                : ActionResult.success(session, decision.reason())
+                                        : ActionResult.recovering(decision.reason()))));
+            }
+            return chain.thenApply(RecoveryAccumulator::result);
         }).exceptionally(failure -> new RecoveryResult(0, 0, 1));
     }
 
@@ -589,6 +617,10 @@ public final class CommandTimedSummoningService {
         default CompletionStage<PopulationDecision> recoverRosterStored(
                 PopulationContext context, @Nullable String populationOperationId) {
             return CompletableFuture.completedFuture(PopulationDecision.denied("population-recovery-unavailable"));
+        }
+        default CompletionStage<PopulationDecision> convergeRosterStored(PopulationContext context) {
+            return CompletableFuture.completedFuture(PopulationDecision.denied(
+                    "population-stored-convergence-unavailable"));
         }
     }
 

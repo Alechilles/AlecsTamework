@@ -83,6 +83,59 @@ class CommandTimedSummoningServiceTest {
     }
 
     @Test
+    void leaseTickDoesNotRecoverAStorageOperationThatIsStillDespawning() throws Exception {
+        try (Fixture fixture = new Fixture(tempDir.resolve("service-live-storage.sqlite"), 1)) {
+            fixture.addStored("dragon-a", 1_000L, 0L, new long[0]);
+            assertEquals(CommandTimedSummoningService.Status.SUCCESS,
+                    await(fixture.summon("dragon-a", "summon-a", 1_000L)).status());
+            CompletableFuture<CommandTimedSummoningService.ProjectionResult> despawn =
+                    new CompletableFuture<>();
+            fixture.projections.pendingStorage = despawn;
+            fixture.projections.recoveryEvidence =
+                    CommandTimedSummoningService.ProjectionEvidence.ABSENT;
+
+            CompletionStage<CommandTimedSummoningService.ActionResult> dismissal =
+                    fixture.service.dismiss(new CommandTimedSummoningService.DismissRequest(
+                            fixture.owner, fixture.family, fixture.profile("dragon-a"), 1L,
+                            null, "dismiss-a", 1_010L));
+            fixture.projections.storageStarted.toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+            await(fixture.service.tick(1_011L));
+
+            assertEquals(0, fixture.projections.inspections);
+            assertEquals(CommandTimedSummonSessionRecord.State.STORING,
+                    fixture.repository.findSession(
+                            fixture.owner, fixture.family, fixture.profile("dragon-a")).state());
+            assertEquals(1, fixture.population.active);
+
+            despawn.complete(new CommandTimedSummoningService.ProjectionResult(
+                    CommandTimedSummoningService.ProjectionOutcome.SUCCESS,
+                    null, "stored"));
+            assertEquals(CommandTimedSummoningService.Status.SUCCESS, await(dismissal).status());
+            assertEquals(CommandTimedSummonSessionRecord.State.ROSTER_STORED,
+                    fixture.repository.findSession(
+                            fixture.owner, fixture.family, fixture.profile("dragon-a")).state());
+            assertEquals(0, fixture.population.active);
+        }
+    }
+
+    @Test
+    void startupConvergenceRepairsStoredSessionStillOccupyingActiveCapacity() throws Exception {
+        try (Fixture fixture = new Fixture(tempDir.resolve("service-stored-convergence.sqlite"), 1)) {
+            fixture.addStored("dragon-a", 1_000L, 0L, new long[0]);
+            fixture.population.active = 1;
+
+            CommandTimedSummoningService.RecoveryResult result =
+                    await(fixture.service.convergeStoredPopulation());
+
+            assertTrue(result.ready());
+            assertEquals(1, result.converged());
+            assertEquals(1, fixture.population.storedConvergences);
+            assertEquals(0, fixture.population.active);
+        }
+    }
+
+    @Test
     void initialProjectionFailureLeavesProvisionedCompanionDormantWithoutLease() throws Exception {
         try (Fixture fixture = new Fixture(tempDir.resolve("service-initial-projection.sqlite"), 1)) {
             String profile = fixture.harness.insertProfile(
@@ -172,6 +225,7 @@ class CommandTimedSummoningServiceTest {
         private final int maxActive;
         private int pending;
         private int active;
+        private int storedConvergences;
         private FakePopulation(int maxActive) { this.maxActive = maxActive; }
 
         public CompletionStage<CommandTimedSummoningService.PopulationReservation> reserveActive(
@@ -209,6 +263,12 @@ class CommandTimedSummoningServiceTest {
         }
         public CompletionStage<CommandTimedSummoningService.PopulationDecision> rollbackStoring(
                 CommandTimedSummoningService.PopulationContext context) { return accepted("active"); }
+        public CompletionStage<CommandTimedSummoningService.PopulationDecision> convergeRosterStored(
+                CommandTimedSummoningService.PopulationContext context) {
+            storedConvergences++;
+            if (active > 0) active--;
+            return accepted("stored-converged");
+        }
         private CompletionStage<CommandTimedSummoningService.PopulationDecision> accepted(String reason) {
             return CompletableFuture.completedFuture(
                     CommandTimedSummoningService.PopulationDecision.accepted(reason));
@@ -217,6 +277,11 @@ class CommandTimedSummoningServiceTest {
 
     private static final class FakeProjection implements CommandTimedSummoningService.ProjectionPort {
         private int frontPlans;
+        private int inspections;
+        private CompletableFuture<Void> storageStarted = new CompletableFuture<>();
+        private CompletionStage<CommandTimedSummoningService.ProjectionResult> pendingStorage;
+        private CommandTimedSummoningService.ProjectionEvidence recoveryEvidence =
+                CommandTimedSummoningService.ProjectionEvidence.AMBIGUOUS;
         private CommandTimedSummoningService.ProjectionOutcome spawnOutcome =
                 CommandTimedSummoningService.ProjectionOutcome.SUCCESS;
         private CommandTimedSummoningService.ProjectionOutcome storageOutcome =
@@ -240,8 +305,15 @@ class CommandTimedSummoningServiceTest {
         }
         public CompletionStage<CommandTimedSummoningService.ProjectionResult> snapshotAndDespawn(
                 CommandTimedSummoningService.PopulationContext context, String sessionId) {
+            storageStarted.complete(null);
+            if (pendingStorage != null) return pendingStorage;
             return CompletableFuture.completedFuture(new CommandTimedSummoningService.ProjectionResult(
                     storageOutcome, context.projectionNpcUuid(), storageOutcome.name().toLowerCase()));
+        }
+        public CompletionStage<CommandTimedSummoningService.ProjectionEvidence> inspect(
+                CommandTimedSummoningService.PopulationContext context, String sessionId) {
+            inspections++;
+            return CompletableFuture.completedFuture(recoveryEvidence);
         }
     }
 
