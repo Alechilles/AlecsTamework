@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionDataPort;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
 import com.alechilles.alecstamework.persistence.incidents.IncidentStore;
@@ -24,6 +25,7 @@ public final class SqlitePersistenceTransactionContext {
     private final IncidentStore incidents;
     private final ProjectionOutboxPort outbox;
     private final ProfileExtensionDataPort profileExtensions;
+    private final CompanionToolLinkPort toolLinks;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -36,6 +38,7 @@ public final class SqlitePersistenceTransactionContext {
         incidents = new SqliteIncidentStore(connection);
         outbox = new SqliteProjectionOutboxStore(connection);
         profileExtensions = new SqliteProfileExtensionDataStore(connection);
+        toolLinks = new SqliteCompanionToolLinkStore(connection);
     }
 
     @Nonnull
@@ -75,5 +78,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     ProfileExtensionDataPort profileExtensions() {
         return profileExtensions;
+    }
+
+    @Nonnull
+    CompanionToolLinkPort toolLinks() {
+        return toolLinks;
     }
 }

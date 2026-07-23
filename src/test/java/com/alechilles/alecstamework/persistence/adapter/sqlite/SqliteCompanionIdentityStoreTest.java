@@ -117,11 +117,54 @@ class SqliteCompanionIdentityStoreTest {
                     new CompanionToolLink(PROFILE, toolId, "command", -7_000, -7_000);
             CompanionToolLink updated =
                     new CompanionToolLink(PROFILE, toolId, "command", -6_000, -5_000);
-            assertTrue(store.linkTool(initial).applied());
-            CompanionToolLink stored = store.linkTool(updated).value();
+            SqliteCompanionToolLinkStore toolLinks =
+                    new SqliteCompanionToolLinkStore(connection);
+            assertTrue(toolLinks.link(initial).applied());
+            CompanionToolLink stored = toolLinks.link(updated).value();
             assertEquals(-7_000, stored.createdAtMs());
             assertEquals(-5_000, stored.updatedAtMs());
-            assertEquals(java.util.List.of(stored), store.findToolLinks(PROFILE));
+            assertEquals(java.util.List.of(stored), toolLinks.findByProfile(PROFILE));
+            connection.commit();
+        }
+    }
+
+    @Test
+    void replacesCompleteToolLinkSetWithoutResettingSurvivingCreationTime()
+            throws Exception {
+        UUID firstId = UUID.fromString("50000000-0000-0000-0000-000000000001");
+        UUID removedId = UUID.fromString("50000000-0000-0000-0000-000000000002");
+        UUID addedId = UUID.fromString("50000000-0000-0000-0000-000000000003");
+        try (Connection connection = transaction()) {
+            SqliteCompanionIdentityStore identities =
+                    new SqliteCompanionIdentityStore(connection);
+            identities.createProfile(profile(0, "Companion", -9_000));
+            SqliteCompanionToolLinkStore toolLinks =
+                    new SqliteCompanionToolLinkStore(connection);
+            toolLinks.link(new CompanionToolLink(
+                    PROFILE, firstId, "command", -8_000, -8_000
+            ));
+            toolLinks.link(new CompanionToolLink(
+                    PROFILE, removedId, "command", -8_000, -8_000
+            ));
+
+            var replaced = toolLinks.replace(PROFILE, java.util.List.of(
+                    new CompanionToolLink(
+                            PROFILE, addedId, "command", -7_000, -7_000
+                    ),
+                    new CompanionToolLink(
+                            PROFILE, firstId, "command", -7_000, -6_000
+                    )
+            )).value();
+
+            assertEquals(2, replaced.size());
+            assertEquals(-8_000, replaced.getFirst().createdAtMs());
+            assertEquals(-6_000, replaced.getFirst().updatedAtMs());
+            assertEquals(addedId, replaced.getLast().toolId());
+            assertEquals(replaced, toolLinks.findByProfile(PROFILE));
+            assertEquals(
+                    java.util.List.of(),
+                    toolLinks.replace(PROFILE, java.util.List.of()).value()
+            );
             connection.commit();
         }
     }

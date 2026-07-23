@@ -99,7 +99,7 @@ public final class SqliteCompanionProfileReader {
                 identity,
                 identities.findCurrentAlias(profileId).orElse(null),
                 lifecycle,
-                identities.findToolLinks(profileId),
+                new SqliteCompanionToolLinkStore(connection).findByProfile(profileId),
                 new SqliteCompanionSnapshotStore(connection)
                         .findCurrentByProfile(profileId)
         );

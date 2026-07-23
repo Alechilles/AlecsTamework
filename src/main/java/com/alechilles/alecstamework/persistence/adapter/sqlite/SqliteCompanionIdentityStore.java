@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
-import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
@@ -16,8 +15,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 
@@ -279,75 +276,6 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
         }
     }
 
-    @Override
-    public PersistenceMutationResult<CompanionToolLink> linkTool(CompanionToolLink link) {
-        require(link, "Tool link");
-        if (findProfile(link.profileId()).isEmpty()) {
-            return PersistenceMutationResult.rejected(PersistenceMutationStatus.NOT_FOUND);
-        }
-        CompanionToolLink existing = findToolLink(link).orElse(null);
-        CompanionToolLink stored = existing == null ? link : new CompanionToolLink(
-                link.profileId(), link.toolId(), link.linkType(),
-                existing.createdAtMs(), link.updatedAtMs()
-        );
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO companion_tool_link(
-                    profile_id, tool_uuid, link_type, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(profile_id, tool_uuid, link_type)
-                DO UPDATE SET updated_at_ms = excluded.updated_at_ms
-                """)) {
-            statement.setString(1, stored.profileId().toString());
-            statement.setString(2, stored.toolId().toString());
-            statement.setString(3, stored.linkType());
-            statement.setLong(4, stored.createdAtMs());
-            statement.setLong(5, stored.updatedAtMs());
-            statement.executeUpdate();
-            return PersistenceMutationResult.applied(stored);
-        } catch (SQLException | RuntimeException failure) {
-            throw storeFailure("identity_link_tool", failure);
-        }
-    }
-
-    @Override
-    public List<CompanionToolLink> findToolLinks(ProfileId profileId) {
-        require(profileId, "Profile ID");
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT profile_id, tool_uuid, link_type, created_at_ms, updated_at_ms
-                FROM companion_tool_link
-                WHERE profile_id = ?
-                ORDER BY tool_uuid, link_type
-                """)) {
-            statement.setString(1, profileId.toString());
-            ArrayList<CompanionToolLink> links = new ArrayList<>();
-            try (ResultSet row = statement.executeQuery()) {
-                while (row.next()) {
-                    links.add(readToolLink(row));
-                }
-            }
-            return List.copyOf(links);
-        } catch (SQLException | RuntimeException failure) {
-            throw storeFailure("identity_find_tool_links", failure);
-        }
-    }
-
-    private Optional<CompanionToolLink> findToolLink(CompanionToolLink link) {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT profile_id, tool_uuid, link_type, created_at_ms, updated_at_ms
-                FROM companion_tool_link
-                WHERE profile_id = ? AND tool_uuid = ? AND link_type = ?
-                """)) {
-            statement.setString(1, link.profileId().toString());
-            statement.setString(2, link.toolId().toString());
-            statement.setString(3, link.linkType());
-            try (ResultSet row = statement.executeQuery()) {
-                return row.next() ? Optional.of(readToolLink(row)) : Optional.empty();
-            }
-        } catch (SQLException | RuntimeException failure) {
-            throw storeFailure("identity_find_tool_link", failure);
-        }
-    }
-
     private long nextAliasGeneration(ProfileId profileId) {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT MAX(alias_generation) FROM companion_alias WHERE profile_id = ?
@@ -424,16 +352,6 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
                 operationId == null ? null : OperationId.parse(operationId),
                 row.getLong("mapped_at_ms"),
                 nullableRetiredAt
-        );
-    }
-
-    private CompanionToolLink readToolLink(ResultSet row) throws SQLException {
-        return new CompanionToolLink(
-                ProfileId.parse(row.getString("profile_id")),
-                java.util.UUID.fromString(row.getString("tool_uuid")),
-                row.getString("link_type"),
-                row.getLong("created_at_ms"),
-                row.getLong("updated_at_ms")
         );
     }
 
