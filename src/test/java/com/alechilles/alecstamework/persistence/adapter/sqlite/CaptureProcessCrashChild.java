@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
@@ -126,24 +127,33 @@ final class CaptureProcessCrashChild {
 
     static CompanionCaptureRequest request() {
         String snapshotJson = "{\"capturedAtMs\":-500}";
+        CompanionSnapshot snapshot = new CompanionSnapshot(
+                SnapshotId.parse(
+                        "50000000-0000-0000-0000-000000000001"
+                ),
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                1,
+                snapshotJson,
+                Sha256Hash.ofUtf8(snapshotJson),
+                new LifecycleRevision(1),
+                true,
+                -500
+        );
         return new CompanionCaptureRequest(
                 PROFILE,
                 LifecycleRevision.INITIAL,
                 OWNER,
                 ALIAS,
                 "world",
-                new CompanionSnapshot(
-                        SnapshotId.parse(
-                                "50000000-0000-0000-0000-000000000001"
-                        ),
-                        PROFILE,
-                        CompanionCaptureRequest.SNAPSHOT_KIND,
+                snapshot,
+                CapturedArtifact.create(
+                        "capture-device-filled",
                         1,
-                        snapshotJson,
-                        Sha256Hash.ofUtf8(snapshotJson),
-                        new LifecycleRevision(1),
-                        true,
-                        -500
+                        0.0D,
+                        0.0D,
+                        "{\"Tamework.CaptureSnapshotId\":\""
+                                + snapshot.snapshotId() + "\"}"
                 ),
                 new CaptureSourceEvidence(
                         UUID.fromString(
@@ -153,9 +163,8 @@ final class CaptureProcessCrashChild {
                         2,
                         "capture-device",
                         1,
-                        "before",
-                        "after",
-                        "capture-process-receipt"
+                        Sha256Hash.ofUtf8("before"),
+                        snapshot.snapshotId().toString()
                 ),
                 -600
         );

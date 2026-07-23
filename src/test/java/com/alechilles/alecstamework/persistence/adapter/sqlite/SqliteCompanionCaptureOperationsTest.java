@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureEventCodec;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureOutcome;
@@ -323,6 +324,14 @@ class SqliteCompanionCaptureOperationsTest {
                 ALIAS,
                 "world",
                 snapshot,
+                CapturedArtifact.create(
+                        "capture-device-filled",
+                        1,
+                        0.0D,
+                        0.0D,
+                        "{\"Tamework.CaptureSnapshotId\":\""
+                                + snapshot.snapshotId() + "\"}"
+                ),
                 new CaptureSourceEvidence(
                         UUID.fromString(
                                 "40000000-0000-0000-0000-000000000001"
@@ -331,9 +340,8 @@ class SqliteCompanionCaptureOperationsTest {
                         2,
                         "capture-device",
                         1,
-                        "before",
-                        "after",
-                        "capture-receipt"
+                        Sha256Hash.ofUtf8("before"),
+                        snapshot.snapshotId().toString()
                 ),
                 -600
         );

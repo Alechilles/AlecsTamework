@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.operation;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
@@ -187,6 +188,14 @@ class ExactSourceFinalizationTest {
                 ALIAS,
                 "world",
                 snapshot,
+                CapturedArtifact.create(
+                        "capture-device-filled",
+                        1,
+                        0.0D,
+                        0.0D,
+                        "{\"Tamework.CaptureSnapshotId\":\""
+                                + snapshot.snapshotId() + "\"}"
+                ),
                 new CaptureSourceEvidence(
                         UUID.fromString(
                                 "40000000-0000-0000-0000-000000000001"
@@ -195,9 +204,8 @@ class ExactSourceFinalizationTest {
                         2,
                         "capture-device",
                         1,
-                        "source-before",
-                        "captured-artifact-after",
-                        "operation-receipt"
+                        Sha256Hash.ofUtf8("source-before"),
+                        snapshot.snapshotId().toString()
                 ),
                 -600
         );

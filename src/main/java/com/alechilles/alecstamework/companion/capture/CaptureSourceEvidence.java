@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.capture;
 
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
@@ -15,8 +16,7 @@ public record CaptureSourceEvidence(@Nonnull UUID actorUuid,
                                     int slot,
                                     @Nonnull String sourceItemId,
                                     int quantity,
-                                    @Nonnull String beforeFingerprint,
-                                    @Nonnull String afterFingerprint,
+                                    @Nonnull Sha256Hash beforeFingerprint,
                                     @Nonnull String receiptKey) {
     public CaptureSourceEvidence {
         if (actorUuid == null || slot < 0 || quantity <= 0) {
@@ -24,20 +24,12 @@ public record CaptureSourceEvidence(@Nonnull UUID actorUuid,
         }
         worldKey = requireText(worldKey, "Capture source world");
         sourceItemId = requireText(sourceItemId, "Capture source item");
-        beforeFingerprint = requireText(
-                beforeFingerprint,
-                "Capture source before fingerprint"
-        );
-        afterFingerprint = requireText(
-                afterFingerprint,
-                "Capture source after fingerprint"
-        );
-        receiptKey = requireText(receiptKey, "Capture source receipt");
-        if (beforeFingerprint.equals(afterFingerprint)) {
+        if (beforeFingerprint == null) {
             throw new IllegalArgumentException(
-                    "Capture source fingerprints must describe an exact mutation"
+                    "Capture source before fingerprint is required"
             );
         }
+        receiptKey = requireText(receiptKey, "Capture source receipt");
     }
 
     private static String requireText(String value, String label) {

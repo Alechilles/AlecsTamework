@@ -29,7 +29,7 @@ public final class CompanionCaptureDefinition
 
     @Override
     public int payloadVersion() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -49,6 +49,7 @@ public final class CompanionCaptureDefinition
         json.addProperty("targetAlias", payload.targetAlias().toString());
         json.addProperty("targetWorldKey", payload.targetWorldKey());
         json.add("snapshot", CompanionSnapshotJsonCodec.encode(payload.snapshot()));
+        json.add("artifact", CapturedArtifactJsonCodec.encode(payload.artifact()));
         json.add("source", encodeSource(payload.source()));
         json.addProperty("requestedAtMs", payload.requestedAtMs());
         return json.toString();
@@ -69,6 +70,9 @@ public final class CompanionCaptureDefinition
                 CompanionSnapshotJsonCodec.decode(
                         json.getAsJsonObject("snapshot")
                 ),
+                CapturedArtifactJsonCodec.decode(
+                        json.getAsJsonObject("artifact")
+                ),
                 decodeSource(json.getAsJsonObject("source")),
                 json.get("requestedAtMs").getAsLong()
         );
@@ -81,8 +85,10 @@ public final class CompanionCaptureDefinition
         json.addProperty("slot", source.slot());
         json.addProperty("sourceItemId", source.sourceItemId());
         json.addProperty("quantity", source.quantity());
-        json.addProperty("beforeFingerprint", source.beforeFingerprint());
-        json.addProperty("afterFingerprint", source.afterFingerprint());
+        json.addProperty(
+                "beforeFingerprint",
+                source.beforeFingerprint().toString()
+        );
         json.addProperty("receiptKey", source.receiptKey());
         return json;
     }
@@ -94,8 +100,9 @@ public final class CompanionCaptureDefinition
                 json.get("slot").getAsInt(),
                 json.get("sourceItemId").getAsString(),
                 json.get("quantity").getAsInt(),
-                json.get("beforeFingerprint").getAsString(),
-                json.get("afterFingerprint").getAsString(),
+                com.alechilles.alecstamework.persistence.kernel.Sha256Hash.parse(
+                        json.get("beforeFingerprint").getAsString()
+                ),
                 json.get("receiptKey").getAsString()
         );
     }

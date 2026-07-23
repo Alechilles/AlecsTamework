@@ -17,6 +17,7 @@ public record CompanionCaptureRequest(
         @Nonnull NpcAlias targetAlias,
         @Nonnull String targetWorldKey,
         @Nonnull CompanionSnapshot snapshot,
+        @Nonnull CapturedArtifact artifact,
         @Nonnull CaptureSourceEvidence source,
         long requestedAtMs
 ) {
@@ -24,7 +25,8 @@ public record CompanionCaptureRequest(
 
     public CompanionCaptureRequest {
         if (profileId == null || expectedLifecycleRevision == null
-                || targetAlias == null || snapshot == null || source == null) {
+                || targetAlias == null || snapshot == null
+                || artifact == null || source == null) {
             throw new IllegalArgumentException("Complete companion capture request is required");
         }
         targetWorldKey = requireText(targetWorldKey, "Capture target world");
@@ -41,6 +43,11 @@ public record CompanionCaptureRequest(
         if (!targetWorldKey.equals(source.worldKey())) {
             throw new IllegalArgumentException(
                     "Capture source and target must share one world boundary"
+            );
+        }
+        if (!snapshot.snapshotId().toString().equals(source.receiptKey())) {
+            throw new IllegalArgumentException(
+                    "Capture source receipt must equal the capture snapshot ID"
             );
         }
     }

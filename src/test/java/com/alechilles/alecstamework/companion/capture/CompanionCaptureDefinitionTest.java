@@ -19,15 +19,18 @@ class CompanionCaptureDefinitionTest {
             ProfileId.parse("10000000-0000-0000-0000-000000000001");
     private static final LifecycleRevision EXPECTED = new LifecycleRevision(4);
     private static final String PAYLOAD = "{\"capturedAtMs\":-500}";
+    private static final String SNAPSHOT_ID =
+            "50000000-0000-0000-0000-000000000001";
 
     @Test
-    void versionOneRoundTripsSignedEvidenceExactly() throws Exception {
+    void versionTwoRoundTripsSignedEvidenceExactly() throws Exception {
         CompanionCaptureRequest request = request(PROFILE, EXPECTED);
 
         String encoded = CompanionCaptureDefinition.INSTANCE.encode(request);
         CompanionCaptureRequest decoded =
                 CompanionCaptureDefinition.INSTANCE.decode(encoded);
 
+        assertEquals(2, CompanionCaptureDefinition.INSTANCE.payloadVersion());
         assertEquals(request, decoded);
         CompanionCaptureOutcome outcome = new CompanionCaptureOutcome(
                 PROFILE,
@@ -63,15 +66,43 @@ class CompanionCaptureDefinitionTest {
                         NpcAlias.parse("20000000-0000-0000-0000-000000000001"),
                         "world",
                         snapshot(PROFILE, EXPECTED),
+                        artifact(),
                         new CaptureSourceEvidence(
                                 UUID.randomUUID(),
                                 "other-world",
                                 2,
                                 "capture-device",
                                 1,
-                                "before",
-                                "after",
-                                "receipt"
+                                Sha256Hash.ofUtf8("before"),
+                                SNAPSHOT_ID
+                        ),
+                        -600
+                )
+        );
+    }
+
+    @Test
+    void receiptMustBeTheCaptureSnapshotIdentity() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionCaptureRequest(
+                        PROFILE,
+                        EXPECTED,
+                        null,
+                        NpcAlias.parse(
+                                "20000000-0000-0000-0000-000000000001"
+                        ),
+                        "world",
+                        snapshot(PROFILE, EXPECTED),
+                        artifact(),
+                        new CaptureSourceEvidence(
+                                UUID.randomUUID(),
+                                "world",
+                                2,
+                                "capture-device",
+                                1,
+                                Sha256Hash.ofUtf8("before"),
+                                "not-the-snapshot"
                         ),
                         -600
                 )
@@ -89,15 +120,15 @@ class CompanionCaptureDefinitionTest {
                 NpcAlias.parse("20000000-0000-0000-0000-000000000001"),
                 "world",
                 snapshot(PROFILE, expected),
+                artifact(),
                 new CaptureSourceEvidence(
                         UUID.fromString("40000000-0000-0000-0000-000000000001"),
                         "world",
                         2,
                         "capture-device",
                         1,
-                        "before-fingerprint",
-                        "after-fingerprint",
-                        "capture-receipt"
+                        Sha256Hash.ofUtf8("before-fingerprint"),
+                        SNAPSHOT_ID
                 ),
                 -600
         );
@@ -108,7 +139,7 @@ class CompanionCaptureDefinitionTest {
             LifecycleRevision expected
     ) {
         return new CompanionSnapshot(
-                SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
+                SnapshotId.parse(SNAPSHOT_ID),
                 profileId,
                 CompanionCaptureRequest.SNAPSHOT_KIND,
                 1,
@@ -117,6 +148,16 @@ class CompanionCaptureDefinitionTest {
                 expected.next(),
                 true,
                 -500
+        );
+    }
+
+    private CapturedArtifact artifact() {
+        return CapturedArtifact.create(
+                "capture-device-filled",
+                1,
+                0.0D,
+                0.0D,
+                "{\"Tamework.CaptureSnapshotId\":\"" + SNAPSHOT_ID + "\"}"
         );
     }
 }
