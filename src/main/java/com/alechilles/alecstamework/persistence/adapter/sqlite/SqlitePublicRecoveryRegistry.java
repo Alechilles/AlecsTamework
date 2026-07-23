@@ -20,6 +20,8 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -88,6 +90,17 @@ final class SqlitePublicRecoveryRegistry {
                                                         .class
                                         )
                                 ).completion()
+                ),
+                Map.entry(
+                        PopulationGroupAssignmentDefinition.INSTANCE.kind(),
+                        claim -> operations.populationGroups().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        PopulationGroupAssignmentRequest.class
+                                )
+                        ).completion()
                 ),
                 Map.entry(
                         CompanionCaptureDefinition.INSTANCE.kind(),

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDef
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -25,6 +26,7 @@ final class SqlitePublicOperationSet {
     private final SqliteOwnerPopulationTransitionOperations ownerPopulation;
     private final SqliteOwnerPopulationReconciliationOperations
             ownerPopulationReconciliation;
+    private final SqlitePopulationGroupAssignmentOperations populationGroups;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -95,6 +97,12 @@ final class SqlitePublicOperationSet {
                                         .INSTANCE.kind()
                         )
                 );
+        populationGroups = new SqlitePopulationGroupAssignmentOperations(
+                database,
+                projections.requiredFor(
+                        PopulationGroupAssignmentDefinition.INSTANCE.kind()
+                )
+        );
         captures = new SqliteCompanionCaptureOperations(
                 engine,
                 publisher,
@@ -170,6 +178,10 @@ final class SqlitePublicOperationSet {
     SqliteOwnerPopulationReconciliationOperations
     ownerPopulationReconciliation() {
         return ownerPopulationReconciliation;
+    }
+
+    SqlitePopulationGroupAssignmentOperations populationGroups() {
+        return populationGroups;
     }
 
     SqliteCompanionCaptureOperations captures() {

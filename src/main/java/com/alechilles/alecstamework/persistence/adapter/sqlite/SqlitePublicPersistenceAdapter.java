@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
@@ -29,6 +30,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteCompanionLifecycleReader lifecycles;
     private final SqliteCompanionCoopReader coops;
     private final SqliteProfileExtensionReader extensions;
+    private final SqlitePopulationGroupReader populationGroups;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
 
@@ -80,6 +82,7 @@ public final class SqlitePublicPersistenceAdapter {
         lifecycles = new SqliteCompanionLifecycleReader(kernel.reads());
         coops = new SqliteCompanionCoopReader(kernel.reads());
         extensions = new SqliteProfileExtensionReader(kernel.reads());
+        populationGroups = new SqlitePopulationGroupReader(kernel.reads());
     }
 
     @Nonnull
@@ -102,6 +105,12 @@ public final class SqlitePublicPersistenceAdapter {
     public SqliteOwnerPopulationReconciliationOperations
     ownerPopulationReconciliationOperations() {
         return publicOperations.ownerPopulationReconciliation();
+    }
+
+    @Nonnull
+    public SqlitePopulationGroupAssignmentOperations
+    populationGroupOperations() {
+        return publicOperations.populationGroups();
     }
 
     @Nonnull
@@ -160,6 +169,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqlitePopulationGroupReader populationGroupReader() {
+        return populationGroups;
+    }
+
+    @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
     }
@@ -167,6 +181,11 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public OwnerPopulationProjectionIndex ownerPopulationIndex() {
         return projections.ownerPopulationIndex();
+    }
+
+    @Nonnull
+    public PopulationGroupProjectionIndex populationGroupIndex() {
+        return projections.populationGroupIndex();
     }
 
     /** Loads the complete canonical startup evidence through the read lane. */
@@ -180,7 +199,9 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CompletionStage<SqlitePublicProjectionStartupResult>
     buildProjections() {
-        return projections.rebuildAndCatchUp(coops, lifecycles);
+        return projections.rebuildAndCatchUp(
+                coops, lifecycles, populationGroups
+        );
     }
 
     /** Scans and resumes every recoverable operation through typed adapters. */

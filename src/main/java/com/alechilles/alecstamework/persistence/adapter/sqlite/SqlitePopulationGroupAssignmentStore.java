@@ -92,12 +92,10 @@ final class SqlitePopulationGroupAssignmentStore {
                    OR EXISTS(
                        SELECT 1
                        FROM population_group_membership membership
-                       WHERE membership.profile_id = classification.profile_id
-                         AND membership.scope_kind = 'PER_WORLD'
-                         AND (
-                             lifecycle.owner_uuid IS NULL
-                             OR lifecycle.owner_world_key IS NULL
-                         )
+                         WHERE membership.profile_id = classification.profile_id
+                           AND membership.scope_kind = 'PER_WORLD'
+                           AND lifecycle.owner_uuid IS NOT NULL
+                           AND lifecycle.owner_world_key IS NULL
                    )
                 ORDER BY classification.profile_id
                 """);
