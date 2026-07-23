@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
@@ -13,7 +14,6 @@ import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
-import com.alechilles.alecstamework.persistence.operation.OperationGeneration;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -209,7 +209,7 @@ class SqliteOperationEngineTest {
         transaction.lifecycles().create(new CompanionLifecycle(
                 PROFILE, null, LifecycleState.UNRESOLVED, LifecycleLocation.unresolved(),
                 LifecycleRevision.INITIAL, null, -10_000,
-                OperationGeneration.INITIAL, null
+                ReconciliationGeneration.INITIAL, null
         ));
     }
 

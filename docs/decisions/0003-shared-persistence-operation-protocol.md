@@ -19,8 +19,9 @@ UNKNOWN -> DURABLE | COMPENSATING | FAILED
 `PUBLISHED`, `COMPENSATED`, and `FAILED` are terminal. Feature-specific progress belongs in a
 versioned operation payload or detail table; features cannot add shared phases.
 
-Each envelope has one typed operation ID, registered kind, idempotency key, non-negative
-generation, and complete scope set. Generation zero is valid historical evidence.
+Each envelope has one typed operation ID, registered kind, idempotency key, and complete scope
+set. Reconciliation generation belongs to canonical lifecycle evidence, not the operation
+envelope; generation zero remains valid historical evidence.
 
 One accepted operation executes as one transaction. The transaction declares all participants
 up front and commits canonical state, required domain detail, durable operation evidence, and

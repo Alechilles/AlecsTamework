@@ -8,9 +8,9 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.persistence.incidents.IncidentId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
-import com.alechilles.alecstamework.persistence.operation.OperationGeneration;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -59,7 +59,7 @@ class SqliteCompanionLifecycleStoreTest {
                     store.create(new CompanionLifecycle(
                             PROFILE, OWNER, LifecycleState.UNLOADED, LifecycleLocation.none(),
                             LifecycleRevision.INITIAL, null, -9_000,
-                            OperationGeneration.INITIAL, null
+                            ReconciliationGeneration.INITIAL, null
                     )).status()
             );
             assertEquals(initial, store.findByProfile(PROFILE).orElseThrow());
@@ -189,7 +189,7 @@ class SqliteCompanionLifecycleStoreTest {
         return new CompanionLifecycle(
                 PROFILE, OWNER, LifecycleState.UNRESOLVED, LifecycleLocation.unresolved(),
                 LifecycleRevision.INITIAL, null, -10_000,
-                OperationGeneration.INITIAL, null
+                ReconciliationGeneration.INITIAL, null
         );
     }
 
@@ -201,7 +201,7 @@ class SqliteCompanionLifecycleStoreTest {
         return new CompanionLifecycle(
                 PROFILE, OWNER, state, location, new LifecycleRevision(revision),
                 operationId, -9_000 + revision,
-                OperationGeneration.INITIAL, incidentId
+                ReconciliationGeneration.INITIAL, incidentId
         );
     }
 

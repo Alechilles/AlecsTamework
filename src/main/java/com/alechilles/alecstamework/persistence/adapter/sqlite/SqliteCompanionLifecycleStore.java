@@ -9,11 +9,11 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.persistence.incidents.IncidentId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
-import com.alechilles.alecstamework.persistence.operation.OperationGeneration;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -263,7 +263,7 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
                 new LifecycleRevision(row.getLong("revision")),
                 operation == null ? null : OperationId.parse(operation),
                 row.getLong("state_changed_at_ms"),
-                new OperationGeneration(row.getLong("last_reconciled_generation")),
+                new ReconciliationGeneration(row.getLong("last_reconciled_generation")),
                 incident == null ? null : IncidentId.parse(incident)
         );
     }

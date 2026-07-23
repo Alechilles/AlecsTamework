@@ -6,13 +6,13 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
-import com.alechilles.alecstamework.persistence.operation.OperationGeneration;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -125,7 +125,7 @@ class SqliteCompanionSnapshotStoreTest {
         new SqliteCompanionLifecycleStore(connection).create(new CompanionLifecycle(
                 PROFILE, null, LifecycleState.UNRESOLVED, LifecycleLocation.unresolved(),
                 LifecycleRevision.INITIAL, null, -10_000,
-                OperationGeneration.INITIAL, null
+                ReconciliationGeneration.INITIAL, null
         ));
     }
 

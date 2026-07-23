@@ -1,0 +1,153 @@
+package com.alechilles.alecstamework.persistence.architecture;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Executable boundaries that keep the replacement persistence core small and composable. */
+class ReplacementPersistenceArchitectureGuardTest {
+    private static final Path MAIN = Path.of(
+            "src/main/java/com/alechilles/alecstamework"
+    );
+    private static final Path SQLITE = MAIN.resolve("persistence/adapter/sqlite");
+    private static final List<Path> REPLACEMENT_ROOTS = List.of(
+            MAIN.resolve("companion/identity"),
+            MAIN.resolve("companion/lifecycle"),
+            MAIN.resolve("companion/snapshot"),
+            MAIN.resolve("persistence/adapter/sqlite"),
+            MAIN.resolve("persistence/kernel"),
+            MAIN.resolve("persistence/operation"),
+            MAIN.resolve("persistence/projection")
+    );
+
+    @Test
+    void transactionLocalStoresNeverOwnConnectionsCommitsThreadsOrProjectionCallbacks()
+            throws Exception {
+        List<String> forbidden = List.of(
+                "openWriterConnection(",
+                "openReadConnection(",
+                ".commit(",
+                ".rollback(",
+                "new Thread(",
+                "ExecutorService",
+                "ProjectionConsumer consumer",
+                "ProjectionCoordinator coordinator"
+        );
+        ArrayList<String> violations = new ArrayList<>();
+        for (Path file : javaFiles(SQLITE)) {
+            if (!file.getFileName().toString().endsWith("Store.java")) {
+                continue;
+            }
+            String source = Files.readString(file);
+            for (String token : forbidden) {
+                if (source.contains(token)) {
+                    violations.add(relative(file) + " contains " + token);
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(), () -> String.join("\n", violations));
+    }
+
+    @Test
+    void lifecycleHasOneSqlMutationPathAndOutboxHasNoCompactionPath() throws Exception {
+        int lifecycleUpdates = 0;
+        ArrayList<String> outboxDeletes = new ArrayList<>();
+        for (Path root : REPLACEMENT_ROOTS) {
+            for (Path file : javaFiles(root)) {
+                String source = Files.readString(file);
+                lifecycleUpdates += occurrences(source, "UPDATE companion_lifecycle");
+                if (source.contains("DELETE FROM projection_outbox")) {
+                    outboxDeletes.add(relative(file));
+                }
+            }
+        }
+        assertEquals(1, lifecycleUpdates, "Canonical lifecycle must have one update statement");
+        assertTrue(outboxDeletes.isEmpty(),
+                () -> "Outbox compaction is not proven: " + outboxDeletes);
+    }
+
+    @Test
+    void durableWorkCannotReceiveLiveOrProjectionCapabilities() throws Exception {
+        String work = Files.readString(
+                MAIN.resolve("persistence/operation/DurableOperationWork.java")
+        );
+        assertTrue(work.contains("SqlitePersistenceTransactionContext transaction"));
+        assertTrue(work.contains("OperationEnvelope operation"));
+        assertFalse(work.contains("ProjectionConsumer"));
+        assertFalse(work.contains("ProjectionCoordinator"));
+        assertFalse(work.contains("Connection connection"));
+
+        String coordinator = Files.readString(
+                MAIN.resolve("persistence/projection/ProjectionCoordinator.java")
+        );
+        assertFalse(coordinator.contains("SqlitePersistenceTransactionContext"));
+        assertFalse(coordinator.contains("SqliteProjectionOutboxStore"));
+    }
+
+    @Test
+    void replacementCoreDoesNotDependOnSupersededSqlitePackage() throws Exception {
+        ArrayList<String> violations = new ArrayList<>();
+        for (Path root : REPLACEMENT_ROOTS) {
+            for (Path file : javaFiles(root)) {
+                String source = Files.readString(file);
+                if (source.contains(
+                        "com.alechilles.alecstamework.persistence.sqlite"
+                )) {
+                    violations.add(relative(file));
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "Replacement core imports superseded persistence: " + violations);
+    }
+
+    @Test
+    void replacementCoreClassesRemainBelowTheProjectComplexityTarget() throws Exception {
+        ArrayList<String> violations = new ArrayList<>();
+        for (Path root : REPLACEMENT_ROOTS) {
+            for (Path file : javaFiles(root)) {
+                long lines;
+                try (Stream<String> stream = Files.lines(file)) {
+                    lines = stream.count();
+                }
+                if (lines > 500) {
+                    violations.add(relative(file) + " has " + lines + " lines");
+                }
+            }
+        }
+        assertTrue(violations.isEmpty(), () -> String.join("\n", violations));
+    }
+
+    private List<Path> javaFiles(Path root) throws Exception {
+        if (!Files.isDirectory(root)) {
+            return List.of();
+        }
+        try (Stream<Path> stream = Files.walk(root)) {
+            return stream.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .sorted()
+                    .toList();
+        }
+    }
+
+    private int occurrences(String source, String token) {
+        int count = 0;
+        int from = 0;
+        while ((from = source.indexOf(token, from)) >= 0) {
+            count++;
+            from += token.length();
+        }
+        return count;
+    }
+
+    private String relative(Path file) {
+        return MAIN.relativize(file).toString().replace('\\', '/');
+    }
+}

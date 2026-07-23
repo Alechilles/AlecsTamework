@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.companion.lifecycle;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.incidents.IncidentId;
-import com.alechilles.alecstamework.persistence.operation.OperationGeneration;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -28,7 +27,7 @@ public record CompanionLifecycle(@Nonnull ProfileId profileId,
                                  @Nonnull LifecycleRevision revision,
                                  @Nullable OperationId activeOperationId,
                                  long stateChangedAtMs,
-                                 @Nonnull OperationGeneration lastReconciledGeneration,
+                                 @Nonnull ReconciliationGeneration lastReconciledGeneration,
                                  @Nullable IncidentId quarantineIncidentId) {
     public CompanionLifecycle {
         if (profileId == null || state == null || location == null

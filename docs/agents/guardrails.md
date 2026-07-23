@@ -36,6 +36,21 @@ The check verifies that:
 - the safety guard tests still exist,
 - the external Lessons Learned path is reachable.
 
+## Replacement Persistence Architecture
+
+After changing the replacement kernel, identity, lifecycle, snapshot, operation, recovery, or
+projection code, run:
+
+```powershell
+.\mvnw.cmd -Dtest=ReplacementPersistenceArchitectureGuardTest,PersistenceProcessCrashMatrixTest test
+```
+
+The architecture guard enforces one canonical lifecycle mutation path, connection-bound stores,
+transaction callback isolation, no dependency on the superseded SQLite package, no premature
+outbox compaction, and a 500-line replacement-core class ceiling. The forked-process matrix
+verifies recovery from each shared prepare, live-apply, durable, publication, compensation, and
+shutdown crash boundary.
+
 ## Artifact Freshness Checks
 
 When behavior differs between source and game:
