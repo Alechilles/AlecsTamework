@@ -8,8 +8,8 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileReader;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -21,27 +21,30 @@ import javax.annotation.Nonnull;
 
 /** Released profile and snapshot reads composed from replacement canonical authorities. */
 public final class ReplacementNpcProfilesApi implements NpcProfilesApi {
-    private final SqliteCompanionProfileReader reader;
+    private final PublicPersistenceQueries queries;
     private final long readTimeoutMs;
 
     public ReplacementNpcProfilesApi(
-            @Nonnull SqliteCompanionProfileReader reader,
+            @Nonnull PublicPersistenceQueries queries,
             @Nonnull Duration readTimeout
     ) {
-        if (reader == null || readTimeout == null
+        if (queries == null || readTimeout == null
                 || readTimeout.isNegative() || readTimeout.isZero()) {
             throw new IllegalArgumentException(
-                    "Profile reader and positive timeout are required"
+                "Profile queries and positive timeout are required"
             );
         }
-        this.reader = reader;
+        this.queries = queries;
         readTimeoutMs = readTimeout.toMillis();
     }
 
     @Override
     public Optional<String> resolveProfileId(UUID npcUuid) {
-        return readByAlias(npcUuid)
-                .map(model -> model.identity().profileId().toString());
+        return stateByAlias(npcUuid)
+                .map(state -> state.profileId().toString())
+                .or(() -> readByAlias(npcUuid)
+                        .map(model ->
+                                model.identity().profileId().toString()));
     }
 
     @Override
@@ -50,12 +53,15 @@ public final class ReplacementNpcProfilesApi implements NpcProfilesApi {
         if (parsed == null) {
             return Optional.empty();
         }
-        return found(await(reader.findByProfile(parsed))).map(this::map);
+        return queries.projectedProfile(parsed)
+                .map(CompanionProfileApiMapper::map);
     }
 
     @Override
     public Optional<NpcProfileView> getByNpcUuid(UUID npcUuid) {
-        return readByAlias(npcUuid).map(this::map);
+        return stateByAlias(npcUuid)
+                .map(CompanionProfileApiMapper::map)
+                .or(() -> readByAlias(npcUuid).map(this::map));
     }
 
     @Override
@@ -76,13 +82,14 @@ public final class ReplacementNpcProfilesApi implements NpcProfilesApi {
 
     @Override
     public Set<String> listActiveSnapshotTypes(String profileId) {
-        Optional<CompanionProfileReadModel> model = readByProfile(profileId);
-        if (model.isEmpty()) {
+        ProfileId parsed = parseProfile(profileId);
+        if (parsed == null) {
             return Set.of();
         }
         LinkedHashSet<String> types = new LinkedHashSet<>();
-        model.orElseThrow().currentSnapshots().stream()
-                .map(snapshot -> snapshot.kind().value())
+        queries.projectedProfile(parsed).stream()
+                .flatMap(state -> state.activeSnapshotKinds().stream())
+                .map(kind -> kind.value())
                 .sorted()
                 .forEach(types::add);
         return Set.copyOf(types);
@@ -92,13 +99,23 @@ public final class ReplacementNpcProfilesApi implements NpcProfilesApi {
         ProfileId parsed = parseProfile(profileId);
         return parsed == null
                 ? Optional.empty()
-                : found(await(reader.findByProfile(parsed)));
+                : found(await(queries.findProfile(parsed)));
     }
 
     private Optional<CompanionProfileReadModel> readByAlias(UUID npcUuid) {
         return npcUuid == null
                 ? Optional.empty()
-                : found(await(reader.findByAlias(new NpcAlias(npcUuid))));
+                : found(await(queries.findProfile(
+                        new NpcAlias(npcUuid)
+                )));
+    }
+
+    private Optional<CompanionProfileProjectionState> stateByAlias(
+            UUID npcUuid
+    ) {
+        return npcUuid == null
+                ? Optional.empty()
+                : queries.projectedProfile(new NpcAlias(npcUuid));
     }
 
     private NpcProfileView map(CompanionProfileReadModel model) {

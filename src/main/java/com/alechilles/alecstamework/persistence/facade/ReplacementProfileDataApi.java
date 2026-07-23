@@ -5,29 +5,25 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
-import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationAction;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProfileExtensionOperations;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProfileExtensionReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
-import java.time.Duration;
+import com.alechilles.alecstamework.persistence.runtime.PublicOperationEvidence;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperations;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -37,31 +33,23 @@ import javax.annotation.Nonnull;
 public final class ReplacementProfileDataApi implements ProfileDataApi {
     private static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
 
-    private final SqliteProfileExtensionReader reader;
-    private final SqliteProfileExtensionOperations operations;
-    private final SqliteOperationReader operationReader;
+    private final PublicPersistenceQueries queries;
+    private final PublicPersistenceOperations operations;
     private final LongSupplier clock;
-    private final long readTimeoutMs;
 
     public ReplacementProfileDataApi(
-            @Nonnull SqliteProfileExtensionReader reader,
-            @Nonnull SqliteProfileExtensionOperations operations,
-            @Nonnull SqliteOperationReader operationReader,
-            @Nonnull LongSupplier clock,
-            @Nonnull Duration readTimeout
+            @Nonnull PublicPersistenceQueries queries,
+            @Nonnull PublicPersistenceOperations operations,
+            @Nonnull LongSupplier clock
     ) {
-        if (reader == null || operations == null || operationReader == null
-                || clock == null || readTimeout == null
-                || readTimeout.isNegative() || readTimeout.isZero()) {
+        if (queries == null || operations == null || clock == null) {
             throw new IllegalArgumentException(
                     "Complete replacement profile-data API dependencies are required"
             );
         }
-        this.reader = reader;
+        this.queries = queries;
         this.operations = operations;
-        this.operationReader = operationReader;
         this.clock = clock;
-        readTimeoutMs = readTimeout.toMillis();
     }
 
     @Override
@@ -70,11 +58,8 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
         if (extensionKey == null) {
             return Optional.empty();
         }
-        PersistenceReadResult<ProfileExtensionData> result =
-                await(reader.findActive(extensionKey));
-        return result instanceof PersistenceReadResult.Found<ProfileExtensionData> found
-                ? Optional.of(found.value().jsonPayload())
-                : Optional.empty();
+        return queries.projectedExtension(extensionKey)
+                .map(ProfileExtensionProjectionValue::jsonPayload);
     }
 
     @Override
@@ -84,16 +69,10 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
         if (parsed == null || normalizedNamespace == null) {
             return Map.of();
         }
-        PersistenceReadResult<List<ProfileExtensionData>> result =
-                await(reader.findNamespace(parsed, normalizedNamespace));
-        if (!(result instanceof
-                PersistenceReadResult.Found<List<ProfileExtensionData>> found)) {
-            return Map.of();
-        }
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
-        for (ProfileExtensionData value : found.value()) {
-            values.put(value.key().dataKey(), value.jsonPayload());
-        }
+        queries.projectedExtensions(parsed, normalizedNamespace)
+                .forEach((key, value) ->
+                        values.put(key, value.jsonPayload()));
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
@@ -134,11 +113,7 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
         if (extensionKey == null) {
             return Optional.empty();
         }
-        PersistenceReadResult<ProfileExtensionData> result =
-                await(reader.findActive(extensionKey));
-        return result instanceof PersistenceReadResult.Found<ProfileExtensionData> found
-                ? Optional.of(entry(found.value()))
-                : Optional.empty();
+        return queries.projectedExtension(extensionKey).map(this::entry);
     }
 
     @Override
@@ -160,12 +135,12 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
                 request.jsonPayload(),
                 clock.getAsLong()
         );
-        return operationReader.findByIdempotency(
+        return queries.findOperation(
                 ProfileExtensionMutationDefinition.KIND,
                 scoped
         ).thenCompose(existing -> {
             if (existing instanceof PersistenceReadResult.Found<
-                    SqliteOperationReader.OperationReadModel> found) {
+                    PublicOperationEvidence> found) {
                 ProfileExtensionMutation durable =
                         ProfileExtensionMutationDefinition.INSTANCE.decode(
                                 found.value().operation().payloadJson()
@@ -175,23 +150,23 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
                             "profile-data-idempotency-conflict"
                     );
                 }
-                return operations.submit(
+                return operations.mutateExtension(
                         found.value().operation().operationId(),
                         scoped,
                         durable
                 ).completion().thenApply(result ->
-                        ReplacementProfileDataMapper.compareAndSetResult(
-                                result,
-                                request.idempotencyKey()
-                        ));
+                        ReplacementProfileDataMapper
+                                .compareAndSetResult(
+                                        result,
+                                        request.idempotencyKey()
+                                ));
             }
-            if (existing instanceof PersistenceReadResult.Failed<
-                    SqliteOperationReader.OperationReadModel>) {
+            if (existing instanceof PersistenceReadResult.Failed<?>) {
                 return completedUnavailable(
                         "profile-data-operation-read-failed"
                 );
             }
-            return operations.submit(
+            return operations.mutateExtension(
                     OperationId.create(),
                     scoped,
                     requestedMutation
@@ -216,12 +191,12 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
             );
         }
         String normalizedKey = idempotencyKey.trim();
-        return operationReader.findByIdempotency(
+        return queries.findOperation(
                 ProfileExtensionMutationDefinition.KIND,
                 scopedIdempotency(normalizedNamespace, normalizedKey)
         ).thenApply(result -> {
             if (!(result instanceof PersistenceReadResult.Found<
-                    SqliteOperationReader.OperationReadModel> found)) {
+                    PublicOperationEvidence> found)) {
                 return Optional.empty();
             }
             return Optional.of(ReplacementProfileDataMapper.operationView(
@@ -251,17 +226,19 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
                     clock.getAsLong()
             );
             String nonce = OperationId.create().toString();
-            return operations.submit(
+            return operations.mutateExtension(
                     OperationId.create(),
                     new IdempotencyKey("compat:" + nonce),
                     mutation
-            ).acceptance() == SqliteSingleWriter.WriteAcceptance.ACCEPTED;
+            ).accepted();
         } catch (RuntimeException failure) {
             return false;
         }
     }
 
-    private ProfileDataEntryView entry(ProfileExtensionData value) {
+    private ProfileDataEntryView entry(
+            ProfileExtensionProjectionValue value
+    ) {
         return new ProfileDataEntryView(
                 value.key().profileId().toString(),
                 value.key().namespace(),
@@ -327,7 +304,10 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
                 durable.expectedRevision(),
                 requested.expectedRevision()
         )
-                && Objects.equals(durable.jsonPayload(), requested.jsonPayload());
+                && Objects.equals(
+                durable.jsonPayload(),
+                requested.jsonPayload()
+        );
     }
 
     private CompletionStage<ProfileDataCompareAndSetResult> completedUnavailable(
@@ -347,16 +327,4 @@ public final class ReplacementProfileDataApi implements ProfileDataApi {
         );
     }
 
-    private <T> PersistenceReadResult<T> await(
-            CompletionStage<PersistenceReadResult<T>> stage
-    ) {
-        try {
-            return stage.toCompletableFuture().get(
-                    readTimeoutMs,
-                    TimeUnit.MILLISECONDS
-            );
-        } catch (Exception failure) {
-            return null;
-        }
-    }
 }

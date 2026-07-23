@@ -5,30 +5,28 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
-import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationEngine;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationEvidenceReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceTransactionContext;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProfileExtensionOperations;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProfileExtensionReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProjectionGateway;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecutor;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteUnitOfWorkRunner;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.persistence.facade.ReplacementProfileDataApi;
-import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
-import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
-import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
-import java.sql.Connection;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -50,73 +48,33 @@ class ReplacementProfileDataApiTest {
     @TempDir
     Path tempDir;
 
-    private SqliteSingleWriter writer;
-    private SqliteReadExecutor reads;
+    private PublicPersistenceRuntime runtime;
     private ReplacementProfileDataApi api;
 
     @BeforeEach
     void setUp() throws Exception {
-        SqliteConnectionFactory connections =
-                new SqliteConnectionFactory(tempDir.resolve("state.sqlite"));
-        new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
-        try (Connection connection = connections.openWriterConnection()) {
-            connection.setAutoCommit(false);
-            new SqlitePersistenceTransactionContext(connection)
-                    .identities()
-                    .createProfile(new CompanionIdentity(
-                            PROFILE,
-                            "Companion",
-                            "role",
-                            null,
-                            null,
-                            "world",
-                            -10_000,
-                            -10_000,
-                            -10_000,
-                            0
-                    ));
-            connection.commit();
-        }
-        writer = new SqliteSingleWriter(connections);
-        reads = new SqliteReadExecutor(connections);
-        SqliteUnitOfWorkRunner units = new SqliteUnitOfWorkRunner(writer, reads);
-        SqliteOperationEngine engine = new SqliteOperationEngine(
-                new OperationDefinitionRegistry(
-                        List.of(ProfileExtensionMutationDefinition.INSTANCE)
-                ),
-                units
-        );
         AtomicLong clock = new AtomicLong(-9_000);
-        SqliteProfileExtensionOperations operations =
-                new SqliteProfileExtensionOperations(
-                        new SqliteDatabaseOperationCoordinator(
-                                engine,
-                                new SqliteOperationEvidenceReader(reads),
-                                new ProjectionCoordinator(
-                                        new SqliteProjectionGateway(reads, units),
-                                        ProjectionRetryPolicy.DEFAULT,
-                                        clock::incrementAndGet
-                                ),
-                                clock::incrementAndGet
-                        ),
-                        List.of()
-                );
+        runtime = runtime(clock);
+        assertTrue(runtime.start().toCompletableFuture().join().complete());
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                runtime.operations().mutateProfile(
+                        OperationId.create(),
+                        new IdempotencyKey("profile-create"),
+                        profileCreate()
+                ).completion().toCompletableFuture().join().status()
+        );
         api = new ReplacementProfileDataApi(
-                new SqliteProfileExtensionReader(reads),
-                operations,
-                new SqliteOperationReader(reads),
-                clock::incrementAndGet,
-                Duration.ofSeconds(5)
+                runtime.queries(),
+                runtime.operations(),
+                clock::incrementAndGet
         );
     }
 
     @AfterEach
     void tearDown() {
-        if (writer != null) {
-            writer.shutdown(Duration.ofSeconds(5));
-        }
-        if (reads != null) {
-            reads.shutdown(Duration.ofSeconds(5));
+        if (runtime != null) {
+            runtime.close();
         }
     }
 
@@ -224,6 +182,78 @@ class ReplacementProfileDataApiTest {
                 Optional.empty(),
                 api.findOperation("Alechilles:Tamework", "reserved")
                         .toCompletableFuture().get(10, TimeUnit.SECONDS)
+        );
+    }
+
+    private PublicPersistenceRuntime runtime(AtomicLong clock) {
+        return new PublicPersistenceRuntime(
+                new PublicPersistenceRuntimeConfiguration(
+                        tempDir,
+                        "profile-data-facade-test",
+                        clock::incrementAndGet,
+                        (claim, operation) -> LiveOperationResult
+                                .confirmed("refund_confirmed").completed(),
+                        event -> {
+                        },
+                        boundaries(),
+                        PublicPersistenceWorldReconciliation
+                                .alreadyComplete(),
+                        Duration.ofSeconds(5)
+                )
+        );
+    }
+
+    private PublicPersistenceLiveBoundaries boundaries() {
+        return new PublicPersistenceLiveBoundaries(
+                (rotation, operation) ->
+                        CompanionAliasLiveBoundary.Result.confirmed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("capture").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("restoration").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("coop_capture").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("coop_release").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("timed").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("provisioning").completed(),
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalBoundaries.unavailable()
+        );
+    }
+
+    private CompanionProfileMutation.Create profileCreate() {
+        String metadata = "{\"source\":\"profile-data-test\"}";
+        CompanionIdentity identity = new CompanionIdentity(
+                PROFILE,
+                "Companion",
+                "role",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                "world",
+                -10_000,
+                -10_000,
+                -10_000,
+                0
+        );
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                PROFILE,
+                OwnerId.parse("20000000-0000-0000-0000-000000000001"),
+                LifecycleState.UNLOADED,
+                LifecycleLocation.none(),
+                LifecycleRevision.INITIAL,
+                null,
+                -10_000,
+                ReconciliationGeneration.INITIAL,
+                null
+        );
+        return new CompanionProfileMutation.Create(
+                identity,
+                lifecycle,
+                java.util.List.of(),
+                -10_000
         );
     }
 

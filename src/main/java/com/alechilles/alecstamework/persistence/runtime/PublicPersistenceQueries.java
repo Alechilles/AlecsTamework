@@ -27,6 +27,9 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -280,5 +283,46 @@ public final class PublicPersistenceQueries {
     public Map<ProfileId, ProvisioningRecord>
     projectedProvisioningSnapshot() {
         return adapter.provisioningIndex().snapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<PublicOperationEvidence>>
+    findOperation(@Nonnull OperationId operationId) {
+        return adapter.operationReader().find(operationId)
+                .thenApply(this::operationEvidence);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<PublicOperationEvidence>>
+    findOperation(
+            @Nonnull OperationKind kind,
+            @Nonnull IdempotencyKey idempotencyKey
+    ) {
+        return adapter.operationReader()
+                .findByIdempotency(kind, idempotencyKey)
+                .thenApply(this::operationEvidence);
+    }
+
+    private PersistenceReadResult<PublicOperationEvidence>
+    operationEvidence(
+            PersistenceReadResult<com.alechilles.alecstamework.persistence
+                    .adapter.sqlite.SqliteOperationReader
+                    .OperationReadModel> read
+    ) {
+        if (read instanceof PersistenceReadResult.Found<
+                com.alechilles.alecstamework.persistence.adapter.sqlite
+                        .SqliteOperationReader.OperationReadModel> found) {
+            return PersistenceReadResult.found(
+                    new PublicOperationEvidence(
+                            found.value().operation(),
+                            found.value().events()
+                    ),
+                    found.revision()
+            );
+        }
+        if (read instanceof PersistenceReadResult.Failed<?> failed) {
+            return PersistenceReadResult.failed(failed.failure());
+        }
+        return PersistenceReadResult.absent();
     }
 }

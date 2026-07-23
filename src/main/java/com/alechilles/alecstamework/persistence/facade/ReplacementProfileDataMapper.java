@@ -8,12 +8,12 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationEventCodec;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationOutcome;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationReader;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.runtime.PublicOperationEvidence;
 import java.util.List;
 
 /** Maps replacement operation evidence to the unreleased versioned profile-data API. */
@@ -31,7 +31,7 @@ final class ReplacementProfileDataMapper {
         }
         ProfileExtensionMutationOutcome outcome = outcome(result.events());
         ProfileDataOperationView view = operationView(
-                new SqliteOperationReader.OperationReadModel(
+                new PublicOperationEvidence(
                         result.operation(),
                         result.events()
                 ),
@@ -62,7 +62,7 @@ final class ReplacementProfileDataMapper {
     }
 
     static ProfileDataOperationView operationView(
-            SqliteOperationReader.OperationReadModel read,
+            PublicOperationEvidence read,
             String publicIdempotencyKey
     ) {
         OperationEnvelope operation = read.operation();

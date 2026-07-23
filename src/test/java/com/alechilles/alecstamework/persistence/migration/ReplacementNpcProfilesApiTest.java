@@ -1,10 +1,13 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecutor;
+import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Set;
@@ -13,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Released v4 profile facade parity against an imported public save. */
@@ -36,21 +38,15 @@ class ReplacementNpcProfilesApiTest {
     void readsReleasedProfileAndSnapshotFieldsFromReplacementAuthorities()
             throws Exception {
         Path source = tempDir.resolve("tamework.sqlite");
-        Path target = tempDir.resolve("tamework-state.sqlite");
         PersistenceConsolidationFixtureDatabase.materialize(
                 "public-v4-representative.sql",
                 source
         );
-        assertInstanceOf(
-                PublicImportResult.Imported.class,
-                new PublicPersistenceImporter(() -> -7_000)
-                        .importSource(source, target)
-        );
-        SqliteReadExecutor reads =
-                new SqliteReadExecutor(new SqliteConnectionFactory(target));
+        PublicPersistenceRuntime runtime = runtime();
         try {
+            assertTrue(runtime.start().toCompletableFuture().join().complete());
             ReplacementNpcProfilesApi api = new ReplacementNpcProfilesApi(
-                    new SqliteCompanionProfileReader(reads),
+                    runtime.queries(),
                     Duration.ofSeconds(5)
             );
 
@@ -94,7 +90,46 @@ class ReplacementNpcProfilesApiTest {
             assertEquals(0, cooped.coopSlot());
             assertTrue(api.getByProfileId("not-a-uuid").isEmpty());
         } finally {
-            reads.shutdown(Duration.ofSeconds(5));
+            runtime.close();
         }
+    }
+
+    private PublicPersistenceRuntime runtime() {
+        return new PublicPersistenceRuntime(
+                new PublicPersistenceRuntimeConfiguration(
+                        tempDir,
+                        "profile-facade-test",
+                        () -> -100,
+                        (claim, operation) -> LiveOperationResult
+                                .confirmed("refund_confirmed").completed(),
+                        event -> {
+                        },
+                        boundaries(),
+                        PublicPersistenceWorldReconciliation
+                                .alreadyComplete(),
+                        Duration.ofSeconds(5)
+                )
+        );
+    }
+
+    private PublicPersistenceLiveBoundaries boundaries() {
+        return new PublicPersistenceLiveBoundaries(
+                (rotation, operation) ->
+                        CompanionAliasLiveBoundary.Result.confirmed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("capture").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("restoration").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("coop_capture").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("coop_release").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("timed").completed(),
+                (request, operation) -> LiveOperationResult
+                        .confirmed("provisioning").completed(),
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalBoundaries.unavailable()
+        );
     }
 }

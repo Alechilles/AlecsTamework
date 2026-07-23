@@ -232,6 +232,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findCoopSlot",
                         "findExtension",
                         "findExtensions",
+                        "findOperation",
                         "findProfile",
                         "findProvisioning",
                         "findStalePopulationGroupProfiles",

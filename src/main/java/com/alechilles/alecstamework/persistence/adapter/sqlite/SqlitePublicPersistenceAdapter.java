@@ -39,6 +39,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteCommandRosterReader commandRosters;
     private final SqliteTimedSummonLeaseReader timedSummons;
     private final SqliteProvisioningReader provisioning;
+    private final SqliteOperationReader operationReader;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
 
@@ -100,6 +101,7 @@ public final class SqlitePublicPersistenceAdapter {
         commandRosters = new SqliteCommandRosterReader(kernel.reads());
         timedSummons = new SqliteTimedSummonLeaseReader(kernel.reads());
         provisioning = new SqliteProvisioningReader(kernel.reads());
+        operationReader = new SqliteOperationReader(kernel.reads());
     }
 
     @Nonnull
@@ -242,6 +244,11 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public SqliteProvisioningReader provisioningReader() {
         return provisioning;
+    }
+
+    @Nonnull
+    public SqliteOperationReader operationReader() {
+        return operationReader;
     }
 
     @Nonnull
