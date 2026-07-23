@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCheckpointResult;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteKernelShutdownReport;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupReport;
@@ -23,7 +24,7 @@ import javax.annotation.Nonnull;
  * and joined only when its isolated reader is available.</p>
  */
 public record PublicPersistenceOperationalStatus(
-        @Nonnull PersistenceEngineMode engine,
+        @Nonnull PersistenceEngineLineage engine,
         @Nonnull Path dataDirectory,
         @Nonnull Optional<Path> databasePath,
         @Nonnull Optional<PublicPersistenceTarget.Origin> targetOrigin,

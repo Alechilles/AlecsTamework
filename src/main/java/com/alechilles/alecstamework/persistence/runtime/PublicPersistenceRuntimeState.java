@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicProje
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicRecoveryResult;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupAction;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
@@ -140,7 +141,7 @@ final class PublicPersistenceRuntimeState {
     synchronized PublicPersistenceOperationalStatus operationalStatus() {
         PersistenceStartupReport report = startup.report();
         return new PublicPersistenceOperationalStatus(
-                PersistenceEngineMode.NEXT,
+                PersistenceEngineLineage.REPLACEMENT,
                 configuration.dataDirectory(),
                 databasePath(),
                 targetOrigin(),

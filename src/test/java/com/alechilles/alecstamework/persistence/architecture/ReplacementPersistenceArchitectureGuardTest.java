@@ -241,6 +241,27 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
+    void productionCutoverHasNoRuntimeSelectorOrLegacyLaunchMode()
+            throws Exception {
+        Path runtime = MAIN.resolve("persistence/runtime");
+        for (String removed : List.of(
+                "PersistenceEngineMode.java",
+                "PersistenceEngineSelection.java",
+                "PersistenceEngineSelector.java"
+        )) {
+            assertFalse(
+                    Files.exists(runtime.resolve(removed)),
+                    removed + " would recreate a second production runtime path"
+            );
+        }
+        String status = Files.readString(
+                runtime.resolve("PublicPersistenceOperationalStatus.java")
+        );
+        assertTrue(status.contains("PersistenceEngineLineage engine"));
+        assertFalse(status.contains("tamework.persistence.engine"));
+    }
+
+    @Test
     void publicQueryFacadeDeclaresOnlyValueOrReadResultQueries() {
         List<String> queries = Stream.of(
                         com.alechilles.alecstamework.persistence.runtime

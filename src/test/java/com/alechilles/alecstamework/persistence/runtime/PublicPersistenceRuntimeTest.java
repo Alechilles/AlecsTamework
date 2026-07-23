@@ -61,7 +61,7 @@ class PublicPersistenceRuntimeTest {
 
         PublicPersistenceOperationalStatus opening =
                 runtime.operationalStatus();
-        assertEquals(PersistenceEngineMode.NEXT, opening.engine());
+        assertEquals(PersistenceEngineLineage.REPLACEMENT, opening.engine());
         assertEquals(
                 PublicPersistenceOperationalStatus.StorageMode.STARTING,
                 opening.storageMode()
