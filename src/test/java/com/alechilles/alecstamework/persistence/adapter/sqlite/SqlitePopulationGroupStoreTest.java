@@ -278,6 +278,59 @@ class SqlitePopulationGroupStoreTest {
         }
     }
 
+    @Test
+    void activeOnlyReservationProtectsRosterToLiveTransition()
+            throws Exception {
+        try (Connection connection = transaction()) {
+            createProfile(connection, PROFILE_A, "Mini");
+            createProfile(connection, PROFILE_B, "Mini");
+            SqlitePopulationGroupStore store =
+                    new SqlitePopulationGroupStore(connection);
+            assertTrue(store.replaceAssignment(
+                    null,
+                    assignment(
+                            PROFILE_A,
+                            List.of(membership(
+                                    "mod:soul",
+                                    PopulationGroupScope.GLOBAL
+                            )),
+                            1,
+                            1
+                    )
+            ).applied());
+            PopulationGroupBucket bucket = new PopulationGroupBucket(
+                    OWNER,
+                    "mod:soul",
+                    PopulationGroupScope.GLOBAL,
+                    null
+            );
+            OperationId operation = operation(connection, PROFILE_B, 43);
+            PopulationGroupReservation activeOnly =
+                    new PopulationGroupReservation(
+                            operation,
+                            PROFILE_B,
+                            LifecycleRevision.INITIAL,
+                            bucket,
+                            0,
+                            1,
+                            2,
+                            2,
+                            1,
+                            -18_000
+                    );
+
+            assertEquals(
+                    PopulationGroupAdmission.Status.ADMITTED,
+                    store.reserve(activeOnly).status()
+            );
+            assertEquals(
+                    new PopulationGroupCounts(1, 1, 0, 1),
+                    store.counts(bucket)
+            );
+            connection.commit();
+        }
+    }
+
     private PopulationGroupAssignment assignment(
             ProfileId profileId,
             List<PopulationGroupMembership> memberships,

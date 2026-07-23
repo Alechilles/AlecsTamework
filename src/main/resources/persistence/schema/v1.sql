@@ -341,9 +341,7 @@ CREATE TABLE population_group_reservation (
     scope_kind TEXT NOT NULL CHECK (scope_kind IN ('GLOBAL', 'PER_WORLD')),
     owner_world_key TEXT NOT NULL,
     owned_delta INTEGER NOT NULL CHECK (owned_delta >= 0),
-    active_delta INTEGER NOT NULL CHECK (
-        active_delta >= 0 AND active_delta <= owned_delta
-    ),
+    active_delta INTEGER NOT NULL CHECK (active_delta >= 0),
     snapshotted_max_owned INTEGER NOT NULL CHECK (
         snapshotted_max_owned >= 0
     ),

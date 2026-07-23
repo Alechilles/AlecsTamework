@@ -10,8 +10,7 @@ public record PopulationGroupCounts(
     public PopulationGroupCounts {
         if (committedOwned < 0 || committedActive < 0
                 || pendingOwned < 0 || pendingActive < 0
-                || committedActive > committedOwned
-                || pendingActive > pendingOwned) {
+                || committedActive > committedOwned) {
             throw new IllegalArgumentException(
                     "Population group counts must be non-negative subsets"
             );

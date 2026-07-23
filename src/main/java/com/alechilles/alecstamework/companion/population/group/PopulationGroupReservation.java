@@ -22,7 +22,6 @@ public record PopulationGroupReservation(
         if (operationId == null || profileId == null
                 || expectedLifecycleRevision == null || bucket == null
                 || ownedDelta < 0 || activeDelta < 0
-                || activeDelta > ownedDelta
                 || (ownedDelta == 0 && activeDelta == 0)
                 || snapshottedMaxOwned < 0
                 || snapshottedMaxActive < 0
