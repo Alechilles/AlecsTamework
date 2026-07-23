@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -22,6 +23,8 @@ final class SqlitePublicOperationSet {
     private final SqliteCompanionProfileOperations profiles;
     private final SqliteCompanionAliasRotationOperations aliases;
     private final SqliteOwnerPopulationTransitionOperations ownerPopulation;
+    private final SqliteOwnerPopulationReconciliationOperations
+            ownerPopulationReconciliation;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -84,6 +87,14 @@ final class SqlitePublicOperationSet {
                         OwnerPopulationTransitionDefinition.INSTANCE.kind()
                 )
         );
+        ownerPopulationReconciliation =
+                new SqliteOwnerPopulationReconciliationOperations(
+                        database,
+                        projections.requiredFor(
+                                OwnerPopulationReconciliationDefinition
+                                        .INSTANCE.kind()
+                        )
+                );
         captures = new SqliteCompanionCaptureOperations(
                 engine,
                 publisher,
@@ -154,6 +165,11 @@ final class SqlitePublicOperationSet {
 
     SqliteOwnerPopulationTransitionOperations ownerPopulation() {
         return ownerPopulation;
+    }
+
+    SqliteOwnerPopulationReconciliationOperations
+    ownerPopulationReconciliation() {
+        return ownerPopulationReconciliation;
     }
 
     SqliteCompanionCaptureOperations captures() {

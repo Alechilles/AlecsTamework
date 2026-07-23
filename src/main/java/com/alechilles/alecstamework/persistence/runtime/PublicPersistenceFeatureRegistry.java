@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
@@ -125,9 +126,17 @@ public final class PublicPersistenceFeatureRegistry {
                         "population_evidence_batch",
                         "population_evidence_observation"
                 ),
-                List.of(OwnerPopulationTransitionDefinition.INSTANCE),
+                List.of(
+                        OwnerPopulationTransitionDefinition.INSTANCE,
+                        OwnerPopulationReconciliationDefinition.INSTANCE
+                ),
                 scopes(
                         OwnerPopulationTransitionDefinition.INSTANCE,
+                        Set.of(
+                                OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER
+                        ),
+                        OwnerPopulationReconciliationDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
                                 OperationScopeType.OWNER

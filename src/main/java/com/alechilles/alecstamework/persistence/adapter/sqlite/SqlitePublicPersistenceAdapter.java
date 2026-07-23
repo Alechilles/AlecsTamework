@@ -99,6 +99,12 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteOwnerPopulationReconciliationOperations
+    ownerPopulationReconciliationOperations() {
+        return publicOperations.ownerPopulationReconciliation();
+    }
+
+    @Nonnull
     public SqliteCompanionCaptureOperations captureOperations() {
         return publicOperations.captures();
     }
