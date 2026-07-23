@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionDataPort;
 import com.alechilles.alecstamework.companion.command.CommandRosterPort;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeasePort;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopPort;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
@@ -20,8 +21,8 @@ import javax.annotation.Nonnull;
 /**
  * Focused connection-bound collaborators available to one application transaction.
  *
- * <p>This is not a service locator: it exposes only the six shared persistence authorities, all
- * bound to the same caller-owned SQLite connection.</p>
+ * <p>This is not a service locator: its public surface exposes only the six shared authorities.
+ * Package-private feature details remain bound to the same caller-owned SQLite connection.</p>
  */
 public final class SqlitePersistenceTransactionContext {
     private final CompanionIdentityPort identities;
@@ -38,6 +39,7 @@ public final class SqlitePersistenceTransactionContext {
     private final OwnerPopulationEvidencePort populationEvidence;
     private final PopulationGroupPort populationGroups;
     private final CommandRosterPort commandRosters;
+    private final TimedSummonLeasePort timedSummons;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -57,6 +59,7 @@ public final class SqlitePersistenceTransactionContext {
         populationEvidence = new SqliteOwnerPopulationEvidenceStore(connection);
         populationGroups = new SqlitePopulationGroupStore(connection);
         commandRosters = new SqliteCommandRosterStore(connection);
+        timedSummons = new SqliteTimedSummonLeaseStore(connection);
     }
 
     @Nonnull
@@ -131,5 +134,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     CommandRosterPort commandRosters() {
         return commandRosters;
+    }
+
+    @Nonnull
+    TimedSummonLeasePort timedSummons() {
+        return timedSummons;
     }
 }

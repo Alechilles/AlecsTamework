@@ -412,6 +412,57 @@ CREATE TABLE command_roster_membership (
 CREATE INDEX idx_command_roster_family
     ON command_roster_membership(owner_uuid, family_id, profile_id);
 
+CREATE TABLE timed_summon_lease (
+    profile_id TEXT PRIMARY KEY,
+    lease_revision INTEGER NOT NULL CHECK (lease_revision > 0),
+    session_id TEXT UNIQUE,
+    remaining_ms INTEGER CHECK (remaining_ms >= 0),
+    cooldown_until_ms INTEGER,
+    config_id TEXT,
+    config_revision INTEGER CHECK (config_revision >= 0),
+    active_duration_ms INTEGER NOT NULL CHECK (active_duration_ms >= 0),
+    resummon_cooldown_ms INTEGER NOT NULL CHECK (
+        resummon_cooldown_ms >= 0
+    ),
+    auto_store_on_owner_logout INTEGER NOT NULL CHECK (
+        auto_store_on_owner_logout IN (0, 1)
+    ),
+    warning_thresholds_json TEXT NOT NULL CHECK (
+        json_valid(warning_thresholds_json)
+        AND json_type(warning_thresholds_json) = 'array'
+    ),
+    emitted_warning_thresholds_json TEXT NOT NULL CHECK (
+        json_valid(emitted_warning_thresholds_json)
+        AND json_type(emitted_warning_thresholds_json) = 'array'
+    ),
+    checkpointed_at_ms INTEGER,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    CHECK (
+        (config_id IS NULL AND config_revision IS NULL)
+        OR (length(trim(config_id)) > 0 AND config_revision IS NOT NULL)
+    ),
+    CHECK (
+        (session_id IS NULL
+            AND remaining_ms IS NULL
+            AND checkpointed_at_ms IS NULL
+            AND json_array_length(
+                emitted_warning_thresholds_json
+            ) = 0)
+        OR (session_id IS NOT NULL
+            AND checkpointed_at_ms IS NOT NULL
+            AND cooldown_until_ms IS NULL
+            AND (
+                (active_duration_ms = 0 AND remaining_ms IS NULL)
+                OR (active_duration_ms > 0
+                    AND remaining_ms IS NOT NULL
+                    AND remaining_ms <= active_duration_ms)
+            ))
+    )
+);
+
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,
