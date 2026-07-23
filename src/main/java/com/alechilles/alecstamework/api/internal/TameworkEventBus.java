@@ -53,6 +53,11 @@ public final class TameworkEventBus
         this.logger = logger;
     }
 
+    /** Receives an already-mapped canonical profile projection after durable commit. */
+    void publishProfileChanged(@Nonnull NpcProfileChangedEvent event) {
+        dispatch(Objects.requireNonNull(event));
+    }
+
     @Override
     public <E extends TameworkEvent> AutoCloseable subscribe(@Nonnull Class<E> type, @Nonnull Consumer<E> listener) {
         Subscription<E> subscription = new Subscription<>(Objects.requireNonNull(type), Objects.requireNonNull(listener));
