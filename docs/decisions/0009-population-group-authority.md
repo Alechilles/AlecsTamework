@@ -1,6 +1,6 @@
 # ADR 0009: Population Group Assignment and Admission
 
-- Status: Accepted for Phase 5B implementation
+- Status: Implemented
 - Date: 2026-07-23
 
 ## Context
@@ -122,3 +122,25 @@ incident/quarantine stores at operation, profile, or owner scope.
 - The unreleased classification statuses, group operation phases, count-evidence
   states, receipt table, recovery service, and publication callbacks are not
   ported.
+
+## Implementation evidence
+
+- Fresh schema v1 owns only classification, normalized membership, and
+  shared-envelope reservation tables for this feature.
+- One typed `population_group_assignment` operation verifies exact profile,
+  lifecycle, owner, owner-world, assignment, and policy revisions.
+- Serialized preparation counts current canonical lifecycle membership plus
+  positive reservations and prevents two profiles from consuming one remaining
+  group slot.
+- Assignment replacement, one self-contained outbox event, operation outcome,
+  and reservation retirement commit in the same transaction.
+- The rebuildable group index consumes assignment, canonical lifecycle, and
+  metadata events; stale roles, impossible lifecycle ordering, and a missing
+  owner-world bucket are explicit lag.
+- An unowned classification is valid and consumes no per-world bucket; lag is
+  raised only when a canonical owner exists without its required owner world.
+- Startup recovery decodes the durable policy snapshot and re-enters the same
+  assignment adapter through the shared recovery registry.
+- The focused Phase 5B gate passes 21 tests covering planning, codecs, normalized
+  SQLite storage, projection replay/rebuild, limits, concurrency, recovery,
+  public composition, and descriptor-derived readiness.
