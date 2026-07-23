@@ -59,7 +59,7 @@
     {
       "id": "exact-source-finalization",
       "contract": "A consumed or retired source is finalized exactly once and is correlated to the target operation.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 4,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.ExactSourceFinalizationTest",
       "currentTests": [
