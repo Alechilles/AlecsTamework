@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,8 @@ class CompanionRestorationDefinitionTest {
             ProfileId.parse("10000000-0000-0000-0000-000000000001");
     private static final NpcAlias TARGET =
             NpcAlias.parse("20000000-0000-0000-0000-000000000002");
+    private static final NpcAlias SOURCE =
+            NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     private static final LifecycleRevision REVISION = new LifecycleRevision(5);
     private static final String PAYLOAD = "{\"health\":100}";
 
@@ -72,6 +75,10 @@ class CompanionRestorationDefinitionTest {
                                 LifecycleState.DEAD_REVIVABLE,
                                 REVISION
                         ),
+                        projection(snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION
+                        )),
                         TARGET,
                         placement(),
                         "spawn-receipt",
@@ -88,6 +95,10 @@ class CompanionRestorationDefinitionTest {
                                 LifecycleState.DEAD_REVIVABLE,
                                 REVISION.next()
                         ),
+                        projection(snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION.next()
+                        )),
                         TARGET,
                         placement(),
                         "spawn-receipt",
@@ -104,11 +115,49 @@ class CompanionRestorationDefinitionTest {
                                 LifecycleState.DEAD_REVIVABLE,
                                 REVISION
                         ),
+                        projection(snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION
+                        )),
                         TARGET,
                         placement(),
                         "spawn-receipt",
                         -500
                 )
+        );
+    }
+
+    @Test
+    void rejectsWrongVersionKindOrAliasedProjection() {
+        CompanionSnapshot source = snapshot(
+                LifecycleState.DEAD_REVIVABLE,
+                REVISION
+        );
+        RestorationProjection valid = projection(source);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> requestWithProjection(new RestorationProjection(
+                        SOURCE,
+                        encoded(
+                                DormantSourceEvidence.Kind
+                                        .DESTRUCTIVE_REMOVAL.snapshotKind(),
+                                2
+                        )
+                ))
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> requestWithProjection(new RestorationProjection(
+                        SOURCE,
+                        encoded(source.kind(), 1)
+                ))
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> requestWithProjection(new RestorationProjection(
+                        TARGET,
+                        valid.fullState()
+                ))
         );
     }
 
@@ -118,6 +167,7 @@ class CompanionRestorationDefinitionTest {
                 REVISION,
                 source,
                 snapshot(source, new LifecycleRevision(4)),
+                projection(snapshot(source, new LifecycleRevision(4))),
                 TARGET,
                 placement(),
                 "spawn-receipt-" + source.name().toLowerCase(),
@@ -148,6 +198,42 @@ class CompanionRestorationDefinitionTest {
                 sourceRevision,
                 true,
                 -600
+        );
+    }
+
+    private RestorationProjection projection(CompanionSnapshot source) {
+        return new RestorationProjection(
+                SOURCE,
+                encoded(source.kind(), 2)
+        );
+    }
+
+    private SnapshotCodecRegistry.EncodedSnapshot encoded(
+            com.alechilles.alecstamework.companion.snapshot.SnapshotKind kind,
+            int version
+    ) {
+        String payload = "{\"state\":\"frozen\"}";
+        return new SnapshotCodecRegistry.EncodedSnapshot(
+                kind,
+                version,
+                payload,
+                Sha256Hash.ofUtf8(payload)
+        );
+    }
+
+    private CompanionRestorationRequest requestWithProjection(
+            RestorationProjection projection
+    ) {
+        return new CompanionRestorationRequest(
+                PROFILE,
+                REVISION,
+                LifecycleState.DEAD_REVIVABLE,
+                snapshot(LifecycleState.DEAD_REVIVABLE, REVISION),
+                projection,
+                TARGET,
+                placement(),
+                "spawn-receipt",
+                -500
         );
     }
 }

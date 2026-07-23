@@ -14,7 +14,9 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
@@ -137,6 +139,7 @@ final class RestorationProcessCrashChild {
                 new LifecycleRevision(1),
                 LifecycleState.DEAD_REVIVABLE,
                 snapshot(true),
+                projection(),
                 TARGET_ALIAS,
                 new CompanionSpawnPlacement(
                         "world-two", -12.5, -63.05, -4.5,
@@ -144,6 +147,20 @@ final class RestorationProcessCrashChild {
                 ),
                 "spawn-process-receipt",
                 -600
+        );
+    }
+
+    private static RestorationProjection projection() {
+        String payload = "{\"state\":\"frozen\"}";
+        return new RestorationProjection(
+                SOURCE_ALIAS,
+                new SnapshotCodecRegistry.EncodedSnapshot(
+                        DormantSourceEvidence.Kind.DEATH_COMPONENT
+                                .snapshotKind(),
+                        2,
+                        payload,
+                        Sha256Hash.ofUtf8(payload)
+                )
         );
     }
 

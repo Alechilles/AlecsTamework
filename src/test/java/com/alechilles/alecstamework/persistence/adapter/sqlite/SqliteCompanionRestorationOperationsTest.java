@@ -18,7 +18,9 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationEv
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationOutcome;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
@@ -353,6 +355,7 @@ class SqliteCompanionRestorationOperationsTest {
                 new LifecycleRevision(1),
                 LifecycleState.DEAD_REVIVABLE,
                 sourceSnapshot(true),
+                restorationProjection(),
                 TARGET_ALIAS,
                 new CompanionSpawnPlacement(
                         "world-two", -12.5, -63.05, -4.5,
@@ -360,6 +363,20 @@ class SqliteCompanionRestorationOperationsTest {
                 ),
                 "spawn-receipt",
                 -600
+        );
+    }
+
+    private RestorationProjection restorationProjection() {
+        String payload = "{\"state\":\"frozen\"}";
+        return new RestorationProjection(
+                SOURCE_ALIAS,
+                new SnapshotCodecRegistry.EncodedSnapshot(
+                        DormantSourceEvidence.Kind.DEATH_COMPONENT
+                                .snapshotKind(),
+                        2,
+                        payload,
+                        Sha256Hash.ofUtf8(payload)
+                )
         );
     }
 

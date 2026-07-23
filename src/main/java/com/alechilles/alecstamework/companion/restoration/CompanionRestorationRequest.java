@@ -15,6 +15,7 @@ public record CompanionRestorationRequest(
         @Nonnull LifecycleRevision expectedLifecycleRevision,
         @Nonnull LifecycleState sourceState,
         @Nonnull CompanionSnapshot sourceSnapshot,
+        @Nonnull RestorationProjection projection,
         @Nonnull NpcAlias targetAlias,
         @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
@@ -23,7 +24,8 @@ public record CompanionRestorationRequest(
     public CompanionRestorationRequest {
         if (profileId == null || expectedLifecycleRevision == null
                 || sourceState == null || sourceSnapshot == null
-                || targetAlias == null || placement == null) {
+                || projection == null || targetAlias == null
+                || placement == null) {
             throw new IllegalArgumentException("Complete companion restoration is required");
         }
         spawnReceiptKey = requireText(spawnReceiptKey, "Restoration spawn receipt");
@@ -41,6 +43,13 @@ public record CompanionRestorationRequest(
                 .equals(sourceSnapshot.kind())) {
             throw new IllegalArgumentException(
                     "Restoration snapshot must be the exact current source artifact"
+            );
+        }
+        if (!sourceSnapshot.kind().equals(projection.fullState().kind())
+                || projection.fullState().payloadVersion() != 2
+                || projection.sourceAlias().equals(targetAlias)) {
+            throw new IllegalArgumentException(
+                    "Restoration projection must be complete modern state for a distinct source alias"
             );
         }
     }

@@ -7,12 +7,15 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionIdentityStore;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionLifecycleStore;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileReader;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionRestorationOperations;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionSnapshotStore;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
@@ -30,6 +33,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.items.persistence.TameworkRestorationSnapshotResolver;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Duration;
@@ -39,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Released-v4 death and lost artifacts restore through the replacement protocol unchanged. */
@@ -104,9 +110,12 @@ class PublicV4DormantRestorationTest {
                             () -> -400,
                             List.of()
                     );
+            SqliteCompanionProfileReader profiles =
+                    new SqliteCompanionProfileReader(reads);
 
             restore(
                     connections,
+                    profiles,
                     restorations,
                     3,
                     DEAD,
@@ -117,6 +126,7 @@ class PublicV4DormantRestorationTest {
             );
             restore(
                     connections,
+                    profiles,
                     restorations,
                     4,
                     LOST,
@@ -133,6 +143,7 @@ class PublicV4DormantRestorationTest {
 
     private void restore(
             SqliteConnectionFactory connections,
+            SqliteCompanionProfileReader profiles,
             SqliteCompanionRestorationOperations restorations,
             int suffix,
             ProfileId profile,
@@ -152,6 +163,21 @@ class PublicV4DormantRestorationTest {
                     .orElseThrow();
         }
         assertEquals(state, before.state());
+        PersistenceReadResult.Found<CompanionProfileReadModel> found =
+                assertInstanceOf(
+                        PersistenceReadResult.Found.class,
+                        profiles.findByProfile(profile).toCompletableFuture()
+                                .get(10, TimeUnit.SECONDS)
+                );
+        TameworkRestorationSnapshotResolver.Resolution.Resolved resolved =
+                assertInstanceOf(
+                        TameworkRestorationSnapshotResolver.Resolution
+                                .Resolved.class,
+                        new TameworkRestorationSnapshotResolver()
+                                .resolve(found.value(), snapshot)
+                );
+        RestorationProjection projection = resolved.projection();
+        assertEquals(oldAlias, projection.sourceAlias());
 
         OperationId operationId = OperationId.parse(String.format(
                 "60000000-0000-0000-0000-%012d", suffix
@@ -164,6 +190,7 @@ class PublicV4DormantRestorationTest {
                         before.revision(),
                         state,
                         snapshot,
+                        projection,
                         targetAlias,
                         new CompanionSpawnPlacement(
                                 "restored-world", -12.5, -63.05, -4.5,

@@ -50,6 +50,26 @@ public final class SnapshotCodecRegistry {
         if (snapshot == null || valueType == null) {
             throw new IllegalArgumentException("Snapshot and expected value type are required");
         }
+        return decode(
+                new EncodedSnapshot(
+                        snapshot.kind(),
+                        snapshot.payloadVersion(),
+                        snapshot.payloadJson(),
+                        snapshot.payloadHash()
+                ),
+                valueType
+        );
+    }
+
+    /** Decodes a self-contained operation artifact without inventing canonical snapshot identity. */
+    @Nonnull
+    public <T> SnapshotDecodeResult<T> decode(
+            @Nonnull EncodedSnapshot snapshot,
+            @Nonnull Class<T> valueType
+    ) {
+        if (snapshot == null || valueType == null) {
+            throw new IllegalArgumentException("Snapshot and expected value type are required");
+        }
         if (!snapshot.payloadHash().matchesUtf8(snapshot.payloadJson())) {
             return failed(SnapshotDecodeResult.Failure.HASH_MISMATCH, "snapshot_hash_mismatch", null);
         }
@@ -111,6 +131,16 @@ public final class SnapshotCodecRegistry {
             if (kind == null || version <= 0 || payloadJson == null || payloadHash == null) {
                 throw new IllegalArgumentException("Complete encoded snapshot is required");
             }
+            if (!payloadHash.matchesUtf8(payloadJson)) {
+                throw new IllegalArgumentException(
+                        "Encoded snapshot SHA-256 does not match its payload"
+                );
+            }
+        }
+
+        /** Alias matching the canonical snapshot field name at JSON boundaries. */
+        public int payloadVersion() {
+            return version;
         }
     }
 

@@ -7,7 +7,9 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -48,6 +50,7 @@ class HytaleCompanionRestorationBoundaryTest {
 
     private CompanionRestorationRequest request() {
         String payload = "{\"health\":100}";
+        String projectionPayload = "{\"state\":\"frozen\"}";
         return new CompanionRestorationRequest(
                 ProfileId.parse(
                         "10000000-0000-0000-0000-000000000001"
@@ -70,6 +73,18 @@ class HytaleCompanionRestorationBoundaryTest {
                         true,
                         -500
                 ),
+                new RestorationProjection(
+                        NpcAlias.parse(
+                                "20000000-0000-0000-0000-000000000002"
+                        ),
+                        new SnapshotCodecRegistry.EncodedSnapshot(
+                                DormantSourceEvidence.Kind.DEATH_COMPONENT
+                                        .snapshotKind(),
+                                2,
+                                projectionPayload,
+                                Sha256Hash.ofUtf8(projectionPayload)
+                        )
+                ),
                 NpcAlias.parse(
                         "20000000-0000-0000-0000-000000000001"
                 ),
@@ -89,7 +104,7 @@ class HytaleCompanionRestorationBoundaryTest {
                 operationId,
                 new IdempotencyKey("restoration-world-test"),
                 new OperationKind("companion_restoration"),
-                2,
+                3,
                 "{}",
                 OperationPhase.LIVE_APPLYING,
                 "companion_restoration",

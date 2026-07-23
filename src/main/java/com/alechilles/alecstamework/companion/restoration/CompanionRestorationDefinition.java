@@ -11,7 +11,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/** Version-one typed operation definition for death and lost restoration. */
+/** Typed operation definition for death and lost restoration. */
 public final class CompanionRestorationDefinition
         implements OperationDefinition<CompanionRestorationRequest> {
     public static final CompanionRestorationDefinition INSTANCE =
@@ -29,7 +29,7 @@ public final class CompanionRestorationDefinition
 
     @Override
     public int payloadVersion() {
-        return 2;
+        return 3;
     }
 
     @Override
@@ -49,6 +49,10 @@ public final class CompanionRestorationDefinition
         json.add(
                 "sourceSnapshot",
                 CompanionSnapshotJsonCodec.encode(payload.sourceSnapshot())
+        );
+        json.add(
+                "projection",
+                RestorationProjectionJsonCodec.encode(payload.projection())
         );
         json.addProperty("targetAlias", payload.targetAlias().toString());
         json.add(
@@ -71,6 +75,9 @@ public final class CompanionRestorationDefinition
                 LifecycleState.valueOf(json.get("sourceState").getAsString()),
                 CompanionSnapshotJsonCodec.decode(
                         json.getAsJsonObject("sourceSnapshot")
+                ),
+                RestorationProjectionJsonCodec.decode(
+                        json.getAsJsonObject("projection")
                 ),
                 NpcAlias.parse(json.get("targetAlias").getAsString()),
                 CompanionSpawnPlacementJsonCodec.decode(
