@@ -21,6 +21,12 @@ public record ProfileExtensionKey(@Nonnull ProfileId profileId,
         dataKey = requireText(dataKey, "Extension data key", 256);
     }
 
+    /** Collision-free stable ID used by revision-aware projection consumers. */
+    @Nonnull
+    public String aggregateId() {
+        return profileId + "|" + namespace.length() + ":" + namespace + "|" + dataKey;
+    }
+
     private static String requireText(String value, String field, int maxLength) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
