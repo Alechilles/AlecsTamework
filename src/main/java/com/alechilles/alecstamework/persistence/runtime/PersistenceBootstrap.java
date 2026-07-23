@@ -74,6 +74,12 @@ public final class PersistenceBootstrap implements AutoCloseable {
         return runtime.metrics();
     }
 
+    /** Returns bounded passive measurements for release performance gates. */
+    @Nonnull
+    public PublicPersistencePerformanceSnapshot performance() {
+        return runtime.performance();
+    }
+
     /** Returns payload-free operator state even when startup is blocked. */
     @Nonnull
     public PublicPersistenceOperationalStatus operationalStatus() {

@@ -95,6 +95,7 @@ public final class SqliteSingleWriter implements AutoCloseable {
             if (!queue.offer(task)) {
                 return rejected(command, PersistenceWriteRejection.SATURATED);
             }
+            task.acceptedQueueDepth = queue.size();
             outstanding.incrementAndGet();
             recordWriteAccepted(command);
             return new WriteSubmission<>(WriteAcceptance.ACCEPTED, task.completion);
@@ -165,6 +166,10 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private <T> void executeTask(Task<T> task) {
         active.set(task);
+        long executionStarted = System.nanoTime();
+        long queueWait = Math.max(
+                0, executionStarted - task.acceptedAtNanos
+        );
         PersistenceTransactionResult<T> result;
         try {
             result = executeWithBusyRetry(task.command);
@@ -173,6 +178,12 @@ public final class SqliteSingleWriter implements AutoCloseable {
                     SqliteFailureClassifier.classify(failure, task.command.kind().value())
             );
         }
+        recordWriteTiming(
+                task.command,
+                task.acceptedQueueDepth,
+                queueWait,
+                Math.max(0, System.nanoTime() - executionStarted)
+        );
         try {
             task.completion.complete(result);
             recordWriteCompleted(task.command, result);
@@ -361,6 +372,24 @@ public final class SqliteSingleWriter implements AutoCloseable {
         }
     }
 
+    private void recordWriteTiming(
+            SqliteTransactionCommand<?> command,
+            int queueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+        try {
+            metrics.writeTimed(
+                    command.kind(),
+                    queueDepth,
+                    queueWaitNanos,
+                    executionNanos
+            );
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change a durable outcome.
+        }
+    }
+
     private void recordCheckpointFailure(PersistenceCheckpoint checkpoint, Throwable failure) {
         try {
             metrics.checkpointFailure(
@@ -417,8 +446,10 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private static final class Task<T> {
         private final SqliteTransactionCommand<T> command;
+        private final long acceptedAtNanos = System.nanoTime();
         private final CompletableFuture<PersistenceTransactionResult<T>> completion =
                 new CompletableFuture<>();
+        private int acceptedQueueDepth;
 
         private Task(SqliteTransactionCommand<T> command) {
             this.command = command;

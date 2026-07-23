@@ -66,6 +66,35 @@ public interface PersistenceKernelMetrics {
     ) {
     }
 
+    default void writeTimed(
+            @Nonnull OperationKind operationKind,
+            int acceptedQueueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+    }
+
+    default void readTimed(
+            @Nonnull PersistenceReadKind readKind,
+            @Nonnull PersistenceReadPriority priority,
+            int acceptedQueueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+    }
+
+    default void checkpointCompleted(
+            int logFrames,
+            int checkpointedFrames
+    ) {
+    }
+
+    default void shutdownCompleted(
+            long elapsedNanos,
+            int outstandingOperations
+    ) {
+    }
+
     default void checkpointFailure(@Nonnull String checkpoint,
                                    @Nonnull Throwable failure) {
     }

@@ -84,8 +84,16 @@ public final class SqliteReadExecutor implements AutoCloseable {
 
         CompletableFuture<PersistenceReadResult<T>> completion = new CompletableFuture<>();
         outstanding.incrementAndGet();
+        ThreadPoolExecutor selectedLane = lane(command.priority());
+        long acceptedAtNanos = System.nanoTime();
+        int acceptedQueueDepth = selectedLane.getQueue().size() + 1;
         try {
-            lane(command.priority()).execute(() -> run(command, completion));
+            selectedLane.execute(() -> run(
+                    command,
+                    completion,
+                    acceptedAtNanos,
+                    acceptedQueueDepth
+            ));
         } catch (RejectedExecutionException rejected) {
             outstanding.decrementAndGet();
             PersistenceReadResult<T> result = failure(
@@ -135,7 +143,13 @@ public final class SqliteReadExecutor implements AutoCloseable {
     }
 
     private <T> void run(SqliteReadCommand<T> command,
-                         CompletableFuture<PersistenceReadResult<T>> completion) {
+                         CompletableFuture<PersistenceReadResult<T>> completion,
+                         long acceptedAtNanos,
+                         int acceptedQueueDepth) {
+        long executionStarted = System.nanoTime();
+        long queueWait = Math.max(
+                0, executionStarted - acceptedAtNanos
+        );
         try (Connection connection = connections.openReadConnection()) {
             PersistenceReadResult<T> returned =
                     command.work().execute(connection);
@@ -152,6 +166,12 @@ public final class SqliteReadExecutor implements AutoCloseable {
             recordCompletion(command, result);
             completion.complete(result);
         } finally {
+            recordTiming(
+                    command,
+                    acceptedQueueDepth,
+                    queueWait,
+                    Math.max(0, System.nanoTime() - executionStarted)
+            );
             outstanding.decrementAndGet();
         }
     }
@@ -208,6 +228,25 @@ public final class SqliteReadExecutor implements AutoCloseable {
     ) {
         try {
             metrics.readCompleted(command.kind(), result);
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change a typed read outcome.
+        }
+    }
+
+    private void recordTiming(
+            SqliteReadCommand<?> command,
+            int queueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+        try {
+            metrics.readTimed(
+                    command.kind(),
+                    command.priority(),
+                    queueDepth,
+                    queueWaitNanos,
+                    executionNanos
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change a typed read outcome.
         }

@@ -110,10 +110,11 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
             throw new IllegalArgumentException("Kernel shutdown timeout is required and non-negative");
         }
         state.compareAndSet(State.OPEN, State.DRAINING);
+        long shutdownStarted = System.nanoTime();
         long deadline = System.nanoTime() + timeout.toNanos();
         PersistenceShutdownResult writerResult = writer.shutdown(remaining(deadline));
         if (writerResult.status() == PersistenceShutdownResult.Status.TIMED_OUT) {
-            return new SqliteKernelShutdownReport(
+            SqliteKernelShutdownReport report = new SqliteKernelShutdownReport(
                     writerResult,
                     new SqliteKernelShutdownReport.CheckpointOutcome(
                             SqliteKernelShutdownReport.CheckpointStatus.SKIPPED_WRITER_ACTIVE,
@@ -124,6 +125,11 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                             reads.outstandingReads()
                     )
             );
+            recordShutdownCompleted(
+                    shutdownStarted,
+                    writerResult.outstandingOperations()
+            );
+            return report;
         }
 
         SqliteCheckpointResult checkpointResult = checkpoints.checkpoint();
@@ -134,6 +140,9 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
         if (checkpointResult instanceof
                 SqliteCheckpointResult.Failed failed) {
             recordCheckpointFailure(failed.failure());
+        } else if (checkpointResult instanceof
+                SqliteCheckpointResult.Completed completed) {
+            recordCheckpointCompleted(completed);
         }
         PersistenceShutdownResult readResult = reads.shutdown(remaining(deadline));
         if (readResult.status()
@@ -143,7 +152,7 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
         if (readResult.status() != PersistenceShutdownResult.Status.TIMED_OUT) {
             state.set(State.CLOSED);
         }
-        return new SqliteKernelShutdownReport(
+        SqliteKernelShutdownReport report = new SqliteKernelShutdownReport(
                 writerResult,
                 new SqliteKernelShutdownReport.CheckpointOutcome(
                         checkpointStatus,
@@ -151,6 +160,11 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                 ),
                 readResult
         );
+        recordShutdownCompleted(
+                shutdownStarted,
+                readResult.outstandingOperations()
+        );
+        return report;
     }
 
     @Override
@@ -179,6 +193,33 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
     private void recordShutdownTimedOut(int outstanding) {
         try {
             metrics.shutdownTimedOut(outstanding);
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change shutdown ownership.
+        }
+    }
+
+    private void recordCheckpointCompleted(
+            SqliteCheckpointResult.Completed completed
+    ) {
+        try {
+            metrics.checkpointCompleted(
+                    completed.logFrames(),
+                    completed.checkpointedFrames()
+            );
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change checkpoint semantics.
+        }
+    }
+
+    private void recordShutdownCompleted(
+            long startedNanos,
+            int outstanding
+    ) {
+        try {
+            metrics.shutdownCompleted(
+                    Math.max(0, System.nanoTime() - startedNanos),
+                    outstanding
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change shutdown ownership.
         }

@@ -82,6 +82,16 @@ class PublicPersistenceRuntimeTest {
         assertNull(metrics.lastGlobalFailureCode());
         PublicPersistenceDiagnosticsSnapshot diagnostics =
                 diagnostics(runtime);
+        PublicPersistencePerformanceSnapshot performance =
+                runtime.performance();
+        assertEquals(
+                1,
+                performance.startupNodes().get(
+                        PersistenceStartupNode.OPEN_TARGET
+                ).count()
+        );
+        assertTrue(performance.reads().execution().count() > 0);
+        assertTrue(performance.reads().maximumDepth() > 0);
         assertEquals(metrics.features().size(), diagnostics.features().size());
         assertEquals(7, diagnostics.projectionCheckpoints().size());
         assertEquals(0, diagnostics.outboxHead());
@@ -269,6 +279,10 @@ class PublicPersistenceRuntimeTest {
                 runtime.queries().findProfile(profileId())
                         .toCompletableFuture().join()
         );
+        PublicPersistencePerformanceSnapshot performance =
+                runtime.performance();
+        assertTrue(performance.writer().execution().count() > 0);
+        assertTrue(performance.writer().maximumDepth() > 0);
         PublicPersistenceDiagnosticsSnapshot diagnostics =
                 diagnostics(runtime);
         assertEquals(

@@ -91,7 +91,7 @@ final class PublicPersistenceRuntimeState {
         actions.put(PersistenceStartupNode.PUBLISH_READ_READINESS, this::publishReadReadiness);
         actions.put(PersistenceStartupNode.PUBLISH_MUTATION_READINESS,
                 this::publishMutationReadiness);
-        return Map.copyOf(actions);
+        return PublicPersistenceStartupActionTimer.wrap(actions, control);
     }
 
     Optional<Path> databasePath() {
@@ -131,6 +131,10 @@ final class PublicPersistenceRuntimeState {
 
     PublicPersistenceMetricsSnapshot metrics() {
         return control.snapshot();
+    }
+
+    PublicPersistencePerformanceSnapshot performance() {
+        return control.performance(walBytes());
     }
 
     synchronized PublicPersistenceOperationalStatus operationalStatus() {
@@ -241,6 +245,23 @@ final class PublicPersistenceRuntimeState {
         )
                 ? OptionalInt.of(SqliteSchemaV1Manager.VERSION)
                 : OptionalInt.empty();
+    }
+
+    private long walBytes() {
+        if (target == null) {
+            return 0;
+        }
+        Path database = target.databasePath();
+        Path wal = database.resolveSibling(
+                database.getFileName() + "-wal"
+        );
+        try {
+            return java.nio.file.Files.exists(wal)
+                    ? java.nio.file.Files.size(wal)
+                    : 0;
+        } catch (java.io.IOException ignored) {
+            return 0;
+        }
     }
 
     private CompletionStage<PersistenceStartupAction.Result> openTarget() {

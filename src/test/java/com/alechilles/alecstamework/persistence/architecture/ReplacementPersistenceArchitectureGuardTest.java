@@ -197,6 +197,32 @@ class ReplacementPersistenceArchitectureGuardTest {
         );
     }
 
+    @Test
+    void replacementPersistenceDoesNotEnterPerTickSystemClasses()
+            throws Exception {
+        ArrayList<String> violations = new ArrayList<>();
+        for (Path file : javaFiles(MAIN)) {
+            if (!file.getFileName().toString().endsWith("System.java")) {
+                continue;
+            }
+            String source = Files.readString(file);
+            if (source.contains(
+                    "com.alechilles.alecstamework.persistence.runtime"
+            ) || source.contains(
+                    "com.alechilles.alecstamework.persistence.adapter"
+            ) || source.contains(
+                    "com.alechilles.alecstamework.persistence.kernel"
+            )) {
+                violations.add(relative(file));
+            }
+        }
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Tick systems must not allocate or block on persistence: "
+                        + violations
+        );
+    }
+
     private List<Path> javaFiles(Path root) throws Exception {
         if (!Files.isDirectory(root)) {
             return List.of();

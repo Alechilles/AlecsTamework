@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -38,6 +40,22 @@ final class PublicPersistenceControlPlane
     private final LongAdder shutdownTimeouts = new LongAdder();
     private final AtomicReference<String> lastGlobalFailure =
             new AtomicReference<>();
+    private final Map<com.alechilles.alecstamework.persistence.control
+            .PersistenceStartupNode, PersistenceLatencyHistogram> startupTimings;
+    private final PersistenceLatencyHistogram writerWait =
+            new PersistenceLatencyHistogram();
+    private final PersistenceLatencyHistogram writerExecution =
+            new PersistenceLatencyHistogram();
+    private final PersistenceLatencyHistogram readWait =
+            new PersistenceLatencyHistogram();
+    private final PersistenceLatencyHistogram readExecution =
+            new PersistenceLatencyHistogram();
+    private final PersistenceLatencyHistogram shutdownDrain =
+            new PersistenceLatencyHistogram();
+    private final AtomicInteger maximumWriterDepth = new AtomicInteger();
+    private final AtomicInteger maximumReadDepth = new AtomicInteger();
+    private final AtomicLong checkpointLogFrames = new AtomicLong();
+    private final AtomicLong checkpointedFrames = new AtomicLong();
     private volatile PersistenceStartupCoordinator startup;
 
     PublicPersistenceControlPlane(PersistenceFeatureRegistry registry) {
@@ -57,6 +75,17 @@ final class PublicPersistenceControlPlane
             );
         }
         features = Map.copyOf(counters);
+        java.util.EnumMap<com.alechilles.alecstamework.persistence.control
+                .PersistenceStartupNode, PersistenceLatencyHistogram> timings =
+                new java.util.EnumMap<>(
+                        com.alechilles.alecstamework.persistence.control
+                                .PersistenceStartupNode.class
+                );
+        for (var node : com.alechilles.alecstamework.persistence.control
+                .PersistenceStartupNode.values()) {
+            timings.put(node, new PersistenceLatencyHistogram());
+        }
+        startupTimings = Map.copyOf(timings);
     }
 
     void bind(PersistenceStartupCoordinator startup) {
@@ -175,6 +204,61 @@ final class PublicPersistenceControlPlane
         shutdownTimeouts.increment();
     }
 
+    @Override
+    public void writeTimed(
+            OperationKind operationKind,
+            int acceptedQueueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+        maximumWriterDepth.accumulateAndGet(
+                acceptedQueueDepth, Math::max
+        );
+        writerWait.observe(queueWaitNanos);
+        writerExecution.observe(executionNanos);
+    }
+
+    @Override
+    public void readTimed(
+            PersistenceReadKind readKind,
+            com.alechilles.alecstamework.persistence.kernel
+                    .PersistenceReadPriority priority,
+            int acceptedQueueDepth,
+            long queueWaitNanos,
+            long executionNanos
+    ) {
+        maximumReadDepth.accumulateAndGet(
+                acceptedQueueDepth, Math::max
+        );
+        readWait.observe(queueWaitNanos);
+        readExecution.observe(executionNanos);
+    }
+
+    @Override
+    public void checkpointCompleted(
+            int logFrames,
+            int completedFrames
+    ) {
+        checkpointLogFrames.set(logFrames);
+        checkpointedFrames.set(completedFrames);
+    }
+
+    @Override
+    public void shutdownCompleted(
+            long elapsedNanos,
+            int outstandingOperations
+    ) {
+        shutdownDrain.observe(elapsedNanos);
+    }
+
+    void startupNodeTimed(
+            com.alechilles.alecstamework.persistence.control
+                    .PersistenceStartupNode node,
+            long elapsedNanos
+    ) {
+        startupTimings.get(node).observe(elapsedNanos);
+    }
+
     PublicPersistenceMetricsSnapshot snapshot() {
         HashMap<PersistenceFeatureId,
                 PublicPersistenceMetricsSnapshot.FeatureMetrics> result =
@@ -188,6 +272,35 @@ final class PublicPersistenceControlPlane
                 shutdownTimeouts.sum(),
                 lastGlobalFailure.get(),
                 result
+        );
+    }
+
+    PublicPersistencePerformanceSnapshot performance(long walBytes) {
+        java.util.EnumMap<com.alechilles.alecstamework.persistence.control
+                .PersistenceStartupNode,
+                PublicPersistencePerformanceSnapshot.Latency> startup =
+                new java.util.EnumMap<>(
+                        com.alechilles.alecstamework.persistence.control
+                                .PersistenceStartupNode.class
+                );
+        startupTimings.forEach((node, histogram) ->
+                startup.put(node, histogram.snapshot()));
+        return new PublicPersistencePerformanceSnapshot(
+                Map.copyOf(startup),
+                new PublicPersistencePerformanceSnapshot.QueuePerformance(
+                        maximumWriterDepth.get(),
+                        writerWait.snapshot(),
+                        writerExecution.snapshot()
+                ),
+                new PublicPersistencePerformanceSnapshot.QueuePerformance(
+                        maximumReadDepth.get(),
+                        readWait.snapshot(),
+                        readExecution.snapshot()
+                ),
+                shutdownDrain.snapshot(),
+                walBytes,
+                Math.toIntExact(checkpointLogFrames.get()),
+                Math.toIntExact(checkpointedFrames.get())
         );
     }
 
