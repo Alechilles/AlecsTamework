@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.migration;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -113,9 +112,6 @@ class PublicPersistenceRuntimeImportTest {
                         event -> {
                         },
                         new PublicPersistenceLiveBoundaries(
-                                (rotation, operation) ->
-                                        CompanionAliasLiveBoundary.Result
-                                                .confirmed(),
                                 (request, operation) -> LiveOperationResult
                                         .confirmed("capture_confirmed")
                                         .completed(),

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationEventCodec;
@@ -34,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-/** End-to-end pre-lease, live resolution, promotion, retry, and unknown tests. */
+/** End-to-end tests for atomic database-only alias rotation and replay. */
 class SqliteCompanionAliasRotationOperationsTest {
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
@@ -105,8 +103,7 @@ class SqliteCompanionAliasRotationOperationsTest {
         );
         consumer = new RevisionConsumer();
         rotations = new SqliteCompanionAliasRotationOperations(
-                engine,
-                new SqliteOperationPublisher(
+                new SqliteDatabaseOperationCoordinator(
                         engine,
                         new SqliteOperationEvidenceReader(reads),
                         new ProjectionCoordinator(
@@ -116,7 +113,6 @@ class SqliteCompanionAliasRotationOperationsTest {
                         ),
                         () -> -5_000
                 ),
-                () -> -5_000,
                 List.of(consumer)
         );
     }
@@ -132,26 +128,17 @@ class SqliteCompanionAliasRotationOperationsTest {
     }
 
     @Test
-    void leaseIsCommittedBeforeLiveCallbackThenPromotionRetiresOldAlias()
+    void rotationsPromoteTheTargetAndRetireThePreviousAlias()
             throws Exception {
-        CompanionAliasRotationOutcome first = published(
-                submit(1, ALIAS_A, (rotation, operation) -> {
-                    assertEquals(OperationPhase.LIVE_APPLYING, operation.phase());
-                    assertEquals(CompanionAlias.State.LEASED, alias(ALIAS_A).state());
-                    return CompanionAliasLiveBoundary.Result.confirmed();
-                })
-        );
+        CompanionAliasRotationOutcome first = published(submit(1, ALIAS_A));
         assertEquals(ALIAS_A, first.currentAlias());
         assertEquals(0, first.generation());
+        assertEquals(-8_999, first.promotedAtMs());
 
-        CompanionAliasRotationOutcome second = published(
-                submit(2, ALIAS_B, (rotation, operation) -> {
-                    assertEquals(CompanionAlias.State.LEASED, alias(ALIAS_B).state());
-                    return CompanionAliasLiveBoundary.Result.confirmed();
-                })
-        );
+        CompanionAliasRotationOutcome second = published(submit(2, ALIAS_B));
         assertEquals(ALIAS_B, second.currentAlias());
         assertEquals(1, second.generation());
+        assertEquals(-8_998, second.promotedAtMs());
         assertEquals(CompanionAlias.State.RETIRED, alias(ALIAS_A).state());
         assertEquals(CompanionAlias.State.CURRENT, alias(ALIAS_B).state());
         assertEquals(
@@ -161,57 +148,23 @@ class SqliteCompanionAliasRotationOperationsTest {
     }
 
     @Test
-    void retryableLiveResultKeepsLeaseAndResumesSameOperation()
+    void replayReturnsDurableEvidenceWithoutRotatingOrProjectingTwice()
             throws Exception {
-        AtomicInteger calls = new AtomicInteger();
-        CompanionAliasLiveBoundary retryThenConfirm = (rotation, operation) ->
-                calls.getAndIncrement() == 0
-                        ? CompanionAliasLiveBoundary.Result.retryable(
-                        "world_not_loaded",
-                        null
-                )
-                        : CompanionAliasLiveBoundary.Result.confirmed();
+        CompanionAliasRotationOutcome first = published(submit(1, ALIAS_A));
+        CompanionAliasRotationOutcome replay = published(submit(1, ALIAS_A));
 
-        OperationWorkflowResult first =
-                submit(1, ALIAS_A, retryThenConfirm);
-
-        assertEquals(OperationWorkflowResult.Status.LIVE_RETRYABLE, first.status());
-        assertEquals(OperationPhase.RETRYABLE, first.operation().phase());
-        assertEquals(CompanionAlias.State.LEASED, alias(ALIAS_A).state());
-
-        CompanionAliasRotationOutcome recovered =
-                published(submit(1, ALIAS_A, retryThenConfirm));
-        assertEquals(ALIAS_A, recovered.currentAlias());
-        assertEquals(2, calls.get());
+        assertEquals(first, replay);
         assertEquals(CompanionAlias.State.CURRENT, alias(ALIAS_A).state());
-    }
-
-    @Test
-    void unknownLiveEvidenceFailsClosedAndIsNotBlindlyReapplied()
-            throws Exception {
-        AtomicInteger calls = new AtomicInteger();
-        CompanionAliasLiveBoundary unknown = (rotation, operation) -> {
-            calls.incrementAndGet();
-            return CompanionAliasLiveBoundary.Result.unknown(
-                    "world_scan_incomplete",
-                    null
-            );
-        };
-
-        OperationWorkflowResult first = submit(1, ALIAS_A, unknown);
-        OperationWorkflowResult replay = submit(1, ALIAS_A, unknown);
-
-        assertEquals(OperationWorkflowResult.Status.LIVE_UNKNOWN, first.status());
-        assertEquals(OperationPhase.UNKNOWN, first.operation().phase());
-        assertEquals(OperationWorkflowResult.Status.LIVE_UNKNOWN, replay.status());
-        assertEquals(1, calls.get());
-        assertEquals(CompanionAlias.State.LEASED, alias(ALIAS_A).state());
+        assertEquals(0, alias(ALIAS_A).generation());
+        assertEquals(
+                0L,
+                consumer.revisions.get("alias-rotation-result:" + PROFILE)
+        );
     }
 
     private OperationWorkflowResult submit(
             int number,
-            NpcAlias alias,
-            CompanionAliasLiveBoundary live
+            NpcAlias alias
     ) throws Exception {
         SqliteCompanionAliasRotationOperations.Submission submission = rotations.submit(
                 OperationId.parse(String.format(
@@ -219,8 +172,7 @@ class SqliteCompanionAliasRotationOperationsTest {
                         number
                 )),
                 new IdempotencyKey("alias-rotation-" + number),
-                new CompanionAliasRotation(PROFILE, alias, -9_000 + number),
-                live
+                new CompanionAliasRotation(PROFILE, alias, -9_000 + number)
         );
         assertNotNull(submission.acceptance());
         return submission.completion().toCompletableFuture()

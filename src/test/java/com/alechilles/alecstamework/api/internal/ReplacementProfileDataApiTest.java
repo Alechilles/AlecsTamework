@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -205,8 +204,6 @@ class ReplacementProfileDataApiTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) -> LiveOperationResult
                         .confirmed("capture").completed(),
                 (request, operation) -> LiveOperationResult

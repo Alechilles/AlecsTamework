@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
@@ -114,8 +113,6 @@ class ReplacementNpcProfilesApiTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) -> LiveOperationResult
                         .confirmed("capture").completed(),
                 (request, operation) -> LiveOperationResult

@@ -132,9 +132,6 @@ class ReplacementPersistencePerformanceGateTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        com.alechilles.alecstamework.companion.identity
-                                .CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) -> confirmed("capture"),
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),

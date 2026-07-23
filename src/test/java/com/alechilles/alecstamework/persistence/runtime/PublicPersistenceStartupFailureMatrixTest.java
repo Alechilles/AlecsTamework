@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupAction;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
@@ -83,8 +82,6 @@ class PublicPersistenceStartupFailureMatrixTest {
                 event -> {
                 },
                 new PublicPersistenceLiveBoundaries(
-                        (rotation, operation) ->
-                                CompanionAliasLiveBoundary.Result.confirmed(),
                         (request, operation) -> LiveOperationResult
                                 .confirmed("capture_confirmed").completed(),
                         (request, operation) -> LiveOperationResult

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
@@ -26,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Forked JVM that halts at alias lease/promotion transaction boundaries. */
+/** Forked JVM that halts at alias rotation prepare/durable transaction boundaries. */
 final class AliasRotationProcessCrashChild {
     static final int HALT_EXIT_CODE = 83;
     static final ProfileId PROFILE =
@@ -62,15 +61,15 @@ final class AliasRotationProcessCrashChild {
                     }
                     if (checkpoint == PersistenceCheckpoint.BEFORE_COMMIT) {
                         int number = commitNumber.incrementAndGet();
-                        if (boundary == Boundary.PROMOTION_UNCOMMITTED && number == 3) {
+                        if (boundary == Boundary.DURABLE_UNCOMMITTED && number == 2) {
                             halt(marker, boundary);
                         }
                     }
                     if (checkpoint == PersistenceCheckpoint.COMMIT_RETURNED) {
                         int number = commitNumber.get();
-                        if ((boundary == Boundary.LEASE_COMMITTED && number == 1)
-                                || (boundary == Boundary.PROMOTION_COMMITTED
-                                && number == 3)) {
+                        if ((boundary == Boundary.PREPARE_COMMITTED && number == 1)
+                                || (boundary == Boundary.DURABLE_COMMITTED
+                                && number == 2)) {
                             halt(marker, boundary);
                         }
                     }
@@ -87,8 +86,7 @@ final class AliasRotationProcessCrashChild {
         );
         SqliteCompanionAliasRotationOperations rotations =
                 new SqliteCompanionAliasRotationOperations(
-                        engine,
-                        new SqliteOperationPublisher(
+                        new SqliteDatabaseOperationCoordinator(
                                 engine,
                                 new SqliteOperationEvidenceReader(reads),
                                 new ProjectionCoordinator(
@@ -98,14 +96,12 @@ final class AliasRotationProcessCrashChild {
                                 ),
                                 () -> -5_000
                         ),
-                        () -> -5_000,
                         List.of()
                 );
         rotations.submit(
                 OPERATION,
                 new IdempotencyKey("alias-process-crash"),
-                new CompanionAliasRotation(PROFILE, TARGET_ALIAS, -9_000),
-                (rotation, operation) -> CompanionAliasLiveBoundary.Result.confirmed()
+                new CompanionAliasRotation(PROFILE, TARGET_ALIAS, -9_000)
         ).completion().toCompletableFuture().get(20, TimeUnit.SECONDS);
         throw new IllegalStateException("Alias crash boundary was not reached");
     }
@@ -170,8 +166,8 @@ final class AliasRotationProcessCrashChild {
     }
 
     enum Boundary {
-        LEASE_COMMITTED,
-        PROMOTION_UNCOMMITTED,
-        PROMOTION_COMMITTED
+        PREPARE_COMMITTED,
+        DURABLE_UNCOMMITTED,
+        DURABLE_COMMITTED
     }
 }

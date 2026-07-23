@@ -76,8 +76,7 @@ final class SqlitePublicRecoveryRegistry {
                         claim -> operations.aliases().submit(
                                 claim.operation().operationId(),
                                 claim.operation().idempotencyKey(),
-                                payload(claim, CompanionAliasRotation.class),
-                                boundaries.aliases()
+                                payload(claim, CompanionAliasRotation.class)
                         ).completion()
                 ),
                 Map.entry(

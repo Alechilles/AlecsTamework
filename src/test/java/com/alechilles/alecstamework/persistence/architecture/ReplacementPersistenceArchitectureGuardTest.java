@@ -206,6 +206,41 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
+    void aliasRotationIsDatabaseLocalAndNotAnExternalBoundary()
+            throws Exception {
+        List<String> boundaries = Stream.of(
+                        com.alechilles.alecstamework.persistence.runtime
+                                .PublicPersistenceLiveBoundaries.class
+                                .getRecordComponents()
+                )
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
+        assertEquals(
+                List.of(
+                        "captures",
+                        "restorations",
+                        "coopCaptures",
+                        "coopReleases",
+                        "timedSummons",
+                        "provisioningActivations",
+                        "paidRevivals"
+                ),
+                boundaries
+        );
+
+        String aliases = Files.readString(
+                SQLITE.resolve(
+                        "SqliteCompanionAliasRotationOperations.java"
+                )
+        );
+        assertTrue(aliases.contains(
+                "SqliteDatabaseOperationCoordinator coordinator"
+        ));
+        assertFalse(aliases.contains("SqliteLiveOperationCoordinator"));
+        assertFalse(aliases.contains("CompanionAliasLiveBoundary"));
+    }
+
+    @Test
     void publicQueryFacadeDeclaresOnlyValueOrReadResultQueries() {
         List<String> queries = Stream.of(
                         com.alechilles.alecstamework.persistence.runtime

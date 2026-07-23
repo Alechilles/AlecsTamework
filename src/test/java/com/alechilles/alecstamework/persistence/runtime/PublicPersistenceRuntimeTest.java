@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationAction;
@@ -476,8 +475,6 @@ class PublicPersistenceRuntimeTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) -> LiveOperationResult
                         .confirmed("capture_confirmed").completed(),
                 (request, operation) -> LiveOperationResult

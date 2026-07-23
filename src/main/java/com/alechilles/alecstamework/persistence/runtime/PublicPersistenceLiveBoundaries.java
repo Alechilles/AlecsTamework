@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBounda
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBoundary;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalBoundaries;
@@ -12,7 +11,6 @@ import javax.annotation.Nonnull;
 
 /** Complete external mutation/resolution boundaries used by normal work and recovery. */
 public record PublicPersistenceLiveBoundaries(
-        @Nonnull CompanionAliasLiveBoundary aliases,
         @Nonnull CompanionCaptureLiveBoundary captures,
         @Nonnull CompanionRestorationLiveBoundary restorations,
         @Nonnull CompanionCoopCaptureLiveBoundary coopCaptures,
@@ -23,7 +21,7 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull PaidRevivalBoundaries paidRevivals
 ) {
     public PublicPersistenceLiveBoundaries {
-        if (aliases == null || captures == null || restorations == null
+        if (captures == null || restorations == null
                 || coopCaptures == null || coopReleases == null
                 || timedSummons == null
                 || provisioningActivations == null

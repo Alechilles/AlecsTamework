@@ -95,9 +95,7 @@ final class SqlitePublicOperationSet {
                 )
         );
         aliases = new SqliteCompanionAliasRotationOperations(
-                engine,
-                publisher,
-                clock,
+                database,
                 projections.requiredFor(
                         CompanionAliasRotationDefinition.INSTANCE.kind()
                 )

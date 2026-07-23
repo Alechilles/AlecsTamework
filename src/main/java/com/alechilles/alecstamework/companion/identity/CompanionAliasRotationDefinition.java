@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/** Version-one operation definition for a pre-leased, live-confirmed alias rotation. */
+/** Version-one operation definition for one atomic database-local alias rotation. */
 public final class CompanionAliasRotationDefinition
         implements OperationDefinition<CompanionAliasRotation> {
     public static final CompanionAliasRotationDefinition INSTANCE =

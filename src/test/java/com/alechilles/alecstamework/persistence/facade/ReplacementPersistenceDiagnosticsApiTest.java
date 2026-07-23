@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityRequest;
 import com.alechilles.alecstamework.api.PersistenceMutationDirection;
 import com.alechilles.alecstamework.api.PersistenceMutationDomain;
 import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
@@ -84,8 +83,6 @@ class ReplacementPersistenceDiagnosticsApiTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) -> confirmed("capture"),
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),

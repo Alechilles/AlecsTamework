@@ -288,9 +288,6 @@ class SqlitePublicPersistenceAdapterTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        com.alechilles.alecstamework.companion.identity
-                                .CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) ->
                         LiveOperationResult.confirmed("capture").completed(),
                 (request, operation) ->

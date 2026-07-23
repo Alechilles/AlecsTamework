@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
@@ -204,8 +203,6 @@ class ProvisioningActivationProcessCrashTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) ->
                         LiveOperationResult.confirmed("capture")
                                 .completed(),

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationEventCodec;
@@ -10,9 +9,9 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileProjection
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
-import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -22,48 +21,43 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
-import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
 /**
- * Fenced alias-rotation use case built on the shared live-operation workflow.
+ * Fenced alias rotation through one database-only operation.
  *
- * <p>This adapter owns only alias preparation and promotion rules. Phase transitions, retry,
- * unknown containment, durable publication, and resume behavior are shared with other live
- * operations.</p>
+ * <p>Alias observation has no external side effect. Leasing, retiring the
+ * previous current alias, promotion, and projection events therefore commit in
+ * one writer transaction without a fabricated live-confirmation phase.</p>
  */
 public final class SqliteCompanionAliasRotationOperations {
     public static final String FEATURE_SCOPE = "companion_alias";
     public static final ProjectionEventType EVENT_TYPE =
             new ProjectionEventType("companion_alias_rotated");
 
-    private final SqliteLiveOperationCoordinator workflow;
+    private final SqliteDatabaseOperationCoordinator coordinator;
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCompanionAliasRotationOperations(
-            @Nonnull SqliteOperationEngine operations,
-            @Nonnull SqliteOperationPublisher publisher,
-            @Nonnull LongSupplier clock,
+            @Nonnull SqliteDatabaseOperationCoordinator coordinator,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
-        if (operations == null || publisher == null || clock == null
-                || requiredConsumers == null) {
+        if (coordinator == null || requiredConsumers == null) {
             throw new IllegalArgumentException("Alias rotation dependencies are required");
         }
-        workflow = new SqliteLiveOperationCoordinator(operations, publisher, clock);
+        this.coordinator = coordinator;
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
-    /** Starts or resumes one exact fenced alias rotation. */
+    /** Starts or resumes one exact database-local alias rotation. */
     @Nonnull
     public Submission submit(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull CompanionAliasRotation rotation,
-            @Nonnull CompanionAliasLiveBoundary liveBoundary
+            @Nonnull CompanionAliasRotation rotation
     ) {
         if (operationId == null || idempotencyKey == null
-                || rotation == null || liveBoundary == null) {
+                || rotation == null) {
             throw new IllegalArgumentException("Complete alias rotation request is required");
         }
         OperationRequest<CompanionAliasRotation> request = new OperationRequest<>(
@@ -75,46 +69,49 @@ public final class SqliteCompanionAliasRotationOperations {
                 List.of(OperationScope.profile(rotation.profileId())),
                 rotation.requestedAtMs()
         );
-        SqliteLiveOperationCoordinator.Submission submission = workflow.execute(
-                CompanionAliasRotationDefinition.INSTANCE,
-                request,
-                new AliasLeaseDetail(rotation),
-                (payload, operation) -> java.util.concurrent.CompletableFuture
-                        .completedFuture(liveResult(
-                                liveBoundary.applyOrResolve(
-                                        payload, operation
-                                )
-                        )),
-                this::promote,
-                requiredConsumers,
-                "alias_rotation"
-        );
+        SqliteDatabaseOperationCoordinator.Submission submission =
+                coordinator.execute(
+                        CompanionAliasRotationDefinition.INSTANCE,
+                        request,
+                        new AliasRotationPrecondition(rotation),
+                        (transaction, operation) -> rotate(
+                                transaction,
+                                operation,
+                                rotation
+                        ),
+                        requiredConsumers
+                );
         return new Submission(submission.acceptance(), submission.completion());
     }
 
-    private List<ProjectionEventDraft> promote(
+    private List<ProjectionEventDraft> rotate(
             SqlitePersistenceTransactionContext transaction,
             OperationEnvelope current,
-            CompanionAliasRotation rotation,
-            long promotedAtMs
+            CompanionAliasRotation rotation
     ) {
+        long promotedAtMs = rotation.requestedAtMs();
         CompanionProfileProjectionState before =
                 SqliteCompanionProfileProjectionComposer.compose(
                         transaction,
                         rotation.profileId()
                 );
-        PersistenceMutationResult<CompanionAlias> promoted =
+        requireApplied(
+                transaction.identities().leaseAlias(
+                        rotation.profileId(),
+                        rotation.targetAlias(),
+                        current.operationId(),
+                        promotedAtMs
+                ),
+                "alias_lease"
+        );
+        CompanionAlias alias = requireApplied(
                 transaction.identities().promoteAlias(
                         rotation.targetAlias(),
                         current.operationId(),
                         promotedAtMs
-                );
-        if (!promoted.applied()) {
-            throw new IllegalStateException(
-                    "alias_promote_" + promoted.status().name().toLowerCase()
-            );
-        }
-        CompanionAlias alias = promoted.value();
+                ),
+                "alias_promote"
+        );
         CompanionAliasRotationOutcome outcome = new CompanionAliasRotationOutcome(
                 alias.profileId(),
                 alias.alias(),
@@ -152,28 +149,28 @@ public final class SqliteCompanionAliasRotationOperations {
         );
     }
 
-    private LiveOperationResult liveResult(CompanionAliasLiveBoundary.Result result) {
-        if (result == null) {
-            throw new IllegalStateException("alias_live_boundary_returned_null");
+    private <T> T requireApplied(
+            PersistenceMutationResult<T> result,
+            String operation
+    ) {
+        if (result == null || !result.applied()) {
+            throw new IllegalStateException(
+                    operation + "_" + (result == null
+                            ? "null"
+                            : result.status().name().toLowerCase())
+            );
         }
-        return switch (result.status()) {
-            case CONFIRMED -> LiveOperationResult.confirmed(result.code());
-            case RETRYABLE -> LiveOperationResult.retryable(
-                    result.code(),
-                    result.cause()
-            );
-            case UNKNOWN -> LiveOperationResult.unknown(
-                    result.code(),
-                    result.cause()
-            );
-        };
+        return result.value();
     }
 
-    /** Preparation detail that proves the target alias remains owned by this operation fence. */
-    private static final class AliasLeaseDetail implements PreparedOperationDetail {
+    /** Read-only preparation check; alias rows are written only by the durable commit. */
+    private static final class AliasRotationPrecondition
+            implements PreparedOperationDetail {
         private final CompanionAliasRotation rotation;
 
-        private AliasLeaseDetail(CompanionAliasRotation rotation) {
+        private AliasRotationPrecondition(
+                CompanionAliasRotation rotation
+        ) {
             this.rotation = rotation;
         }
 
@@ -182,16 +179,9 @@ public final class SqliteCompanionAliasRotationOperations {
                 SqlitePersistenceTransactionContext transaction,
                 OperationEnvelope operation
         ) {
-            PersistenceMutationResult<CompanionAlias> lease =
-                    transaction.identities().leaseAlias(
-                            rotation.profileId(),
-                            rotation.targetAlias(),
-                            operation.operationId(),
-                            rotation.requestedAtMs()
-                    );
-            if (!lease.applied()) {
+            if (!matches(transaction, operation)) {
                 throw new IllegalStateException(
-                        "alias_lease_" + lease.status().name().toLowerCase()
+                        "alias_rotation_precondition_failed"
                 );
             }
         }
@@ -201,13 +191,14 @@ public final class SqliteCompanionAliasRotationOperations {
                 SqlitePersistenceTransactionContext transaction,
                 OperationEnvelope operation
         ) {
-            CompanionAlias alias = transaction.identities()
-                    .resolveAlias(rotation.targetAlias())
-                    .orElse(null);
-            return alias != null
-                    && alias.profileId().equals(rotation.profileId())
-                    && operation.operationId().equals(alias.leaseOperationId())
-                    && alias.state() != CompanionAlias.State.RETIRED;
+            if (operation.phase() == OperationPhase.DURABLE
+                    || operation.phase() == OperationPhase.PUBLISHED) {
+                return true;
+            }
+            return transaction.identities()
+                    .findProfile(rotation.profileId()).isPresent()
+                    && transaction.identities()
+                    .resolveAlias(rotation.targetAlias()).isEmpty();
         }
     }
 

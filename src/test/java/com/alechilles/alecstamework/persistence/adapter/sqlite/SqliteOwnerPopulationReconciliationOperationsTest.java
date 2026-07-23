@@ -503,9 +503,6 @@ class SqliteOwnerPopulationReconciliationOperationsTest {
 
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
-                (rotation, operation) ->
-                        com.alechilles.alecstamework.companion.identity
-                                .CompanionAliasLiveBoundary.Result.confirmed(),
                 (request, operation) ->
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed(

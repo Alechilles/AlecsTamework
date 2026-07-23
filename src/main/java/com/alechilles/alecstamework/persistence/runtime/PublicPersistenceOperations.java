@@ -71,8 +71,7 @@ public final class PublicPersistenceOperations {
         var submitted = adapter.aliasOperations().submit(
                 operationId,
                 idempotencyKey,
-                rotation,
-                boundaries.aliases()
+                rotation
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

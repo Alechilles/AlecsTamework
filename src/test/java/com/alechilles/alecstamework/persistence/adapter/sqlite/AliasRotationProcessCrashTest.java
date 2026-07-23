@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -17,20 +16,19 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Forked-process restart gate for alias lease and promotion commit boundaries. */
+/** Forked-process restart gate for database-only alias rotation commit boundaries. */
 class AliasRotationProcessCrashTest {
     @TempDir
     Path tempDir;
 
     @Test
-    void leaseAndPromotionCrashesResumeFromExactDurableEvidence()
+    void prepareAndDurableCrashesResumeFromExactCommittedEvidence()
             throws Exception {
         for (AliasRotationProcessCrashChild.Boundary boundary
                 : AliasRotationProcessCrashChild.Boundary.values()) {
@@ -49,7 +47,7 @@ class AliasRotationProcessCrashTest {
 
         SqliteConnectionFactory connections = new SqliteConnectionFactory(database);
         assertCrashEvidence(boundary, connections, output);
-        resume(boundary, connections);
+        resume(connections);
     }
 
     private void assertCrashEvidence(
@@ -66,22 +64,24 @@ class AliasRotationProcessCrashTest {
             CompanionAlias oldAlias = transaction.identities()
                     .resolveAlias(AliasRotationProcessCrashChild.OLD_ALIAS)
                     .orElseThrow();
-            CompanionAlias target = transaction.identities()
-                    .resolveAlias(AliasRotationProcessCrashChild.TARGET_ALIAS)
-                    .orElseThrow();
+            var target = transaction.identities()
+                    .resolveAlias(AliasRotationProcessCrashChild.TARGET_ALIAS);
+            assertEquals(
+                    boundary
+                            == AliasRotationProcessCrashChild.Boundary.DURABLE_COMMITTED
+                            ? OperationPhase.DURABLE
+                            : OperationPhase.PREPARED,
+                    operation.phase(),
+                    output
+            );
             if (boundary
-                    == AliasRotationProcessCrashChild.Boundary.LEASE_COMMITTED) {
-                assertEquals(OperationPhase.PREPARED, operation.phase(), output);
-            } else if (boundary
-                    == AliasRotationProcessCrashChild.Boundary.PROMOTION_UNCOMMITTED) {
-                assertEquals(OperationPhase.LIVE_APPLYING, operation.phase(), output);
-            } else {
-                assertEquals(OperationPhase.DURABLE, operation.phase(), output);
-            }
-            if (boundary
-                    == AliasRotationProcessCrashChild.Boundary.PROMOTION_COMMITTED) {
+                    == AliasRotationProcessCrashChild.Boundary.DURABLE_COMMITTED) {
                 assertEquals(CompanionAlias.State.RETIRED, oldAlias.state(), output);
-                assertEquals(CompanionAlias.State.CURRENT, target.state(), output);
+                assertEquals(
+                        CompanionAlias.State.CURRENT,
+                        target.orElseThrow().state(),
+                        output
+                );
                 assertEquals(
                         2,
                         transaction.outbox()
@@ -91,7 +91,7 @@ class AliasRotationProcessCrashTest {
                 );
             } else {
                 assertEquals(CompanionAlias.State.CURRENT, oldAlias.state(), output);
-                assertEquals(CompanionAlias.State.LEASED, target.state(), output);
+                assertTrue(target.isEmpty(), output);
                 assertTrue(
                         transaction.outbox()
                                 .findByOperation(AliasRotationProcessCrashChild.OPERATION)
@@ -102,10 +102,7 @@ class AliasRotationProcessCrashTest {
         }
     }
 
-    private void resume(
-            AliasRotationProcessCrashChild.Boundary boundary,
-            SqliteConnectionFactory connections
-    ) throws Exception {
+    private void resume(SqliteConnectionFactory connections) throws Exception {
         SqliteSingleWriter writer = new SqliteSingleWriter(connections);
         SqliteReadExecutor reads = new SqliteReadExecutor(connections);
         try {
@@ -118,8 +115,7 @@ class AliasRotationProcessCrashTest {
             );
             SqliteCompanionAliasRotationOperations rotations =
                     new SqliteCompanionAliasRotationOperations(
-                            engine,
-                            new SqliteOperationPublisher(
+                            new SqliteDatabaseOperationCoordinator(
                                     engine,
                                     new SqliteOperationEvidenceReader(reads),
                                     new ProjectionCoordinator(
@@ -129,10 +125,8 @@ class AliasRotationProcessCrashTest {
                                     ),
                                     () -> -4_000
                             ),
-                            () -> -4_000,
                             List.of()
                     );
-            AtomicInteger liveCalls = new AtomicInteger();
             OperationWorkflowResult result = rotations.submit(
                     AliasRotationProcessCrashChild.OPERATION,
                     new IdempotencyKey("alias-process-crash"),
@@ -140,20 +134,10 @@ class AliasRotationProcessCrashTest {
                             AliasRotationProcessCrashChild.PROFILE,
                             AliasRotationProcessCrashChild.TARGET_ALIAS,
                             -9_000
-                    ),
-                    (rotation, operation) -> {
-                        liveCalls.incrementAndGet();
-                        return CompanionAliasLiveBoundary.Result.confirmed();
-                    }
+                    )
             ).completion().toCompletableFuture().get(20, TimeUnit.SECONDS);
 
             assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
-            assertEquals(
-                    boundary == AliasRotationProcessCrashChild.Boundary.PROMOTION_COMMITTED
-                            ? 0
-                            : 1,
-                    liveCalls.get()
-            );
             try (java.sql.Connection connection = connections.openReadConnection()) {
                 SqlitePersistenceTransactionContext transaction =
                         new SqlitePersistenceTransactionContext(connection);
