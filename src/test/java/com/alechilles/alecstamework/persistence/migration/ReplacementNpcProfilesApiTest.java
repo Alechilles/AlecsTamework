@@ -87,6 +87,11 @@ class ReplacementNpcProfilesApiTest {
                     api.resolveProfileId(HISTORICAL_ALIAS).orElseThrow()
             );
             assertTrue(api.getByNpcUuid(CURRENT_ALIAS).isPresent());
+            NpcProfileView cooped = api.getByProfileId(
+                    "20000000-0000-0000-0000-000000000005"
+            ).orElseThrow();
+            assertEquals("fixture-coop", cooped.coopId());
+            assertEquals(0, cooped.coopSlot());
             assertTrue(api.getByProfileId("not-a-uuid").isEmpty());
         } finally {
             reads.shutdown(Duration.ofSeconds(5));
