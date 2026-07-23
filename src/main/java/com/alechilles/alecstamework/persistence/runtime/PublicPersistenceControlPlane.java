@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -161,11 +160,14 @@ final class PublicPersistenceControlPlane
 
     @Override
     public void checkpointFailure(
-            PersistenceCheckpoint checkpoint,
+            String checkpoint,
             Throwable failure
     ) {
         checkpointFailures.increment();
-        enterGlobal("checkpoint_failure:" + checkpoint.name().toLowerCase());
+        String normalized = checkpoint == null || checkpoint.isBlank()
+                ? "unknown"
+                : checkpoint.trim().toLowerCase(java.util.Locale.ROOT);
+        enterGlobal("checkpoint_failure:" + normalized);
     }
 
     @Override

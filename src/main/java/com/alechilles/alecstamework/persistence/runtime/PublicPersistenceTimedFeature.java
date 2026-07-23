@@ -2,11 +2,8 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
-import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
-import com.alechilles.alecstamework.persistence.control.PersistenceFeatureHookId;
-import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +15,7 @@ final class PublicPersistenceTimedFeature {
     }
 
     static PersistenceFeatureDescriptor create() {
-        return new PersistenceFeatureDescriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 PublicPersistenceFeatureRegistry.TIMED_SUMMON,
                 PersistenceFeatureDomain.COMMAND,
                 Set.of("timed_summon_lease"),
@@ -43,33 +40,16 @@ final class PublicPersistenceTimedFeature {
                         PublicPersistenceFeatureRegistry.POPULATION_GROUPS,
                         PublicPersistenceFeatureRegistry.COMMAND_ROSTER
                 ),
-                hook("loader"),
                 Set.of(
                         PublicPersistenceFeatureRegistry.TIMED_SUMMON_INDEX
                 ),
-                hook("recovery"),
-                Set.of(
-                        PersistenceStartupNode.RECOVER_OPERATIONS,
-                        PersistenceStartupNode.BUILD_PROJECTIONS,
-                        PersistenceStartupNode.LOAD_FEATURE_DETAIL,
-                        PersistenceStartupNode.RECONCILE_WORLD
-                ),
-                PersistenceCircuitPolicy.BOUNDED_SCOPE,
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
                         OperationScopeType.OWNER,
                         OperationScopeType.COMMAND_FAMILY
-                ),
-                hook("shutdown"),
-                "persistence." + PublicPersistenceFeatureRegistry.TIMED_SUMMON
-        );
-    }
-
-    private static PersistenceFeatureHookId hook(String kind) {
-        return new PersistenceFeatureHookId(
-                PublicPersistenceFeatureRegistry.TIMED_SUMMON
-                        + "." + kind
+                )
         );
     }
 }

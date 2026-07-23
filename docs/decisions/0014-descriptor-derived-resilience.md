@@ -1,6 +1,6 @@
 # ADR 0014: Descriptor-Derived Resilience and Diagnostics
 
-- Status: Accepted for Phase 5G implementation
+- Status: Implemented
 - Date: 2026-07-23
 
 ## Context

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegist
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupReport;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTarget;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -80,6 +81,24 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PublicPersistenceMetricsSnapshot metrics() {
         return state.metrics();
+    }
+
+    /**
+     * Reads sanitized descriptor, operation, projection, and containment
+     * evidence after projection startup has established exact consumers.
+     */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<
+            PublicPersistenceDiagnosticsSnapshot>> diagnostics() {
+        if (!startup.report().completedNodes().contains(
+                com.alechilles.alecstamework.persistence.control
+                        .PersistenceStartupNode.BUILD_PROJECTIONS
+        )) {
+            throw new IllegalStateException(
+                    "public_persistence_diagnostics_not_ready"
+            );
+        }
+        return state.diagnostics();
     }
 
     /** Returns the one typed mutation facade after the target is open. */

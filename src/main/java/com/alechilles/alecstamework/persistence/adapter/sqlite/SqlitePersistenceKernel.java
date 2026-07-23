@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCancellation;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult;
@@ -169,7 +168,7 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                 : failure.cause();
         try {
             metrics.checkpointFailure(
-                    PersistenceCheckpoint.CLOSE,
+                    "wal_checkpoint",
                     cause
             );
         } catch (RuntimeException ignored) {

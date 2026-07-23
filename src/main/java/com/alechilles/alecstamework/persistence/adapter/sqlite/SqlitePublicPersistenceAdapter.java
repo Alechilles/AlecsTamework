@@ -30,6 +30,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteOperationRecoveryCoordinator recovery;
     private final SqlitePublicStartupGateway startup;
     private final SqlitePublicControlGateway control;
+    private final SqlitePublicDiagnosticsReader diagnostics;
     private final SqliteCompanionProfileReader profiles;
     private final SqliteCompanionLifecycleReader lifecycles;
     private final SqliteCompanionCoopReader coops;
@@ -87,6 +88,9 @@ public final class SqlitePublicPersistenceAdapter {
         startup = new SqlitePublicStartupGateway(kernel.reads());
         control = new SqlitePublicControlGateway(
                 registry, kernel.units(), clock
+        );
+        diagnostics = new SqlitePublicDiagnosticsReader(
+                registry, kernel.reads()
         );
         profiles = new SqliteCompanionProfileReader(kernel.reads());
         lifecycles = new SqliteCompanionLifecycleReader(kernel.reads());
@@ -283,6 +287,14 @@ public final class SqlitePublicPersistenceAdapter {
             .PersistenceTransactionResult<SqlitePublicControlSnapshot>>
     synchronizeControlPlane() {
         return control.synchronize();
+    }
+
+    /** Reads sanitized operational evidence on the isolated diagnostic lane. */
+    @Nonnull
+    public CompletionStage<
+            PersistenceReadResult<SqlitePublicDiagnosticsSnapshot>>
+    diagnostics() {
+        return diagnostics.read();
     }
 
     /** Rebuilds canonical derived state and catches every registry consumer up. */

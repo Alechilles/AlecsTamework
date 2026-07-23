@@ -15,15 +15,11 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationReconcil
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
-import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
-import com.alechilles.alecstamework.persistence.control.PersistenceFeatureHookId;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureId;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
-import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
-import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import java.util.List;
@@ -95,7 +91,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor identity() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 IDENTITY,
                 PersistenceFeatureDomain.IDENTITY,
                 Set.of(
@@ -107,7 +103,7 @@ public final class PublicPersistenceFeatureRegistry {
                         CompanionProfileMutationDefinition.INSTANCE,
                         CompanionAliasRotationDefinition.INSTANCE
                 ),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionProfileMutationDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE),
                         CompanionAliasRotationDefinition.INSTANCE,
@@ -134,7 +130,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor lifecycle() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 LIFECYCLE,
                 PersistenceFeatureDomain.LIFECYCLE,
                 Set.of("companion_lifecycle", "companion_snapshot"),
@@ -160,7 +156,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor ownerPopulation() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 OWNER_POPULATION,
                 PersistenceFeatureDomain.POPULATION,
                 Set.of(
@@ -172,7 +168,7 @@ public final class PublicPersistenceFeatureRegistry {
                         OwnerPopulationTransitionDefinition.INSTANCE,
                         OwnerPopulationReconciliationDefinition.INSTANCE
                 ),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         OwnerPopulationTransitionDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
@@ -207,7 +203,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor populationGroups() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 POPULATION_GROUPS,
                 PersistenceFeatureDomain.POPULATION,
                 Set.of(
@@ -216,7 +212,7 @@ public final class PublicPersistenceFeatureRegistry {
                         "population_group_reservation"
                 ),
                 List.of(PopulationGroupAssignmentDefinition.INSTANCE),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         PopulationGroupAssignmentDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
@@ -239,7 +235,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor commandRoster() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 COMMAND_ROSTER,
                 PersistenceFeatureDomain.COMMAND,
                 Set.of(
@@ -250,7 +246,7 @@ public final class PublicPersistenceFeatureRegistry {
                         CommandRosterMembershipDefinition.INSTANCE,
                         CommandRosterTransitionDefinition.INSTANCE
                 ),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         CommandRosterMembershipDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
@@ -277,7 +273,7 @@ public final class PublicPersistenceFeatureRegistry {
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX
                 ),
-                worldReadiness(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
@@ -288,12 +284,12 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor capture() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 CAPTURE,
                 PersistenceFeatureDomain.CAPTURE,
                 Set.of(),
                 List.of(CompanionCaptureDefinition.INSTANCE),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionCaptureDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
@@ -308,7 +304,7 @@ public final class PublicPersistenceFeatureRegistry {
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX
                 ),
-                worldReadiness(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
@@ -318,7 +314,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor economicCompensation() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 ECONOMIC_COMPENSATION,
                 PersistenceFeatureDomain.COMPENSATION,
                 Set.of("refund_claim", "refund_claim_item"),
@@ -338,12 +334,12 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor paidRevival() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 PAID_REVIVAL,
                 PersistenceFeatureDomain.COMMAND,
                 Set.of(),
                 List.of(PaidRevivalDefinition.INSTANCE),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         PaidRevivalDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
@@ -366,7 +362,7 @@ public final class PublicPersistenceFeatureRegistry {
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX
                 ),
-                worldReadiness(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
@@ -377,7 +373,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor dormant() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 DORMANT,
                 PersistenceFeatureDomain.DORMANT,
                 Set.of("dormant_transition"),
@@ -385,7 +381,7 @@ public final class PublicPersistenceFeatureRegistry {
                         CompanionDormantTransitionDefinition.INSTANCE,
                         CompanionRestorationDefinition.INSTANCE
                 ),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionDormantTransitionDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE),
                         CompanionRestorationDefinition.INSTANCE,
@@ -399,7 +395,7 @@ public final class PublicPersistenceFeatureRegistry {
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX
                 ),
-                worldReadiness(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE
@@ -408,7 +404,7 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor coop() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 COOP,
                 PersistenceFeatureDomain.COOP,
                 Set.of("coop_slot", "coop_residency"),
@@ -417,7 +413,7 @@ public final class PublicPersistenceFeatureRegistry {
                         CompanionCoopCaptureDefinition.INSTANCE,
                         CompanionCoopReleaseDefinition.INSTANCE
                 ),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         CoopSlotRegistrationDefinition.INSTANCE,
                         Set.of(OperationScopeType.COOP),
                         CompanionCoopCaptureDefinition.INSTANCE,
@@ -440,7 +436,7 @@ public final class PublicPersistenceFeatureRegistry {
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX
                 ),
-                worldReadiness(),
+                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
@@ -450,12 +446,12 @@ public final class PublicPersistenceFeatureRegistry {
     }
 
     private static PersistenceFeatureDescriptor extension() {
-        return descriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 EXTENSION,
                 PersistenceFeatureDomain.EXTENSION,
                 Set.of("profile_extension_data"),
                 List.of(ProfileExtensionMutationDefinition.INSTANCE),
-                scopes(
+                PublicPersistenceFeatureDescriptorFactory.scopes(
                         ProfileExtensionMutationDefinition.INSTANCE,
                         Set.of(OperationScopeType.PROFILE)
                 ),
@@ -472,66 +468,4 @@ public final class PublicPersistenceFeatureRegistry {
         );
     }
 
-    private static Set<PersistenceStartupNode> worldReadiness() {
-        return Set.of(
-                PersistenceStartupNode.RECOVER_OPERATIONS,
-                PersistenceStartupNode.BUILD_PROJECTIONS,
-                PersistenceStartupNode.LOAD_FEATURE_DETAIL,
-                PersistenceStartupNode.RECONCILE_WORLD
-        );
-    }
-
-    private static PersistenceFeatureDescriptor descriptor(
-            PersistenceFeatureId id,
-            PersistenceFeatureDomain domain,
-            Set<String> authorities,
-            List<OperationDefinition<?>> definitions,
-            Map<OperationKind, Set<OperationScopeType>> scopes,
-            Set<PersistenceFeatureId> dependencies,
-            Set<ProjectionConsumerId> consumers,
-            Set<PersistenceStartupNode> readiness,
-            Set<OperationScopeType> quarantine
-    ) {
-        return new PersistenceFeatureDescriptor(
-                id,
-                domain,
-                authorities,
-                definitions,
-                scopes,
-                dependencies,
-                hook(id, "loader"),
-                consumers,
-                hook(id, "recovery"),
-                readiness,
-                id.equals(IDENTITY) || id.equals(LIFECYCLE)
-                        ? PersistenceCircuitPolicy.GLOBAL_FAIL_CLOSED
-                        : PersistenceCircuitPolicy.BOUNDED_SCOPE,
-                quarantine,
-                hook(id, "shutdown"),
-                "persistence." + id
-        );
-    }
-
-    private static PersistenceFeatureHookId hook(
-            PersistenceFeatureId id,
-            String kind
-    ) {
-        return new PersistenceFeatureHookId(id + "." + kind);
-    }
-
-    private static Map<OperationKind, Set<OperationScopeType>> scopes(
-            Object... pairs
-    ) {
-        java.util.HashMap<OperationKind, Set<OperationScopeType>> result =
-                new java.util.HashMap<>();
-        for (int index = 0; index < pairs.length; index += 2) {
-            OperationDefinition<?> definition =
-                    (OperationDefinition<?>) pairs[index];
-            @SuppressWarnings("unchecked")
-            Set<OperationScopeType> value =
-                    (Set<OperationScopeType>) pairs[index + 1];
-            result.put(definition.kind(), value);
-        }
-        return Map.copyOf(result);
-    }
 }

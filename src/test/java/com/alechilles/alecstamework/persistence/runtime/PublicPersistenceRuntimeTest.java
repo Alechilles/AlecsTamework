@@ -10,18 +10,26 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLineage;
+import com.alechilles.alecstamework.persistence.control.PersistenceFeatureCircuitState;
 import com.alechilles.alecstamework.persistence.control.PersistenceReadinessLevel;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTarget;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -63,6 +71,28 @@ class PublicPersistenceRuntimeTest {
         );
         assertTrue(metrics.readsCompleted() > 0);
         assertNull(metrics.lastGlobalFailureCode());
+        PublicPersistenceDiagnosticsSnapshot diagnostics =
+                diagnostics(runtime);
+        assertEquals(metrics.features().size(), diagnostics.features().size());
+        assertEquals(7, diagnostics.projectionCheckpoints().size());
+        assertEquals(0, diagnostics.outboxHead());
+        assertTrue(diagnostics.openIncidentsByCode().isEmpty());
+        assertTrue(diagnostics.activeQuarantinesByScope().isEmpty());
+        for (var descriptor
+                : PublicPersistenceFeatureRegistry.create().descriptors()) {
+            var health = diagnostics.features().get(
+                    descriptor.featureId()
+            );
+            assertEquals(descriptor.domain(), health.domain());
+            assertEquals(
+                    descriptor.operationScopes().keySet(),
+                    health.operationCounts().keySet()
+            );
+            assertEquals(
+                    descriptor.metricsNamespace(),
+                    health.metrics().namespace()
+            );
+        }
 
         assertEquals(
                 PublicPersistenceShutdownReport.Status.COMPLETE,
@@ -78,6 +108,61 @@ class PublicPersistenceRuntimeTest {
             assertTrue(manifest.startupComplete());
             assertTrue(manifest.cleanShutdown());
         }
+    }
+
+    @Test
+    void durableBoundedCircuitBlocksOnlyItsDescriptor() throws Exception {
+        Path database = PersistenceFiles.replacementDatabase(tempDir);
+        SqliteConnectionFactory connections =
+                new SqliteConnectionFactory(database);
+        SqliteSchemaV1Manager schemas =
+                new SqliteSchemaV1Manager(connections, () -> -500);
+        schemas.initialize();
+        assertInstanceOf(
+                PersistenceReadResult.Found.class, schemas.verify()
+        );
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO feature_circuit(
+                         feature_id, state, failure_count, reason_code,
+                         opened_at_ms, updated_at_ms
+                     ) VALUES (?, 'OPEN', 1, 'injected_bounded_failure', ?, ?)
+                     """)) {
+            statement.setString(
+                    1, PublicPersistenceFeatureRegistry.CAPTURE.value()
+            );
+            statement.setLong(2, -400);
+            statement.setLong(3, -400);
+            statement.executeUpdate();
+        }
+        PublicPersistenceRuntime runtime = runtime(
+                PublicPersistenceWorldReconciliation.alreadyComplete()
+        );
+
+        assertTrue(runtime.start().toCompletableFuture().join().complete());
+        assertEquals(
+                PersistenceReadinessLevel.QUARANTINED,
+                runtime.readiness(PublicPersistenceFeatureRegistry.CAPTURE)
+        );
+        assertEquals(
+                PersistenceReadinessLevel.MUTATION_READY,
+                runtime.readiness(PublicPersistenceFeatureRegistry.IDENTITY)
+        );
+        PublicPersistenceDiagnosticsSnapshot diagnostics =
+                diagnostics(runtime);
+        assertEquals(
+                PersistenceFeatureCircuitState.OPEN,
+                diagnostics.features().get(
+                        PublicPersistenceFeatureRegistry.CAPTURE
+                ).circuit().state()
+        );
+        assertEquals(
+                PersistenceFeatureCircuitState.CLOSED,
+                diagnostics.features().get(
+                        PublicPersistenceFeatureRegistry.IDENTITY
+                ).circuit().state()
+        );
+        runtime.close();
     }
 
     @Test
@@ -140,6 +225,17 @@ class PublicPersistenceRuntimeTest {
                 runtime.queries().findProfile(profileId())
                         .toCompletableFuture().join()
         );
+        PublicPersistenceDiagnosticsSnapshot diagnostics =
+                diagnostics(runtime);
+        assertEquals(
+                1,
+                diagnostics.features().get(
+                        PublicPersistenceFeatureRegistry.IDENTITY
+                ).operationCounts().get(
+                        CompanionProfileMutationDefinition.INSTANCE.kind()
+                ).get(OperationPhase.PUBLISHED)
+        );
+        assertTrue(diagnostics.outboxHead() > 0);
         assertEquals(2, attempts.get());
         runtime.close();
     }
@@ -262,6 +358,18 @@ class PublicPersistenceRuntimeTest {
                         Duration.ofSeconds(5)
                 )
         );
+    }
+
+    private PublicPersistenceDiagnosticsSnapshot diagnostics(
+            PublicPersistenceRuntime runtime
+    ) {
+        PersistenceReadResult<PublicPersistenceDiagnosticsSnapshot> result =
+                runtime.diagnostics().toCompletableFuture().join();
+        if (result instanceof PersistenceReadResult.Found<
+                PublicPersistenceDiagnosticsSnapshot> found) {
+            return found.value();
+        }
+        throw new AssertionError("Expected diagnostics, received " + result);
     }
 
     private PublicPersistenceLiveBoundaries boundaries() {

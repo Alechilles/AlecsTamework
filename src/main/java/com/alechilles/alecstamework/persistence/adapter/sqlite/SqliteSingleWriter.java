@@ -363,7 +363,12 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private void recordCheckpointFailure(PersistenceCheckpoint checkpoint, Throwable failure) {
         try {
-            metrics.checkpointFailure(checkpoint, failure);
+            metrics.checkpointFailure(
+                    checkpoint.name().toLowerCase(
+                            java.util.Locale.ROOT
+                    ),
+                    failure
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change checkpoint semantics.
         }

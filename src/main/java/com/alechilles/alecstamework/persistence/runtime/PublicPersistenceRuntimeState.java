@@ -35,6 +35,7 @@ final class PublicPersistenceRuntimeState {
     private final PublicPersistenceTargetOpener targets;
     private final PublicPersistenceWorkflowTracker workflows;
     private final PublicPersistenceControlPlane control;
+    private PublicPersistenceDiagnosticsAssembler diagnostics;
     private PersistenceStartupCoordinator startup;
     private PersistenceEngineLease lease;
     private PublicPersistenceTarget target;
@@ -67,6 +68,9 @@ final class PublicPersistenceRuntimeState {
         }
         this.startup = startup;
         control.bind(startup);
+        diagnostics = new PublicPersistenceDiagnosticsAssembler(
+                registry, startup, control
+        );
     }
 
     Map<PersistenceStartupNode, PersistenceStartupAction> actions() {
@@ -123,6 +127,13 @@ final class PublicPersistenceRuntimeState {
 
     PublicPersistenceMetricsSnapshot metrics() {
         return control.snapshot();
+    }
+
+    CompletionStage<PersistenceReadResult<
+            PublicPersistenceDiagnosticsSnapshot>> diagnostics() {
+        return requireAdapter().diagnostics().thenApply(
+                diagnostics::assemble
+        );
     }
 
     synchronized PublicPersistenceShutdownReport shutdown(Duration timeout) {

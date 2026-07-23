@@ -2,10 +2,8 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
-import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
-import com.alechilles.alecstamework.persistence.control.PersistenceFeatureHookId;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import java.util.List;
@@ -18,7 +16,7 @@ final class PublicPersistenceProvisioningFeature {
     }
 
     static PersistenceFeatureDescriptor create() {
-        return new PersistenceFeatureDescriptor(
+        return PublicPersistenceFeatureDescriptorFactory.create(
                 PublicPersistenceFeatureRegistry.PROVISIONING,
                 PersistenceFeatureDomain.PROVISIONING,
                 Set.of("provisioning_record"),
@@ -48,7 +46,6 @@ final class PublicPersistenceProvisioningFeature {
                         PublicPersistenceFeatureRegistry.COMMAND_ROSTER,
                         PublicPersistenceFeatureRegistry.TIMED_SUMMON
                 ),
-                hook("loader"),
                 Set.of(
                         PublicPersistenceFeatureRegistry.PROFILE_OBSERVER,
                         PublicPersistenceFeatureRegistry
@@ -61,29 +58,17 @@ final class PublicPersistenceProvisioningFeature {
                                 .TIMED_SUMMON_INDEX,
                         PublicPersistenceFeatureRegistry.PROVISIONING_INDEX
                 ),
-                hook("recovery"),
                 Set.of(
                         PersistenceStartupNode.LOAD_FEATURE_DETAIL,
                         PersistenceStartupNode.RECOVER_OPERATIONS,
                         PersistenceStartupNode.BUILD_PROJECTIONS
                 ),
-                PersistenceCircuitPolicy.BOUNDED_SCOPE,
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
                         OperationScopeType.OWNER,
                         OperationScopeType.COMMAND_FAMILY
-                ),
-                hook("shutdown"),
-                "persistence."
-                        + PublicPersistenceFeatureRegistry.PROVISIONING
-        );
-    }
-
-    private static PersistenceFeatureHookId hook(String kind) {
-        return new PersistenceFeatureHookId(
-                PublicPersistenceFeatureRegistry.PROVISIONING
-                        + "." + kind
+                )
         );
     }
 }

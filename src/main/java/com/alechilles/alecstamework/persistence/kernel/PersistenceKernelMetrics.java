@@ -66,7 +66,7 @@ public interface PersistenceKernelMetrics {
     ) {
     }
 
-    default void checkpointFailure(@Nonnull PersistenceCheckpoint checkpoint,
+    default void checkpointFailure(@Nonnull String checkpoint,
                                    @Nonnull Throwable failure) {
     }
 
