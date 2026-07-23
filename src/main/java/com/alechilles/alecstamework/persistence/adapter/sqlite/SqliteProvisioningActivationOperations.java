@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
@@ -12,7 +13,6 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivatio
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationOutcome;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningTimedActivation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -261,7 +261,7 @@ public final class SqliteProvisioningActivationOperations {
                     "provisioning_activation_record_mismatch"
             );
         }
-        ProvisioningTimedActivation timed =
+        TimedSummonActivation timed =
                 request.timedActivation();
         if (timed != null) {
             SqliteCommandRosterEvidence.requireExact(

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.provisioning;
 
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseJsonCodec;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
@@ -92,7 +93,7 @@ public final class ProvisioningActivationDefinition
         );
     }
 
-    private JsonObject timed(ProvisioningTimedActivation value) {
+    private JsonObject timed(TimedSummonActivation value) {
         JsonObject json = new JsonObject();
         json.addProperty(
                 "ownerId", value.familyKey().ownerId().toString()
@@ -109,8 +110,8 @@ public final class ProvisioningActivationDefinition
         return json;
     }
 
-    private ProvisioningTimedActivation readTimed(JsonObject json) {
-        return new ProvisioningTimedActivation(
+    private TimedSummonActivation readTimed(JsonObject json) {
+        return new TimedSummonActivation(
                 new CommandFamilyKey(
                         OwnerId.parse(
                                 json.get("ownerId").getAsString()

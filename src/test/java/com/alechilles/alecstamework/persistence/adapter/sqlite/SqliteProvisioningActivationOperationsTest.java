@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDraft;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonPolicy;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonSessionId;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
@@ -26,7 +27,6 @@ import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioning
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningTimedActivation;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -142,7 +142,7 @@ class SqliteProvisioningActivationOperationsTest {
                 activation(
                         origin,
                         alias,
-                        new ProvisioningTimedActivation(
+                        new TimedSummonActivation(
                                 new CommandFamilyKey(OWNER, "summon"),
                                 origin.commandSlotId(),
                                 1,
@@ -291,7 +291,7 @@ class SqliteProvisioningActivationOperationsTest {
     private ProvisioningActivationRequest activation(
             ProvisioningOrigin origin,
             NpcAlias alias,
-            ProvisioningTimedActivation timed
+            TimedSummonActivation timed
     ) {
         CompanionLifecycle before = dormant(origin);
         CompanionLifecycle after = new CompanionLifecycle(

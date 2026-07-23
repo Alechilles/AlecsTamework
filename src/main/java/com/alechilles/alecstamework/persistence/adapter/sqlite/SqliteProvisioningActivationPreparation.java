@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationEventCodec;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationOutcome;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningTimedActivation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -206,7 +206,7 @@ final class SqliteProvisioningActivationPreparation
     private boolean terminalOutcomeMatches(
             ProvisioningActivationOutcome outcome
     ) {
-        ProvisioningTimedActivation timed = request.timedActivation();
+        TimedSummonActivation timed = request.timedActivation();
         return outcome.profileId().equals(request.origin().profileId())
                 && outcome.liveAlias().equals(request.targetAlias())
                 && outcome.worldKey().equals(request.targetWorldKey())
@@ -224,7 +224,7 @@ final class SqliteProvisioningActivationPreparation
 
     private void requireCommand(
             SqlitePersistenceTransactionContext transaction,
-            ProvisioningTimedActivation timed
+            TimedSummonActivation timed
     ) {
         SqliteCommandRosterEvidence.requireExact(
                 transaction,

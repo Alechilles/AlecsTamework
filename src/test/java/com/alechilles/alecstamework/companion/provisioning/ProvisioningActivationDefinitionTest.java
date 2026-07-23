@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.provisioning;
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonPolicy;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonSessionId;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -102,7 +103,7 @@ class ProvisioningActivationDefinitionTest {
                         ALIAS,
                         "world-a",
                         "receipt",
-                        new ProvisioningTimedActivation(
+                        new TimedSummonActivation(
                                 valid.timedActivation().familyKey(),
                                 valid.timedActivation().slotId(),
                                 1,
@@ -155,8 +156,8 @@ class ProvisioningActivationDefinitionTest {
         );
     }
 
-    private ProvisioningTimedActivation timed() {
-        return new ProvisioningTimedActivation(
+    private TimedSummonActivation timed() {
+        return new TimedSummonActivation(
                 new CommandFamilyKey(OWNER, "summon"),
                 new CommandRosterSlotId(new UUID(0, 98)),
                 1,

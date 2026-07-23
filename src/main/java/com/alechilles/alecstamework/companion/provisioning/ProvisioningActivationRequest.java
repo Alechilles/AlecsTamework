@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.provisioning;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -17,7 +18,7 @@ public record ProvisioningActivationRequest(
         @Nonnull NpcAlias targetAlias,
         @Nonnull String targetWorldKey,
         @Nonnull String spawnReceiptKey,
-        @Nullable ProvisioningTimedActivation timedActivation,
+        @Nullable TimedSummonActivation timedActivation,
         long requestedAtMs
 ) {
     public ProvisioningActivationRequest {
@@ -87,7 +88,7 @@ public record ProvisioningActivationRequest(
     }
 
     private static void requireTimed(
-            ProvisioningTimedActivation timed,
+            TimedSummonActivation timed,
             CompanionLifecycle before,
             long requestedAtMs
     ) {

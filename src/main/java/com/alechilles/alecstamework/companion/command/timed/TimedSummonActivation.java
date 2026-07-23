@@ -1,22 +1,21 @@
-package com.alechilles.alecstamework.companion.provisioning;
+package com.alechilles.alecstamework.companion.command.timed;
 
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
 import javax.annotation.Nonnull;
 
-/** Optional initial timed-session evidence attached to live activation. */
-public record ProvisioningTimedActivation(
+/** Optional command-family timed-session evidence attached to live activation. */
+public record TimedSummonActivation(
         @Nonnull CommandFamilyKey familyKey,
         @Nonnull CommandRosterSlotId slotId,
         long expectedMembershipRevision,
         @Nonnull TimedSummonLease lease
 ) {
-    public ProvisioningTimedActivation {
+    public TimedSummonActivation {
         if (familyKey == null || slotId == null || lease == null
                 || expectedMembershipRevision <= 0) {
             throw new IllegalArgumentException(
-                    "Complete provisioning timed activation is required"
+                    "Complete timed summon activation is required"
             );
         }
     }
