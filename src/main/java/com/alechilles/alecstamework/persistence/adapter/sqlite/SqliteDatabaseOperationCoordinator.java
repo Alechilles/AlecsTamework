@@ -9,10 +9,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
-import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -69,11 +67,15 @@ public final class SqliteDatabaseOperationCoordinator {
                 prepared.completion().thenCompose(result -> {
                     if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
                             || !(committed.value() instanceof OperationEnvelope preparedOperation)) {
-                        return completed(failed(
+                        return SqliteOperationResults.completed(
+                                SqliteOperationResults.failed(
                                 OperationWorkflowResult.Status.PREPARE_FAILED,
                                 null,
                                 List.of(),
-                                transactionFailure(result, "operation_prepare_failed")
+                                SqliteOperationResults.transactionFailure(
+                                        result,
+                                        "operation_prepare_failed"
+                                )
                         ));
                     }
                     return continueFrom(preparedOperation, work, consumers);
@@ -89,7 +91,7 @@ public final class SqliteDatabaseOperationCoordinator {
         return switch (operation.phase()) {
             case PUBLISHED, DURABLE -> publisher.resume(operation, consumers);
             case PREPARED, RETRYABLE -> commitAndPublish(operation, work, consumers);
-            default -> completed(failed(
+            default -> SqliteOperationResults.completed(SqliteOperationResults.failed(
                     OperationWorkflowResult.Status.INVALID_PHASE,
                     operation,
                     List.of(),
@@ -109,50 +111,19 @@ public final class SqliteDatabaseOperationCoordinator {
                 .completion().thenCompose(result -> {
                     if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
                             || !(committed.value() instanceof DurableCommitEvidence evidence)) {
-                        return completed(failed(
+                        return SqliteOperationResults.completed(
+                                SqliteOperationResults.failed(
                                 OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED,
                                 operation,
                                 List.of(),
-                                transactionFailure(result, "operation_durable_commit_failed")
+                                SqliteOperationResults.transactionFailure(
+                                        result,
+                                        "operation_durable_commit_failed"
+                                )
                         ));
                     }
                     return publisher.publish(evidence, consumers);
                 });
-    }
-
-    private Throwable transactionFailure(
-            PersistenceTransactionResult<?> result,
-            String fallback
-    ) {
-        if (result instanceof PersistenceTransactionResult.RolledBack<?> rolledBack) {
-            return cause(rolledBack.failure().cause(), rolledBack.failure().code());
-        }
-        if (result instanceof PersistenceTransactionResult.Unknown<?> unknown) {
-            return cause(unknown.failure().cause(), unknown.failure().code());
-        }
-        if (result instanceof PersistenceTransactionResult.Rejected<?> rejected) {
-            return new IllegalStateException(rejected.reason().name().toLowerCase());
-        }
-        return new IllegalStateException(fallback);
-    }
-
-    private Throwable cause(Throwable cause, String code) {
-        return cause == null ? new IllegalStateException(code) : cause;
-    }
-
-    private OperationWorkflowResult failed(
-            OperationWorkflowResult.Status status,
-            OperationEnvelope operation,
-            List<ProjectionEvent> events,
-            Throwable failure
-    ) {
-        return new OperationWorkflowResult(status, operation, events, failure);
-    }
-
-    private CompletionStage<OperationWorkflowResult> completed(
-            OperationWorkflowResult result
-    ) {
-        return CompletableFuture.completedFuture(result);
     }
 
     /** Writer admission for preparation plus the eventual exact workflow result. */
