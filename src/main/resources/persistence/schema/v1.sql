@@ -272,6 +272,15 @@ CREATE TABLE coop_slot (
     y INTEGER NOT NULL,
     z INTEGER NOT NULL,
     resident_slot INTEGER NOT NULL CHECK (resident_slot >= 0),
+    residency_revision INTEGER NOT NULL DEFAULT 0 CHECK (residency_revision >= 0),
+    active_operation_id TEXT,
+    reserved_profile_id TEXT,
+    CHECK (
+        (active_operation_id IS NULL AND reserved_profile_id IS NULL)
+        OR (active_operation_id IS NOT NULL AND reserved_profile_id IS NOT NULL)
+    ),
+    FOREIGN KEY (active_operation_id) REFERENCES operation_envelope(operation_id),
+    FOREIGN KEY (reserved_profile_id) REFERENCES companion_profile(profile_id),
     UNIQUE (world_key, coop_id, x, y, z, resident_slot)
 );
 

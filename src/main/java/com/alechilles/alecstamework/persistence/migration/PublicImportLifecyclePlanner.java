@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.migration;
 
+import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.google.gson.JsonArray;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -102,8 +103,9 @@ final class PublicImportLifecyclePlanner {
         ArrayList<PublicImportPlan.CoopSlot> slots = new ArrayList<>();
         HashMap<String, List<PublicImportPlanningModel.CoopDraft>> byProfile = new HashMap<>();
         for (LegacyPublicData.CoopSlot slot : source.coopSlots()) {
+            CoopSlotKey key = targetCoopKey(slot);
             slots.add(new PublicImportPlan.CoopSlot(
-                    slot.coopKey(), slot.worldName(), slot.coopId(),
+                    key.toString(), key.worldKey(), key.coopId(),
                     slot.x(), slot.y(), slot.z(), slot.residentSlot()
             ));
             if (slot.profileId() != null) {
@@ -288,7 +290,12 @@ final class PublicImportLifecyclePlanner {
             profile.conflict("COOP_EVIDENCE_INCOMPLETE");
             profile.lifecycle("UNRESOLVED", "UNRESOLVED", null, state.updatedAtMs());
         } else {
-            profile.lifecycle("COOP", "COOP_SLOT", state.coopKey(), state.updatedAtMs());
+            profile.lifecycle(
+                    "COOP",
+                    "COOP_SLOT",
+                    targetCoopKey(coopRows.getFirst().slot()).toString(),
+                    state.updatedAtMs()
+            );
         }
     }
 
@@ -315,13 +322,24 @@ final class PublicImportLifecyclePlanner {
             if (!profile.hasConflicts() && "COOP".equals(profile.lifecycleState())) {
                 PublicImportPlanningModel.CoopDraft row = entry.getValue().getFirst();
                 result.add(new PublicImportPlan.CoopResidency(
-                        row.slot().coopKey(), row.slot().profileId(),
+                        targetCoopKey(row.slot()).toString(), row.slot().profileId(),
                         row.slot().housedNpcUuid(), row.snapshot().snapshotId(),
                         row.slot().capturedAtMs(), row.slot().updatedAtMs()
                 ));
             }
         }
         return List.copyOf(result);
+    }
+
+    private CoopSlotKey targetCoopKey(LegacyPublicData.CoopSlot slot) {
+        return new CoopSlotKey(
+                slot.worldName(),
+                slot.coopId(),
+                slot.x(),
+                slot.y(),
+                slot.z(),
+                slot.residentSlot()
+        );
     }
 
     private void finalizeProfile(

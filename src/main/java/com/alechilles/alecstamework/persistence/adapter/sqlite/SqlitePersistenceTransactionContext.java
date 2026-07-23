@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionDataPort;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopPort;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
@@ -28,6 +29,7 @@ public final class SqlitePersistenceTransactionContext {
     private final ProfileExtensionDataPort profileExtensions;
     private final CompanionToolLinkPort toolLinks;
     private final RefundClaimPort refunds;
+    private final CompanionCoopPort coops;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -42,6 +44,7 @@ public final class SqlitePersistenceTransactionContext {
         profileExtensions = new SqliteProfileExtensionDataStore(connection);
         toolLinks = new SqliteCompanionToolLinkStore(connection);
         refunds = new SqliteRefundClaimStore(connection);
+        coops = new SqliteCompanionCoopStore(connection);
     }
 
     @Nonnull
@@ -91,5 +94,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     RefundClaimPort refunds() {
         return refunds;
+    }
+
+    @Nonnull
+    CompanionCoopPort coops() {
+        return coops;
     }
 }

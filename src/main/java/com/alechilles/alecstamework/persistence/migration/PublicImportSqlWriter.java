@@ -218,6 +218,13 @@ final class PublicImportSqlWriter {
             }
             statement.executeBatch();
         }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE coop_slot
+                SET residency_revision = 1
+                WHERE coop_key IN (SELECT coop_key FROM coop_residency)
+                """)) {
+            statement.executeUpdate();
+        }
     }
 
     private void insertQuarantines(Connection connection, PublicImportPlan plan) throws Exception {
