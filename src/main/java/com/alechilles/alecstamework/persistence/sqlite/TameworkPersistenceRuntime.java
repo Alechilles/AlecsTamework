@@ -29,6 +29,7 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureCont
 import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryProbe;
@@ -44,6 +45,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -90,6 +92,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final PersistenceResilienceRuntime resilienceRuntime;
     private final StorageRecoveryCoordinator storageRecoveryCoordinator;
     private final PersistenceIncidentJournal incidentJournal;
+    private final PersistenceEngineLease engineLease;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private TameworkPersistenceRuntime(
             @Nonnull Path runtimeDataDirectory,
@@ -126,7 +130,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull SqliteSchemaMigrator schemaMigrator,
             @Nonnull PersistenceResilienceRuntime resilienceRuntime,
             @Nonnull StorageRecoveryCoordinator storageRecoveryCoordinator,
-            @Nonnull PersistenceIncidentJournal incidentJournal) {
+            @Nonnull PersistenceIncidentJournal incidentJournal,
+            @Nonnull PersistenceEngineLease engineLease) {
         this.runtimeDataDirectory = runtimeDataDirectory;
         this.sqlitePath = sqlitePath;
         this.bootId = bootId;
@@ -162,12 +167,36 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.resilienceRuntime = resilienceRuntime;
         this.storageRecoveryCoordinator = storageRecoveryCoordinator;
         this.incidentJournal = incidentJournal;
+        this.engineLease = engineLease;
     }
 
     @Nonnull
     public static TameworkPersistenceRuntime initialize(@Nonnull Path runtimeDataDirectory,
                                                         @Nullable HytaleLogger logger) {
         Path normalizedDataDir = runtimeDataDirectory.toAbsolutePath().normalize();
+        PersistenceEngineLease engineLease =
+                PersistenceEngineLease.acquireLegacy(normalizedDataDir);
+        try {
+            return initializeWithLease(
+                    normalizedDataDir,
+                    logger,
+                    engineLease
+            );
+        } catch (RuntimeException | Error failure) {
+            try {
+                engineLease.close();
+            } catch (RuntimeException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
+        }
+    }
+
+    private static TameworkPersistenceRuntime initializeWithLease(
+            Path normalizedDataDir,
+            @Nullable HytaleLogger logger,
+            PersistenceEngineLease engineLease
+    ) {
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
         String bootId = UUID.randomUUID().toString();
         PersistenceStorageHealthService storageHealth = new PersistenceStorageHealthService(state -> {
@@ -338,34 +367,45 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 schemaMigrator,
                 resilienceRuntime,
                 storageRecoveryCoordinator,
-                incidentJournal
+                incidentJournal,
+                engineLease
         );
 
-        if (health.isHealthy()) {
-            runtime.runLegacyDatImport(logger);
-            try {
-                DeathRepository.OrphanedRosterDeathRecovery recovery =
-                        deathRepository.recoverOrphanedCommandRosterDeaths();
-                if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
-                    logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
-                            "Command-roster death recovery completed: recovered="
-                                    + recovery.recovered() + ", conflicted=" + recovery.conflicted());
-                }
-            } catch (Exception failure) {
-                if (logger != null) {
-                    logger.at(Level.WARNING).log(
-                            "Command-roster death recovery failed; roster authority will remain fail-closed: "
-                                    + failure.getMessage());
-                }
-            }
-            boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
+        try {
             if (health.isHealthy()) {
-                if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
-                maintenanceService.start();
+                runtime.runLegacyDatImport(logger);
+                try {
+                    DeathRepository.OrphanedRosterDeathRecovery recovery =
+                            deathRepository.recoverOrphanedCommandRosterDeaths();
+                    if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
+                        logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
+                                "Command-roster death recovery completed: recovered="
+                                        + recovery.recovered() + ", conflicted=" + recovery.conflicted());
+                    }
+                } catch (Exception failure) {
+                    if (logger != null) {
+                        logger.at(Level.WARNING).log(
+                                "Command-roster death recovery failed; roster authority will remain fail-closed: "
+                                        + failure.getMessage());
+                    }
+                }
+                boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
+                if (health.isHealthy()) {
+                    if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
+                    maintenanceService.start();
+                }
             }
+            storageRecoveryCoordinator.start();
+            engineLease.publishStartupComplete();
+            return runtime;
+        } catch (RuntimeException | Error failure) {
+            try {
+                runtime.close();
+            } catch (RuntimeException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
         }
-        storageRecoveryCoordinator.start();
-        return runtime;
     }
 
     @Nonnull
@@ -808,13 +848,45 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
     @Override
     public void close() {
-        maintenanceService.close();
-        storageRecoveryCoordinator.close();
-        resilienceRuntime.close();
-        readExecutor.close();
-        writeQueue.close();
-        incidentJournal.close();
-        storageHealthService.close();
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        RuntimeException failure = null;
+        failure = close(failure, maintenanceService::close);
+        failure = close(failure, storageRecoveryCoordinator::close);
+        failure = close(failure, resilienceRuntime::close);
+        failure = close(failure, readExecutor::close);
+        failure = close(failure, writeQueue::close);
+        failure = close(failure, incidentJournal::close);
+        failure = close(failure, storageHealthService::close);
+        failure = close(failure, engineLease::close);
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private RuntimeException close(
+            @Nullable RuntimeException existing,
+            CloseParticipant participant
+    ) {
+        try {
+            participant.close();
+            return existing;
+        } catch (Exception closeFailure) {
+            if (existing == null) {
+                return new IllegalStateException(
+                        "legacy_persistence_shutdown_failed",
+                        closeFailure
+                );
+            }
+            existing.addSuppressed(closeFailure);
+            return existing;
+        }
+    }
+
+    @FunctionalInterface
+    private interface CloseParticipant {
+        void close() throws Exception;
     }
 
     public record PersistenceDiagnostics(
