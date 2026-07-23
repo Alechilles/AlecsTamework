@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -49,23 +48,28 @@ public final class CommandLinkedNpcStateSnapshotService {
             fullSnapshotsByNpc = new ConcurrentHashMap<>();
     private final CoopResidentStateSnapshotService fullStateCaptureService = new CoopResidentStateSnapshotService();
     private final CoopResidentStateSnapshotCodec fullStateCodec = new CoopResidentStateSnapshotCodec();
-    @Nullable
-    private final NpcProfileRepository profileRepository;
+    private final CompanionProfileSnapshotSink profileSnapshots;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
     @Nullable private volatile ProjectionUnloadSnapshotSink projectionUnloadSnapshotSink;
     @Nullable private volatile ProjectionLoadSink projectionLoadSink;
 
     public CommandLinkedNpcStateSnapshotService() {
-        this(null, new LoadedNpcIdentityIndex());
+        this(CompanionProfileSnapshotSink.ignore(), new LoadedNpcIdentityIndex());
     }
 
-    public CommandLinkedNpcStateSnapshotService(@Nullable NpcProfileRepository profileRepository) {
-        this(profileRepository, new LoadedNpcIdentityIndex());
+    public CommandLinkedNpcStateSnapshotService(
+            @Nonnull CompanionProfileSnapshotSink profileSnapshots
+    ) {
+        this(profileSnapshots, new LoadedNpcIdentityIndex());
     }
 
-    public CommandLinkedNpcStateSnapshotService(@Nullable NpcProfileRepository profileRepository,
-                                                @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex) {
-        this.profileRepository = profileRepository;
+    public CommandLinkedNpcStateSnapshotService(
+            @Nonnull CompanionProfileSnapshotSink profileSnapshots,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex
+    ) {
+        this.profileSnapshots = Objects.requireNonNull(
+                profileSnapshots, "profileSnapshots"
+        );
         this.loadedNpcIdentityIndex = Objects.requireNonNull(loadedNpcIdentityIndex, "loadedNpcIdentityIndex");
     }
 
@@ -350,22 +354,10 @@ public final class CommandLinkedNpcStateSnapshotService {
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
-        if (profileRepository == null || snapshot.npcUuid() == null) {
+        if (snapshot.npcUuid() == null) {
             return;
         }
-        profileRepository.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                snapshot.ownerName(),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                snapshot.customName(),
-                snapshot.tamed(),
-                null,
-                null,
-                null,
-                snapshot.toolIds()
-        ));
+        profileSnapshots.publish(snapshot);
     }
 
     @Nullable

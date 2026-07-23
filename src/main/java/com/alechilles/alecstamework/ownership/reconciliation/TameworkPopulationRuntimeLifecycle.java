@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyProfileSnapshotSink;
 import com.hypixel.hytale.component.ComponentRegistryProxy;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -85,7 +86,9 @@ public final class TameworkPopulationRuntimeLifecycle {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(runtime, "runtime");
         return new CommandLinkedNpcStateSnapshotService(
-                persistence.getNpcProfileRepository(),
+                new LegacyProfileSnapshotSink(
+                        persistence.getNpcProfileRepository()
+                ),
                 runtime.loadedNpcIdentityIndex()
         );
     }

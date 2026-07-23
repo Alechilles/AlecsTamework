@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.sqlite.LegacyPersistenceEventBridge;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyProfileSnapshotSink;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
@@ -53,7 +54,11 @@ class TameworkApiImplTest {
                     new LegacyPersistenceEventBridge(bus)
             );
             CommandLinkedNpcStateSnapshotService stateSnapshotService =
-                    new CommandLinkedNpcStateSnapshotService(runtime.getNpcProfileRepository());
+                    new CommandLinkedNpcStateSnapshotService(
+                            new LegacyProfileSnapshotSink(
+                                    runtime.getNpcProfileRepository()
+                            )
+                    );
             TameworkApi api = LegacyTameworkApiFactory.create(
                     runtime,
                     bus,

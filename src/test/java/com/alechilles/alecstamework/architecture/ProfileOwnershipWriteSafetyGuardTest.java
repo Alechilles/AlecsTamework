@@ -14,14 +14,29 @@ class ProfileOwnershipWriteSafetyGuardTest {
 
     @Test
     void snapshotServicesUseOwnershipNeutralProfileUpserts() throws Exception {
-        for (String file : List.of(
-                "CommandLinkedNpcCaptureService.java",
-                "CommandLinkedNpcStateSnapshotService.java"
-        )) {
+        for (String file : List.of("CommandLinkedNpcCaptureService.java")) {
             String source = Files.readString(MAIN.resolve("items").resolve(file));
             assertTrue(source.contains("profileRepository.upsertSnapshotAsync("), file);
             assertFalse(source.contains("profileRepository.upsertAsync("), file);
         }
+        String snapshotService = Files.readString(
+                MAIN.resolve("items")
+                        .resolve("CommandLinkedNpcStateSnapshotService.java")
+        );
+        assertTrue(snapshotService.contains(
+                "profileSnapshots.publish(snapshot)"
+        ));
+        assertFalse(snapshotService.contains("NpcProfileRepository"));
+        assertFalse(snapshotService.contains("persistence.sqlite"));
+
+        String legacySnapshotSink = Files.readString(
+                MAIN.resolve("persistence").resolve("sqlite")
+                        .resolve("LegacyProfileSnapshotSink.java")
+        );
+        assertTrue(legacySnapshotSink.contains(
+                "profiles.upsertSnapshotAsync("
+        ));
+        assertFalse(legacySnapshotSink.contains("profiles.upsertAsync("));
         String deathWriter = Files.readString(
                 MAIN.resolve("items").resolve("CommandLinkedNpcDeathProfileWriter.java")
         );

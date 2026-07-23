@@ -19,7 +19,9 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
 
         CommandLinkedNpcStateSnapshotService service =
-                new CommandLinkedNpcStateSnapshotService(null, index);
+                new CommandLinkedNpcStateSnapshotService(
+                        CompanionProfileSnapshotSink.ignore(), index
+                );
 
         assertSame(index, service.getLoadedNpcIdentityIndex());
     }
