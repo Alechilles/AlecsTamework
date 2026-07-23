@@ -156,7 +156,12 @@ public final class SqliteProvisioningActivationOperations {
                 ? null
                 : requireApplied(
                         transaction.timedSummons().replace(
-                                null,
+                                request.timedActivation()
+                                        .expectedPreviousLease() == null
+                                        ? null
+                                        : request.timedActivation()
+                                        .expectedPreviousLease()
+                                        .leaseRevision(),
                                 request.timedActivation().lease()
                         ),
                         "provisioning_activation_timed_lease"

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBound
 import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalBoundaries;
 import javax.annotation.Nonnull;
 
 /** Complete external mutation/resolution boundaries used by normal work and recovery. */
@@ -18,13 +19,15 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull CompanionCoopReleaseLiveBoundary coopReleases,
         @Nonnull TimedSummonLiveBoundary timedSummons,
         @Nonnull ProvisioningActivationLiveBoundary
-                provisioningActivations
+                provisioningActivations,
+        @Nonnull PaidRevivalBoundaries paidRevivals
 ) {
     public PublicPersistenceLiveBoundaries {
         if (aliases == null || captures == null || restorations == null
                 || coopCaptures == null || coopReleases == null
                 || timedSummons == null
-                || provisioningActivations == null) {
+                || provisioningActivations == null
+                || paidRevivals == null) {
             throw new IllegalArgumentException(
                     "Every public live persistence boundary is required"
             );

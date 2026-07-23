@@ -65,10 +65,15 @@ final class SqlitePopulationGroupTransitionParticipant
                 || operation.phase() == OperationPhase.PUBLISHED) {
             return true;
         }
+        if (operation.phase() == OperationPhase.COMPENSATED) {
+            return transaction.populationGroups()
+                    .findReservations(operation.operationId()).isEmpty();
+        }
         try {
             return (operation.phase() == OperationPhase.PREPARED
                     || operation.phase() == OperationPhase.RETRYABLE
-                    || operation.phase() == OperationPhase.LIVE_APPLYING)
+                    || operation.phase() == OperationPhase.LIVE_APPLYING
+                    || operation.phase() == OperationPhase.COMPENSATING)
                     && transaction.populationGroups()
                     .findReservations(operation.operationId())
                     .equals(plan(transaction, operation));
@@ -84,18 +89,47 @@ final class SqlitePopulationGroupTransitionParticipant
             );
         }
         return (transaction, operation) -> {
-            int expected = plan(transaction, operation).size();
+            int expected = plannedReservationCount(
+                    transaction, operation
+            );
             List<ProjectionEventDraft> events =
                     delegated.execute(transaction, operation);
-            if (!transaction.populationGroups().retireExact(
-                    operation.operationId(), expected
-            )) {
-                throw new IllegalStateException(
-                        "population_group_reservation_retirement_failed"
-                );
-            }
+            retireExact(transaction, operation, expected);
             return events;
         };
+    }
+
+    /** Retires only this participant's exact prepared reservation set. */
+    void retirePrepared(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
+    ) {
+        retireExact(
+                transaction,
+                operation,
+                plannedReservationCount(transaction, operation)
+        );
+    }
+
+    private int plannedReservationCount(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation
+    ) {
+        return plan(transaction, operation).size();
+    }
+
+    private void retireExact(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            int expected
+    ) {
+        if (!transaction.populationGroups().retireExact(
+                operation.operationId(), expected
+        )) {
+            throw new IllegalStateException(
+                    "population_group_reservation_retirement_failed"
+            );
+        }
     }
 
     private List<PopulationGroupReservation> plan(

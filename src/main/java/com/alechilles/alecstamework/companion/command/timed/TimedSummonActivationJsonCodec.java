@@ -31,6 +31,14 @@ public final class TimedSummonActivationJsonCodec {
                 activation.expectedMembershipRevision()
         );
         json.add(
+                "expectedPreviousLease",
+                activation.expectedPreviousLease() == null
+                        ? null
+                        : TimedSummonLeaseJsonCodec.encode(
+                                activation.expectedPreviousLease()
+                        )
+        );
+        json.add(
                 "lease",
                 TimedSummonLeaseJsonCodec.encode(activation.lease())
         );
@@ -53,6 +61,14 @@ public final class TimedSummonActivationJsonCodec {
                         json.get("slotId").getAsString()
                 ),
                 json.get("expectedMembershipRevision").getAsLong(),
+                json.get("expectedPreviousLease") == null
+                        || json.get("expectedPreviousLease").isJsonNull()
+                        ? null
+                        : TimedSummonLeaseJsonCodec.decode(
+                                json.getAsJsonObject(
+                                        "expectedPreviousLease"
+                                )
+                        ),
                 TimedSummonLeaseJsonCodec.decode(
                         json.getAsJsonObject("lease")
                 )

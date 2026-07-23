@@ -99,7 +99,8 @@ public record ProvisioningActivationRequest(
         Long expectedRemaining = lease.policy().unlimited()
                 ? null
                 : lease.policy().activeDurationMs();
-        if (!timed.familyKey().ownerId().equals(before.ownerId())
+        if (timed.expectedPreviousLease() != null
+                || !timed.familyKey().ownerId().equals(before.ownerId())
                 || !lease.profileId().equals(before.profileId())
                 || lease.leaseRevision() != 1
                 || !lease.activeSession()

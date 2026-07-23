@@ -387,7 +387,9 @@ class SqliteOwnerPopulationTransitionOperationsTest {
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed(
                                         "provisioning_activation"
-                                ).completed()
+                                ).completed(),
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalBoundaries.unavailable()
         );
     }
 

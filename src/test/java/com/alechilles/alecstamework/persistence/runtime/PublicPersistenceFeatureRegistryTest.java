@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMuta
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -25,7 +26,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(12, registry.descriptors().size());
+        assertEquals(13, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -52,7 +53,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(18, operationKinds.size());
+        assertEquals(19, operationKinds.size());
 
         PersistenceFeatureDescriptor economics = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
@@ -67,6 +68,31 @@ class PublicPersistenceFeatureRegistryTest {
         assertTrue(capture.ownedAuthorities().isEmpty());
         assertTrue(capture.startupDependencies().contains(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
+        ));
+        PersistenceFeatureDescriptor paidRevival =
+                registry.requireFeature(
+                        PublicPersistenceFeatureRegistry.PAID_REVIVAL
+                );
+        assertTrue(paidRevival.ownedAuthorities().isEmpty());
+        assertEquals(
+                Set.of(
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
+                ),
+                paidRevival.operationScopes().get(
+                        PaidRevivalDefinition.INSTANCE.kind()
+                )
+        );
+        assertTrue(paidRevival.startupDependencies().containsAll(
+                Set.of(
+                        PublicPersistenceFeatureRegistry
+                                .POPULATION_GROUPS,
+                        PublicPersistenceFeatureRegistry.COMMAND_ROSTER,
+                        PublicPersistenceFeatureRegistry.TIMED_SUMMON,
+                        PublicPersistenceFeatureRegistry
+                                .ECONOMIC_COMPENSATION
+                )
         ));
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(

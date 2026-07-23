@@ -98,7 +98,9 @@ class PublicPersistenceStartupFailureMatrixTest {
                         (request, operation) -> LiveOperationResult
                                 .confirmed(
                                         "provisioning_activation_confirmed"
-                                ).completed()
+                                ).completed(),
+                        com.alechilles.alecstamework.companion.revival
+                                .PaidRevivalBoundaries.unavailable()
                 ),
                 PublicPersistenceWorldReconciliation.alreadyComplete(),
                 Duration.ofSeconds(5)

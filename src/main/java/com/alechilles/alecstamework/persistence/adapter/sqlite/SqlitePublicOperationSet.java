@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
@@ -43,6 +44,7 @@ final class SqlitePublicOperationSet {
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
+    private final SqlitePaidRevivalOperations paidRevivals;
     private final SqliteCoopSlotOperations coopSlots;
     private final SqliteCompanionCoopCaptureOperations coopCaptures;
     private final SqliteCompanionCoopReleaseOperations coopReleases;
@@ -184,6 +186,16 @@ final class SqlitePublicOperationSet {
                         CompanionRestorationDefinition.INSTANCE.kind()
                 )
         );
+        paidRevivals = new SqlitePaidRevivalOperations(
+                engine,
+                publisher,
+                kernel.reads(),
+                clock,
+                refunds,
+                projections.requiredFor(
+                        PaidRevivalDefinition.INSTANCE.kind()
+                )
+        );
         coopSlots = new SqliteCoopSlotOperations(
                 database,
                 projections.requiredFor(
@@ -273,6 +285,10 @@ final class SqlitePublicOperationSet {
 
     SqliteCompanionRestorationOperations restorations() {
         return restorations;
+    }
+
+    SqlitePaidRevivalOperations paidRevivals() {
+        return paidRevivals;
     }
 
     SqliteCoopSlotOperations coopSlots() {

@@ -36,6 +36,8 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupAs
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -207,6 +209,16 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().idempotencyKey(),
                                 payload(claim, CompanionRestorationRequest.class),
                                 boundaries.restorations()
+                        ).completion()
+                ),
+                Map.entry(
+                        PaidRevivalDefinition.INSTANCE.kind(),
+                        claim -> operations.paidRevivals().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(claim, PaidRevivalRequest.class),
+                                boundaries.paidRevivals().revivals(),
+                                boundaries.paidRevivals().releases()
                         ).completion()
                 ),
                 Map.entry(

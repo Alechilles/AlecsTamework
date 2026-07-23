@@ -172,6 +172,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqlitePaidRevivalOperations paidRevivalOperations() {
+        return publicOperations.paidRevivals();
+    }
+
+    @Nonnull
     public SqliteCoopSlotOperations coopSlotOperations() {
         return publicOperations.coopSlots();
     }

@@ -93,6 +93,7 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.coopSlotOperations());
         assertNotNull(adapter.coopCaptureOperations());
         assertNotNull(adapter.coopReleaseOperations());
+        assertNotNull(adapter.paidRevivalOperations());
         assertNotNull(adapter.extensionOperations());
         assertNotNull(adapter.profileReader());
         assertNotNull(adapter.lifecycleReader());
@@ -302,7 +303,9 @@ class SqlitePublicPersistenceAdapterTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed(
                                 "provisioning_activation"
-                        ).completed()
+                        ).completed(),
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalBoundaries.unavailable()
         );
     }
 

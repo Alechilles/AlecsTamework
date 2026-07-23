@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationTransiti
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -47,6 +48,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("provisioning");
     public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
             new PersistenceFeatureId("economic_compensation");
+    public static final PersistenceFeatureId PAID_REVIVAL =
+            new PersistenceFeatureId("paid_revival");
     public static final PersistenceFeatureId CAPTURE =
             new PersistenceFeatureId("capture");
     public static final PersistenceFeatureId DORMANT =
@@ -83,6 +86,7 @@ public final class PublicPersistenceFeatureRegistry {
                 PublicPersistenceTimedFeature.create(),
                 PublicPersistenceProvisioningFeature.create(),
                 economicCompensation(),
+                paidRevival(),
                 capture(),
                 dormant(),
                 coop(),
@@ -329,6 +333,45 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.OWNER
+                )
+        );
+    }
+
+    private static PersistenceFeatureDescriptor paidRevival() {
+        return descriptor(
+                PAID_REVIVAL,
+                PersistenceFeatureDomain.COMMAND,
+                Set.of(),
+                List.of(PaidRevivalDefinition.INSTANCE),
+                scopes(
+                        PaidRevivalDefinition.INSTANCE,
+                        Set.of(
+                                OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER,
+                                OperationScopeType.COMMAND_FAMILY
+                        )
+                ),
+                Set.of(
+                        IDENTITY,
+                        LIFECYCLE,
+                        POPULATION_GROUPS,
+                        COMMAND_ROSTER,
+                        TIMED_SUMMON,
+                        ECONOMIC_COMPENSATION
+                ),
+                Set.of(
+                        PROFILE_OBSERVER,
+                        OWNER_POPULATION_INDEX,
+                        POPULATION_GROUP_INDEX,
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
+                ),
+                worldReadiness(),
+                Set.of(
+                        OperationScopeType.OPERATION,
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
                 )
         );
     }
