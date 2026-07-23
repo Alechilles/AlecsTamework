@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
-import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -172,17 +171,15 @@ public final class SqliteCommandRosterTransitionOperations {
                 ).orElseThrow(() -> new IllegalStateException(
                         "command_roster_lifecycle_missing"
                 ));
-        CommandRosterMembership membership =
-                transaction.commandRosters()
-                        .findByProfile(lifecycle.profileId())
-                        .orElseThrow(() -> new IllegalStateException(
-                                "command_roster_membership_missing"
-                        ));
+        var membership = SqliteCommandRosterEvidence.requireExact(
+                transaction,
+                lifecycle.profileId(),
+                request.familyKey(),
+                request.slotId(),
+                request.expectedMembershipRevision()
+        );
         if (!lifecycle.equals(request.groupAdmission().before())
-                || !membership.familyKey().equals(request.familyKey())
-                || !membership.slotId().equals(request.slotId())
-                || membership.membershipRevision()
-                != request.expectedMembershipRevision()) {
+                || !membership.profileId().equals(lifecycle.profileId())) {
             throw new IllegalStateException(
                     "command_roster_transition_source_mismatch"
             );

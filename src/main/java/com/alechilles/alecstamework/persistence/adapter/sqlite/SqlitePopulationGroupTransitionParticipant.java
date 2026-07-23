@@ -67,7 +67,8 @@ final class SqlitePopulationGroupTransitionParticipant
         }
         try {
             return (operation.phase() == OperationPhase.PREPARED
-                    || operation.phase() == OperationPhase.RETRYABLE)
+                    || operation.phase() == OperationPhase.RETRYABLE
+                    || operation.phase() == OperationPhase.LIVE_APPLYING)
                     && transaction.populationGroups()
                     .findReservations(operation.operationId())
                     .equals(plan(transaction, operation));
@@ -112,9 +113,7 @@ final class SqlitePopulationGroupTransitionParticipant
                         .orElseThrow(() -> new IllegalStateException(
                                 "population_group_transition_assignment_missing"
                         ));
-        if (!lifecycle.equals(request.before())
-                || lifecycle.activeOperationId() != null
-                || lifecycle.quarantined()) {
+        if (!sourceMatches(lifecycle, operation)) {
             throw new IllegalStateException(
                     "population_group_transition_source_mismatch"
             );
@@ -122,5 +121,39 @@ final class SqlitePopulationGroupTransitionParticipant
         return PopulationGroupTransitionAdmissionPlanner.plan(
                 operation.operationId(), request, assignment
         );
+    }
+
+    private boolean sourceMatches(
+            CompanionLifecycle lifecycle,
+            OperationEnvelope operation
+    ) {
+        CompanionLifecycle before = request.before();
+        if (lifecycle.equals(before)
+                && lifecycle.activeOperationId() == null
+                && !lifecycle.quarantined()) {
+            return true;
+        }
+        return lifecycle.profileId().equals(before.profileId())
+                && java.util.Objects.equals(
+                lifecycle.ownerId(), before.ownerId()
+        )
+                && lifecycle.state() == before.state()
+                && lifecycle.location().equals(before.location())
+                && lifecycle.revision().equals(before.revision().next())
+                && operation.operationId().equals(
+                lifecycle.activeOperationId()
+        )
+                && lifecycle.stateChangedAtMs() == request.requestedAtMs()
+                && lifecycle.lastReconciledGeneration().equals(
+                before.lastReconciledGeneration()
+        )
+                && java.util.Objects.equals(
+                lifecycle.quarantineIncidentId(),
+                before.quarantineIncidentId()
+        )
+                && java.util.Objects.equals(
+                lifecycle.ownerWorldKey(), before.ownerWorldKey()
+        )
+                && !lifecycle.quarantined();
     }
 }

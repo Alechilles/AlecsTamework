@@ -137,6 +137,12 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteTimedSummonTransitionOperations
+    timedSummonTransitionOperations() {
+        return publicOperations.timedTransitions();
+    }
+
+    @Nonnull
     public SqliteCompanionCaptureOperations captureOperations() {
         return publicOperations.captures();
     }

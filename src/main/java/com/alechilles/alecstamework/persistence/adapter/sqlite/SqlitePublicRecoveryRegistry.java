@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDef
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
@@ -139,6 +141,18 @@ final class SqlitePublicRecoveryRegistry {
                                         claim,
                                         TimedSummonLeaseMutationRequest.class
                                 )
+                        ).completion()
+                ),
+                Map.entry(
+                        TimedSummonTransitionDefinition.INSTANCE.kind(),
+                        claim -> operations.timedTransitions().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        TimedSummonTransitionRequest.class
+                                ),
+                                boundaries.timedSummons()
                         ).completion()
                 ),
                 Map.entry(

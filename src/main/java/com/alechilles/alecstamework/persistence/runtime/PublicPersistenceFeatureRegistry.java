@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.persistence.runtime;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -75,7 +74,7 @@ public final class PublicPersistenceFeatureRegistry {
                 ownerPopulation(),
                 populationGroups(),
                 commandRoster(),
-                timedSummon(),
+                PublicPersistenceTimedFeature.create(),
                 capture(),
                 dormant(),
                 coop(),
@@ -272,32 +271,6 @@ public final class PublicPersistenceFeatureRegistry {
                         OperationScopeType.PROFILE,
                         OperationScopeType.OWNER,
                         OperationScopeType.COMMAND_FAMILY
-                )
-        );
-    }
-
-    private static PersistenceFeatureDescriptor timedSummon() {
-        return descriptor(
-                TIMED_SUMMON,
-                PersistenceFeatureDomain.COMMAND,
-                Set.of("timed_summon_lease"),
-                List.of(TimedSummonLeaseMutationDefinition.INSTANCE),
-                scopes(
-                        TimedSummonLeaseMutationDefinition.INSTANCE,
-                        Set.of(OperationScopeType.PROFILE)
-                ),
-                Set.of(
-                        IDENTITY,
-                        LIFECYCLE,
-                        OWNER_POPULATION,
-                        POPULATION_GROUPS,
-                        COMMAND_ROSTER
-                ),
-                Set.of(TIMED_SUMMON_INDEX),
-                worldReadiness(),
-                Set.of(
-                        OperationScopeType.OPERATION,
-                        OperationScopeType.PROFILE
                 )
         );
     }
