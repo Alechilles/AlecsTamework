@@ -29,7 +29,8 @@ class ReplacementPersistenceArchitectureGuardTest {
             MAIN.resolve("persistence/facade"),
             MAIN.resolve("persistence/kernel"),
             MAIN.resolve("persistence/operation"),
-            MAIN.resolve("persistence/projection")
+            MAIN.resolve("persistence/projection"),
+            MAIN.resolve("persistence/runtime")
     );
 
     @Test

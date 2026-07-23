@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -141,6 +142,13 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
+    }
+
+    /** Loads the complete canonical startup evidence through the read lane. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>
+    loadCanonical() {
+        return startup.loadCanonical();
     }
 
     /** Rebuilds canonical derived state and catches every registry consumer up. */
