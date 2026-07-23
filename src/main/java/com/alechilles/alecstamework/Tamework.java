@@ -2904,7 +2904,18 @@ public class Tamework extends JavaPlugin {
                     .toCompletableFuture().join();
             var recovery = service.recover(System.currentTimeMillis()).toCompletableFuture().join();
             var storedConvergence = service.convergeStoredPopulation().toCompletableFuture().join();
-            commandTimedSummoningRecoveryReady = recovery.ready() && storedConvergence.ready();
+            /*
+             * Worlds are not guaranteed to be loaded during plugin bootstrap, so projection
+             * inspection can legitimately remain unresolved here. Stored population convergence
+             * is the activation invariant; the installed lease tick safely retries stale
+             * projection operations once their worlds become available.
+             */
+            commandTimedSummoningRecoveryReady = storedConvergence.ready();
+            if (!recovery.ready()) {
+                getLogger().at(Level.INFO).log(
+                        "Deferred " + recovery.unresolved()
+                                + " timed command summon recovery operation(s) until world runtime.");
+            }
             if (storedConvergence.converged() > 0) {
                 getLogger().at(Level.INFO).log(
                         "Repaired " + storedConvergence.converged()

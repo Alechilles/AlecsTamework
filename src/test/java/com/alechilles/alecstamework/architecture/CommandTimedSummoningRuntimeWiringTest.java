@@ -15,6 +15,8 @@ class CommandTimedSummoningRuntimeWiringTest {
         String plugin = Files.readString(MAIN.resolve("Tamework.java"));
         assertTrue(plugin.contains("new HytaleCommandTimedSummonProjectionPort("));
         assertTrue(plugin.contains("service.recover(System.currentTimeMillis())"));
+        assertTrue(plugin.contains("commandTimedSummoningRecoveryReady = storedConvergence.ready()"));
+        assertTrue(plugin.contains("recovery.unresolved()"));
         assertTrue(plugin.contains("activateCommandTimedSummoningRuntime("));
         assertTrue(plugin.contains("installInitialProjectionHook(runtime.initialProjectionHook())"));
         assertTrue(plugin.contains("service.onOwnerLogout("));
