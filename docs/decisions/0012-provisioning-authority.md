@@ -1,6 +1,6 @@
 # ADR 0012: Companion Provisioning Authority
 
-- Status: Accepted for Phase 5E implementation
+- Status: Implemented
 - Date: 2026-07-23
 
 ## Context
