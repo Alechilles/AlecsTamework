@@ -162,11 +162,26 @@ public final class PersistenceEngineLease implements AutoCloseable {
 
     @Override
     public synchronized void close() {
+        closeLease(true);
+    }
+
+    /**
+     * Releases ownership without claiming that the replacement checkpoint
+     * completed successfully.
+     *
+     * <p>This is valid only after all writer and read work is terminal. It is
+     * not a shortcut around a timed-out drain.</p>
+     */
+    public synchronized void closeUnclean() {
+        closeLease(false);
+    }
+
+    private void closeLease(boolean publishCleanShutdown) {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
         RuntimeException failure = null;
-        if (startupPublished) {
+        if (startupPublished && publishCleanShutdown) {
             try {
                 writeManifest(true, true);
             } catch (Exception manifestFailure) {

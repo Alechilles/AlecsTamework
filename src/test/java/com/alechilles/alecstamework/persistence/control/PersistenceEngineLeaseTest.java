@@ -167,6 +167,31 @@ class PersistenceEngineLeaseTest {
         }
     }
 
+    @Test
+    void uncleanReleaseNeverPublishesAFalseCleanShutdown() {
+        AtomicLong clock = new AtomicLong(1);
+        PersistenceEngineLease replacement = PersistenceEngineLease.acquire(
+                tempDir,
+                PersistenceEngineLineage.REPLACEMENT,
+                clock::getAndIncrement
+        );
+        replacement.publishStartupComplete();
+
+        replacement.closeUnclean();
+        replacement.close();
+
+        PersistenceEngineManifest closed;
+        try {
+            closed = new PersistenceEngineManifestStore(tempDir)
+                    .read()
+                    .orElseThrow();
+        } catch (Exception failure) {
+            throw new AssertionError(failure);
+        }
+        assertTrue(closed.startupComplete());
+        assertFalse(closed.cleanShutdown());
+    }
+
     private void assertLockUnavailable(PersistenceEngineLineage lineage) {
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
