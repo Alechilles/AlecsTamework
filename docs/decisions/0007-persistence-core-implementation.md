@@ -80,13 +80,17 @@ The core tests additionally prove exact unknown-commit readback without duplicat
 outbox replay and rebuild comparison, alias and lifecycle revision fencing, versioned snapshot
 decode failure, scoped incident containment, lease takeover, and starvation-free recovery.
 
-## Deferred work
+## Subsequent composition
 
-Phase 3 intentionally does not compose gameplay features. Feature descriptors, readiness,
-startup DAG ownership, global storage containment, and public runtime cutover are introduced in
-later phases alongside the feature slices that exercise them. Until a slice passes its gate, the
-old implementation remains only as characterization evidence; no feature may mix the two
-persistence engines at runtime.
+Phase 4 composed the public behavior surface on this core. Static feature descriptors now drive
+one startup DAG, exhaustive recovery, projection catch-up, readiness, containment, diagnostics,
+and ordered shutdown. The public runtime imports released v2-v4 data, exposes one operation
+facade and one canonical query facade, and holds a process-wide engine lease from open through
+terminal shutdown.
+
+Unreleased July features remain intentionally outside this composition until their Phase 5
+behavior slices are reimplemented on the shared protocol. The superseded implementation is
+characterization evidence only; no feature may mix the two persistence engines at runtime.
 
 ## Consequences
 

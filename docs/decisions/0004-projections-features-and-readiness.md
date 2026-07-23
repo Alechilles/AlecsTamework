@@ -1,6 +1,6 @@
 # ADR 0004: Projections, Feature Descriptors, and Readiness
 
-- Status: Accepted
+- Status: Accepted and implemented for the public runtime
 - Date: 2026-07-23
 
 ## Projection ordering
@@ -66,3 +66,20 @@ Scoped quarantine is evaluated alongside readiness and does not create another g
 The same registration makes forgotten recovery and shutdown wiring structurally impossible.
 Projection replay replaces pre-commit callbacks, and one readiness graph replaces the July
 collection of feature-specific gates.
+
+## Verification
+
+The public replacement runtime now derives startup, recovery dispatch, projection catch-up,
+readiness, and shutdown from the descriptor registry and startup graph. Its public facade exposes
+exactly the nine released operation families and canonical-gated query methods; it does not
+expose the SQLite kernel or stores.
+
+Acceptance coverage proves:
+
+- a copied public-v4 runtime imports and operates through the replacement;
+- failed cutover preserves the source and permits the legacy runtime to reopen;
+- old and replacement engines are mutually exclusive, including across JVMs;
+- injected failure at every startup node performs terminal ordered cleanup;
+- timed-out shutdown retains the engine lease and resumes after accepted work completes.
+
+The focused Phase 4E aggregate runs 56 tests with no failures, errors, or skips.
