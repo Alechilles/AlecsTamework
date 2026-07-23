@@ -263,6 +263,24 @@ class SqliteSingleWriterTest {
                 || finalStatus == PersistenceShutdownResult.Status.ALREADY_CLOSED);
     }
 
+    @Test
+    void closeCheckpointFailureCannotPreventAcceptedWorkFromDraining() throws Exception {
+        Fixture fixture = fixture(new SqliteWriterConfiguration(2, 0, 0, 2_000),
+                (checkpoint, operationId) -> {
+                    if (checkpoint == PersistenceCheckpoint.CLOSE) {
+                        throw new SQLException("injected close observer failure");
+                    }
+                });
+        SqliteSingleWriter.WriteSubmission<Integer> accepted =
+                fixture.writer.submit(command(connection -> 41));
+
+        PersistenceShutdownResult shutdown = fixture.writer.shutdown(Duration.ofSeconds(2));
+
+        assertEquals(PersistenceShutdownResult.Status.DRAINED, shutdown.status());
+        assertEquals(41,
+                assertInstanceOf(PersistenceTransactionResult.Committed.class, await(accepted)).value());
+    }
+
     private Fixture fixture(SqliteWriterConfiguration configuration,
                             com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpointHook hook) {
         SqliteConnectionFactory connections =

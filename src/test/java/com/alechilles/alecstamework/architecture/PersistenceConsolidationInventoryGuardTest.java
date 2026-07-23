@@ -144,6 +144,52 @@ class PersistenceConsolidationInventoryGuardTest {
         }
     }
 
+    @Test
+    void replacementKernelClassesRespectTargetSize() throws Exception {
+        int target = loadBaseline()
+                .getAsJsonObject("replacementRules")
+                .get("targetClassLines")
+                .getAsInt();
+        List<Path> focusedRoots = List.of(
+                SOURCE_ROOT.resolve("persistence/kernel"),
+                SOURCE_ROOT.resolve("persistence/adapter"),
+                SOURCE_ROOT.resolve("persistence/projection"),
+                SOURCE_ROOT.resolve("companion/identity"),
+                SOURCE_ROOT.resolve("companion/lifecycle")
+        );
+        for (Path root : focusedRoots) {
+            for (Path file : javaFiles(root)) {
+                long lines = countLines(List.of(file));
+                assertTrue(
+                        lines <= target,
+                        () -> relative(file) + " has " + lines
+                                + " lines; replacement target is " + target
+                );
+            }
+        }
+    }
+
+    @Test
+    void replacementAdapterHasNoLegacyQueueOrMetadataVocabulary() throws Exception {
+        List<String> forbidden = List.of(
+                "submitTracked(",
+                "submitWithCompletion(",
+                "PersistenceOperationMetadata",
+                "PersistenceWriteQueue",
+                "MAX_BATCH_SIZE",
+                "batchExecutor"
+        );
+        for (Path file : javaFiles(SOURCE_ROOT.resolve("persistence/adapter"))) {
+            String source = Files.readString(file);
+            for (String vocabulary : forbidden) {
+                assertTrue(
+                        !source.contains(vocabulary),
+                        () -> relative(file) + " contains superseded persistence API: " + vocabulary
+                );
+            }
+        }
+    }
+
     private Inventory inventory() throws Exception {
         List<Path> productionFiles = productionJavaFiles();
         List<Path> legacyFiles = javaFiles(LEGACY_SQLITE_ROOT);
