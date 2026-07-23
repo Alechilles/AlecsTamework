@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.concurrent.CompletionStage;
@@ -25,6 +26,8 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteCompanionProfileReader profiles;
     private final SqliteCompanionCoopReader coops;
     private final SqliteProfileExtensionReader extensions;
+    private final LongSupplier clock;
+    private final PersistenceFeatureRegistry registry;
 
     public SqlitePublicPersistenceAdapter(
             @Nonnull PersistenceFeatureRegistry registry,
@@ -40,6 +43,8 @@ public final class SqlitePublicPersistenceAdapter {
                     "Public persistence adapter dependencies are required"
             );
         }
+        this.clock = clock;
+        this.registry = registry;
         projections = new SqlitePublicProjectionSet(
                 registry,
                 kernel,
@@ -143,6 +148,22 @@ public final class SqlitePublicPersistenceAdapter {
     public CompletionStage<SqlitePublicProjectionStartupResult>
     buildProjections() {
         return projections.rebuildAndCatchUp(coops);
+    }
+
+    /** Scans and resumes every recoverable operation through typed adapters. */
+    @Nonnull
+    public CompletionStage<SqlitePublicRecoveryResult> recover(
+            @Nonnull PublicPersistenceLiveBoundaries boundaries,
+            @Nonnull String workerId
+    ) {
+        return new SqlitePublicRecoveryDispatcher(
+                recovery,
+                registry,
+                recoveryOperations,
+                boundaries,
+                clock,
+                workerId
+        ).recover();
     }
 
     SqlitePublicProjectionSet projections() {

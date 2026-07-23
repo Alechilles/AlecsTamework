@@ -1,24 +1,50 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /** Registry-driven composition checks for the complete public SQLite adapter. */
 class SqlitePublicPersistenceAdapterTest {
+    private static final ProfileId PROFILE =
+            ProfileId.parse("20000000-0000-0000-0000-000000000001");
+    private static final OperationId OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000001");
+
     @TempDir
     Path tempDir;
 
@@ -106,6 +132,62 @@ class SqlitePublicPersistenceAdapterTest {
         assertEquals(0, adapter.coopIndex().snapshot().size());
     }
 
+    @Test
+    void resumesPreparedProfileThroughTheSameTypedAdapter() throws Exception {
+        SqlitePublicPersistenceAdapter adapter = adapter();
+        prepareProfile(adapter);
+
+        SqlitePublicRecoveryResult result = adapter.recover(
+                boundaries(),
+                "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, result.status());
+        assertEquals(1, result.completedCount());
+        assertEquals(List.of(), result.quarantinedScopes());
+        PersistenceReadResult.Found<?> found = assertInstanceOf(
+                PersistenceReadResult.Found.class,
+                adapter.profileReader().findByProfile(PROFILE)
+                        .toCompletableFuture().get(10, TimeUnit.SECONDS)
+        );
+        assertNotNull(found.value());
+    }
+
+    @Test
+    void containsUnknownClaimWithoutDispatchingIt() throws Exception {
+        SqlitePublicPersistenceAdapter adapter = adapter();
+        OperationEnvelope prepared = prepareProfile(adapter);
+        OperationEnvelope applying = committed(adapter.publicOperations()
+                .engine().transition(
+                        prepared,
+                        OperationPhase.LIVE_APPLYING,
+                        null,
+                        null,
+                        -90
+                ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+        committed(adapter.publicOperations().engine().transition(
+                applying,
+                OperationPhase.UNKNOWN,
+                "live",
+                "ambiguous_test",
+                -80
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+
+        SqlitePublicRecoveryResult result = adapter.recover(
+                boundaries(),
+                "startup-worker"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, result.status());
+        assertEquals(0, result.completedCount());
+        assertEquals(
+                List.of(OperationScope.operation(OPERATION)),
+                result.quarantinedScopes()
+        );
+    }
+
     private SqlitePublicPersistenceAdapter adapter() {
         SqliteConnectionFactory connections = new SqliteConnectionFactory(
                 tempDir.resolve("projection-state.sqlite")
@@ -124,5 +206,85 @@ class SqlitePublicPersistenceAdapterTest {
                 event -> {
                 }
         );
+    }
+
+    private OperationEnvelope prepareProfile(
+            SqlitePublicPersistenceAdapter adapter
+    ) throws Exception {
+        CompanionProfileMutation mutation = new CompanionProfileMutation.Create(
+                identity(),
+                new CompanionLifecycle(
+                        PROFILE,
+                        OwnerId.parse(
+                                "10000000-0000-0000-0000-000000000001"
+                        ),
+                        LifecycleState.UNLOADED,
+                        LifecycleLocation.none(),
+                        LifecycleRevision.INITIAL,
+                        null,
+                        -100,
+                        ReconciliationGeneration.INITIAL,
+                        null
+                ),
+                List.of(),
+                -100
+        );
+        OperationRequest<CompanionProfileMutation> request =
+                new OperationRequest<>(
+                        OPERATION,
+                        new IdempotencyKey("recover-profile"),
+                        mutation,
+                        SqliteCompanionProfileOperations.FEATURE_SCOPE,
+                        null,
+                        List.of(OperationScope.profile(PROFILE)),
+                        -100
+                );
+        return committed(adapter.publicOperations().engine().prepare(
+                CompanionProfileMutationDefinition.INSTANCE,
+                request
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+    }
+
+    private CompanionIdentity identity() {
+        String metadata = "{\"source\":\"recovery-test\"}";
+        return new CompanionIdentity(
+                PROFILE,
+                "Companion",
+                "role",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                "world",
+                -100,
+                -100,
+                -100,
+                0
+        );
+    }
+
+    private PublicPersistenceLiveBoundaries boundaries() {
+        return new PublicPersistenceLiveBoundaries(
+                (rotation, operation) ->
+                        com.alechilles.alecstamework.companion.identity
+                                .CompanionAliasLiveBoundary.Result.confirmed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("capture").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("restoration").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("coop_capture").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("coop_release").completed()
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private OperationEnvelope committed(
+            PersistenceTransactionResult<OperationEnvelope> result
+    ) {
+        return ((PersistenceTransactionResult.Committed<OperationEnvelope>)
+                assertInstanceOf(
+                        PersistenceTransactionResult.Committed.class,
+                        result
+                )).value();
     }
 }
