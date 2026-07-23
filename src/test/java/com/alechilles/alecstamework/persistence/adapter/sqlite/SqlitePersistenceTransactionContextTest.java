@@ -64,6 +64,7 @@ class SqlitePersistenceTransactionContextTest {
             ));
             assertTrue(transaction.commandRosters()
                     .findAllRosters().isEmpty());
+            assertTrue(transaction.timedSummons().findAll().isEmpty());
             transaction.outbox().append(new ProjectionEventDraft(
                     OPERATION, new ProjectionEventType("profile_created"),
                     PROFILE.toString(), 0, 1, "{}", -10_000
