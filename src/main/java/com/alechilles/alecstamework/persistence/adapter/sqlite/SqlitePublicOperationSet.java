@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -31,6 +32,7 @@ final class SqlitePublicOperationSet {
     private final SqlitePopulationGroupAssignmentOperations populationGroups;
     private final SqliteCommandRosterMembershipOperations commandRosters;
     private final SqliteCommandRosterTransitionOperations commandTransitions;
+    private final SqliteTimedSummonLeaseOperations timedSummons;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -117,6 +119,12 @@ final class SqlitePublicOperationSet {
                 database,
                 projections.requiredFor(
                         CommandRosterTransitionDefinition.INSTANCE.kind()
+                )
+        );
+        timedSummons = new SqliteTimedSummonLeaseOperations(
+                database,
+                projections.requiredFor(
+                        TimedSummonLeaseMutationDefinition.INSTANCE.kind()
                 )
         );
         captures = new SqliteCompanionCaptureOperations(
@@ -206,6 +214,10 @@ final class SqlitePublicOperationSet {
 
     SqliteCommandRosterTransitionOperations commandTransitions() {
         return commandTransitions;
+    }
+
+    SqliteTimedSummonLeaseOperations timedSummons() {
+        return timedSummons;
     }
 
     SqliteCompanionCaptureOperations captures() {

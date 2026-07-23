@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionIndex;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
@@ -33,6 +34,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteProfileExtensionReader extensions;
     private final SqlitePopulationGroupReader populationGroups;
     private final SqliteCommandRosterReader commandRosters;
+    private final SqliteTimedSummonLeaseReader timedSummons;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
 
@@ -86,6 +88,7 @@ public final class SqlitePublicPersistenceAdapter {
         extensions = new SqliteProfileExtensionReader(kernel.reads());
         populationGroups = new SqlitePopulationGroupReader(kernel.reads());
         commandRosters = new SqliteCommandRosterReader(kernel.reads());
+        timedSummons = new SqliteTimedSummonLeaseReader(kernel.reads());
     }
 
     @Nonnull
@@ -126,6 +129,11 @@ public final class SqlitePublicPersistenceAdapter {
     public SqliteCommandRosterTransitionOperations
     commandRosterTransitionOperations() {
         return publicOperations.commandTransitions();
+    }
+
+    @Nonnull
+    public SqliteTimedSummonLeaseOperations timedSummonOperations() {
+        return publicOperations.timedSummons();
     }
 
     @Nonnull
@@ -194,6 +202,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteTimedSummonLeaseReader timedSummonReader() {
+        return timedSummons;
+    }
+
+    @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
     }
@@ -211,6 +224,11 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CommandRosterProjectionIndex commandRosterIndex() {
         return projections.commandRosterIndex();
+    }
+
+    @Nonnull
+    public TimedSummonProjectionIndex timedSummonIndex() {
+        return projections.timedSummonIndex();
     }
 
     /** Loads the complete canonical startup evidence through the read lane. */

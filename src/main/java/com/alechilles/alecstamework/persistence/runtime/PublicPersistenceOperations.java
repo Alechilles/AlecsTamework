@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseRequest;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistration;
@@ -105,6 +106,18 @@ public final class PublicPersistenceOperations {
                 idempotencyKey,
                 restoration,
                 boundaries.restorations()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission mutateTimedSummonLease(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull TimedSummonLeaseMutationRequest mutation
+    ) {
+        var submitted = adapter.timedSummonOperations().submit(
+                operationId, idempotencyKey, mutation
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

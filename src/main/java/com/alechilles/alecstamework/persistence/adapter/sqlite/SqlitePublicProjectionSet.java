@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProject
 import com.alechilles.alecstamework.companion.command.CommandRoster;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionSeed;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionIndex;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -38,6 +40,8 @@ final class SqlitePublicProjectionSet {
     private final OwnerPopulationProjectionIndex ownerPopulationIndex;
     private final PopulationGroupProjectionIndex populationGroupIndex;
     private final CommandRosterProjectionIndex commandRosterIndex;
+    private final TimedSummonProjectionIndex timedSummonIndex;
+    private final SqliteTimedSummonLeaseReader timedSummonReader;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
 
     SqlitePublicProjectionSet(
@@ -67,6 +71,9 @@ final class SqlitePublicProjectionSet {
         this.ownerPopulationIndex = new OwnerPopulationProjectionIndex();
         this.populationGroupIndex = new PopulationGroupProjectionIndex();
         this.commandRosterIndex = new CommandRosterProjectionIndex();
+        this.timedSummonIndex = new TimedSummonProjectionIndex();
+        this.timedSummonReader =
+                new SqliteTimedSummonLeaseReader(kernel.reads());
         this.consumers = Map.of(
                 profileObserver.consumerId(),
                 profileObserver,
@@ -77,7 +84,9 @@ final class SqlitePublicProjectionSet {
                 populationGroupIndex.consumerId(),
                 populationGroupIndex,
                 commandRosterIndex.consumerId(),
-                commandRosterIndex
+                commandRosterIndex,
+                timedSummonIndex.consumerId(),
+                timedSummonIndex
         );
         requireExactRegistryConsumers();
     }
@@ -105,6 +114,11 @@ final class SqlitePublicProjectionSet {
     @Nonnull
     CommandRosterProjectionIndex commandRosterIndex() {
         return commandRosterIndex;
+    }
+
+    @Nonnull
+    TimedSummonProjectionIndex timedSummonIndex() {
+        return timedSummonIndex;
     }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
@@ -303,7 +317,30 @@ final class SqlitePublicProjectionSet {
                     failure
             );
         }
-        return catchUp(all(), 0, new ArrayList<>());
+        return timedSummonReader.findAll().thenCompose(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<
+                    List<TimedSummonLease>> found)) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_READ_FAILED,
+                        List.of(),
+                        readFailure("timed_summon_leases", read)
+                );
+            }
+            try {
+                timedSummonIndex.rebuild(
+                        found.value(), rosters, lifecycles
+                );
+            } catch (Throwable failure) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_REBUILD_FAILED,
+                        List.of(),
+                        failure
+                );
+            }
+            return catchUp(all(), 0, new ArrayList<>());
+        });
     }
 
     private CompletionStage<SqlitePublicProjectionStartupResult> catchUp(

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.coop.CoopConflictDiagnostic;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionView;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidency;
 import com.alechilles.alecstamework.companion.coop.CoopSlot;
@@ -73,6 +75,18 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<ProfileExtensionData>>
     findExtension(@Nonnull ProfileExtensionKey key) {
         return adapter.extensionReader().findActive(key);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<TimedSummonLease>>
+    findTimedSummonLease(@Nonnull ProfileId profileId) {
+        return adapter.timedSummonReader().find(profileId);
+    }
+
+    @Nonnull
+    public Map<ProfileId, TimedSummonProjectionView>
+    projectedTimedSummons() {
+        return adapter.timedSummonIndex().readySnapshot();
     }
 
     @Nonnull

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -41,6 +42,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("population_groups");
     public static final PersistenceFeatureId COMMAND_ROSTER =
             new PersistenceFeatureId("command_roster");
+    public static final PersistenceFeatureId TIMED_SUMMON =
+            new PersistenceFeatureId("timed_summon");
     public static final PersistenceFeatureId CAPTURE =
             new PersistenceFeatureId("capture");
     public static final PersistenceFeatureId DORMANT =
@@ -59,6 +62,8 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("population_group_index");
     public static final ProjectionConsumerId COMMAND_ROSTER_INDEX =
             new ProjectionConsumerId("command_roster_index");
+    public static final ProjectionConsumerId TIMED_SUMMON_INDEX =
+            new ProjectionConsumerId("timed_summon_index");
 
     private PublicPersistenceFeatureRegistry() {
     }
@@ -70,6 +75,7 @@ public final class PublicPersistenceFeatureRegistry {
                 ownerPopulation(),
                 populationGroups(),
                 commandRoster(),
+                timedSummon(),
                 capture(),
                 dormant(),
                 coop(),
@@ -101,7 +107,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -127,7 +134,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -170,7 +178,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -254,7 +263,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 worldReadiness(),
                 Set.of(
@@ -262,6 +272,32 @@ public final class PublicPersistenceFeatureRegistry {
                         OperationScopeType.PROFILE,
                         OperationScopeType.OWNER,
                         OperationScopeType.COMMAND_FAMILY
+                )
+        );
+    }
+
+    private static PersistenceFeatureDescriptor timedSummon() {
+        return descriptor(
+                TIMED_SUMMON,
+                PersistenceFeatureDomain.COMMAND,
+                Set.of("timed_summon_lease"),
+                List.of(TimedSummonLeaseMutationDefinition.INSTANCE),
+                scopes(
+                        TimedSummonLeaseMutationDefinition.INSTANCE,
+                        Set.of(OperationScopeType.PROFILE)
+                ),
+                Set.of(
+                        IDENTITY,
+                        LIFECYCLE,
+                        OWNER_POPULATION,
+                        POPULATION_GROUPS,
+                        COMMAND_ROSTER
+                ),
+                Set.of(TIMED_SUMMON_INDEX),
+                worldReadiness(),
+                Set.of(
+                        OperationScopeType.OPERATION,
+                        OperationScopeType.PROFILE
                 )
         );
     }
@@ -284,7 +320,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 worldReadiness(),
                 Set.of(
@@ -315,7 +352,8 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 worldReadiness(),
                 Set.of(
@@ -355,7 +393,8 @@ public final class PublicPersistenceFeatureRegistry {
                         COOP_INDEX,
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX
+                        COMMAND_ROSTER_INDEX,
+                        TIMED_SUMMON_INDEX
                 ),
                 worldReadiness(),
                 Set.of(
