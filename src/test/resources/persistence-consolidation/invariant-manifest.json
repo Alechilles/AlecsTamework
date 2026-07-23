@@ -211,7 +211,7 @@
     {
       "id": "public-import-development-refusal",
       "contract": "Public v2-v4 sources import without mutation while unreleased v5-v9 sources are refused non-destructively.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 2,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.migration.PublicPersistenceImporterTest",
       "currentTests": [

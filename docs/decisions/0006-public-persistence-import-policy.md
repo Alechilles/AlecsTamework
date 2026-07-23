@@ -66,3 +66,10 @@ an atomic same-directory move publishes `tamework-state.sqlite`.
 An existing target is never merged with a different source. Failed work remains isolated to an
 owned temporary target and cannot enable mutation readiness. The legacy main database, WAL, and SHM
 remain byte-for-byte unchanged.
+
+## Phase-2 acceptance budget
+
+The immutable representative-v4 fixture must import in at most 10 seconds on the development test
+host and produce a replacement main database no larger than 2 MiB. These are regression ceilings,
+not expected runtime: the fixture normally completes well below one second. Larger release-corpus
+benchmarks must establish scaled production budgets before release packaging.

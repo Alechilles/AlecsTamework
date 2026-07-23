@@ -10,7 +10,10 @@ import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Statement;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -24,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /** End-to-end public import, refusal, idempotency, and non-mutation acceptance tests. */
 class PublicPersistenceImporterTest {
@@ -134,6 +138,38 @@ class PublicPersistenceImporterTest {
         assertEquals(first.importId(), second.importId());
         assertEquals(before, fileEvidence(testCase.target()));
         assertEquals(1, count(testCase.target(), "import_manifest"));
+    }
+
+    @Test
+    void independentImportsOfTheSameSourceProduceIdenticalLogicalTargets() throws Exception {
+        ImportCase testCase = importCase("public-v4-representative.sql");
+        Path secondTarget = testCase.directory().resolve("second-tamework-state.sqlite");
+
+        PublicImportResult.Imported first = assertInstanceOf(
+                PublicImportResult.Imported.class,
+                importer.importSource(testCase.source(), testCase.target())
+        );
+        PublicImportResult.Imported second = assertInstanceOf(
+                PublicImportResult.Imported.class,
+                importer.importSource(testCase.source(), secondTarget)
+        );
+
+        assertEquals(first.importId(), second.importId());
+        assertEquals(logicalRows(testCase.target()), logicalRows(secondTarget));
+    }
+
+    @Test
+    void representativeImportStaysWithinDocumentedOfflineFixtureBudget() throws Exception {
+        ImportCase testCase = importCase("public-v4-representative.sql");
+
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () ->
+                assertInstanceOf(
+                        PublicImportResult.Imported.class,
+                        importer.importSource(testCase.source(), testCase.target())
+                )
+        );
+        assertTrue(Files.size(testCase.target()) <= 2L * 1024 * 1024,
+                "representative target exceeded 2 MiB");
     }
 
     @Test
@@ -333,6 +369,34 @@ class PublicPersistenceImporterTest {
         }
         assertFalse(names.stream().anyMatch(name -> name.contains(".importing.")), names.toString());
         assertFalse(names.stream().anyMatch(name -> name.endsWith(".writing")), names.toString());
+    }
+
+    private List<String> logicalRows(Path database) throws Exception {
+        ArrayList<String> rows = new ArrayList<>();
+        List<String> tables = new ArrayList<>(
+                com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager
+                        .requiredTables()
+        );
+        tables.sort(String::compareTo);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            for (String table : tables) {
+                try (ResultSet result = statement.executeQuery(
+                        "SELECT * FROM " + table + " ORDER BY rowid"
+                )) {
+                    ResultSetMetaData metadata = result.getMetaData();
+                    while (result.next()) {
+                        StringBuilder row = new StringBuilder(table);
+                        for (int column = 1; column <= metadata.getColumnCount(); column++) {
+                            row.append('|').append(metadata.getColumnName(column))
+                                    .append('=').append(result.getString(column));
+                        }
+                        rows.add(row.toString());
+                    }
+                }
+            }
+        }
+        return List.copyOf(rows);
     }
 
     private long count(Path database, String table) throws Exception {
