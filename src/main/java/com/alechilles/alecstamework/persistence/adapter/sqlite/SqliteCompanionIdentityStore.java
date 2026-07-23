@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -102,7 +103,7 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
             setNullableText(statement, 1, next.displayName());
             setNullableText(statement, 2, next.roleId());
             setNullableText(statement, 3, next.metadataJson());
-            setNullableText(statement, 4, next.metadataHash());
+            setNullableText(statement, 4, text(next.metadataHash()));
             setNullableText(statement, 5, next.lastKnownWorldKey());
             statement.setLong(6, next.updatedAtMs());
             statement.setLong(7, next.lastActiveAtMs());
@@ -402,7 +403,7 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
                 row.getString("display_name"),
                 row.getString("role_id"),
                 row.getString("metadata_json"),
-                row.getString("metadata_hash"),
+                parseHash(row.getString("metadata_hash")),
                 row.getString("last_known_world_key"),
                 row.getLong("created_at_ms"),
                 row.getLong("updated_at_ms"),
@@ -442,7 +443,7 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
         setNullableText(statement, 2, profile.displayName());
         setNullableText(statement, 3, profile.roleId());
         setNullableText(statement, 4, profile.metadataJson());
-        setNullableText(statement, 5, profile.metadataHash());
+        setNullableText(statement, 5, text(profile.metadataHash()));
         setNullableText(statement, 6, profile.lastKnownWorldKey());
         statement.setLong(7, profile.createdAtMs());
         statement.setLong(8, profile.updatedAtMs());
@@ -457,6 +458,14 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
         } else {
             statement.setString(index, value);
         }
+    }
+
+    private Sha256Hash parseHash(String value) {
+        return value == null ? null : Sha256Hash.parse(value);
+    }
+
+    private String text(Object value) {
+        return value == null ? null : value.toString();
     }
 
     private PersistenceStoreException storeFailure(String operation, Throwable failure) {

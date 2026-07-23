@@ -7,14 +7,12 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -155,7 +153,7 @@ class SqliteCompanionIdentityStoreTest {
     private CompanionIdentity profile(long revision, String name, long updatedAt) throws Exception {
         String json = "{\"source\":\"test\"}";
         return new CompanionIdentity(
-                PROFILE, name, "role", json, sha256(json), "world",
+                PROFILE, name, "role", json, Sha256Hash.ofUtf8(json), "world",
                 -10_000, updatedAt, updatedAt, revision
         );
     }
@@ -174,11 +172,5 @@ class SqliteCompanionIdentityStoreTest {
             statement.setString(2, operationId.toString());
             statement.executeUpdate();
         }
-    }
-
-    private String sha256(String value) throws Exception {
-        return HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))
-        );
     }
 }
