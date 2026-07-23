@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.sqlite.CompanionIdentityRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -30,6 +31,19 @@ public final class OwnerPopulationCanonicalRecoveryService {
         populationRepository.loadNonterminalOperations();
         coverageRepository.loadAll();
         identityRepository.loadAllAliases();
+    }
+
+    /** Proves that one formerly ambiguous population journal now has a durable terminal outcome. */
+    @Nonnull
+    public CompanionPopulationOperationRecord requireTerminalOperation(
+            @Nonnull String operationId
+    ) throws Exception {
+        CompanionPopulationOperationRecord operation =
+                populationRepository.findOperation(operationId);
+        if (operation == null || !operation.state().isTerminal()) {
+            throw new IllegalStateException("population_operation_not_terminal:" + operationId);
+        }
+        return operation;
     }
 
     /** Replaces runtime indexes from canonical rows and rejects a degraded rebuild. */

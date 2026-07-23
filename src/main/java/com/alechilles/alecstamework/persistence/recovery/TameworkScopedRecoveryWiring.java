@@ -44,6 +44,11 @@ public final class TameworkScopedRecoveryWiring {
                 population.canonicalRecoveryService()::verifyReadable,
                 population.canonicalRecoveryService()::republish
         ));
+        coordinator.register(new ReconciliationOperationRecoveryVerifier(
+                population.canonicalRecoveryService()::requireTerminalOperation,
+                population.canonicalRecoveryService()::verifyReadable,
+                population.canonicalRecoveryService()::republish
+        ));
         installManagedCoopVerifiers(coordinator, persistence.getManagedCoopServices());
         coordinator.scheduleOpenIncidentsAfterStartup();
     }

@@ -408,6 +408,92 @@ class CompanionPopulationOperationRecoveryServiceTest {
     }
 
     @Test
+    void interruptedRosterStoreCommitsAfterCompleteScanProvesProjectionAbsent() throws Exception {
+        try (Harness harness = harness("roster-store-absent.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.STORING, CompanionLifecycleState.ROSTER_STORED,
+                    "default", "default", OwnerPopulationOperation.LIFECYCLE_CHANGE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of(), new LoadedNpcIdentitySnapshot(7L, true, List.of()));
+
+            assertTrue(result.complete());
+            assertEquals(1, result.committed());
+            assertEquals(CompanionPopulationOperationRecord.State.COMMITTED, harness.operationState());
+            assertEquals(CompanionLifecycleState.ROSTER_STORED.name(), harness.state().lifecycleState());
+            assertEquals(null, harness.state().physicalWorldName());
+            assertEquals(null, harness.state().physicalChunkX());
+            assertEquals(null, harness.state().physicalChunkZ());
+        }
+    }
+
+    @Test
+    void interruptedRosterStoreRemainsAmbiguousWhenTargetIsStillLoaded() throws Exception {
+        try (Harness harness = harness("roster-store-loaded.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.STORING, CompanionLifecycleState.ROSTER_STORED,
+                    "default", "default", OwnerPopulationOperation.LIFECYCLE_CHANGE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+            LoadedNpcIdentitySnapshot loaded = new LoadedNpcIdentitySnapshot(
+                    8L,
+                    true,
+                    List.of(new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                            npcUuid,
+                            npcUuid,
+                            new LoadedNpcIdentityIndex.Location("default", "store-default"),
+                            null
+                    ))
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of(), loaded);
+
+            assertFalse(result.complete());
+            assertEquals(
+                    "operation-recovery-live-target-not-persisted",
+                    result.ambiguous().getFirst().reason()
+            );
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING, harness.operationState());
+            assertEquals(CompanionLifecycleState.STORING.name(), harness.state().lifecycleState());
+        }
+    }
+
+    @Test
+    void interruptedRosterStoreRequiresACompleteLoadedIdentityScan() throws Exception {
+        try (Harness harness = harness("roster-store-incomplete-scan.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.STORING, CompanionLifecycleState.ROSTER_STORED,
+                    "default", "default", OwnerPopulationOperation.LIFECYCLE_CHANGE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(), new LoadedNpcIdentitySnapshot(9L, false, List.of())
+            );
+
+            assertFalse(result.complete());
+            assertEquals(
+                    "operation-recovery-loaded-identities-incomplete",
+                    result.ambiguous().getFirst().reason()
+            );
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING, harness.operationState());
+            assertEquals(CompanionLifecycleState.STORING.name(), harness.state().lifecycleState());
+        }
+    }
+
+    @Test
     void sameOwnerCaptureRestoreAndRehomeRecoverFromLifecycleAndLocation() throws Exception {
         UUID ownerUuid = UUID.randomUUID();
         try (Harness capture = harness("same-owner-capture.sqlite")) {
