@@ -54,7 +54,7 @@ public final class TameworkEventBus
     }
 
     /** Receives an already-mapped canonical profile projection after durable commit. */
-    void publishProfileChanged(@Nonnull NpcProfileChangedEvent event) {
+    public void publishProfileChanged(@Nonnull NpcProfileChangedEvent event) {
         dispatch(Objects.requireNonNull(event));
     }
 
