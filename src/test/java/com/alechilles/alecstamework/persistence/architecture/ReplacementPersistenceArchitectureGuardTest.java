@@ -181,19 +181,76 @@ class ReplacementPersistenceArchitectureGuardTest {
 
         assertEquals(
                 List.of(
+                        "activateProvisionedCompanion",
+                        "assignPopulationGroups",
                         "capture",
                         "captureToCoop",
                         "makeDormant",
+                        "mutateCommandRoster",
                         "mutateExtension",
                         "mutateProfile",
                         "mutateTimedSummonLease",
+                        "provisionCompanion",
+                        "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseFromCoop",
                         "restore",
+                        "revivePaid",
                         "rotateAlias",
+                        "transitionCommandRoster",
+                        "transitionOwnerPopulation",
                         "transitionTimedSummon"
                 ),
                 operations
+        );
+    }
+
+    @Test
+    void publicQueryFacadeDeclaresOnlyValueOrReadResultQueries() {
+        List<String> queries = Stream.of(
+                        com.alechilles.alecstamework.persistence.runtime
+                                .PublicPersistenceQueries.class
+                                .getDeclaredMethods()
+                )
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .map(Method::getName)
+                .distinct()
+                .sorted()
+                .toList();
+
+        assertEquals(
+                List.of(
+                        "diagnoseCoopCapture",
+                        "diagnoseCoopRelease",
+                        "findAllCommandRosters",
+                        "findAllLifecycles",
+                        "findAllPopulationGroupAssignments",
+                        "findAllProvisioningRecords",
+                        "findCommandRoster",
+                        "findCommandRosterMembership",
+                        "findCoopResidency",
+                        "findCoopSlot",
+                        "findExtension",
+                        "findExtensions",
+                        "findProfile",
+                        "findProvisioning",
+                        "findStalePopulationGroupProfiles",
+                        "findTimedSummonLease",
+                        "projectedCommandRosterActions",
+                        "projectedCommandRosterRevisions",
+                        "projectedCoopResidency",
+                        "projectedCoopSnapshot",
+                        "projectedLaggingCommandRosterProfiles",
+                        "projectedLaggingPopulationGroupProfiles",
+                        "projectedOwnerPopulationCount",
+                        "projectedOwnerPopulationSnapshot",
+                        "projectedPopulationGroupAssignments",
+                        "projectedPopulationGroupCounts",
+                        "projectedProvisioning",
+                        "projectedProvisioningSnapshot",
+                        "projectedTimedSummons"
+                ),
+                queries
         );
     }
 

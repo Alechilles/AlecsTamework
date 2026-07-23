@@ -7,16 +7,28 @@ import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidency;
 import com.alechilles.alecstamework.companion.coop.CoopSlot;
 import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
+import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
+import com.alechilles.alecstamework.companion.command.CommandRoster;
+import com.alechilles.alecstamework.companion.command.CommandRosterActionView;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -109,5 +121,127 @@ public final class PublicPersistenceQueries {
     @Nonnull
     public Map<CoopSlotKey, CoopOccupancy> projectedCoopSnapshot() {
         return adapter.coopIndex().snapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<CompanionLifecycle>>>
+    findAllLifecycles() {
+        return adapter.lifecycleReader().findAll();
+    }
+
+    public long projectedOwnerPopulationCount(
+            @Nonnull OwnerPopulationScope scope
+    ) {
+        return adapter.ownerPopulationIndex().count(scope);
+    }
+
+    @Nonnull
+    public Map<ProfileId, CompanionLifecycle>
+    projectedOwnerPopulationSnapshot() {
+        return adapter.ownerPopulationIndex().snapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<
+            List<PopulationGroupAssignment>>>
+    findAllPopulationGroupAssignments() {
+        return adapter.populationGroupReader().findAllAssignments();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<ProfileId>>>
+    findStalePopulationGroupProfiles() {
+        return adapter.populationGroupReader().findStaleProfiles();
+    }
+
+    @Nonnull
+    public PopulationGroupCounts projectedPopulationGroupCounts(
+            @Nonnull PopulationGroupBucket bucket
+    ) {
+        return adapter.populationGroupIndex().counts(bucket);
+    }
+
+    @Nonnull
+    public Set<ProfileId> projectedLaggingPopulationGroupProfiles() {
+        return adapter.populationGroupIndex().laggingProfiles();
+    }
+
+    @Nonnull
+    public Map<ProfileId, PopulationGroupAssignment>
+    projectedPopulationGroupAssignments() {
+        return adapter.populationGroupIndex().assignmentSnapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<CommandRoster>>
+    findCommandRoster(@Nonnull CommandFamilyKey familyKey) {
+        return adapter.commandRosterReader().findRoster(familyKey);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<CommandRosterMembership>>
+    findCommandRosterMembership(@Nonnull ProfileId profileId) {
+        return adapter.commandRosterReader().findByProfile(profileId);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<CommandRoster>>>
+    findAllCommandRosters() {
+        return adapter.commandRosterReader().findAllRosters();
+    }
+
+    @Nonnull
+    public Map<ProfileId, CommandRosterActionView>
+    projectedCommandRosterActions() {
+        return adapter.commandRosterIndex().actionSnapshot();
+    }
+
+    @Nonnull
+    public Set<ProfileId> projectedLaggingCommandRosterProfiles() {
+        return adapter.commandRosterIndex().laggingProfiles();
+    }
+
+    @Nonnull
+    public Map<CommandFamilyKey, Long>
+    projectedCommandRosterRevisions() {
+        return adapter.commandRosterIndex().familyRevisionSnapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ProvisioningRecord>>
+    findProvisioning(@Nonnull ProfileId profileId) {
+        return adapter.provisioningReader().findByProfile(profileId);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ProvisioningRecord>>
+    findProvisioning(@Nonnull ProvisioningOrigin origin) {
+        return adapter.provisioningReader().findByOrigin(origin);
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<ProvisioningRecord>>>
+    findAllProvisioningRecords() {
+        return adapter.provisioningReader().findAll();
+    }
+
+    @Nonnull
+    public Optional<ProvisioningRecord> projectedProvisioning(
+            @Nonnull ProfileId profileId
+    ) {
+        return adapter.provisioningIndex().findByProfile(profileId);
+    }
+
+    @Nonnull
+    public Optional<ProvisioningRecord> projectedProvisioning(
+            @Nonnull ProvisioningOrigin origin
+    ) {
+        return adapter.provisioningIndex().findByOrigin(origin);
+    }
+
+    @Nonnull
+    public Map<ProfileId, ProvisioningRecord>
+    projectedProvisioningSnapshot() {
+        return adapter.provisioningIndex().snapshot();
     }
 }

@@ -10,7 +10,15 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
@@ -190,6 +198,107 @@ public final class PublicPersistenceOperations {
                 adapter.extensionOperations().submit(
                         operationId, idempotencyKey, mutation
                 );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission transitionOwnerPopulation(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull OwnerPopulationTransitionRequest transition
+    ) {
+        var submitted = adapter.ownerPopulationOperations().submit(
+                operationId, idempotencyKey, transition
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission reconcileOwnerPopulation(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull OwnerPopulationReconciliationRequest reconciliation
+    ) {
+        var submitted =
+                adapter.ownerPopulationReconciliationOperations().submit(
+                        operationId, idempotencyKey, reconciliation
+                );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission assignPopulationGroups(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull PopulationGroupAssignmentRequest assignment
+    ) {
+        var submitted = adapter.populationGroupOperations().submit(
+                operationId, idempotencyKey, assignment
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission mutateCommandRoster(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CommandRosterMembershipRequest request
+    ) {
+        var submitted = adapter.commandRosterOperations().submit(
+                operationId, idempotencyKey, request
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission transitionCommandRoster(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CommandRosterTransitionRequest transition
+    ) {
+        var submitted = adapter.commandRosterTransitionOperations().submit(
+                operationId, idempotencyKey, transition
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission provisionCompanion(
+            @Nonnull OperationId operationId,
+            @Nonnull CompanionProvisioningRequest request
+    ) {
+        var submitted = adapter.provisioningOperations().submit(
+                operationId, request
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission activateProvisionedCompanion(
+            @Nonnull OperationId operationId,
+            @Nonnull ProvisioningActivationRequest request
+    ) {
+        var submitted = adapter.provisioningActivationOperations().submit(
+                operationId,
+                request,
+                boundaries.provisioningActivations()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission revivePaid(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull PaidRevivalRequest request
+    ) {
+        var submitted = adapter.paidRevivalOperations().submit(
+                operationId,
+                idempotencyKey,
+                request,
+                boundaries.paidRevivals().revivals(),
+                boundaries.paidRevivals().releases()
+        );
         return submission(submitted.acceptance(), submitted.completion());
     }
 
