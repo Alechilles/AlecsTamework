@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "capturedAtCommit": "b70b0f6a6c872609ce93af88c128f7cc761f4f41",
+  "publicCompatibilityCommit": "acb12aaae05e3568b1bf787a1d6d17d009df5686",
+  "legacySqlite": {
+    "javaFiles": { "baseline": 121, "target": 0, "removeByPhase": 7 },
+    "javaLines": { "baseline": 31657, "target": 0, "removeByPhase": 7 },
+    "schemaTables": { "baseline": 50, "target": 0, "removeByPhase": 7 },
+    "classesAtOrAbove1000Lines": { "baseline": 3, "target": 0, "removeByPhase": 7 }
+  },
+  "crossPackageCoupling": {
+    "nonPersistenceFilesImportingLegacySqlite": {
+      "baseline": 183,
+      "target": 0,
+      "removeByPhase": 7
+    },
+    "legacySqliteImportStatementsOutsidePersistence": {
+      "baseline": 565,
+      "target": 0,
+      "removeByPhase": 7
+    }
+  },
+  "legacyWriteApi": {
+    "submitTrackedCalls": { "baseline": 90, "target": 0, "removeByPhase": 7 },
+    "submitWithCompletionCalls": { "baseline": 3, "target": 0, "removeByPhase": 7 },
+    "untrackedSubmitCalls": { "baseline": 14, "target": 0, "removeByPhase": 7 }
+  },
+  "replacementRules": {
+    "targetClassLines": 500,
+    "hardClassLines": 800
+  }
+}
