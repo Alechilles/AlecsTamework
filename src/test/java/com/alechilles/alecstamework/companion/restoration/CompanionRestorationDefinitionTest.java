@@ -1,0 +1,143 @@
+package com.alechilles.alecstamework.companion.restoration;
+
+import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/** Restoration payload codec and exact-source validation contracts. */
+class CompanionRestorationDefinitionTest {
+    private static final ProfileId PROFILE =
+            ProfileId.parse("10000000-0000-0000-0000-000000000001");
+    private static final NpcAlias TARGET =
+            NpcAlias.parse("20000000-0000-0000-0000-000000000002");
+    private static final LifecycleRevision REVISION = new LifecycleRevision(5);
+    private static final String PAYLOAD = "{\"health\":100}";
+
+    @Test
+    void deathAndLostRestorationsRoundTripExactly() {
+        for (LifecycleState source : new LifecycleState[]{
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleState.LOST
+        }) {
+            CompanionRestorationRequest request = request(source);
+
+            assertEquals(
+                    request,
+                    CompanionRestorationDefinition.INSTANCE.decode(
+                            CompanionRestorationDefinition.INSTANCE
+                                    .encode(request)
+                    )
+            );
+            CompanionRestorationOutcome outcome =
+                    new CompanionRestorationOutcome(
+                            PROFILE,
+                            request.sourceSnapshot().snapshotId(),
+                            TARGET,
+                            "world-two",
+                            REVISION.next().next(),
+                            request.spawnReceiptKey(),
+                            -400
+                    );
+            assertEquals(
+                    outcome,
+                    CompanionRestorationEventCodec.decode(
+                            CompanionRestorationEventCodec.VERSION,
+                            CompanionRestorationEventCodec.encode(outcome)
+                    )
+            );
+        }
+    }
+
+    @Test
+    void rejectsWrongKindFutureOrNonDormantSources() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        REVISION,
+                        LifecycleState.LOST,
+                        snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION
+                        ),
+                        TARGET,
+                        "world-two",
+                        "spawn-receipt",
+                        -500
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        REVISION,
+                        LifecycleState.DEAD_REVIVABLE,
+                        snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION.next()
+                        ),
+                        TARGET,
+                        "world-two",
+                        "spawn-receipt",
+                        -500
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        REVISION,
+                        LifecycleState.ACTIVE,
+                        snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION
+                        ),
+                        TARGET,
+                        "world-two",
+                        "spawn-receipt",
+                        -500
+                )
+        );
+    }
+
+    private CompanionRestorationRequest request(LifecycleState source) {
+        return new CompanionRestorationRequest(
+                PROFILE,
+                REVISION,
+                source,
+                snapshot(source, new LifecycleRevision(4)),
+                TARGET,
+                "world-two",
+                "spawn-receipt-" + source.name().toLowerCase(),
+                -500
+        );
+    }
+
+    private CompanionSnapshot snapshot(
+            LifecycleState source,
+            LifecycleRevision sourceRevision
+    ) {
+        return new CompanionSnapshot(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
+                PROFILE,
+                source == LifecycleState.DEAD_REVIVABLE
+                        ? DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind()
+                        : DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL.snapshotKind(),
+                1,
+                PAYLOAD,
+                Sha256Hash.ofUtf8(PAYLOAD),
+                sourceRevision,
+                true,
+                -600
+        );
+    }
+}

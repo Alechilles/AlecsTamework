@@ -1,0 +1,61 @@
+package com.alechilles.alecstamework.companion.restoration;
+
+import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import javax.annotation.Nonnull;
+
+/** Immutable command to restore one exact death or lost snapshot under a pre-leased alias. */
+public record CompanionRestorationRequest(
+        @Nonnull ProfileId profileId,
+        @Nonnull LifecycleRevision expectedLifecycleRevision,
+        @Nonnull LifecycleState sourceState,
+        @Nonnull CompanionSnapshot sourceSnapshot,
+        @Nonnull NpcAlias targetAlias,
+        @Nonnull String targetWorldKey,
+        @Nonnull String spawnReceiptKey,
+        long requestedAtMs
+) {
+    public CompanionRestorationRequest {
+        if (profileId == null || expectedLifecycleRevision == null
+                || sourceState == null || sourceSnapshot == null
+                || targetAlias == null) {
+            throw new IllegalArgumentException("Complete companion restoration is required");
+        }
+        targetWorldKey = requireText(targetWorldKey, "Restoration target world");
+        spawnReceiptKey = requireText(spawnReceiptKey, "Restoration spawn receipt");
+        if (sourceState != LifecycleState.DEAD_REVIVABLE
+                && sourceState != LifecycleState.LOST) {
+            throw new IllegalArgumentException(
+                    "Restoration source must be death or lost"
+            );
+        }
+        if (!profileId.equals(sourceSnapshot.profileId())
+                || !sourceSnapshot.current()
+                || sourceSnapshot.sourceLifecycleRevision()
+                .compareTo(expectedLifecycleRevision) > 0
+                || !expectedSnapshotKind(sourceState)
+                .equals(sourceSnapshot.kind())) {
+            throw new IllegalArgumentException(
+                    "Restoration snapshot must be the exact current source artifact"
+            );
+        }
+    }
+
+    private static com.alechilles.alecstamework.companion.snapshot.SnapshotKind
+    expectedSnapshotKind(LifecycleState sourceState) {
+        return sourceState == LifecycleState.DEAD_REVIVABLE
+                ? DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind()
+                : DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL.snapshotKind();
+    }
+
+    private static String requireText(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+        return value.trim();
+    }
+}
