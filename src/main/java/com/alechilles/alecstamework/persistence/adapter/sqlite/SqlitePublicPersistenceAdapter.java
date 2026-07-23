@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegist
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
 /**
@@ -135,6 +136,13 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
+    }
+
+    /** Rebuilds canonical derived state and catches every registry consumer up. */
+    @Nonnull
+    public CompletionStage<SqlitePublicProjectionStartupResult>
+    buildProjections() {
+        return projections.rebuildAndCatchUp(coops);
     }
 
     SqlitePublicProjectionSet projections() {

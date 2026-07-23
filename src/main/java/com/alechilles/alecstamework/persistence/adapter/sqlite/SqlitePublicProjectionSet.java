@@ -2,17 +2,23 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProjection;
+import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.persistence.projection.ProjectionCatchUpResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -91,6 +97,93 @@ final class SqlitePublicProjectionSet {
                 ))
                 .map(Map.Entry::getValue)
                 .toList();
+    }
+
+    /** Rebuilds canonical indexes before catching every declared consumer up. */
+    @Nonnull
+    CompletionStage<SqlitePublicProjectionStartupResult> rebuildAndCatchUp(
+            @Nonnull SqliteCompanionCoopReader coopReader
+    ) {
+        if (coopReader == null) {
+            throw new IllegalArgumentException("Canonical coop reader is required");
+        }
+        return coopReader.findAllOccupancies().thenCompose(read -> {
+            if (!(read instanceof
+                    PersistenceReadResult.Found<List<CoopOccupancy>> found)) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_READ_FAILED,
+                        List.of(),
+                        readFailure(read)
+                );
+            }
+            try {
+                coopIndex.rebuild(found.value());
+            } catch (Throwable failure) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_REBUILD_FAILED,
+                        List.of(),
+                        failure
+                );
+            }
+            return catchUp(all(), 0, new ArrayList<>());
+        });
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult> catchUp(
+            List<ProjectionConsumer> ordered,
+            int index,
+            ArrayList<ProjectionCatchUpResult> results
+    ) {
+        if (index >= ordered.size()) {
+            return completed(
+                    SqlitePublicProjectionStartupResult.Status.COMPLETE,
+                    results,
+                    null
+            );
+        }
+        return coordinator.startupCatchUp(
+                ordered.get(index),
+                256
+        ).thenCompose(result -> {
+            results.add(result);
+            if (result.status() != ProjectionCatchUpResult.Status.CAUGHT_UP) {
+                return completed(
+                        SqlitePublicProjectionStartupResult.Status
+                                .CATCH_UP_FAILED,
+                        results,
+                        result.failure()
+                );
+            }
+            return catchUp(ordered, index + 1, results);
+        });
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult> completed(
+            SqlitePublicProjectionStartupResult.Status status,
+            List<ProjectionCatchUpResult> results,
+            Throwable failure
+    ) {
+        return CompletableFuture.completedFuture(
+                new SqlitePublicProjectionStartupResult(
+                        status,
+                        results,
+                        failure
+                )
+        );
+    }
+
+    private Throwable readFailure(PersistenceReadResult<?> read) {
+        if (read instanceof PersistenceReadResult.Failed<?> failed) {
+            return new IllegalStateException(
+                    failed.failure().code(),
+                    failed.failure().cause()
+            );
+        }
+        return new IllegalStateException(
+                "canonical_coop_rebuild_read_absent"
+        );
     }
 
     private ProjectionConsumer requireConsumer(ProjectionConsumerId consumerId) {

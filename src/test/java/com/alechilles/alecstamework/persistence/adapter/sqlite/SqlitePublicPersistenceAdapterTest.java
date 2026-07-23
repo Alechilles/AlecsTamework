@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -85,6 +86,43 @@ class SqlitePublicPersistenceAdapterTest {
                 adapter.projections().requiredFor(
                         ProfileExtensionMutationDefinition.INSTANCE.kind()
                 ).size()
+        );
+    }
+
+    @Test
+    void rebuildsCanonicalProjectionBeforeCatchingUpEveryConsumer()
+            throws Exception {
+        SqlitePublicPersistenceAdapter adapter = adapter();
+
+        SqlitePublicProjectionStartupResult result =
+                adapter.buildProjections().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                SqlitePublicProjectionStartupResult.Status.COMPLETE,
+                result.status()
+        );
+        assertEquals(2, result.catchUps().size());
+        assertEquals(0, adapter.coopIndex().snapshot().size());
+    }
+
+    private SqlitePublicPersistenceAdapter adapter() {
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                tempDir.resolve("projection-state.sqlite")
+        );
+        new SqliteSchemaV1Manager(connections, () -> -100).initialize();
+        kernel = new SqlitePersistenceKernel(connections);
+        return new SqlitePublicPersistenceAdapter(
+                PublicPersistenceFeatureRegistry.create(),
+                kernel,
+                PersistenceOperationAdmissionGate.allowAll(),
+                () -> -100,
+                (claim, operation) ->
+                        LiveOperationResult.confirmed(
+                                "test_refund"
+                        ).completed(),
+                event -> {
+                }
         );
     }
 }
