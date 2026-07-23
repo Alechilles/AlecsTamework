@@ -1,0 +1,151 @@
+{
+  "manifestVersion": 1,
+  "publicRelease": {
+    "version": "2.16.1",
+    "commit": "acb12aaae05e3568b1bf787a1d6d17d009df5686",
+    "releasedAt": "2026-06-30T23:10:08-04:00",
+    "maximumSchemaVersion": 4
+  },
+  "sourceFiles": [
+    {
+      "resource": "schema-public-v2.sql",
+      "normalizedLfSha256": "5a93500cc0014802f9795405d5cf49136b6c4d5f01baaa53c6ea42ddf7ca0b5d"
+    },
+    {
+      "resource": "schema-public-v3.sql",
+      "normalizedLfSha256": "ab3f00dccacc15af1b51aa521984a81faa0eb63a63dc3d5d41907d1e7749757e"
+    },
+    {
+      "resource": "schema-public-v4.sql",
+      "normalizedLfSha256": "fa76990d85afd5faee83bd8b6db38ee58e6d1e3d734e17521be7040398c304ae"
+    },
+    {
+      "resource": "public-v2-empty.sql",
+      "normalizedLfSha256": "4682a6df0a9743e7d2649475e2db446a89e232a8c2119f1c8d1e2c68f9b07a08"
+    },
+    {
+      "resource": "public-v3-extension-data.sql",
+      "normalizedLfSha256": "726c0dc178d48ed3bdd77551674c77e9fde6f88f4f1aef8c487c22daf8bef047"
+    },
+    {
+      "resource": "public-v4-representative.sql",
+      "normalizedLfSha256": "932e026b332f86e0b19b7438f4fa25fa9c0c51af618523aa52732b2f30757cdc"
+    },
+    {
+      "resource": "public-v4-conflicting-flags.sql",
+      "normalizedLfSha256": "2cfc6d16736d8767340fac187228a705e017da0c1d2bc8beebeb136853d2eea0"
+    },
+    {
+      "resource": "public-v4-corrupt-foreign-key.sql",
+      "normalizedLfSha256": "df9267148cc172b3ab30d9376e6720a2675f3bca61a6666633de556668b67d69"
+    },
+    {
+      "resource": "development-v5-marker.sql",
+      "normalizedLfSha256": "6d140fd1e745db60bde7f60dae7d22963f5244a2756d39b8c5816fc9a24da4f0"
+    },
+    {
+      "resource": "development-v9-marker.sql",
+      "normalizedLfSha256": "fbfec539b5c6c178d7b02508dfa2cd359387f6524c042a1a0428cf65a62e7cf5"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "public-v2-empty",
+      "resource": "public-v2-empty.sql",
+      "classification": "PUBLIC_V2",
+      "maximumSchemaVersion": 2,
+      "expectedTableCount": 7,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 1,
+        "npc_profiles": 0
+      }
+    },
+    {
+      "id": "public-v3-extension-data",
+      "resource": "public-v3-extension-data.sql",
+      "classification": "PUBLIC_V3",
+      "maximumSchemaVersion": 3,
+      "expectedTableCount": 8,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 2,
+        "npc_profiles": 1,
+        "npc_uuid_aliases": 1,
+        "profile_states": 1,
+        "api_profile_data": 1
+      }
+    },
+    {
+      "id": "public-v4-representative",
+      "resource": "public-v4-representative.sql",
+      "classification": "PUBLIC_V4",
+      "maximumSchemaVersion": 4,
+      "expectedTableCount": 8,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 3,
+        "npc_profiles": 6,
+        "npc_uuid_aliases": 7,
+        "npc_tool_links": 2,
+        "npc_snapshots": 3,
+        "coop_slots": 1,
+        "profile_states": 6,
+        "api_profile_data": 1
+      }
+    },
+    {
+      "id": "public-v4-conflicting-flags",
+      "resource": "public-v4-conflicting-flags.sql",
+      "classification": "PUBLIC_V4_LOGICAL_CONFLICT",
+      "maximumSchemaVersion": 4,
+      "expectedTableCount": 8,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 3,
+        "npc_profiles": 1,
+        "npc_uuid_aliases": 1,
+        "npc_snapshots": 2,
+        "profile_states": 1
+      }
+    },
+    {
+      "id": "public-v4-corrupt-foreign-key",
+      "resource": "public-v4-corrupt-foreign-key.sql",
+      "classification": "MALFORMED",
+      "maximumSchemaVersion": 4,
+      "expectedTableCount": 8,
+      "expectedForeignKeyViolations": 1,
+      "rowCounts": {
+        "schema_migrations": 3,
+        "npc_profiles": 0,
+        "npc_uuid_aliases": 1
+      }
+    },
+    {
+      "id": "development-v5",
+      "resource": "development-v5-marker.sql",
+      "classification": "UNSUPPORTED_DEVELOPMENT_SCHEMA",
+      "maximumSchemaVersion": 5,
+      "expectedTableCount": 2,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 4,
+        "managed_coop_authority": 0
+      }
+    },
+    {
+      "id": "development-v9",
+      "resource": "development-v9-marker.sql",
+      "classification": "UNSUPPORTED_DEVELOPMENT_SCHEMA",
+      "maximumSchemaVersion": 9,
+      "expectedTableCount": 3,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 8,
+        "command_timed_summon_sessions": 0,
+        "paid_command_revival_operations": 0
+      }
+    }
+  ]
+}
