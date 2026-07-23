@@ -5,6 +5,7 @@ public enum PersistenceMutationStatus {
     APPLIED,
     NOT_FOUND,
     REVISION_MISMATCH,
+    PHASE_MISMATCH,
     CONFLICT,
     FENCE_MISMATCH
 }
