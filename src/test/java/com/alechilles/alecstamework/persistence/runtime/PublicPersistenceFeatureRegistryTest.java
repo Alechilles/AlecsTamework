@@ -2,7 +2,9 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,7 +18,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(7, registry.descriptors().size());
+        assertEquals(8, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -40,6 +42,30 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(11, operationKinds.size());
+        assertEquals(12, operationKinds.size());
+
+        PersistenceFeatureDescriptor groups = registry.requireFeature(
+                PublicPersistenceFeatureRegistry.POPULATION_GROUPS
+        );
+        assertEquals(
+                Set.of(
+                        PublicPersistenceFeatureRegistry.IDENTITY,
+                        PublicPersistenceFeatureRegistry.LIFECYCLE,
+                        PublicPersistenceFeatureRegistry.OWNER_POPULATION
+                ),
+                groups.startupDependencies()
+        );
+        assertEquals(
+                Set.of(
+                        PersistenceStartupNode.LOAD_FEATURE_DETAIL,
+                        PersistenceStartupNode.RECOVER_OPERATIONS,
+                        PersistenceStartupNode.BUILD_PROJECTIONS
+                ),
+                groups.readinessEvidence()
+        );
+        assertEquals(
+                Set.of(PublicPersistenceFeatureRegistry.POPULATION_GROUP_INDEX),
+                groups.projectionConsumers()
+        );
     }
 }
