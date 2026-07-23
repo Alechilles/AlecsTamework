@@ -28,6 +28,7 @@ public final class PersistenceStartupCoordinator
 
     private final Object monitor = new Object();
     private final PersistenceFeatureRegistry registry;
+    private final PersistenceFeatureCircuitGate circuits;
     private final Map<PersistenceStartupNode, PersistenceStartupAction> actions;
     private final java.util.EnumSet<PersistenceStartupNode> completed =
             java.util.EnumSet.noneOf(PersistenceStartupNode.class);
@@ -52,6 +53,7 @@ public final class PersistenceStartupCoordinator
             );
         }
         this.registry = registry;
+        circuits = new PersistenceFeatureCircuitGate(registry);
         this.actions = Map.copyOf(actions);
     }
 
@@ -91,6 +93,32 @@ public final class PersistenceStartupCoordinator
     ) {
         synchronized (monitor) {
             return deriveReadiness(registry.requireFeature(featureId), List.of());
+        }
+    }
+
+    /**
+     * Replaces the complete descriptor-derived circuit view with durable
+     * startup evidence.
+     */
+    public void installFeatureCircuits(
+            @Nonnull Map<PersistenceFeatureId, PersistenceFeatureCircuit>
+                    replacement
+    ) {
+        String globalReason;
+        synchronized (monitor) {
+            globalReason = circuits.install(replacement).orElse(null);
+        }
+        if (globalReason != null) {
+            enterGlobalReadOnly(globalReason);
+        }
+    }
+
+    /** Returns the exact installed circuit evidence for diagnostics. */
+    @Nonnull
+    public Map<PersistenceFeatureId, PersistenceFeatureCircuit>
+    featureCircuits() {
+        synchronized (monitor) {
+            return circuits.snapshot();
         }
     }
 
@@ -334,6 +362,9 @@ public final class PersistenceStartupCoordinator
             return global;
         }
         if (candidates.stream().anyMatch(quarantines::containsKey)) {
+            return PersistenceReadinessLevel.QUARANTINED;
+        }
+        if (circuits.blocks(descriptor)) {
             return PersistenceReadinessLevel.QUARANTINED;
         }
         if (mode == Mode.ACTIVE

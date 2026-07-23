@@ -503,7 +503,9 @@ public final class PublicPersistenceFeatureRegistry {
                 consumers,
                 hook(id, "recovery"),
                 readiness,
-                PersistenceCircuitPolicy.BOUNDED_SCOPE,
+                id.equals(IDENTITY) || id.equals(LIFECYCLE)
+                        ? PersistenceCircuitPolicy.GLOBAL_FAIL_CLOSED
+                        : PersistenceCircuitPolicy.BOUNDED_SCOPE,
                 quarantine,
                 hook(id, "shutdown"),
                 "persistence." + id

@@ -29,10 +29,21 @@ public final class PersistenceFeatureRegistry {
         java.util.HashMap<OperationKind, PersistenceFeatureDescriptor>
                 byOperation = new java.util.HashMap<>();
         java.util.HashSet<String> authorities = new java.util.HashSet<>();
+        java.util.HashSet<PersistenceFeatureHookId> hooks =
+                new java.util.HashSet<>();
+        java.util.HashSet<String> metricsNamespaces =
+                new java.util.HashSet<>();
         java.util.ArrayList<OperationDefinition<?>> allDefinitions =
                 new java.util.ArrayList<>();
         for (PersistenceFeatureDescriptor descriptor : descriptors) {
-            validateDescriptor(descriptor, byId, byOperation, authorities);
+            validateDescriptor(
+                    descriptor,
+                    byId,
+                    byOperation,
+                    authorities,
+                    hooks,
+                    metricsNamespaces
+            );
             byId.put(descriptor.featureId(), descriptor);
             for (OperationDefinition<?> definition
                     : descriptor.operationDefinitions()) {
@@ -87,7 +98,9 @@ public final class PersistenceFeatureRegistry {
             PersistenceFeatureDescriptor descriptor,
             Map<PersistenceFeatureId, PersistenceFeatureDescriptor> byId,
             Map<OperationKind, PersistenceFeatureDescriptor> byOperation,
-            Set<String> authorities
+            Set<String> authorities,
+            Set<PersistenceFeatureHookId> hooks,
+            Set<String> metricsNamespaces
     ) {
         if (descriptor == null
                 || byId.containsKey(descriptor.featureId())) {
@@ -111,6 +124,18 @@ public final class PersistenceFeatureRegistry {
                                 + definition.kind()
                 );
             }
+        }
+        if (!hooks.add(descriptor.canonicalLoader())
+                || !hooks.add(descriptor.recoveryHandler())
+                || !hooks.add(descriptor.shutdownParticipant())) {
+            throw new IllegalArgumentException(
+                    "Persistence feature hooks must be globally unique"
+            );
+        }
+        if (!metricsNamespaces.add(descriptor.metricsNamespace())) {
+            throw new IllegalArgumentException(
+                    "Persistence metrics namespaces must be unique"
+            );
         }
     }
 

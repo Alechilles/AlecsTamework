@@ -29,6 +29,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqlitePublicOperationSet recoveryOperations;
     private final SqliteOperationRecoveryCoordinator recovery;
     private final SqlitePublicStartupGateway startup;
+    private final SqlitePublicControlGateway control;
     private final SqliteCompanionProfileReader profiles;
     private final SqliteCompanionLifecycleReader lifecycles;
     private final SqliteCompanionCoopReader coops;
@@ -84,6 +85,9 @@ public final class SqlitePublicPersistenceAdapter {
                 kernel.units()
         );
         startup = new SqlitePublicStartupGateway(kernel.reads());
+        control = new SqlitePublicControlGateway(
+                registry, kernel.units(), clock
+        );
         profiles = new SqliteCompanionProfileReader(kernel.reads());
         lifecycles = new SqliteCompanionLifecycleReader(kernel.reads());
         coops = new SqliteCompanionCoopReader(kernel.reads());
@@ -271,6 +275,14 @@ public final class SqlitePublicPersistenceAdapter {
     public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>
     loadCanonical() {
         return startup.loadCanonical();
+    }
+
+    /** Synchronizes circuits with the exact descriptor set and returns them. */
+    @Nonnull
+    public CompletionStage<com.alechilles.alecstamework.persistence.kernel
+            .PersistenceTransactionResult<SqlitePublicControlSnapshot>>
+    synchronizeControlPlane() {
+        return control.synchronize();
     }
 
     /** Rebuilds canonical derived state and catches every registry consumer up. */

@@ -170,6 +170,63 @@ class PersistenceStartupCoordinatorTest {
     }
 
     @Test
+    void boundedCircuitBlocksItsFeatureAndDependentsOnly() {
+        PersistenceStartupCoordinator coordinator = readyCoordinator();
+        java.util.HashMap<PersistenceFeatureId, PersistenceFeatureCircuit>
+                circuits = new java.util.HashMap<>(
+                coordinator.featureCircuits()
+        );
+        circuits.put(
+                PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION,
+                openCircuit(
+                        PublicPersistenceFeatureRegistry
+                                .ECONOMIC_COMPENSATION
+                )
+        );
+
+        coordinator.installFeatureCircuits(circuits);
+
+        assertEquals(
+                PersistenceReadinessLevel.QUARANTINED,
+                coordinator.readiness(
+                        PublicPersistenceFeatureRegistry.CAPTURE
+                )
+        );
+        assertEquals(
+                PersistenceReadinessLevel.MUTATION_READY,
+                coordinator.readiness(
+                        PublicPersistenceFeatureRegistry.IDENTITY
+                )
+        );
+    }
+
+    @Test
+    void openCoreCircuitMovesTheWholeRuntimeToGlobalReadOnly() {
+        PersistenceStartupCoordinator coordinator = readyCoordinator();
+        java.util.HashMap<PersistenceFeatureId, PersistenceFeatureCircuit>
+                circuits = new java.util.HashMap<>(
+                coordinator.featureCircuits()
+        );
+        circuits.put(
+                PublicPersistenceFeatureRegistry.IDENTITY,
+                openCircuit(PublicPersistenceFeatureRegistry.IDENTITY)
+        );
+
+        coordinator.installFeatureCircuits(circuits);
+
+        assertEquals(
+                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
+                coordinator.report().readiness()
+        );
+        assertEquals(
+                PersistenceReadinessLevel.GLOBAL_READ_ONLY,
+                coordinator.readiness(
+                        PublicPersistenceFeatureRegistry.CAPTURE
+                )
+        );
+    }
+
+    @Test
     void closeWinsAgainstAnInFlightStartupCallbackAndPermanentlyClosesAdmission() {
         CompletableFuture<PersistenceStartupAction.Result> open =
                 new CompletableFuture<>();
@@ -242,6 +299,19 @@ class PersistenceStartupCoordinatorTest {
         return List.of(
                 OperationScope.profile(profileId),
                 OperationScope.owner(OWNER)
+        );
+    }
+
+    private PersistenceFeatureCircuit openCircuit(
+            PersistenceFeatureId featureId
+    ) {
+        return new PersistenceFeatureCircuit(
+                featureId,
+                PersistenceFeatureCircuitState.OPEN,
+                1,
+                "injected_failure",
+                -100L,
+                -100
         );
     }
 }

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionF
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteKernelShutdownReport;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceKernel;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicCanonicalSnapshot;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicControlSnapshot;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicProjectionStartupResult;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicRecoveryResult;
@@ -16,6 +17,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.incidents.ScopeQuarantine;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTarget;
 import com.alechilles.alecstamework.persistence.migration.PublicPersistenceTargetOpener;
 import java.nio.file.Path;
@@ -290,7 +292,20 @@ final class PublicPersistenceRuntimeState {
                     "canonical_feature_detail_unavailable"
             );
         }
-        return complete();
+        return workflows.track(
+                adapter.synchronizeControlPlane().thenApply(result -> {
+                    if (result instanceof PersistenceTransactionResult
+                            .Committed<?> committed
+                            && committed.value()
+                            instanceof SqlitePublicControlSnapshot control) {
+                        startup.installFeatureCircuits(
+                                control.circuits()
+                        );
+                        return PersistenceStartupAction.Result.COMPLETE;
+                    }
+                    throw controlFailure(result);
+                })
+        );
     }
 
     private CompletionStage<PersistenceStartupAction.Result>
@@ -330,6 +345,25 @@ final class PublicPersistenceRuntimeState {
     private CompletionStage<PersistenceStartupAction.Result> complete() {
         return CompletableFuture.completedFuture(
                 PersistenceStartupAction.Result.COMPLETE
+        );
+    }
+
+    private IllegalStateException controlFailure(
+            PersistenceTransactionResult<?> result
+    ) {
+        if (result instanceof PersistenceTransactionResult.RolledBack<?> failed) {
+            return new IllegalStateException(
+                    "feature_control_synchronization_failed:"
+                            + failed.failure().code(),
+                    failed.failure().cause()
+            );
+        }
+        PersistenceTransactionResult.Unknown<?> unknown =
+                (PersistenceTransactionResult.Unknown<?>) result;
+        return new IllegalStateException(
+                "feature_control_synchronization_unknown:"
+                        + unknown.failure().code(),
+                unknown.failure().cause()
         );
     }
 
