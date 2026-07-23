@@ -165,27 +165,30 @@ class LinkedNpcPanelCardLayoutTest {
                 cardUi.contains("Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);"),
                 "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
         );
-        assertTrue(cardUi.contains("Group #ReviveCostPanel"), "Dead cards need a dedicated inline cost panel.");
-        assertTrue(
-                cardUi.contains("Group #ReviveCostPanel {\n        Anchor: (Top: 27, Right: 0, Width: 120, Height: 54);\n        Visible: true;"),
-                "The inline cost container must exist in the initial markup so nested rows are not suppressed."
-        );
         for (int index = 0; index < 3; index++) {
-            assertTrue(cardUi.contains("Group #ReviveCost" + index),
-                    "The card should provide a static cost row for mockup layout " + (index + 1) + ".");
+            assertTrue(cardUi.contains("Label #ReviveCost" + index + "Quantity"),
+                    "The card should provide a direct quantity label for cost row " + (index + 1) + ".");
+            assertTrue(cardUi.contains("ItemGrid #ReviveCost" + index + "Item"),
+                    "The card should provide a direct item icon for cost row " + (index + 1) + ".");
+            assertTrue(cardUi.contains("Label #ReviveCost" + index + "Name"),
+                    "The card should provide a direct item name for cost row " + (index + 1) + ".");
         }
         assertTrue(
-                binder.contains("#RequiredQuantity.Text")
+                binder.contains("Quantity.Text")
                         && binder.contains("line.requiredQuantity()")
-                        && binder.contains("#CostName.Text")
+                        && binder.contains("Name.Text")
                         && binder.contains("line.localizedName()")
-                        && binder.contains("#CostItem.Slots")
+                        && binder.contains("Item.Slots")
                         && binder.contains("new ItemStack(line.itemId(), 1)"),
                 "Each visible revive component must bind its quantity, localized name, and actual item icon."
         );
+        assertFalse(cardUi.contains("Group #ReviveCostPanel"),
+                "Revival costs must be direct card children so CustomUI selectors cannot lose nested rows.");
         assertFalse(
-                binder.contains("panelSelector + \".Visible\""),
-                "Inline revival rows must not depend on dynamically unhiding their parent group."
+                binder.contains("Quantity.Visible")
+                        || binder.contains("Item.Visible")
+                        || binder.contains("Name.Visible"),
+                "Direct cost fields should remain renderable and hide by clearing content, not visibility toggles."
         );
         assertTrue(
                 binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),

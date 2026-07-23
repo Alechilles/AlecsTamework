@@ -65,7 +65,6 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
-        String reviveCostPanelSelector = entrySelector + " #ReviveCostPanel";
         String summonSelector = entrySelector + " #RosterSummonButton";
         String dismissSelector = entrySelector + " #RosterDismissButton";
         String rosterStateSelector = entrySelector + " #RosterState";
@@ -200,7 +199,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
         bindReviveCosts(
                 commandBuilder,
-                reviveCostPanelSelector,
+                entrySelector,
                 entry.reviveCostPresentation(),
                 showReviveAction
         );
@@ -364,7 +363,7 @@ final class LinkedNpcPanelCardBinder {
     }
 
     private static void bindReviveCosts(UICommandBuilder builder,
-                                        String panelSelector,
+                                        String entrySelector,
                                         CommandReviveCostPresentation presentation,
                                         boolean reviveActionVisible) {
         List<CommandReviveCostPresentation.CostLine> costs = presentation == null
@@ -373,29 +372,21 @@ final class LinkedNpcPanelCardBinder {
         int visibleCostCount = reviveActionVisible
                 ? Math.min(MAX_INLINE_REVIVE_COSTS, costs.size())
                 : 0;
-        if (visibleCostCount > 0) {
-            builder.setObject(panelSelector + ".Anchor", buildReviveCostAnchor(visibleCostCount));
-        }
         for (int costIndex = 0; costIndex < MAX_INLINE_REVIVE_COSTS; costIndex++) {
-            String rowSelector = panelSelector + " #ReviveCost" + costIndex;
+            String rowSelector = entrySelector + " #ReviveCost" + costIndex;
             boolean rowVisible = costIndex < visibleCostCount;
-            builder.set(rowSelector + ".Visible", rowVisible);
-            if (!rowVisible) continue;
+            if (!rowVisible) {
+                builder.set(rowSelector + "Quantity.Text", "");
+                builder.set(rowSelector + "Name.Text", "");
+                builder.set(rowSelector + "Item.Slots", List.<ItemGridSlot>of());
+                continue;
+            }
 
             CommandReviveCostPresentation.CostLine line = costs.get(costIndex);
-            builder.set(rowSelector + " #RequiredQuantity.Text", Integer.toString(line.requiredQuantity()));
-            builder.set(rowSelector + " #CostName.Text", line.localizedName());
-            builder.set(rowSelector + " #CostItem.Slots", List.of(reviveCostSlot(line)));
+            builder.set(rowSelector + "Quantity.Text", Integer.toString(line.requiredQuantity()));
+            builder.set(rowSelector + "Name.Text", line.localizedName());
+            builder.set(rowSelector + "Item.Slots", List.of(reviveCostSlot(line)));
         }
-    }
-
-    private static Anchor buildReviveCostAnchor(int visibleCostCount) {
-        Anchor anchor = new Anchor();
-        anchor.setTop(Value.of(43 - ((visibleCostCount - 1) * 8)));
-        anchor.setRight(Value.of(0));
-        anchor.setWidth(Value.of(120));
-        anchor.setHeight(Value.of(54));
-        return anchor;
     }
 
     private static ItemGridSlot reviveCostSlot(CommandReviveCostPresentation.CostLine line) {

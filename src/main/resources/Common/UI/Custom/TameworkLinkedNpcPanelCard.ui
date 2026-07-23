@@ -440,81 +440,61 @@ Group {
         Visible: false;
     }
 
-    Group #ReviveCostPanel {
-        Anchor: (Top: 27, Right: 0, Width: 120, Height: 54);
-        Visible: true;
+    Label #ReviveCost0Quantity {
+        Anchor: (Top: 29, Right: 104, Width: 13, Height: 16);
+        Text: "";
+        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
+    }
 
-        Group #ReviveCost0 {
-            Anchor: (Top: 0, Left: 0, Width: 120, Height: 20);
-            Visible: true;
+    ItemGrid #ReviveCost0Item {
+        Anchor: (Top: 27, Right: 82, Width: 20, Height: 20);
+        SlotsPerRow: 1;
+        RenderItemQualityBackground: false;
+        InfoDisplay: None;
+    }
 
-            Label #RequiredQuantity {
-                Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);
-                Text: "";
-                Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-            }
+    Label #ReviveCost0Name {
+        Anchor: (Top: 29, Right: 0, Width: 80, Height: 16);
+        Text: "";
+        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
 
-            ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
-                SlotsPerRow: 1;
-                RenderItemQualityBackground: false;
-                InfoDisplay: None;
-            }
+    Label #ReviveCost1Quantity {
+        Anchor: (Top: 47, Right: 104, Width: 13, Height: 16);
+        Text: "";
+        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
+    }
 
-            Label #CostName {
-                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
-                Text: "";
-                Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
-            }
-        }
+    ItemGrid #ReviveCost1Item {
+        Anchor: (Top: 45, Right: 82, Width: 20, Height: 20);
+        SlotsPerRow: 1;
+        RenderItemQualityBackground: false;
+        InfoDisplay: None;
+    }
 
-        Group #ReviveCost1 {
-            Anchor: (Top: 17, Left: 0, Width: 120, Height: 20);
-            Visible: true;
+    Label #ReviveCost1Name {
+        Anchor: (Top: 47, Right: 0, Width: 80, Height: 16);
+        Text: "";
+        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
 
-            Label #RequiredQuantity {
-                Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);
-                Text: "";
-                Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-            }
+    Label #ReviveCost2Quantity {
+        Anchor: (Top: 65, Right: 104, Width: 13, Height: 16);
+        Text: "";
+        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
+    }
 
-            ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
-                SlotsPerRow: 1;
-                RenderItemQualityBackground: false;
-                InfoDisplay: None;
-            }
+    ItemGrid #ReviveCost2Item {
+        Anchor: (Top: 63, Right: 82, Width: 20, Height: 20);
+        SlotsPerRow: 1;
+        RenderItemQualityBackground: false;
+        InfoDisplay: None;
+    }
 
-            Label #CostName {
-                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
-                Text: "";
-                Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
-            }
-        }
-
-        Group #ReviveCost2 {
-            Anchor: (Top: 34, Left: 0, Width: 120, Height: 20);
-            Visible: true;
-
-            Label #RequiredQuantity {
-                Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);
-                Text: "";
-                Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-            }
-
-            ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
-                SlotsPerRow: 1;
-                RenderItemQualityBackground: false;
-                InfoDisplay: None;
-            }
-
-            Label #CostName {
-                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
-                Text: "";
-                Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
-            }
-        }
+    Label #ReviveCost2Name {
+        Anchor: (Top: 65, Right: 0, Width: 80, Height: 16);
+        Text: "";
+        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     TextButton #LinkButton {
