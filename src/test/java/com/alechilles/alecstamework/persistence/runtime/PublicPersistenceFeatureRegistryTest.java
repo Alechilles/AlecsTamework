@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -21,7 +22,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(9, registry.descriptors().size());
+        assertEquals(10, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -45,7 +46,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(14, operationKinds.size());
+        assertEquals(15, operationKinds.size());
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS
@@ -111,5 +112,21 @@ class PublicPersistenceFeatureRegistryTest {
         assertTrue(command.projectionConsumers().contains(
                 PublicPersistenceFeatureRegistry.COMMAND_ROSTER_INDEX
         ));
+
+        PersistenceFeatureDescriptor timed = registry.requireFeature(
+                PublicPersistenceFeatureRegistry.TIMED_SUMMON
+        );
+        assertEquals(Set.of("timed_summon_lease"),
+                timed.ownedAuthorities());
+        assertEquals(
+                Set.of(OperationScopeType.PROFILE),
+                timed.operationScopes().get(
+                        TimedSummonLeaseMutationDefinition.INSTANCE.kind()
+                )
+        );
+        assertEquals(
+                Set.of(PublicPersistenceFeatureRegistry.TIMED_SUMMON_INDEX),
+                timed.projectionConsumers()
+        );
     }
 }
