@@ -264,6 +264,68 @@ class SqliteOwnerPopulationReconciliationOperationsTest {
     }
 
     @Test
+    void lateSameGenerationContradictionStillQuarantinesTheOwner()
+            throws Exception {
+        PopulationEvidenceObservation matching = positive(
+                PopulationEvidenceBatch.Source.LIVE,
+                OWNER,
+                "world-a"
+        );
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                submit(
+                        50,
+                        request(
+                                OwnerPopulationEvidenceClaim.positive(
+                                        matching
+                                )
+                        )
+                ).status()
+        );
+        PopulationEvidenceObservation contradiction = positive(
+                PopulationEvidenceBatch.Source.DISK,
+                OTHER_OWNER,
+                "world-b"
+        );
+        OwnerPopulationReconciliationRequest late =
+                new OwnerPopulationReconciliationRequest(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        OWNER,
+                        "world-a",
+                        OwnerPopulationEvidenceClaim.positive(
+                                contradiction
+                        ),
+                        -4_900
+                );
+
+        OperationWorkflowResult result = submit(51, late);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        CompanionLifecycle lifecycle = lifecycle();
+        assertEquals(new LifecycleRevision(2), lifecycle.revision());
+        assertEquals(GENERATION, lifecycle.lastReconciledGeneration());
+        assertNotNull(lifecycle.quarantineIncidentId());
+        assertEquals(1, canonicalOwnerCount());
+        try (var connection = connections.openReadConnection()) {
+            SqliteIncidentStore incidents =
+                    new SqliteIncidentStore(connection);
+            assertEquals(
+                    QuarantineState.ACTIVE,
+                    incidents.findQuarantine(
+                            OperationScope.owner(OWNER)
+                    ).orElseThrow().state()
+            );
+            assertEquals(
+                    QuarantineState.ACTIVE,
+                    incidents.findQuarantine(
+                            OperationScope.owner(OTHER_OWNER)
+                    ).orElseThrow().state()
+            );
+        }
+    }
+
+    @Test
     void definitionRoundTripsExactPositiveAndAbsenceClaims() {
         PopulationEvidenceObservation observation = new PopulationEvidenceObservation(
                 key(PopulationEvidenceBatch.Source.DISK, GENERATION),

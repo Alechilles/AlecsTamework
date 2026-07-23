@@ -343,10 +343,7 @@ public final class SqliteOwnerPopulationReconciliationOperations {
                 request.expectedOwnerWorldKey()
         )
                 || source.activeOperationId() != null
-                || source.quarantined()
-                || request.evidence().generation().compareTo(
-                source.lastReconciledGeneration()
-        ) <= 0) {
+                || source.quarantined()) {
             throw new IllegalStateException(
                     "owner_population_reconciliation_source_mismatch"
             );
@@ -356,6 +353,17 @@ public final class SqliteOwnerPopulationReconciliationOperations {
         if (!assessment.actionable()) {
             throw new IllegalStateException(
                     assessment.reasonCode()
+            );
+        }
+        int generationOrder = request.evidence().generation().compareTo(
+                source.lastReconciledGeneration()
+        );
+        if (generationOrder < 0
+                || (generationOrder == 0
+                && assessment.status()
+                == PopulationEvidenceAssessment.Status.PRESENT_MATCH)) {
+            throw new IllegalStateException(
+                    "owner_population_reconciliation_generation_stale"
             );
         }
         return new Evaluation(source, assessment);
@@ -368,6 +376,16 @@ public final class SqliteOwnerPopulationReconciliationOperations {
     ) {
         OwnerPopulationEvidenceClaim claim = request.evidence();
         if (claim.kind() == OwnerPopulationEvidenceClaim.Kind.ABSENCE) {
+            if (source.ownerId() == null
+                    || !Objects.equals(
+                    claim.worldKey(), source.ownerWorldKey()
+            )) {
+                return new PopulationEvidenceAssessment(
+                        PopulationEvidenceAssessment.Status.INCOMPLETE,
+                        "population_absence_owner_world_mismatch",
+                        null
+                );
+            }
             return transaction.populationEvidence().assessAbsence(
                     claim.bootId(),
                     claim.worldKey(),
