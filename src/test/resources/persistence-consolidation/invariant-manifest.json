@@ -134,7 +134,7 @@
     {
       "id": "negative-world-time-valid",
       "contract": "Negative world timestamps are valid and zero alone is the unset sentinel.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 1,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistentTimestampTest",
       "currentTests": [
@@ -200,7 +200,7 @@
     {
       "id": "read-failure-not-absence",
       "contract": "A storage or decode failure cannot be represented as absent data or a successful empty query.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 1,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistenceReadResultTest",
       "currentTests": [
