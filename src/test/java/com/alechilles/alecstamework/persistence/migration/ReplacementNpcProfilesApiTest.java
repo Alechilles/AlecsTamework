@@ -20,6 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReplacementNpcProfilesApiTest {
     private static final String CAPTURED =
             "20000000-0000-0000-0000-000000000002";
+    private static final String DEAD =
+            "20000000-0000-0000-0000-000000000003";
+    private static final String LOST =
+            "20000000-0000-0000-0000-000000000004";
     private static final UUID CURRENT_ALIAS =
             UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID HISTORICAL_ALIAS =
@@ -68,6 +72,12 @@ class ReplacementNpcProfilesApiTest {
             assertTrue(api.getActiveSnapshot(CAPTURED, "capture")
                     .orElseThrow().contains("\"capturedAtMs\":250"));
             assertEquals(Set.of("capture"), api.listActiveSnapshotTypes(CAPTURED));
+            assertEquals(Set.of("death"), api.listActiveSnapshotTypes(DEAD));
+            assertTrue(api.getActiveSnapshot(DEAD, "death")
+                    .orElseThrow().contains("\"diedAtMs\":260"));
+            assertEquals(Set.of("lost"), api.listActiveSnapshotTypes(LOST));
+            assertTrue(api.getActiveSnapshot(LOST, "lost")
+                    .orElseThrow().contains("\"lostAtMs\":270"));
             assertEquals(
                     CAPTURED,
                     api.resolveProfileId(CURRENT_ALIAS).orElseThrow()
