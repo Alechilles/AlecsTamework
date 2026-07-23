@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,6 +30,7 @@ class PublicImportSqlWriterTest {
         assertEquals(7, count(target, "companion_alias"));
         assertEquals(6, count(target, "companion_lifecycle"));
         assertEquals(4, count(target, "companion_snapshot"));
+        assertEquals(1, count(target, "profile_extension_data"));
         assertEquals(1, count(target, "coop_residency"));
         assertEquals(1, count(target, "import_manifest"));
         assertEquals(0, count(target, "operation_envelope"));
@@ -37,6 +39,16 @@ class PublicImportSqlWriterTest {
                 SELECT lifecycle_state FROM companion_lifecycle
                 WHERE profile_id = '20000000-0000-0000-0000-000000000005'
                 """));
+        assertEquals(1, queryLong(target,
+                "SELECT payload_version FROM profile_extension_data"));
+        assertEquals(1, queryLong(target,
+                "SELECT revision FROM profile_extension_data"));
+        assertEquals(
+                Sha256Hash.ofUtf8(
+                        "{\"message\":\"preserve Ω and negative time\",\"worldTimeMs\":-3000}"
+                ).toString(),
+                queryString(target, "SELECT payload_hash FROM profile_extension_data")
+        );
         assertEquals("ok", queryString(target, "PRAGMA integrity_check"));
         assertEquals(0, rowCount(target, "PRAGMA foreign_key_check"));
     }

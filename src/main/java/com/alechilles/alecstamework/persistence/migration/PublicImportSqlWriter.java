@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.migration;
 
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Types;
@@ -136,17 +137,20 @@ final class PublicImportSqlWriter {
     private void insertExtensions(Connection connection, PublicImportPlan plan) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO profile_extension_data(
-                    profile_id, namespace, data_key, json_payload,
-                    created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    profile_id, namespace, data_key, payload_version, json_payload,
+                    payload_hash, revision, created_at_ms, updated_at_ms
+                ) VALUES (?, ?, ?, 1, ?, ?, 1, ?, ?)
                 """)) {
             for (PublicImportPlan.ExtensionData extension : plan.extensionData()) {
                 statement.setString(1, extension.profileId());
                 statement.setString(2, extension.namespace());
                 statement.setString(3, extension.dataKey());
                 statement.setString(4, extension.jsonPayload());
-                statement.setLong(5, extension.createdAtMs());
-                statement.setLong(6, extension.updatedAtMs());
+                statement.setString(5, Sha256Hash.ofUtf8(
+                        extension.jsonPayload()
+                ).toString());
+                statement.setLong(6, extension.createdAtMs());
+                statement.setLong(7, extension.updatedAtMs());
                 statement.addBatch();
             }
             statement.executeBatch();

@@ -18,6 +18,7 @@ class ReplacementPersistenceArchitectureGuardTest {
     );
     private static final Path SQLITE = MAIN.resolve("persistence/adapter/sqlite");
     private static final List<Path> REPLACEMENT_ROOTS = List.of(
+            MAIN.resolve("companion/extension"),
             MAIN.resolve("companion/identity"),
             MAIN.resolve("companion/lifecycle"),
             MAIN.resolve("companion/snapshot"),
