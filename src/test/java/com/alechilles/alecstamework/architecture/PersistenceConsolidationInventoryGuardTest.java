@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PersistenceConsolidationInventoryGuardTest {
     private static final Path SOURCE_ROOT = Path.of("src/main/java/com/alechilles/alecstamework");
     private static final Path LEGACY_SQLITE_ROOT = SOURCE_ROOT.resolve("persistence/sqlite");
+    private static final Path LEGACY_BRIDGE_ROOT =
+            SOURCE_ROOT.resolve("persistence/legacy");
     private static final String LEGACY_SQLITE_IMPORT =
             "import com.alechilles.alecstamework.persistence.sqlite.";
     private static final String REPLACEMENT_ADAPTER_IMPORT =
@@ -108,6 +110,25 @@ class PersistenceConsolidationInventoryGuardTest {
                     () -> relative(file) + " imports the legacy SQLite implementation"
             );
         }
+    }
+
+    @Test
+    void temporaryLegacyBridgePackageCannotGrow() throws Exception {
+        Set<String> expected = Set.of(
+                "LegacyNpcProfilesApi.java",
+                "LegacyPersistenceEventBridge.java",
+                "LegacyProfileDataApi.java",
+                "LegacyProfileSnapshotSink.java"
+        );
+        Set<String> actual = new LinkedHashSet<>();
+        for (Path file : javaFiles(LEGACY_BRIDGE_ROOT)) {
+            actual.add(file.getFileName().toString());
+        }
+        assertTrue(
+                actual.equals(expected),
+                () -> "Temporary legacy bridges changed: " + actual
+                        + "; expected exactly " + expected
+        );
     }
 
     @Test

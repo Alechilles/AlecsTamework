@@ -347,9 +347,9 @@ public final class TameworkApiImpl
         }
     }
 
-    /** Publishes provisioning only after its journal recovery and backend reconciliation succeed. */
+    /** Publishes provisioning only after its canonical feature readiness succeeds. */
     public boolean activateCompanionProvisioningRuntime(
-            @Nonnull CompanionProvisioningApiDelegate runtime,
+            @Nonnull CompanionProvisioningApi runtime,
             boolean recoveryReady) {
         Objects.requireNonNull(runtime, "runtime");
         if (!recoveryReady) {
@@ -385,7 +385,7 @@ public final class TameworkApiImpl
 
     /** Publishes group projections only after durable reconciliation reports READY. */
     public boolean activatePopulationGroupRuntime(
-            @Nonnull PopulationGroupApiDelegate runtime,
+            @Nonnull PopulationGroupApi runtime,
             boolean allPositivePathsInstalled) {
         Objects.requireNonNull(runtime, "runtime");
         if (!allPositivePathsInstalled

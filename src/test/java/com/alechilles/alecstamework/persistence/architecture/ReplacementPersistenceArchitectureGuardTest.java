@@ -285,6 +285,23 @@ class ReplacementPersistenceArchitectureGuardTest {
         );
     }
 
+    @Test
+    void publicApiCapabilityActivationDependsOnInterfaces() throws Exception {
+        String api = Files.readString(
+                MAIN.resolve("api/internal/TameworkApiImpl.java")
+        );
+        assertTrue(api.contains(
+                "@Nonnull CompanionProvisioningApi runtime"
+        ));
+        assertTrue(api.contains("@Nonnull PopulationGroupApi runtime"));
+        assertFalse(api.contains(
+                "@Nonnull CompanionProvisioningApiDelegate runtime"
+        ));
+        assertFalse(api.contains(
+                "@Nonnull PopulationGroupApiDelegate runtime"
+        ));
+    }
+
     private List<Path> javaFiles(Path root) throws Exception {
         if (!Files.isDirectory(root)) {
             return List.of();
