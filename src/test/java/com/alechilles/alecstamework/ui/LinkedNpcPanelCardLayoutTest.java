@@ -162,6 +162,10 @@ class LinkedNpcPanelCardLayoutTest {
         assertEquals(41, heartbeat.getWidth(), "Revive heartbeat should retain the supplied 41px width.");
         assertEquals(41, heartbeat.getHeight(), "Revive heartbeat should retain the supplied 41px height.");
         assertTrue(
+                cardUi.contains("@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 20, SlotSpacing: 0, SlotIconSize: 20);"),
+                "Inline revival item icons need an explicit ItemGrid style, as used by native Hytale UI grids."
+        );
+        assertTrue(
                 cardUi.contains("Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);"),
                 "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
         );
@@ -173,6 +177,8 @@ class LinkedNpcPanelCardLayoutTest {
             assertTrue(cardUi.contains("Label #ReviveCost" + index + "Name"),
                     "The card should provide a direct item name for cost row " + (index + 1) + ".");
         }
+        assertEquals(3, countOccurrences(cardUi, "Style: @ReviveCostItemGridStyle;"),
+                "Every inline revival item grid should use the explicit compact icon style.");
         assertTrue(
                 binder.contains("Quantity.Text")
                         && binder.contains("line.requiredQuantity()")
@@ -314,6 +320,16 @@ class LinkedNpcPanelCardLayoutTest {
             }
         }
         return matches;
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = text.indexOf(needle, offset)) >= 0) {
+            count++;
+            offset += needle.length();
+        }
+        return count;
     }
 
     private static void assertLinkedPanelIconSize(String fileName) throws IOException {

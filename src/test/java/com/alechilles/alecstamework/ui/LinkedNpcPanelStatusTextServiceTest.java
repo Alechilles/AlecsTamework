@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -191,6 +193,45 @@ class LinkedNpcPanelStatusTextServiceTest {
         LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry));
         assertEquals(1, snapshots.length);
         assertEquals("12345678", snapshots[0].recoveryIncidentId());
+    }
+
+    @Test
+    void snapshotMapperPreservesReviveQuoteAndRosterPresentation() {
+        CommandReviveCostPresentation reviveQuote = new CommandReviveCostPresentation(
+                List.of(
+                        new CommandReviveCostPresentation.CostLine(
+                                "Draconic_Essence_Fire", "Fire Essence", null, 0, 2),
+                        new CommandReviveCostPresentation.CostLine(
+                                "Revitalizing_Essence", "Revitalizing Essence", null, 1, 3)
+                ),
+                "test-revision",
+                "tamework.ui.linkedPanel.revive.missing"
+        );
+        CommandRosterStatusPresentation roster = new CommandRosterStatusPresentation(
+                "profile-1",
+                "hydragon",
+                CommandTimedSummoningState.DEAD_REVIVABLE,
+                7L,
+                null,
+                0L,
+                false,
+                0L,
+                0,
+                2,
+                null,
+                null
+        );
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Dead Dragon", 0, 0, 0, 0, null,
+                0, 0, 0, 0, false, false, true, false, false, false,
+                0L, LinkedNpcTraitIndicator.EMPTY
+        ).withReviveCostPresentation(reviveQuote).withRosterStatusPresentation(roster);
+
+        LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(List.of(entry));
+
+        assertEquals(1, snapshots.length);
+        assertEquals(reviveQuote, snapshots[0].reviveCostPresentation());
+        assertEquals(roster, snapshots[0].rosterStatusPresentation());
     }
 
     @Test

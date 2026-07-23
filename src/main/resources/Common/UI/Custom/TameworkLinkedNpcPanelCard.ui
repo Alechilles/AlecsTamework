@@ -17,6 +17,7 @@ $C = "Common.ui";
 @LinkedProgressionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 360, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
 @TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
+@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 20, SlotSpacing: 0, SlotIconSize: 20);
 
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 126);
@@ -451,6 +452,7 @@ Group {
         SlotsPerRow: 1;
         RenderItemQualityBackground: false;
         InfoDisplay: None;
+        Style: @ReviveCostItemGridStyle;
     }
 
     Label #ReviveCost0Name {
@@ -470,6 +472,7 @@ Group {
         SlotsPerRow: 1;
         RenderItemQualityBackground: false;
         InfoDisplay: None;
+        Style: @ReviveCostItemGridStyle;
     }
 
     Label #ReviveCost1Name {
@@ -489,6 +492,7 @@ Group {
         SlotsPerRow: 1;
         RenderItemQualityBackground: false;
         InfoDisplay: None;
+        Style: @ReviveCostItemGridStyle;
     }
 
     Label #ReviveCost2Name {
