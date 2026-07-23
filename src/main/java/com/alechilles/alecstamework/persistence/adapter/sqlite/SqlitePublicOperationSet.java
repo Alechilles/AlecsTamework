@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
@@ -35,6 +36,7 @@ final class SqlitePublicOperationSet {
     private final SqliteCommandRosterTransitionOperations commandTransitions;
     private final SqliteTimedSummonLeaseOperations timedSummons;
     private final SqliteTimedSummonTransitionOperations timedTransitions;
+    private final SqliteCompanionProvisioningOperations provisioning;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -137,6 +139,12 @@ final class SqlitePublicOperationSet {
                         TimedSummonTransitionDefinition.INSTANCE.kind()
                 )
         );
+        provisioning = new SqliteCompanionProvisioningOperations(
+                database,
+                projections.requiredFor(
+                        CompanionProvisioningDefinition.INSTANCE.kind()
+                )
+        );
         captures = new SqliteCompanionCaptureOperations(
                 engine,
                 publisher,
@@ -232,6 +240,10 @@ final class SqlitePublicOperationSet {
 
     SqliteTimedSummonTransitionOperations timedTransitions() {
         return timedTransitions;
+    }
+
+    SqliteCompanionProvisioningOperations provisioning() {
+        return provisioning;
     }
 
     SqliteCompanionCaptureOperations captures() {

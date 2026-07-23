@@ -9,5 +9,6 @@ public enum PersistenceFeatureDomain {
     DORMANT,
     COOP,
     COMMAND,
+    PROVISIONING,
     EXTENSION
 }
