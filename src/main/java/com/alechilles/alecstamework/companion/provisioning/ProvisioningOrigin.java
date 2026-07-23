@@ -50,6 +50,20 @@ public record ProvisioningOrigin(
         return new IdempotencyKey("provision:" + stableKey());
     }
 
+    /** Returns the receipt-correlated key for one initial live activation. */
+    @Nonnull
+    public IdempotencyKey activationKey(@Nonnull String receiptKey) {
+        if (receiptKey == null || receiptKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Provisioning activation receipt is required"
+            );
+        }
+        return new IdempotencyKey(
+                "provision-activate:" + stableKey() + ":"
+                        + Sha256Hash.ofUtf8(receiptKey.trim())
+        );
+    }
+
     @Override
     public int compareTo(ProvisioningOrigin other) {
         if (other == null) {

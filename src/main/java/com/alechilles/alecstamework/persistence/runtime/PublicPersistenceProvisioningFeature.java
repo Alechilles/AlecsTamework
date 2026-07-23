@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -21,9 +22,18 @@ final class PublicPersistenceProvisioningFeature {
                 PublicPersistenceFeatureRegistry.PROVISIONING,
                 PersistenceFeatureDomain.PROVISIONING,
                 Set.of("provisioning_record"),
-                List.of(CompanionProvisioningDefinition.INSTANCE),
+                List.of(
+                        CompanionProvisioningDefinition.INSTANCE,
+                        ProvisioningActivationDefinition.INSTANCE
+                ),
                 Map.of(
                         CompanionProvisioningDefinition.INSTANCE.kind(),
+                        Set.of(
+                                OperationScopeType.PROFILE,
+                                OperationScopeType.OWNER,
+                                OperationScopeType.COMMAND_FAMILY
+                        ),
+                        ProvisioningActivationDefinition.INSTANCE.kind(),
                         Set.of(
                                 OperationScopeType.PROFILE,
                                 OperationScopeType.OWNER,
@@ -35,7 +45,8 @@ final class PublicPersistenceProvisioningFeature {
                         PublicPersistenceFeatureRegistry.LIFECYCLE,
                         PublicPersistenceFeatureRegistry.OWNER_POPULATION,
                         PublicPersistenceFeatureRegistry.POPULATION_GROUPS,
-                        PublicPersistenceFeatureRegistry.COMMAND_ROSTER
+                        PublicPersistenceFeatureRegistry.COMMAND_ROSTER,
+                        PublicPersistenceFeatureRegistry.TIMED_SUMMON
                 ),
                 hook("loader"),
                 Set.of(

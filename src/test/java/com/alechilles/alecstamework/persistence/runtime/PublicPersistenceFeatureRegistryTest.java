@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDef
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -48,7 +49,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(17, operationKinds.size());
+        assertEquals(18, operationKinds.size());
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS
@@ -159,6 +160,17 @@ class PublicPersistenceFeatureRegistryTest {
                         CompanionProvisioningDefinition.INSTANCE.kind()
                 )
         );
+        assertEquals(
+                provisioning.operationScopes().get(
+                        CompanionProvisioningDefinition.INSTANCE.kind()
+                ),
+                provisioning.operationScopes().get(
+                        ProvisioningActivationDefinition.INSTANCE.kind()
+                )
+        );
+        assertTrue(provisioning.startupDependencies().contains(
+                PublicPersistenceFeatureRegistry.TIMED_SUMMON
+        ));
         assertTrue(provisioning.projectionConsumers().contains(
                 PublicPersistenceFeatureRegistry.PROVISIONING_INDEX
         ));

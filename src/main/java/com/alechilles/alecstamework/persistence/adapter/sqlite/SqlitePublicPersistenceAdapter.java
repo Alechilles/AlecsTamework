@@ -151,6 +151,12 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteProvisioningActivationOperations
+    provisioningActivationOperations() {
+        return publicOperations.provisioningActivations();
+    }
+
+    @Nonnull
     public SqliteCompanionCaptureOperations captureOperations() {
         return publicOperations.captures();
     }

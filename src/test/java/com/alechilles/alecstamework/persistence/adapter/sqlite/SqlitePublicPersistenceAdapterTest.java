@@ -298,7 +298,11 @@ class SqlitePublicPersistenceAdapterTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed("coop_release").completed(),
                 (request, operation) ->
-                        LiveOperationResult.confirmed("timed").completed()
+                        LiveOperationResult.confirmed("timed").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed(
+                                "provisioning_activation"
+                        ).completed()
         );
     }
 

@@ -530,6 +530,11 @@ class SqliteOwnerPopulationReconciliationOperationsTest {
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed(
                                         "timed"
+                                ).completed(),
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed(
+                                        "provisioning_activation"
                                 ).completed()
         );
     }
