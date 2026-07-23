@@ -12,7 +12,7 @@ import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;

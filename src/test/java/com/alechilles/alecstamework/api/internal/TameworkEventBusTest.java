@@ -16,7 +16,7 @@ import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
-import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import org.joml.Vector3d;
 import java.util.ArrayList;

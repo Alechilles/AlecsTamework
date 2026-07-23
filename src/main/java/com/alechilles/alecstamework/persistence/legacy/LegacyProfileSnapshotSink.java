@@ -1,7 +1,8 @@
-package com.alechilles.alecstamework.persistence.sqlite;
+package com.alechilles.alecstamework.persistence.legacy;
 
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 

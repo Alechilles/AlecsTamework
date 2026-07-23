@@ -30,7 +30,7 @@ class ProfileOwnershipWriteSafetyGuardTest {
         assertFalse(snapshotService.contains("persistence.sqlite"));
 
         String legacySnapshotSink = Files.readString(
-                MAIN.resolve("persistence").resolve("sqlite")
+                MAIN.resolve("persistence").resolve("legacy")
                         .resolve("LegacyProfileSnapshotSink.java")
         );
         assertTrue(legacySnapshotSink.contains(

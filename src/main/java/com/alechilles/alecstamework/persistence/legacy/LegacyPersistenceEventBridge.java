@@ -1,9 +1,11 @@
-package com.alechilles.alecstamework.persistence.sqlite;
+package com.alechilles.alecstamework.persistence.legacy;
 
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceChangeObserver;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

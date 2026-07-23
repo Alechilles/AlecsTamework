@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.persistence.sqlite;
+package com.alechilles.alecstamework.persistence.legacy;
 
 import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
 import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
+import com.alechilles.alecstamework.persistence.sqlite.ApiProfileDataRepository;
 import com.google.gson.JsonParser;
 import java.util.Collections;
 import java.util.LinkedHashMap;

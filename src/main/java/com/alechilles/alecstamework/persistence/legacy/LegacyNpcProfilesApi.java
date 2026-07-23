@@ -1,7 +1,8 @@
-package com.alechilles.alecstamework.persistence.sqlite;
+package com.alechilles.alecstamework.persistence.legacy;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Optional;

@@ -190,8 +190,8 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryWiring;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
-import com.alechilles.alecstamework.persistence.sqlite.LegacyPersistenceEventBridge;
+import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.legacy.LegacyPersistenceEventBridge;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
 import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;

@@ -13,7 +13,7 @@ import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.World
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsDamageBridgeFixture;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import java.nio.file.Path;
 import java.util.ArrayList;
