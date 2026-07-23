@@ -149,7 +149,8 @@ public final class SqliteCompanionCoopCaptureOperations {
                 null,
                 capturedAtMs,
                 fenced.lastReconciledGeneration(),
-                fenced.quarantineIncidentId()
+                fenced.quarantineIncidentId(),
+                fenced.ownerWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(

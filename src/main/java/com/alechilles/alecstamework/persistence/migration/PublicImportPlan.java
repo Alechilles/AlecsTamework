@@ -105,6 +105,7 @@ record PublicImportPlan(
     record Lifecycle(
             String profileId,
             @Nullable String ownerUuid,
+            @Nullable String ownerWorldKey,
             String state,
             String locationKind,
             @Nullable String locationKey,

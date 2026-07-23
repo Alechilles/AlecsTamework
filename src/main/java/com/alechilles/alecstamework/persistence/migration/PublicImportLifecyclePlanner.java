@@ -375,6 +375,9 @@ final class PublicImportLifecyclePlanner {
         return new PublicImportPlan.Lifecycle(
                 profile.source().profileId(),
                 profile.source().ownerUuid(),
+                profile.source().ownerUuid() == null
+                        ? null
+                        : profile.source().lastWorldName(),
                 unresolved ? "UNRESOLVED" : profile.lifecycleState(),
                 unresolved ? "UNRESOLVED" : profile.locationKind(),
                 unresolved ? null : profile.locationKey(),

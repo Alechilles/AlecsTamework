@@ -198,7 +198,8 @@ final class SqliteCaptureCompensation {
                     null,
                     compensatedAtMs,
                     fenced.lastReconciledGeneration(),
-                    fenced.quarantineIncidentId()
+                    fenced.quarantineIncidentId(),
+                    fenced.ownerId() == null ? null : capture.targetWorldKey()
             );
             if (!transaction.lifecycles().transition(new LifecycleTransition(
                     fenced.revision(),

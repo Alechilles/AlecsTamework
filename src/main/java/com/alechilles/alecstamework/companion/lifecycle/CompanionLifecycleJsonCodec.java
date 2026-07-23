@@ -25,6 +25,7 @@ public final class CompanionLifecycleJsonCodec {
         json.addProperty("locationKind", lifecycle.location().kind().name());
         nullable(json, "locationKey", lifecycle.location().key());
         nullable(json, "worldKey", lifecycle.location().worldKey());
+        nullable(json, "ownerWorldKey", lifecycle.ownerWorldKey());
         json.addProperty("revision", lifecycle.revision().value());
         nullable(json, "activeOperationId", lifecycle.activeOperationId());
         json.addProperty("stateChangedAtMs", lifecycle.stateChangedAtMs());
@@ -44,6 +45,11 @@ public final class CompanionLifecycleJsonCodec {
         String owner = nullableText(json, "ownerId");
         String activeOperation = nullableText(json, "activeOperationId");
         String quarantine = nullableText(json, "quarantineIncidentId");
+        String worldKey = nullableText(json, "worldKey");
+        String ownerWorldKey = nullableText(json, "ownerWorldKey");
+        if (owner != null && ownerWorldKey == null) {
+            ownerWorldKey = worldKey;
+        }
         return new CompanionLifecycle(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 owner == null ? null : OwnerId.parse(owner),
@@ -53,7 +59,7 @@ public final class CompanionLifecycleJsonCodec {
                                 json.get("locationKind").getAsString()
                         ),
                         nullableText(json, "locationKey"),
-                        nullableText(json, "worldKey")
+                        worldKey
                 ),
                 new LifecycleRevision(json.get("revision").getAsLong()),
                 activeOperation == null ? null : OperationId.parse(activeOperation),
@@ -61,7 +67,8 @@ public final class CompanionLifecycleJsonCodec {
                 new ReconciliationGeneration(
                         json.get("lastReconciledGeneration").getAsLong()
                 ),
-                quarantine == null ? null : IncidentId.parse(quarantine)
+                quarantine == null ? null : IncidentId.parse(quarantine),
+                ownerWorldKey
         );
     }
 

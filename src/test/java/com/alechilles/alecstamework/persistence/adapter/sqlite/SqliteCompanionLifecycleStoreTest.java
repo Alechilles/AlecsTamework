@@ -123,6 +123,10 @@ class SqliteCompanionLifecycleStoreTest {
                     )).value()
             );
             assertEquals(
+                    "world-a",
+                    store.findByProfile(PROFILE).orElseThrow().ownerWorldKey()
+            );
+            assertEquals(
                     PersistenceMutationStatus.REVISION_MISMATCH,
                     store.transition(new LifecycleTransition(
                             new LifecycleRevision(1), OPERATION,
@@ -189,7 +193,7 @@ class SqliteCompanionLifecycleStoreTest {
         return new CompanionLifecycle(
                 PROFILE, OWNER, LifecycleState.UNRESOLVED, LifecycleLocation.unresolved(),
                 LifecycleRevision.INITIAL, null, -10_000,
-                ReconciliationGeneration.INITIAL, null
+                ReconciliationGeneration.INITIAL, null, "world-a"
         );
     }
 
@@ -201,7 +205,7 @@ class SqliteCompanionLifecycleStoreTest {
         return new CompanionLifecycle(
                 PROFILE, OWNER, state, location, new LifecycleRevision(revision),
                 operationId, -9_000 + revision,
-                ReconciliationGeneration.INITIAL, incidentId
+                ReconciliationGeneration.INITIAL, incidentId, "world-a"
         );
     }
 

@@ -39,6 +39,10 @@ class PublicImportSqlWriterTest {
                 SELECT lifecycle_state FROM companion_lifecycle
                 WHERE profile_id = '20000000-0000-0000-0000-000000000005'
                 """));
+        assertEquals("world-a", queryString(target, """
+                SELECT owner_world_key FROM companion_lifecycle
+                WHERE profile_id = '20000000-0000-0000-0000-000000000005'
+                """));
         assertEquals(1, queryLong(target,
                 "SELECT payload_version FROM profile_extension_data"));
         assertEquals(1, queryLong(target,

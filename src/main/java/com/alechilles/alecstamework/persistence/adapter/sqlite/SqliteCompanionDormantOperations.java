@@ -128,7 +128,8 @@ public final class SqliteCompanionDormantOperations {
                         current.lastReconciledGeneration(),
                         dormant.source().observedGeneration()
                 ),
-                current.quarantineIncidentId()
+                current.quarantineIncidentId(),
+                current.ownerWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(

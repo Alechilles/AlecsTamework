@@ -181,9 +181,9 @@ final class PublicImportSqlWriter {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO companion_lifecycle(
                     profile_id, owner_uuid, lifecycle_state, location_kind,
-                    location_key, world_key, revision, active_operation_id,
+                    location_key, world_key, owner_world_key, revision, active_operation_id,
                     state_changed_at_ms, last_reconciled_generation, quarantine_incident_id
-                ) VALUES (?, ?, ?, ?, ?, NULL, 0, NULL, ?, 0, ?)
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, 0, NULL, ?, 0, ?)
                 """)) {
             for (PublicImportPlan.Lifecycle lifecycle : plan.lifecycles()) {
                 statement.setString(1, lifecycle.profileId());
@@ -191,8 +191,9 @@ final class PublicImportSqlWriter {
                 statement.setString(3, lifecycle.state());
                 statement.setString(4, lifecycle.locationKind());
                 setNullableString(statement, 5, lifecycle.locationKey());
-                statement.setLong(6, lifecycle.changedAtMs());
-                setNullableString(statement, 7, lifecycle.incidentId());
+                setNullableString(statement, 6, lifecycle.ownerWorldKey());
+                statement.setLong(7, lifecycle.changedAtMs());
+                setNullableString(statement, 8, lifecycle.incidentId());
                 statement.addBatch();
             }
             statement.executeBatch();

@@ -34,7 +34,7 @@ import javax.annotation.Nonnull;
 public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePort {
     private static final String SELECT_COLUMNS = """
             profile_id, owner_uuid, lifecycle_state, location_kind, location_key,
-            world_key, revision, active_operation_id, state_changed_at_ms,
+            world_key, owner_world_key, revision, active_operation_id, state_changed_at_ms,
             last_reconciled_generation, quarantine_incident_id
             """;
 
@@ -112,14 +112,14 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO companion_lifecycle(
                     profile_id, owner_uuid, lifecycle_state, location_kind,
-                    location_key, world_key, revision, active_operation_id,
+                    location_key, world_key, owner_world_key, revision, active_operation_id,
                     state_changed_at_ms, last_reconciled_generation, quarantine_incident_id
-                ) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
                 """)) {
             bindIdentityAndLocation(statement, initial, 1);
-            statement.setLong(7, initial.stateChangedAtMs());
-            statement.setLong(8, initial.lastReconciledGeneration().value());
-            setNullableText(statement, 9, text(initial.quarantineIncidentId()));
+            statement.setLong(8, initial.stateChangedAtMs());
+            statement.setLong(9, initial.lastReconciledGeneration().value());
+            setNullableText(statement, 10, text(initial.quarantineIncidentId()));
             statement.executeUpdate();
             return PersistenceMutationResult.applied(initial);
         } catch (SQLException | RuntimeException failure) {
@@ -149,7 +149,8 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE companion_lifecycle
                 SET owner_uuid = ?, lifecycle_state = ?, location_kind = ?,
-                    location_key = ?, world_key = ?, revision = ?, active_operation_id = ?,
+                    location_key = ?, world_key = ?, owner_world_key = ?,
+                    revision = ?, active_operation_id = ?,
                     state_changed_at_ms = ?, last_reconciled_generation = ?,
                     quarantine_incident_id = ?
                 WHERE profile_id = ? AND revision = ?
@@ -215,6 +216,7 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
         statement.setString(start + 3, lifecycle.location().kind().name());
         setNullableText(statement, start + 4, lifecycle.location().key());
         setNullableText(statement, start + 5, lifecycle.location().worldKey());
+        setNullableText(statement, start + 6, lifecycle.ownerWorldKey());
     }
 
     private void bindTransition(PreparedStatement statement,
@@ -225,15 +227,16 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
         statement.setString(3, next.location().kind().name());
         setNullableText(statement, 4, next.location().key());
         setNullableText(statement, 5, next.location().worldKey());
-        statement.setLong(6, next.revision().value());
-        setNullableText(statement, 7, text(next.activeOperationId()));
-        statement.setLong(8, next.stateChangedAtMs());
-        statement.setLong(9, next.lastReconciledGeneration().value());
-        setNullableText(statement, 10, text(next.quarantineIncidentId()));
-        statement.setString(11, next.profileId().toString());
-        statement.setLong(12, transition.expectedRevision().value());
-        setNullableText(statement, 13, text(transition.expectedOperationId()));
+        setNullableText(statement, 6, next.ownerWorldKey());
+        statement.setLong(7, next.revision().value());
+        setNullableText(statement, 8, text(next.activeOperationId()));
+        statement.setLong(9, next.stateChangedAtMs());
+        statement.setLong(10, next.lastReconciledGeneration().value());
+        setNullableText(statement, 11, text(next.quarantineIncidentId()));
+        statement.setString(12, next.profileId().toString());
+        statement.setLong(13, transition.expectedRevision().value());
         setNullableText(statement, 14, text(transition.expectedOperationId()));
+        setNullableText(statement, 15, text(transition.expectedOperationId()));
     }
 
     private List<CompanionLifecycle> readRows(PreparedStatement statement) throws SQLException {
@@ -264,7 +267,8 @@ public final class SqliteCompanionLifecycleStore implements CompanionLifecyclePo
                 operation == null ? null : OperationId.parse(operation),
                 row.getLong("state_changed_at_ms"),
                 new ReconciliationGeneration(row.getLong("last_reconciled_generation")),
-                incident == null ? null : IncidentId.parse(incident)
+                incident == null ? null : IncidentId.parse(incident),
+                row.getString("owner_world_key")
         );
     }
 

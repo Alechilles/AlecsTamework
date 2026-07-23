@@ -151,7 +151,10 @@ public final class SqliteCompanionCaptureOperations {
                 null,
                 capturedAtMs,
                 fenced.lastReconciledGeneration(),
-                fenced.quarantineIncidentId()
+                fenced.quarantineIncidentId(),
+                capture.resultingOwnerId() == null
+                        ? null
+                        : capture.targetWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(
@@ -260,7 +263,8 @@ public final class SqliteCompanionCaptureOperations {
                     operation.operationId(),
                     capture.requestedAtMs(),
                     current.lastReconciledGeneration(),
-                    current.quarantineIncidentId()
+                    current.quarantineIncidentId(),
+                    current.ownerWorldKey()
             );
             PersistenceMutationResult<CompanionLifecycle> result =
                     transaction.lifecycles().transition(new LifecycleTransition(

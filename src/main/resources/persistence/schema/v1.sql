@@ -106,6 +106,7 @@ CREATE TABLE companion_lifecycle (
     )),
     location_key TEXT,
     world_key TEXT,
+    owner_world_key TEXT,
     revision INTEGER NOT NULL CHECK (revision >= 0),
     active_operation_id TEXT,
     state_changed_at_ms INTEGER NOT NULL,
@@ -147,7 +148,7 @@ CREATE TABLE companion_lifecycle (
 );
 
 CREATE INDEX idx_companion_lifecycle_owner_state
-    ON companion_lifecycle(owner_uuid, lifecycle_state);
+    ON companion_lifecycle(owner_uuid, owner_world_key, lifecycle_state);
 CREATE INDEX idx_companion_lifecycle_location
     ON companion_lifecycle(location_kind, location_key);
 CREATE INDEX idx_companion_lifecycle_active_operation

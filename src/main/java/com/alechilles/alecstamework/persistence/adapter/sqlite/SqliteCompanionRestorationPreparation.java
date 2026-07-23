@@ -52,7 +52,8 @@ final class SqliteCompanionRestorationPreparation
                 operation.operationId(),
                 restoration.requestedAtMs(),
                 current.lastReconciledGeneration(),
-                current.quarantineIncidentId()
+                current.quarantineIncidentId(),
+                current.ownerWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(

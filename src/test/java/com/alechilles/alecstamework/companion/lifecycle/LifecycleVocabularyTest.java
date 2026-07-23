@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.companion.lifecycle;
 
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -59,5 +61,41 @@ class LifecycleVocabularyTest {
         assertEquals(1, LifecycleRevision.INITIAL.next().value());
         assertThrows(IllegalArgumentException.class, () -> new LifecycleRevision(-1));
         assertThrows(IllegalStateException.class, () -> new LifecycleRevision(Long.MAX_VALUE).next());
+    }
+
+    @Test
+    void ownerWorldIsCanonicalAndIndependentOfPhysicalLocation() {
+        CompanionLifecycle dormant = new CompanionLifecycle(
+                ProfileId.parse("10000000-0000-0000-0000-000000000001"),
+                OwnerId.parse("20000000-0000-0000-0000-000000000001"),
+                LifecycleState.CAPTURED,
+                LifecycleLocation.keyed(
+                        LifecycleLocationKind.CAPTURE_ITEM,
+                        "capture-a"
+                ),
+                LifecycleRevision.INITIAL,
+                null,
+                -1,
+                ReconciliationGeneration.INITIAL,
+                null,
+                " world-a "
+        );
+
+        assertEquals("world-a", dormant.ownerWorldKey());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionLifecycle(
+                        dormant.profileId(),
+                        null,
+                        dormant.state(),
+                        dormant.location(),
+                        dormant.revision(),
+                        null,
+                        dormant.stateChangedAtMs(),
+                        dormant.lastReconciledGeneration(),
+                        null,
+                        "world-a"
+                )
+        );
     }
 }

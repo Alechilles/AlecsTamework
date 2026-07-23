@@ -58,7 +58,8 @@ final class SqliteCompanionCoopCapturePreparation
                 operation.operationId(),
                 capture.requestedAtMs(),
                 current.lastReconciledGeneration(),
-                current.quarantineIncidentId()
+                current.quarantineIncidentId(),
+                current.ownerWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(

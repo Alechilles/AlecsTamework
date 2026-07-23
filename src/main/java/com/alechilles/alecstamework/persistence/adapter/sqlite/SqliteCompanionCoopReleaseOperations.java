@@ -153,7 +153,8 @@ public final class SqliteCompanionCoopReleaseOperations {
                 null,
                 releasedAtMs,
                 fenced.lastReconciledGeneration(),
-                fenced.quarantineIncidentId()
+                fenced.quarantineIncidentId(),
+                fenced.ownerId() == null ? null : release.targetWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(

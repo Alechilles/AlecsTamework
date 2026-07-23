@@ -5,8 +5,8 @@
 
 ## Decision
 
-`companion_lifecycle` is the sole durable authority for a companion's owner, lifecycle state,
-location, revision, and active operation fence.
+`companion_lifecycle` is the sole durable authority for a companion's owner, owner-world capacity
+bucket, lifecycle state, location, revision, and active operation fence.
 
 Canonical states and their only valid location kinds are:
 
@@ -32,6 +32,11 @@ Locations carry these fields:
 - `LIVE_ENTITY` requires both a stable entity locator and world key.
 - `CAPTURE_ITEM`, `COOP_SLOT`, `COMMAND_ROSTER`, and `PROVISIONING` require one normalized key.
 - `NONE` and `UNRESOLVED` carry no key.
+
+`ownerWorldKey` is independent of physical location. Owned profiles retain this authoritative
+per-world capacity bucket while captured, cooped, dead, lost, roster-stored, or provisioned.
+An admitted rehome changes it through the same lifecycle revision path. Unowned profiles cannot
+carry an owner-world bucket.
 
 Revisions are non-negative and begin at zero. Every transition compares an expected revision and
 advances it exactly once.

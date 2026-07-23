@@ -179,7 +179,8 @@ public final class SqliteCompanionRestorationOperations {
                 null,
                 restoredAtMs,
                 fenced.lastReconciledGeneration(),
-                fenced.quarantineIncidentId()
+                fenced.quarantineIncidentId(),
+                fenced.ownerId() == null ? null : restoration.targetWorldKey()
         );
         requireApplied(
                 transaction.lifecycles().transition(new LifecycleTransition(
