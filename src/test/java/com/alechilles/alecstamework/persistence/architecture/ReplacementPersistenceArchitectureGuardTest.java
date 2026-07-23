@@ -23,6 +23,7 @@ class ReplacementPersistenceArchitectureGuardTest {
             MAIN.resolve("companion/extension"),
             MAIN.resolve("companion/identity"),
             MAIN.resolve("companion/lifecycle"),
+            MAIN.resolve("companion/population"),
             MAIN.resolve("companion/profile"),
             MAIN.resolve("companion/snapshot"),
             MAIN.resolve("persistence/adapter/sqlite"),

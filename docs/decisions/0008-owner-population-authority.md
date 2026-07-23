@@ -53,6 +53,11 @@ reservations belonging to nonterminal envelopes. A pending negative transition
 never releases capacity before its canonical commit. This makes concurrent
 over-admission impossible without relying on a pre-commit cache update.
 
+Fresh schema v1 stores this evidence in `owner_population_reservation`. Its
+primary key is the owning operation plus normalized owner scope. The row has
+foreign keys to the shared envelope and canonical profile, and deliberately has
+no phase, lease, attempt, failure, or recovery columns.
+
 The public population API may expose a population transition as its own
 registered operation kind, but it uses the same reservation participant,
 envelope, recovery registry, readiness graph, and shutdown tracking as every

@@ -36,6 +36,7 @@ public final class SqliteSchemaV1Manager implements PersistenceSchemaManager {
             "companion_tool_link",
             "profile_extension_data",
             "operation_participant",
+            "owner_population_reservation",
             "projection_outbox",
             "projection_checkpoint",
             "feature_circuit",

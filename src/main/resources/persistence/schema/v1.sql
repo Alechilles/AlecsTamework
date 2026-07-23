@@ -115,6 +115,7 @@ CREATE TABLE companion_lifecycle (
     FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id) ON DELETE CASCADE,
     FOREIGN KEY (active_operation_id) REFERENCES operation_envelope(operation_id),
     FOREIGN KEY (quarantine_incident_id) REFERENCES persistence_incident(incident_id),
+    CHECK (owner_uuid IS NOT NULL OR owner_world_key IS NULL),
     CHECK (
         (lifecycle_state = 'ACTIVE'
             AND location_kind = 'LIVE_ENTITY'
@@ -216,6 +217,34 @@ CREATE TABLE operation_participant (
 
 CREATE INDEX idx_operation_participant_scope
     ON operation_participant(scope_type, scope_key, operation_id);
+
+CREATE TABLE owner_population_reservation (
+    operation_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    expected_lifecycle_revision INTEGER CHECK (
+        expected_lifecycle_revision IS NULL OR expected_lifecycle_revision >= 0
+    ),
+    scope_kind TEXT NOT NULL CHECK (scope_kind IN ('GLOBAL', 'PER_WORLD')),
+    owner_uuid TEXT NOT NULL,
+    owner_world_key TEXT NOT NULL,
+    capacity_delta INTEGER NOT NULL CHECK (capacity_delta > 0),
+    snapshotted_limit INTEGER NOT NULL CHECK (snapshotted_limit >= 0),
+    created_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (operation_id, scope_kind, owner_uuid, owner_world_key),
+    FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    CHECK (
+        (scope_kind = 'GLOBAL' AND owner_world_key = '')
+        OR (scope_kind = 'PER_WORLD' AND length(trim(owner_world_key)) > 0)
+    )
+);
+
+CREATE INDEX idx_owner_population_reservation_scope
+    ON owner_population_reservation(
+        scope_kind, owner_uuid, owner_world_key, operation_id
+    );
 
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
