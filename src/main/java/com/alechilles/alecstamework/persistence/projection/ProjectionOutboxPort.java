@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.projection;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
@@ -12,6 +13,9 @@ public interface ProjectionOutboxPort {
 
     @Nonnull
     List<ProjectionEvent> readAfter(@Nonnull ProjectionSequence sequence, int limit);
+
+    @Nonnull
+    List<ProjectionEvent> findByOperation(@Nonnull OperationId operationId);
 
     @Nonnull
     ProjectionSequence head();

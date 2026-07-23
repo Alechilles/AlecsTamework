@@ -1,0 +1,314 @@
+package com.alechilles.alecstamework.persistence.adapter.sqlite;
+
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
+import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
+import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
+import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
+import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
+import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
+import com.alechilles.alecstamework.persistence.operation.OperationTransition;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import java.util.List;
+import java.util.Optional;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Staged application engine for the one shared replacement operation protocol.
+ *
+ * <p>Live effects occur between {@link #transition} to {@code LIVE_APPLYING} and
+ * {@link #commitDurable}; this engine never accepts a live callback inside a SQLite transaction.
+ * Canonical mutations, the {@code DURABLE} phase, and outbox events commit atomically.</p>
+ */
+public final class SqliteOperationEngine {
+    private static final PersistenceReadKind PREPARE_READBACK =
+            new PersistenceReadKind("operation_prepare_readback");
+    private static final PersistenceReadKind TRANSITION_READBACK =
+            new PersistenceReadKind("operation_transition_readback");
+    private static final PersistenceReadKind DURABLE_READBACK =
+            new PersistenceReadKind("operation_durable_readback");
+
+    private final OperationDefinitionRegistry definitions;
+    private final SqliteUnitOfWorkRunner units;
+    private final PersistenceCheckpointHook checkpoints;
+
+    public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
+                                 @Nonnull SqliteUnitOfWorkRunner units) {
+        this(definitions, units, PersistenceCheckpointHook.NO_OP);
+    }
+
+    /** Test-only checkpoint injection; runtime composition uses the hook-free overload. */
+    public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
+                                 @Nonnull SqliteUnitOfWorkRunner units,
+                                 @Nonnull PersistenceCheckpointHook checkpoints) {
+        if (definitions == null || units == null || checkpoints == null) {
+            throw new IllegalArgumentException("Operation engine dependencies are required");
+        }
+        this.definitions = definitions;
+        this.units = units;
+        this.checkpoints = checkpoints;
+    }
+
+    /** Encodes and durably prepares one idempotent operation. */
+    @Nonnull
+    public <T> SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
+            @Nonnull OperationDefinition<T> definition,
+            @Nonnull OperationRequest<T> request
+    ) {
+        if (definition == null || request == null) {
+            throw new IllegalArgumentException("Operation definition and request are required");
+        }
+        OperationDefinitionRegistry.EncodedOperation encoded =
+                definitions.encode(definition, request.payload());
+        PreparedOperation prepared = new PreparedOperation(
+                request.operationId(), request.idempotencyKey(), encoded.kind(),
+                encoded.payloadVersion(), encoded.payloadJson(), request.featureScope(),
+                request.expectedLifecycleRevision(), request.participants(), request.createdAtMs()
+        );
+        SqliteTransactionCommand<OperationEnvelope> command = new SqliteTransactionCommand<>(
+                prepared.operationId(),
+                prepared.kind(),
+                TransactionReplayPolicy.SAFE_DATABASE_ONLY,
+                connection -> {
+                    hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
+                    OperationEnvelope operation = requireApplied(
+                            new SqliteOperationStore(connection).prepare(prepared),
+                            "operation_prepare"
+                    );
+                    hit(PersistenceCheckpoint.AFTER_OPERATION_PREPARATION);
+                    hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
+                    return operation;
+                }
+        );
+        return units.execute(new SqliteUnitOfWork<>(
+                command,
+                PREPARE_READBACK,
+                connection -> {
+                    Optional<OperationEnvelope> found =
+                            new SqliteOperationStore(connection).findByIdempotency(
+                                    prepared.kind(), prepared.idempotencyKey()
+                            );
+                    if (found.isPresent() && matchesPreparation(found.get(), prepared)) {
+                        hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
+                        return PersistenceReadResult.found(
+                                found.get(), found.get().attemptCount()
+                        );
+                    }
+                    return PersistenceReadResult.absent();
+                }
+        ));
+    }
+
+    /** Advances one exact phase/lease edge through the shared state graph. */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<OperationEnvelope> transition(
+            @Nonnull OperationEnvelope expected,
+            @Nonnull OperationPhase nextPhase,
+            @Nullable String failureKind,
+            @Nullable String failureCode,
+            long transitionedAtMs
+    ) {
+        if (expected == null || nextPhase == null) {
+            throw new IllegalArgumentException("Expected operation and next phase are required");
+        }
+        OperationTransition transition = new OperationTransition(
+                expected.operationId(), expected.phase(), nextPhase, expected.leaseOwner(),
+                failureKind, failureCode, transitionedAtMs
+        );
+        SqliteTransactionCommand<OperationEnvelope> command = new SqliteTransactionCommand<>(
+                expected.operationId(),
+                expected.kind(),
+                TransactionReplayPolicy.SAFE_DATABASE_ONLY,
+                connection -> {
+                    hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
+                    if (nextPhase.isTerminal()) {
+                        hit(PersistenceCheckpoint.BEFORE_JOURNAL_TERMINALIZATION);
+                    }
+                    OperationEnvelope result = requireApplied(
+                            new SqliteOperationStore(connection).transition(transition),
+                            "operation_transition"
+                    );
+                    hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
+                    return result;
+                }
+        );
+        return units.execute(new SqliteUnitOfWork<>(
+                command,
+                TRANSITION_READBACK,
+                connection -> exactTransitionReadback(connection, transition)
+        ));
+    }
+
+    /**
+     * Commits canonical mutations, durable phase evidence, and outbox rows atomically.
+     */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<DurableCommitEvidence> commitDurable(
+            @Nonnull OperationEnvelope expected,
+            @Nonnull DurableOperationWork work,
+            long committedAtMs
+    ) {
+        if (expected == null || work == null) {
+            throw new IllegalArgumentException("Expected operation and durable work are required");
+        }
+        if (expected.phase() != OperationPhase.LIVE_APPLYING
+                && expected.phase() != OperationPhase.RETRYABLE) {
+            throw new IllegalArgumentException("Durable commit requires applying or retryable phase");
+        }
+        SqliteTransactionCommand<DurableCommitEvidence> command = new SqliteTransactionCommand<>(
+                expected.operationId(),
+                expected.kind(),
+                TransactionReplayPolicy.SAFE_DATABASE_ONLY,
+                connection -> commitDurableTransaction(connection, expected, work, committedAtMs)
+        );
+        return units.execute(new SqliteUnitOfWork<>(
+                command,
+                DURABLE_READBACK,
+                connection -> exactDurableReadback(connection, expected)
+        ));
+    }
+
+    private DurableCommitEvidence commitDurableTransaction(
+            java.sql.Connection connection,
+            OperationEnvelope expected,
+            DurableOperationWork work,
+            long committedAtMs
+    ) throws Exception {
+        hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
+        SqlitePersistenceTransactionContext transaction =
+                new SqlitePersistenceTransactionContext(connection);
+        OperationEnvelope current = transaction.operations()
+                .find(expected.operationId())
+                .orElseThrow(() -> new IllegalStateException("operation_not_found"));
+        requireExpected(current, expected);
+        List<ProjectionEventDraft> drafts = work.execute(transaction, current);
+        if (drafts == null || drafts.isEmpty()) {
+            throw new IllegalStateException("durable_operation_requires_outbox_event");
+        }
+        List<ProjectionEvent> events = appendEvents(transaction, current, drafts);
+        OperationEnvelope durable = requireApplied(
+                transaction.operations().transition(new OperationTransition(
+                        current.operationId(), current.phase(), OperationPhase.DURABLE,
+                        current.leaseOwner(), null, null, committedAtMs
+                )),
+                "operation_durable_transition"
+        );
+        hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
+        return new DurableCommitEvidence(durable, events);
+    }
+
+    private List<ProjectionEvent> appendEvents(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            List<ProjectionEventDraft> drafts
+    ) {
+        java.util.ArrayList<ProjectionEvent> events = new java.util.ArrayList<>();
+        for (ProjectionEventDraft draft : List.copyOf(drafts)) {
+            if (draft == null || !draft.operationId().equals(operation.operationId())) {
+                throw new IllegalArgumentException(
+                        "Durable outbox event must belong to its operation"
+                );
+            }
+            events.add(requireApplied(
+                    transaction.outbox().append(draft),
+                    "operation_outbox_append"
+            ));
+        }
+        return List.copyOf(events);
+    }
+
+    private PersistenceReadResult<OperationEnvelope> exactTransitionReadback(
+            java.sql.Connection connection,
+            OperationTransition transition
+    ) throws Exception {
+        OperationEnvelope found = new SqliteOperationStore(connection)
+                .find(transition.operationId())
+                .orElse(null);
+        if (found != null && found.phase() == transition.nextPhase()
+                && java.util.Objects.equals(found.failureKind(), transition.failureKind())
+                && java.util.Objects.equals(found.failureCode(), transition.failureCode())) {
+            hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
+            return PersistenceReadResult.found(found, found.attemptCount());
+        }
+        return PersistenceReadResult.absent();
+    }
+
+    private PersistenceReadResult<DurableCommitEvidence> exactDurableReadback(
+            java.sql.Connection connection,
+            OperationEnvelope expected
+    ) throws Exception {
+        SqlitePersistenceTransactionContext transaction =
+                new SqlitePersistenceTransactionContext(connection);
+        OperationEnvelope operation = transaction.operations()
+                .find(expected.operationId())
+                .orElse(null);
+        if (operation == null || operation.phase() != OperationPhase.DURABLE) {
+            return PersistenceReadResult.absent();
+        }
+        List<ProjectionEvent> events =
+                transaction.outbox().findByOperation(expected.operationId());
+        if (events.isEmpty()) {
+            return PersistenceReadResult.absent();
+        }
+        hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
+        return PersistenceReadResult.found(
+                new DurableCommitEvidence(operation, events),
+                events.getLast().sequence().value()
+        );
+    }
+
+    private boolean matchesPreparation(OperationEnvelope existing, PreparedOperation requested) {
+        return existing.kind().equals(requested.kind())
+                && existing.idempotencyKey().equals(requested.idempotencyKey())
+                && existing.payloadVersion() == requested.payloadVersion()
+                && existing.payloadJson().equals(requested.payloadJson())
+                && existing.featureScope().equals(requested.featureScope())
+                && java.util.Objects.equals(
+                        existing.expectedLifecycleRevision(),
+                        requested.expectedLifecycleRevision()
+                )
+                && semanticParticipants(existing.participants())
+                .equals(semanticParticipants(requested.participants()));
+    }
+
+    private List<OperationScope> semanticParticipants(List<OperationScope> participants) {
+        return participants.stream()
+                .filter(scope -> scope.type() != OperationScopeType.OPERATION)
+                .sorted()
+                .toList();
+    }
+
+    private void requireExpected(OperationEnvelope current, OperationEnvelope expected) {
+        if (current.phase() != expected.phase()
+                || !java.util.Objects.equals(current.leaseOwner(), expected.leaseOwner())) {
+            throw new IllegalStateException("operation_phase_or_lease_mismatch");
+        }
+    }
+
+    private <T> T requireApplied(
+            com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult<T> result,
+            String operation
+    ) {
+        if (result == null || !result.applied()) {
+            throw new IllegalStateException(
+                    operation + "_" + (result == null ? "null" : result.status().name().toLowerCase())
+            );
+        }
+        return result.value();
+    }
+
+    private void hit(PersistenceCheckpoint checkpoint) throws Exception {
+        checkpoints.hit(checkpoint, null);
+    }
+}

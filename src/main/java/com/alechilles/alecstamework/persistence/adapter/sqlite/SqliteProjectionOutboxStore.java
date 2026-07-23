@@ -106,6 +106,28 @@ public final class SqliteProjectionOutboxStore implements ProjectionOutboxPort {
     }
 
     @Override
+    public List<ProjectionEvent> findByOperation(OperationId operationId) {
+        require(operationId, "Operation ID");
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + SELECT_EVENT + """
+                         FROM projection_outbox
+                         WHERE operation_id = ?
+                         ORDER BY event_sequence
+                        """)) {
+            statement.setString(1, operationId.toString());
+            ArrayList<ProjectionEvent> events = new ArrayList<>();
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    events.add(readEvent(row));
+                }
+            }
+            return List.copyOf(events);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("projection_find_operation", failure);
+        }
+    }
+
+    @Override
     public ProjectionSequence head() {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT COALESCE(MAX(event_sequence), 0) FROM projection_outbox");
