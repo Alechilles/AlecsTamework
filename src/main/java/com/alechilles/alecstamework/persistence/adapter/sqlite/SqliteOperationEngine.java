@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.operation.OperationTransition;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import java.util.List;
@@ -55,8 +56,23 @@ public final class SqliteOperationEngine {
             @Nonnull OperationDefinition<T> definition,
             @Nonnull OperationRequest<T> request
     ) {
+        return prepare(definition, request, PreparedOperationDetail.none());
+    }
+
+    /**
+     * Atomically prepares an operation and its typed, idempotent pre-live detail.
+     */
+    @Nonnull
+    public <T> SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepare(
+            @Nonnull OperationDefinition<T> definition,
+            @Nonnull OperationRequest<T> request,
+            @Nonnull PreparedOperationDetail detail
+    ) {
         if (definition == null || request == null) {
             throw new IllegalArgumentException("Operation definition and request are required");
+        }
+        if (detail == null) {
+            throw new IllegalArgumentException("Prepared operation detail is required");
         }
         OperationDefinitionRegistry.EncodedOperation encoded =
                 definitions.encode(definition, request.payload());
@@ -70,10 +86,21 @@ public final class SqliteOperationEngine {
                 prepared.kind(),
                 TransactionReplayPolicy.SAFE_DATABASE_ONLY,
                 connection -> {
+                    SqlitePersistenceTransactionContext transaction =
+                            new SqlitePersistenceTransactionContext(connection);
                     OperationEnvelope operation = requireApplied(
-                            new SqliteOperationStore(connection).prepare(prepared),
+                            transaction.operations().prepare(prepared),
                             "operation_prepare"
                     );
+                    if (operation.phase() == OperationPhase.PREPARED
+                            && !detail.matches(transaction, operation)) {
+                        detail.prepare(transaction, operation);
+                    }
+                    if (!detail.matches(transaction, operation)) {
+                        throw new IllegalStateException(
+                                "operation_prepared_detail_missing"
+                        );
+                    }
                     return operation;
                 }
         );
@@ -86,9 +113,13 @@ public final class SqliteOperationEngine {
                                     prepared.kind(), prepared.idempotencyKey()
                     );
                     if (found.isPresent() && matchesPreparation(found.get(), prepared)) {
-                        return PersistenceReadResult.found(
-                                found.get(), found.get().attemptCount()
-                        );
+                        SqlitePersistenceTransactionContext transaction =
+                                new SqlitePersistenceTransactionContext(connection);
+                        if (detail.matches(transaction, found.get())) {
+                            return PersistenceReadResult.found(
+                                    found.get(), found.get().attemptCount()
+                            );
+                        }
                     }
                     return PersistenceReadResult.absent();
                 }

@@ -88,6 +88,16 @@ class ReplacementPersistenceArchitectureGuardTest {
         assertFalse(work.contains("ProjectionCoordinator"));
         assertFalse(work.contains("Connection connection"));
 
+        String preparedDetail = Files.readString(
+                MAIN.resolve("persistence/operation/PreparedOperationDetail.java")
+        );
+        assertTrue(preparedDetail.contains(
+                "SqlitePersistenceTransactionContext transaction"
+        ));
+        assertFalse(preparedDetail.contains("ProjectionConsumer"));
+        assertFalse(preparedDetail.contains("ProjectionCoordinator"));
+        assertFalse(preparedDetail.contains("Connection connection"));
+
         String coordinator = Files.readString(
                 MAIN.resolve("persistence/projection/ProjectionCoordinator.java")
         );

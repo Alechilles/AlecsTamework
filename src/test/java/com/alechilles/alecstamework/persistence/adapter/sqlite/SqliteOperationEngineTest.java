@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -19,6 +21,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.nio.file.Path;
@@ -43,6 +46,8 @@ class SqliteOperationEngineTest {
             OperationId.parse("40000000-0000-0000-0000-000000000001");
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
+    private static final NpcAlias ALIAS =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000001");
 
     @TempDir
     Path tempDir;
@@ -122,6 +127,119 @@ class SqliteOperationEngineTest {
 
         assertEquals(OperationPhase.DURABLE, durable.operation().phase());
         assertEquals(1, durable.events().size());
+    }
+
+    @Test
+    void typedPreparationDetailCommitsAtomicallyWithOperationFence()
+            throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            createCanonicalProfile(
+                    new SqlitePersistenceTransactionContext(connection)
+            );
+            connection.commit();
+        }
+        PreparedOperationDetail aliasLease = new PreparedOperationDetail() {
+            @Override
+            public void prepare(
+                    SqlitePersistenceTransactionContext transaction,
+                    OperationEnvelope operation
+            ) {
+                if (!transaction.identities().leaseAlias(
+                        PROFILE,
+                        ALIAS,
+                        operation.operationId(),
+                        -9_000
+                ).applied()) {
+                    throw new IllegalStateException("alias_lease_failed");
+                }
+            }
+
+            @Override
+            public boolean matches(
+                    SqlitePersistenceTransactionContext transaction,
+                    OperationEnvelope operation
+            ) {
+                CompanionAlias alias =
+                        transaction.identities().resolveAlias(ALIAS).orElse(null);
+                return alias != null
+                        && alias.profileId().equals(PROFILE)
+                        && operation.operationId().equals(alias.leaseOperationId())
+                        && alias.state() != CompanionAlias.State.RETIRED;
+            }
+        };
+
+        OperationEnvelope prepared = committed(
+                engine.prepare(definition, request(), aliasLease)
+        );
+
+        assertEquals(OperationPhase.PREPARED, prepared.phase());
+        try (Connection connection = connections.openReadConnection()) {
+            CompanionAlias leased = new SqliteCompanionIdentityStore(connection)
+                    .resolveAlias(ALIAS)
+                    .orElseThrow();
+            assertEquals(CompanionAlias.State.LEASED, leased.state());
+            assertEquals(OPERATION, leased.leaseOperationId());
+        }
+    }
+
+    @Test
+    void preparationCheckpointFailureRollsBackOperationAndDetailTogether()
+            throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            createCanonicalProfile(
+                    new SqlitePersistenceTransactionContext(connection)
+            );
+            connection.commit();
+        }
+        writer.shutdown(Duration.ofSeconds(5));
+        writer = new SqliteSingleWriter(
+                connections,
+                SqliteWriterConfiguration.DEFAULT,
+                (checkpoint, ignored) -> {
+                    if (checkpoint
+                            == com.alechilles.alecstamework.persistence.kernel
+                            .PersistenceCheckpoint.BEFORE_COMMIT) {
+                        throw new IllegalStateException("injected_before_prepare_commit");
+                    }
+                },
+                PersistenceKernelMetrics.NO_OP
+        );
+        engine = engine(writer);
+        PreparedOperationDetail aliasLease = new PreparedOperationDetail() {
+            @Override
+            public void prepare(
+                    SqlitePersistenceTransactionContext transaction,
+                    OperationEnvelope operation
+            ) {
+                if (!transaction.identities().leaseAlias(
+                        PROFILE, ALIAS, operation.operationId(), -9_000
+                ).applied()) {
+                    throw new IllegalStateException("alias_lease_failed");
+                }
+            }
+
+            @Override
+            public boolean matches(
+                    SqlitePersistenceTransactionContext transaction,
+                    OperationEnvelope operation
+            ) {
+                return transaction.identities().resolveAlias(ALIAS).isPresent();
+            }
+        };
+
+        PersistenceTransactionResult<OperationEnvelope> result =
+                engine.prepare(definition, request(), aliasLease)
+                        .completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertInstanceOf(PersistenceTransactionResult.RolledBack.class, result);
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteOperationStore(connection).find(OPERATION).isEmpty());
+            assertTrue(new SqliteCompanionIdentityStore(connection)
+                    .resolveAlias(ALIAS).isEmpty());
+        }
     }
 
     @Test
