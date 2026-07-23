@@ -119,6 +119,38 @@ class CommandTimedSummoningServiceTest {
         }
     }
 
+    /** Regression: a failed world-removal callback must not leave STORING active forever. */
+    @Test
+    void leaseTickRecoversStaleStorageThatRetainedItsProjection() throws Exception {
+        try (Fixture fixture = new Fixture(tempDir.resolve("service-stale-storage.sqlite"), 1)) {
+            fixture.addStored("dragon-a", 1_000L, 0L, new long[0]);
+            assertEquals(CommandTimedSummoningService.Status.SUCCESS,
+                    await(fixture.summon("dragon-a", "summon-a", 1_000L)).status());
+            fixture.projections.pendingStorage = new CompletableFuture<>();
+            fixture.projections.recoveryEvidence =
+                    CommandTimedSummoningService.ProjectionEvidence.PRESENT;
+
+            fixture.service.dismiss(new CommandTimedSummoningService.DismissRequest(
+                    fixture.owner, fixture.family, fixture.profile("dragon-a"), 1L,
+                    null, "dismiss-a", 1_010L));
+            fixture.projections.storageStarted.toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+            await(fixture.service.tick(
+                    1_010L + 15_000L - 1L));
+            assertEquals(0, fixture.projections.inspections);
+
+            await(fixture.service.tick(
+                    1_010L + 15_000L));
+
+            assertEquals(1, fixture.projections.inspections);
+            assertEquals(1, fixture.population.activeRecoveries);
+            assertEquals(CommandTimedSummonSessionRecord.State.ACTIVE,
+                    fixture.repository.findSession(
+                            fixture.owner, fixture.family, fixture.profile("dragon-a")).state());
+            assertEquals(1, fixture.population.active);
+        }
+    }
+
     @Test
     void startupConvergenceRepairsStoredSessionStillOccupyingActiveCapacity() throws Exception {
         try (Fixture fixture = new Fixture(tempDir.resolve("service-stored-convergence.sqlite"), 1)) {
@@ -226,6 +258,7 @@ class CommandTimedSummoningServiceTest {
         private int pending;
         private int active;
         private int storedConvergences;
+        private int activeRecoveries;
         private FakePopulation(int maxActive) { this.maxActive = maxActive; }
 
         public CompletionStage<CommandTimedSummoningService.PopulationReservation> reserveActive(
@@ -268,6 +301,13 @@ class CommandTimedSummoningServiceTest {
             storedConvergences++;
             if (active > 0) active--;
             return accepted("stored-converged");
+        }
+        public CompletionStage<CommandTimedSummoningService.PopulationDecision> recoverActive(
+                CommandTimedSummoningService.PopulationContext context,
+                String populationOperationId) {
+            activeRecoveries++;
+            active = Math.max(1, active);
+            return accepted("active-recovered");
         }
         private CompletionStage<CommandTimedSummoningService.PopulationDecision> accepted(String reason) {
             return CompletableFuture.completedFuture(

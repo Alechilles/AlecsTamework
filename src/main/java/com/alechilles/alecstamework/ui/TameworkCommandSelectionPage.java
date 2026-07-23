@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1103,8 +1104,10 @@ public final class TameworkCommandSelectionPage
                 + status.profileId() + ":" + status.state().name() + ":" + status.revision();
         CommandTimedSummoningRequest request = new CommandTimedSummoningRequest(
                 playerUuid, status.commandFamilyId(), status.profileId(), key);
-        if (summon) plugin.getApi().commandTimedSummoning().summon(request);
-        else plugin.getApi().commandTimedSummoning().dismiss(request);
+        CompletionStage<?> action = summon
+                ? plugin.getApi().commandTimedSummoning().summon(request)
+                : plugin.getApi().commandTimedSummoning().dismiss(request);
+        action.whenComplete((ignored, failure) -> dispatchRefreshTick());
     }
 
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {

@@ -16,6 +16,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -26,6 +28,8 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
     @Nullable private final TameworkEventBus eventBus;
     private final ConcurrentHashMap<RosterKey, RosterRevisionProof> revisionProofs =
             new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<Consumer<CommandFamilyRosterMembershipChangedEvent>>
+            changeListeners = new CopyOnWriteArrayList<>();
 
     public CommandFamilyRosterService(@Nonnull CommandFamilyRosterRepository repository) {
         this(repository, AccessValidator.ALLOW_ALL, null);
@@ -101,6 +105,19 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
         return mutate(CommandFamilyRosterRepository.MutationKind.REMOVE, request);
     }
 
+    /**
+     * Subscribes an internal runtime cache to canonical post-commit roster mutations.
+     * Public integrations should continue to use {@code TameworkEventsApi}.
+     */
+    @Nonnull
+    public AutoCloseable subscribeChanges(
+            @Nonnull Consumer<CommandFamilyRosterMembershipChangedEvent> listener) {
+        Consumer<CommandFamilyRosterMembershipChangedEvent> required =
+                Objects.requireNonNull(listener, "listener");
+        changeListeners.add(required);
+        return () -> changeListeners.remove(required);
+    }
+
     private CompletionStage<CommandFamilyRosterMutationResult> mutate(
             CommandFamilyRosterRepository.MutationKind kind,
             CommandFamilyRosterMutationRequest request) {
@@ -168,16 +185,27 @@ public final class CommandFamilyRosterService implements CommandFamilyRosterApi 
     }
 
     private void emitChanged(CommandFamilyRosterRepository.MutationOutcome outcome) {
-        if (eventBus == null || outcome.status() != CommandFamilyRosterMutationStatus.APPLIED
+        if (outcome.status() != CommandFamilyRosterMutationStatus.APPLIED
                 || outcome.roster() == null) return;
         long previousRevision = Math.max(0L, outcome.roster().revision() - 1L);
         long nowMs = System.currentTimeMillis();
-        eventBus.emitCommandFamilyRosterEvent(new CommandFamilyRosterMembershipChangedEvent(
+        CommandFamilyRosterMembershipChangedEvent event =
+                new CommandFamilyRosterMembershipChangedEvent(
                 outcome.operationId(), outcome.roster().ownerUuid(), outcome.roster().commandFamilyId(),
                 outcome.previousMembership() != null ? outcome.previousMembership().profileId()
                         : Objects.requireNonNull(outcome.currentMembership()).profileId(),
                 outcome.previousMembership(), outcome.currentMembership(), previousRevision,
-                outcome.roster().revision(), nowMs, nowMs));
+                outcome.roster().revision(), nowMs, nowMs);
+        for (Consumer<CommandFamilyRosterMembershipChangedEvent> listener : changeListeners) {
+            try {
+                listener.accept(event);
+            } catch (RuntimeException ignored) {
+                // A cache listener cannot roll back or mask a committed roster mutation.
+            }
+        }
+        if (eventBus != null) {
+            eventBus.emitCommandFamilyRosterEvent(event);
+        }
     }
 
     @FunctionalInterface

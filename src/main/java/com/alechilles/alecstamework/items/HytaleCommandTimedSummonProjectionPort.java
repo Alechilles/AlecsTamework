@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -396,26 +398,24 @@ public final class HytaleCommandTimedSummonProjectionPort
     private void removeExactProjection(World world, CommandTimedSummoningService.PopulationContext context,
                                        String sessionId, UUID npcUuid,
                                        CompletableFuture<CommandTimedSummoningService.ProjectionResult> completion) {
-        if (completion.isDone() || world.getEntityStore() == null) return;
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> ref = world.getEntityRef(npcUuid);
-        if (ref == null || !ref.isValid()) {
-            completion.complete(ambiguous("timed-summon-projection-vanished-before-retirement"));
-            return;
-        }
-        NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
-        if (npc == null || !npcUuid.equals(npc.getUuid()) || npc.isDespawning()) {
-            completion.complete(ambiguous("timed-summon-projection-changed-before-retirement"));
-            return;
-        }
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        if (markerType == null) {
-            completion.complete(notApplied("timed-summon-projection-marker-unavailable"));
-            return;
-        }
-        store.putComponent(ref, markerType, marker(context, sessionId, npcUuid, npcUuid));
         try {
+            if (completion.isDone() || world.getEntityStore() == null) return;
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            Ref<EntityStore> ref = world.getEntityRef(npcUuid);
+            if (ref == null || !ref.isValid()) {
+                completion.complete(ambiguous("timed-summon-projection-vanished-before-retirement"));
+                return;
+            }
+            NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+            if (npc == null || !npcUuid.equals(npc.getUuid()) || npc.isDespawning()) {
+                completion.complete(ambiguous("timed-summon-projection-changed-before-retirement"));
+                return;
+            }
+            /*
+             * The projection already carries the durable command-roster marker installed before
+             * spawn. Replacing that component immediately before removal is both redundant and a
+             * second ECS mutation that can fail before Store#removeEntity is reached.
+             */
             store.removeEntity(ref, RemoveReason.REMOVE);
             if (ref.isValid()) {
                 completion.complete(ambiguous("timed-summon-projection-removal-unconfirmed"));
@@ -425,6 +425,13 @@ public final class HytaleCommandTimedSummonProjectionPort
                         "timed-summon-projection-stored"));
             }
         } catch (RuntimeException | LinkageError failure) {
+            Tamework plugin = Tamework.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().at(Level.WARNING).withCause(failure).log(
+                        "Timed command summon failed to remove projection npc=" + npcUuid
+                                + " profile=" + context.profileId()
+                                + "; stale-operation recovery will reconcile it.");
+            }
             completion.complete(ambiguous("timed-summon-projection-removal-failed"));
         }
     }

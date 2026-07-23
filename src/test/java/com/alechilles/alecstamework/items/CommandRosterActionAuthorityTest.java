@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipView;
 import com.alechilles.alecstamework.api.CommandFamilyRosterView;
 import com.alechilles.alecstamework.api.Vector3View;
@@ -152,6 +153,33 @@ class CommandRosterActionAuthorityTest {
         authority.refreshAsync(owner, horn).toCompletableFuture().join();
         assertEquals("profile-2", authority.resolveCached(owner, horn, "b")
                 .snapshot().members().getFirst().profileId());
+    }
+
+    /** Regression: newly provisioned roster rows must not wait for the 30-second cache expiry. */
+    @Test
+    void committedRosterChangeImmediatelyRefreshesCanonicalSnapshot() throws Exception {
+        UUID owner = UUID.randomUUID();
+        AtomicReference<CommandRosterActionAuthority.LoadedRoster> loaded =
+                new AtomicReference<>(oneMember(owner, "dragons", "profile-1"));
+        AtomicInteger loads = new AtomicInteger();
+        executor = Executors.newSingleThreadExecutor();
+        CommandRosterActionAuthority authority = new CommandRosterActionAuthority(
+                (requestedOwner, family) -> {
+                    loads.incrementAndGet();
+                    return loaded.get();
+                }, executor, new MutableClock(1_000L), 30_000L);
+        TwCommandItemConfig horn = rosterConfig("dragons");
+        authority.refreshAsync(owner, horn).toCompletableFuture().join();
+        loaded.set(oneMember(owner, "dragons", "profile-2"));
+
+        authority.rosterChanged(new CommandFamilyRosterMembershipChangedEvent(
+                UUID.randomUUID(), owner, "dragons", "profile-2", null,
+                loaded.get().roster().memberships().getFirst(), 9L, 10L, 1_001L, 1_001L));
+        authority.refreshAsync(owner, horn).toCompletableFuture().join();
+
+        assertEquals("profile-2", authority.resolveCached(owner, horn, "copy")
+                .snapshot().members().getFirst().profileId());
+        assertEquals(2, loads.get());
     }
 
     @Test

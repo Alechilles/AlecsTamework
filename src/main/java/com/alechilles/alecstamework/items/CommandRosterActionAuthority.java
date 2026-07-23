@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.CommandFamilyRosterMemberState;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipView;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMutationRequest;
 import com.alechilles.alecstamework.api.CommandFamilyRosterView;
@@ -78,6 +79,9 @@ final class CommandRosterActionAuthority {
         }
         this.maxCacheAgeMs = maxCacheAgeMs;
         this.mutationService = mutationService;
+        if (mutationService != null) {
+            mutationService.subscribeChanges(this::rosterChanged);
+        }
     }
 
     @Nonnull
@@ -154,6 +158,15 @@ final class CommandRosterActionAuthority {
         RosterKey key = new RosterKey(ownerUuid, commandFamilyId);
         generations.computeIfAbsent(key, ignored -> new AtomicLong()).incrementAndGet();
         cache.remove(key);
+    }
+
+    /** Refreshes a canonical roster immediately after its committed mutation event. */
+    void rosterChanged(@Nonnull CommandFamilyRosterMembershipChangedEvent event) {
+        Objects.requireNonNull(event, "event");
+        RosterKey key = new RosterKey(event.ownerUuid(), event.commandFamilyId());
+        generations.computeIfAbsent(key, ignored -> new AtomicLong()).incrementAndGet();
+        cache.remove(key);
+        refresh(key);
     }
 
     @Nonnull

@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
  */
 public final class CommandTimedSummoningService {
     private static final String CALLER_NAMESPACE = "Alechilles:Tamework:CommandTimedSummoning";
+    static final long RUNTIME_RECOVERY_STALE_MS = 15_000L;
 
     private final CommandTimedSummonRepository repository;
     private final PersistenceReadExecutor reads;
@@ -209,7 +210,29 @@ public final class CommandTimedSummoningService {
     /** Checkpoints leases, emits each threshold once, and stores every expired active projection. */
     @Nonnull
     public CompletionStage<TickResult> tick(long nowMs) {
-        return tickProjected(nowMs);
+        return recoverStale(nowMs).thenCompose(ignored -> tickProjected(nowMs));
+    }
+
+    /**
+     * Reconciles only operations old enough that their lease-bound world work must already have
+     * started or been rejected. This keeps a fresh asynchronous despawn from racing recovery while
+     * ensuring an escaped world-task failure cannot leave a companion in STORING forever.
+     */
+    @Nonnull
+    private CompletionStage<RecoveryResult> recoverStale(long nowMs) {
+        return reads.submit(repository::loadRecoverableOperations).thenCompose(operations -> {
+            CompletionStage<RecoveryAccumulator> chain =
+                    CompletableFuture.completedFuture(new RecoveryAccumulator());
+            for (CommandTimedSummonOperationRecord operation : operations) {
+                if (operation.updatedAtMs() > nowMs
+                        || nowMs - operation.updatedAtMs() < RUNTIME_RECOVERY_STALE_MS) {
+                    continue;
+                }
+                chain = chain.thenCompose(accumulator -> recover(operation, nowMs)
+                        .thenApply(accumulator::include));
+            }
+            return chain.thenApply(RecoveryAccumulator::result);
+        }).exceptionally(failure -> new RecoveryResult(0, 0, 1));
     }
 
     @Nonnull
