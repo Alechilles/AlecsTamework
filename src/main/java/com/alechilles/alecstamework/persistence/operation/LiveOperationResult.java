@@ -1,0 +1,49 @@
+package com.alechilles.alecstamework.persistence.operation;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/** Exact outcome of one idempotent live boundary executed outside the database transaction. */
+public record LiveOperationResult(@Nonnull Status status,
+                                  @Nonnull String code,
+                                  @Nullable Throwable cause) {
+    public LiveOperationResult {
+        if (status == null || code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Live operation status and code are required");
+        }
+        code = code.trim();
+        if (status == Status.CONFIRMED && cause != null) {
+            throw new IllegalArgumentException("Confirmed live operation cannot carry failure");
+        }
+    }
+
+    /** Returns positive evidence that the live effect is complete. */
+    @Nonnull
+    public static LiveOperationResult confirmed(@Nonnull String code) {
+        return new LiveOperationResult(Status.CONFIRMED, code, null);
+    }
+
+    /** Returns exact evidence that retrying the same idempotent boundary is safe. */
+    @Nonnull
+    public static LiveOperationResult retryable(
+            @Nonnull String code,
+            @Nullable Throwable cause
+    ) {
+        return new LiveOperationResult(Status.RETRYABLE, code, cause);
+    }
+
+    /** Returns ambiguous evidence that must fail closed until recovery can prove an outcome. */
+    @Nonnull
+    public static LiveOperationResult unknown(
+            @Nonnull String code,
+            @Nullable Throwable cause
+    ) {
+        return new LiveOperationResult(Status.UNKNOWN, code, cause);
+    }
+
+    public enum Status {
+        CONFIRMED,
+        RETRYABLE,
+        UNKNOWN
+    }
+}
