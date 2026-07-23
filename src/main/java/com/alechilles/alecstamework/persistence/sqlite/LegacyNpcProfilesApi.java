@@ -35,7 +35,7 @@ public final class LegacyNpcProfilesApi implements NpcProfilesApi {
                 ? Optional.empty()
                 : Optional.ofNullable(
                 profiles.loadProfileById(profileId.trim())
-        ).map(this::map);
+        ).map(LegacyNpcProfilesApi::mapProfile);
     }
 
     @Override
@@ -44,7 +44,7 @@ public final class LegacyNpcProfilesApi implements NpcProfilesApi {
                 ? Optional.empty()
                 : Optional.ofNullable(
                 profiles.loadProfileByNpcUuid(npcUuid)
-        ).map(this::map);
+        ).map(LegacyNpcProfilesApi::mapProfile);
     }
 
     @Override
@@ -69,7 +69,9 @@ public final class LegacyNpcProfilesApi implements NpcProfilesApi {
         ));
     }
 
-    private NpcProfileView map(NpcProfileRepository.ProfileRecord profile) {
+    public static NpcProfileView mapProfile(
+            NpcProfileRepository.ProfileRecord profile
+    ) {
         return new NpcProfileView(
                 profile.profileId(),
                 profile.currentNpcUuid(),
@@ -87,7 +89,7 @@ public final class LegacyNpcProfilesApi implements NpcProfilesApi {
         );
     }
 
-    private Set<String> ordered(String[] values) {
+    private static Set<String> ordered(String[] values) {
         LinkedHashSet<String> result = new LinkedHashSet<>();
         if (values != null) {
             for (String value : values) {

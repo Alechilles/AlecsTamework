@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import org.joml.Vector3d;
 import java.util.ArrayList;
@@ -43,12 +44,34 @@ class TameworkEventBusTest {
             assertEquals("profile-alpha", event.profileId());
         });
 
-        bus.onProfileChanged(null, profile("profile-alpha", UUID.randomUUID(), "Display A", "Custom A"));
+        bus.publishProfileChanged(
+                null,
+                publicProfile(profile(
+                        "profile-alpha",
+                        UUID.randomUUID(),
+                        "Display A",
+                        "Custom A"
+                )),
+                System.currentTimeMillis()
+        );
         assertEquals(1, deliveries.get());
 
         subscription.close();
-        bus.onProfileChanged(profile("profile-alpha", UUID.randomUUID(), "Display A", "Custom A"),
-                profile("profile-alpha", UUID.randomUUID(), "Display B", "Custom A"));
+        bus.publishProfileChanged(
+                publicProfile(profile(
+                        "profile-alpha",
+                        UUID.randomUUID(),
+                        "Display A",
+                        "Custom A"
+                )),
+                publicProfile(profile(
+                        "profile-alpha",
+                        UUID.randomUUID(),
+                        "Display B",
+                        "Custom A"
+                )),
+                System.currentTimeMillis()
+        );
         assertEquals(1, deliveries.get());
     }
 
@@ -169,7 +192,7 @@ class TameworkEventBusTest {
         UUID npcUuid = UUID.randomUUID();
         UUID ownerUuid = UUID.randomUUID();
         NpcProfileRepository.ProfileRecord profile = profile("profile-beta", npcUuid, "Display B", "Custom B");
-        bus.onCaptureRecorded(new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+        bus.publishCaptureRecorded(new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
                 npcUuid,
                 ownerUuid,
                 new String[] {"tool-a", "tool-b"},
@@ -178,8 +201,8 @@ class TameworkEventBusTest {
                 new Vector3d(1.0, 2.0, 3.0),
                 new Vector3d(4.0, 5.0, 6.0),
                 123L
-        ), profile);
-        bus.onDeathRecorded(new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+        ), publicProfile(profile));
+        bus.publishDeathRecorded(new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerUuid,
                 "Owner B",
@@ -226,8 +249,8 @@ class TameworkEventBusTest {
                 CommandLinkedNpcDeathService.DeathCauseKind.PLAYER,
                 "Owner B",
                 null
-        ), profile);
-        bus.onLostRecorded(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
+        ), publicProfile(profile));
+        bus.publishLostRecorded(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
                 npcUuid,
                 new Vector3d(7.0, 8.0, 9.0),
                 new Vector3d(4.0, 5.0, 6.0),
@@ -236,7 +259,7 @@ class TameworkEventBusTest {
                 2,
                 null,
                 0L
-        ), profile);
+        ), publicProfile(profile));
         bus.emitConfigReload(TameworkConfigFamily.INTERACTION, Set.of("interaction/farm"));
 
         assertEquals(4, events.size());
@@ -275,6 +298,12 @@ class TameworkEventBusTest {
                 new String[] {"capture"},
                 System.currentTimeMillis()
         );
+    }
+
+    private com.alechilles.alecstamework.api.NpcProfileView publicProfile(
+            NpcProfileRepository.ProfileRecord profile
+    ) {
+        return LegacyNpcProfilesApi.mapProfile(profile);
     }
 }
 

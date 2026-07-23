@@ -12,7 +12,6 @@ import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
 import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.PaidCommandRevivedEvent;
@@ -22,11 +21,8 @@ import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceChangeObserver;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -39,7 +35,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TameworkEventBus
-        implements TameworkEventsApi, PersistenceChangeObserver, AutoCloseable {
+        implements TameworkEventsApi, AutoCloseable {
     @Nullable
     private final HytaleLogger logger;
     private final CopyOnWriteArrayList<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
@@ -58,6 +54,24 @@ public final class TameworkEventBus
         dispatch(Objects.requireNonNull(event));
     }
 
+    /** Compatibility event seam over immutable profile values. */
+    public void publishProfileChanged(
+            @Nullable NpcProfileView before,
+            @Nullable NpcProfileView after,
+            long publishedAtMs
+    ) {
+        if (before == null && after == null) {
+            return;
+        }
+        dispatch(new NpcProfileChangedEvent(
+                after != null ? after.profileId() : before.profileId(),
+                CompanionProfileApiMapper.diff(before, after),
+                before,
+                after,
+                publishedAtMs
+        ));
+    }
+
     @Override
     public <E extends TameworkEvent> AutoCloseable subscribe(@Nonnull Class<E> type, @Nonnull Consumer<E> listener) {
         Subscription<E> subscription = new Subscription<>(Objects.requireNonNull(type), Objects.requireNonNull(listener));
@@ -65,28 +79,12 @@ public final class TameworkEventBus
         return () -> subscriptions.remove(subscription);
     }
 
-    @Override
-    public void onProfileChanged(@Nullable NpcProfileRepository.ProfileRecord before,
-                                 @Nullable NpcProfileRepository.ProfileRecord after) {
-        if (before == null && after == null) {
-            return;
-        }
-        String profileId = after != null ? after.profileId() : before.profileId();
-        EnumSet<ProfileChangeType> changeTypes = ApiMapper.diffProfileChanges(before, after);
-        dispatch(new NpcProfileChangedEvent(
-                profileId,
-                changeTypes,
-                before != null ? ApiMapper.mapProfile(before) : null,
-                after != null ? ApiMapper.mapProfile(after) : null,
-                System.currentTimeMillis()
-        ));
-    }
-
-    @Override
-    public void onCaptureRecorded(@Nonnull CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot,
-                                  @Nullable NpcProfileRepository.ProfileRecord profile) {
+    public void publishCaptureRecorded(
+            @Nonnull CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot,
+            @Nullable NpcProfileView profile
+    ) {
         dispatch(new NpcCapturedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
+                profile,
                 snapshot.npcUuid(),
                 snapshot.ownerId(),
                 toOrderedSet(snapshot.toolIds()),
@@ -99,11 +97,12 @@ public final class TameworkEventBus
         ));
     }
 
-    @Override
-    public void onDeathRecorded(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
-                                @Nullable NpcProfileRepository.ProfileRecord profile) {
+    public void publishDeathRecorded(
+            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            @Nullable NpcProfileView profile
+    ) {
         dispatch(new NpcDeathRecordedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
+                profile,
                 snapshot.npcUuid(),
                 snapshot.ownerId(),
                 snapshot.ownerName(),
@@ -120,11 +119,12 @@ public final class TameworkEventBus
         ));
     }
 
-    @Override
-    public void onLostRecorded(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot,
-                               @Nullable NpcProfileRepository.ProfileRecord profile) {
+    public void publishLostRecorded(
+            @Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot,
+            @Nullable NpcProfileView profile
+    ) {
         dispatch(new NpcLostRecordedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
+                profile,
                 snapshot.npcUuid(),
                 ApiMapper.mapVector(snapshot.lastKnownPosition()),
                 ApiMapper.mapVector(snapshot.homePosition()),

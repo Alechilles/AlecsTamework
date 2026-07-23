@@ -17,6 +17,7 @@ import org.joml.Vector3d;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.persistence.sqlite.LegacyNpcProfilesApi;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyPersistenceEventBridge;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
@@ -48,7 +49,9 @@ class TameworkApiImplTest {
     void exposesVersionCapabilitiesProfilesEventsAndProfileData() throws Exception {
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
             TameworkEventBus bus = new TameworkEventBus(null);
-            runtime.getNpcProfileRepository().setChangeObserver(bus);
+            runtime.getNpcProfileRepository().setChangeObserver(
+                    new LegacyPersistenceEventBridge(bus)
+            );
             CommandLinkedNpcStateSnapshotService stateSnapshotService =
                     new CommandLinkedNpcStateSnapshotService(runtime.getNpcProfileRepository());
             TameworkApi api = LegacyTameworkApiFactory.create(
