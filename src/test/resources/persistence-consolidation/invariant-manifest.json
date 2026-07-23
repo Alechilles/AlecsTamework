@@ -123,7 +123,7 @@
     {
       "id": "generation-zero-valid",
       "contract": "Generation zero is valid historical evidence and only negative generations are rejected.",
-      "status": "CHARACTERIZED",
+      "status": "REPLACEMENT_PROVEN",
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.OperationGenerationContractTest",
       "currentTests": [
