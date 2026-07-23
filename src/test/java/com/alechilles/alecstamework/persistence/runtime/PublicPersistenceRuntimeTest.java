@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAliasLiveBoundary;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationAction;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -93,7 +96,7 @@ class PublicPersistenceRuntimeTest {
         assertTrue(performance.reads().execution().count() > 0);
         assertTrue(performance.reads().maximumDepth() > 0);
         assertEquals(metrics.features().size(), diagnostics.features().size());
-        assertEquals(7, diagnostics.projectionCheckpoints().size());
+        assertEquals(8, diagnostics.projectionCheckpoints().size());
         assertEquals(0, diagnostics.outboxHead());
         assertTrue(diagnostics.openIncidentsByCode().isEmpty());
         assertTrue(diagnostics.activeQuarantinesByScope().isEmpty());
@@ -283,6 +286,28 @@ class PublicPersistenceRuntimeTest {
                 profileId(),
                 runtime.queries().projectedProfile(profileId())
                         .orElseThrow().profileId()
+        );
+        ProfileExtensionKey extensionKey =
+                new ProfileExtensionKey(profileId(), "example", "value");
+        var extension = runtime.operations().mutateExtension(
+                OperationId.create(),
+                new IdempotencyKey("extension-create"),
+                new ProfileExtensionMutation(
+                        extensionKey,
+                        ProfileExtensionMutationAction.PUT,
+                        null,
+                        "{\"ready\":true}",
+                        -5
+                )
+        );
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                extension.completion().toCompletableFuture().join().status()
+        );
+        assertEquals(
+                "{\"ready\":true}",
+                runtime.queries().projectedExtension(extensionKey)
+                        .orElseThrow().jsonPayload()
         );
         PublicPersistencePerformanceSnapshot performance =
                 runtime.performance();

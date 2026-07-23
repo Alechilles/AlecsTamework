@@ -101,6 +101,40 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         }
     }
 
+    /** Returns all active rows and tombstones for deterministic projection rebuild. */
+    public PersistenceReadResult<List<ProfileExtensionData>> findAll() {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT profile_id, namespace, data_key, payload_version,
+                       json_payload, payload_hash, revision, created_at_ms,
+                       updated_at_ms, deleted_at_ms
+                FROM profile_extension_data
+                ORDER BY profile_id, namespace, data_key
+                """)) {
+            ArrayList<ProfileExtensionData> values = new ArrayList<>();
+            long maxRevision = 0;
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    ProfileExtensionData value = read(row);
+                    values.add(value);
+                    maxRevision = Math.max(
+                            maxRevision, value.revision()
+                    );
+                }
+            }
+            return PersistenceReadResult.found(
+                    List.copyOf(values), maxRevision
+            );
+        } catch (SQLException failure) {
+            return storageFailure("extension_find_all", failure);
+        } catch (RuntimeException failure) {
+            return decodeFailure(
+                    "extension_all_row_decode_failed",
+                    "extension_find_all",
+                    failure
+            );
+        }
+    }
+
     @Override
     public PersistenceMutationResult<ProfileExtensionData> put(
             ProfileExtensionData next,

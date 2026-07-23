@@ -240,6 +240,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "projectedCommandRosterRevisions",
                         "projectedCoopResidency",
                         "projectedCoopSnapshot",
+                        "projectedExtension",
+                        "projectedExtensions",
                         "projectedLaggingCommandRosterProfiles",
                         "projectedLaggingPopulationGroupProfiles",
                         "projectedOwnerPopulationCount",

@@ -280,6 +280,12 @@ public final class SqlitePublicPersistenceAdapter {
         return projections.profileIndex();
     }
 
+    @Nonnull
+    public com.alechilles.alecstamework.companion.extension
+            .ProfileExtensionProjectionIndex extensionIndex() {
+        return projections.extensionIndex();
+    }
+
     /** Loads the complete canonical startup evidence through the read lane. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>

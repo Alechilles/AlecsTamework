@@ -107,6 +107,7 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.populationGroupIndex());
         assertNotNull(adapter.commandRosterIndex());
         assertNotNull(adapter.timedSummonIndex());
+        assertNotNull(adapter.extensionIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
@@ -124,7 +125,7 @@ class SqlitePublicPersistenceAdapterTest {
                 ).size()
         );
         assertEquals(
-                0,
+                1,
                 adapter.projections().requiredFor(
                         ProfileExtensionMutationDefinition.INSTANCE.kind()
                 ).size()
@@ -144,7 +145,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(7, result.catchUps().size());
+        assertEquals(8, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
         assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
         assertEquals(0, adapter.populationGroupIndex()

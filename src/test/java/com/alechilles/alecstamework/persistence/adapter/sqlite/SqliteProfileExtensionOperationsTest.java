@@ -217,7 +217,10 @@ class SqliteProfileExtensionOperationsTest {
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
         assertEquals(1, result.events().size());
         ProjectionEvent event = result.events().getFirst();
-        assertEquals(SqliteProfileExtensionOperations.EVENT_TYPE, event.eventType());
+        assertEquals(
+                ProfileExtensionMutationEventCodec.EVENT_TYPE,
+                event.eventType()
+        );
         return ProfileExtensionMutationEventCodec.decode(
                 event.payloadVersion(),
                 event.payloadJson()
@@ -273,7 +276,9 @@ class SqliteProfileExtensionOperationsTest {
 
         @Override
         public ProjectionApplyOutcome apply(ProjectionEvent event) {
-            if (!event.eventType().equals(SqliteProfileExtensionOperations.EVENT_TYPE)) {
+            if (!event.eventType().equals(
+                    ProfileExtensionMutationEventCodec.EVENT_TYPE
+            )) {
                 return ProjectionApplyOutcome.IRRELEVANT;
             }
             long current = revisions.getOrDefault(event.aggregateId(), -1L);

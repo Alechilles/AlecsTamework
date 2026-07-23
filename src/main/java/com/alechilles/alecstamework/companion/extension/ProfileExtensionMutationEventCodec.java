@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.extension;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -9,6 +10,8 @@ import javax.annotation.Nonnull;
 /** Version-one codec for replayable extension mutation outcomes. */
 public final class ProfileExtensionMutationEventCodec {
     public static final int VERSION = 1;
+    public static final ProjectionEventType EVENT_TYPE =
+            new ProjectionEventType("profile_extension_mutated");
 
     private ProfileExtensionMutationEventCodec() {
     }

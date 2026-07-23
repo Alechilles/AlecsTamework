@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationEventCodec;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationOutcome;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationReader;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteProfileExtensionOperations;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -118,7 +117,7 @@ final class ReplacementProfileDataMapper {
             List<ProjectionEvent> events
     ) {
         ProjectionEvent event = events.stream()
-                .filter(candidate -> SqliteProfileExtensionOperations.EVENT_TYPE.equals(
+                .filter(candidate -> ProfileExtensionMutationEventCodec.EVENT_TYPE.equals(
                         candidate.eventType()
                 ))
                 .findFirst()

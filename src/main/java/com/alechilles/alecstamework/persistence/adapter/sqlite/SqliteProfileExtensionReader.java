@@ -71,6 +71,20 @@ public final class SqliteProfileExtensionReader {
         ));
     }
 
+    /** Lists validated active rows and tombstones for projection rebuild. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<ProfileExtensionData>>>
+    findAll() {
+        return reads.execute(new SqliteReadCommand<>(
+                new PersistenceReadKind("profile_extension_all"),
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> validateAll(
+                        new SqliteProfileExtensionDataStore(connection)
+                                .findAll()
+                )
+        ));
+    }
+
     private PersistenceReadResult<ProfileExtensionData> validateOne(
             PersistenceReadResult<ProfileExtensionData> result,
             PersistenceReadKind kind

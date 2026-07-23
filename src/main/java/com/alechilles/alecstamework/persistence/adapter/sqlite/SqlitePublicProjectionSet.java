@@ -9,12 +9,12 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionIndex;
 import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionIndex;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -47,6 +47,8 @@ final class SqlitePublicProjectionSet {
     private final SqliteTimedSummonLeaseReader timedSummonReader;
     private final ProvisioningProjectionIndex provisioningIndex;
     private final SqliteProvisioningReader provisioningReader;
+    private final ProfileExtensionProjectionIndex extensionIndex;
+    private final SqliteProfileExtensionReader extensionReader;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
     SqlitePublicProjectionSet(
             @Nonnull PersistenceFeatureRegistry registry,
@@ -81,22 +83,22 @@ final class SqlitePublicProjectionSet {
         this.provisioningIndex = new ProvisioningProjectionIndex();
         this.provisioningReader =
                 new SqliteProvisioningReader(kernel.reads());
-        this.consumers = Map.of(
-                profileObserver.consumerId(),
+        this.extensionIndex = new ProfileExtensionProjectionIndex();
+        this.extensionReader =
+                new SqliteProfileExtensionReader(kernel.reads());
+        this.consumers = List.<ProjectionConsumer>of(
                 profileObserver,
-                coopIndex.consumerId(),
                 coopIndex,
-                ownerPopulationIndex.consumerId(),
                 ownerPopulationIndex,
-                populationGroupIndex.consumerId(),
                 populationGroupIndex,
-                commandRosterIndex.consumerId(),
                 commandRosterIndex,
-                timedSummonIndex.consumerId(),
                 timedSummonIndex,
-                provisioningIndex.consumerId(),
-                provisioningIndex
-        );
+                provisioningIndex,
+                extensionIndex
+        ).stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                ProjectionConsumer::consumerId,
+                java.util.function.Function.identity()
+        ));
         requireExactRegistryConsumers();
     }
     @Nonnull
@@ -115,25 +117,25 @@ final class SqlitePublicProjectionSet {
     PopulationGroupProjectionIndex populationGroupIndex() {
         return populationGroupIndex;
     }
-
     @Nonnull
     CommandRosterProjectionIndex commandRosterIndex() {
         return commandRosterIndex;
     }
-
     @Nonnull
     TimedSummonProjectionIndex timedSummonIndex() {
         return timedSummonIndex;
     }
-
     @Nonnull
     ProvisioningProjectionIndex provisioningIndex() {
         return provisioningIndex;
     }
-
     @Nonnull
     CompanionProfileObserverProjection profileIndex() {
         return profileObserver;
+    }
+    @Nonnull
+    ProfileExtensionProjectionIndex extensionIndex() {
+        return extensionIndex;
     }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
@@ -387,30 +389,29 @@ final class SqlitePublicProjectionSet {
                         failure
                 );
             }
-            return rebuildProvisioning();
+            return rebuildDetails();
         });
     }
 
     private CompletionStage<SqlitePublicProjectionStartupResult>
-    rebuildProvisioning() {
-        return provisioningReader.findAll().thenCompose(read -> {
-            if (!(read instanceof PersistenceReadResult.Found<
-                    List<ProvisioningRecord>> found)) {
+    rebuildDetails() {
+        return SqliteDetailProjectionBootstrap.rebuild(
+                provisioningReader,
+                provisioningIndex,
+                extensionReader,
+                extensionIndex
+        ).thenCompose(result -> {
+            if (!result.complete()) {
                 return completed(
-                        SqlitePublicProjectionStartupResult.Status
-                                .CANONICAL_READ_FAILED,
-                        List.of(),
-                        readFailure("provisioning", read)
-                );
-            }
-            try {
-                provisioningIndex.rebuild(found.value());
-            } catch (Throwable failure) {
-                return completed(
-                        SqlitePublicProjectionStartupResult.Status
+                        result.status()
+                                == SqliteDetailProjectionBootstrap.Status
+                                .CANONICAL_READ_FAILED
+                                ? SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_READ_FAILED
+                                : SqlitePublicProjectionStartupResult.Status
                                 .CANONICAL_REBUILD_FAILED,
                         List.of(),
-                        failure
+                        result.failure()
                 );
             }
             return catchUp(all(), 0, new ArrayList<>());

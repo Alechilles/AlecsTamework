@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterActionView;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionKey;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionValue;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -108,6 +109,21 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<ProfileExtensionData>>
     findExtension(@Nonnull ProfileExtensionKey key) {
         return adapter.extensionReader().findActive(key);
+    }
+
+    @Nonnull
+    public Optional<ProfileExtensionProjectionValue> projectedExtension(
+            @Nonnull ProfileExtensionKey key
+    ) {
+        return adapter.extensionIndex().find(key);
+    }
+
+    @Nonnull
+    public Map<String, ProfileExtensionProjectionValue> projectedExtensions(
+            @Nonnull ProfileId profileId,
+            @Nonnull String namespace
+    ) {
+        return adapter.extensionIndex().namespace(profileId, namespace);
     }
 
     @Nonnull

@@ -19,7 +19,6 @@ import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
-import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -31,9 +30,6 @@ import javax.annotation.Nonnull;
  */
 public final class SqliteProfileExtensionOperations {
     public static final String FEATURE_SCOPE = "profile_extension";
-    public static final ProjectionEventType EVENT_TYPE =
-            new ProjectionEventType("profile_extension_mutated");
-
     private final SqliteDatabaseOperationCoordinator coordinator;
     private final List<ProjectionConsumer> requiredConsumers;
 
@@ -236,7 +232,7 @@ public final class SqliteProfileExtensionOperations {
     ) {
         return new ProjectionEventDraft(
                 operationId,
-                EVENT_TYPE,
+                ProfileExtensionMutationEventCodec.EVENT_TYPE,
                 outcome.key().aggregateId(),
                 outcome.revision(),
                 ProfileExtensionMutationEventCodec.VERSION,

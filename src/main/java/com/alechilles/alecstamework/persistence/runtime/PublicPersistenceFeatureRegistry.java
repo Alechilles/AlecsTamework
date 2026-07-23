@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinitio
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinition;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionIndex;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
@@ -68,6 +69,8 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("timed_summon_index");
     public static final ProjectionConsumerId PROVISIONING_INDEX =
             new ProjectionConsumerId("provisioning_index");
+    public static final ProjectionConsumerId EXTENSION_INDEX =
+            ProfileExtensionProjectionIndex.CONSUMER_ID;
 
     private PublicPersistenceFeatureRegistry() {
     }
@@ -456,7 +459,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY),
-                Set.of(),
+                Set.of(EXTENSION_INDEX),
                 Set.of(
                         PersistenceStartupNode.LOAD_FEATURE_DETAIL,
                         PersistenceStartupNode.RECOVER_OPERATIONS
