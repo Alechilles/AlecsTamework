@@ -39,7 +39,9 @@ class ProfileExtensionDataDecoderTest {
     }
 
     private ProfileExtensionData value(int version, String json, Sha256Hash hash) {
-        return new ProfileExtensionData(KEY, version, json, hash, 1, -10_000, -9_000);
+        return new ProfileExtensionData(
+                KEY, version, json, hash, 1, -10_000, -9_000, null
+        );
     }
 
     private void assertFailure(

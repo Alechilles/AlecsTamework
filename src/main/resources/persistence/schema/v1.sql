@@ -194,6 +194,7 @@ CREATE TABLE profile_extension_data (
     revision INTEGER NOT NULL CHECK (revision > 0),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
+    deleted_at_ms INTEGER,
     PRIMARY KEY (profile_id, namespace, data_key),
     FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id) ON DELETE CASCADE
 );

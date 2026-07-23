@@ -42,7 +42,7 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         require(key, "Extension key");
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT profile_id, namespace, data_key, payload_version, json_payload,
-                       payload_hash, revision, created_at_ms, updated_at_ms
+                       payload_hash, revision, created_at_ms, updated_at_ms, deleted_at_ms
                 FROM profile_extension_data
                 WHERE profile_id = ? AND namespace = ? AND data_key = ?
                 """)) {
@@ -72,9 +72,9 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
             }
             try (PreparedStatement statement = connection.prepareStatement("""
                     SELECT profile_id, namespace, data_key, payload_version, json_payload,
-                           payload_hash, revision, created_at_ms, updated_at_ms
+                           payload_hash, revision, created_at_ms, updated_at_ms, deleted_at_ms
                     FROM profile_extension_data
-                    WHERE profile_id = ? AND namespace = ?
+                    WHERE profile_id = ? AND namespace = ? AND deleted_at_ms IS NULL
                     ORDER BY data_key
                     """)) {
                 statement.setString(1, profileId.toString());
@@ -133,7 +133,7 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE profile_extension_data
                 SET payload_version = ?, json_payload = ?, payload_hash = ?,
-                    revision = ?, updated_at_ms = ?
+                    revision = ?, updated_at_ms = ?, deleted_at_ms = NULL
                 WHERE profile_id = ? AND namespace = ? AND data_key = ? AND revision = ?
                 """)) {
             statement.setInt(1, next.payloadVersion());
@@ -158,7 +158,8 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
     @Override
     public PersistenceMutationResult<ProfileExtensionData> delete(
             ProfileExtensionKey key,
-            long expectedRevision
+            long expectedRevision,
+            long deletedAtMs
     ) {
         require(key, "Extension key");
         if (expectedRevision <= 0) {
@@ -171,14 +172,33 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         if (existing.revision() != expectedRevision) {
             return PersistenceMutationResult.rejected(PersistenceMutationStatus.REVISION_MISMATCH);
         }
+        if (existing.deleted()) {
+            return PersistenceMutationResult.applied(existing);
+        }
         try (PreparedStatement statement = connection.prepareStatement("""
-                DELETE FROM profile_extension_data
+                UPDATE profile_extension_data
+                SET revision = ?, updated_at_ms = ?, deleted_at_ms = ?
                 WHERE profile_id = ? AND namespace = ? AND data_key = ? AND revision = ?
                 """)) {
-            bindKey(statement, key);
-            statement.setLong(4, expectedRevision);
+            statement.setLong(1, expectedRevision + 1);
+            statement.setLong(2, deletedAtMs);
+            statement.setLong(3, deletedAtMs);
+            statement.setString(4, key.profileId().toString());
+            statement.setString(5, key.namespace());
+            statement.setString(6, key.dataKey());
+            statement.setLong(7, expectedRevision);
+            ProfileExtensionData tombstone = new ProfileExtensionData(
+                    existing.key(),
+                    existing.payloadVersion(),
+                    existing.jsonPayload(),
+                    existing.payloadHash(),
+                    expectedRevision + 1,
+                    existing.createdAtMs(),
+                    deletedAtMs,
+                    deletedAtMs
+            );
             return statement.executeUpdate() == 1
-                    ? PersistenceMutationResult.applied(existing)
+                    ? PersistenceMutationResult.applied(tombstone)
                     : PersistenceMutationResult.rejected(
                     PersistenceMutationStatus.REVISION_MISMATCH
             );
@@ -191,8 +211,8 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO profile_extension_data(
                     profile_id, namespace, data_key, payload_version, json_payload,
-                    payload_hash, revision, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    payload_hash, revision, created_at_ms, updated_at_ms, deleted_at_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
                 """)) {
             statement.setString(1, next.key().profileId().toString());
             statement.setString(2, next.key().namespace());
@@ -248,12 +268,16 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
                 Sha256Hash.parse(row.getString("payload_hash")),
                 row.getLong("revision"),
                 row.getLong("created_at_ms"),
-                row.getLong("updated_at_ms")
+                row.getLong("updated_at_ms"),
+                nullableLong(row, "deleted_at_ms")
         );
     }
 
     private void requireValidMutation(ProfileExtensionData value, long expectedRevision) {
         require(value, "Extension value");
+        if (value.deleted()) {
+            throw new IllegalArgumentException("Extension put cannot write a tombstone");
+        }
         if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE
                 || value.revision() != expectedRevision + 1) {
             throw new IllegalArgumentException(
@@ -273,6 +297,11 @@ public final class SqliteProfileExtensionDataStore implements ProfileExtensionDa
         statement.setString(1, key.profileId().toString());
         statement.setString(2, key.namespace());
         statement.setString(3, key.dataKey());
+    }
+
+    private Long nullableLong(ResultSet row, String column) throws SQLException {
+        long value = row.getLong(column);
+        return row.wasNull() ? null : value;
     }
 
     private <T> PersistenceReadResult<T> storageFailure(String operation, Throwable failure) {

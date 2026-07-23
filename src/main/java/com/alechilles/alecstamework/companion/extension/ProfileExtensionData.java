@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.extension;
 
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Immutable profile extension row with version, integrity, and optimistic revision evidence.
@@ -16,7 +17,8 @@ public record ProfileExtensionData(@Nonnull ProfileExtensionKey key,
                                    @Nonnull Sha256Hash payloadHash,
                                    long revision,
                                    long createdAtMs,
-                                   long updatedAtMs) {
+                                   long updatedAtMs,
+                                   @Nullable Long deletedAtMs) {
     public ProfileExtensionData {
         if (key == null || jsonPayload == null || payloadHash == null) {
             throw new IllegalArgumentException("Complete profile extension data is required");
@@ -41,7 +43,13 @@ public record ProfileExtensionData(@Nonnull ProfileExtensionKey key,
                 Sha256Hash.ofUtf8(jsonPayload),
                 1,
                 createdAtMs,
-                createdAtMs
+                createdAtMs,
+                null
         );
+    }
+
+    /** Returns whether the latest durable revision is a deletion tombstone. */
+    public boolean deleted() {
+        return deletedAtMs != null;
     }
 }

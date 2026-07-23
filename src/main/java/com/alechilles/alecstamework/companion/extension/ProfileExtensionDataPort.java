@@ -30,10 +30,11 @@ public interface ProfileExtensionDataPort {
             long expectedRevision
     );
 
-    /** Deletes only the exact expected positive revision and returns the removed row. */
+    /** Advances the exact expected positive revision to a durable deletion tombstone. */
     @Nonnull
     PersistenceMutationResult<ProfileExtensionData> delete(
             @Nonnull ProfileExtensionKey key,
-            long expectedRevision
+            long expectedRevision,
+            long deletedAtMs
     );
 }

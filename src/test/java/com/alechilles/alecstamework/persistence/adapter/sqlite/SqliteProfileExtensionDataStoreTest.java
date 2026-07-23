@@ -71,6 +71,16 @@ class SqliteProfileExtensionDataStoreTest {
                             store.findNamespace(PROFILE, KEY.namespace())
                     );
             assertEquals(List.of(updated), namespace.value());
+            ProfileExtensionData deleted = store.delete(KEY, 2, -7_000).value();
+            assertTrue(deleted.deleted());
+            assertEquals(3, deleted.revision());
+            assertEquals(
+                    List.of(),
+                    assertInstanceOf(
+                            PersistenceReadResult.Found.class,
+                            store.findNamespace(PROFILE, KEY.namespace())
+                    ).value()
+            );
             connection.commit();
         }
     }
@@ -123,7 +133,7 @@ class SqliteProfileExtensionDataStoreTest {
             ProfileExtensionData initial =
                     ProfileExtensionData.initial(KEY, "{\"value\":1}", -9_000);
             assertTrue(store.put(initial, 0).applied());
-            assertTrue(store.delete(KEY, 1).applied());
+            assertTrue(store.delete(KEY, 1, -8_000).applied());
             connection.rollback();
         }
         try (Connection connection = connections.openReadConnection()) {
@@ -142,7 +152,8 @@ class SqliteProfileExtensionDataStoreTest {
                 Sha256Hash.ofUtf8(json),
                 revision,
                 -9_000,
-                updatedAt
+                updatedAt,
+                null
         );
     }
 
