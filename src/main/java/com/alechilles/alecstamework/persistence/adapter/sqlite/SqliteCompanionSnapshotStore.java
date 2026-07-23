@@ -74,6 +74,28 @@ public final class SqliteCompanionSnapshotStore implements CompanionSnapshotPort
     }
 
     @Override
+    public List<CompanionSnapshot> findCurrentByProfile(ProfileId profileId) {
+        require(profileId, "Profile ID");
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + SELECT_COLUMNS + """
+                         FROM companion_snapshot
+                         WHERE profile_id = ? AND is_current = 1
+                         ORDER BY snapshot_kind, created_at_ms, snapshot_id
+                        """)) {
+            statement.setString(1, profileId.toString());
+            ArrayList<CompanionSnapshot> snapshots = new ArrayList<>();
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    snapshots.add(readSnapshot(row));
+                }
+            }
+            return List.copyOf(snapshots);
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("snapshot_find_current_profile", failure);
+        }
+    }
+
+    @Override
     public List<CompanionSnapshot> findHistory(ProfileId profileId, SnapshotKind kind) {
         require(profileId, "Profile ID");
         require(kind, "Snapshot kind");

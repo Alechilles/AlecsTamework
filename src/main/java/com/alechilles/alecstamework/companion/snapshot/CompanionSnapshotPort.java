@@ -21,6 +21,10 @@ public interface CompanionSnapshotPort {
             @Nonnull SnapshotKind kind
     );
 
+    /** Lists every current snapshot for a profile in stable kind order. */
+    @Nonnull
+    List<CompanionSnapshot> findCurrentByProfile(@Nonnull ProfileId profileId);
+
     @Nonnull
     List<CompanionSnapshot> findHistory(
             @Nonnull ProfileId profileId,

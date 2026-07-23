@@ -58,6 +58,7 @@ class SqliteCompanionSnapshotStoreTest {
             assertTrue(store.replaceCurrent(first).applied());
             assertTrue(store.replaceCurrent(second).applied());
             assertEquals(second, store.findCurrent(PROFILE, KIND).orElseThrow());
+            assertEquals(java.util.List.of(second), store.findCurrentByProfile(PROFILE));
             assertEquals(2, store.findHistory(PROFILE, KIND).size());
             assertFalse(store.findById(SNAPSHOT_A).orElseThrow().current());
             assertTrue(store.findById(SNAPSHOT_B).orElseThrow().current());
