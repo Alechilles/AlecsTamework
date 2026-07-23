@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEventCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationOutcome;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -62,15 +64,15 @@ public final class SqliteCompanionProfileOperations {
                         List.of(OperationScope.profile(mutation.profileId())),
                         mutation.requestedAtMs()
                 ),
-                (transaction, operation) -> List.of(event(
+                (transaction, operation) -> events(
                         operation.operationId(),
                         apply(transaction, mutation)
-                )),
+                ),
                 requiredConsumers
         );
     }
 
-    private CompanionProfileMutationOutcome apply(
+    private AppliedMutation apply(
             SqlitePersistenceTransactionContext transaction,
             CompanionProfileMutation mutation
     ) {
@@ -80,7 +82,7 @@ public final class SqliteCompanionProfileOperations {
         return update(transaction, (CompanionProfileMutation.Update) mutation);
     }
 
-    private CompanionProfileMutationOutcome create(
+    private AppliedMutation create(
             SqlitePersistenceTransactionContext transaction,
             CompanionProfileMutation.Create create
     ) {
@@ -100,11 +102,7 @@ public final class SqliteCompanionProfileOperations {
                             && links.equals(create.toolLinks())
                             ? CompanionProfileMutationOutcome.Status.UNCHANGED
                             : CompanionProfileMutationOutcome.Status.CONFLICT;
-            return outcome(
-                    status,
-                    create,
-                    existing.metadataRevision()
-            );
+            return unchanged(outcome(status, create, existing.metadataRevision()));
         }
         requireApplied(
                 transaction.identities().createProfile(create.identity()),
@@ -118,33 +116,49 @@ public final class SqliteCompanionProfileOperations {
                 transaction.toolLinks().replace(create.profileId(), create.toolLinks()),
                 "profile_create_tool_links"
         );
-        return outcome(
+        CompanionProfileMutationOutcome outcome = outcome(
                 CompanionProfileMutationOutcome.Status.CREATED,
                 create,
                 create.identity().metadataRevision()
         );
+        CompanionProfileProjectionState after =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        create.profileId()
+                );
+        return changed(
+                outcome,
+                null,
+                after,
+                CompanionProfileProjectionChange.Source.METADATA
+        );
     }
 
-    private CompanionProfileMutationOutcome update(
+    private AppliedMutation update(
             SqlitePersistenceTransactionContext transaction,
             CompanionProfileMutation.Update update
     ) {
         CompanionIdentity existing =
                 transaction.identities().findProfile(update.profileId()).orElse(null);
         if (existing == null) {
-            return outcome(
+            return unchanged(outcome(
                     CompanionProfileMutationOutcome.Status.NOT_FOUND,
                     update,
                     0
-            );
+            ));
         }
         if (existing.metadataRevision() != update.expectedMetadataRevision()) {
-            return outcome(
+            return unchanged(outcome(
                     CompanionProfileMutationOutcome.Status.REVISION_MISMATCH,
                     update,
                     existing.metadataRevision()
-            );
+            ));
         }
+        CompanionProfileProjectionState before =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        update.profileId()
+                );
         PersistenceMutationResult<CompanionIdentity> identity =
                 transaction.identities().updateProfile(
                         update.nextIdentity(),
@@ -156,34 +170,45 @@ public final class SqliteCompanionProfileOperations {
         PersistenceMutationResult<List<CompanionToolLink>> links =
                 transaction.toolLinks().replace(update.profileId(), update.toolLinks());
         requireApplied(links, "profile_update_tool_links");
-        return outcome(
+        CompanionProfileMutationOutcome outcome = outcome(
                 CompanionProfileMutationOutcome.Status.UPDATED,
                 update,
                 identity.value().metadataRevision()
         );
+        CompanionProfileProjectionState after =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        update.profileId()
+                );
+        return changed(
+                outcome,
+                before,
+                after,
+                CompanionProfileProjectionChange.Source.METADATA
+        );
     }
 
-    private CompanionProfileMutationOutcome rejected(
+    private AppliedMutation rejected(
             PersistenceMutationStatus status,
             CompanionProfileMutation mutation,
             long revision
     ) {
         return switch (status) {
-            case NOT_FOUND -> outcome(
+            case NOT_FOUND -> unchanged(outcome(
                     CompanionProfileMutationOutcome.Status.NOT_FOUND,
                     mutation,
                     revision
-            );
-            case REVISION_MISMATCH -> outcome(
+            ));
+            case REVISION_MISMATCH -> unchanged(outcome(
                     CompanionProfileMutationOutcome.Status.REVISION_MISMATCH,
                     mutation,
                     revision
-            );
-            case CONFLICT -> outcome(
+            ));
+            case CONFLICT -> unchanged(outcome(
                     CompanionProfileMutationOutcome.Status.CONFLICT,
                     mutation,
                     revision
-            );
+            ));
             default -> throw new IllegalStateException(
                     "profile_mutation_" + status.name().toLowerCase()
             );
@@ -210,11 +235,50 @@ public final class SqliteCompanionProfileOperations {
         return new ProjectionEventDraft(
                 operationId,
                 EVENT_TYPE,
-                outcome.profileId().toString(),
+                "profile-mutation-result:" + outcome.profileId(),
                 outcome.metadataRevision(),
                 CompanionProfileMutationEventCodec.VERSION,
                 CompanionProfileMutationEventCodec.encode(outcome),
                 outcome.updatedAtMs()
+        );
+    }
+
+    private List<ProjectionEventDraft> events(
+            OperationId operationId,
+            AppliedMutation applied
+    ) {
+        ProjectionEventDraft result = event(operationId, applied.outcome());
+        return applied.change() == null
+                ? List.of(result)
+                : List.of(
+                        result,
+                        SqliteCompanionProfileProjectionComposer.event(
+                                operationId,
+                                applied.change()
+                        )
+                );
+    }
+
+    private AppliedMutation unchanged(CompanionProfileMutationOutcome outcome) {
+        return new AppliedMutation(outcome, null);
+    }
+
+    private AppliedMutation changed(
+            CompanionProfileMutationOutcome outcome,
+            CompanionProfileProjectionState before,
+            CompanionProfileProjectionState after,
+            CompanionProfileProjectionChange.Source source
+    ) {
+        return new AppliedMutation(
+                outcome,
+                new CompanionProfileProjectionChange(
+                        source,
+                        outcome.profileId(),
+                        outcome.metadataRevision(),
+                        before,
+                        after,
+                        outcome.updatedAtMs()
+                )
         );
     }
 
@@ -230,5 +294,11 @@ public final class SqliteCompanionProfileOperations {
             );
         }
         return result.value();
+    }
+
+    private record AppliedMutation(
+            CompanionProfileMutationOutcome outcome,
+            CompanionProfileProjectionChange change
+    ) {
     }
 }

@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEventCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationOutcome;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -185,11 +187,33 @@ class SqliteCompanionProfileOperationsTest {
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
-        assertEquals(1, result.events().size());
-        return CompanionProfileMutationEventCodec.decode(
+        assertEquals(
+                SqliteCompanionProfileOperations.EVENT_TYPE,
+                result.events().getFirst().eventType()
+        );
+        CompanionProfileMutationOutcome outcome =
+                CompanionProfileMutationEventCodec.decode(
                 result.events().getFirst().payloadVersion(),
                 result.events().getFirst().payloadJson()
         );
+        if (outcome.status() == CompanionProfileMutationOutcome.Status.CREATED
+                || outcome.status() == CompanionProfileMutationOutcome.Status.UPDATED) {
+            assertEquals(2, result.events().size());
+            CompanionProfileProjectionChange change =
+                    CompanionProfileProjectionChangeCodec.decode(
+                            result.events().get(1).payloadVersion(),
+                            result.events().get(1).payloadJson()
+                    );
+            assertEquals(outcome.profileId(), change.profileId());
+            assertEquals(outcome.metadataRevision(), change.sourceRevision());
+            assertEquals(
+                    CompanionProfileProjectionChange.Source.METADATA,
+                    change.source()
+            );
+        } else {
+            assertEquals(1, result.events().size());
+        }
+        return outcome;
     }
 
     private CompanionProfileMutation.Create create(
