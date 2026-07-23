@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
+import com.alechilles.alecstamework.persistence.compensation.RefundClaimPort;
 import com.alechilles.alecstamework.persistence.incidents.IncidentStore;
 import com.alechilles.alecstamework.persistence.operation.OperationStore;
 import com.alechilles.alecstamework.persistence.projection.ProjectionOutboxPort;
@@ -26,6 +27,7 @@ public final class SqlitePersistenceTransactionContext {
     private final ProjectionOutboxPort outbox;
     private final ProfileExtensionDataPort profileExtensions;
     private final CompanionToolLinkPort toolLinks;
+    private final RefundClaimPort refunds;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -39,6 +41,7 @@ public final class SqlitePersistenceTransactionContext {
         outbox = new SqliteProjectionOutboxStore(connection);
         profileExtensions = new SqliteProfileExtensionDataStore(connection);
         toolLinks = new SqliteCompanionToolLinkStore(connection);
+        refunds = new SqliteRefundClaimStore(connection);
     }
 
     @Nonnull
@@ -83,5 +86,10 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     CompanionToolLinkPort toolLinks() {
         return toolLinks;
+    }
+
+    @Nonnull
+    RefundClaimPort refunds() {
+        return refunds;
     }
 }

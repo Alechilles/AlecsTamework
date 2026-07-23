@@ -216,6 +216,23 @@ CREATE TABLE operation_participant (
 CREATE INDEX idx_operation_participant_scope
     ON operation_participant(scope_type, scope_key, operation_id);
 
+CREATE TABLE refund_claim (
+    operation_id TEXT PRIMARY KEY,
+    recipient_uuid TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    reason_code TEXT NOT NULL,
+    receipt_key TEXT NOT NULL UNIQUE,
+    claimed_at_ms INTEGER NOT NULL,
+    delivery_evidence TEXT,
+    delivered_at_ms INTEGER,
+    FOREIGN KEY (operation_id) REFERENCES operation_envelope(operation_id) ON DELETE CASCADE,
+    CHECK (
+        (delivery_evidence IS NULL AND delivered_at_ms IS NULL)
+        OR (delivery_evidence IS NOT NULL AND delivered_at_ms IS NOT NULL)
+    )
+);
+
 CREATE TABLE projection_outbox (
     event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     operation_id TEXT NOT NULL,
