@@ -143,7 +143,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(6, result.catchUps().size());
+        assertEquals(7, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
         assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
         assertEquals(0, adapter.populationGroupIndex()
@@ -152,6 +152,7 @@ class SqlitePublicPersistenceAdapterTest {
                 .actionSnapshot().size());
         assertEquals(0, adapter.timedSummonIndex()
                 .readySnapshot().size());
+        assertEquals(0, adapter.provisioningIndex().snapshot().size());
     }
 
     @Test

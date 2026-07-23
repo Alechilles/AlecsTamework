@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDef
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -23,7 +24,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(10, registry.descriptors().size());
+        assertEquals(11, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -47,7 +48,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(16, operationKinds.size());
+        assertEquals(17, operationKinds.size());
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS
@@ -139,5 +140,27 @@ class PublicPersistenceFeatureRegistryTest {
                 Set.of(PublicPersistenceFeatureRegistry.TIMED_SUMMON_INDEX),
                 timed.projectionConsumers()
         );
+
+        PersistenceFeatureDescriptor provisioning =
+                registry.requireFeature(
+                        PublicPersistenceFeatureRegistry.PROVISIONING
+                );
+        assertEquals(
+                Set.of("provisioning_record"),
+                provisioning.ownedAuthorities()
+        );
+        assertEquals(
+                Set.of(
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
+                ),
+                provisioning.operationScopes().get(
+                        CompanionProvisioningDefinition.INSTANCE.kind()
+                )
+        );
+        assertTrue(provisioning.projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry.PROVISIONING_INDEX
+        ));
     }
 }
