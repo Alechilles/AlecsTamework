@@ -17,8 +17,6 @@ public record ProfileDataEntryView(@Nonnull String profileId,
         if (revision < 1L) {
             throw new IllegalArgumentException("revision must be positive for an existing value.");
         }
-        if (updatedAtMs < 0L) {
-            throw new IllegalArgumentException("updatedAtMs cannot be negative.");
-        }
+        // Signed Hytale world-time timestamps are valid; zero is not overloaded as a bound.
     }
 }

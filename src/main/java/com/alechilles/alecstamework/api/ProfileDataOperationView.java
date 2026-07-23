@@ -42,9 +42,7 @@ public record ProfileDataOperationView(@Nonnull UUID operationId,
                 && resultingRevision != UNKNOWN_REVISION) {
             throw new IllegalArgumentException("Only a committed CAS may expose a resulting revision.");
         }
-        if (updatedAtMs < 0L) {
-            throw new IllegalArgumentException("updatedAtMs cannot be negative.");
-        }
+        // Signed Hytale world-time timestamps are valid; zero is not overloaded as a bound.
     }
 
     public boolean terminal() {
