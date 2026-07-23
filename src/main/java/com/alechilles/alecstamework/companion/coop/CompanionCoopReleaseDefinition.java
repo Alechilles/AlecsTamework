@@ -12,7 +12,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/** Version-one typed operation definition for coop-to-live release. */
+/** Typed operation definition for coop-to-live release. */
 public final class CompanionCoopReleaseDefinition
         implements OperationDefinition<CompanionCoopReleaseRequest> {
     public static final CompanionCoopReleaseDefinition INSTANCE =
