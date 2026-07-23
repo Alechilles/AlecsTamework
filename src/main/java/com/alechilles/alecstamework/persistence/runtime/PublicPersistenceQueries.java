@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupAs
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
@@ -50,6 +51,26 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
     findProfile(@Nonnull NpcAlias alias) {
         return adapter.profileReader().findByAlias(alias);
+    }
+
+    @Nonnull
+    public Optional<CompanionProfileProjectionState> projectedProfile(
+            @Nonnull ProfileId profileId
+    ) {
+        return adapter.profileIndex().find(profileId);
+    }
+
+    @Nonnull
+    public Optional<CompanionProfileProjectionState> projectedProfile(
+            @Nonnull NpcAlias alias
+    ) {
+        return adapter.profileIndex().find(alias);
+    }
+
+    @Nonnull
+    public Map<ProfileId, CompanionProfileProjectionState>
+    projectedProfileSnapshot() {
+        return adapter.profileIndex().snapshot();
     }
 
     @Nonnull

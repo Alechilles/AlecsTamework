@@ -246,6 +246,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "projectedOwnerPopulationSnapshot",
                         "projectedPopulationGroupAssignments",
                         "projectedPopulationGroupCounts",
+                        "projectedProfile",
+                        "projectedProfileSnapshot",
                         "projectedProvisioning",
                         "projectedProvisioningSnapshot",
                         "projectedTimedSummons"

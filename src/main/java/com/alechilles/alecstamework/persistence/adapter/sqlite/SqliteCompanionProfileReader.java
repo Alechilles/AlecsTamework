@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
@@ -13,6 +14,8 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -72,6 +75,41 @@ public final class SqliteCompanionProfileReader {
         ));
     }
 
+    /** Reads every public projection state on one consistent connection. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<
+            List<CompanionProfileProjectionState>>>
+    findAllProjectionStates() {
+        return reads.execute(new SqliteReadCommand<>(
+                new PersistenceReadKind(
+                        "companion_profile_projection_all"
+                ),
+                PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                connection -> {
+                    ArrayList<CompanionProfileProjectionState> states =
+                            new ArrayList<>();
+                    for (CompanionLifecycle lifecycle
+                            : new SqliteCompanionLifecycleStore(connection)
+                            .findAll()) {
+                        CompanionProfileReadModel model = requireModel(
+                                connection, lifecycle.profileId()
+                        );
+                        states.add(CompanionProfileProjectionState.compose(
+                                model.identity(),
+                                model.currentAlias(),
+                                model.lifecycle(),
+                                model.toolLinks(),
+                                model.currentSnapshots(),
+                                model.currentCoopSlot()
+                        ));
+                    }
+                    return PersistenceReadResult.found(
+                            List.copyOf(states), states.size()
+                    );
+                }
+        ));
+    }
+
     private PersistenceReadResult<CompanionProfileReadModel> compose(
             Connection connection,
             ProfileId profileId,
@@ -96,11 +134,50 @@ public final class SqliteCompanionProfileReader {
                     null
             ));
         }
+        CompanionProfileReadModel model = model(
+                connection, profileId, identity, lifecycle
+        );
+        return PersistenceReadResult.found(
+                model,
+                Math.max(
+                        model.identity().metadataRevision(),
+                        model.lifecycle().revision().value()
+                )
+        );
+    }
+
+    private CompanionProfileReadModel requireModel(
+            Connection connection,
+            ProfileId profileId
+    ) {
+        CompanionIdentity identity =
+                new SqliteCompanionIdentityStore(connection)
+                        .findProfile(profileId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "profile_projection_identity_missing"
+                        ));
+        CompanionLifecycle lifecycle =
+                new SqliteCompanionLifecycleStore(connection)
+                        .findByProfile(profileId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "profile_projection_lifecycle_missing"
+                        ));
+        return model(connection, profileId, identity, lifecycle);
+    }
+
+    private CompanionProfileReadModel model(
+            Connection connection,
+            ProfileId profileId,
+            CompanionIdentity identity,
+            CompanionLifecycle lifecycle
+    ) {
+        SqliteCompanionIdentityStore identities =
+                new SqliteCompanionIdentityStore(connection);
         SqliteCompanionCoopStore coops = new SqliteCompanionCoopStore(connection);
         CoopSlot coopSlot = coops.findResidencyByProfile(profileId)
                 .flatMap(residency -> coops.findSlot(residency.slotKey()))
                 .orElse(null);
-        CompanionProfileReadModel model = new CompanionProfileReadModel(
+        return new CompanionProfileReadModel(
                 identity,
                 identities.findCurrentAlias(profileId).orElse(null),
                 lifecycle,
@@ -108,10 +185,6 @@ public final class SqliteCompanionProfileReader {
                 new SqliteCompanionSnapshotStore(connection)
                         .findCurrentByProfile(profileId),
                 coopSlot
-        );
-        return PersistenceReadResult.found(
-                model,
-                Math.max(identity.metadataRevision(), lifecycle.revision().value())
         );
     }
 }

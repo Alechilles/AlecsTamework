@@ -38,6 +38,7 @@ import javax.annotation.Nonnull;
 final class SqlitePublicProjectionSet {
     private final PersistenceFeatureRegistry registry;
     private final ProjectionCoordinator coordinator;
+    private final CompanionProfileObserverProjection profileObserver;
     private final CoopResidencyProjectionIndex coopIndex;
     private final OwnerPopulationProjectionIndex ownerPopulationIndex;
     private final PopulationGroupProjectionIndex populationGroupIndex;
@@ -47,7 +48,6 @@ final class SqlitePublicProjectionSet {
     private final ProvisioningProjectionIndex provisioningIndex;
     private final SqliteProvisioningReader provisioningReader;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
-
     SqlitePublicProjectionSet(
             @Nonnull PersistenceFeatureRegistry registry,
             @Nonnull SqlitePersistenceKernel kernel,
@@ -69,7 +69,7 @@ final class SqlitePublicProjectionSet {
                 ProjectionRetryPolicy.DEFAULT,
                 clock
         );
-        CompanionProfileObserverProjection profileObserver =
+        this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
         this.coopIndex = new CoopResidencyProjectionIndex();
         this.ownerPopulationIndex = new OwnerPopulationProjectionIndex();
@@ -99,22 +99,18 @@ final class SqlitePublicProjectionSet {
         );
         requireExactRegistryConsumers();
     }
-
     @Nonnull
     ProjectionCoordinator coordinator() {
         return coordinator;
     }
-
     @Nonnull
     CoopResidencyProjectionIndex coopIndex() {
         return coopIndex;
     }
-
     @Nonnull
     OwnerPopulationProjectionIndex ownerPopulationIndex() {
         return ownerPopulationIndex;
     }
-
     @Nonnull
     PopulationGroupProjectionIndex populationGroupIndex() {
         return populationGroupIndex;
@@ -133,6 +129,11 @@ final class SqlitePublicProjectionSet {
     @Nonnull
     ProvisioningProjectionIndex provisioningIndex() {
         return provisioningIndex;
+    }
+
+    @Nonnull
+    CompanionProfileObserverProjection profileIndex() {
+        return profileObserver;
     }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
@@ -164,18 +165,51 @@ final class SqlitePublicProjectionSet {
     /** Rebuilds canonical indexes before catching every declared consumer up. */
     @Nonnull
     CompletionStage<SqlitePublicProjectionStartupResult> rebuildAndCatchUp(
+            @Nonnull SqliteCompanionProfileReader profileReader,
             @Nonnull SqliteCompanionCoopReader coopReader,
             @Nonnull SqliteCompanionLifecycleReader lifecycleReader,
             @Nonnull SqlitePopulationGroupReader populationGroupReader,
             @Nonnull SqliteCommandRosterReader commandRosterReader
     ) {
-        if (coopReader == null || lifecycleReader == null
+        if (profileReader == null || coopReader == null
+                || lifecycleReader == null
                 || populationGroupReader == null
                 || commandRosterReader == null) {
             throw new IllegalArgumentException(
                     "Canonical projection readers are required"
             );
         }
+        return SqliteProfileProjectionBootstrap.rebuild(
+                profileReader, profileObserver
+        ).thenCompose(result -> {
+            if (result.status()
+                    != SqliteProfileProjectionBootstrap.Status.COMPLETE) {
+                return completed(
+                        result.status() == SqliteProfileProjectionBootstrap
+                                .Status.CANONICAL_READ_FAILED
+                                ? SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_READ_FAILED
+                                : SqlitePublicProjectionStartupResult.Status
+                                .CANONICAL_REBUILD_FAILED,
+                        List.of(),
+                        result.failure()
+                );
+            }
+            return rebuildCoop(
+                    coopReader,
+                    lifecycleReader,
+                    populationGroupReader,
+                    commandRosterReader
+            );
+        });
+    }
+
+    private CompletionStage<SqlitePublicProjectionStartupResult> rebuildCoop(
+            SqliteCompanionCoopReader coopReader,
+            SqliteCompanionLifecycleReader lifecycleReader,
+            SqlitePopulationGroupReader populationGroupReader,
+            SqliteCommandRosterReader commandRosterReader
+    ) {
         return coopReader.findAllOccupancies().thenCompose(read -> {
             if (!(read instanceof
                     PersistenceReadResult.Found<List<CoopOccupancy>> found)) {

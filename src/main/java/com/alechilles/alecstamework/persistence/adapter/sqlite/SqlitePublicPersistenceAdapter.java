@@ -274,6 +274,12 @@ public final class SqlitePublicPersistenceAdapter {
         return projections.provisioningIndex();
     }
 
+    @Nonnull
+    public com.alechilles.alecstamework.api.internal
+            .CompanionProfileObserverProjection profileIndex() {
+        return projections.profileIndex();
+    }
+
     /** Loads the complete canonical startup evidence through the read lane. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<SqlitePublicCanonicalSnapshot>>
@@ -302,7 +308,11 @@ public final class SqlitePublicPersistenceAdapter {
     public CompletionStage<SqlitePublicProjectionStartupResult>
     buildProjections() {
         return projections.rebuildAndCatchUp(
-                coops, lifecycles, populationGroups, commandRosters
+                profiles,
+                coops,
+                lifecycles,
+                populationGroups,
+                commandRosters
         );
     }
 

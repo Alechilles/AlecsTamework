@@ -1,14 +1,20 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.projection.ProjectionApplyOutcome;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
@@ -24,6 +30,9 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
 
     private final Consumer<NpcProfileChangedEvent> listener;
     private final Map<String, Long> appliedRevisions = new HashMap<>();
+    private final Map<ProfileId, CompanionProfileProjectionState> profiles =
+            new HashMap<>();
+    private final Map<NpcAlias, ProfileId> currentAliases = new HashMap<>();
 
     public CompanionProfileObserverProjection(
             @Nonnull Consumer<NpcProfileChangedEvent> listener
@@ -67,6 +76,7 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
         if (applied >= event.aggregateRevision()) {
             return ProjectionApplyOutcome.ALREADY_APPLIED;
         }
+        validateReplacement(change.after());
         listener.accept(new NpcProfileChangedEvent(
                 change.profileId().toString(),
                 CompanionProfileApiMapper.diff(change.before(), change.after()),
@@ -78,7 +88,107 @@ public final class CompanionProfileObserverProjection implements ProjectionConsu
                         : CompanionProfileApiMapper.map(change.after()),
                 change.changedAtMs()
         ));
+        replace(change.before(), change.after());
         appliedRevisions.put(event.aggregateId(), event.aggregateRevision());
         return ProjectionApplyOutcome.APPLIED;
+    }
+
+    /** Replaces the non-authoritative lookup from one canonical snapshot. */
+    public synchronized void rebuild(
+            @Nonnull Collection<CompanionProfileProjectionState> states
+    ) {
+        if (states == null) {
+            throw new IllegalArgumentException(
+                    "Canonical profile projection states are required"
+            );
+        }
+        profiles.clear();
+        currentAliases.clear();
+        for (CompanionProfileProjectionState state : List.copyOf(states)) {
+            if (state == null
+                    || profiles.putIfAbsent(state.profileId(), state) != null) {
+                throw new IllegalArgumentException(
+                        "Profile projection states must be unique"
+                );
+            }
+            indexAlias(state);
+        }
+    }
+
+    /** Returns a current projection without touching storage. */
+    @Nonnull
+    public synchronized Optional<CompanionProfileProjectionState> find(
+            @Nonnull ProfileId profileId
+    ) {
+        if (profileId == null) {
+            throw new IllegalArgumentException("Profile ID is required");
+        }
+        return Optional.ofNullable(profiles.get(profileId));
+    }
+
+    /** Resolves only the current projected alias without touching storage. */
+    @Nonnull
+    public synchronized Optional<CompanionProfileProjectionState> find(
+            @Nonnull NpcAlias alias
+    ) {
+        if (alias == null) {
+            throw new IllegalArgumentException("NPC alias is required");
+        }
+        ProfileId profileId = currentAliases.get(alias);
+        return profileId == null
+                ? Optional.empty()
+                : Optional.ofNullable(profiles.get(profileId));
+    }
+
+    /** Returns an immutable snapshot for bounded API iteration. */
+    @Nonnull
+    public synchronized Map<ProfileId, CompanionProfileProjectionState>
+    snapshot() {
+        return Map.copyOf(profiles);
+    }
+
+    private void replace(
+            CompanionProfileProjectionState before,
+            CompanionProfileProjectionState after
+    ) {
+        if (before != null && before.currentAlias() != null) {
+            currentAliases.remove(before.currentAlias(), before.profileId());
+        }
+        if (after == null) {
+            if (before != null) {
+                profiles.remove(before.profileId());
+            }
+            return;
+        }
+        profiles.put(after.profileId(), after);
+        indexAlias(after);
+    }
+
+    private void validateReplacement(
+            CompanionProfileProjectionState after
+    ) {
+        if (after == null || after.currentAlias() == null) {
+            return;
+        }
+        ProfileId conflict = currentAliases.get(after.currentAlias());
+        if (conflict != null && !conflict.equals(after.profileId())) {
+            throw new IllegalArgumentException(
+                    "Profile projection current alias conflict"
+            );
+        }
+    }
+
+    private void indexAlias(CompanionProfileProjectionState state) {
+        if (state.currentAlias() == null) {
+            return;
+        }
+        ProfileId conflict = currentAliases.putIfAbsent(
+                state.currentAlias(), state.profileId()
+        );
+        if (conflict != null && !conflict.equals(state.profileId())) {
+            throw new IllegalArgumentException(
+                    "Profile projection current alias conflict"
+            );
+        }
     }
 }

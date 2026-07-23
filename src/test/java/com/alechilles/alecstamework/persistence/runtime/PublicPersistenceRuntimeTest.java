@@ -279,6 +279,11 @@ class PublicPersistenceRuntimeTest {
                 runtime.queries().findProfile(profileId())
                         .toCompletableFuture().join()
         );
+        assertEquals(
+                profileId(),
+                runtime.queries().projectedProfile(profileId())
+                        .orElseThrow().profileId()
+        );
         PublicPersistencePerformanceSnapshot performance =
                 runtime.performance();
         assertTrue(performance.writer().execution().count() > 0);
