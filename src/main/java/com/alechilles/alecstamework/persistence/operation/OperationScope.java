@@ -45,6 +45,14 @@ public record OperationScope(@Nonnull OperationScopeType type, @Nonnull String k
         return new OperationScope(OperationScopeType.OWNER, require(ownerId, "Owner ID").toString());
     }
 
+    /** Creates one normalized coop slot scope. */
+    public static OperationScope coop(@Nonnull String coopSlotKey) {
+        if (coopSlotKey == null || coopSlotKey.isBlank()) {
+            throw new IllegalArgumentException("Coop slot key is required");
+        }
+        return new OperationScope(OperationScopeType.COOP, coopSlotKey);
+    }
+
     /** Creates the singleton global scope. */
     public static OperationScope global() {
         return new OperationScope(OperationScopeType.GLOBAL, GLOBAL_KEY);
