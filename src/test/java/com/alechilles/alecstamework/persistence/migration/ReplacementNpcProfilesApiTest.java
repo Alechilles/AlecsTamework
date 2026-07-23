@@ -1,10 +1,10 @@
 package com.alechilles.alecstamework.persistence.migration;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.internal.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileReader;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecutor;
+import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Set;

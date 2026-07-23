@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecuto
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteUnitOfWorkRunner;
+import com.alechilles.alecstamework.persistence.facade.ReplacementProfileDataApi;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;

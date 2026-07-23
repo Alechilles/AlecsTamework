@@ -11,12 +11,12 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Maps replacement profile projection evidence to the released public API contract. */
-final class CompanionProfileApiMapper {
+public final class CompanionProfileApiMapper {
     private CompanionProfileApiMapper() {
     }
 
     @Nonnull
-    static NpcProfileView map(@Nonnull CompanionProfileProjectionState state) {
+    public static NpcProfileView map(@Nonnull CompanionProfileProjectionState state) {
         if (state == null) {
             throw new IllegalArgumentException("Profile projection state is required");
         }
@@ -45,7 +45,7 @@ final class CompanionProfileApiMapper {
     }
 
     @Nonnull
-    static EnumSet<ProfileChangeType> diff(
+    public static EnumSet<ProfileChangeType> diff(
             @Nullable CompanionProfileProjectionState before,
             @Nullable CompanionProfileProjectionState after
     ) {

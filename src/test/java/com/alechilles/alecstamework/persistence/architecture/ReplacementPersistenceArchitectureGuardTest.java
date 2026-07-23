@@ -26,6 +26,7 @@ class ReplacementPersistenceArchitectureGuardTest {
             MAIN.resolve("companion/profile"),
             MAIN.resolve("companion/snapshot"),
             MAIN.resolve("persistence/adapter/sqlite"),
+            MAIN.resolve("persistence/facade"),
             MAIN.resolve("persistence/kernel"),
             MAIN.resolve("persistence/operation"),
             MAIN.resolve("persistence/projection")

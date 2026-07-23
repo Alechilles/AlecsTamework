@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.api.internal;
+package com.alechilles.alecstamework.persistence.facade;
 
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;

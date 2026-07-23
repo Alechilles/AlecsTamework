@@ -1,7 +1,8 @@
-package com.alechilles.alecstamework.api.internal;
+package com.alechilles.alecstamework.persistence.facade;
 
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.internal.CompanionProfileApiMapper;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;

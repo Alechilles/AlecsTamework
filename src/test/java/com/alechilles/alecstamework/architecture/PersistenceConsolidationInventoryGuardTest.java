@@ -45,6 +45,7 @@ class PersistenceConsolidationInventoryGuardTest {
             SOURCE_ROOT.resolve("persistence/control"),
             SOURCE_ROOT.resolve("persistence/migration"),
             SOURCE_ROOT.resolve("persistence/adapter"),
+            SOURCE_ROOT.resolve("persistence/facade"),
             SOURCE_ROOT.resolve("companion/identity"),
             SOURCE_ROOT.resolve("companion/lifecycle"),
             SOURCE_ROOT.resolve("companion/snapshot")
