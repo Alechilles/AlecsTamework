@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDe
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
+import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -67,7 +68,10 @@ final class SqlitePublicOperationSet {
         engine = new SqliteOperationEngine(
                 registry.operationDefinitions(),
                 kernel.units(),
-                admission
+                admission,
+                admission instanceof PersistenceContainmentListener listener
+                        ? listener
+                        : PersistenceContainmentListener.NO_OP
         );
         SqliteOperationEvidenceReader evidence =
                 new SqliteOperationEvidenceReader(kernel.reads());

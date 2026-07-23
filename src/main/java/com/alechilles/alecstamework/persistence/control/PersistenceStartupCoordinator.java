@@ -18,7 +18,9 @@ import javax.annotation.Nonnull;
  * the entire coordinator to global read-only.</p>
  */
 public final class PersistenceStartupCoordinator
-        implements PersistenceOperationAdmissionGate, AutoCloseable {
+        implements PersistenceOperationAdmissionGate,
+        PersistenceContainmentListener,
+        AutoCloseable {
     private enum Mode {
         STARTING,
         ACTIVE,
@@ -150,6 +152,23 @@ public final class PersistenceStartupCoordinator
         }
         synchronized (monitor) {
             quarantines.remove(scope);
+        }
+    }
+
+    @Override
+    public void contained(
+            @Nonnull List<OperationScope> scopes,
+            @Nonnull String reasonCode
+    ) {
+        if (scopes == null || scopes.isEmpty()
+                || scopes.stream().anyMatch(java.util.Objects::isNull)
+                || reasonCode == null || reasonCode.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Contained scopes and reason are required"
+            );
+        }
+        for (OperationScope scope : List.copyOf(scopes)) {
+            quarantine(scope, reasonCode);
         }
     }
 

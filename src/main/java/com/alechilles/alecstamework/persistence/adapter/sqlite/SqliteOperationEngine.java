@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.TransactionReplayPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
 import com.alechilles.alecstamework.persistence.compensation.PreparedCompensationDetail;
 import com.alechilles.alecstamework.persistence.compensation.TimedCompensatedOperationWork;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
@@ -43,6 +44,7 @@ public final class SqliteOperationEngine {
     private final OperationDefinitionRegistry definitions;
     private final SqliteUnitOfWorkRunner units;
     private final PersistenceOperationAdmissionGate admission;
+    private final PersistenceContainmentListener containmentListener;
     private final SqliteOperationCompensationEngine compensations;
     private final SqliteOperationContainmentEngine containment;
 
@@ -51,7 +53,8 @@ public final class SqliteOperationEngine {
         this(
                 definitions,
                 units,
-                PersistenceOperationAdmissionGate.allowAll()
+                PersistenceOperationAdmissionGate.allowAll(),
+                PersistenceContainmentListener.NO_OP
         );
     }
 
@@ -60,12 +63,28 @@ public final class SqliteOperationEngine {
             @Nonnull SqliteUnitOfWorkRunner units,
             @Nonnull PersistenceOperationAdmissionGate admission
     ) {
-        if (definitions == null || units == null || admission == null) {
+        this(
+                definitions,
+                units,
+                admission,
+                PersistenceContainmentListener.NO_OP
+        );
+    }
+
+    public SqliteOperationEngine(
+            @Nonnull OperationDefinitionRegistry definitions,
+            @Nonnull SqliteUnitOfWorkRunner units,
+            @Nonnull PersistenceOperationAdmissionGate admission,
+            @Nonnull PersistenceContainmentListener containmentListener
+    ) {
+        if (definitions == null || units == null || admission == null
+                || containmentListener == null) {
             throw new IllegalArgumentException("Operation engine dependencies are required");
         }
         this.definitions = definitions;
         this.units = units;
         this.admission = admission;
+        this.containmentListener = containmentListener;
         this.compensations = new SqliteOperationCompensationEngine(units);
         this.containment = new SqliteOperationContainmentEngine(units);
     }
@@ -173,8 +192,25 @@ public final class SqliteOperationEngine {
             @Nonnull List<OperationScope> scopes,
             long containedAtMs
     ) {
-        return containment.contain(
+        List<OperationScope> notifiedScopes = List.copyOf(
+                new java.util.TreeSet<>(scopes)
+        );
+        SqliteUnitOfWorkRunner.Submission<
+                com.alechilles.alecstamework.persistence.incidents
+                        .IncidentRecord> submitted = containment.contain(
                 operation, failureCode, summary, scopes, containedAtMs
+        );
+        return new SqliteUnitOfWorkRunner.Submission<>(
+                submitted.acceptance(),
+                submitted.completion().thenApply(result -> {
+                    if (result instanceof PersistenceTransactionResult
+                            .Committed<?>) {
+                        containmentListener.contained(
+                                notifiedScopes, failureCode
+                        );
+                    }
+                    return result;
+                })
         );
     }
 

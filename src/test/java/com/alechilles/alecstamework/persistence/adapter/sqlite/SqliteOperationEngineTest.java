@@ -351,41 +351,55 @@ class SqliteOperationEngineTest {
     @Test
     void unknownContainmentBlocksNewScopeWorkButAllowsExactReadback()
             throws Exception {
-        OperationEnvelope prepared = committed(
-                engine.prepare(definition, request())
+        java.util.concurrent.atomic.AtomicReference<List<OperationScope>>
+                notified = new java.util.concurrent.atomic.AtomicReference<>();
+        SqliteOperationEngine notifying = new SqliteOperationEngine(
+                definitions,
+                new SqliteUnitOfWorkRunner(writer, reads),
+                com.alechilles.alecstamework.persistence.control
+                        .PersistenceOperationAdmissionGate.allowAll(),
+                (scopes, reason) -> {
+                    assertEquals("receipt_read_failed", reason);
+                    notified.set(scopes);
+                }
         );
-        OperationEnvelope applying = committed(engine.transition(
+        OperationEnvelope prepared = committed(
+                notifying.prepare(definition, request())
+        );
+        OperationEnvelope applying = committed(notifying.transition(
                 prepared,
                 OperationPhase.LIVE_APPLYING,
                 null,
                 null,
                 -9_500
         ));
-        OperationEnvelope unknown = committed(engine.transition(
+        OperationEnvelope unknown = committed(notifying.transition(
                 applying,
                 OperationPhase.UNKNOWN,
                 "live",
                 "receipt_read_failed",
                 -9_000
         ));
-        committed(engine.containUnknown(
+        List<OperationScope> containedScopes = List.of(
+                OperationScope.operation(OPERATION),
+                OperationScope.profile(PROFILE)
+        );
+        committed(notifying.containUnknown(
                 unknown,
                 "receipt_read_failed",
                 "Could not prove external mutation",
-                List.of(
-                        OperationScope.operation(OPERATION),
-                        OperationScope.profile(PROFILE)
-                ),
+                containedScopes,
                 -8_500
         ));
+        assertEquals(containedScopes, notified.get());
 
         OperationEnvelope exactReplay = committed(
-                engine.prepare(definition, request())
+                notifying.prepare(definition, request())
         );
         assertEquals(OperationPhase.UNKNOWN, exactReplay.phase());
 
         PersistenceTransactionResult<OperationEnvelope> rejected =
-                engine.prepare(definition, new OperationRequest<>(
+                notifying.prepare(definition, new OperationRequest<>(
                         OTHER_OPERATION,
                         new IdempotencyKey("other-profile-create-test"),
                         new Payload("Other"),
