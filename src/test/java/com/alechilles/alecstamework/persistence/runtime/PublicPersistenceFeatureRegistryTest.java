@@ -25,18 +25,21 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(11, registry.descriptors().size());
+        assertEquals(12, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
         );
         HashSet<String> operationKinds = new HashSet<>();
+        HashSet<String> authorities = new HashSet<>();
         for (PersistenceFeatureDescriptor descriptor
                 : registry.descriptors()) {
-            assertFalse(descriptor.ownedAuthorities().isEmpty());
             assertFalse(descriptor.readinessEvidence().isEmpty());
             assertFalse(descriptor.quarantineGranularity().isEmpty());
             assertFalse(descriptor.metricsNamespace().isBlank());
+            descriptor.ownedAuthorities().forEach(
+                    authority -> assertTrue(authorities.add(authority))
+            );
             descriptor.operationDefinitions().forEach(definition -> {
                 assertTrue(operationKinds.add(
                         definition.kind().value()
@@ -50,6 +53,21 @@ class PublicPersistenceFeatureRegistryTest {
             });
         }
         assertEquals(18, operationKinds.size());
+
+        PersistenceFeatureDescriptor economics = registry.requireFeature(
+                PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
+        );
+        assertEquals(
+                Set.of("refund_claim", "refund_claim_item"),
+                economics.ownedAuthorities()
+        );
+        PersistenceFeatureDescriptor capture = registry.requireFeature(
+                PublicPersistenceFeatureRegistry.CAPTURE
+        );
+        assertTrue(capture.ownedAuthorities().isEmpty());
+        assertTrue(capture.startupDependencies().contains(
+                PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
+        ));
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS

@@ -6,7 +6,7 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
- * Transaction-local authority for one-time item refund claims.
+ * Transaction-local authority for one-time refund recipes.
  *
  * <p>Implementations never perform inventory mutation. They only persist the deterministic claim
  * and the positive receipt returned by an idempotent live delivery boundary.</p>

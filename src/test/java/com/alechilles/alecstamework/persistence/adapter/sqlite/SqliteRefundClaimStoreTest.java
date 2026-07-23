@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
+import com.alechilles.alecstamework.persistence.compensation.RefundItem;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies exact, idempotent refund claims without an independent phase machine. */
@@ -69,6 +71,13 @@ class SqliteRefundClaimStoreTest {
                     .findByReceipt(claim.receiptKey())
                     .orElseThrow();
             assertTrue(delivered.delivered());
+            assertEquals(
+                    List.of(
+                            new RefundItem("capture-device", 1),
+                            new RefundItem("life-essence", 3)
+                    ),
+                    delivered.items()
+            );
             assertEquals("inventory_receipt", delivered.deliveryEvidence());
             assertEquals(-800, delivered.deliveredAtMs());
             connection.commit();
@@ -89,8 +98,7 @@ class SqliteRefundClaimStoreTest {
             RefundClaim conflicting = new RefundClaim(
                     claim.operationId(),
                     claim.recipientUuid(),
-                    "different-item",
-                    claim.quantity(),
+                    List.of(new RefundItem("different-item", 1)),
                     claim.reasonCode(),
                     claim.receiptKey(),
                     claim.claimedAtMs(),
@@ -114,12 +122,31 @@ class SqliteRefundClaimStoreTest {
         }
     }
 
+    @Test
+    void rejectsDuplicateItemIdsBeforeAnyClaimCanBeStored() {
+        assertThrows(IllegalArgumentException.class, () -> new RefundClaim(
+                OPERATION,
+                UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                List.of(
+                        new RefundItem("life-essence", 1),
+                        new RefundItem("life-essence", 2)
+                ),
+                "capture_aborted",
+                "refund:duplicate",
+                -900,
+                null,
+                null
+        ));
+    }
+
     private RefundClaim claim(String receipt) {
         return new RefundClaim(
                 OPERATION,
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
-                "capture-device",
-                1,
+                List.of(
+                        new RefundItem("capture-device", 1),
+                        new RefundItem("life-essence", 3)
+                ),
                 "capture_aborted",
                 receipt,
                 -900,

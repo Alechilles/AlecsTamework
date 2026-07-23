@@ -45,6 +45,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("timed_summon");
     public static final PersistenceFeatureId PROVISIONING =
             new PersistenceFeatureId("provisioning");
+    public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
+            new PersistenceFeatureId("economic_compensation");
     public static final PersistenceFeatureId CAPTURE =
             new PersistenceFeatureId("capture");
     public static final PersistenceFeatureId DORMANT =
@@ -80,6 +82,7 @@ public final class PublicPersistenceFeatureRegistry {
                 commandRoster(),
                 PublicPersistenceTimedFeature.create(),
                 PublicPersistenceProvisioningFeature.create(),
+                economicCompensation(),
                 capture(),
                 dormant(),
                 coop(),
@@ -284,7 +287,7 @@ public final class PublicPersistenceFeatureRegistry {
         return descriptor(
                 CAPTURE,
                 PersistenceFeatureDomain.CAPTURE,
-                Set.of("refund_claim"),
+                Set.of(),
                 List.of(CompanionCaptureDefinition.INSTANCE),
                 scopes(
                         CompanionCaptureDefinition.INSTANCE,
@@ -293,7 +296,7 @@ public final class PublicPersistenceFeatureRegistry {
                                 OperationScopeType.OWNER
                         )
                 ),
-                Set.of(IDENTITY, LIFECYCLE),
+                Set.of(IDENTITY, LIFECYCLE, ECONOMIC_COMPENSATION),
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
@@ -305,6 +308,26 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER
+                )
+        );
+    }
+
+    private static PersistenceFeatureDescriptor economicCompensation() {
+        return descriptor(
+                ECONOMIC_COMPENSATION,
+                PersistenceFeatureDomain.COMPENSATION,
+                Set.of("refund_claim", "refund_claim_item"),
+                List.of(),
+                Map.of(),
+                Set.of(),
+                Set.of(),
+                Set.of(
+                        PersistenceStartupNode.LOAD_FEATURE_DETAIL,
+                        PersistenceStartupNode.RECOVER_OPERATIONS
+                ),
+                Set.of(
+                        OperationScopeType.OPERATION,
                         OperationScopeType.OWNER
                 )
         );

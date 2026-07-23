@@ -52,6 +52,7 @@ public final class SqliteSchemaV1Manager implements PersistenceSchemaManager {
             "coop_slot",
             "coop_residency",
             "refund_claim",
+            "refund_claim_item",
             "import_manifest"
     );
 

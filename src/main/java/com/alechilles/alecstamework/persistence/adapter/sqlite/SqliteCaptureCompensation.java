@@ -10,10 +10,12 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.persistence.compensation.PreparedCompensationDetail;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
+import com.alechilles.alecstamework.persistence.compensation.RefundItem;
 import com.alechilles.alecstamework.persistence.compensation.TimedCompensatedOperationWork;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -100,8 +102,10 @@ final class SqliteCaptureCompensation {
         return new RefundClaim(
                 operationId,
                 capture.source().actorUuid(),
-                capture.source().sourceItemId(),
-                capture.source().quantity(),
+                List.of(new RefundItem(
+                        capture.source().sourceItemId(),
+                        capture.source().quantity()
+                )),
                 REASON,
                 "capture-refund:" + operationId,
                 capture.requestedAtMs(),
@@ -116,8 +120,7 @@ final class SqliteCaptureCompensation {
     ) {
         return expected.operationId().equals(actual.operationId())
                 && expected.recipientUuid().equals(actual.recipientUuid())
-                && expected.itemId().equals(actual.itemId())
-                && expected.quantity() == actual.quantity()
+                && expected.items().equals(actual.items())
                 && expected.reasonCode().equals(actual.reasonCode())
                 && expected.receiptKey().equals(actual.receiptKey())
                 && expected.claimedAtMs() == actual.claimedAtMs();

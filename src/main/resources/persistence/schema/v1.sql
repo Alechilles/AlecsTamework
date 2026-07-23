@@ -478,8 +478,6 @@ CREATE TABLE provisioning_record (
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,
-    item_id TEXT NOT NULL,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
     reason_code TEXT NOT NULL,
     receipt_key TEXT NOT NULL UNIQUE,
     claimed_at_ms INTEGER NOT NULL,
@@ -490,6 +488,16 @@ CREATE TABLE refund_claim (
         (delivery_evidence IS NULL AND delivered_at_ms IS NULL)
         OR (delivery_evidence IS NOT NULL AND delivered_at_ms IS NOT NULL)
     )
+);
+
+CREATE TABLE refund_claim_item (
+    operation_id TEXT NOT NULL,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    item_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (operation_id, ordinal),
+    UNIQUE (operation_id, item_id),
+    FOREIGN KEY (operation_id) REFERENCES refund_claim(operation_id) ON DELETE CASCADE
 );
 
 CREATE TABLE projection_outbox (

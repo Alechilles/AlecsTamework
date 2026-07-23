@@ -47,10 +47,9 @@ public record PersistenceFeatureDescriptor(
         quarantineGranularity = Set.copyOf(quarantineGranularity);
         metricsNamespace = metricsNamespace.trim();
         validateOperations(operationDefinitions, operationScopes);
-        if (ownedAuthorities.isEmpty() || readinessEvidence.isEmpty()
-                || quarantineGranularity.isEmpty()) {
+        if (readinessEvidence.isEmpty() || quarantineGranularity.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Feature authority, readiness, and quarantine declarations are required"
+                    "Feature readiness and quarantine declarations are required"
             );
         }
     }

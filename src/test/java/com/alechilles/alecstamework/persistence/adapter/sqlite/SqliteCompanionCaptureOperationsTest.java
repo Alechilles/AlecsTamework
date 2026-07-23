@@ -255,8 +255,8 @@ class SqliteCompanionCaptureOperationsTest {
         assertEquals(1, refundDeliveries.get());
         RefundClaim delivered = refundClaim(operationId(5));
         assertTrue(delivered.delivered());
-        assertEquals("capture-device", delivered.itemId());
-        assertEquals(1, delivered.quantity());
+        assertEquals("capture-device", delivered.items().getFirst().itemId());
+        assertEquals(1, delivered.items().getFirst().quantity());
         assertEquals(
                 "refund_receipt_confirmed",
                 delivered.deliveryEvidence()

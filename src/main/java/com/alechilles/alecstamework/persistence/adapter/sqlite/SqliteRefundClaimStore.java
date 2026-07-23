@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaimPort;
+import com.alechilles.alecstamework.persistence.compensation.RefundItem;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationStatus;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceStoreException;
@@ -11,15 +12,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
-/** Connection-bound SQLite adapter for deterministic one-time item refund claims. */
+/** Connection-bound SQLite adapter for deterministic one-time refund recipes. */
 public final class SqliteRefundClaimStore implements RefundClaimPort {
     private static final String SELECT_COLUMNS = """
-            operation_id, recipient_uuid, item_id, quantity, reason_code, receipt_key,
-            claimed_at_ms, delivery_evidence, delivered_at_ms
+            operation_id, recipient_uuid, reason_code, receipt_key, claimed_at_ms,
+            delivery_evidence, delivered_at_ms
             """;
 
     private final Connection connection;
@@ -71,20 +74,19 @@ public final class SqliteRefundClaimStore implements RefundClaimPort {
         }
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO refund_claim(
-                    operation_id, recipient_uuid, item_id, quantity, reason_code,
-                    receipt_key, claimed_at_ms, delivery_evidence, delivered_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    operation_id, recipient_uuid, reason_code, receipt_key,
+                    claimed_at_ms, delivery_evidence, delivered_at_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, claim.operationId().toString());
             statement.setString(2, claim.recipientUuid().toString());
-            statement.setString(3, claim.itemId());
-            statement.setInt(4, claim.quantity());
-            statement.setString(5, claim.reasonCode());
-            statement.setString(6, claim.receiptKey());
-            statement.setLong(7, claim.claimedAtMs());
-            setNullableText(statement, 8, claim.deliveryEvidence());
-            setNullableLong(statement, 9, claim.deliveredAtMs());
+            statement.setString(3, claim.reasonCode());
+            statement.setString(4, claim.receiptKey());
+            statement.setLong(5, claim.claimedAtMs());
+            setNullableText(statement, 6, claim.deliveryEvidence());
+            setNullableLong(statement, 7, claim.deliveredAtMs());
             statement.executeUpdate();
+            insertItems(claim);
             return PersistenceMutationResult.applied(claim);
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("refund_create", failure);
@@ -163,19 +165,61 @@ public final class SqliteRefundClaimStore implements RefundClaimPort {
     }
 
     private RefundClaim read(ResultSet row) throws SQLException {
+        OperationId operationId = OperationId.parse(
+                row.getString("operation_id")
+        );
         long deliveredAt = row.getLong("delivered_at_ms");
         boolean deliveredAtAbsent = row.wasNull();
         return new RefundClaim(
-                OperationId.parse(row.getString("operation_id")),
+                operationId,
                 UUID.fromString(row.getString("recipient_uuid")),
-                row.getString("item_id"),
-                row.getInt("quantity"),
+                readItems(operationId),
                 row.getString("reason_code"),
                 row.getString("receipt_key"),
                 row.getLong("claimed_at_ms"),
                 row.getString("delivery_evidence"),
                 deliveredAtAbsent ? null : deliveredAt
         );
+    }
+
+    private void insertItems(RefundClaim claim) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO refund_claim_item(
+                    operation_id, ordinal, item_id, quantity
+                ) VALUES (?, ?, ?, ?)
+                """)) {
+            for (int ordinal = 0; ordinal < claim.items().size(); ordinal++) {
+                RefundItem item = claim.items().get(ordinal);
+                statement.setString(1, claim.operationId().toString());
+                statement.setInt(2, ordinal);
+                statement.setString(3, item.itemId());
+                statement.setInt(4, item.quantity());
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        }
+    }
+
+    private List<RefundItem> readItems(OperationId operationId)
+            throws SQLException {
+        ArrayList<RefundItem> items = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT item_id, quantity
+                FROM refund_claim_item
+                WHERE operation_id = ?
+                ORDER BY ordinal
+                """)) {
+            statement.setString(1, operationId.toString());
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    items.add(new RefundItem(
+                            row.getString("item_id"),
+                            row.getInt("quantity")
+                    ));
+                }
+            }
+        }
+        return List.copyOf(items);
     }
 
     private void setNullableText(
