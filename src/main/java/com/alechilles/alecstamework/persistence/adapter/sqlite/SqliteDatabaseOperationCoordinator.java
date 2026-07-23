@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
-import com.alechilles.alecstamework.persistence.operation.DatabaseOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
 import com.alechilles.alecstamework.persistence.operation.DurableOperationWork;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -65,12 +65,12 @@ public final class SqliteDatabaseOperationCoordinator {
                 publisher.validateConsumers(requiredConsumers);
         SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepared =
                 operations.prepare(definition, request);
-        CompletionStage<DatabaseOperationResult> completion =
+        CompletionStage<OperationWorkflowResult> completion =
                 prepared.completion().thenCompose(result -> {
                     if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
                             || !(committed.value() instanceof OperationEnvelope preparedOperation)) {
                         return completed(failed(
-                                DatabaseOperationResult.Status.PREPARE_FAILED,
+                                OperationWorkflowResult.Status.PREPARE_FAILED,
                                 null,
                                 List.of(),
                                 transactionFailure(result, "operation_prepare_failed")
@@ -81,7 +81,7 @@ public final class SqliteDatabaseOperationCoordinator {
         return new Submission(prepared.acceptance(), completion);
     }
 
-    private CompletionStage<DatabaseOperationResult> continueFrom(
+    private CompletionStage<OperationWorkflowResult> continueFrom(
             OperationEnvelope operation,
             DurableOperationWork work,
             List<ProjectionConsumer> consumers
@@ -90,7 +90,7 @@ public final class SqliteDatabaseOperationCoordinator {
             case PUBLISHED, DURABLE -> publisher.resume(operation, consumers);
             case PREPARED, RETRYABLE -> commitAndPublish(operation, work, consumers);
             default -> completed(failed(
-                    DatabaseOperationResult.Status.INVALID_PHASE,
+                    OperationWorkflowResult.Status.INVALID_PHASE,
                     operation,
                     List.of(),
                     new IllegalStateException(
@@ -100,7 +100,7 @@ public final class SqliteDatabaseOperationCoordinator {
         };
     }
 
-    private CompletionStage<DatabaseOperationResult> commitAndPublish(
+    private CompletionStage<OperationWorkflowResult> commitAndPublish(
             OperationEnvelope operation,
             DurableOperationWork work,
             List<ProjectionConsumer> consumers
@@ -110,7 +110,7 @@ public final class SqliteDatabaseOperationCoordinator {
                     if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
                             || !(committed.value() instanceof DurableCommitEvidence evidence)) {
                         return completed(failed(
-                                DatabaseOperationResult.Status.DURABLE_COMMIT_FAILED,
+                                OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED,
                                 operation,
                                 List.of(),
                                 transactionFailure(result, "operation_durable_commit_failed")
@@ -140,17 +140,17 @@ public final class SqliteDatabaseOperationCoordinator {
         return cause == null ? new IllegalStateException(code) : cause;
     }
 
-    private DatabaseOperationResult failed(
-            DatabaseOperationResult.Status status,
+    private OperationWorkflowResult failed(
+            OperationWorkflowResult.Status status,
             OperationEnvelope operation,
             List<ProjectionEvent> events,
             Throwable failure
     ) {
-        return new DatabaseOperationResult(status, operation, events, failure);
+        return new OperationWorkflowResult(status, operation, events, failure);
     }
 
-    private CompletionStage<DatabaseOperationResult> completed(
-            DatabaseOperationResult result
+    private CompletionStage<OperationWorkflowResult> completed(
+            OperationWorkflowResult result
     ) {
         return CompletableFuture.completedFuture(result);
     }
@@ -158,7 +158,7 @@ public final class SqliteDatabaseOperationCoordinator {
     /** Writer admission for preparation plus the eventual exact workflow result. */
     public record Submission(
             @Nonnull SqliteSingleWriter.WriteAcceptance acceptance,
-            @Nonnull CompletionStage<DatabaseOperationResult> completion
+            @Nonnull CompletionStage<OperationWorkflowResult> completion
     ) {
         public Submission {
             if (acceptance == null || completion == null) {

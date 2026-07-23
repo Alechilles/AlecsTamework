@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
-import com.alechilles.alecstamework.persistence.operation.DatabaseOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -51,7 +51,7 @@ public final class SqliteOperationPublisher {
 
     /** Resumes durable publication or returns immutable evidence for a published replay. */
     @Nonnull
-    public CompletionStage<DatabaseOperationResult> resume(
+    public CompletionStage<OperationWorkflowResult> resume(
             @Nonnull OperationEnvelope operation,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
@@ -63,7 +63,7 @@ public final class SqliteOperationPublisher {
             case DURABLE -> loadAndPublish(operation, consumers);
             case PUBLISHED -> loadPublished(operation);
             default -> completed(failed(
-                    DatabaseOperationResult.Status.INVALID_PHASE,
+                    OperationWorkflowResult.Status.INVALID_PHASE,
                     operation,
                     List.of(),
                     new IllegalStateException(
@@ -76,7 +76,7 @@ public final class SqliteOperationPublisher {
 
     /** Projects one exact durable commit and transitions it to published. */
     @Nonnull
-    public CompletionStage<DatabaseOperationResult> publish(
+    public CompletionStage<OperationWorkflowResult> publish(
             @Nonnull DurableCommitEvidence durable,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
@@ -88,7 +88,7 @@ public final class SqliteOperationPublisher {
         return publishNext(consumers, 0, target).thenCompose(publication -> {
             if (publication != null) {
                 return completed(failed(
-                        DatabaseOperationResult.Status.PUBLICATION_PENDING,
+                        OperationWorkflowResult.Status.PUBLICATION_PENDING,
                         durable.operation(),
                         durable.events(),
                         publication
@@ -120,7 +120,7 @@ public final class SqliteOperationPublisher {
         return List.copyOf(copy);
     }
 
-    private CompletionStage<DatabaseOperationResult> loadAndPublish(
+    private CompletionStage<OperationWorkflowResult> loadAndPublish(
             OperationEnvelope operation,
             List<ProjectionConsumer> consumers
     ) {
@@ -129,7 +129,7 @@ public final class SqliteOperationPublisher {
                 return publish(found.value(), consumers);
             }
             return completed(failed(
-                    DatabaseOperationResult.Status.DURABLE_READ_FAILED,
+                    OperationWorkflowResult.Status.DURABLE_READ_FAILED,
                     operation,
                     List.of(),
                     readFailure(read)
@@ -137,20 +137,20 @@ public final class SqliteOperationPublisher {
         });
     }
 
-    private CompletionStage<DatabaseOperationResult> loadPublished(
+    private CompletionStage<OperationWorkflowResult> loadPublished(
             OperationEnvelope operation
     ) {
         return evidence.find(operation.operationId()).thenApply(read -> {
             if (read instanceof PersistenceReadResult.Found<DurableCommitEvidence> found) {
-                return new DatabaseOperationResult(
-                        DatabaseOperationResult.Status.PUBLISHED,
+                return new OperationWorkflowResult(
+                        OperationWorkflowResult.Status.PUBLISHED,
                         operation,
                         found.value().events(),
                         null
                 );
             }
             return failed(
-                    DatabaseOperationResult.Status.DURABLE_READ_FAILED,
+                    OperationWorkflowResult.Status.DURABLE_READ_FAILED,
                     operation,
                     List.of(),
                     readFailure(read)
@@ -158,7 +158,7 @@ public final class SqliteOperationPublisher {
         });
     }
 
-    private CompletionStage<DatabaseOperationResult> transitionPublished(
+    private CompletionStage<OperationWorkflowResult> transitionPublished(
             DurableCommitEvidence durable
     ) {
         return operations.transition(
@@ -170,15 +170,15 @@ public final class SqliteOperationPublisher {
         ).completion().thenApply(result -> {
             if (result instanceof PersistenceTransactionResult.Committed<?> committed
                     && committed.value() instanceof OperationEnvelope published) {
-                return new DatabaseOperationResult(
-                        DatabaseOperationResult.Status.PUBLISHED,
+                return new OperationWorkflowResult(
+                        OperationWorkflowResult.Status.PUBLISHED,
                         published,
                         durable.events(),
                         null
                 );
             }
             return failed(
-                    DatabaseOperationResult.Status.TERMINALIZATION_FAILED,
+                    OperationWorkflowResult.Status.TERMINALIZATION_FAILED,
                     durable.operation(),
                     durable.events(),
                     transactionFailure(result, "operation_publish_transition_failed")
@@ -243,17 +243,17 @@ public final class SqliteOperationPublisher {
         return cause == null ? new IllegalStateException(code) : cause;
     }
 
-    private DatabaseOperationResult failed(
-            DatabaseOperationResult.Status status,
+    private OperationWorkflowResult failed(
+            OperationWorkflowResult.Status status,
             OperationEnvelope operation,
             List<ProjectionEvent> events,
             Throwable failure
     ) {
-        return new DatabaseOperationResult(status, operation, events, failure);
+        return new OperationWorkflowResult(status, operation, events, failure);
     }
 
-    private CompletionStage<DatabaseOperationResult> completed(
-            DatabaseOperationResult result
+    private CompletionStage<OperationWorkflowResult> completed(
+            OperationWorkflowResult result
     ) {
         return CompletableFuture.completedFuture(result);
     }

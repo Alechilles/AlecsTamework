@@ -14,7 +14,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDe
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEventCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationOutcome;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
-import com.alechilles.alecstamework.persistence.operation.DatabaseOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -175,7 +175,7 @@ class SqliteCompanionProfileOperationsTest {
             String idempotencyKey,
             CompanionProfileMutation mutation
     ) throws Exception {
-        DatabaseOperationResult result = operations.submit(
+        OperationWorkflowResult result = operations.submit(
                 OperationId.parse(String.format(
                         "40000000-0000-0000-0000-%012d",
                         operationNumber
@@ -183,7 +183,7 @@ class SqliteCompanionProfileOperationsTest {
                 new IdempotencyKey(idempotencyKey),
                 mutation
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
-        assertEquals(DatabaseOperationResult.Status.PUBLISHED, result.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
         assertEquals(1, result.events().size());
         return CompanionProfileMutationEventCodec.decode(

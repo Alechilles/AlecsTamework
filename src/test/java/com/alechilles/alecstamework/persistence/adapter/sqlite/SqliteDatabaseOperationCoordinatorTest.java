@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
-import com.alechilles.alecstamework.persistence.operation.DatabaseOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -95,9 +95,9 @@ class SqliteDatabaseOperationCoordinatorTest {
             throws Exception {
         RevisionConsumer consumer = new RevisionConsumer("profile_view", 0);
 
-        DatabaseOperationResult result = execute(new AtomicInteger(), consumer);
+        OperationWorkflowResult result = execute(new AtomicInteger(), consumer);
 
-        assertEquals(DatabaseOperationResult.Status.PUBLISHED, result.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
         assertEquals(1, result.events().size());
         assertEquals(1L, consumer.revisions.get(PROFILE.toString()));
@@ -111,29 +111,29 @@ class SqliteDatabaseOperationCoordinatorTest {
         AtomicInteger durableExecutions = new AtomicInteger();
         RevisionConsumer failing = new RevisionConsumer("profile_view", 1);
 
-        DatabaseOperationResult first = execute(durableExecutions, failing);
+        OperationWorkflowResult first = execute(durableExecutions, failing);
 
-        assertEquals(DatabaseOperationResult.Status.PUBLICATION_PENDING, first.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLICATION_PENDING, first.status());
         assertEquals(OperationPhase.DURABLE, first.operation().phase());
         assertEquals(1, durableExecutions.get());
         assertEquals(OperationPhase.DURABLE, storedOperation().phase());
 
         RevisionConsumer recovered = new RevisionConsumer("profile_view", 0);
-        DatabaseOperationResult second = execute(durableExecutions, recovered);
+        OperationWorkflowResult second = execute(durableExecutions, recovered);
 
-        assertEquals(DatabaseOperationResult.Status.PUBLISHED, second.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, second.status());
         assertEquals(OperationPhase.PUBLISHED, second.operation().phase());
         assertEquals(1, durableExecutions.get());
         assertEquals(1, recovered.applyCalls.get());
 
-        DatabaseOperationResult repeated = execute(durableExecutions, recovered);
-        assertEquals(DatabaseOperationResult.Status.PUBLISHED, repeated.status());
+        OperationWorkflowResult repeated = execute(durableExecutions, recovered);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, repeated.status());
         assertEquals(1, repeated.events().size());
         assertEquals(1, durableExecutions.get());
         assertEquals(1, recovered.applyCalls.get());
     }
 
-    private DatabaseOperationResult execute(
+    private OperationWorkflowResult execute(
             AtomicInteger durableExecutions,
             ProjectionConsumer consumer
     ) throws Exception {

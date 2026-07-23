@@ -10,7 +10,7 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
-import com.alechilles.alecstamework.persistence.operation.DatabaseOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
@@ -208,12 +208,12 @@ class SqliteProfileExtensionOperationsTest {
             String idempotencyKey,
             ProfileExtensionMutation mutation
     ) throws Exception {
-        DatabaseOperationResult result = operations.submit(
+        OperationWorkflowResult result = operations.submit(
                 OperationId.parse(operationId),
                 new IdempotencyKey(idempotencyKey),
                 mutation
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
-        assertEquals(DatabaseOperationResult.Status.PUBLISHED, result.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
         assertEquals(1, result.events().size());
         ProjectionEvent event = result.events().getFirst();
