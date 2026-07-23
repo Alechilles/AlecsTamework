@@ -14,8 +14,6 @@ import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.operation.OperationTransition;
-import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
-import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
@@ -41,23 +39,14 @@ public final class SqliteOperationEngine {
 
     private final OperationDefinitionRegistry definitions;
     private final SqliteUnitOfWorkRunner units;
-    private final PersistenceCheckpointHook checkpoints;
 
     public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
                                  @Nonnull SqliteUnitOfWorkRunner units) {
-        this(definitions, units, PersistenceCheckpointHook.NO_OP);
-    }
-
-    /** Test-only checkpoint injection; runtime composition uses the hook-free overload. */
-    public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
-                                 @Nonnull SqliteUnitOfWorkRunner units,
-                                 @Nonnull PersistenceCheckpointHook checkpoints) {
-        if (definitions == null || units == null || checkpoints == null) {
+        if (definitions == null || units == null) {
             throw new IllegalArgumentException("Operation engine dependencies are required");
         }
         this.definitions = definitions;
         this.units = units;
-        this.checkpoints = checkpoints;
     }
 
     /** Encodes and durably prepares one idempotent operation. */
@@ -81,13 +70,10 @@ public final class SqliteOperationEngine {
                 prepared.kind(),
                 TransactionReplayPolicy.SAFE_DATABASE_ONLY,
                 connection -> {
-                    hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
                     OperationEnvelope operation = requireApplied(
                             new SqliteOperationStore(connection).prepare(prepared),
                             "operation_prepare"
                     );
-                    hit(PersistenceCheckpoint.AFTER_OPERATION_PREPARATION);
-                    hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
                     return operation;
                 }
         );
@@ -98,9 +84,8 @@ public final class SqliteOperationEngine {
                     Optional<OperationEnvelope> found =
                             new SqliteOperationStore(connection).findByIdempotency(
                                     prepared.kind(), prepared.idempotencyKey()
-                            );
+                    );
                     if (found.isPresent() && matchesPreparation(found.get(), prepared)) {
-                        hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
                         return PersistenceReadResult.found(
                                 found.get(), found.get().attemptCount()
                         );
@@ -131,15 +116,10 @@ public final class SqliteOperationEngine {
                 expected.kind(),
                 TransactionReplayPolicy.SAFE_DATABASE_ONLY,
                 connection -> {
-                    hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
-                    if (nextPhase.isTerminal()) {
-                        hit(PersistenceCheckpoint.BEFORE_JOURNAL_TERMINALIZATION);
-                    }
                     OperationEnvelope result = requireApplied(
                             new SqliteOperationStore(connection).transition(transition),
                             "operation_transition"
                     );
-                    hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
                     return result;
                 }
         );
@@ -185,7 +165,6 @@ public final class SqliteOperationEngine {
             DurableOperationWork work,
             long committedAtMs
     ) throws Exception {
-        hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT);
         SqlitePersistenceTransactionContext transaction =
                 new SqlitePersistenceTransactionContext(connection);
         OperationEnvelope current = transaction.operations()
@@ -204,7 +183,6 @@ public final class SqliteOperationEngine {
                 )),
                 "operation_durable_transition"
         );
-        hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION);
         return new DurableCommitEvidence(durable, events);
     }
 
@@ -238,7 +216,6 @@ public final class SqliteOperationEngine {
         if (found != null && found.phase() == transition.nextPhase()
                 && java.util.Objects.equals(found.failureKind(), transition.failureKind())
                 && java.util.Objects.equals(found.failureCode(), transition.failureCode())) {
-            hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
             return PersistenceReadResult.found(found, found.attemptCount());
         }
         return PersistenceReadResult.absent();
@@ -261,7 +238,6 @@ public final class SqliteOperationEngine {
         if (events.isEmpty()) {
             return PersistenceReadResult.absent();
         }
-        hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK);
         return PersistenceReadResult.found(
                 new DurableCommitEvidence(operation, events),
                 events.getLast().sequence().value()
@@ -308,7 +284,4 @@ public final class SqliteOperationEngine {
         return result.value();
     }
 
-    private void hit(PersistenceCheckpoint checkpoint) throws Exception {
-        checkpoints.hit(checkpoint, null);
-    }
 }

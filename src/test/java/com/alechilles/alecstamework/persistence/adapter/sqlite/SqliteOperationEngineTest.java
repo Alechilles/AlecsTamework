@@ -19,7 +19,6 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
-import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.nio.file.Path;
@@ -63,8 +62,7 @@ class SqliteOperationEngineTest {
         reads = new SqliteReadExecutor(connections);
         definition = new TestDefinition();
         definitions = new OperationDefinitionRegistry(List.of(definition));
-        engine = engine(writer, com.alechilles.alecstamework.persistence.operation
-                .PersistenceCheckpointHook.NO_OP);
+        engine = engine(writer);
     }
 
     @AfterEach
@@ -124,8 +122,7 @@ class SqliteOperationEngineTest {
                 },
                 PersistenceKernelMetrics.NO_OP
         );
-        engine = engine(writer, com.alechilles.alecstamework.persistence.operation
-                .PersistenceCheckpointHook.NO_OP);
+        engine = engine(writer);
         AtomicInteger durableExecutions = new AtomicInteger();
         OperationEnvelope prepared = committed(engine.prepare(definition, request()));
         OperationEnvelope applying = committed(engine.transition(
@@ -153,11 +150,20 @@ class SqliteOperationEngineTest {
         OperationEnvelope applying = committed(engine.transition(
                 prepared, OperationPhase.LIVE_APPLYING, null, null, -9_000
         ));
-        SqliteOperationEngine faulted = engine(writer, (checkpoint, ignored) -> {
-            if (checkpoint == PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION) {
-                throw new IllegalStateException("injected_before_commit");
-            }
-        });
+        writer.shutdown(Duration.ofSeconds(5));
+        writer = new SqliteSingleWriter(
+                connections,
+                SqliteWriterConfiguration.DEFAULT,
+                (checkpoint, ignored) -> {
+                    if (checkpoint
+                            == com.alechilles.alecstamework.persistence.kernel
+                            .PersistenceCheckpoint.BEFORE_COMMIT) {
+                        throw new IllegalStateException("injected_before_commit");
+                    }
+                },
+                PersistenceKernelMetrics.NO_OP
+        );
+        SqliteOperationEngine faulted = engine(writer);
 
         PersistenceTransactionResult<DurableCommitEvidence> result =
                 faulted.commitDurable(
@@ -182,14 +188,10 @@ class SqliteOperationEngineTest {
         }
     }
 
-    private SqliteOperationEngine engine(
-            SqliteSingleWriter writer,
-            com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook hook
-    ) {
+    private SqliteOperationEngine engine(SqliteSingleWriter writer) {
         return new SqliteOperationEngine(
                 definitions,
-                new SqliteUnitOfWorkRunner(writer, reads),
-                hook
+                new SqliteUnitOfWorkRunner(writer, reads)
         );
     }
 
