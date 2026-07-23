@@ -327,11 +327,11 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
-        if (roster != null && roster.summonVisible()) {
+        if (roster != null && roster.summonEnabled()) {
             eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, summonSelector,
                     EventData.of(config.eventCommandId(), config.summonCommandPrefix() + entry.npcUuid()), false);
         }
-        if (roster != null && roster.dismissVisible()) {
+        if (roster != null && roster.dismissEnabled()) {
             eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, dismissSelector,
                     EventData.of(config.eventCommandId(), config.dismissCommandPrefix() + entry.npcUuid()), false);
         }
@@ -404,8 +404,8 @@ final class LinkedNpcPanelCardBinder {
         builder.set(stateSelector + ".Visible", visible);
         builder.set(timerSelector + ".Visible", visible);
         builder.set(capacitySelector + ".Visible", visible);
-        builder.set(summonSelector + ".Visible", visible && roster.summonVisible());
-        builder.set(dismissSelector + ".Visible", visible && roster.dismissVisible());
+        builder.set(summonSelector + ".Visible", visible && roster.summonEnabled());
+        builder.set(dismissSelector + ".Visible", visible && roster.dismissEnabled());
         if (!visible) return;
         String stateKey = switch (roster.state()) {
             case ACTIVE -> "active";
@@ -436,8 +436,6 @@ final class LinkedNpcPanelCardBinder {
                 roster.activeCount())
                 : LocalizedText.format(language, "tamework.ui.linkedPanel.roster.capacity",
                 roster.activeCount(), roster.activeLimit()));
-        builder.set(summonSelector + ".Enabled", roster.summonEnabled());
-        builder.set(dismissSelector + ".Enabled", roster.dismissEnabled());
     }
 
     record CardBindingConfig(String linkedPanelCardUiPath,

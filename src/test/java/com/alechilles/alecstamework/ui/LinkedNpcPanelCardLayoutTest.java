@@ -204,6 +204,16 @@ class LinkedNpcPanelCardLayoutTest {
                 binder.contains("respawnSelector + \".Enabled\""),
                 "TextButton has no runtime-settable Enabled markup property; binding it disconnects the client."
         );
+        assertFalse(
+                binder.contains("summonSelector + \".Enabled\"")
+                        || binder.contains("dismissSelector + \".Enabled\""),
+                "Roster TextButtons must not bind the unsupported Enabled markup property."
+        );
+        assertTrue(
+                binder.contains("summonSelector + \".Visible\", visible && roster.summonEnabled()")
+                        && binder.contains("dismissSelector + \".Visible\", visible && roster.dismissEnabled()"),
+                "Roster actions should hide when unavailable and only expose actionable buttons."
+        );
         assertTrue(
                 binder.contains("respawnSelector + \".Visible\", showRespawn"),
                 "A cap-blocked revive action should be hidden rather than bound through unsupported Enabled state."
