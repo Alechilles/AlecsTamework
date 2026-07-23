@@ -90,6 +90,16 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
                 || next.metadataRevision() != expectedRevision + 1) {
             throw new IllegalArgumentException("Profile update must advance the expected revision exactly once");
         }
+        CompanionIdentity current = findProfile(next.profileId()).orElse(null);
+        if (current == null) {
+            return PersistenceMutationResult.rejected(PersistenceMutationStatus.NOT_FOUND);
+        }
+        if (current.metadataRevision() != expectedRevision) {
+            return PersistenceMutationResult.rejected(PersistenceMutationStatus.REVISION_MISMATCH);
+        }
+        if (current.createdAtMs() != next.createdAtMs()) {
+            return PersistenceMutationResult.rejected(PersistenceMutationStatus.CONFLICT);
+        }
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE companion_profile
                 SET display_name = ?, role_id = ?, metadata_json = ?, metadata_hash = ?,
@@ -110,11 +120,7 @@ public final class SqliteCompanionIdentityStore implements CompanionIdentityPort
             if (statement.executeUpdate() == 1) {
                 return PersistenceMutationResult.applied(next);
             }
-            return PersistenceMutationResult.rejected(
-                    findProfile(next.profileId()).isEmpty()
-                            ? PersistenceMutationStatus.NOT_FOUND
-                            : PersistenceMutationStatus.REVISION_MISMATCH
-            );
+            return PersistenceMutationResult.rejected(PersistenceMutationStatus.REVISION_MISMATCH);
         } catch (SQLException | RuntimeException failure) {
             throw storeFailure("identity_update_profile", failure);
         }
