@@ -108,6 +108,23 @@ class SqliteOperationEngineTest {
     }
 
     @Test
+    void databaseOnlyOperationCommitsDirectlyFromPrepared() throws Exception {
+        OperationEnvelope prepared = committed(engine.prepare(definition, request()));
+
+        DurableCommitEvidence durable = committed(engine.commitDurable(
+                prepared,
+                (transaction, operation) -> {
+                    createCanonicalProfile(transaction);
+                    return List.of(event(operation, 0, -8_000));
+                },
+                -8_000
+        ));
+
+        assertEquals(OperationPhase.DURABLE, durable.operation().phase());
+        assertEquals(1, durable.events().size());
+    }
+
+    @Test
     void unknownCommitReadbackNeverReexecutesDurableWork() throws Exception {
         writer.shutdown(Duration.ofSeconds(5));
         writer = new SqliteSingleWriter(

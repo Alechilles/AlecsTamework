@@ -142,9 +142,12 @@ public final class SqliteOperationEngine {
         if (expected == null || work == null) {
             throw new IllegalArgumentException("Expected operation and durable work are required");
         }
-        if (expected.phase() != OperationPhase.LIVE_APPLYING
+        if (expected.phase() != OperationPhase.PREPARED
+                && expected.phase() != OperationPhase.LIVE_APPLYING
                 && expected.phase() != OperationPhase.RETRYABLE) {
-            throw new IllegalArgumentException("Durable commit requires applying or retryable phase");
+            throw new IllegalArgumentException(
+                    "Durable commit requires prepared, applying, or retryable phase"
+            );
         }
         SqliteTransactionCommand<DurableCommitEvidence> command = new SqliteTransactionCommand<>(
                 expected.operationId(),
