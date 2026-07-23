@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegist
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupAction;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinator;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupReport;
 import com.alechilles.alecstamework.persistence.incidents.ScopeQuarantine;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceSchemaStatus;
@@ -25,6 +26,7 @@ import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -46,6 +48,8 @@ final class PublicPersistenceRuntimeState {
     private PublicPersistenceQueries queries;
     private SqlitePublicCanonicalSnapshot canonical;
     private boolean worldQuiesced;
+    private boolean shutdownStarted;
+    private SqliteKernelShutdownReport lastKernelShutdown;
     private PublicPersistenceShutdownReport terminalShutdown;
 
     PublicPersistenceRuntimeState(
@@ -129,6 +133,33 @@ final class PublicPersistenceRuntimeState {
         return control.snapshot();
     }
 
+    synchronized PublicPersistenceOperationalStatus operationalStatus() {
+        PersistenceStartupReport report = startup.report();
+        return new PublicPersistenceOperationalStatus(
+                PersistenceEngineMode.NEXT,
+                configuration.dataDirectory(),
+                databasePath(),
+                targetOrigin(),
+                schemaVersion(report),
+                PublicPersistenceOperationalStatus.storageMode(
+                        report,
+                        shutdownStarted,
+                        terminalShutdown != null
+                ),
+                report,
+                PublicPersistenceOperationalStatus.nodeStates(report),
+                PublicPersistenceOperationalStatus.CheckpointEvidence.from(
+                        lastKernelShutdown
+                ),
+                PublicPersistenceOperationalGuidance.forStatus(
+                        report,
+                        target,
+                        shutdownStarted,
+                        terminalShutdown
+                )
+        );
+    }
+
     CompletionStage<PersistenceReadResult<
             PublicPersistenceDiagnosticsSnapshot>> diagnostics() {
         return requireAdapter().diagnostics().thenApply(
@@ -140,6 +171,7 @@ final class PublicPersistenceRuntimeState {
         if (terminalShutdown != null) {
             return terminalShutdown;
         }
+        shutdownStarted = true;
         long deadline = System.nanoTime() + timeout.toNanos();
         startup.close();
         try {
@@ -167,6 +199,7 @@ final class PublicPersistenceRuntimeState {
         }
         SqliteKernelShutdownReport kernelReport =
                 kernel == null ? null : kernel.shutdown(remaining(deadline));
+        lastKernelShutdown = kernelReport;
         if (kernelReport != null
                 && kernel.state() != SqlitePersistenceKernel.State.CLOSED) {
             return report(
@@ -198,6 +231,16 @@ final class PublicPersistenceRuntimeState {
                         : PublicPersistenceShutdownReport.Status.COMPLETE_UNCLEAN;
         terminalShutdown = report(status, kernelReport, null);
         return terminalShutdown;
+    }
+
+    private OptionalInt schemaVersion(
+            PersistenceStartupReport report
+    ) {
+        return report.completedNodes().contains(
+                PersistenceStartupNode.VALIDATE_SCHEMA
+        )
+                ? OptionalInt.of(SqliteSchemaV1Manager.VERSION)
+                : OptionalInt.empty();
     }
 
     private CompletionStage<PersistenceStartupAction.Result> openTarget() {

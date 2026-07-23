@@ -74,6 +74,12 @@ public final class PersistenceBootstrap implements AutoCloseable {
         return runtime.metrics();
     }
 
+    /** Returns payload-free operator state even when startup is blocked. */
+    @Nonnull
+    public PublicPersistenceOperationalStatus operationalStatus() {
+        return runtime.operationalStatus();
+    }
+
     /** Returns sanitized operational evidence after projections are ready. */
     @Nonnull
     public CompletionStage<PersistenceReadResult<

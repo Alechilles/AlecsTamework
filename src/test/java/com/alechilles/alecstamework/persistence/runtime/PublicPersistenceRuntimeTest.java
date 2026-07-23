@@ -57,6 +57,15 @@ class PublicPersistenceRuntimeTest {
                 PublicPersistenceWorldReconciliation.alreadyComplete()
         );
 
+        PublicPersistenceOperationalStatus opening =
+                runtime.operationalStatus();
+        assertEquals(PersistenceEngineMode.NEXT, opening.engine());
+        assertEquals(
+                PublicPersistenceOperationalStatus.StorageMode.STARTING,
+                opening.storageMode()
+        );
+        assertTrue(opening.databasePath().isEmpty());
+        assertTrue(opening.schemaVersion().isEmpty());
         assertTrue(runtime.start().toCompletableFuture().join().complete());
         assertEquals(
                 PublicPersistenceTarget.Origin.FRESH,
@@ -78,6 +87,12 @@ class PublicPersistenceRuntimeTest {
         assertEquals(0, diagnostics.outboxHead());
         assertTrue(diagnostics.openIncidentsByCode().isEmpty());
         assertTrue(diagnostics.activeQuarantinesByScope().isEmpty());
+        assertEquals(0, diagnostics.openCircuitCount());
+        assertEquals(
+                0L,
+                diagnostics.operationsByPhase().values().stream()
+                        .mapToLong(Long::longValue).sum()
+        );
         for (var descriptor
                 : PublicPersistenceFeatureRegistry.create().descriptors()) {
             var health = diagnostics.features().get(
@@ -98,6 +113,24 @@ class PublicPersistenceRuntimeTest {
                 PublicPersistenceShutdownReport.Status.COMPLETE,
                 runtime.shutdown(Duration.ofSeconds(5)).status()
         );
+        PublicPersistenceOperationalStatus closed =
+                runtime.operationalStatus();
+        assertEquals(
+                PublicPersistenceOperationalStatus.StorageMode.CLOSED,
+                closed.storageMode()
+        );
+        assertEquals(
+                PublicPersistenceOperationalStatus.CheckpointEvidence.Status
+                        .COMPLETED,
+                closed.lastCheckpoint().status()
+        );
+        assertEquals(
+                SqliteSchemaV1Manager.VERSION,
+                closed.schemaVersion().orElseThrow()
+        );
+        assertTrue(closed.guidance().contains(
+                "legacy_rollback_requires_complete_pre_cutover_backup_restore"
+        ));
         try (PersistenceEngineLease reopened =
                      PersistenceEngineLease.acquireReplacement(tempDir)) {
             var manifest = reopened.manifest().orElseThrow();
@@ -201,6 +234,17 @@ class PublicPersistenceRuntimeTest {
                 PersistenceReadinessLevel.WORLD_EVIDENCE_PENDING,
                 deferred.readiness()
         );
+        PublicPersistenceOperationalStatus deferredStatus =
+                runtime.operationalStatus();
+        assertEquals(
+                PublicPersistenceOperationalStatus.NodeState.DEFERRED,
+                deferredStatus.startupNodes().get(
+                        PersistenceStartupNode.WAIT_WORLD_EVIDENCE
+                )
+        );
+        assertTrue(deferredStatus.guidance().contains(
+                "wait_for_required_worlds_then_resume_startup"
+        ));
         assertThrows(
                 IllegalStateException.class,
                 () -> runtime.operations().mutateProfile(
@@ -271,6 +315,20 @@ class PublicPersistenceRuntimeTest {
         );
         assertFalse(report.complete());
         assertTrue(runtime.shutdown(Duration.ofSeconds(5)).terminal());
+        PublicPersistenceOperationalStatus status =
+                runtime.operationalStatus();
+        assertEquals(
+                PublicPersistenceOperationalStatus.NodeState.FAILED,
+                status.startupNodes().get(
+                        PersistenceStartupNode.WAIT_WORLD_EVIDENCE
+                )
+        );
+        assertEquals(
+                PublicPersistenceOperationalStatus.NodeState.BLOCKED,
+                status.startupNodes().get(
+                        PersistenceStartupNode.RECONCILE_WORLD
+                )
+        );
 
         try (PersistenceEngineLease legacy =
                      PersistenceEngineLease.acquireLegacy(tempDir)) {

@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -97,6 +98,30 @@ public record PublicPersistenceDiagnosticsSnapshot(
             readinessEvidence = Set.copyOf(readinessEvidence);
             quarantineGranularity = Set.copyOf(quarantineGranularity);
         }
+    }
+
+    /** Returns complete operation totals aggregated across feature descriptors. */
+    @Nonnull
+    public Map<OperationPhase, Long> operationsByPhase() {
+        EnumMap<OperationPhase, Long> totals =
+                new EnumMap<>(OperationPhase.class);
+        for (OperationPhase phase : OperationPhase.values()) {
+            totals.put(phase, 0L);
+        }
+        features.values().forEach(feature ->
+                feature.operationCounts().values().forEach(counts ->
+                        counts.forEach((phase, count) ->
+                                totals.merge(phase, count, Long::sum))));
+        return Map.copyOf(totals);
+    }
+
+    /** Returns the number of descriptor circuits currently open. */
+    public long openCircuitCount() {
+        return features.values().stream()
+                .filter(feature -> feature.circuit().state()
+                        == com.alechilles.alecstamework.persistence.control
+                        .PersistenceFeatureCircuitState.OPEN)
+                .count();
     }
 
     private static <K> Map<K, Long> copyCounts(Map<K, Long> source) {

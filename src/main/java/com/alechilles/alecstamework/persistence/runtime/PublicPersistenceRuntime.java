@@ -83,6 +83,12 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.metrics();
     }
 
+    /** Returns payload-free operational state at every lifecycle boundary. */
+    @Nonnull
+    public PublicPersistenceOperationalStatus operationalStatus() {
+        return state.operationalStatus();
+    }
+
     /**
      * Reads sanitized descriptor, operation, projection, and containment
      * evidence after projection startup has established exact consumers.
