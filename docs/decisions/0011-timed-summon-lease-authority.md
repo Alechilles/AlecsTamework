@@ -1,6 +1,6 @@
 # ADR 0011: Timed Summon Lease Authority
 
-- Status: Accepted for Phase 5D implementation
+- Status: Implemented
 - Date: 2026-07-23
 
 ## Context
@@ -159,3 +159,25 @@ and failure detector, not normal runtime behavior.
 - The old session cache, repository listeners, direct transaction callbacks,
   separate population operation chain, and custom recovery scanner are not
   ported.
+
+## Implementation evidence
+
+Completed on 2026-07-23:
+
+- the fresh schema contains one `timed_summon_lease` table and no timed
+  session, snapshot, operation, recovery, phase, or readiness table;
+- lease registration, policy refresh, checkpoints, and warning receipts use
+  one database-only mutation kind and publish only committed evidence;
+- summon and store use the same typed live-operation coordinator, lifecycle
+  fence, exact command-membership evidence, alias/snapshot authorities, and
+  receipt-correlated world boundary;
+- positive active-capacity admission composes the existing population-group
+  participant into the same operation envelope and transaction;
+- signed cooldown arithmetic and process-monotonic remaining duration are
+  covered through negative and `nanoTime` wraparound cases;
+- retryable late worlds retain the exact lifecycle, alias, group, and lease
+  fences until the same recovery route proves the live receipt;
+- a four-boundary forked-JVM matrix covers summon and store immediately before
+  and after durable commit, with no duplicate live effect after restart;
+- the aggregate Phase 5D gate passes 57 persistence, recovery, registry, import,
+  and architecture tests.
