@@ -219,6 +219,22 @@ final class CommandLinkedPanelEntryService {
                     deathCauseHint = resolveDeathCauseHint(deadSnapshot, playerLanguage);
                 }
             }
+            if (dead && reviveCostPresentation == null) {
+                TwCompanionConfig.EffectiveSettings effectiveSettings =
+                        TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId);
+                boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
+                        effectiveSettings.getRevive().isEnabled()
+                );
+                if (deadRespawnEnabled) {
+                    reviveCostPresentation = reviveCostQuoteService.quote(
+                            reviveOwnedByItemId,
+                            player,
+                            effectiveSettings.getRevive()
+                    );
+                } else {
+                    deadRespawnRemainingMs = -1L;
+                }
+            }
             if (!loaded && !dead && captureService != null) {
                 CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
                         captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());

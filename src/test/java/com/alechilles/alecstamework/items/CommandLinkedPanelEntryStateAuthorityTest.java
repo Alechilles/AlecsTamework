@@ -29,5 +29,10 @@ class CommandLinkedPanelEntryStateAuthorityTest {
         assertTrue(source.contains("if (!dead && !captured && !inCoop && world != null)"));
         assertTrue(source.contains("liveTargetResolver.resolveRedirect(record)"),
                 "A released projection must be retried through its canonical profile UUID.");
+        assertTrue(source.contains("if (dead && reviveCostPresentation == null)"),
+                "A durable DEAD_REVIVABLE roster row must still present its role-configured revival costs "
+                        + "when the in-memory death snapshot is unavailable.");
+        assertTrue(source.contains("TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId)"),
+                "The durable-dead fallback must use the canonical roster role rather than a hard-coded cost.");
     }
 }

@@ -162,8 +162,8 @@ class LinkedNpcPanelCardLayoutTest {
         assertEquals(41, heartbeat.getWidth(), "Revive heartbeat should retain the supplied 41px width.");
         assertEquals(41, heartbeat.getHeight(), "Revive heartbeat should retain the supplied 41px height.");
         assertTrue(
-                cardUi.contains("Anchor: (Top: 33, Right: 136, Width: 41, Height: 41);"),
-                "The dead-card revive action should use the larger heartbeat control from the mockup."
+                cardUi.contains("Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);"),
+                "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
         );
         assertTrue(cardUi.contains("Group #ReviveCostPanel"), "Dead cards need a dedicated inline cost panel.");
         for (int index = 0; index < 3; index++) {

@@ -441,11 +441,11 @@ Group {
     }
 
     Group #ReviveCostPanel {
-        Anchor: (Top: 27, Right: 0, Width: 132, Height: 54);
+        Anchor: (Top: 27, Right: 0, Width: 120, Height: 54);
         Visible: false;
 
         Group #ReviveCost0 {
-            Anchor: (Top: 0, Left: 0, Width: 132, Height: 20);
+            Anchor: (Top: 0, Left: 0, Width: 120, Height: 20);
             Visible: false;
 
             Label #RequiredQuantity {
@@ -455,21 +455,21 @@ Group {
             }
 
             ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 15, Width: 20, Height: 20);
+                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
                 SlotsPerRow: 1;
                 RenderItemQualityBackground: false;
                 InfoDisplay: None;
             }
 
             Label #CostName {
-                Anchor: (Top: 2, Left: 38, Width: 94, Height: 16);
+                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
                 Text: "";
                 Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
         }
 
         Group #ReviveCost1 {
-            Anchor: (Top: 17, Left: 0, Width: 132, Height: 20);
+            Anchor: (Top: 17, Left: 0, Width: 120, Height: 20);
             Visible: false;
 
             Label #RequiredQuantity {
@@ -479,21 +479,21 @@ Group {
             }
 
             ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 15, Width: 20, Height: 20);
+                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
                 SlotsPerRow: 1;
                 RenderItemQualityBackground: false;
                 InfoDisplay: None;
             }
 
             Label #CostName {
-                Anchor: (Top: 2, Left: 38, Width: 94, Height: 16);
+                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
                 Text: "";
                 Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
         }
 
         Group #ReviveCost2 {
-            Anchor: (Top: 34, Left: 0, Width: 132, Height: 20);
+            Anchor: (Top: 34, Left: 0, Width: 120, Height: 20);
             Visible: false;
 
             Label #RequiredQuantity {
@@ -503,14 +503,14 @@ Group {
             }
 
             ItemGrid #CostItem {
-                Anchor: (Top: 0, Left: 15, Width: 20, Height: 20);
+                Anchor: (Top: 0, Left: 14, Width: 20, Height: 20);
                 SlotsPerRow: 1;
                 RenderItemQualityBackground: false;
                 InfoDisplay: None;
             }
 
             Label #CostName {
-                Anchor: (Top: 2, Left: 38, Width: 94, Height: 16);
+                Anchor: (Top: 2, Left: 36, Width: 84, Height: 16);
                 Text: "";
                 Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
             }
@@ -584,7 +584,7 @@ Group {
     }
 
     TextButton #RespawnButton {
-        Anchor: (Top: 33, Right: 136, Width: 41, Height: 41);
+        Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);
         Style: @LinkedActionRespawnButtonStyle;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn;

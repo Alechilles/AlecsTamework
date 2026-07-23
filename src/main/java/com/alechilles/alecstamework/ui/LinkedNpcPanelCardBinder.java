@@ -394,7 +394,7 @@ final class LinkedNpcPanelCardBinder {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(43 - ((visibleCostCount - 1) * 8)));
         anchor.setRight(Value.of(0));
-        anchor.setWidth(Value.of(132));
+        anchor.setWidth(Value.of(120));
         anchor.setHeight(Value.of(54));
         return anchor;
     }
