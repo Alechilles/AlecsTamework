@@ -14,10 +14,12 @@ import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegist
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageState;
 import com.alechilles.alecstamework.persistence.diagnostics.CompositePersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.diagnostics.CoalescingPersistenceIncidentSink;
+import com.alechilles.alecstamework.persistence.diagnostics.LegacyPersistenceDiagnostics;
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentJournal;
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRepository;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureReasonCatalog;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRepository;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
@@ -30,13 +32,16 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPh
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.control.PersistenceEngineLease;
+import com.alechilles.alecstamework.persistence.control.PersistenceEngineStartup;
+import com.alechilles.alecstamework.persistence.control.OrderedPersistenceCloser;
+import com.alechilles.alecstamework.persistence.SqliteDriverAvailability;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryProbe;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -174,29 +179,22 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     public static TameworkPersistenceRuntime initialize(@Nonnull Path runtimeDataDirectory,
                                                         @Nullable HytaleLogger logger) {
         Path normalizedDataDir = runtimeDataDirectory.toAbsolutePath().normalize();
-        PersistenceEngineLease engineLease =
-                PersistenceEngineLease.acquireLegacy(normalizedDataDir);
-        try {
+        try (PersistenceEngineStartup startup =
+                     PersistenceEngineStartup.acquireLegacy(normalizedDataDir)) {
             return initializeWithLease(
                     normalizedDataDir,
                     logger,
-                    engineLease
+                    startup
             );
-        } catch (RuntimeException | Error failure) {
-            try {
-                engineLease.close();
-            } catch (RuntimeException closeFailure) {
-                failure.addSuppressed(closeFailure);
-            }
-            throw failure;
         }
     }
 
     private static TameworkPersistenceRuntime initializeWithLease(
             Path normalizedDataDir,
             @Nullable HytaleLogger logger,
-            PersistenceEngineLease engineLease
+            PersistenceEngineStartup startup
     ) {
+        PersistenceEngineLease engineLease = startup.lease();
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
         String bootId = UUID.randomUUID().toString();
         PersistenceStorageHealthService storageHealth = new PersistenceStorageHealthService(state -> {
@@ -371,41 +369,33 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 engineLease
         );
 
-        try {
-            if (health.isHealthy()) {
-                runtime.runLegacyDatImport(logger);
-                try {
-                    DeathRepository.OrphanedRosterDeathRecovery recovery =
-                            deathRepository.recoverOrphanedCommandRosterDeaths();
-                    if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
-                        logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
-                                "Command-roster death recovery completed: recovered="
-                                        + recovery.recovered() + ", conflicted=" + recovery.conflicted());
-                    }
-                } catch (Exception failure) {
-                    if (logger != null) {
-                        logger.at(Level.WARNING).log(
-                                "Command-roster death recovery failed; roster authority will remain fail-closed: "
-                                        + failure.getMessage());
-                    }
-                }
-                boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
-                if (health.isHealthy()) {
-                    if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
-                    maintenanceService.start();
-                }
-            }
-            storageRecoveryCoordinator.start();
-            engineLease.publishStartupComplete();
-            return runtime;
-        } catch (RuntimeException | Error failure) {
+        startup.registerOwner(runtime);
+        if (health.isHealthy()) {
+            runtime.runLegacyDatImport(logger);
             try {
-                runtime.close();
-            } catch (RuntimeException closeFailure) {
-                failure.addSuppressed(closeFailure);
+                DeathRepository.OrphanedRosterDeathRecovery recovery =
+                        deathRepository.recoverOrphanedCommandRosterDeaths();
+                if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
+                    logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
+                            "Command-roster death recovery completed: recovered="
+                                    + recovery.recovered() + ", conflicted=" + recovery.conflicted());
+                }
+            } catch (Exception failure) {
+                if (logger != null) {
+                    logger.at(Level.WARNING).log(
+                            "Command-roster death recovery failed; roster authority will remain fail-closed: "
+                                    + failure.getMessage());
+                }
             }
-            throw failure;
+            boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
+            if (health.isHealthy()) {
+                if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
+                maintenanceService.start();
+            }
         }
+        storageRecoveryCoordinator.start();
+        startup.publishAndTransfer();
+        return runtime;
     }
 
     @Nonnull
@@ -686,13 +676,15 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
-    public PersistenceDiagnostics collectDiagnostics() {
+    public LegacyPersistenceDiagnostics collectDiagnostics() {
         PersistenceWriteQueue.QueueMetrics queueMetrics = writeQueue.getMetrics();
         PersistenceHealthService.HealthState healthState = healthService.getState();
-        long sqliteBytes = safeSize(sqlitePath);
-        long walBytes = safeSize(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-wal"));
-        long shmBytes = safeSize(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-shm"));
-        return new PersistenceDiagnostics(
+        long sqliteBytes = PersistenceFiles.sizeOrZero(sqlitePath);
+        long walBytes = PersistenceFiles.sizeOrZero(
+                sqlitePath.resolveSibling(sqlitePath.getFileName() + "-wal"));
+        long shmBytes = PersistenceFiles.sizeOrZero(
+                sqlitePath.resolveSibling(sqlitePath.getFileName() + "-shm"));
+        return new LegacyPersistenceDiagnostics(
                 sqlitePath,
                 sqliteBytes,
                 walBytes,
@@ -791,26 +783,14 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         resilienceRuntime.coverage().publish(PersistenceEvidenceDimension.MANAGED_COOP_CATALOG,
                 false, reason, System.currentTimeMillis());
         resilienceRuntime.reporter().report(new PersistenceFailureContext(
-                normalizeReason(reason), PersistenceDomain.MANAGED_COOP_AUTOMATION,
+                PersistenceFailureReasonCatalog.normalizeCode(reason),
+                PersistenceDomain.MANAGED_COOP_AUTOMATION,
                 PersistenceOperationPhase.PUBLICATION, PersistenceTransactionOutcome.ROLLED_BACK,
                 List.of(resilienceRuntime.scopeFactory().featureDomain(
                         PersistenceDomain.MANAGED_COOP_AUTOMATION,
                         PersistenceEvidenceDimension.MANAGED_COOP_CATALOG.key())),
                 true, true, false, false, false,
                 false, true, false, null, failure));
-    }
-
-    private static String normalizeReason(String reason) {
-        if (reason == null || reason.isBlank()) return "managed_coop_coverage_unavailable";
-        return reason.trim().replace('-', '_').replace(':', '_').replace(';', '_');
-    }
-
-    private long safeSize(@Nonnull Path path) {
-        try {
-            return Files.exists(path) ? Files.size(path) : 0L;
-        } catch (Exception ignored) {
-            return 0L;
-        }
     }
 
     private static void backupAndResetPreV2SqliteIfNeeded(
@@ -837,13 +817,10 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         }
 
         String suffix = BACKUP_SUFFIX_FORMAT.format(Instant.now());
-        Path backupPath = sqlitePath.resolveSibling(
+        PersistenceFiles.backupAndRemoveSqliteFamily(
+                sqlitePath,
                 "tamework_pre_v2_" + suffix + ".sqlite.bak"
         );
-        Files.copy(sqlitePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
-        Files.deleteIfExists(sqlitePath);
-        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-wal"));
-        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-shm"));
     }
 
     @Override
@@ -851,69 +828,19 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        RuntimeException failure = null;
-        failure = close(failure, maintenanceService::close);
-        failure = close(failure, storageRecoveryCoordinator::close);
-        failure = close(failure, resilienceRuntime::close);
-        failure = close(failure, readExecutor::close);
-        failure = close(failure, writeQueue::close);
-        failure = close(failure, incidentJournal::close);
-        failure = close(failure, storageHealthService::close);
-        failure = close(failure, engineLease::close);
-        if (failure != null) {
-            throw failure;
-        }
-    }
-
-    private RuntimeException close(
-            @Nullable RuntimeException existing,
-            CloseParticipant participant
-    ) {
-        try {
-            participant.close();
-            return existing;
-        } catch (Exception closeFailure) {
-            if (existing == null) {
-                return new IllegalStateException(
-                        "legacy_persistence_shutdown_failed",
-                        closeFailure
-                );
-            }
-            existing.addSuppressed(closeFailure);
-            return existing;
-        }
-    }
-
-    @FunctionalInterface
-    private interface CloseParticipant {
-        void close() throws Exception;
-    }
-
-    public record PersistenceDiagnostics(
-            @Nonnull Path databasePath,
-            long sqliteBytes,
-            long walBytes,
-            long shmBytes,
-            long totalBytes,
-            @Nonnull PersistenceWriteQueue.QueueMetrics queueMetrics,
-            @Nonnull PersistenceHealthService.HealthState healthState) {
+        OrderedPersistenceCloser.closeAll(
+                maintenanceService::close,
+                storageRecoveryCoordinator::close,
+                resilienceRuntime::close,
+                readExecutor::close,
+                writeQueue::close,
+                incidentJournal::close,
+                storageHealthService::close,
+                engineLease::close
+        );
     }
 
     static boolean isSqliteDriverUnavailable(@Nullable Throwable throwable) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof LinkageError) {
-                return true;
-            }
-            if (current instanceof SQLException) {
-                String message = current.getMessage();
-                if ("sqlite_native_unavailable".equals(message)
-                        || "sqlite_jdbc_driver_missing".equals(message)) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
+        return SqliteDriverAvailability.isUnavailable(throwable);
     }
 }

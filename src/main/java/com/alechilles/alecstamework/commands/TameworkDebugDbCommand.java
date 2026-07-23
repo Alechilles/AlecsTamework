@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceIntegrityService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.diagnostics.LegacyPersistenceDiagnostics;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import java.time.Instant;
@@ -65,7 +66,7 @@ public final class TameworkDebugDbCommand extends AbstractTameworkServerCommand 
             return;
         }
 
-        TameworkPersistenceRuntime.PersistenceDiagnostics diagnostics = runtime.collectDiagnostics();
+        LegacyPersistenceDiagnostics diagnostics = runtime.collectDiagnostics();
         PersistenceWriteQueue.QueueMetrics queueMetrics = diagnostics.queueMetrics();
         PersistenceWriteQueue.QueueLifecycleMetrics lifecycleMetrics =
                 runtime.getWriteQueueLifecycleMetrics();

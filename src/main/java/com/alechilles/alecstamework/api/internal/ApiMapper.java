@@ -37,6 +37,7 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.diagnostics.LegacyPersistenceDiagnostics;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
@@ -562,7 +563,7 @@ final class ApiMapper {
 
     @Nonnull
     static PersistenceDiagnosticsView mapPersistenceDiagnostics(
-            @Nonnull TameworkPersistenceRuntime.PersistenceDiagnostics diagnostics) {
+            @Nonnull LegacyPersistenceDiagnostics diagnostics) {
         return new PersistenceDiagnosticsView(
                 diagnostics.databasePath().toString(),
                 diagnostics.sqliteBytes(),

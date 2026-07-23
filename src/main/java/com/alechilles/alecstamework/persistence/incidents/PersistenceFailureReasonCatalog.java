@@ -23,6 +23,19 @@ public final class PersistenceFailureReasonCatalog {
         return ENTRIES;
     }
 
+    /** Normalizes a caller-supplied reason for durable catalog and incident use. */
+    @Nonnull
+    public static String normalizeCode(@Nonnull String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reasonCode");
+        }
+        return reason.trim()
+                .replace('-', '_')
+                .replace(':', '_')
+                .replace(';', '_')
+                .toLowerCase(java.util.Locale.ROOT);
+    }
+
     private static Map<String, Entry> build() {
         LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
         register(entries, PersistenceFailureClass.STORAGE_UNAVAILABLE,
@@ -169,8 +182,7 @@ public final class PersistenceFailureReasonCatalog {
     }
 
     private static String normalize(String reason) {
-        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("reasonCode");
-        return reason.trim().replace('-', '_').toLowerCase(java.util.Locale.ROOT);
+        return normalizeCode(reason);
     }
 
     /** Reviewable containment and recovery contract for one stable reason code. */
