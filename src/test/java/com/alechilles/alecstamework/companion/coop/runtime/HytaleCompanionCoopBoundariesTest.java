@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.coop.CoopSlotKey;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -117,7 +118,10 @@ class HytaleCompanionCoopBoundariesTest {
                 ),
                 snapshot,
                 TARGET_ALIAS,
-                "world-two",
+                new CompanionSpawnPlacement(
+                        "world-two", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
                 "spawn-receipt",
                 -600
         );
@@ -146,7 +150,7 @@ class HytaleCompanionCoopBoundariesTest {
                 operationId,
                 new IdempotencyKey(kind + "-world-test"),
                 new OperationKind(kind),
-                1,
+                "companion_coop_release".equals(kind) ? 2 : 1,
                 "{}",
                 OperationPhase.LIVE_APPLYING,
                 kind,

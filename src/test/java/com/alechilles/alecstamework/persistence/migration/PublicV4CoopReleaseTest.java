@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCoopReleaseOperations;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCoopStore;
@@ -136,7 +137,10 @@ class PublicV4CoopReleaseTest {
                             occupancy.residency(),
                             snapshot,
                             TARGET_ALIAS,
-                            "restored-world",
+                            new CompanionSpawnPlacement(
+                                    "restored-world", -12.5, -63.05, -4.5,
+                                    -0.25f, -1.5f, -0.5f
+                            ),
                             "public-v4-coop-spawn-receipt",
                             -600
                     ),

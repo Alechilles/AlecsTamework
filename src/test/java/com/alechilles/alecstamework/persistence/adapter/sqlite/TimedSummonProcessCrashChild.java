@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
@@ -192,6 +193,15 @@ final class TimedSummonProcessCrashChild {
                 ),
                 ALIAS,
                 "world-a",
+                new CompanionSpawnPlacement(
+                        "world-a",
+                        -12.5,
+                        -63.05,
+                        -4.5,
+                        -0.25f,
+                        -1.5f,
+                        -0.5f
+                ),
                 snapshot(true),
                 "timed-process-receipt",
                 -600
@@ -233,6 +243,7 @@ final class TimedSummonProcessCrashChild {
                 ),
                 ALIAS,
                 "world-a",
+                null,
                 storeSnapshot(),
                 "timed-store-process-receipt",
                 -600

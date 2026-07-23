@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
@@ -417,7 +418,10 @@ class SqliteCompanionCoopOperationsTest {
                 residency().orElseThrow(),
                 snapshot(),
                 TARGET_ALIAS,
-                "world-two",
+                new CompanionSpawnPlacement(
+                        "world-two", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
                 "spawn-receipt",
                 -350
         );

@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
@@ -128,8 +129,10 @@ final class PaidRevivalTestSupport {
                 ),
                 snapshot(),
                 ALIAS,
-                "world",
-                "placement-fingerprint",
+                new CompanionSpawnPlacement(
+                        "world", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
                 "revive-config",
                 "config-revision",
                 List.of(

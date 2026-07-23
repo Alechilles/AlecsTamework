@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.coop;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -29,7 +30,7 @@ public final class CompanionCoopReleaseDefinition
 
     @Override
     public int payloadVersion() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -51,7 +52,10 @@ public final class CompanionCoopReleaseDefinition
                 CompanionSnapshotJsonCodec.encode(payload.sourceSnapshot())
         );
         json.addProperty("targetAlias", payload.targetAlias().toString());
-        json.addProperty("targetWorldKey", payload.targetWorldKey());
+        json.add(
+                "placement",
+                CompanionSpawnPlacementJsonCodec.encode(payload.placement())
+        );
         json.addProperty("spawnReceiptKey", payload.spawnReceiptKey());
         json.addProperty("requestedAtMs", payload.requestedAtMs());
         return json.toString();
@@ -70,7 +74,9 @@ public final class CompanionCoopReleaseDefinition
                         json.getAsJsonObject("sourceSnapshot")
                 ),
                 NpcAlias.parse(json.get("targetAlias").getAsString()),
-                json.get("targetWorldKey").getAsString(),
+                CompanionSpawnPlacementJsonCodec.decode(
+                        json.getAsJsonObject("placement")
+                ),
                 json.get("spawnReceiptKey").getAsString(),
                 json.get("requestedAtMs").getAsLong()
         );

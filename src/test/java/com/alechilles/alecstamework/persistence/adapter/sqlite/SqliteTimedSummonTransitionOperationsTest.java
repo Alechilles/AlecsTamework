@@ -1,14 +1,19 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Live round-trip and late-world recovery tests for timed transitions. */
@@ -21,6 +26,22 @@ class SqliteTimedSummonTransitionOperationsTest
         CompanionLifecycle stored = lifecycleRead(PROFILE_A);
         TimedSummonTransitionRequest start = startRequest(
                 prepared, stored, -3_000
+        );
+        assertEquals(2, TimedSummonTransitionDefinition.INSTANCE
+                .payloadVersion());
+        assertNotNull(start.spawnPlacement());
+        assertEquals(-12.5, start.spawnPlacement().x());
+        assertEquals(
+                start,
+                TimedSummonTransitionDefinition.INSTANCE.decode(
+                        TimedSummonTransitionDefinition.INSTANCE.encode(
+                                start
+                        )
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> withPlacement(start, null)
         );
 
         published(adapter.timedSummonTransitionOperations().submit(
@@ -45,6 +66,19 @@ class SqliteTimedSummonTransitionOperationsTest
 
         TimedSummonTransitionRequest store = storeRequest(
                 prepared, active, lease(), -2_000
+        );
+        assertNull(store.spawnPlacement());
+        assertEquals(
+                store,
+                TimedSummonTransitionDefinition.INSTANCE.decode(
+                        TimedSummonTransitionDefinition.INSTANCE.encode(
+                                store
+                        )
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> withPlacement(store, start.spawnPlacement())
         );
         published(adapter.timedSummonTransitionOperations().submit(
                 operationId(85),
@@ -126,5 +160,26 @@ class SqliteTimedSummonTransitionOperationsTest
                 .get(10, TimeUnit.SECONDS));
         assertEquals(2, lifecycleRead(PROFILE_A).revision().value());
         assertEquals(0, reservationCount(operationId));
+    }
+
+    private TimedSummonTransitionRequest withPlacement(
+            TimedSummonTransitionRequest request,
+            CompanionSpawnPlacement placement
+    ) {
+        return new TimedSummonTransitionRequest(
+                request.action(),
+                request.familyKey(),
+                request.slotId(),
+                request.expectedMembershipRevision(),
+                request.beforeLease(),
+                request.afterLease(),
+                request.groupAdmission(),
+                request.liveAlias(),
+                request.worldKey(),
+                placement,
+                request.snapshot(),
+                request.receiptKey(),
+                request.requestedAtMs()
+        );
     }
 }

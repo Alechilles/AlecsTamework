@@ -21,7 +21,7 @@ public final class PaidRevivalDefinition
 
     @Override
     public int payloadVersion() {
-        return 1;
+        return 2;
     }
 
     @Override

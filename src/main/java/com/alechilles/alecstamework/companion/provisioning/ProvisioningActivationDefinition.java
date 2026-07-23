@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.provisioning;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivationJsonCodec;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
@@ -27,7 +28,7 @@ public final class ProvisioningActivationDefinition
 
     @Override
     public int payloadVersion() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -52,7 +53,10 @@ public final class ProvisioningActivationDefinition
         json.addProperty(
                 "targetAlias", payload.targetAlias().toString()
         );
-        json.addProperty("targetWorldKey", payload.targetWorldKey());
+        json.add(
+                "placement",
+                CompanionSpawnPlacementJsonCodec.encode(payload.placement())
+        );
         json.addProperty("spawnReceiptKey", payload.spawnReceiptKey());
         json.add(
                 "timedActivation",
@@ -82,7 +86,9 @@ public final class ProvisioningActivationDefinition
                 NpcAlias.parse(
                         json.get("targetAlias").getAsString()
                 ),
-                json.get("targetWorldKey").getAsString(),
+                CompanionSpawnPlacementJsonCodec.decode(
+                        json.getAsJsonObject("placement")
+                ),
                 json.get("spawnReceiptKey").getAsString(),
                 timed == null || timed.isJsonNull()
                         ? null

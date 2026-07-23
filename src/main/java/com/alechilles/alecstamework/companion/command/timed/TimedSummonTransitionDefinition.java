@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -29,7 +30,7 @@ public final class TimedSummonTransitionDefinition
 
     @Override
     public int payloadVersion() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -66,6 +67,14 @@ public final class TimedSummonTransitionDefinition
         );
         json.addProperty("liveAlias", payload.liveAlias().toString());
         json.addProperty("worldKey", payload.worldKey());
+        json.add(
+                "spawnPlacement",
+                payload.spawnPlacement() == null
+                        ? null
+                        : CompanionSpawnPlacementJsonCodec.encode(
+                                payload.spawnPlacement()
+                        )
+        );
         json.add(
                 "snapshot",
                 CompanionSnapshotJsonCodec.encode(payload.snapshot())
@@ -104,6 +113,12 @@ public final class TimedSummonTransitionDefinition
                 ),
                 NpcAlias.parse(json.get("liveAlias").getAsString()),
                 json.get("worldKey").getAsString(),
+                json.get("spawnPlacement") == null
+                        || json.get("spawnPlacement").isJsonNull()
+                        ? null
+                        : CompanionSpawnPlacementJsonCodec.decode(
+                                json.getAsJsonObject("spawnPlacement")
+                        ),
                 CompanionSnapshotJsonCodec.decode(
                         json.getAsJsonObject("snapshot")
                 ),

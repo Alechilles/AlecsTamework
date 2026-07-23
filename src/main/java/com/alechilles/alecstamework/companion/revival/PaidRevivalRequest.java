@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import java.util.HashSet;
@@ -27,8 +28,7 @@ public record PaidRevivalRequest(
         @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
         @Nonnull CompanionSnapshot sourceSnapshot,
         @Nonnull NpcAlias targetAlias,
-        @Nonnull String targetWorldKey,
-        @Nonnull String placementFingerprint,
+        @Nonnull CompanionSpawnPlacement placement,
         @Nullable String configId,
         @Nonnull String configRevision,
         @Nonnull List<RevivalCostItem> exactCost,
@@ -43,15 +43,11 @@ public record PaidRevivalRequest(
                 || expectedMembershipRevision <= 0
                 || expectedProfileRevision < 0
                 || groupAdmission == null || sourceSnapshot == null
-                || targetAlias == null) {
+                || targetAlias == null || placement == null) {
             throw new IllegalArgumentException(
                     "Complete paid revival evidence is required"
             );
         }
-        targetWorldKey = text(targetWorldKey, "Paid revival world");
-        placementFingerprint = text(
-                placementFingerprint, "Paid revival placement"
-        );
         configId = normalize(configId);
         configRevision = text(
                 configRevision, "Paid revival config revision"
@@ -69,7 +65,7 @@ public record PaidRevivalRequest(
                 groupAdmission,
                 sourceSnapshot,
                 targetAlias,
-                targetWorldKey,
+                placement.worldKey(),
                 requestedAtMs
         );
         requireTimed(
@@ -80,6 +76,12 @@ public record PaidRevivalRequest(
                 groupAdmission.before(),
                 requestedAtMs
         );
+    }
+
+    /** Returns the canonical target world without storing a second placement authority. */
+    @Nonnull
+    public String targetWorldKey() {
+        return placement.worldKey();
     }
 
     /** Returns the post-fence active lifecycle committed after both receipts resolve. */

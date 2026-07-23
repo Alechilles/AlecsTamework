@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -30,6 +31,8 @@ class CompanionRestorationDefinitionTest {
         }) {
             CompanionRestorationRequest request = request(source);
 
+            assertEquals(-12.5, request.placement().x());
+            assertEquals(-500, request.requestedAtMs());
             assertEquals(
                     request,
                     CompanionRestorationDefinition.INSTANCE.decode(
@@ -70,7 +73,7 @@ class CompanionRestorationDefinitionTest {
                                 REVISION
                         ),
                         TARGET,
-                        "world-two",
+                        placement(),
                         "spawn-receipt",
                         -500
                 )
@@ -86,7 +89,7 @@ class CompanionRestorationDefinitionTest {
                                 REVISION.next()
                         ),
                         TARGET,
-                        "world-two",
+                        placement(),
                         "spawn-receipt",
                         -500
                 )
@@ -102,7 +105,7 @@ class CompanionRestorationDefinitionTest {
                                 REVISION
                         ),
                         TARGET,
-                        "world-two",
+                        placement(),
                         "spawn-receipt",
                         -500
                 )
@@ -116,9 +119,16 @@ class CompanionRestorationDefinitionTest {
                 source,
                 snapshot(source, new LifecycleRevision(4)),
                 TARGET,
-                "world-two",
+                placement(),
                 "spawn-receipt-" + source.name().toLowerCase(),
                 -500
+        );
+    }
+
+    private CompanionSpawnPlacement placement() {
+        return new CompanionSpawnPlacement(
+                "world-two", -12.5, -63.05, -4.5,
+                -0.25f, -1.5f, -0.5f
         );
     }
 

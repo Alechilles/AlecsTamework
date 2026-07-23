@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
@@ -319,7 +320,10 @@ class SqliteProvisioningActivationOperationsTest {
                         ACTIVATED_AT
                 ),
                 alias,
-                "world-a",
+                new CompanionSpawnPlacement(
+                        "world-a", -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
                 "spawn:" + origin.callerKey(),
                 timed,
                 ACTIVATED_AT

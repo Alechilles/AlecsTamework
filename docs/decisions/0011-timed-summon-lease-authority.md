@@ -80,6 +80,8 @@ typed variants:
 1. Summon
    - exact roster-stored lifecycle, slot, membership, lease, policy, current
      timed snapshot, group assignment, and cooldown evidence;
+   - freezes the exact world-qualified spawn position and rotation before
+     operation preparation, so recovery never reruns placement policy;
    - reserves only positive group admission through the shared population-group
      participant;
    - leases the target alias and fences canonical lifecycle during preparation;
@@ -130,10 +132,12 @@ serves a second lifecycle state.
 
 Both normal execution and startup recovery use the same typed adapter and live
 boundary. The boundary must prove the exact operation receipt; entity absence
-alone is not completion. An unavailable destination/source world returns
-retryable evidence, leaves the operation and lifecycle fence durable, blocks
-new mutation for that profile, and can be resumed by the same recovery entry
-after the world loads. Truly ambiguous effects use shared unknown containment.
+alone is not completion. Summon replay uses the frozen world-qualified position
+and rotation from the operation payload; it may not silently choose a new
+placement. An unavailable destination/source world returns retryable evidence,
+leaves the operation and lifecycle fence durable, blocks new mutation for that
+profile, and can be resumed by the same recovery entry after the world loads.
+Truly ambiguous effects use shared unknown containment.
 
 ### Cross-feature integration
 

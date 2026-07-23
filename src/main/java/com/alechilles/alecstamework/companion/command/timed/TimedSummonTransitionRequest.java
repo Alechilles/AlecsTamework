@@ -6,11 +6,13 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Exact summon/store evidence for the sole timed external transition. */
 public record TimedSummonTransitionRequest(
@@ -23,6 +25,7 @@ public record TimedSummonTransitionRequest(
         @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
         @Nonnull NpcAlias liveAlias,
         @Nonnull String worldKey,
+        @Nullable CompanionSpawnPlacement spawnPlacement,
         @Nonnull CompanionSnapshot snapshot,
         @Nonnull String receiptKey,
         long requestedAtMs
@@ -42,6 +45,18 @@ public record TimedSummonTransitionRequest(
         }
         worldKey = text(worldKey, "Timed summon world");
         receiptKey = text(receiptKey, "Timed summon receipt");
+        if (action == Action.START
+                && (spawnPlacement == null
+                || !worldKey.equals(spawnPlacement.worldKey()))) {
+            throw new IllegalArgumentException(
+                    "Timed summon start requires exact placement in its target world"
+            );
+        }
+        if (action == Action.STORE && spawnPlacement != null) {
+            throw new IllegalArgumentException(
+                    "Timed summon store cannot declare spawn placement"
+            );
+        }
         new TimedSummonLeaseChange(beforeLease, afterLease);
         CompanionLifecycle before = groupAdmission.before();
         CompanionLifecycle after = groupAdmission.after();

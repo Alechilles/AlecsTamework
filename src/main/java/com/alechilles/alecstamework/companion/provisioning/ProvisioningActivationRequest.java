@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -16,21 +17,18 @@ public record ProvisioningActivationRequest(
         @Nonnull ProvisioningOrigin origin,
         @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
         @Nonnull NpcAlias targetAlias,
-        @Nonnull String targetWorldKey,
+        @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
         @Nullable TimedSummonActivation timedActivation,
         long requestedAtMs
 ) {
     public ProvisioningActivationRequest {
         if (origin == null || groupAdmission == null
-                || targetAlias == null) {
+                || targetAlias == null || placement == null) {
             throw new IllegalArgumentException(
                     "Complete provisioning activation is required"
             );
         }
-        targetWorldKey = text(
-                targetWorldKey, "Provisioning activation world"
-        );
         spawnReceiptKey = text(
                 spawnReceiptKey, "Provisioning activation receipt"
         );
@@ -47,11 +45,11 @@ public record ProvisioningActivationRequest(
                 )
         )
                 || before.ownerId() == null
-                || !targetWorldKey.equals(before.ownerWorldKey())
+                || !placement.worldKey().equals(before.ownerWorldKey())
                 || after.state() != LifecycleState.ACTIVE
                 || !after.location().equals(
                 LifecycleLocation.liveEntity(
-                        targetAlias.toString(), targetWorldKey
+                        targetAlias.toString(), placement.worldKey()
                 )
         )
                 || !java.util.Objects.equals(
@@ -67,6 +65,12 @@ public record ProvisioningActivationRequest(
             );
         }
         requireTimed(timedActivation, before, requestedAtMs);
+    }
+
+    /** Returns the canonical target world without storing a second placement authority. */
+    @Nonnull
+    public String targetWorldKey() {
+        return placement.worldKey();
     }
 
     /** Returns the post-fence lifecycle committed after live confirmation. */

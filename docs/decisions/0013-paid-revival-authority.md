@@ -32,7 +32,7 @@ compatibility requirements.
 - owner, profile, command family, slot, and exact membership revision;
 - the exact `DEAD_REVIVABLE` lifecycle and current death snapshot;
 - the resolved group policy and active-capacity transition;
-- target alias, world, placement fingerprint, and spawn receipt;
+- target alias, exact world-qualified position and rotation, and spawn receipt;
 - resolved config ID/revision and ordered multi-item cost;
 - deterministic inventory source reservations and charge receipt;
 - optional exact previous-to-active timed-lease replacement;
@@ -46,6 +46,10 @@ A quote is not durable authority. Runtime confirmation re-resolves the config,
 inventory, placement, roster, lifecycle, and policy before submitting the
 frozen payload. Duplicate caller confirmation addresses the same semantic
 operation and cannot adopt a different quote, source plan, or target.
+
+The frozen transform is the complete placement result. Recovery replays those
+exact coordinates and rotations and never reruns placement policy within the
+same operation.
 
 ### Preparation composes existing authorities
 

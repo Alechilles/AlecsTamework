@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import javax.annotation.Nonnull;
 
@@ -15,17 +16,16 @@ public record CompanionRestorationRequest(
         @Nonnull LifecycleState sourceState,
         @Nonnull CompanionSnapshot sourceSnapshot,
         @Nonnull NpcAlias targetAlias,
-        @Nonnull String targetWorldKey,
+        @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
         long requestedAtMs
 ) {
     public CompanionRestorationRequest {
         if (profileId == null || expectedLifecycleRevision == null
                 || sourceState == null || sourceSnapshot == null
-                || targetAlias == null) {
+                || targetAlias == null || placement == null) {
             throw new IllegalArgumentException("Complete companion restoration is required");
         }
-        targetWorldKey = requireText(targetWorldKey, "Restoration target world");
         spawnReceiptKey = requireText(spawnReceiptKey, "Restoration spawn receipt");
         if (sourceState != LifecycleState.DEAD_REVIVABLE
                 && sourceState != LifecycleState.LOST) {
@@ -43,6 +43,12 @@ public record CompanionRestorationRequest(
                     "Restoration snapshot must be the exact current source artifact"
             );
         }
+    }
+
+    /** Returns the canonical target world without storing a second placement authority. */
+    @Nonnull
+    public String targetWorldKey() {
+        return placement.worldKey();
     }
 
     private static com.alechilles.alecstamework.companion.snapshot.SnapshotKind

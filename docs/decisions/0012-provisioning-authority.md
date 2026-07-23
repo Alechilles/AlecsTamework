@@ -82,15 +82,19 @@ same commit as the profile. A failure rolls back both.
 
 1. validates the exact provisioning record, dormant lifecycle, assignment,
    group policy, and optional command membership/timed policy;
-2. reserves only positive group-active capacity;
-3. leases the target alias and fences canonical lifecycle;
-4. invokes one idempotent world-thread spawn/receipt boundary;
-5. atomically promotes the alias, commits `ACTIVE`, optionally creates the
+2. freezes the exact world-qualified spawn position and rotation before
+   operation preparation;
+3. reserves only positive group-active capacity;
+4. leases the target alias and fences canonical lifecycle;
+5. invokes one idempotent world-thread spawn/receipt boundary with that frozen
+   transform;
+6. atomically promotes the alias, commits `ACTIVE`, optionally creates the
    initial active timed lease, retires reservations, and emits outbox evidence.
 
 An unavailable world is retryable and retains the exact shared envelope,
 lifecycle fence, alias lease, and group reservations. An ambiguous live outcome
-uses shared scoped containment.
+uses shared scoped containment. Recovery replays the same frozen transform and
+may not rerun placement policy inside the existing operation.
 
 Dormant creation remains successful if optional activation is denied before
 preparation or cannot yet be requested. The caller may retry activation for the

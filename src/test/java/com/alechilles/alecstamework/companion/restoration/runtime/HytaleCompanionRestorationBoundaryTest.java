@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
@@ -72,7 +73,9 @@ class HytaleCompanionRestorationBoundaryTest {
                 NpcAlias.parse(
                         "20000000-0000-0000-0000-000000000001"
                 ),
-                "world",
+                new CompanionSpawnPlacement(
+                        "world", -1, -2, -3, 0, -1, 0
+                ),
                 "spawn-receipt",
                 -600
         );
@@ -86,7 +89,7 @@ class HytaleCompanionRestorationBoundaryTest {
                 operationId,
                 new IdempotencyKey("restoration-world-test"),
                 new OperationKind("companion_restoration"),
-                1,
+                2,
                 "{}",
                 OperationPhase.LIVE_APPLYING,
                 "companion_restoration",

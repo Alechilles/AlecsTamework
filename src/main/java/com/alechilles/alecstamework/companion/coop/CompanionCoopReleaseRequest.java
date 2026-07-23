@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.coop;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import javax.annotation.Nonnull;
 
@@ -13,17 +14,16 @@ public record CompanionCoopReleaseRequest(
         @Nonnull CoopResidency sourceResidency,
         @Nonnull CompanionSnapshot sourceSnapshot,
         @Nonnull NpcAlias targetAlias,
-        @Nonnull String targetWorldKey,
+        @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
         long requestedAtMs
 ) {
     public CompanionCoopReleaseRequest {
         if (profileId == null || expectedLifecycleRevision == null
                 || sourceResidency == null || sourceSnapshot == null
-                || targetAlias == null) {
+                || targetAlias == null || placement == null) {
             throw new IllegalArgumentException("Complete coop release request is required");
         }
-        targetWorldKey = requireText(targetWorldKey, "Coop release target world");
         spawnReceiptKey = requireText(spawnReceiptKey, "Coop release spawn receipt");
         if (!profileId.equals(sourceResidency.profileId())
                 || !profileId.equals(sourceSnapshot.profileId())
@@ -40,6 +40,12 @@ public record CompanionCoopReleaseRequest(
                     "Coop release must reference the exact current residency snapshot"
             );
         }
+    }
+
+    /** Returns the canonical target world without storing a second placement authority. */
+    @Nonnull
+    public String targetWorldKey() {
+        return placement.worldKey();
     }
 
     private static String requireText(String value, String label) {

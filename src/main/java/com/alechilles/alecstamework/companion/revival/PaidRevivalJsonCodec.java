@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivationJsonCodec;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.google.gson.JsonArray;
@@ -52,9 +53,9 @@ public final class PaidRevivalJsonCodec {
                 CompanionSnapshotJsonCodec.encode(request.sourceSnapshot())
         );
         json.addProperty("targetAlias", request.targetAlias().toString());
-        json.addProperty("targetWorldKey", request.targetWorldKey());
-        json.addProperty(
-                "placementFingerprint", request.placementFingerprint()
+        json.add(
+                "placement",
+                CompanionSpawnPlacementJsonCodec.encode(request.placement())
         );
         nullable(json, "configId", request.configId());
         json.addProperty("configRevision", request.configRevision());
@@ -98,8 +99,9 @@ public final class PaidRevivalJsonCodec {
                         json.getAsJsonObject("sourceSnapshot")
                 ),
                 NpcAlias.parse(json.get("targetAlias").getAsString()),
-                json.get("targetWorldKey").getAsString(),
-                json.get("placementFingerprint").getAsString(),
+                CompanionSpawnPlacementJsonCodec.decode(
+                        json.getAsJsonObject("placement")
+                ),
                 optionalText(json, "configId"),
                 json.get("configRevision").getAsString(),
                 readCosts(json.getAsJsonArray("exactCost")),

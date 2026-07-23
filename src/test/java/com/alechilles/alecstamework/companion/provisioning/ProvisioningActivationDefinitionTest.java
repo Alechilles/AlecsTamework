@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
@@ -39,6 +40,8 @@ class ProvisioningActivationDefinitionTest {
     void timedActivationRoundTripsAndProducesFinalFenceRevision() {
         ProvisioningActivationRequest request = request(true);
 
+        assertEquals(-12.5, request.placement().x());
+        assertEquals(NOW, request.requestedAtMs());
         assertEquals(
                 request,
                 ProvisioningActivationDefinition.INSTANCE.decode(
@@ -77,7 +80,7 @@ class ProvisioningActivationDefinitionTest {
                                 NOW
                         ),
                         ALIAS,
-                        "world-b",
+                        placement("world-b"),
                         "receipt",
                         valid.timedActivation(),
                         NOW
@@ -101,7 +104,7 @@ class ProvisioningActivationDefinitionTest {
                         ORIGIN,
                         valid.groupAdmission(),
                         ALIAS,
-                        "world-a",
+                        placement("world-a"),
                         "receipt",
                         new TimedSummonActivation(
                                 valid.timedActivation().familyKey(),
@@ -149,10 +152,17 @@ class ProvisioningActivationDefinitionTest {
                         NOW
                 ),
                 ALIAS,
-                "world-a",
+                placement("world-a"),
                 "receipt",
                 timed ? timed() : null,
                 NOW
+        );
+    }
+
+    private CompanionSpawnPlacement placement(String world) {
+        return new CompanionSpawnPlacement(
+                world, -12.5, -63.05, -4.5,
+                -0.25f, -1.5f, -0.5f
         );
     }
 

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
@@ -57,6 +58,8 @@ class PaidRevivalDefinitionTest {
                 )
         );
 
+        assertEquals(-12.5, request.placement().x());
+        assertEquals(NOW, request.requestedAtMs());
         assertEquals(
                 request,
                 PaidRevivalDefinition.INSTANCE.decode(
@@ -205,8 +208,10 @@ class PaidRevivalDefinitionTest {
                 admission,
                 snapshot,
                 ALIAS,
-                targetWorld,
-                "placement-fingerprint",
+                new CompanionSpawnPlacement(
+                        targetWorld, -12.5, -63.05, -4.5,
+                        -0.25f, -1.5f, -0.5f
+                ),
                 "revive-config",
                 "revision-hash",
                 cost,
