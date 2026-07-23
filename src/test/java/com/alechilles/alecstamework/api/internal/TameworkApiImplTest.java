@@ -50,7 +50,7 @@ class TameworkApiImplTest {
             runtime.getNpcProfileRepository().setChangeObserver(bus);
             CommandLinkedNpcStateSnapshotService stateSnapshotService =
                     new CommandLinkedNpcStateSnapshotService(runtime.getNpcProfileRepository());
-            TameworkApi api = new TameworkApiImpl(
+            TameworkApi api = LegacyTameworkApiFactory.create(
                     runtime,
                     bus,
                     stateSnapshotService,

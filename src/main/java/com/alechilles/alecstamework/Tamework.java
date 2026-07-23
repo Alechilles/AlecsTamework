@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.api.internal.CompanionProvisioningApiDelegat
 import com.alechilles.alecstamework.api.internal.CommandTimedSummoningApiDelegate;
 import com.alechilles.alecstamework.api.internal.PopulationGroupApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
+import com.alechilles.alecstamework.api.internal.LegacyTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
@@ -990,7 +991,7 @@ public class Tamework extends JavaPlugin {
                 )
         );
         SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
-        api = new TameworkApiImpl(
+        api = LegacyTameworkApiFactory.create(
                 persistenceRuntime, apiEventBus,
                 commandLinkedNpcStateSnapshotService,
                 interactionExtensionRegistry,

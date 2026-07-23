@@ -30,7 +30,7 @@ class ProfileDataTransactionsApiIntegrationTest {
                     true, null, null, null, new String[0])));
             assertTrue(awaitUntil(() -> runtime.getNpcProfileRepository().resolveProfileId(npcUuid) != null));
             String profileId = runtime.getNpcProfileRepository().resolveProfileId(npcUuid);
-            TameworkApi api = new TameworkApiImpl(
+            TameworkApi api = LegacyTameworkApiFactory.create(
                     runtime,
                     new TameworkEventBus(null),
                     null,

@@ -129,6 +129,29 @@ final class ApiMapper {
     }
 
     @Nonnull
+    static CommandLinkView mapCommandLink(
+            @Nonnull NpcProfileView profile,
+            @Nonnull Set<String> toolIds,
+            @Nullable Vector3View homePosition,
+            @Nullable Vector3View lastKnownPosition
+    ) {
+        Set<String> resolvedToolIds = toolIds.isEmpty()
+                ? profile.toolIds()
+                : toolIds;
+        return new CommandLinkView(
+                profile.profileId(),
+                profile.currentNpcUuid(),
+                profile.ownerUuid(),
+                resolvedToolIds,
+                homePosition != null,
+                homePosition,
+                lastKnownPosition,
+                profile.activeSnapshotTypes(),
+                profile.lastUpdatedAtMs()
+        );
+    }
+
+    @Nonnull
     static ProgressionView.HappinessView mapHappiness(@Nullable String configId,
                                                       long lastUpdateMs,
                                                       @Nonnull String source,

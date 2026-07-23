@@ -64,7 +64,7 @@ class SimpleClaimsDamageAdapterParityTest {
             OwnerDamageFilterSystem runtimeAdapter = new OwnerDamageFilterSystem(null, policyFixture.policy());
             worldFixture.invoke(runtimeAdapter, runtimeDamage);
 
-            TameworkApiImpl apiAdapter = new TameworkApiImpl(
+            TameworkApiImpl apiAdapter = LegacyTameworkApiFactory.create(
                     runtime,
                     new TameworkEventBus(null),
                     null,

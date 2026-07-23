@@ -32,7 +32,6 @@ import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
 import com.alechilles.alecstamework.api.ProfileDataEntryView;
-import com.alechilles.alecstamework.api.ProfileDataOperationStatus;
 import com.alechilles.alecstamework.api.ProfileDataOperationView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
@@ -93,9 +92,6 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
-import com.alechilles.alecstamework.persistence.sqlite.ApiProfileDataRepository;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -121,7 +117,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -131,15 +126,13 @@ public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
     static final String API_VERSION = "0.9.0";
-    static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
     private static final String SNAPSHOT_LOST = "lost";
     private static final String[] COMMAND_LINK_SNAPSHOT_PRIORITY = {SNAPSHOT_CAPTURE, SNAPSHOT_DEATH, SNAPSHOT_LOST};
 
-    private final TameworkPersistenceRuntime persistenceRuntime;
-    private final NpcProfileRepository profileRepository;
-    private final ApiProfileDataRepository profileDataRepository;
+    private final NpcProfilesApi profilesApi;
+    private final ProfileDataApi profileDataApi;
     private final TameworkEventBus eventBus;
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
@@ -305,48 +298,22 @@ public final class TameworkApiImpl
     private volatile PaidCommandRevivalApi paidCommandRevivalApi = PaidCommandRevivalApi.unavailable();
     private volatile CommandFamilyRosterApi commandFamilyRosterApi = CommandFamilyRosterApi.unavailable();
 
-    public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
-                           @Nonnull TameworkEventBus eventBus,
-                           @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                           @Nonnull InteractionExtensionApi interactionExtensionApi,
-                           @Nonnull TraitEffectApi traitEffectApi) {
-        this(
-                persistenceRuntime,
-                eventBus,
-                stateSnapshotService,
-                interactionExtensionApi,
-                traitEffectApi,
-                new SimpleClaimsTamedDamagePolicy()
-        );
-    }
-
-    TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
-                    @Nonnull TameworkEventBus eventBus,
-                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                    @Nonnull InteractionExtensionApi interactionExtensionApi,
-                    @Nonnull TraitEffectApi traitEffectApi,
-                    @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
-        this(
-                persistenceRuntime,
-                eventBus,
-                stateSnapshotService,
-                interactionExtensionApi,
-                traitEffectApi,
-                damagePolicy,
-                UnavailablePopulationPolicyAuthority.INSTANCE
-        );
-    }
-
-    public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+    public TameworkApiImpl(@Nonnull NpcProfilesApi profilesApi,
+                           @Nonnull ProfileDataApi profileDataApi,
+                           @Nonnull DiagnosticsApi diagnosticsApi,
                            @Nonnull TameworkEventBus eventBus,
                            @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                            @Nonnull InteractionExtensionApi interactionExtensionApi,
                            @Nonnull TraitEffectApi traitEffectApi,
                            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
                            @Nonnull PopulationPolicyAuthority populationPolicyAuthority) {
-        this.persistenceRuntime = Objects.requireNonNull(persistenceRuntime);
-        this.profileRepository = Objects.requireNonNull(persistenceRuntime.getNpcProfileRepository());
-        this.profileDataRepository = Objects.requireNonNull(persistenceRuntime.getApiProfileDataRepository());
+        this.profilesApi = Objects.requireNonNull(profilesApi, "profilesApi");
+        this.profileDataApi = Objects.requireNonNull(
+                profileDataApi, "profileDataApi"
+        );
+        this.diagnosticsApi = Objects.requireNonNull(
+                diagnosticsApi, "diagnosticsApi"
+        );
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS);
         }
@@ -354,7 +321,6 @@ public final class TameworkApiImpl
         this.stateSnapshotService = stateSnapshotService;
         this.damagePolicy = Objects.requireNonNull(damagePolicy);
         this.populationPolicy = new PopulationPolicyApiDelegate(populationPolicyAuthority);
-        this.diagnosticsApi = new TameworkDiagnosticsApi(persistenceRuntime, populationPolicy);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
@@ -676,109 +642,61 @@ public final class TameworkApiImpl
 
     @Override
     public Optional<String> resolveProfileId(UUID npcUuid) {
-        if (npcUuid == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileRepository.resolveProfileId(npcUuid));
+        return profilesApi.resolveProfileId(npcUuid);
     }
 
     @Override
     public Optional<NpcProfileView> getByProfileId(String profileId) {
-        if (isBlank(profileId)) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileRepository.loadProfileById(profileId.trim()))
-                .map(ApiMapper::mapProfile);
+        return profilesApi.getByProfileId(profileId);
     }
 
     @Override
     public Optional<NpcProfileView> getByNpcUuid(UUID npcUuid) {
-        if (npcUuid == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileRepository.loadProfileByNpcUuid(npcUuid))
-                .map(ApiMapper::mapProfile);
+        return profilesApi.getByNpcUuid(npcUuid);
     }
 
     @Override
     public Optional<String> getActiveSnapshot(String profileId, String snapshotType) {
-        if (isBlank(profileId) || isBlank(snapshotType)) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileRepository.loadActiveSnapshotPayload(profileId.trim(), snapshotType.trim()));
+        return profilesApi.getActiveSnapshot(profileId, snapshotType);
     }
 
     @Override
     public Set<String> listActiveSnapshotTypes(String profileId) {
-        if (isBlank(profileId)) {
-            return Set.of();
-        }
-        return Collections.unmodifiableSet(profileRepository.listActiveSnapshotTypes(profileId.trim()));
+        return profilesApi.listActiveSnapshotTypes(profileId);
     }
 
     @Override
     public Optional<String> get(String profileId, String namespace, String key) {
-        if (!isValidProfileDataScope(profileId, namespace, key)) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileDataRepository.get(profileId.trim(), namespace.trim(), key.trim()));
+        return profileDataApi.get(profileId, namespace, key);
     }
 
     @Override
     public Map<String, String> list(String profileId, String namespace) {
-        if (isBlank(profileId) || !isValidNamespace(namespace)) {
-            return Map.of();
-        }
-        LinkedHashMap<String, String> values = profileDataRepository.list(profileId.trim(), namespace.trim());
-        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+        return profileDataApi.list(profileId, namespace);
     }
 
     @Override
     public boolean put(String profileId, String namespace, String key, String jsonPayload) {
-        if (!isValidProfileDataScope(profileId, namespace, key) || isBlank(jsonPayload)) {
-            return false;
-        }
-        try {
-            String normalizedJson = JsonParser.parseString(jsonPayload).toString();
-            return profileDataRepository.putAsync(profileId.trim(), namespace.trim(), key.trim(), normalizedJson);
-        } catch (Exception ignored) {
-            return false;
-        }
+        return profileDataApi.put(profileId, namespace, key, jsonPayload);
     }
 
     @Override
     public boolean delete(String profileId, String namespace, String key) {
-        if (!isValidProfileDataScope(profileId, namespace, key)) {
-            return false;
-        }
-        return profileDataRepository.deleteAsync(profileId.trim(), namespace.trim(), key.trim());
+        return profileDataApi.delete(profileId, namespace, key);
     }
 
     @Override
     public Optional<ProfileDataEntryView> getVersioned(String profileId,
                                                        String namespace,
                                                        String key) {
-        if (!isValidProfileDataScope(profileId, namespace, key)) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(profileDataRepository.getVersioned(
-                        profileId.trim(), namespace.trim(), key.trim()))
-                .map(TameworkApiImpl::mapProfileDataEntry);
+        return profileDataApi.getVersioned(profileId, namespace, key);
     }
 
     @Override
     public CompletionStage<ProfileDataCompareAndSetResult> compareAndSet(
             ProfileDataCompareAndSetRequest request
     ) {
-        Objects.requireNonNull(request, "request");
-        return profileDataRepository.compareAndSetAsync(
-                        request.profileId(),
-                        request.namespace(),
-                        request.key(),
-                        request.expectedRevision(),
-                        request.idempotencyKey(),
-                        request.jsonPayload())
-                .thenApply(TameworkApiImpl::mapProfileDataTransactionResult);
+        return profileDataApi.compareAndSet(request);
     }
 
     @Override
@@ -786,69 +704,7 @@ public final class TameworkApiImpl
             String namespace,
             String idempotencyKey
     ) {
-        if (isBlank(namespace) || isBlank(idempotencyKey)) {
-            return CompletableFuture.completedFuture(Optional.empty());
-        }
-        return CompletableFuture.completedFuture(Optional.ofNullable(
-                        profileDataRepository.findOperation(
-                                namespace.trim(), idempotencyKey.trim()))
-                .map(TameworkApiImpl::mapProfileDataOperation));
-    }
-
-    private static ProfileDataCompareAndSetResult mapProfileDataTransactionResult(
-            ApiProfileDataRepository.TransactionResult result
-    ) {
-        if (result == null || result.outcome()
-                == ApiProfileDataRepository.TransactionOutcome.UNAVAILABLE) {
-            String reason = result == null ? "profile-data-transaction-authority-unavailable"
-                    : result.reason();
-            return new ProfileDataCompareAndSetResult(
-                    ProfileDataCompareAndSetResult.Status.UNAVAILABLE,
-                    reason,
-                    null,
-                    null);
-        }
-        ProfileDataOperationView operation = mapProfileDataOperation(
-                Objects.requireNonNull(result.operation(), "durable operation"));
-        return switch (result.outcome()) {
-            case COMMITTED -> new ProfileDataCompareAndSetResult(
-                    ProfileDataCompareAndSetResult.Status.COMMITTED,
-                    result.reason(),
-                    operation,
-                    mapProfileDataEntry(Objects.requireNonNull(result.value(), "committed value")));
-            case TERMINAL_DENIED -> new ProfileDataCompareAndSetResult(
-                    ProfileDataCompareAndSetResult.Status.TERMINAL_DENIED,
-                    result.reason(), operation, null);
-            case QUARANTINED -> new ProfileDataCompareAndSetResult(
-                    ProfileDataCompareAndSetResult.Status.QUARANTINED,
-                    result.reason(), operation, null);
-            case UNAVAILABLE -> throw new IllegalStateException("handled above");
-        };
-    }
-
-    private static ProfileDataEntryView mapProfileDataEntry(
-            ApiProfileDataRepository.VersionedValue value
-    ) {
-        return new ProfileDataEntryView(
-                value.profileId(), value.namespace(), value.key(), value.revision(),
-                value.jsonPayload(), value.updatedAtMs());
-    }
-
-    private static ProfileDataOperationView mapProfileDataOperation(
-            ApiProfileDataRepository.TransactionOperation operation
-    ) {
-        return new ProfileDataOperationView(
-                operation.operationId(),
-                operation.namespace(),
-                operation.idempotencyKey(),
-                operation.profileId(),
-                operation.key(),
-                operation.expectedRevision(),
-                operation.resultingRevision(),
-                operation.payloadFingerprint(),
-                ProfileDataOperationStatus.valueOf(operation.status().name()),
-                operation.reason(),
-                operation.updatedAtMs());
+        return profileDataApi.findOperation(namespace, idempotencyKey);
     }
 
     @Override
@@ -1076,8 +932,7 @@ public final class TameworkApiImpl
         if (isBlank(profileId)) {
             return Optional.empty();
         }
-        return Optional.ofNullable(profileRepository.loadProfileById(profileId.trim()))
-                .map(this::mapOwnershipPolicy);
+        return profilesApi.getByProfileId(profileId).map(this::mapOwnershipPolicy);
     }
 
     @Override
@@ -1085,8 +940,7 @@ public final class TameworkApiImpl
         if (npcUuid == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(profileRepository.loadProfileByNpcUuid(npcUuid))
-                .map(this::mapOwnershipPolicy);
+        return profilesApi.getByNpcUuid(npcUuid).map(this::mapOwnershipPolicy);
     }
 
     @Override
@@ -1106,7 +960,9 @@ public final class TameworkApiImpl
         if (isBlank(profileId)) {
             return unavailableClaimDecision("profile-id-missing");
         }
-        NpcProfileRepository.ProfileRecord profile = profileRepository.loadProfileById(profileId.trim());
+        NpcProfileView profile = profilesApi.getByProfileId(
+                profileId
+        ).orElse(null);
         if (profile == null) {
             return unavailableClaimDecision("profile-not-found");
         }
@@ -1214,7 +1070,9 @@ public final class TameworkApiImpl
             if (normalizedProfileId == null) {
                 return invalidMutation("Profile id is required.");
             }
-            NpcProfileRepository.ProfileRecord profile = profileRepository.loadProfileById(normalizedProfileId);
+            NpcProfileView profile = profilesApi.getByProfileId(
+                    normalizedProfileId
+            ).orElse(null);
             if (profile == null) {
                 return notFoundMutation("No profile found for id '" + normalizedProfileId + "'.");
             }
@@ -1244,7 +1102,9 @@ public final class TameworkApiImpl
             if (npcUuid == null) {
                 return invalidMutation("NPC UUID is required.");
             }
-            NpcProfileRepository.ProfileRecord profile = profileRepository.loadProfileByNpcUuid(npcUuid);
+            NpcProfileView profile = profilesApi.getByNpcUuid(
+                    npcUuid
+            ).orElse(null);
             ResolvedLiveNpc liveNpc = resolveLiveNpc(npcUuid);
             if (liveNpc == null) {
                 if (profile != null) {
@@ -1784,7 +1644,9 @@ public final class TameworkApiImpl
         if (isBlank(profileId)) {
             return Optional.empty();
         }
-        NpcProfileRepository.ProfileRecord profile = profileRepository.loadProfileById(profileId.trim());
+        NpcProfileView profile = profilesApi.getByProfileId(
+                profileId
+        ).orElse(null);
         if (profile == null || profile.currentNpcUuid() == null) {
             return Optional.empty();
         }
@@ -1795,7 +1657,7 @@ public final class TameworkApiImpl
         if (npcUuid == null) {
             return Optional.empty();
         }
-        NpcProfileRepository.ProfileRecord profile = profileRepository.loadProfileByNpcUuid(npcUuid);
+        NpcProfileView profile = profilesApi.getByNpcUuid(npcUuid).orElse(null);
         return buildProgressionView(
                 profile != null ? profile.profileId() : null,
                 profile != null ? profile.roleId() : null,
@@ -2043,19 +1905,8 @@ public final class TameworkApiImpl
         return ApiMapper.mapAttachments(attachmentsComponent, currentAttachments);
     }
 
-    private boolean isValidProfileDataScope(String profileId, String namespace, String key) {
-        return !isBlank(profileId) && isValidNamespace(namespace) && !isBlank(key);
-    }
-
-    private boolean isValidNamespace(String namespace) {
-        if (isBlank(namespace)) {
-            return false;
-        }
-        return !RESERVED_NAMESPACE.equalsIgnoreCase(namespace.trim());
-    }
-
     @Nonnull
-    private OwnershipPolicyView mapOwnershipPolicy(@Nonnull NpcProfileRepository.ProfileRecord profile) {
+    private OwnershipPolicyView mapOwnershipPolicy(@Nonnull NpcProfileView profile) {
         TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(profile.roleId());
         return new OwnershipPolicyView(
                 profile.profileId(),
@@ -2063,7 +1914,7 @@ public final class TameworkApiImpl
                 profile.ownerUuid(),
                 profile.ownerName(),
                 profile.roleId(),
-                Boolean.TRUE.equals(profile.tamed()),
+                profile.tamed(),
                 !isBlank(profile.coopId()) || profile.coopSlot() != null,
                 profile.coopId(),
                 profile.coopSlot(),
@@ -2073,7 +1924,9 @@ public final class TameworkApiImpl
         );
     }
 
-    private Optional<CommandLinkView> buildCommandLinkView(@Nullable NpcProfileRepository.ProfileRecord profile) {
+    private Optional<CommandLinkView> buildCommandLinkView(
+            @Nullable NpcProfileView profile
+    ) {
         if (profile == null) {
             return Optional.empty();
         }
@@ -2082,10 +1935,11 @@ public final class TameworkApiImpl
         ResolvedCommandLinkState cachedState = readCachedCommandLinkState(profile.currentNpcUuid());
         ResolvedCommandLinkState persistedState = readPersistedSnapshotState(profile.profileId(), profile.activeSnapshotTypes());
 
-        String[] resolvedToolIds = liveContext != null && !isEmpty(liveContext.toolIds())
-                ? liveContext.toolIds()
+        Set<String> resolvedToolIds = liveContext != null
+                && !isEmpty(liveContext.toolIds())
+                ? ordered(liveContext.toolIds())
                 : !isEmpty(cachedState.toolIds())
-                ? cachedState.toolIds()
+                ? ordered(cachedState.toolIds())
                 : profile.toolIds();
         Vector3View homePosition = firstNonNull(
                 liveContext != null ? liveContext.homePosition() : null,
@@ -2101,7 +1955,7 @@ public final class TameworkApiImpl
         if (isEmpty(resolvedToolIds)
                 && homePosition == null
                 && lastKnownPosition == null
-                && profile.activeSnapshotTypes().length == 0) {
+                && profile.activeSnapshotTypes().isEmpty()) {
             return Optional.empty();
         }
 
@@ -2117,14 +1971,16 @@ public final class TameworkApiImpl
         if (isBlank(profileId)) {
             return Optional.empty();
         }
-        return buildCommandLinkView(profileRepository.loadProfileById(profileId.trim()));
+        return buildCommandLinkView(profilesApi.getByProfileId(
+                profileId
+        ).orElse(null));
     }
 
     private Optional<CommandLinkView> getCommandLinkByNpcUuid(UUID npcUuid) {
         if (npcUuid == null) {
             return Optional.empty();
         }
-        return buildCommandLinkView(profileRepository.loadProfileByNpcUuid(npcUuid));
+        return buildCommandLinkView(profilesApi.getByNpcUuid(npcUuid).orElse(null));
     }
 
     private Set<String> listLinkedToolIdsInternal(String profileId) {
@@ -2227,15 +2083,20 @@ public final class TameworkApiImpl
     }
 
     @Nonnull
-    private ResolvedCommandLinkState readPersistedSnapshotState(@Nonnull String profileId, @Nonnull String[] snapshotTypes) {
-        if (snapshotTypes.length == 0) {
+    private ResolvedCommandLinkState readPersistedSnapshotState(
+            @Nonnull String profileId,
+            @Nonnull Set<String> snapshotTypes
+    ) {
+        if (snapshotTypes.isEmpty()) {
             return ResolvedCommandLinkState.empty();
         }
         for (String snapshotType : COMMAND_LINK_SNAPSHOT_PRIORITY) {
             if (!contains(snapshotTypes, snapshotType)) {
                 continue;
             }
-            String payload = profileRepository.loadActiveSnapshotPayload(profileId, snapshotType);
+            String payload = profilesApi.getActiveSnapshot(
+                    profileId, snapshotType
+            ).orElse(null);
             if (isBlank(payload)) {
                 continue;
             }
@@ -2477,8 +2338,38 @@ public final class TameworkApiImpl
         return false;
     }
 
+    private boolean contains(
+            @Nonnull Set<String> values,
+            @Nonnull String expected
+    ) {
+        for (String value : values) {
+            if (expected.equalsIgnoreCase(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isEmpty(@Nullable String[] values) {
         return values == null || values.length == 0;
+    }
+
+    private boolean isEmpty(@Nullable Set<String> values) {
+        return values == null || values.isEmpty();
+    }
+
+    @Nonnull
+    private Set<String> ordered(@Nullable String[] values) {
+        if (isEmpty(values)) {
+            return Set.of();
+        }
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (String value : values) {
+            if (!isBlank(value)) {
+                result.add(value.trim());
+            }
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     @SafeVarargs

@@ -29,7 +29,7 @@ class TameworkApiPopulationPolicyTest {
     void injectedPopulationAuthorityOwnsV2EvaluationAndAdmissionLifecycle() throws Exception {
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
             FakeAuthority authority = new FakeAuthority();
-            TameworkApiImpl api = new TameworkApiImpl(
+            TameworkApiImpl api = LegacyTameworkApiFactory.create(
                     runtime,
                     new TameworkEventBus(null),
                     null,
