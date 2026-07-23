@@ -128,6 +128,7 @@ class SqliteDatabaseOperationCoordinatorTest {
 
         DatabaseOperationResult repeated = execute(durableExecutions, recovered);
         assertEquals(DatabaseOperationResult.Status.PUBLISHED, repeated.status());
+        assertEquals(1, repeated.events().size());
         assertEquals(1, durableExecutions.get());
         assertEquals(1, recovered.applyCalls.get());
     }

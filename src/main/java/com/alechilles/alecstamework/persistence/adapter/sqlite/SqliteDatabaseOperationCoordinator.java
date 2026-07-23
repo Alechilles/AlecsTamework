@@ -90,12 +90,7 @@ public final class SqliteDatabaseOperationCoordinator {
             List<ProjectionConsumer> consumers
     ) {
         return switch (operation.phase()) {
-            case PUBLISHED -> completed(new DatabaseOperationResult(
-                    DatabaseOperationResult.Status.PUBLISHED,
-                    operation,
-                    List.of(),
-                    null
-            ));
+            case PUBLISHED -> loadPublished(operation);
             case DURABLE -> loadAndPublish(operation, consumers);
             case PREPARED, RETRYABLE -> commitAndPublish(operation, work, consumers);
             default -> completed(failed(
@@ -143,6 +138,27 @@ public final class SqliteDatabaseOperationCoordinator {
                     List.of(),
                     readFailure(read)
             ));
+        });
+    }
+
+    private CompletionStage<DatabaseOperationResult> loadPublished(
+            OperationEnvelope operation
+    ) {
+        return evidence.find(operation.operationId()).thenApply(read -> {
+            if (read instanceof PersistenceReadResult.Found<DurableCommitEvidence> found) {
+                return new DatabaseOperationResult(
+                        DatabaseOperationResult.Status.PUBLISHED,
+                        operation,
+                        found.value().events(),
+                        null
+                );
+            }
+            return failed(
+                    DatabaseOperationResult.Status.DURABLE_READ_FAILED,
+                    operation,
+                    List.of(),
+                    readFailure(read)
+            );
         });
     }
 

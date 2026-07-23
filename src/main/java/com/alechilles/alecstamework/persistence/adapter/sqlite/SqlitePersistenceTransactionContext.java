@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.extension.ProfileExtensionDataPort;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecyclePort;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotPort;
@@ -22,6 +23,7 @@ public final class SqlitePersistenceTransactionContext {
     private final OperationStore operations;
     private final IncidentStore incidents;
     private final ProjectionOutboxPort outbox;
+    private final ProfileExtensionDataPort profileExtensions;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -33,6 +35,7 @@ public final class SqlitePersistenceTransactionContext {
         operations = new SqliteOperationStore(connection);
         incidents = new SqliteIncidentStore(connection);
         outbox = new SqliteProjectionOutboxStore(connection);
+        profileExtensions = new SqliteProfileExtensionDataStore(connection);
     }
 
     @Nonnull
@@ -63,5 +66,14 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     public ProjectionOutboxPort outbox() {
         return outbox;
+    }
+
+    /*
+     * Feature detail is intentionally package-private: operation adapters may compose it inside
+     * the shared transaction, but the context's public surface remains the six core authorities.
+     */
+    @Nonnull
+    ProfileExtensionDataPort profileExtensions() {
+        return profileExtensions;
     }
 }

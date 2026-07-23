@@ -4,13 +4,18 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 import java.util.List;
 import javax.annotation.Nonnull;
 
-/** Exact durable operation envelope and outbox rows committed in one transaction. */
+/** Exact durable-or-published operation envelope and its immutable committed outbox rows. */
 public record DurableCommitEvidence(@Nonnull OperationEnvelope operation,
                                     @Nonnull List<ProjectionEvent> events) {
     public DurableCommitEvidence {
-        if (operation == null || operation.phase() != OperationPhase.DURABLE || events == null
+        if (operation == null
+                || (operation.phase() != OperationPhase.DURABLE
+                && operation.phase() != OperationPhase.PUBLISHED)
+                || events == null
                 || events.isEmpty()) {
-            throw new IllegalArgumentException("Durable operation and nonempty outbox evidence are required");
+            throw new IllegalArgumentException(
+                    "Durable lineage and nonempty outbox evidence are required"
+            );
         }
         events = List.copyOf(events);
         for (ProjectionEvent event : events) {

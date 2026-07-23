@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.architecture;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -125,6 +127,31 @@ class ReplacementPersistenceArchitectureGuardTest {
             }
         }
         assertTrue(violations.isEmpty(), () -> String.join("\n", violations));
+    }
+
+    @Test
+    void transactionContextKeepsExactlySixPublicAuthorityAccessors() throws Exception {
+        Class<?> context = Class.forName(
+                "com.alechilles.alecstamework.persistence.adapter.sqlite"
+                        + ".SqlitePersistenceTransactionContext"
+        );
+        List<String> accessors = Stream.of(context.getDeclaredMethods())
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .map(Method::getName)
+                .sorted()
+                .toList();
+
+        assertEquals(
+                List.of(
+                        "identities",
+                        "incidents",
+                        "lifecycles",
+                        "operations",
+                        "outbox",
+                        "snapshots"
+                ),
+                accessors
+        );
     }
 
     private List<Path> javaFiles(Path root) throws Exception {
