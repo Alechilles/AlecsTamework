@@ -44,6 +44,8 @@ class SqliteOperationEngineTest {
     private static final OperationKind KIND = new OperationKind("profile_create");
     private static final OperationId OPERATION =
             OperationId.parse("40000000-0000-0000-0000-000000000001");
+    private static final OperationId OTHER_OPERATION =
+            OperationId.parse("40000000-0000-0000-0000-000000000002");
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
     private static final NpcAlias ALIAS =
@@ -320,6 +322,64 @@ class SqliteOperationEngineTest {
                     OperationPhase.LIVE_APPLYING,
                     transaction.operations().find(OPERATION).orElseThrow().phase()
             );
+        }
+    }
+
+    @Test
+    void unknownContainmentBlocksNewScopeWorkButAllowsExactReadback()
+            throws Exception {
+        OperationEnvelope prepared = committed(
+                engine.prepare(definition, request())
+        );
+        OperationEnvelope applying = committed(engine.transition(
+                prepared,
+                OperationPhase.LIVE_APPLYING,
+                null,
+                null,
+                -9_500
+        ));
+        OperationEnvelope unknown = committed(engine.transition(
+                applying,
+                OperationPhase.UNKNOWN,
+                "live",
+                "receipt_read_failed",
+                -9_000
+        ));
+        committed(engine.containUnknown(
+                unknown,
+                "receipt_read_failed",
+                "Could not prove external mutation",
+                List.of(
+                        OperationScope.operation(OPERATION),
+                        OperationScope.profile(PROFILE)
+                ),
+                -8_500
+        ));
+
+        OperationEnvelope exactReplay = committed(
+                engine.prepare(definition, request())
+        );
+        assertEquals(OperationPhase.UNKNOWN, exactReplay.phase());
+
+        PersistenceTransactionResult<OperationEnvelope> rejected =
+                engine.prepare(definition, new OperationRequest<>(
+                        OTHER_OPERATION,
+                        new IdempotencyKey("other-profile-create-test"),
+                        new Payload("Other"),
+                        "profile",
+                        LifecycleRevision.INITIAL,
+                        List.of(OperationScope.profile(PROFILE)),
+                        -8_000
+                )).completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertInstanceOf(
+                PersistenceTransactionResult.RolledBack.class,
+                rejected
+        );
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteOperationStore(connection)
+                    .find(OTHER_OPERATION).isEmpty());
         }
     }
 

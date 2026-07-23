@@ -42,6 +42,7 @@ public final class SqliteOperationEngine {
     private final OperationDefinitionRegistry definitions;
     private final SqliteUnitOfWorkRunner units;
     private final SqliteOperationCompensationEngine compensations;
+    private final SqliteOperationContainmentEngine containment;
 
     public SqliteOperationEngine(@Nonnull OperationDefinitionRegistry definitions,
                                  @Nonnull SqliteUnitOfWorkRunner units) {
@@ -51,6 +52,7 @@ public final class SqliteOperationEngine {
         this.definitions = definitions;
         this.units = units;
         this.compensations = new SqliteOperationCompensationEngine(units);
+        this.containment = new SqliteOperationContainmentEngine(units);
     }
 
     /** Encodes and durably prepares one idempotent operation. */
@@ -91,6 +93,15 @@ public final class SqliteOperationEngine {
                 connection -> {
                     SqlitePersistenceTransactionContext transaction =
                             new SqlitePersistenceTransactionContext(connection);
+                    boolean existing = transaction.operations()
+                            .findByIdempotency(
+                                    prepared.kind(),
+                                    prepared.idempotencyKey()
+                            )
+                            .isPresent();
+                    if (!existing) {
+                        requireNotQuarantined(transaction, prepared);
+                    }
                     OperationEnvelope operation = requireApplied(
                             transaction.operations().prepare(prepared),
                             "operation_prepare"
@@ -127,6 +138,24 @@ public final class SqliteOperationEngine {
                     return PersistenceReadResult.absent();
                 }
         ));
+    }
+
+    /**
+     * Records one unknown operation incident and blocks only its proven affected scopes.
+     */
+    @Nonnull
+    public SqliteUnitOfWorkRunner.Submission<
+            com.alechilles.alecstamework.persistence.incidents.IncidentRecord>
+    containUnknown(
+            @Nonnull OperationEnvelope operation,
+            @Nonnull String failureCode,
+            @Nonnull String summary,
+            @Nonnull List<OperationScope> scopes,
+            long containedAtMs
+    ) {
+        return containment.contain(
+                operation, failureCode, summary, scopes, containedAtMs
+        );
     }
 
     /** Advances one exact phase/lease edge through the shared state graph. */
@@ -330,6 +359,26 @@ public final class SqliteOperationEngine {
                 .filter(scope -> scope.type() != OperationScopeType.OPERATION)
                 .sorted()
                 .toList();
+    }
+
+    private void requireNotQuarantined(
+            SqlitePersistenceTransactionContext transaction,
+            PreparedOperation prepared
+    ) {
+        java.util.ArrayList<OperationScope> candidates =
+                new java.util.ArrayList<>(prepared.participants());
+        candidates.add(new OperationScope(
+                OperationScopeType.FEATURE,
+                prepared.featureScope()
+        ));
+        candidates.add(OperationScope.global());
+        if (!transaction.incidents()
+                .findActiveQuarantines(candidates)
+                .isEmpty()) {
+            throw new IllegalStateException(
+                    "operation_scope_quarantined"
+            );
+        }
     }
 
     private void requireExpected(OperationEnvelope current, OperationEnvelope expected) {

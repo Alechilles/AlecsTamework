@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -39,6 +40,8 @@ public final class SqliteCompanionRestorationOperations {
             new ProjectionEventType("companion_restored");
 
     private final SqliteLiveOperationCoordinator workflow;
+    private final SqliteOperationEngine operations;
+    private final LongSupplier clock;
     private final List<ProjectionConsumer> requiredConsumers;
 
     public SqliteCompanionRestorationOperations(
@@ -54,6 +57,8 @@ public final class SqliteCompanionRestorationOperations {
         workflow = new SqliteLiveOperationCoordinator(
                 operations, publisher, clock
         );
+        this.operations = operations;
+        this.clock = clock;
         this.requiredConsumers = List.copyOf(requiredConsumers);
     }
 
@@ -91,7 +96,48 @@ public final class SqliteCompanionRestorationOperations {
                         requiredConsumers,
                         "companion_restoration"
                 );
-        return new Submission(submission.acceptance(), submission.completion());
+        CompletionStage<OperationWorkflowResult> completion =
+                submission.completion().thenCompose(result -> {
+                    if (result.status()
+                            != OperationWorkflowResult.Status.LIVE_UNKNOWN
+                            || result.operation() == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    OperationEnvelope operation = result.operation();
+                    return operations.containUnknown(
+                            operation,
+                            operation.failureCode() == null
+                                    ? "restoration_live_outcome_unknown"
+                                    : operation.failureCode(),
+                            "Restoration could not prove whether the exact "
+                                    + "entity insertion completed",
+                            List.of(
+                                    OperationScope.operation(
+                                            operation.operationId()
+                                    ),
+                                    OperationScope.profile(
+                                            restoration.profileId()
+                                    )
+                            ),
+                            clock.getAsLong()
+                    ).completion().thenApply(containment -> {
+                        if (containment instanceof
+                                com.alechilles.alecstamework.persistence.kernel
+                                .PersistenceTransactionResult.Committed<?>) {
+                            return result;
+                        }
+                        return new OperationWorkflowResult(
+                                OperationWorkflowResult.Status.LIVE_UNKNOWN,
+                                operation,
+                                List.of(),
+                                new IllegalStateException(
+                                        "restoration_unknown_containment_failed",
+                                        result.failure()
+                                )
+                        );
+                    });
+                });
+        return new Submission(submission.acceptance(), completion);
     }
 
     private List<ProjectionEventDraft> commitRestoration(

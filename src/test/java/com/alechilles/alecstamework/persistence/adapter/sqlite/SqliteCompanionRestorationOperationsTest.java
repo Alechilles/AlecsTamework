@@ -20,11 +20,13 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRe
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
@@ -229,6 +231,56 @@ class SqliteCompanionRestorationOperationsTest {
                 lifecycle().state()
         );
         assertNotNull(lifecycle().activeOperationId());
+        assertEquals(
+                CompanionAlias.State.LEASED,
+                alias(TARGET_ALIAS).state()
+        );
+        assertTrue(snapshot().current());
+    }
+
+    @Test
+    void ambiguousInsertionQuarantinesOnlyOperationAndProfile()
+            throws Exception {
+        OperationWorkflowResult result = submit(
+                4,
+                (restoration, operation) -> LiveOperationResult.unknown(
+                        "spawn_receipt_read_failed",
+                        null
+                )
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.LIVE_UNKNOWN,
+                result.status()
+        );
+        assertEquals(OperationPhase.UNKNOWN, result.operation().phase());
+        try (Connection connection = connections.openReadConnection()) {
+            SqliteIncidentStore incidents = new SqliteIncidentStore(connection);
+            assertEquals(
+                    QuarantineState.ACTIVE,
+                    incidents.findQuarantine(
+                            OperationScope.operation(operationId(4))
+                    ).orElseThrow().state()
+            );
+            assertEquals(
+                    QuarantineState.ACTIVE,
+                    incidents.findQuarantine(
+                            OperationScope.profile(PROFILE)
+                    ).orElseThrow().state()
+            );
+            assertTrue(
+                    incidents.findQuarantine(OperationScope.owner(OWNER))
+                            .isEmpty()
+            );
+            assertTrue(
+                    incidents.findQuarantine(OperationScope.global())
+                            .isEmpty()
+            );
+        }
+        assertEquals(
+                LifecycleState.DEAD_REVIVABLE,
+                lifecycle().state()
+        );
         assertEquals(
                 CompanionAlias.State.LEASED,
                 alias(TARGET_ALIAS).state()
