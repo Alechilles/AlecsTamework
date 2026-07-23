@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -18,7 +21,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(8, registry.descriptors().size());
+        assertEquals(9, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -42,7 +45,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(12, operationKinds.size());
+        assertEquals(14, operationKinds.size());
 
         PersistenceFeatureDescriptor groups = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.POPULATION_GROUPS
@@ -67,5 +70,46 @@ class PublicPersistenceFeatureRegistryTest {
                 Set.of(PublicPersistenceFeatureRegistry.POPULATION_GROUP_INDEX),
                 groups.projectionConsumers()
         );
+
+        PersistenceFeatureDescriptor command = registry.requireFeature(
+                PublicPersistenceFeatureRegistry.COMMAND_ROSTER
+        );
+        assertEquals(
+                Set.of(
+                        "command_family",
+                        "command_roster_membership"
+                ),
+                command.ownedAuthorities()
+        );
+        assertEquals(
+                Set.of(
+                        PublicPersistenceFeatureRegistry.IDENTITY,
+                        PublicPersistenceFeatureRegistry.LIFECYCLE,
+                        PublicPersistenceFeatureRegistry.OWNER_POPULATION,
+                        PublicPersistenceFeatureRegistry.POPULATION_GROUPS
+                ),
+                command.startupDependencies()
+        );
+        assertEquals(
+                Set.of(
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
+                ),
+                command.operationScopes().get(
+                        CommandRosterMembershipDefinition.INSTANCE.kind()
+                )
+        );
+        assertEquals(
+                command.operationScopes().get(
+                        CommandRosterMembershipDefinition.INSTANCE.kind()
+                ),
+                command.operationScopes().get(
+                        CommandRosterTransitionDefinition.INSTANCE.kind()
+                )
+        );
+        assertTrue(command.projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry.COMMAND_ROSTER_INDEX
+        ));
     }
 }

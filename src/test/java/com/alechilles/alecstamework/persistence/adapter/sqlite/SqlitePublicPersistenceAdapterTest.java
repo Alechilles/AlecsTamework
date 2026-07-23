@@ -83,6 +83,8 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.ownerPopulationOperations());
         assertNotNull(adapter.ownerPopulationReconciliationOperations());
         assertNotNull(adapter.populationGroupOperations());
+        assertNotNull(adapter.commandRosterOperations());
+        assertNotNull(adapter.commandRosterTransitionOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -95,21 +97,23 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.coopReader());
         assertNotNull(adapter.extensionReader());
         assertNotNull(adapter.populationGroupReader());
+        assertNotNull(adapter.commandRosterReader());
         assertNotNull(adapter.coopIndex());
         assertNotNull(adapter.ownerPopulationIndex());
         assertNotNull(adapter.populationGroupIndex());
+        assertNotNull(adapter.commandRosterIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
         );
         assertEquals(
-                3,
+                4,
                 adapter.projections().requiredFor(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                4,
+                5,
                 adapter.projections().requiredFor(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 ).size()
@@ -135,11 +139,13 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(4, result.catchUps().size());
+        assertEquals(5, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
         assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
         assertEquals(0, adapter.populationGroupIndex()
                 .assignmentSnapshot().size());
+        assertEquals(0, adapter.commandRosterIndex()
+                .actionSnapshot().size());
     }
 
     @Test
