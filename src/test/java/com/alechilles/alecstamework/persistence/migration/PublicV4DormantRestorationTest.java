@@ -181,7 +181,7 @@ class PublicV4DormantRestorationTest {
                     }
                     return LiveOperationResult.confirmed(
                             "spawn_receipt_confirmed"
-                    );
+                    ).completed();
                 }
         ).completion().toCompletableFuture().get(20, TimeUnit.SECONDS);
 

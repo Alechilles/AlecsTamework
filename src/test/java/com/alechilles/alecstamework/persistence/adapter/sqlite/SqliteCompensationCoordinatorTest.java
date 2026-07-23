@@ -83,10 +83,10 @@ class SqliteCompensationCoordinatorTest {
                         ? LiveOperationResult.retryable(
                                 "inventory_temporarily_unavailable",
                                 null
-                        )
+                        ).completed()
                         : LiveOperationResult.confirmed(
                                 "refund_receipt_confirmed"
-                        ),
+                        ).completed(),
                 completion,
                 "test_refund"
         ).toCompletableFuture().get(10, TimeUnit.SECONDS);
@@ -106,7 +106,7 @@ class SqliteCompensationCoordinatorTest {
                     attempts.incrementAndGet();
                     return LiveOperationResult.confirmed(
                             "refund_receipt_confirmed"
-                    );
+                    ).completed();
                 },
                 completion,
                 "test_refund"

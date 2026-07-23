@@ -94,7 +94,7 @@ final class RestorationProcessCrashChild {
                     Files.writeString(spawnReceipt, "spawn");
                     return LiveOperationResult.confirmed(
                             "spawn_receipt_confirmed"
-                    );
+                    ).completed();
                 }
         ).completion().toCompletableFuture().get(20, TimeUnit.SECONDS);
         throw new IllegalStateException(

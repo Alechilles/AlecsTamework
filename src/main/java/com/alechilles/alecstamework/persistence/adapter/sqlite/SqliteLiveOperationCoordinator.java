@@ -170,18 +170,42 @@ public final class SqliteLiveOperationCoordinator {
             List<ProjectionConsumer> consumers,
             String code
     ) {
-        LiveOperationResult live;
+        CompletionStage<LiveOperationResult> resolution;
         try {
-            live = liveBoundary.applyOrResolve(payload, operation);
-            if (live == null) {
+            resolution = liveBoundary.applyOrResolve(payload, operation);
+            if (resolution == null) {
                 throw new IllegalStateException(code + "_live_boundary_returned_null");
             }
         } catch (Throwable failure) {
-            live = LiveOperationResult.retryable(
+            resolution = LiveOperationResult.retryable(
                     code + "_live_boundary_failed",
                     failure
-            );
+            ).completed();
         }
+        return resolution.handle((live, failure) -> failure == null
+                        ? live
+                        : LiveOperationResult.retryable(
+                                code + "_live_boundary_failed",
+                                failure
+                        ))
+                .thenCompose(live -> continueLiveResult(
+                        operation,
+                        payload,
+                        durableWork,
+                        consumers,
+                        code,
+                        requireLiveResult(live, code)
+                ));
+    }
+
+    private <T> CompletionStage<OperationWorkflowResult> continueLiveResult(
+            OperationEnvelope operation,
+            T payload,
+            TimedDurableOperationWork<T> durableWork,
+            List<ProjectionConsumer> consumers,
+            String code,
+            LiveOperationResult live
+    ) {
         return switch (live.status()) {
             case CONFIRMED -> commit(
                     operation, payload, durableWork, consumers, code
@@ -211,6 +235,20 @@ public final class SqliteLiveOperationCoordinator {
                     code
             );
         };
+    }
+
+    private LiveOperationResult requireLiveResult(
+            LiveOperationResult live,
+            String code
+    ) {
+        return live == null
+                ? LiveOperationResult.retryable(
+                        code + "_live_boundary_returned_null",
+                        new IllegalStateException(
+                                code + "_live_boundary_returned_null"
+                        )
+                )
+                : live;
     }
 
     private CompletionStage<OperationWorkflowResult> transitionLiveFailure(

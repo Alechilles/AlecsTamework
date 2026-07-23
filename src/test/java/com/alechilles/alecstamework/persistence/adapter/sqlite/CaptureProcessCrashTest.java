@@ -203,11 +203,11 @@ class CaptureProcessCrashTest {
                                 ? LiveOperationResult.compensate(
                                         "source_spent_target_proven_live",
                                         null
-                                )
+                                ).completed()
                                 : LiveOperationResult.confirmed(
                                         "capture_receipt_and_target_"
                                                 + "retirement_confirmed"
-                                );
+                                ).completed();
                     }
             ).completion().toCompletableFuture()
                     .get(20, TimeUnit.SECONDS);

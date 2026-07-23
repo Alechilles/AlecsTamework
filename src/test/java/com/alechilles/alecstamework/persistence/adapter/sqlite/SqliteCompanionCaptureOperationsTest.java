@@ -105,7 +105,7 @@ class SqliteCompanionCaptureOperationsTest {
                     );
                     return LiveOperationResult.confirmed(
                             "refund_receipt_confirmed"
-                    );
+                    ).completed();
                 },
                 List.of()
         );
@@ -136,7 +136,7 @@ class SqliteCompanionCaptureOperationsTest {
                     assertTrue(snapshot().isEmpty());
                     return LiveOperationResult.confirmed(
                             "capture_receipt_and_target_retirement_confirmed"
-                    );
+                    ).completed();
                 }
         );
 
@@ -182,12 +182,12 @@ class SqliteCompanionCaptureOperationsTest {
                                 return LiveOperationResult.retryable(
                                         "capture_world_temporarily_unavailable",
                                         null
-                                );
+                                ).completed();
                             }
                             mutations.incrementAndGet();
                             return LiveOperationResult.confirmed(
                                     "capture_receipt_and_target_retirement_confirmed"
-                            );
+                            ).completed();
                         };
 
         OperationWorkflowResult first = submit(2, boundary);
@@ -210,6 +210,7 @@ class SqliteCompanionCaptureOperationsTest {
                 OperationWorkflowResult.Status.PUBLISHED,
                 submit(3, (capture, operation) ->
                         LiveOperationResult.confirmed("capture_confirmed")
+                                .completed()
                 ).status()
         );
         AtomicInteger calls = new AtomicInteger();
@@ -218,7 +219,8 @@ class SqliteCompanionCaptureOperationsTest {
                 4,
                 (capture, operation) -> {
                     calls.incrementAndGet();
-                    return LiveOperationResult.confirmed("should_not_run");
+                    return LiveOperationResult.confirmed("should_not_run")
+                            .completed();
                 }
         );
 
@@ -242,7 +244,7 @@ class SqliteCompanionCaptureOperationsTest {
                     return LiveOperationResult.compensate(
                             "source_spent_target_proven_live",
                             null
-                    );
+                    ).completed();
                 }
         );
 
@@ -273,7 +275,8 @@ class SqliteCompanionCaptureOperationsTest {
                 5,
                 (capture, operation) -> {
                     captureResolutions.incrementAndGet();
-                    return LiveOperationResult.confirmed("must_not_run");
+                    return LiveOperationResult.confirmed("must_not_run")
+                            .completed();
                 }
         );
 

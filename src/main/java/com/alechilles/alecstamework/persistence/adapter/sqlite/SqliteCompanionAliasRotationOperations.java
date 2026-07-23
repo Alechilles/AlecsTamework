@@ -79,9 +79,12 @@ public final class SqliteCompanionAliasRotationOperations {
                 CompanionAliasRotationDefinition.INSTANCE,
                 request,
                 new AliasLeaseDetail(rotation),
-                (payload, operation) -> liveResult(
-                        liveBoundary.applyOrResolve(payload, operation)
-                ),
+                (payload, operation) -> java.util.concurrent.CompletableFuture
+                        .completedFuture(liveResult(
+                                liveBoundary.applyOrResolve(
+                                        payload, operation
+                                )
+                        )),
                 this::promote,
                 requiredConsumers,
                 "alias_rotation"

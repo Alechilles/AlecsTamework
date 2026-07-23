@@ -163,7 +163,7 @@ class ExactSourceFinalizationTest {
                 () -> -400,
                 (claim, operation) -> LiveOperationResult.confirmed(
                         "refund_receipt_confirmed"
-                ),
+                ).completed(),
                 List.of()
         );
     }
@@ -284,7 +284,8 @@ class ExactSourceFinalizationTest {
         private boolean targetRetired;
 
         @Override
-        public LiveOperationResult applyOrResolve(
+        public java.util.concurrent.CompletionStage<LiveOperationResult>
+        applyOrResolve(
                 CompanionCaptureRequest capture,
                 OperationEnvelope operation
         ) {
@@ -299,7 +300,7 @@ class ExactSourceFinalizationTest {
             }
             return LiveOperationResult.confirmed(
                     "capture_receipt_and_target_retirement_confirmed"
-            );
+            ).completed();
         }
     }
 }

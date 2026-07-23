@@ -35,6 +35,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -144,7 +147,7 @@ class SqliteCompanionRestorationOperationsTest {
                     assertTrue(snapshot().current());
                     return LiveOperationResult.confirmed(
                             "spawn_receipt_confirmed"
-                    );
+                    ).completed();
                 }
         );
 
@@ -189,12 +192,12 @@ class SqliteCompanionRestorationOperationsTest {
                         return LiveOperationResult.retryable(
                                 "target_world_temporarily_unavailable",
                                 null
-                        );
+                        ).completed();
                     }
                     insertions.incrementAndGet();
                     return LiveOperationResult.confirmed(
                             "spawn_receipt_confirmed"
-                    );
+                    ).completed();
                 };
 
         OperationWorkflowResult first = submit(2, boundary);
@@ -219,7 +222,7 @@ class SqliteCompanionRestorationOperationsTest {
                 (restoration, operation) -> LiveOperationResult.retryable(
                         "spawn_receipt_not_found",
                         null
-                )
+                ).completed()
         );
 
         assertEquals(
@@ -246,7 +249,7 @@ class SqliteCompanionRestorationOperationsTest {
                 (restoration, operation) -> LiveOperationResult.unknown(
                         "spawn_receipt_read_failed",
                         null
-                )
+                ).completed()
         );
 
         assertEquals(
@@ -286,6 +289,45 @@ class SqliteCompanionRestorationOperationsTest {
                 alias(TARGET_ALIAS).state()
         );
         assertTrue(snapshot().current());
+    }
+
+    @Test
+    void durableCommitWaitsForAsynchronousWorldThreadEvidence()
+            throws Exception {
+        CompletableFuture<LiveOperationResult> live =
+                new CompletableFuture<>();
+        CountDownLatch invoked = new CountDownLatch(1);
+
+        SqliteCompanionRestorationOperations.Submission submission =
+                restorations.submit(
+                        operationId(5),
+                        new IdempotencyKey("restoration-5"),
+                        restorationRequest(),
+                        (restoration, operation) -> {
+                            invoked.countDown();
+                            return live;
+                        }
+                );
+
+        assertTrue(invoked.await(10, TimeUnit.SECONDS));
+        assertFalse(submission.completion().toCompletableFuture().isDone());
+        assertEquals(
+                CompanionAlias.State.LEASED,
+                alias(TARGET_ALIAS).state()
+        );
+        assertEquals(
+                LifecycleState.DEAD_REVIVABLE,
+                lifecycle().state()
+        );
+
+        live.complete(LiveOperationResult.confirmed(
+                "spawn_receipt_confirmed"
+        ));
+        OperationWorkflowResult result = submission.completion()
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
     }
 
     private OperationWorkflowResult submit(

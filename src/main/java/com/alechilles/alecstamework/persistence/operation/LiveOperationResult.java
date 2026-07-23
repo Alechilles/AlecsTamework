@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.operation;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -48,6 +50,12 @@ public record LiveOperationResult(@Nonnull Status status,
             @Nullable Throwable cause
     ) {
         return new LiveOperationResult(Status.UNKNOWN, code, cause);
+    }
+
+    /** Returns this result as an already-completed asynchronous live boundary outcome. */
+    @Nonnull
+    public CompletionStage<LiveOperationResult> completed() {
+        return CompletableFuture.completedFuture(this);
     }
 
     public enum Status {

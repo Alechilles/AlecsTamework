@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.operation;
 
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
 /**
@@ -11,7 +12,7 @@ import javax.annotation.Nonnull;
 @FunctionalInterface
 public interface LiveOperationBoundary<T> {
     @Nonnull
-    LiveOperationResult applyOrResolve(
+    CompletionStage<LiveOperationResult> applyOrResolve(
             @Nonnull T payload,
             @Nonnull OperationEnvelope operation
     ) throws Exception;

@@ -154,20 +154,47 @@ public final class SqliteCompensationCoordinator {
             TimedCompensatedOperationWork<T> compensatedWork,
             String code
     ) {
-        LiveOperationResult live;
+        CompletionStage<LiveOperationResult> resolution;
         try {
-            live = liveBoundary.applyOrResolve(payload, operation);
-            if (live == null) {
+            resolution = liveBoundary.applyOrResolve(payload, operation);
+            if (resolution == null) {
                 throw new IllegalStateException(
                         code + "_live_boundary_returned_null"
                 );
             }
         } catch (Throwable failure) {
-            live = LiveOperationResult.retryable(
+            resolution = LiveOperationResult.retryable(
                     code + "_live_boundary_failed",
                     failure
-            );
+            ).completed();
         }
+        return resolution.handle((live, failure) -> failure == null
+                        ? live
+                        : LiveOperationResult.retryable(
+                                code + "_live_boundary_failed",
+                                failure
+                        ))
+                .thenCompose(live -> continueLiveResult(
+                        operation,
+                        payload,
+                        compensatedWork,
+                        code,
+                        live == null
+                                ? LiveOperationResult.retryable(
+                                        code + "_live_boundary_returned_null",
+                                        null
+                                )
+                                : live
+                ));
+    }
+
+    private <T> CompletionStage<OperationWorkflowResult> continueLiveResult(
+            OperationEnvelope operation,
+            T payload,
+            TimedCompensatedOperationWork<T> compensatedWork,
+            String code,
+            LiveOperationResult live
+    ) {
         return switch (live.status()) {
             case CONFIRMED -> commit(
                     operation,
