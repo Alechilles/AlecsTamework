@@ -373,7 +373,6 @@ final class LinkedNpcPanelCardBinder {
         int visibleCostCount = reviveActionVisible
                 ? Math.min(MAX_INLINE_REVIVE_COSTS, costs.size())
                 : 0;
-        builder.set(panelSelector + ".Visible", visibleCostCount > 0);
         if (visibleCostCount > 0) {
             builder.setObject(panelSelector + ".Anchor", buildReviveCostAnchor(visibleCostCount));
         }

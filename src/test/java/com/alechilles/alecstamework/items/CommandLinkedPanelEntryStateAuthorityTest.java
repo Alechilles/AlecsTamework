@@ -34,5 +34,7 @@ class CommandLinkedPanelEntryStateAuthorityTest {
                         + "when the in-memory death snapshot is unavailable.");
         assertTrue(source.contains("TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId)"),
                 "The durable-dead fallback must use the canonical roster role rather than a hard-coded cost.");
+        assertTrue(source.contains("Linked revival cost projection:"),
+                "The first resolved dead-card quote should expose its role, config, and row count for diagnosis.");
     }
 }

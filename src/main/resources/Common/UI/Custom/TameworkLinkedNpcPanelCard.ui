@@ -442,11 +442,11 @@ Group {
 
     Group #ReviveCostPanel {
         Anchor: (Top: 27, Right: 0, Width: 120, Height: 54);
-        Visible: false;
+        Visible: true;
 
         Group #ReviveCost0 {
             Anchor: (Top: 0, Left: 0, Width: 120, Height: 20);
-            Visible: false;
+            Visible: true;
 
             Label #RequiredQuantity {
                 Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);
@@ -470,7 +470,7 @@ Group {
 
         Group #ReviveCost1 {
             Anchor: (Top: 17, Left: 0, Width: 120, Height: 20);
-            Visible: false;
+            Visible: true;
 
             Label #RequiredQuantity {
                 Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);
@@ -494,7 +494,7 @@ Group {
 
         Group #ReviveCost2 {
             Anchor: (Top: 34, Left: 0, Width: 120, Height: 20);
-            Visible: false;
+            Visible: true;
 
             Label #RequiredQuantity {
                 Anchor: (Top: 2, Left: 0, Width: 13, Height: 16);

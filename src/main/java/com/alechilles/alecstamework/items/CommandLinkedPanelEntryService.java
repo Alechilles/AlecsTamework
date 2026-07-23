@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
@@ -25,7 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -36,6 +40,7 @@ import javax.annotation.Nullable;
  * health snapshots, and home flags) from command orchestration flows.
  */
 final class CommandLinkedPanelEntryService {
+    private static final Set<String> LOGGED_REVIVE_COST_PROJECTIONS = ConcurrentHashMap.newKeySet();
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
@@ -235,6 +240,9 @@ final class CommandLinkedPanelEntryService {
                     deadRespawnRemainingMs = -1L;
                 }
             }
+            if (reviveCostPresentation != null) {
+                logReviveCostProjection(record.cachedRoleId, reviveCostPresentation);
+            }
             if (!loaded && !dead && captureService != null) {
                 CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
                         captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
@@ -352,6 +360,28 @@ final class CommandLinkedPanelEntryService {
             entries.add(applyRecoveryHold(entry, record.profileId));
         }
         return entries;
+    }
+
+    private static void logReviveCostProjection(
+            @Nullable String roleId,
+            @Nonnull CommandReviveCostPresentation presentation) {
+        TwCompanionConfig scoped = TwCompanionConfig.resolveForRole(roleId);
+        String configId = scoped == null || scoped.getId() == null ? "<default>" : scoped.getId();
+        int costCount = presentation.costs().size();
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || plugin.getLogger() == null) {
+            return;
+        }
+        String key = String.valueOf(roleId) + '|' + configId + '|' + costCount;
+        if (!LOGGED_REVIVE_COST_PROJECTIONS.add(key)) {
+            return;
+        }
+        Level level = costCount == 0 ? Level.WARNING : Level.INFO;
+        plugin.getLogger().at(level).log(
+                "Linked revival cost projection: role=" + String.valueOf(roleId)
+                        + ", config=" + configId
+                        + ", costRows=" + costCount
+        );
     }
 
     private LinkedNpcEntry applyRecoveryHold(LinkedNpcEntry entry, @Nullable String profileId) {

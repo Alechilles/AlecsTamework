@@ -166,6 +166,10 @@ class LinkedNpcPanelCardLayoutTest {
                 "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
         );
         assertTrue(cardUi.contains("Group #ReviveCostPanel"), "Dead cards need a dedicated inline cost panel.");
+        assertTrue(
+                cardUi.contains("Group #ReviveCostPanel {\n        Anchor: (Top: 27, Right: 0, Width: 120, Height: 54);\n        Visible: true;"),
+                "The inline cost container must exist in the initial markup so nested rows are not suppressed."
+        );
         for (int index = 0; index < 3; index++) {
             assertTrue(cardUi.contains("Group #ReviveCost" + index),
                     "The card should provide a static cost row for mockup layout " + (index + 1) + ".");
@@ -178,6 +182,10 @@ class LinkedNpcPanelCardLayoutTest {
                         && binder.contains("#CostItem.Slots")
                         && binder.contains("new ItemStack(line.itemId(), 1)"),
                 "Each visible revive component must bind its quantity, localized name, and actual item icon."
+        );
+        assertFalse(
+                binder.contains("panelSelector + \".Visible\""),
+                "Inline revival rows must not depend on dynamically unhiding their parent group."
         );
         assertTrue(
                 binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),
