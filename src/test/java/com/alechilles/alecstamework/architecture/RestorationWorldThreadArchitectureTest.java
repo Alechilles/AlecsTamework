@@ -7,27 +7,44 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Source gate for current-world re-resolution at the replacement restoration boundary. */
+/** Source gate for the one current-world dispatcher shared by replacement live operations. */
 class RestorationWorldThreadArchitectureTest {
     @Test
-    void boundaryReResolvesWorldAndStoreInsideWorldExecute()
+    void sharedDispatcherReResolvesWorldAndStoreInsideWorldExecute()
             throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/companion/"
-                        + "restoration/runtime/"
-                        + "HytaleCompanionRestorationBoundary.java"
+        String dispatcher = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/persistence/"
+                        + "runtime/HytaleWorldOperationDispatcher.java"
         ));
+        String restoration = source(
+                "restoration/runtime/HytaleCompanionRestorationBoundary.java"
+        );
+        String capture = source(
+                "coop/runtime/HytaleCompanionCoopCaptureBoundary.java"
+        );
+        String release = source(
+                "coop/runtime/HytaleCompanionCoopReleaseBoundary.java"
+        );
 
-        assertTrue(source.contains("scheduled.execute(() ->"));
-        assertTrue(source.contains(
-                "World current = findWorld(request.targetWorldKey())"
-        ));
-        assertTrue(source.contains(
+        assertTrue(dispatcher.contains("scheduled.execute(() ->"));
+        assertTrue(dispatcher.contains("World current = findWorld(worldKey)"));
+        assertTrue(dispatcher.contains(
                 "current.getEntityStore().getStore()"
         ));
-        assertFalse(source.contains("PlayerRef.getComponent"));
-        assertFalse(source.contains("Universe.get().getPlayers"));
-        assertFalse(source.contains("store.putComponent"));
-        assertFalse(source.contains("store.removeComponent"));
+        assertTrue(restoration.contains("dispatcher.applyOrResolve("));
+        assertTrue(capture.contains("dispatcher.applyOrResolve("));
+        assertTrue(release.contains("dispatcher.applyOrResolve("));
+        String all = dispatcher + restoration + capture + release;
+        assertFalse(all.contains("PlayerRef.getComponent"));
+        assertFalse(all.contains("Universe.get().getPlayers"));
+        assertFalse(all.contains("store.putComponent"));
+        assertFalse(all.contains("store.removeComponent"));
+    }
+
+    private String source(String relativePath) throws Exception {
+        return Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/companion/"
+                        + relativePath
+        ));
     }
 }
