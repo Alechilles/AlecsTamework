@@ -372,6 +372,48 @@ CREATE INDEX idx_population_group_reservation_scope
         owner_uuid, group_id, scope_kind, owner_world_key, operation_id
     );
 
+CREATE TABLE command_family (
+    owner_uuid TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    roster_revision INTEGER NOT NULL DEFAULT 0 CHECK (roster_revision >= 0),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (owner_uuid, family_id)
+);
+
+CREATE TABLE command_roster_membership (
+    slot_id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL UNIQUE,
+    owner_uuid TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    membership_revision INTEGER NOT NULL CHECK (membership_revision > 0),
+    group_id TEXT,
+    active_for_bulk_commands INTEGER NOT NULL CHECK (
+        active_for_bulk_commands IN (0, 1)
+    ),
+    home_world_key TEXT,
+    home_x REAL,
+    home_y REAL,
+    home_z REAL,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (owner_uuid, family_id)
+        REFERENCES command_family(owner_uuid, family_id)
+        ON DELETE CASCADE,
+    CHECK (
+        (home_world_key IS NULL AND home_x IS NULL
+            AND home_y IS NULL AND home_z IS NULL)
+        OR (length(trim(home_world_key)) > 0
+            AND home_x IS NOT NULL AND home_y IS NOT NULL
+            AND home_z IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_command_roster_family
+    ON command_roster_membership(owner_uuid, family_id, profile_id);
+
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,

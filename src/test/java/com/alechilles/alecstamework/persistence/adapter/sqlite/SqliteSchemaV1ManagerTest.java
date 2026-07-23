@@ -48,7 +48,7 @@ class SqliteSchemaV1ManagerTest {
 
         assertInstanceOf(PersistenceTransactionResult.Committed.class, schemas.initialize());
         assertEquals(1, queryLong("SELECT COUNT(*) FROM schema_history"));
-        assertEquals(24, SqliteSchemaV1Manager.requiredTables().size());
+        assertEquals(26, SqliteSchemaV1Manager.requiredTables().size());
     }
 
     @Test
