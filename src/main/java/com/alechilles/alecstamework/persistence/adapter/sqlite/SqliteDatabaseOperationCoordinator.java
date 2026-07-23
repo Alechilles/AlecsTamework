@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import java.util.List;
@@ -55,14 +56,34 @@ public final class SqliteDatabaseOperationCoordinator {
             @Nonnull DurableOperationWork work,
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers
     ) {
+        return execute(
+                definition,
+                request,
+                PreparedOperationDetail.none(),
+                work,
+                requiredConsumers
+        );
+    }
+
+    /**
+     * Starts or resumes one exact database-only operation with atomic preparation validation.
+     */
+    @Nonnull
+    public <T> Submission execute(
+            @Nonnull OperationDefinition<T> definition,
+            @Nonnull OperationRequest<T> request,
+            @Nonnull PreparedOperationDetail detail,
+            @Nonnull DurableOperationWork work,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
         if (definition == null || request == null || work == null
-                || requiredConsumers == null) {
+                || detail == null || requiredConsumers == null) {
             throw new IllegalArgumentException("Complete database operation request is required");
         }
         List<ProjectionConsumer> consumers =
                 publisher.validateConsumers(requiredConsumers);
         SqliteUnitOfWorkRunner.Submission<OperationEnvelope> prepared =
-                operations.prepare(definition, request);
+                operations.prepare(definition, request, detail);
         CompletionStage<OperationWorkflowResult> completion =
                 prepared.completion().thenCompose(result -> {
                     if (!(result instanceof PersistenceTransactionResult.Committed<?> committed)
