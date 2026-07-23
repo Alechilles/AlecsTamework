@@ -80,6 +80,7 @@ class SqlitePublicPersistenceAdapterTest {
 
         assertNotNull(adapter.profileOperations());
         assertNotNull(adapter.aliasOperations());
+        assertNotNull(adapter.ownerPopulationOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());

@@ -40,6 +40,6 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(9, operationKinds.size());
+        assertEquals(10, operationKinds.size());
     }
 }

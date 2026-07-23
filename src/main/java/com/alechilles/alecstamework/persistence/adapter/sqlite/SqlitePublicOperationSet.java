@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -15,11 +16,12 @@ import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmi
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** All nine public operation adapters composed over one shared engine protocol. */
+/** All replacement operation adapters composed over one shared engine protocol. */
 final class SqlitePublicOperationSet {
     private final SqliteOperationEngine engine;
     private final SqliteCompanionProfileOperations profiles;
     private final SqliteCompanionAliasRotationOperations aliases;
+    private final SqliteOwnerPopulationTransitionOperations ownerPopulation;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
@@ -74,6 +76,12 @@ final class SqlitePublicOperationSet {
                 clock,
                 projections.requiredFor(
                         CompanionAliasRotationDefinition.INSTANCE.kind()
+                )
+        );
+        ownerPopulation = new SqliteOwnerPopulationTransitionOperations(
+                database,
+                projections.requiredFor(
+                        OwnerPopulationTransitionDefinition.INSTANCE.kind()
                 )
         );
         captures = new SqliteCompanionCaptureOperations(
@@ -142,6 +150,10 @@ final class SqlitePublicOperationSet {
 
     SqliteCompanionAliasRotationOperations aliases() {
         return aliases;
+    }
+
+    SqliteOwnerPopulationTransitionOperations ownerPopulation() {
+        return ownerPopulation;
     }
 
     SqliteCompanionCaptureOperations captures() {

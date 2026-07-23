@@ -16,6 +16,8 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -58,6 +60,17 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().idempotencyKey(),
                                 payload(claim, CompanionAliasRotation.class),
                                 boundaries.aliases()
+                        ).completion()
+                ),
+                Map.entry(
+                        OwnerPopulationTransitionDefinition.INSTANCE.kind(),
+                        claim -> operations.ownerPopulation().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        OwnerPopulationTransitionRequest.class
+                                )
                         ).completion()
                 ),
                 Map.entry(
