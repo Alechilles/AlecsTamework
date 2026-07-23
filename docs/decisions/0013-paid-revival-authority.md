@@ -1,6 +1,6 @@
 # ADR 0013: Paid Revival Authority
 
-- Status: Accepted for Phase 5F implementation
+- Status: Implemented in Phase 5F
 - Date: 2026-07-23
 
 ## Context
@@ -35,7 +35,7 @@ compatibility requirements.
 - target alias, world, placement fingerprint, and spawn receipt;
 - resolved config ID/revision and ordered multi-item cost;
 - deterministic inventory source reservations and charge receipt;
-- optional first active timed-lease snapshot;
+- optional exact previous-to-active timed-lease replacement;
 - signed request timestamp.
 
 The operation envelope owns idempotency, phase, recovery, participants,
@@ -81,12 +81,14 @@ implementation is a runtime concern, but this persistence contract does not
 accept a best-effort or process-local inference.
 
 `NO_CHARGE` and `REFUND_REQUIRED` both use the shared `COMPENSATING` protocol.
-The durable compensation code distinguishes them across restart. No-charge
-compensation retires the alias and group reservation and restores dead
-lifecycle without delivering items. Refund-required compensation first
-creates the exact immutable refund claim, then invokes the idempotent refund
-delivery boundary and records its positive receipt before the same canonical
-cleanup.
+The atomic presence or absence of the operation's generic refund claim
+distinguishes them across restart; there is no paid-revival subtype column or
+table. No-charge compensation durably enters `COMPENSATING` with no claim,
+retires the alias and group reservation, and restores dead lifecycle without
+delivering items. Refund-required compensation creates the exact immutable
+claim in the same transaction that enters `COMPENSATING`, then invokes the
+idempotent refund delivery boundary and records its positive receipt before
+the same canonical cleanup.
 
 ### Generic refund claims are multi-item recipes
 
@@ -113,7 +115,7 @@ After `CONFIRMED`, one transaction:
 - promotes the leased alias;
 - retires the current death snapshot;
 - commits canonical `ACTIVE` lifecycle;
-- optionally creates the initial active timed lease;
+- optionally replaces the exact previous timed lease with its active session;
 - retires the exact group-active reservations;
 - appends paid-revival, profile, lifecycle, and optional timed-lease events;
 - commits the shared operation as durable.
@@ -136,3 +138,7 @@ descriptor-derived projection and recovery registries.
   charge.
 - The runtime inventory implementation must supply durable receipt evidence;
   the persistence layer will not guess from missing stacks.
+- Thirteen forked-process seams prove public-registry recovery before and after
+  preparation, composite receipt application, durable success, no-charge
+  release, refund delivery, and compensation commits.
+- Paid revival adds no table to the 29-table fresh schema.
