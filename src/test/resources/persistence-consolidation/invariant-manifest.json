@@ -1,0 +1,222 @@
+{
+  "manifestVersion": 1,
+  "statusValues": ["CHARACTERIZED", "REPLACEMENT_PROVEN"],
+  "invariants": [
+    {
+      "id": "stable-profile-identity",
+      "contract": "A logical companion has one stable profile ID while runtime NPC UUIDs are replaceable aliases.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.companion.identity.CompanionIdentityContractTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.ownership.CompanionIdentityResolverTest",
+        "com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepositoryTest"
+      ]
+    },
+    {
+      "id": "identity-leased-before-live-add",
+      "contract": "A planned runtime UUID is leased to the stable profile before ECS insertion and has exactly one terminal owner.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 4,
+      "replacementTestClass": "com.alechilles.alecstamework.companion.identity.CompanionAliasLeaseCrashTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.architecture.LostRecoveryPreparedAliasArchitectureTest",
+        "com.alechilles.alecstamework.architecture.PreparedSpawnCrashBoundaryArchitectureTest"
+      ]
+    },
+    {
+      "id": "single-canonical-lifecycle",
+      "contract": "Exactly one durable lifecycle and location row answers where a managed profile is.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleInvariantTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepositoryTest",
+        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopPopulationAtomicityTest"
+      ]
+    },
+    {
+      "id": "optimistic-lifecycle-revision",
+      "contract": "Owner, capacity, and lifecycle transitions compare an expected revision before committing.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.companion.lifecycle.LifecycleRevisionConflictTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepositoryTest"
+      ]
+    },
+    {
+      "id": "prepare-before-live-mutation",
+      "contract": "Irreversible inventory or ECS mutation begins only after durable operation preparation.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.OperationPreparationBoundaryTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.architecture.PreparedSpawnCrashBoundaryArchitectureTest",
+        "com.alechilles.alecstamework.architecture.CaptureSourceSpendRecoveryArchitectureTest"
+      ]
+    },
+    {
+      "id": "exact-source-finalization",
+      "contract": "A consumed or retired source is finalized exactly once and is correlated to the target operation.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 4,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.ExactSourceFinalizationTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.architecture.CaptureSourceSpendRecoveryArchitectureTest",
+        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest"
+      ]
+    },
+    {
+      "id": "coupled-authorities-one-transaction",
+      "contract": "Lifecycle and required domain detail commit in one database transaction.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.CanonicalUnitOfWorkAtomicityTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopPopulationAtomicityTest"
+      ]
+    },
+    {
+      "id": "unknown-commit-readback",
+      "contract": "An unknown commit outcome is read back exactly before retry or compensation.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.UnknownCommitReadbackTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteCheckpointFaultTest"
+      ]
+    },
+    {
+      "id": "publication-after-commit",
+      "contract": "Runtime projections never publish uncommitted canonical state and failed publication remains replayable.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.projection.ProjectionOutboxRecoveryTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.ownership.CompanionPopulationCommitFailureTest",
+        "com.alechilles.alecstamework.persistence.recovery.PostCommitPublicationRecoveryVerifierTest"
+      ]
+    },
+    {
+      "id": "sealed-absence-evidence",
+      "contract": "Absence is authoritative only after complete boot and generation scoped disk/live evidence is sealed.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 5,
+      "replacementTestClass": "com.alechilles.alecstamework.ownership.reconciliation.SealedAbsenceEvidenceTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.ownership.reconciliation.HytaleSavedWorldEvidenceSourceTest",
+        "com.alechilles.alecstamework.ownership.reconciliation.HytaleStoredPlayerInventoryEvidenceSourceTest"
+      ]
+    },
+    {
+      "id": "positive-contradiction-repair",
+      "contract": "Cross-authority sidecars are repaired from positive contradiction, never mere absence.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 5,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.recovery.PositiveContradictionRepairTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.items.ManagedCoopDeployedProjectionImportServiceTest",
+        "com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryServiceTest"
+      ]
+    },
+    {
+      "id": "generation-zero-valid",
+      "contract": "Generation zero is valid historical evidence and only negative generations are rejected.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.OperationGenerationContractTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadRepositoryTest",
+        "com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryAtomicFinalizationTest"
+      ]
+    },
+    {
+      "id": "negative-world-time-valid",
+      "contract": "Negative world timestamps are valid and zero alone is the unset sentinel.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 1,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistentTimestampTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.npc.alarms.TameworkAlarmServiceSignedTimeTest",
+        "com.alechilles.alecstamework.npc.progression.LegacyWorldTimestampClassifierTest"
+      ]
+    },
+    {
+      "id": "economic-claims-idempotent",
+      "contract": "Reservations, charges, and refunds are claim based and can reach their economic effect at most once.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 5,
+      "replacementTestClass": "com.alechilles.alecstamework.companion.command.EconomicClaimIdempotencyTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest",
+        "com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRepositoryTest"
+      ]
+    },
+    {
+      "id": "bounded-failure-quarantine",
+      "contract": "A failure with exact bounded evidence quarantines the narrowest safe scope.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.control.ScopedQuarantineTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistryTest",
+        "com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinatorTest"
+      ]
+    },
+    {
+      "id": "unbounded-failure-global-read-only",
+      "contract": "Unreadable canonical state, unknown scope, or failed fencing blocks all persistence mutations.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.control.GlobalReadOnlyContainmentTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityServiceTest",
+        "com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClassifierTest"
+      ]
+    },
+    {
+      "id": "deferred-work-resolves-live-state",
+      "contract": "Delayed work carries stable identifiers and resolves live components on the owning world thread.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 4,
+      "replacementTestClass": "com.alechilles.alecstamework.runtime.dispatch.PersistenceWorldDispatchSafetyTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.architecture.AsyncThreadSafetyGuardTest",
+        "com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcherTest"
+      ]
+    },
+    {
+      "id": "shutdown-drains-accepted-work",
+      "contract": "Shutdown rejects new work, drains accepted work, and leaves timed-out work explicitly recoverable.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 6,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownCoordinatorTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueueTest",
+        "com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntimeCloseTest"
+      ]
+    },
+    {
+      "id": "read-failure-not-absence",
+      "contract": "A storage or decode failure cannot be represented as absent data or a successful empty query.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 1,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistenceReadResultTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadRepositoryTest",
+        "com.alechilles.alecstamework.architecture.PersistenceDegradationArchitectureTest"
+      ]
+    },
+    {
+      "id": "public-import-development-refusal",
+      "contract": "Public v2-v4 sources import without mutation while unreleased v5-v9 sources are refused non-destructively.",
+      "status": "CHARACTERIZED",
+      "replacementGatePhase": 2,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.migration.PublicPersistenceImporterTest",
+      "currentTests": [
+        "com.alechilles.alecstamework.persistence.migration.LegacyPersistenceFixtureTest"
+      ]
+    }
+  ]
+}
