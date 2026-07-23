@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.operation;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceTransactionContext;
+import java.util.Arrays;
+import java.util.List;
 import javax.annotation.Nonnull;
 
 /**
@@ -26,6 +28,68 @@ public interface PreparedOperationDetail {
     @Nonnull
     static PreparedOperationDetail none() {
         return NoDetail.INSTANCE;
+    }
+
+    /** Composes ordered preparation participants into the same shared transaction. */
+    @Nonnull
+    static PreparedOperationDetail compose(
+            @Nonnull PreparedOperationDetail... details
+    ) {
+        if (details == null || Arrays.stream(details).anyMatch(
+                java.util.Objects::isNull
+        )) {
+            throw new IllegalArgumentException(
+                    "Prepared operation details cannot be null"
+            );
+        }
+        List<PreparedOperationDetail> active = Arrays.stream(details)
+                .filter(detail -> detail != NoDetail.INSTANCE)
+                .toList();
+        return switch (active.size()) {
+            case 0 -> NoDetail.INSTANCE;
+            case 1 -> active.getFirst();
+            default -> new CompositeDetail(active);
+        };
+    }
+
+    /** Ordered composite with no lifecycle or recovery state of its own. */
+    record CompositeDetail(
+            @Nonnull List<PreparedOperationDetail> details
+    ) implements PreparedOperationDetail {
+        public CompositeDetail {
+            if (details == null || details.isEmpty()
+                    || details.stream().anyMatch(java.util.Objects::isNull)) {
+                throw new IllegalArgumentException(
+                        "Composite preparation details are required"
+                );
+            }
+            details = List.copyOf(details);
+        }
+
+        @Override
+        public void prepare(
+                SqlitePersistenceTransactionContext transaction,
+                OperationEnvelope operation
+        ) throws Exception {
+            for (PreparedOperationDetail detail : details) {
+                if (!detail.matches(transaction, operation)) {
+                    detail.prepare(transaction, operation);
+                }
+            }
+        }
+
+        @Override
+        public boolean matches(
+                SqlitePersistenceTransactionContext transaction,
+                OperationEnvelope operation
+        ) throws Exception {
+            for (PreparedOperationDetail detail : details) {
+                if (!detail.matches(transaction, operation)) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     enum NoDetail implements PreparedOperationDetail {
