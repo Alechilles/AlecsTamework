@@ -109,8 +109,6 @@ class SqlitePersistenceKernelTest {
                 connections,
                 new SqliteWriterConfiguration(8, 0, 0, 2_000),
                 new SqliteReadExecutorConfiguration(1, 8, 1, 4, 2_000),
-                (checkpoint, operationId) -> {
-                },
                 PersistenceKernelMetrics.NO_OP,
                 2_000
         );

@@ -49,6 +49,13 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     public SqliteSingleWriter(@Nonnull SqliteConnectionFactory connections,
                               @Nonnull SqliteWriterConfiguration configuration,
+                              @Nonnull PersistenceKernelMetrics metrics) {
+        this(connections, configuration, PersistenceCheckpointHook.NO_OP, metrics);
+    }
+
+    /** Test-only boundary injection constructor; runtime composition uses the hook-free overload. */
+    public SqliteSingleWriter(@Nonnull SqliteConnectionFactory connections,
+                              @Nonnull SqliteWriterConfiguration configuration,
                               @Nonnull PersistenceCheckpointHook checkpoints,
                               @Nonnull PersistenceKernelMetrics metrics) {
         if (connections == null || configuration == null || checkpoints == null || metrics == null) {

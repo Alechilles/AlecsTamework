@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCancellation;
-import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult;
@@ -29,7 +28,6 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                 connections,
                 SqliteWriterConfiguration.DEFAULT,
                 SqliteReadExecutorConfiguration.DEFAULT,
-                PersistenceCheckpointHook.NO_OP,
                 PersistenceKernelMetrics.NO_OP,
                 10_000
         );
@@ -38,15 +36,13 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
     public SqlitePersistenceKernel(@Nonnull SqliteConnectionFactory connections,
                                    @Nonnull SqliteWriterConfiguration writerConfiguration,
                                    @Nonnull SqliteReadExecutorConfiguration readConfiguration,
-                                   @Nonnull PersistenceCheckpointHook checkpointHook,
                                    @Nonnull PersistenceKernelMetrics metrics,
                                    long defaultShutdownTimeoutMs) {
         if (connections == null || writerConfiguration == null || readConfiguration == null
-                || checkpointHook == null || metrics == null || defaultShutdownTimeoutMs < 1) {
+                || metrics == null || defaultShutdownTimeoutMs < 1) {
             throw new IllegalArgumentException("Complete SQLite kernel configuration is required");
         }
-        this.writer = new SqliteSingleWriter(
-                connections, writerConfiguration, checkpointHook, metrics);
+        this.writer = new SqliteSingleWriter(connections, writerConfiguration, metrics);
         this.reads = new SqliteReadExecutor(connections, readConfiguration);
         this.units = new SqliteUnitOfWorkRunner(writer, reads);
         this.checkpoints = new SqliteCheckpointService(connections);
