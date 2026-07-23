@@ -235,6 +235,24 @@ class LinkedNpcPanelStatusTextServiceTest {
     }
 
     @Test
+    void storedRosterStateOverridesGenericUnloadedStatus() {
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Stored Dragon", 0, 0, 0, 0, null,
+                0, 0, 0, 0, false, false, false, false, false, false,
+                0L, LinkedNpcTraitIndicator.EMPTY
+        ).withRosterStatusPresentation(new CommandRosterStatusPresentation(
+                "profile-stored", "hydragon:dragon_horn",
+                CommandTimedSummoningState.ROSTER_STORED, 4L, null,
+                600_000L, false, 0L, 1, 1,
+                "hydragon:full_dragons", "active-cap-reached"));
+
+        assertEquals(
+                LocalizedText.resolve((String) null,
+                        "tamework.ui.linkedPanel.roster.state.stored"),
+                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
+    }
+
+    @Test
     void saturatedCooldownFormattingNeverWrapsNegative() {
         String clock = LinkedNpcPanelStatusTextService.formatRemainingClock(Long.MAX_VALUE);
         String duration = LinkedNpcPanelStatusTextService.formatRemainingTime(Long.MAX_VALUE, null);

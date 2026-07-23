@@ -22,3 +22,7 @@ tamework.ui.linkedPanel.roster.capacityUnlimited=Activos: {0} / ilimitado
 tamework.ui.linkedPanel.roster.capBlocked=Se alcanzó el límite de activos de {0}.
 tamework.ui.linkedPanel.roster.summon=Invocar
 tamework.ui.linkedPanel.roster.dismiss=Retirar
+tamework.ui.linkedPanel.roster.blocked.limit=Límite alcanzado
+tamework.ui.linkedPanel.roster.blocked.cooldown=Recarga
+tamework.ui.linkedPanel.roster.blocked.limitTooltip=Invocación bloqueada: ya hay {0} de {1} compañeros activos invocados. Retira primero a un compañero activo.
+tamework.ui.linkedPanel.roster.blocked.cooldownTooltip=Este compañero podrá invocarse de nuevo en {0}.

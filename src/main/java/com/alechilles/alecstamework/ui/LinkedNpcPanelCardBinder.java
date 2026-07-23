@@ -66,6 +66,7 @@ final class LinkedNpcPanelCardBinder {
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
         String summonSelector = entrySelector + " #RosterSummonButton";
+        String summonBlockedSelector = entrySelector + " #RosterSummonBlockedButton";
         String dismissSelector = entrySelector + " #RosterDismissButton";
         String rosterStateSelector = entrySelector + " #RosterState";
         String rosterTimerSelector = entrySelector + " #RosterTimer";
@@ -123,7 +124,9 @@ final class LinkedNpcPanelCardBinder {
                 isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
                 isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        boolean showInactiveBadge = isLinked && !entry.active() && !showReviveAction && !pendingUnlink;
+        CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
+        boolean showInactiveBadge = isLinked && !entry.active() && !showReviveAction
+                && roster == null && !pendingUnlink;
         boolean showRecallCountdown = isLinked
                 && entry.recallPending()
                 && !entry.loaded()
@@ -132,7 +135,6 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
-        CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
         boolean reviveBlocked = roster != null && roster.reviveCapBlocked();
         boolean showRespawn = showReviveAction && !reviveBlocked;
 
@@ -204,7 +206,7 @@ final class LinkedNpcPanelCardBinder {
                 showReviveAction
         );
         bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
-                rosterCapacitySelector, summonSelector, dismissSelector,
+                rosterCapacitySelector, summonSelector, summonBlockedSelector, dismissSelector,
                 showRosterDetails ? roster : null, language);
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
@@ -398,15 +400,33 @@ final class LinkedNpcPanelCardBinder {
 
     private static void bindRosterStatus(UICommandBuilder builder, String stateSelector,
                                          String timerSelector, String capacitySelector,
-                                         String summonSelector, String dismissSelector,
+                                         String summonSelector, String summonBlockedSelector,
+                                         String dismissSelector,
                                          CommandRosterStatusPresentation roster, String language) {
         boolean visible = roster != null;
         builder.set(stateSelector + ".Visible", visible);
         builder.set(timerSelector + ".Visible", visible);
         builder.set(capacitySelector + ".Visible", visible);
         builder.set(summonSelector + ".Visible", visible && roster.summonEnabled());
+        builder.set(summonBlockedSelector + ".Visible",
+                visible && roster.summonVisible() && !roster.summonEnabled());
         builder.set(dismissSelector + ".Visible", visible && roster.dismissEnabled());
         if (!visible) return;
+        if (roster.summonVisible() && !roster.summonEnabled()) {
+            boolean capBlocked = roster.capBlocked();
+            builder.set(summonBlockedSelector + ".Text", LocalizedText.resolve(language,
+                    capBlocked
+                            ? "tamework.ui.linkedPanel.roster.blocked.limit"
+                            : "tamework.ui.linkedPanel.roster.blocked.cooldown"));
+            builder.set(summonBlockedSelector + ".TooltipText", capBlocked
+                    ? LocalizedText.format(language,
+                    "tamework.ui.linkedPanel.roster.blocked.limitTooltip",
+                    roster.activeCount(), roster.activeLimit())
+                    : LocalizedText.format(language,
+                    "tamework.ui.linkedPanel.roster.blocked.cooldownTooltip",
+                    LinkedNpcPanelStatusTextService.formatRemainingTime(
+                            roster.cooldownRemainingMs(), language)));
+        }
         String stateKey = switch (roster.state()) {
             case ACTIVE -> "active";
             case UNLOADED -> "unloaded";

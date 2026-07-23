@@ -206,14 +206,20 @@ class LinkedNpcPanelCardLayoutTest {
         );
         assertFalse(
                 binder.contains("summonSelector + \".Enabled\"")
+                        || binder.contains("summonBlockedSelector + \".Enabled\"")
                         || binder.contains("dismissSelector + \".Enabled\""),
                 "Roster TextButtons must not bind the unsupported Enabled markup property."
         );
         assertTrue(
                 binder.contains("summonSelector + \".Visible\", visible && roster.summonEnabled()")
+                        && binder.contains("summonBlockedSelector + \".Visible\"")
+                        && binder.contains("visible && roster.summonVisible() && !roster.summonEnabled()")
                         && binder.contains("dismissSelector + \".Visible\", visible && roster.dismissEnabled()"),
-                "Roster actions should hide when unavailable and only expose actionable buttons."
+                "Roster actions should expose a non-interactive explanation when summoning is blocked."
         );
+        assertTrue(cardUi.contains("TextButton #RosterSummonBlockedButton")
+                        && cardUi.contains("TooltipText: \"\""),
+                "The blocked summon facade should provide a safe tooltip target without Enabled binding.");
         assertTrue(
                 binder.contains("respawnSelector + \".Visible\", showRespawn"),
                 "A cap-blocked revive action should be hidden rather than bound through unsupported Enabled state."
