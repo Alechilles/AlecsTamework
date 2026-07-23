@@ -321,7 +321,9 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private void recordWriteAccepted(SqliteTransactionCommand<?> command) {
         try {
-            metrics.writeAccepted(command.operationId());
+            metrics.writeAccepted(
+                    command.operationId(), command.kind()
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change admission ownership.
         }
@@ -330,7 +332,9 @@ public final class SqliteSingleWriter implements AutoCloseable {
     private void recordWriteRejected(SqliteTransactionCommand<?> command,
                                      PersistenceWriteRejection reason) {
         try {
-            metrics.writeRejected(command.operationId(), reason);
+            metrics.writeRejected(
+                    command.operationId(), command.kind(), reason
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change a rejection outcome.
         }
@@ -338,7 +342,9 @@ public final class SqliteSingleWriter implements AutoCloseable {
 
     private void recordBusyRetry(SqliteTransactionCommand<?> command, int retryNumber) {
         try {
-            metrics.busyRetry(command.operationId(), retryNumber);
+            metrics.busyRetry(
+                    command.operationId(), command.kind(), retryNumber
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change transaction control flow.
         }
@@ -347,7 +353,9 @@ public final class SqliteSingleWriter implements AutoCloseable {
     private void recordWriteCompleted(SqliteTransactionCommand<?> command,
                                       PersistenceTransactionResult<?> result) {
         try {
-            metrics.writeCompleted(command.operationId(), result);
+            metrics.writeCompleted(
+                    command.operationId(), command.kind(), result
+            );
         } catch (RuntimeException ignored) {
             // Passive metrics cannot change a durable outcome.
         }

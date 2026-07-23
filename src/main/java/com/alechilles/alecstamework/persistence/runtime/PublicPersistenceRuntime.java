@@ -76,6 +76,12 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.targetOrigin();
     }
 
+    /** Returns passive counters for every descriptor metrics namespace. */
+    @Nonnull
+    public PublicPersistenceMetricsSnapshot metrics() {
+        return state.metrics();
+    }
+
     /** Returns the one typed mutation facade after the target is open. */
     @Nonnull
     public PublicPersistenceOperations operations() {

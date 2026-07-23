@@ -34,6 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +55,14 @@ class PublicPersistenceRuntimeTest {
                 runtime.targetOrigin().orElseThrow()
         );
         assertTrue(runtime.databasePath().orElseThrow().toFile().isFile());
+        PublicPersistenceMetricsSnapshot metrics = runtime.metrics();
+        assertEquals(
+                PublicPersistenceFeatureRegistry.create()
+                        .descriptors().size(),
+                metrics.features().size()
+        );
+        assertTrue(metrics.readsCompleted() > 0);
+        assertNull(metrics.lastGlobalFailureCode());
 
         assertEquals(
                 PublicPersistenceShutdownReport.Status.COMPLETE,

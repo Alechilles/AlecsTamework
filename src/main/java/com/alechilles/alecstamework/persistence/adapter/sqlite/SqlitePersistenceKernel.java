@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCancellation;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult;
+import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import java.time.Duration;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,6 +22,7 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
     private final SqliteReadExecutor reads;
     private final SqliteUnitOfWorkRunner units;
     private final SqliteCheckpointService checkpoints;
+    private final PersistenceKernelMetrics metrics;
     private final long defaultShutdownTimeoutMs;
     private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
 
@@ -29,6 +32,19 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                 SqliteWriterConfiguration.DEFAULT,
                 SqliteReadExecutorConfiguration.DEFAULT,
                 PersistenceKernelMetrics.NO_OP,
+                10_000
+        );
+    }
+
+    public SqlitePersistenceKernel(
+            @Nonnull SqliteConnectionFactory connections,
+            @Nonnull PersistenceKernelMetrics metrics
+    ) {
+        this(
+                connections,
+                SqliteWriterConfiguration.DEFAULT,
+                SqliteReadExecutorConfiguration.DEFAULT,
+                metrics,
                 10_000
         );
     }
@@ -43,9 +59,12 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
             throw new IllegalArgumentException("Complete SQLite kernel configuration is required");
         }
         this.writer = new SqliteSingleWriter(connections, writerConfiguration, metrics);
-        this.reads = new SqliteReadExecutor(connections, readConfiguration);
-        this.units = new SqliteUnitOfWorkRunner(writer, reads);
+        this.reads = new SqliteReadExecutor(
+                connections, readConfiguration, metrics
+        );
+        this.units = new SqliteUnitOfWorkRunner(writer, reads, metrics);
         this.checkpoints = new SqliteCheckpointService(connections);
+        this.metrics = metrics;
         this.defaultShutdownTimeoutMs = defaultShutdownTimeoutMs;
     }
 
@@ -113,7 +132,15 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
                 checkpointResult instanceof SqliteCheckpointResult.Completed
                         ? SqliteKernelShutdownReport.CheckpointStatus.COMPLETED
                         : SqliteKernelShutdownReport.CheckpointStatus.FAILED;
+        if (checkpointResult instanceof
+                SqliteCheckpointResult.Failed failed) {
+            recordCheckpointFailure(failed.failure());
+        }
         PersistenceShutdownResult readResult = reads.shutdown(remaining(deadline));
+        if (readResult.status()
+                == PersistenceShutdownResult.Status.TIMED_OUT) {
+            recordShutdownTimedOut(readResult.outstandingOperations());
+        }
         if (readResult.status() != PersistenceShutdownResult.Status.TIMED_OUT) {
             state.set(State.CLOSED);
         }
@@ -134,6 +161,28 @@ public final class SqlitePersistenceKernel implements AutoCloseable {
 
     private Duration remaining(long deadlineNs) {
         return Duration.ofNanos(Math.max(0, deadlineNs - System.nanoTime()));
+    }
+
+    private void recordCheckpointFailure(StorageFailure failure) {
+        Throwable cause = failure.cause() == null
+                ? new IllegalStateException(failure.code())
+                : failure.cause();
+        try {
+            metrics.checkpointFailure(
+                    PersistenceCheckpoint.CLOSE,
+                    cause
+            );
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change shutdown checkpoint semantics.
+        }
+    }
+
+    private void recordShutdownTimedOut(int outstanding) {
+        try {
+            metrics.shutdownTimedOut(outstanding);
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change shutdown ownership.
+        }
     }
 
     public enum State {

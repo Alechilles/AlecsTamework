@@ -34,6 +34,7 @@ final class PublicPersistenceRuntimeState {
     private final PersistenceFeatureRegistry registry;
     private final PublicPersistenceTargetOpener targets;
     private final PublicPersistenceWorkflowTracker workflows;
+    private final PublicPersistenceControlPlane control;
     private PersistenceStartupCoordinator startup;
     private PersistenceEngineLease lease;
     private PublicPersistenceTarget target;
@@ -54,6 +55,7 @@ final class PublicPersistenceRuntimeState {
         this.configuration = configuration;
         this.registry = registry;
         this.workflows = workflows;
+        control = new PublicPersistenceControlPlane(registry);
         targets = new PublicPersistenceTargetOpener(configuration.clock());
     }
 
@@ -64,6 +66,7 @@ final class PublicPersistenceRuntimeState {
             );
         }
         this.startup = startup;
+        control.bind(startup);
     }
 
     Map<PersistenceStartupNode, PersistenceStartupAction> actions() {
@@ -116,6 +119,10 @@ final class PublicPersistenceRuntimeState {
 
     PublicPersistenceWorkflowTracker workflows() {
         return workflows;
+    }
+
+    PublicPersistenceMetricsSnapshot metrics() {
+        return control.snapshot();
     }
 
     synchronized PublicPersistenceShutdownReport shutdown(Duration timeout) {
@@ -193,11 +200,11 @@ final class PublicPersistenceRuntimeState {
                 connections,
                 configuration.clock()
         );
-        kernel = new SqlitePersistenceKernel(connections);
+        kernel = new SqlitePersistenceKernel(connections, control);
         adapter = new SqlitePublicPersistenceAdapter(
                 registry,
                 kernel,
-                startup,
+                control,
                 configuration.clock(),
                 configuration.refunds(),
                 configuration.profileListener()

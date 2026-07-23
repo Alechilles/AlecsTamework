@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownResult;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
@@ -27,22 +28,36 @@ import javax.annotation.Nonnull;
 public final class SqliteReadExecutor implements AutoCloseable {
     private final SqliteConnectionFactory connections;
     private final SqliteReadExecutorConfiguration configuration;
+    private final PersistenceKernelMetrics metrics;
     private final ThreadPoolExecutor gameplay;
     private final ThreadPoolExecutor diagnostic;
     private final AtomicBoolean admissionOpen = new AtomicBoolean(true);
     private final AtomicInteger outstanding = new AtomicInteger();
 
     public SqliteReadExecutor(@Nonnull SqliteConnectionFactory connections) {
-        this(connections, SqliteReadExecutorConfiguration.DEFAULT);
+        this(
+                connections,
+                SqliteReadExecutorConfiguration.DEFAULT,
+                PersistenceKernelMetrics.NO_OP
+        );
     }
 
     public SqliteReadExecutor(@Nonnull SqliteConnectionFactory connections,
                               @Nonnull SqliteReadExecutorConfiguration configuration) {
-        if (connections == null || configuration == null) {
+        this(connections, configuration, PersistenceKernelMetrics.NO_OP);
+    }
+
+    public SqliteReadExecutor(
+            @Nonnull SqliteConnectionFactory connections,
+            @Nonnull SqliteReadExecutorConfiguration configuration,
+            @Nonnull PersistenceKernelMetrics metrics
+    ) {
+        if (connections == null || configuration == null || metrics == null) {
             throw new IllegalArgumentException("SQLite read executor dependencies are required");
         }
         this.connections = connections;
         this.configuration = configuration;
+        this.metrics = metrics;
         this.gameplay = executor(
                 configuration.gameplayThreads(),
                 configuration.gameplayQueueCapacity(),
@@ -73,13 +88,15 @@ public final class SqliteReadExecutor implements AutoCloseable {
             lane(command.priority()).execute(() -> run(command, completion));
         } catch (RejectedExecutionException rejected) {
             outstanding.decrementAndGet();
-            completion.complete(failure(
+            PersistenceReadResult<T> result = failure(
                     command,
                     "read_executor_saturated",
                     StorageFailureKind.UNAVAILABLE,
                     true,
                     rejected
-            ));
+            );
+            recordCompletion(command, result);
+            completion.complete(result);
         }
         return completion;
     }
@@ -120,15 +137,20 @@ public final class SqliteReadExecutor implements AutoCloseable {
     private <T> void run(SqliteReadCommand<T> command,
                          CompletableFuture<PersistenceReadResult<T>> completion) {
         try (Connection connection = connections.openReadConnection()) {
-            PersistenceReadResult<T> result = command.work().execute(connection);
-            completion.complete(result == null
+            PersistenceReadResult<T> returned =
+                    command.work().execute(connection);
+            PersistenceReadResult<T> result = returned == null
                     ? failure(command, "read_contract_returned_null",
                     StorageFailureKind.DECODE, false, null)
-                    : result);
+                    : returned;
+            recordCompletion(command, result);
+            completion.complete(result);
         } catch (Throwable failure) {
-            completion.complete(PersistenceReadResult.failed(
+            PersistenceReadResult<T> result = PersistenceReadResult.failed(
                     SqliteFailureClassifier.classify(failure, command.kind().value())
-            ));
+            );
+            recordCompletion(command, result);
+            completion.complete(result);
         } finally {
             outstanding.decrementAndGet();
         }
@@ -142,9 +164,15 @@ public final class SqliteReadExecutor implements AutoCloseable {
             SqliteReadCommand<T> command,
             String code
     ) {
-        return CompletableFuture.completedFuture(
-                failure(command, code, StorageFailureKind.UNAVAILABLE, false, null)
+        PersistenceReadResult<T> result = failure(
+                command,
+                code,
+                StorageFailureKind.UNAVAILABLE,
+                false,
+                null
         );
+        recordCompletion(command, result);
+        return CompletableFuture.completedFuture(result);
     }
 
     private <T> PersistenceReadResult<T> failure(SqliteReadCommand<T> command,
@@ -171,6 +199,17 @@ public final class SqliteReadExecutor implements AutoCloseable {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return executor.isTerminated();
+        }
+    }
+
+    private void recordCompletion(
+            SqliteReadCommand<?> command,
+            PersistenceReadResult<?> result
+    ) {
+        try {
+            metrics.readCompleted(command.kind(), result);
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change a typed read outcome.
         }
     }
 

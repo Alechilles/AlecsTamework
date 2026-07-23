@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCancellation;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
@@ -18,14 +19,28 @@ import javax.annotation.Nonnull;
 public final class SqliteUnitOfWorkRunner {
     private final SqliteSingleWriter writer;
     private final SqliteReadExecutor reads;
+    private final PersistenceKernelMetrics metrics;
 
     public SqliteUnitOfWorkRunner(@Nonnull SqliteSingleWriter writer,
                                   @Nonnull SqliteReadExecutor reads) {
-        if (writer == null || reads == null) {
+        this(
+                writer,
+                reads,
+                PersistenceKernelMetrics.NO_OP
+        );
+    }
+
+    public SqliteUnitOfWorkRunner(
+            @Nonnull SqliteSingleWriter writer,
+            @Nonnull SqliteReadExecutor reads,
+            @Nonnull PersistenceKernelMetrics metrics
+    ) {
+        if (writer == null || reads == null || metrics == null) {
             throw new IllegalArgumentException("Unit-of-work writer and read executor are required");
         }
         this.writer = writer;
         this.reads = reads;
+        this.metrics = metrics;
     }
 
     /** Submits one unit of work and exposes writer acceptance plus its readback-resolved outcome. */
@@ -38,7 +53,14 @@ public final class SqliteUnitOfWorkRunner {
         SqliteSingleWriter.WriteSubmission<T> write =
                 writer.submit(unitOfWork.transaction(), cancellation);
         CompletionStage<PersistenceTransactionResult<T>> resolved =
-                write.completion().thenCompose(result -> resolveUnknown(unitOfWork, result));
+                write.completion()
+                        .thenCompose(result -> resolveUnknown(
+                                unitOfWork, result
+                        ))
+                        .thenApply(result -> {
+                            recordCompletion(unitOfWork, result);
+                            return result;
+                        });
         return new Submission<>(write.acceptance(), resolved);
     }
 
@@ -88,6 +110,19 @@ public final class SqliteUnitOfWorkRunner {
                 false,
                 failed.failure().cause()
         ));
+    }
+
+    private void recordCompletion(
+            SqliteUnitOfWork<?> unitOfWork,
+            PersistenceTransactionResult<?> result
+    ) {
+        try {
+            metrics.unitOfWorkCompleted(
+                    unitOfWork.transaction().kind(), result
+            );
+        } catch (RuntimeException ignored) {
+            // Passive metrics cannot change the resolved transaction outcome.
+        }
     }
 
     /** Writer acceptance and exact final outcome of one unit of work. */

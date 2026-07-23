@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadKind;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadPriority;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -12,6 +13,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -143,6 +145,41 @@ class SqliteReadExecutorTest {
                     assertInstanceOf(PersistenceReadResult.Failed.class, result);
             assertEquals(StorageFailureKind.DECODE, failure.failure().kind());
             assertEquals("read_contract_returned_null", failure.failure().code());
+        }
+    }
+
+    @Test
+    void reportsEveryTypedOutcomeWithoutGivingMetricsControlFlow()
+            throws Exception {
+        AtomicInteger completions = new AtomicInteger();
+        PersistenceKernelMetrics metrics = new PersistenceKernelMetrics() {
+            @Override
+            public void readCompleted(
+                    PersistenceReadKind readKind,
+                    PersistenceReadResult<?> result
+            ) {
+                assertEquals(TEST_READ, readKind);
+                completions.incrementAndGet();
+                throw new IllegalStateException("injected_metrics_failure");
+            }
+        };
+        try (SqliteReadExecutor reads = new SqliteReadExecutor(
+                connections,
+                SqliteReadExecutorConfiguration.DEFAULT,
+                metrics
+        )) {
+            PersistenceReadResult<String> result = await(reads.execute(command(
+                    PersistenceReadPriority.GAMEPLAY_CRITICAL,
+                    connection -> PersistenceReadResult.found("safe", 0)
+            )));
+
+            assertEquals(
+                    "safe",
+                    assertInstanceOf(
+                            PersistenceReadResult.Found.class, result
+                    ).value()
+            );
+            assertEquals(1, completions.get());
         }
     }
 
