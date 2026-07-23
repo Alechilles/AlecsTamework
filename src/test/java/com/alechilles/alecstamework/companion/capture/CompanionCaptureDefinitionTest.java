@@ -1,0 +1,122 @@
+package com.alechilles.alecstamework.companion.capture;
+
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/** Capture payload codec and cross-authority validation contracts. */
+class CompanionCaptureDefinitionTest {
+    private static final ProfileId PROFILE =
+            ProfileId.parse("10000000-0000-0000-0000-000000000001");
+    private static final LifecycleRevision EXPECTED = new LifecycleRevision(4);
+    private static final String PAYLOAD = "{\"capturedAtMs\":-500}";
+
+    @Test
+    void versionOneRoundTripsSignedEvidenceExactly() throws Exception {
+        CompanionCaptureRequest request = request(PROFILE, EXPECTED);
+
+        String encoded = CompanionCaptureDefinition.INSTANCE.encode(request);
+        CompanionCaptureRequest decoded =
+                CompanionCaptureDefinition.INSTANCE.decode(encoded);
+
+        assertEquals(request, decoded);
+        CompanionCaptureOutcome outcome = new CompanionCaptureOutcome(
+                PROFILE,
+                request.snapshot().snapshotId(),
+                new LifecycleRevision(6),
+                request.source().receiptKey(),
+                -500
+        );
+        assertEquals(
+                outcome,
+                CompanionCaptureEventCodec.decode(
+                        CompanionCaptureEventCodec.VERSION,
+                        CompanionCaptureEventCodec.encode(outcome)
+                )
+        );
+    }
+
+    @Test
+    void snapshotMustBelongToProfileAndPostPrepareRevision() {
+        ProfileId other =
+                ProfileId.parse("10000000-0000-0000-0000-000000000002");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> request(other, EXPECTED)
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionCaptureRequest(
+                        PROFILE,
+                        EXPECTED,
+                        null,
+                        NpcAlias.parse("20000000-0000-0000-0000-000000000001"),
+                        "world",
+                        snapshot(PROFILE, EXPECTED),
+                        new CaptureSourceEvidence(
+                                UUID.randomUUID(),
+                                "other-world",
+                                2,
+                                "capture-device",
+                                1,
+                                "before",
+                                "after",
+                                "receipt"
+                        ),
+                        -600
+                )
+        );
+    }
+
+    private CompanionCaptureRequest request(
+            ProfileId requestedProfile,
+            LifecycleRevision expected
+    ) {
+        return new CompanionCaptureRequest(
+                requestedProfile,
+                expected,
+                OwnerId.parse("30000000-0000-0000-0000-000000000001"),
+                NpcAlias.parse("20000000-0000-0000-0000-000000000001"),
+                "world",
+                snapshot(PROFILE, expected),
+                new CaptureSourceEvidence(
+                        UUID.fromString("40000000-0000-0000-0000-000000000001"),
+                        "world",
+                        2,
+                        "capture-device",
+                        1,
+                        "before-fingerprint",
+                        "after-fingerprint",
+                        "capture-receipt"
+                ),
+                -600
+        );
+    }
+
+    private CompanionSnapshot snapshot(
+            ProfileId profileId,
+            LifecycleRevision expected
+    ) {
+        return new CompanionSnapshot(
+                SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
+                profileId,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                1,
+                PAYLOAD,
+                Sha256Hash.ofUtf8(PAYLOAD),
+                expected.next(),
+                true,
+                -500
+        );
+    }
+}
