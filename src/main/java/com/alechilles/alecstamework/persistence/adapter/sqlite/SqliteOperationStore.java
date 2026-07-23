@@ -201,6 +201,13 @@ public final class SqliteOperationStore implements OperationStore {
                  FROM operation_envelope
                  WHERE phase NOT IN (%s)
                    AND (lease_owner IS NULL OR lease_until_ms <= ?)
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM persistence_quarantine quarantine
+                       WHERE quarantine.scope_type = 'OPERATION'
+                         AND quarantine.scope_key = operation_envelope.operation_id
+                         AND quarantine.state = 'ACTIVE'
+                   )
                  ORDER BY created_at_ms, operation_id
                  LIMIT ?
                 """.formatted(TERMINAL_PHASES);

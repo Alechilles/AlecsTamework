@@ -87,6 +87,43 @@ public final class OperationDefinitionRegistry {
         }
     }
 
+    /** Decodes a durable payload while retaining its registered definition for recovery routing. */
+    @Nonnull
+    public OperationDecodeResult<DecodedOperationPayload> decode(
+            @Nonnull OperationEnvelope envelope
+    ) {
+        if (envelope == null) {
+            throw new IllegalArgumentException("Operation envelope is required");
+        }
+        OperationDefinition<?> definition = definitions.get(envelope.kind());
+        if (definition == null) {
+            return failed(
+                    OperationDecodeResult.Failure.UNKNOWN_DEFINITION,
+                    "operation_definition_unknown",
+                    null
+            );
+        }
+        if (definition.payloadVersion() != envelope.payloadVersion()) {
+            return failed(
+                    OperationDecodeResult.Failure.UNSUPPORTED_VERSION,
+                    "operation_payload_version_unsupported",
+                    null
+            );
+        }
+        try {
+            Object payload = definition.decode(envelope.payloadJson());
+            return new OperationDecodeResult.Decoded<>(
+                    new DecodedOperationPayload(definition, payload)
+            );
+        } catch (Exception failure) {
+            return failed(
+                    OperationDecodeResult.Failure.DECODE_FAILED,
+                    "operation_payload_decode_failed",
+                    failure
+            );
+        }
+    }
+
     private void requireRegistered(OperationDefinition<?> definition) {
         validate(definition);
         if (definitions.get(definition.kind()) != definition) {
