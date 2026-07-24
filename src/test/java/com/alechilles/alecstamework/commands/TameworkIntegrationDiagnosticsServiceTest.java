@@ -25,7 +25,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "duplicateCallbacksSinceBoot=4"));
         assertTrue(contains(lines, "commandFamilyRosters=true"));
         assertTrue(contains(lines, "timedSummoning=true"));
-        assertTrue(contains(lines, "paidRevival=true"));
         assertTrue(contains(lines, "openOperations=3"));
         assertTrue(contains(lines, "classified=21"));
         assertTrue(contains(lines, "oldestCorrelation=population-op-4"));
@@ -115,7 +114,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
         private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
                 TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
                 TameworkApiCapability.COMMAND_TIMED_SUMMONING,
-                TameworkApiCapability.PAID_COMMAND_REVIVAL,
                 TameworkApiCapability.POPULATION_GROUPS,
                 TameworkApiCapability.COMPANION_PROVISIONING);
         private TameworkIntegrationDiagnosticsService.ProvisioningDetail provisioning =
@@ -140,7 +138,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         @Override public String apiVersion() { return "0.9.0"; }
         @Override public String capabilities() {
             return "[COMMAND_FAMILY_ROSTERS, COMMAND_TIMED_SUMMONING, "
-                    + "PAID_COMMAND_REVIVAL, COMPANION_PROVISIONING, POPULATION_GROUPS]";
+                    + "COMPANION_PROVISIONING, POPULATION_GROUPS]";
         }
         @Override public boolean captureReady() { return true; }
         @Override public boolean hasCapability(TameworkApiCapability capability) {

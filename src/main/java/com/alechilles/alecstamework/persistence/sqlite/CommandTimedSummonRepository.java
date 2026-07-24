@@ -65,46 +65,6 @@ public final class CommandTimedSummonRepository {
         );
     }
 
-    /** Resets the active lease after a paid revival has committed the canonical live projection. */
-    @Nonnull
-    public PersistenceWriteQueue.WriteSubmission<MutationResult> activateAfterRevivalAsync(
-            @Nonnull CommandTimedSummonSessionRecord active) {
-        Objects.requireNonNull(active, "active");
-        return writeQueue.submitTracked("command_timed_summon_activate_after_revival", connection -> {
-            CommandTimedSummonSessionRecord current = findSession(
-                    connection, active.ownerUuid(), active.commandFamilyId(), active.profileId());
-            if (current == null) return createSession(connection, active);
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    UPDATE command_timed_summon_sessions SET
-                        row_revision = row_revision + 1,
-                        summon_state = 'ACTIVE', summon_session_id = ?, summon_remaining_ms = ?,
-                        resummon_cooldown_until_ms = 0, summon_config_id = ?,
-                        summon_config_revision = ?, summon_policy_json = ?,
-                        warning_receipts_json = '[]', summon_last_checkpoint_at_ms = ?,
-                        active_operation_id = NULL, updated_at_ms = ?
-                    WHERE owner_uuid = ? AND command_family_id = ? AND profile_id = ?
-                    """)) {
-                int index = 1;
-                statement.setString(index++, active.summonSessionId());
-                if (active.summonRemainingMs() == null) statement.setNull(index++, Types.BIGINT);
-                else statement.setLong(index++, active.summonRemainingMs());
-                statement.setString(index++, active.summonConfigId());
-                if (active.summonConfigRevision() == null) statement.setNull(index++, Types.BIGINT);
-                else statement.setLong(index++, active.summonConfigRevision());
-                statement.setString(index++, CommandTimedSummonPolicySnapshot.toJson(active.summonPolicy()));
-                statement.setLong(index++, active.summonLastCheckpointAtMs());
-                statement.setLong(index++, active.updatedAtMs());
-                statement.setString(index++, active.ownerUuid().toString());
-                statement.setString(index++, active.commandFamilyId());
-                statement.setString(index, active.profileId());
-                statement.executeUpdate();
-            }
-            return result(Status.COMMITTED, findSession(
-                    connection, active.ownerUuid(), active.commandFamilyId(), active.profileId()),
-                    null, "revival-active-lease-registered");
-        }, null);
-    }
-
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> prepareAsync(
             @Nonnull CommandTimedSummonOperationRecord requested) {

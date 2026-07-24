@@ -153,7 +153,7 @@ class LinkedNpcPanelCardLayoutTest {
     }
 
     @Test
-    void deadCompanionCardShowsThreeInlineReviveCostsAndLargeHeartbeatAction() throws IOException {
+    void deadCompanionCardShowsFreeHeartbeatRespawnWithoutCostPresentation() throws IOException {
         String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
         String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
         BufferedImage heartbeat = ImageIO.read(REVIVE_HEARTBEAT_ICON.toFile());
@@ -162,43 +162,17 @@ class LinkedNpcPanelCardLayoutTest {
         assertEquals(41, heartbeat.getWidth(), "Revive heartbeat should retain the supplied 41px width.");
         assertEquals(41, heartbeat.getHeight(), "Revive heartbeat should retain the supplied 41px height.");
         assertTrue(
-                cardUi.contains("@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 20, SlotSpacing: 0, SlotIconSize: 20);"),
-                "Inline revival item icons need an explicit ItemGrid style, as used by native Hytale UI grids."
-        );
-        assertTrue(
                 cardUi.contains("Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);"),
                 "The dead-card revive action should use the in-game-scaled heartbeat control from the mockup."
         );
-        for (int index = 0; index < 3; index++) {
-            assertTrue(cardUi.contains("Label #ReviveCost" + index + "Quantity"),
-                    "The card should provide a direct quantity label for cost row " + (index + 1) + ".");
-            assertTrue(cardUi.contains("ItemGrid #ReviveCost" + index + "Item"),
-                    "The card should provide a direct item icon for cost row " + (index + 1) + ".");
-            assertTrue(cardUi.contains("Label #ReviveCost" + index + "Name"),
-                    "The card should provide a direct item name for cost row " + (index + 1) + ".");
-        }
-        assertEquals(3, countOccurrences(cardUi, "Style: @ReviveCostItemGridStyle;"),
-                "Every inline revival item grid should use the explicit compact icon style.");
-        assertTrue(
-                binder.contains("Quantity.Text")
-                        && binder.contains("line.requiredQuantity()")
-                        && binder.contains("Name.Text")
-                        && binder.contains("line.localizedName()")
-                        && binder.contains("Item.Slots")
-                        && binder.contains("new ItemStack(line.itemId(), 1)"),
-                "Each visible revive component must bind its quantity, localized name, and actual item icon."
-        );
-        assertFalse(cardUi.contains("Group #ReviveCostPanel"),
-                "Revival costs must be direct card children so CustomUI selectors cannot lose nested rows.");
-        assertFalse(
-                binder.contains("Quantity.Visible")
-                        || binder.contains("Item.Visible")
-                        || binder.contains("Name.Visible"),
-                "Direct cost fields should remain renderable and hide by clearing content, not visibility toggles."
-        );
+        assertFalse(cardUi.contains("ReviveCost"),
+                "Free respawn cards must not retain paid item-cost controls.");
+        assertFalse(binder.contains("CommandReviveCostPresentation")
+                        || binder.contains("bindReviveCosts"),
+                "The card binder must not project paid revival quote state.");
         assertTrue(
                 binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),
-                "Dead-card costs should replace the inactive badge and locate action instead of overlapping them."
+                "The heartbeat action should replace the inactive badge and locate action instead of overlapping them."
         );
         assertFalse(
                 binder.contains("respawnSelector + \".Enabled\""),

@@ -428,9 +428,7 @@ class SqliteProvisioningActivationOperationsTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed(
                                 request.spawnReceiptKey()
-                        ).completed(),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                        ).completed()
         );
     }
 

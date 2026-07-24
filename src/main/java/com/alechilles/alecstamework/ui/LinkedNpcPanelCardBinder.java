@@ -3,14 +3,11 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.Anchor;
-import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import java.util.List;
 
 /**
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
@@ -18,7 +15,6 @@ import java.util.List;
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_HEIGHT = 126;
     private static final int COMPACT_CARD_HEIGHT = 88;
-    private static final int MAX_INLINE_REVIVE_COSTS = 3;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -199,12 +195,6 @@ final class LinkedNpcPanelCardBinder {
                 showTalentPointAction
         );
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
-        bindReviveCosts(
-                commandBuilder,
-                entrySelector,
-                entry.reviveCostPresentation(),
-                showReviveAction
-        );
         bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
                 rosterCapacitySelector, summonSelector, summonBlockedSelector, dismissSelector,
                 showRosterDetails ? roster : null, language);
@@ -362,40 +352,6 @@ final class LinkedNpcPanelCardBinder {
         anchor.setRight(Value.of(0));
         anchor.setHeight(Value.of(showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT));
         return anchor;
-    }
-
-    private static void bindReviveCosts(UICommandBuilder builder,
-                                        String entrySelector,
-                                        CommandReviveCostPresentation presentation,
-                                        boolean reviveActionVisible) {
-        List<CommandReviveCostPresentation.CostLine> costs = presentation == null
-                ? List.of()
-                : presentation.costs();
-        int visibleCostCount = reviveActionVisible
-                ? Math.min(MAX_INLINE_REVIVE_COSTS, costs.size())
-                : 0;
-        for (int costIndex = 0; costIndex < MAX_INLINE_REVIVE_COSTS; costIndex++) {
-            String rowSelector = entrySelector + " #ReviveCost" + costIndex;
-            boolean rowVisible = costIndex < visibleCostCount;
-            if (!rowVisible) {
-                builder.set(rowSelector + "Quantity.Text", "");
-                builder.set(rowSelector + "Name.Text", "");
-                builder.set(rowSelector + "Item.Slots", List.<ItemGridSlot>of());
-                continue;
-            }
-
-            CommandReviveCostPresentation.CostLine line = costs.get(costIndex);
-            builder.set(rowSelector + "Quantity.Text", Integer.toString(line.requiredQuantity()));
-            builder.set(rowSelector + "Name.Text", line.localizedName());
-            builder.set(rowSelector + "Item.Slots", List.of(reviveCostSlot(line)));
-        }
-    }
-
-    private static ItemGridSlot reviveCostSlot(CommandReviveCostPresentation.CostLine line) {
-        ItemGridSlot slot = new ItemGridSlot(new ItemStack(line.itemId(), 1));
-        slot.setName(line.localizedName());
-        slot.setSkipItemQualityBackground(true);
-        return slot;
     }
 
     private static void bindRosterStatus(UICommandBuilder builder, String stateSelector,

@@ -146,7 +146,6 @@ import com.alechilles.alecstamework.items.CommandTimedSummonPopulationPort;
 import com.alechilles.alecstamework.items.CommandTimedSummoningService;
 import com.alechilles.alecstamework.items.CommandTimedSummoningTickSystem;
 import com.alechilles.alecstamework.items.CommandTimedProjectionRetirementIndex;
-import com.alechilles.alecstamework.items.PaidCommandRevivalCoordinator;
 import com.alechilles.alecstamework.items.RecoveryProjectionReconciliationService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
@@ -345,7 +344,6 @@ public class Tamework extends JavaPlugin {
     private CommandTimedSummoningApiDelegate commandTimedSummoningApi;
     private CommandTimedSummoningService commandTimedSummoningService;
     private CommandTimedSummoningTickSystem commandTimedSummoningTickSystem;
-    private PaidCommandRevivalCoordinator paidCommandRevivalCoordinator;
     private boolean commandTimedSummoningRecoveryReady;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
@@ -1213,21 +1211,6 @@ public class Tamework extends JavaPlugin {
                 commandFamilyRosterService,
                 commandRosterReadExecutor
         );
-        if (api instanceof TameworkApiImpl implementation) {
-            paidCommandRevivalCoordinator = commandItemFeatureHandler.createPaidCommandRevivalRuntime(
-                    persistenceRuntime.getPaidCommandRevivalRepository(),
-                    apiEventBus::emitPaidCommandRevived);
-            PaidCommandRevivalCoordinator.RecoveryReport paidRecovery =
-                    paidCommandRevivalCoordinator.recoverStartup(128).toCompletableFuture().join();
-            boolean paidRecoveryReady = paidRecovery != null && paidRecovery.healthy();
-            if (!paidRecoveryReady) {
-                getLogger().at(Level.WARNING).log(
-                        "Paid command revival startup recovery failed; capability remains unavailable. reason=%s",
-                        paidRecovery != null ? paidRecovery.reason() : "no-report");
-            }
-            implementation.activatePaidCommandRevivalRuntime(
-                    paidCommandRevivalCoordinator, paidRecoveryReady, true);
-        }
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         getEntityStoreRegistry().registerSystem(
@@ -1341,12 +1324,6 @@ public class Tamework extends JavaPlugin {
             );
         }
         if (commandItemFeatureHandler != null) {
-            TameworkEventRegistrationSupport.registerGlobal(
-                    this,
-                    PlayerReadyEvent.class,
-                    this::onPaidCommandRevivalPlayerReady,
-                    "paid command revival owner recovery"
-            );
             TameworkEventRegistrationSupport.registerGlobal(
                     this,
                     PlayerConnectEvent.class,
@@ -1520,27 +1497,6 @@ public class Tamework extends JavaPlugin {
         service.onOwnerLogout(event.getPlayerRef().getUuid(), System.currentTimeMillis());
     }
 
-    private void onPaidCommandRevivalPlayerReady(@Nullable PlayerReadyEvent event) {
-        PaidCommandRevivalCoordinator coordinator = paidCommandRevivalCoordinator;
-        UUID ownerUuid = event != null && event.getPlayer() != null
-                ? event.getPlayer().getUuid() : null;
-        if (coordinator == null || ownerUuid == null) return;
-        coordinator.recoverOwner(ownerUuid, 128).whenComplete((report, failure) -> {
-            if (failure != null || report == null || !report.healthy()) {
-                String reason = report != null ? report.reason() : "no-report";
-                if (failure != null) {
-                    getLogger().at(Level.WARNING).withCause(failure).log(
-                            "Paid command revival owner recovery failed owner=%s reason=%s",
-                            ownerUuid, reason);
-                } else {
-                    getLogger().at(Level.WARNING).log(
-                            "Paid command revival owner recovery failed owner=%s reason=%s",
-                            ownerUuid, reason);
-                }
-            }
-        });
-    }
-
     @Override
     protected void shutdown() {
         if (hStatsIntegration != null) {
@@ -1566,7 +1522,6 @@ public class Tamework extends JavaPlugin {
         companionProvisioningRecoveryReady = false;
         commandTimedSummoningApi = null;
         commandTimedSummoningService = null;
-        paidCommandRevivalCoordinator = null;
         commandTimedSummoningRecoveryReady = false;
         if (commandRosterReadExecutor != null) {
             commandRosterReadExecutor.shutdownNow();

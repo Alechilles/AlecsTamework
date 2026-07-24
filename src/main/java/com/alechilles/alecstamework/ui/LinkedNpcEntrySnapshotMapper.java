@@ -88,9 +88,6 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.recallPending(),
                     entry.recallLostRemainingMs()
             );
-            if (entry.reviveCostPresentation() != null) {
-                snapshot = snapshot.withReviveCostPresentation(entry.reviveCostPresentation());
-            }
             if (entry.rosterStatusPresentation() != null) {
                 snapshot = snapshot.withRosterStatusPresentation(entry.rosterStatusPresentation());
             }

@@ -39,7 +39,7 @@ public final class LegacySourceClassifier {
             "companion_population_state", "companion_population_operations",
             "persistence_incidents", "api_profile_data_operations", "capture_attempts",
             "companion_provisioning_operations", "command_family_rosters",
-            "command_timed_summon_sessions", "paid_command_revival_operations"
+            "command_timed_summon_sessions"
     );
     private static final Map<String, Set<String>> V2_COLUMNS = Map.of(
             "schema_migrations", Set.of("version", "name", "applied_at_ms"),

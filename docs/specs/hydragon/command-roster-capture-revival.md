@@ -1,14 +1,20 @@
-# Command-Roster Capture, Timed Summoning, and Paid Revival Specification
+# Command-Roster Capture, Timed Summoning, and Death Restoration Specification
 
 Status: Proposed replacement for the unreleased bonded-vessel subsystem
 Target: Tamework 3.x
 Consumer: HyDragon `>=3.0.0 <4.0.0`
 
-HyDragon counterpart: [Draconic capture, Dragon Horn, and revival](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)
+HyDragon counterpart: [Draconic capture, Dragon Horn, and death restoration](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)
 
 ## 1. Goal
 
-Extend Tamework's existing capture, canonical profile, command-item, population, and revival systems so a consumable capture item can tame an NPC in place and atomically add it to an owner-scoped command roster. Add population-backed active limits, per-profile timed summon leases that return companions to roster storage, and generic multi-component inventory costs for command-panel revival. These are asset-driven capabilities; Tamework must not hardcode dragons, stones, horns, eggs, ore names, or essence IDs.
+Extend Tamework's existing capture, canonical profile, command-item, population,
+and free respawn systems so a consumable capture item can tame an NPC in place
+and atomically add it to an owner-scoped command roster. Add population-backed
+active limits and per-profile timed summon leases that return companions to
+roster storage. Dead roster rows use Tamework's existing free same-profile
+restoration path. These are asset-driven capabilities; Tamework must not
+hardcode dragons, stones, horns, or eggs.
 
 This design replaces one-companion-per-vessel storage. Physical command items remain player access tools, while canonical command membership is durable per owner and command family.
 
@@ -21,8 +27,8 @@ This design replaces one-companion-per-vessel storage. Physical command items re
 - Command-family membership is durable Tamework authority. Item metadata is a cache and UI projection only.
 - Active limits remain `TwPopulationGroupConfig` authority and may be any non-negative configured value; command items do not maintain a second count.
 - An opted-in role may have a finite summon lease. Expiry or manual dismissal durably snapshots/despawns the projection into `ROSTER_STORED`, releases active capacity, and starts a configured cooldown.
-- A paid revive consumes every component of its configured item-agnostic cost exactly once and restores the same profile exactly once.
-- Capture, roster link, provisioning, population admission, timed summoning, and revival are capability-gated through the public API.
+- A dead roster row uses the existing free respawn policy and restores the same profile without consuming an item.
+- Capture, roster link, provisioning, population admission, and timed summoning are capability-gated through the public API. Respawn remains Tamework's established gameplay path.
 - The bonded-vessel subsystem and capability are removed. Tamework needs no HyDragon migration behavior because HyDragon has never shipped.
 
 ## 3. New and changed configuration
@@ -74,22 +80,20 @@ Add inherited fields:
 
 `OwnerCommandFamily` requires `CommandFamilyId`, `RequireOwner: true`, and profile-capable recipients. All item IDs resolved by that command config are equivalent access keys for the acting owner's family roster.
 
-### 3.3 `TwCompanionConfig.Command.Revive`
+### 3.3 `TwCompanionConfig.Command` death respawn
 
-Replace the flat HyDragon use of cooldown-only revival with an inherited nested block:
+Use Tamework's existing inherited fields:
 
 | Field | Type/default | Meaning |
 | --- | --- | --- |
-| `Enabled` | boolean/current resolved behavior | Enables command-panel revival for the role |
-| `GameplayCooldownMs` | integer/current cooldown | Balance cooldown after death; may be zero |
-| `Costs` | ordered `TwItemCostComponent[]`, empty | All item components required and consumed on successful revival |
-| `InsufficientCostMessage` | string/null | Optional localization key override |
+| `DeadRespawnEnabled` | boolean/current resolved behavior | Enables the normal free command-panel respawn for the role |
+| `DeadRespawnCooldownMs` | integer/current cooldown | Cooldown after death; may be zero |
+| `DeadRespawnCooldownMins` | integer/legacy | Backward-readable minute form retained by Tamework's existing config contract |
 
-`TwItemCostComponent` is a reusable content-neutral codec/value object with exact `ItemId` and positive integer `Quantity`. The ordered array is an AND cost: every component is required. Different roles may use different IDs and quantities, including several different item types in one payment. Duplicate item IDs are rejected so UI, reservation, and refund totals remain unambiguous. An explicit array replaces the inherited array. Empty costs preserve free revival for other Tamework users; HyDragon must configure a non-empty cost for every relevant role. The generic type must be reusable by later features such as animal-husbandry revival priced in Life Essence.
-
-The linked-panel quote renders every component in configured order with item icon, localized item name, `owned / required` quantity, and explicit shortage styling. Confirmation is disabled if any component is missing. A compact summary may be used on the row, but the confirmation view must never hide part of a multi-item cost.
-
-Existing `DeadRespawnCooldownMs`/`DeadRespawnCooldownMins` remain readable during Tamework's own config transition, but the implementation and generated docs should converge on the `Revive` block. This is Tamework schema evolution, not a HyDragon migration requirement.
+No nested `Revive` block, item-cost codec, payment confirmation, inventory
+reservation, or refund claim is part of this integration. The linked panel
+shows authoritative dead/cooldown state and invokes the normal free respawn
+action when eligible.
 
 ### 3.4 `TwCompanionConfig.Command.Summon`
 
@@ -222,14 +226,14 @@ Owner-command-family rows participate in the existing linked panel, command radi
 - UI rows are sourced from the roster joined with canonical profile/lifecycle state, not from the held item's cached list.
 - Loaded and unloaded resolution remains profile-first.
 - Recall and recovery preserve normal population admission and cross-world safety.
-- Default safe-placement ordering for Recall and command revival searches in front of the player first, then side offsets, then wider fallback candidates. Behind-player candidates are last-resort only and must never be the first valid default.
+- Default safe-placement ordering for Recall and command respawn searches in front of the player first, then side offsets, then wider fallback candidates. Behind-player candidates are last-resort only and must never be the first valid default.
 - Placement failure leaves the profile and roster unchanged and returns a stable reason.
 
 ### 7.1 Active-cap enforcement
 
 `TwPopulationGroupConfig.Limits.MaxActivePerOwner` is the sole balance authority for how many matching profiles one owner may project concurrently. Zero remains unlimited; any positive value is enforced without hardcoded HyDragon assumptions.
 
-Active headroom includes committed `ACTIVE`, durable `UNLOADED`, committed `RESTORING`, `STORING`, pending positive admissions, and ambiguous states that may still contain a live projection. Capacity is released only after durable transition to `ROSTER_STORED`, `DEAD_REVIVABLE`, or permanent release. Capture tame/link, Summon, provisioned projection, revival, lost recovery, and cross-world recovery reserve the same group constraints.
+Active headroom includes committed `ACTIVE`, durable `UNLOADED`, committed `RESTORING`, `STORING`, pending positive admissions, and ambiguous states that may still contain a live projection. Capacity is released only after durable transition to `ROSTER_STORED`, `DEAD_REVIVABLE`, or permanent release. Capture tame/link, Summon, provisioned projection, respawn, lost recovery, and cross-world recovery reserve the same group constraints.
 
 Cap denial leaves the profile, roster, source item, timer, cooldown, and world unchanged. For capture it occurs before entropy and stone consumption.
 
@@ -250,8 +254,8 @@ stateDiagram-v2
     STORING --> ROSTER_STORED: snapshot + despawn commit
     ACTIVE --> DEAD_REVIVABLE: death
     UNLOADED --> DEAD_REVIVABLE: reconciled death
-    DEAD_REVIVABLE --> RESTORING: paid revival admitted
-    RESTORING --> ACTIVE: revival + lease commit
+    DEAD_REVIVABLE --> RESTORING: free respawn admitted
+    RESTORING --> ACTIVE: same-profile restoration commit
 ```
 
 `Summon` is available only for `ROSTER_STORED` after cooldown. `Recall` relocates an already active/unloaded profile and never starts or resets a lease. `Dismiss` is available for active/unloaded profiles and invokes the same storage transaction as expiry.
@@ -259,7 +263,7 @@ stateDiagram-v2
 ### 7.3 Lease start and accounting
 
 - Successful `TameAndCommandLink` capture starts the first lease on the existing live projection.
-- Successful Horn Summon and paid revival start a new lease with the role's snapshotted `ActiveDurationMs`.
+- Successful Horn Summon starts a new lease with the role's snapshotted `ActiveDurationMs`.
 - Each profile owns an independent `summon_session_id`; no owner-wide timer pool is implied.
 - A lease decrements while the companion is canonically active or durably unloaded during the running server session.
 - Recall, relocation, command changes, mount state, chunk unload, UI close/reopen, and item replacement preserve remaining time.
@@ -279,35 +283,35 @@ stateDiagram-v2
 
 Until step 6 commits, active capacity remains occupied. Duplicate expiry ticks, Dismiss clicks, logout callbacks, or restart recovery reuse the same session/operation and cannot remove twice. If snapshot/removal is temporarily unavailable, `STORING` retries and blocks new projection. Recovery converges to exactly one active projection with the original remaining time or one roster-stored profile with cooldown.
 
-## 8. Paid revival transaction
+## 8. Free respawn transaction
 
-### 8.1 Quote and confirmation
+### 8.1 Status and request
 
-For a dead roster row, the linked panel resolves the role's current `Revive` configuration and displays every required item icon, localized name, required quantity, owned quantity, and shortage before confirmation. All components are conjunctive. The server re-resolves the config revision and inventory at commit; client UI is never authority.
+For a dead roster row, the linked panel resolves authoritative lifecycle and
+cooldown state and exposes the normal respawn action only when the role permits
+it. Client state is advisory; the server revalidates the current profile, death
+snapshot, owner, cooldown, and admission state.
 
-### 8.2 Commit sequence
+### 8.2 Restoration sequence
 
-1. Resolve actor, owner, command family, profile, death record, role config revision, population group, and target world.
-2. Validate revival enablement, ownership, roster membership, dead/revivable state, cooldown, persistence health, population admission, and safe placement.
-3. Locate and exact-fence every required inventory component. Split each item total across stacks deterministically without exceeding the quoted quantities.
-4. Persist a revival operation and inventory reservation under one idempotency key.
-5. Prepare the existing profile/death/population recovery transition.
-6. Consume all reserved costs exactly once.
-7. Commit revival of the same profile, one safe projection, and one new summon lease when the role enables timed summoning.
-8. Commit lifecycle/roster status, release reservations, and emit one result event.
+1. Resolve actor, owner, command family, profile, death record, role config, population group, and target world.
+2. Validate respawn enablement, ownership, roster membership, dead/revivable state, cooldown, persistence health, population admission, and safe placement.
+3. Fence the existing profile/death revision and prepare the profile/death/population restoration transition.
+4. Restore the recorded profile at one safe placement on the owning world thread.
+5. Commit lifecycle and roster status for the restored projection.
+6. Clear death evidence only after durable same-profile restoration succeeds.
 
-If failure occurs before durable cost consumption, release reservations and charge nothing. After an ambiguous crash, recovery queries the same operation. Terminal inability to finish after a proven charge creates one durable owner refund/recovery claim. It never silently drops the cost.
+Capacity, cooldown, placement, permission, or persistence denial leaves the
+row dead/revivable and creates no projection. Respawn never reserves, consumes,
+or refunds an inventory item.
 
 ### 8.3 Invariants
 
-- One dead profile can have at most one live revival operation.
-- Duplicate confirmation returns the existing operation result.
-- A config reload cannot change the cost of an in-flight operation.
-- Inventory movement invalidates stale fences before consumption.
-- Missing any one cost component prevents reservation and consumes nothing from every component.
-- Refund/recovery reproduces the exact consumed component list and quantities rather than one aggregate currency value.
-- Successful revival preserves profile ID, name, progression, traits, attachments, and command-family membership.
-- Insufficient cost, capacity denial, unsafe placement, or unavailable persistence causes no charge and no projection.
+- A dead profile can produce at most one live projection.
+- Duplicate clicks and recovery reuse the existing death/profile evidence and cannot create a replacement profile.
+- Successful restoration preserves profile ID, name, progression, traits, attachments, and command-family membership.
+- Failure before commit leaves the authoritative dead row and restoration evidence intact.
+- Respawn performs no inventory payment or refund mutation.
 
 ## 9. Public API and capabilities
 
@@ -317,7 +321,6 @@ Replace `BONDED_VESSELS` with granular capabilities:
 - `CAPTURE_TAME_AND_LINK`
 - `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`
 - `COMMAND_TIMED_SUMMONING`
-- `PAID_COMMAND_REVIVAL`
 
 Required public surfaces:
 
@@ -325,16 +328,25 @@ Required public surfaces:
 - capture config views for source consumption and success disposition;
 - provision-and-link request/result;
 - Summon/Dismiss/lease query, operation result, and lifecycle events;
-- revive quote, prepare/commit/query result, and recovery status;
-- post-commit roster membership, capture, and paid-revival events;
+- post-commit roster membership and capture events;
 - stable denial/recovery reason codes;
 - aggregate, non-player-scoped diagnostics usable from server console.
 
-HyDragon must gate each dependent feature independently. Missing paid revival may disable Revive without disabling ordinary Horn commands; missing timed summoning must disable HyDragon Summon and tame/link before a time-limited profile can be made active; missing tame-and-link must disable Draconic Stone attempts before a roll.
+HyDragon must gate each dependent feature independently. Missing timed
+summoning must disable HyDragon Summon and tame/link before a time-limited
+profile can be made active; missing tame-and-link must disable Draconic Stone
+attempts before a roll. Free respawn uses Tamework's existing role and runtime
+readiness checks rather than a new HyDragon capability.
 
 ## 10. Persistence and recovery
 
-Add durable storage for command-family membership, roster-stored lifecycle, summon sessions/remaining time/cooldowns/storage operations, source-consumption state where the capture journal does not already cover it, paid revival operations, inventory reservations, and exact multi-component capture/revival refund claims. Schema changes follow Tamework's backup-first transactional migration policy.
+Add durable storage for command-family membership, roster-stored lifecycle,
+summon sessions/remaining time/cooldowns/storage operations, and
+source-consumption state where the capture journal does not already cover it.
+Death restoration reuses existing profile/death persistence. Generic
+replacement-source claims remain available only for terminal capture-source
+compensation. Schema changes follow Tamework's backup-first transactional
+migration policy.
 
 Recovery order:
 
@@ -343,7 +355,7 @@ Recovery order:
 3. resume capture attempts that have a resolved outcome or pending source spend;
 4. resume provisioning/link operations;
 5. resume timed storage/summon sessions and reconcile active population slots;
-6. resume paid revival and refund claims;
+6. reconcile existing dead/revivable profile evidence;
 7. expose command UI/actions only after required authorities report ready.
 
 Unknown or contradictory positive state quarantines the operation and fails closed. Diagnostics identify the operation/profile/family and bounded reason without exposing unrelated player data.
@@ -371,7 +383,6 @@ At minimum:
 - `/tw diagnose command-family [owner] [family]`
 - `/tw diagnose capture-attempt <attempt-id>`
 - `/tw diagnose provision <operation-id>`
-- `/tw diagnose revive <operation-id-or-profile>`
 - `/tw api test`
 
 Output reports capability readiness, counts, operation states, queue/recovery health, and bounded incident IDs. Commands that mutate inventories, ownership, or world state remain permission-gated and require explicit targets.
@@ -385,13 +396,13 @@ Output reports capability readiness, counts, operation states, queue/recovery he
 | Finalization | `SpawnerCaptureFinalizerService` | Branch captured-item versus in-place tame/link without mixing paths |
 | Command config | `TwCommandItemConfig` | Add family ID and roster storage mode |
 | Command persistence | `CommandLinkedNpcRecordStore` and SQLite persistence | Add owner/family/profile authority; make item metadata a projection for opted-in configs |
-| Command UI/runtime | `CommandItemFeatureHandler` and linked-panel services | Source opted-in rows from canonical roster; render state, timer, cooldown, and complete cost quotes |
+| Command UI/runtime | `CommandItemFeatureHandler` and linked-panel services | Source opted-in rows from canonical roster; render state, timer, cooldown, and free respawn action |
 | Provisioning | public/internal provisioning API | Optional atomic family membership |
 | Timed summoning | command relocation/placement, profile lifecycle, population authority | Summon/Dismiss, per-profile lease, `ROSTER_STORED`, warning, cooldown, storage recovery |
-| Revival | `CommandLinkedNpcDeathService`, `CommandRespawnService` | Generic multi-component cost quote, reservation, exact consumption, recovery/refund, lease start |
-| Placement | `CommandCompanionPlacementService` | Prefer safe in-front candidates for Recall and Revive |
+| Death restoration | `CommandLinkedNpcDeathService`, `CommandRespawnService` | Preserve death evidence and restore the same profile for free |
+| Placement | `CommandCompanionPlacementService` | Prefer safe in-front candidates for Recall and Respawn |
 | Public API | capability/config/event surfaces | Add granular capabilities and remove bonded vessels |
-| Persistence | schema/repositories/recovery | Roster, lease/storage, spend, revive, exact refund, and obsolete-vessel removal |
+| Persistence | schema/repositories/recovery | Roster, lease/storage, capture-source spend/compensation, existing death restoration, and obsolete-vessel removal |
 | Diagnostics | command/API self-tests | Non-player-scoped health and operation inspection |
 
 ## 14. Acceptance criteria
@@ -422,29 +433,28 @@ Output reports capability readiness, counts, operation states, queue/recovery he
 
 ### Active limits and timed summoning
 
-16. Any positive `MaxActivePerOwner` is enforced atomically across capture, Summon, provisioning, revival, and recovery; zero remains unlimited.
+16. Any positive `MaxActivePerOwner` is enforced atomically across capture, Summon, provisioning, respawn, and recovery; zero remains unlimited.
 17. `ROSTER_STORED` counts owned but not active; `ACTIVE`, `UNLOADED`, `RESTORING`, `STORING`, and ambiguous potentially-live state retain active capacity.
-18. Capture success, Summon, and paid revival start exactly one snapshotted per-profile lease.
+18. Capture success and Summon start exactly one snapshotted per-profile lease.
 19. Recall, movement, mount, command, unload, relog, item replacement, and UI actions never reset or duplicate a lease.
 20. Expiry and Dismiss snapshot/despawn once, commit `ROSTER_STORED`, release one slot, start one cooldown, and show the new state/time in the UI.
 21. Restart at every lease/storage checkpoint preserves remaining time and converges to one active or one stored projection state.
 22. Owner logout auto-storage and server downtime follow the configured/accounting contract without granting extra active time.
 
-### Provisioning and revival
+### Provisioning and death restoration
 
 23. Provision-and-link retries return one profile and one membership.
 24. Projection failure leaves a dormant/recoverable roster row and starts no lease.
-25. Paid revival clearly quotes every configured item component with icon/name and owned/required quantities, consumes all components exactly once, revives the same profile once, and starts one lease when enabled.
-26. Cost codecs accept arbitrary item IDs and positive quantities, support several different item components, reject duplicate IDs, and remain reusable outside command revival.
-27. Missing any component, cooldown, capacity, placement, permission, or persistence denial charges nothing from every component.
-28. Restart at each paid-revival checkpoint converges to no charge/no revive, one exact multi-item charge/one revive, or one exact multi-item refund claim.
+25. Free respawn restores the same profile once and performs no inventory mutation.
+26. Cooldown, capacity, placement, permission, or persistence denial leaves the row dead/revivable and creates no projection.
+27. Restart during restoration converges to one dead/revivable row or one restored projection, never a replacement profile or duplicate projection.
 
 ### Removal and operations
 
-29. Tamework compiles and passes tests with no bonded-vessel capability, API, config, persistence, runtime, diagnostics, docs, or examples.
-30. No HyDragon-specific migration or compatibility code is introduced.
-31. Required diagnostics run from server console and accept an optional player filter.
-32. Packaged HyDragon integration proves failed-stone spending, live tame/link, active cap, timed expiry/storage/resummon, Egg provision/link, Horn replacement, exact multi-item paid revival, and restart recovery.
+28. Tamework compiles and passes tests with no bonded-vessel capability, API, config, persistence, runtime, diagnostics, docs, or examples.
+29. No HyDragon-specific migration or compatibility code is introduced.
+30. Required diagnostics run from server console and accept an optional player filter.
+31. Packaged HyDragon integration proves failed-stone spending, live tame/link, active cap, timed expiry/storage/resummon, Egg provision/link, Horn replacement, free same-profile respawn, and restart recovery.
 
 ## 15. Delivery order
 
@@ -452,7 +462,7 @@ Output reports capability readiness, counts, operation states, queue/recovery he
 2. Add capture source-consumption policy and tame/link finalizer.
 3. Add provision-and-link.
 4. Add configurable active limits, `ROSTER_STORED`, timed Summon/Dismiss, UI status, and recovery.
-5. Add reusable multi-component item costs, paid revival, and in-front placement.
+5. Integrate existing free respawn with roster-backed rows and in-front placement.
 6. Convert HyDragon assets/runtime and packaged integration tests.
 7. Remove bonded-vessel code, schema/API/config/docs, then run repository-wide reference checks.
 8. Run clean unit/integration/package suites and live-server acceptance.

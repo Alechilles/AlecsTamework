@@ -45,11 +45,6 @@ public interface TameworkApi {
         return CompanionProvisioningApi.unavailable();
     }
 
-    /** Returns paid command revival when {@link TameworkApiCapability#PAID_COMMAND_REVIVAL} is advertised. */
-    default PaidCommandRevivalApi paidCommandRevival() {
-        return PaidCommandRevivalApi.unavailable();
-    }
-
     /** Read-only population-group counts used by roster capacity presentation. */
     default PopulationGroupApi populationGroups() {
         return PopulationGroupApi.unavailable();

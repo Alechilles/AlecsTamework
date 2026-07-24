@@ -128,25 +128,6 @@ public final class DeathRepository {
         return rows;
     }
 
-    /** Exact active death snapshot revision used as a paid-revival compare-and-set fence. */
-    public long loadActiveSnapshotVersion(@Nonnull String profileId) {
-        if (profileId.isBlank()) return -1L;
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT snapshot_version FROM npc_snapshots
-                     WHERE profile_id = ? AND snapshot_type = ? AND is_active = 1
-                     ORDER BY snapshot_version DESC LIMIT 1
-                     """)) {
-            statement.setString(1, profileId);
-            statement.setString(2, SNAPSHOT_TYPE);
-            try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? result.getLong("snapshot_version") : -1L;
-            }
-        } catch (Exception failure) {
-            return -2L;
-        }
-    }
-
     public boolean upsertAsync(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
         AtomicReference<NpcProfileRepository.ProfileRecord> beforeRef = new AtomicReference<>();
         AtomicReference<NpcProfileRepository.ProfileRecord> afterRef = new AtomicReference<>();

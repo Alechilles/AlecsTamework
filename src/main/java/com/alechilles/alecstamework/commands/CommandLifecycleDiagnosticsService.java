@@ -14,7 +14,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Bounded, read-only diagnostics for command-family roster, timed summon, and paid revival state. */
+/** Bounded, read-only diagnostics for command-family roster and timed summon state. */
 final class CommandLifecycleDiagnosticsService {
     private static final int MAX_ROWS = 8;
     private static final int MAX_FIELD = 96;
@@ -31,9 +31,7 @@ final class CommandLifecycleDiagnosticsService {
         return List.of(summary("Command-family rosters", "command_family_roster_memberships",
                         "active_for_bulk_commands"),
                 stateSummary("Timed summons", "command_timed_summon_sessions", "summon_state",
-                        "command_timed_summon_operations", "operation_state"),
-                stateSummary("Paid revival", "paid_command_revival_operations", "state",
-                        "paid_command_revival_refund_claims", "state"));
+                        "command_timed_summon_operations", "operation_state"));
     }
 
     @Nonnull
@@ -124,38 +122,6 @@ final class CommandLifecycleDiagnosticsService {
                 + ", cooldownUntilMs=" + result.getLong("resummon_cooldown_until_ms")
                 + ", operation=" + boundedOrNone(result.getString("active_operation_id")),
                 "No timed summon operation or session found for '" + bounded(key) + "'.");
-    }
-
-    @Nonnull
-    List<String> revive(@Nullable String operationOrProfile) {
-        if (operationOrProfile == null || operationOrProfile.isBlank()) return List.of(overview().get(2));
-        String key = operationOrProfile.trim();
-        return queryRows("""
-                SELECT o.operation_id, o.owner_uuid, o.command_family_id, o.profile_id, o.role_id,
-                       o.state, o.detail, o.updated_at_ms,
-                       (SELECT COUNT(*) FROM paid_command_revival_costs c
-                         WHERE c.operation_id = o.operation_id) cost_components,
-                       (SELECT COUNT(*) FROM paid_command_revival_refund_claims r
-                         WHERE r.operation_id = o.operation_id
-                           AND r.state IN ('PENDING','DELIVERING','QUARANTINED')) open_refunds
-                FROM paid_command_revival_operations o
-                WHERE o.operation_id = ? OR o.profile_id = ?
-                ORDER BY o.updated_at_ms DESC LIMIT ?
-                """, statement -> {
-            statement.setString(1, key);
-            statement.setString(2, key);
-            statement.setInt(3, MAX_ROWS);
-        }, result -> "Paid revival: id=" + bounded(result.getString("operation_id"))
-                + ", owner=" + bounded(result.getString("owner_uuid"))
-                + ", family=" + bounded(result.getString("command_family_id"))
-                + ", profile=" + bounded(result.getString("profile_id"))
-                + ", role=" + bounded(result.getString("role_id"))
-                + ", state=" + bounded(result.getString("state"))
-                + ", costs=" + result.getLong("cost_components")
-                + ", openRefunds=" + result.getLong("open_refunds")
-                + ", detail=" + boundedOrNone(result.getString("detail"))
-                + ", updatedAtMs=" + result.getLong("updated_at_ms"),
-                "No paid-revival operation found for '" + bounded(key) + "'.");
     }
 
     @Nonnull

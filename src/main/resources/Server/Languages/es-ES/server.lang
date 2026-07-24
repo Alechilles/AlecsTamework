@@ -1,10 +1,3 @@
-tamework.ui.linkedPanel.revive.title=Reanimar compañero
-tamework.ui.linkedPanel.revive.subtitle=Revisa el coste completo de reanimación de {0}.
-tamework.ui.linkedPanel.revive.costHeader=Objetos necesarios (disponibles / necesarios)
-tamework.ui.linkedPanel.revive.shortage=Faltan {0}
-tamework.ui.linkedPanel.revive.ready=Todos los objetos necesarios están disponibles.
-tamework.ui.linkedPanel.revive.missingComponents=Faltan {0} tipo(s) de objeto necesarios.
-tamework.ui.linkedPanel.revive.confirm=Reanimar
 tamework.ui.linkedPanel.roster.state=Estado de la lista: {0}
 tamework.ui.linkedPanel.roster.state.active=Activo
 tamework.ui.linkedPanel.roster.state.unloaded=Descargado

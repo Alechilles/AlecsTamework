@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** Guards command-menu actions against bypassing canonical owner/family roster authority. */
 class CommandRosterMenuAuthorityArchitectureTest {
@@ -52,6 +53,19 @@ class CommandRosterMenuAuthorityArchitectureTest {
         assertOrdered(handler, "private boolean queueRosterMenuAfterRefresh(",
                 "world.execute(", "WorldPlayerResolver.resolve(world, ownerUuid)",
                 "openSelectionMenu(");
+    }
+
+    @Test
+    void rosterDeathUsesTheSameFreeCooldownGatedRespawnPath() throws Exception {
+        String handler = source("CommandItemFeatureHandler.java");
+        int method = handler.indexOf("private void applyMenuRespawn(");
+        int nextMethod = handler.indexOf("\n    private ", method + 1);
+        String respawn = handler.substring(method, nextMethod);
+
+        assertTrue(respawn.contains("deadSnapshot.respawnAvailableAtMs()"));
+        assertTrue(respawn.contains("respawnService.respawnDeadLinkedNpc("));
+        assertFalse(respawn.contains("PaidCommand")
+                        || respawn.contains("requestPaidMenuRevival"));
     }
 
     private static void assertOrdered(String source, String method, String removal,

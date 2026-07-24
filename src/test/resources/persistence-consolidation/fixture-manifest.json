@@ -45,7 +45,7 @@
     },
     {
       "resource": "development-v9-marker.sql",
-      "normalizedLfSha256": "fbfec539b5c6c178d7b02508dfa2cd359387f6524c042a1a0428cf65a62e7cf5"
+      "normalizedLfSha256": "2c769973d76c1fd6c1b9cc8cbdd77da9c5517aa70a510f8ebb850138d6aee169"
     }
   ],
   "fixtures": [
@@ -139,12 +139,11 @@
       "resource": "development-v9-marker.sql",
       "classification": "UNSUPPORTED_DEVELOPMENT_SCHEMA",
       "maximumSchemaVersion": 9,
-      "expectedTableCount": 3,
+      "expectedTableCount": 2,
       "expectedForeignKeyViolations": 0,
       "rowCounts": {
         "schema_migrations": 8,
-        "command_timed_summon_sessions": 0,
-        "paid_command_revival_operations": 0
+        "command_timed_summon_sessions": 0
       }
     }
   ]

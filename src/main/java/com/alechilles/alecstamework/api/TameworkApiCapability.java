@@ -19,8 +19,6 @@ public enum TameworkApiCapability {
     COMPANION_PROVISIONING,
     /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
     COMMAND_TIMED_SUMMONING,
-    /** Data-driven, idempotent, exact multi-item command revival. */
-    PAID_COMMAND_REVIVAL,
     /** Durable owner/command-family/profile roster authority. */
     COMMAND_FAMILY_ROSTERS,
     /** Exact source decrement after either terminal capture roll. */

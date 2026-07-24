@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies parent fallback behavior for role-scoped companion config inheritance. */
@@ -93,35 +92,33 @@ class TwCompanionConfigInheritanceTest {
     }
 
     @Test
-    void reviveNestedFieldsInheritWhileExplicitCostsReplace() throws Exception {
+    void deadRespawnFieldsInheritDirectly() throws Exception {
         TwCompanionConfig parent = new TwCompanionConfig();
         TwCompanionConfig child = new TwCompanionConfig();
-        Object parentRevive = getNestedObject(parent, "command", "revive");
-        Object childRevive = getNestedObject(child, "command", "revive");
-        setBooleanField(parentRevive, "enabled", false);
-        setLongField(parentRevive, "gameplayCooldownMs", 120_000L);
-        setField(parentRevive, "costs", new TwItemCostComponent[] {
-                new TwItemCostComponent("Life_Essence", 3)
-        });
-        setBooleanField(childRevive, "enabled", true);
-        setLongField(childRevive, "gameplayCooldownMs", 1L);
-        setField(childRevive, "costs", new TwItemCostComponent[] {
-                new TwItemCostComponent("Dragon_Essence", 2),
-                new TwItemCostComponent("Gold_Bar", 5)
-        });
+        setNestedBooleanField(
+                parent, "command", "deadRespawnEnabled", false
+        );
+        setNestedIntField(
+                parent, "command", "deadRespawnCooldownMs", 120_000
+        );
+        setNestedBooleanField(
+                child, "command", "deadRespawnEnabled", true
+        );
+        setNestedIntField(
+                child, "command", "deadRespawnCooldownMs", 1
+        );
 
         child.inheritMissingTopLevelFrom(
                 parent,
                 Set.of("Command"),
-                Map.of("Command", Set.of("Revive", "Revive.Costs"))
+                Map.of("Command", Set.of("DeadRespawnEnabled"))
         );
 
-        TwCompanionConfig.ReviveSettings result = child.getCommand().getRevive();
-        assertFalse(result.isEnabled());
-        assertEquals(120_000L, result.getGameplayCooldownMs());
-        assertEquals(2, result.getCosts().length);
-        assertEquals("Dragon_Essence", result.getCosts()[0].getItemId());
-        assertEquals("Gold_Bar", result.getCosts()[1].getItemId());
+        assertTrue(child.getCommand().isDeadRespawnEnabled());
+        assertEquals(
+                120_000,
+                child.getCommand().getDeadRespawnCooldownMs()
+        );
     }
 
     @Test

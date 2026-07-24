@@ -134,9 +134,7 @@ class PublicPersistenceRuntimeImportTest {
                                         .confirmed(
                                                 "provisioning_activation_confirmed"
                                         )
-                                        .completed(),
-                                com.alechilles.alecstamework.companion.revival
-                                        .PaidRevivalBoundaries.unavailable()
+                                        .completed()
                         ),
                         world,
                         Duration.ofSeconds(5)

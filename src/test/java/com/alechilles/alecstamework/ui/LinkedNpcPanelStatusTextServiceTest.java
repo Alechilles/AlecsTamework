@@ -196,17 +196,7 @@ class LinkedNpcPanelStatusTextServiceTest {
     }
 
     @Test
-    void snapshotMapperPreservesReviveQuoteAndRosterPresentation() {
-        CommandReviveCostPresentation reviveQuote = new CommandReviveCostPresentation(
-                List.of(
-                        new CommandReviveCostPresentation.CostLine(
-                                "Draconic_Essence_Fire", "Fire Essence", null, 0, 2),
-                        new CommandReviveCostPresentation.CostLine(
-                                "Revitalizing_Essence", "Revitalizing Essence", null, 1, 3)
-                ),
-                "test-revision",
-                "tamework.ui.linkedPanel.revive.missing"
-        );
+    void snapshotMapperPreservesRosterPresentationAndDisabledRespawnSentinel() {
         CommandRosterStatusPresentation roster = new CommandRosterStatusPresentation(
                 "profile-1",
                 "hydragon",
@@ -224,13 +214,18 @@ class LinkedNpcPanelStatusTextServiceTest {
         LinkedNpcEntry entry = new LinkedNpcEntry(
                 UUID.randomUUID(), "Dead Dragon", 0, 0, 0, 0, null,
                 0, 0, 0, 0, false, false, true, false, false, false,
-                0L, LinkedNpcTraitIndicator.EMPTY
-        ).withReviveCostPresentation(reviveQuote).withRosterStatusPresentation(roster);
+                -1L, LinkedNpcTraitIndicator.EMPTY
+        ).withRosterStatusPresentation(roster);
 
         LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(List.of(entry));
 
         assertEquals(1, snapshots.length);
-        assertEquals(reviveQuote, snapshots[0].reviveCostPresentation());
+        assertEquals(-1L, snapshots[0].deadRespawnRemainingMs());
+        assertEquals(
+                LocalizedText.resolve((String) null,
+                        "tamework.ui.linkedPanel.health.deadRespawnDisabled"),
+                LinkedNpcPanelStatusTextService.resolveDeadHealthText(snapshots[0])
+        );
         assertEquals(roster, snapshots[0].rosterStatusPresentation());
     }
 

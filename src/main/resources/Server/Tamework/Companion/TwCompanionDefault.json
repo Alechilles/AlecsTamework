@@ -20,11 +20,7 @@
         "Aggressive"
       ]
     },
-    "Revive": {
-      "Enabled": true,
-      "GameplayCooldownMs": 600000,
-      "Costs": []
-    },
+    "DeadRespawnCooldownMins": 10,
     "Summon": {
       "Enabled": false,
       "ActiveDurationMs": 0,

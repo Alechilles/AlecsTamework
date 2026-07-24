@@ -18,7 +18,6 @@ final class SqliteSchemaV9Migration {
             createCommandFamilyRosters(statement);
             createProvisioningCommandLinks(statement);
             createTimedSummons(statement);
-            createPaidRevival(statement);
             createCaptureSourceRefunds(statement);
         }
     }
@@ -307,101 +306,4 @@ final class SqliteSchemaV9Migration {
                 """);
     }
 
-    private void createPaidRevival(Statement statement) throws Exception {
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS paid_command_revival_operations (
-                    operation_id TEXT PRIMARY KEY,
-                    caller_namespace TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    owner_uuid TEXT NOT NULL,
-                    profile_id TEXT NOT NULL,
-                    command_family_id TEXT NOT NULL,
-                    role_id TEXT NOT NULL,
-                    config_id TEXT,
-                    config_revision TEXT NOT NULL,
-                    death_revision INTEGER NOT NULL CHECK (death_revision >= 0),
-                    profile_revision INTEGER NOT NULL CHECK (profile_revision >= 0),
-                    population_admission_operation_id TEXT,
-                    placement_fingerprint TEXT,
-                    revive_projection_operation_id TEXT,
-                    state TEXT NOT NULL CHECK (state IN (
-                        'PREPARED','RESERVED','COST_CONSUMED','APPLYING','SUCCEEDED','CANCELED',
-                        'REFUND_REQUIRED','REFUNDED','QUARANTINED')),
-                    detail TEXT,
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    completed_at_ms INTEGER,
-                    UNIQUE (caller_namespace, idempotency_key),
-                    FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
-                )
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_paid_command_revival_owner_profile_state
-                ON paid_command_revival_operations(owner_uuid, profile_id, state)
-                """);
-        statement.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_paid_command_revival_active_profile
-                ON paid_command_revival_operations(owner_uuid, profile_id)
-                WHERE state IN ('PREPARED','RESERVED','COST_CONSUMED','APPLYING',
-                    'REFUND_REQUIRED','QUARANTINED')
-                """);
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS paid_command_revival_costs (
-                    operation_id TEXT NOT NULL REFERENCES paid_command_revival_operations(operation_id)
-                        ON DELETE CASCADE,
-                    ordinal INTEGER NOT NULL,
-                    item_id TEXT NOT NULL,
-                    quantity INTEGER NOT NULL CHECK (quantity > 0),
-                    PRIMARY KEY (operation_id, ordinal),
-                    UNIQUE (operation_id, item_id)
-                )
-                """);
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS paid_command_revival_reservations (
-                    operation_id TEXT NOT NULL REFERENCES paid_command_revival_operations(operation_id)
-                        ON DELETE CASCADE,
-                    cost_ordinal INTEGER NOT NULL,
-                    stack_ordinal INTEGER NOT NULL,
-                    compartment_id TEXT NOT NULL,
-                    slot_index INTEGER NOT NULL,
-                    quantity INTEGER NOT NULL CHECK (quantity > 0),
-                    source_stack_fingerprint TEXT NOT NULL,
-                    reservation_generation INTEGER NOT NULL CHECK (reservation_generation >= 0),
-                    state TEXT NOT NULL CHECK (state IN (
-                        'HELD','CONSUMED','RELEASED','REFUND_REQUIRED','REFUNDED')),
-                    PRIMARY KEY (operation_id, cost_ordinal, stack_ordinal),
-                    FOREIGN KEY (operation_id, cost_ordinal)
-                        REFERENCES paid_command_revival_costs(operation_id, ordinal) ON DELETE CASCADE
-                )
-                """);
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS paid_command_revival_refund_claims (
-                    operation_id TEXT PRIMARY KEY REFERENCES paid_command_revival_operations(operation_id)
-                        ON DELETE CASCADE,
-                    owner_uuid TEXT NOT NULL,
-                    exact_cost_json TEXT NOT NULL,
-                    state TEXT NOT NULL CHECK (state IN (
-                        'PENDING','DELIVERING','DELIVERED','QUARANTINED')),
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL
-                )
-                """);
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS paid_command_revival_apply_plans (
-                    operation_id TEXT PRIMARY KEY REFERENCES paid_command_revival_operations(operation_id)
-                        ON DELETE CASCADE,
-                    projection_npc_uuid TEXT NOT NULL,
-                    summon_session_id TEXT,
-                    summon_remaining_ms INTEGER CHECK (
-                        summon_remaining_ms IS NULL OR summon_remaining_ms >= 0),
-                    summon_config_id TEXT,
-                    summon_config_revision INTEGER CHECK (
-                        summon_config_revision IS NULL OR summon_config_revision >= 0),
-                    summon_policy_json TEXT,
-                    created_at_ms INTEGER NOT NULL,
-                    CHECK ((summon_session_id IS NULL AND summon_policy_json IS NULL)
-                        OR (summon_session_id IS NOT NULL AND summon_policy_json IS NOT NULL))
-                )
-                """);
-    }
 }

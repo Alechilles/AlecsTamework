@@ -22,7 +22,6 @@ import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
@@ -295,7 +294,6 @@ public final class TameworkApiImpl
     private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
     private volatile CommandTimedSummoningApi commandTimedSummoningApi =
             CommandTimedSummoningApi.unavailable();
-    private volatile PaidCommandRevivalApi paidCommandRevivalApi = PaidCommandRevivalApi.unavailable();
     private volatile CommandFamilyRosterApi commandFamilyRosterApi = CommandFamilyRosterApi.unavailable();
 
     public TameworkApiImpl(@Nonnull NpcProfilesApi profilesApi,
@@ -421,21 +419,6 @@ public final class TameworkApiImpl
         return commandTimedSummoningApi;
     }
 
-    /** Publishes paid revival only after its journal recovery and exact inventory authority are ready. */
-    public boolean activatePaidCommandRevivalRuntime(@Nonnull PaidCommandRevivalApi runtime,
-                                                     boolean recoveryReady,
-                                                     boolean exactInventoryAuthorityReady) {
-        Objects.requireNonNull(runtime, "runtime");
-        if (!recoveryReady || !exactInventoryAuthorityReady) {
-            return false;
-        }
-        paidCommandRevivalApi = runtime;
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.PAID_COMMAND_REVIVAL);
-        }
-        return true;
-    }
-
     /** Drops reflected optional-claim contracts after a settings change. */
     public void onRuntimeSettingsChanged() {
         damagePolicy.onRuntimeSettingsChanged();
@@ -480,11 +463,6 @@ public final class TameworkApiImpl
     @Override
     public CompanionProvisioningApi companionProvisioning() {
         return companionProvisioningApi;
-    }
-
-    @Override
-    public PaidCommandRevivalApi paidCommandRevival() {
-        return paidCommandRevivalApi;
     }
 
     @Override

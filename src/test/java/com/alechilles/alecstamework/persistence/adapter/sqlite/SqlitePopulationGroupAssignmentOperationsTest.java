@@ -391,9 +391,7 @@ class SqlitePopulationGroupAssignmentOperationsTest {
                                 .LiveOperationResult.confirmed(
                                         "provisioning-activation"
                                 )
-                                .completed(),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                                .completed()
         );
     }
 

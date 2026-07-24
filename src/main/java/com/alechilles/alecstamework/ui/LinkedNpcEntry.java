@@ -58,7 +58,6 @@ public final class LinkedNpcEntry {
     private final boolean traitsActionEnabled;
     private final boolean talentsActionVisible;
     private final boolean talentsActionEnabled;
-    private final CommandReviveCostPresentation reviveCostPresentation;
     private final CommandRosterStatusPresentation rosterStatusPresentation;
 
     public LinkedNpcEntry(UUID npcUuid,
@@ -455,7 +454,7 @@ public final class LinkedNpcEntry {
         this.captured = captured;
         this.inCoop = inCoop;
         this.lost = lost;
-        this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
+        this.deadRespawnRemainingMs = deadRespawnRemainingMs < 0L ? -1L : deadRespawnRemainingMs;
         this.deathCauseHint = deathCauseHint;
         this.speciesId = speciesId;
         this.speciesLabel = speciesLabel;
@@ -483,7 +482,6 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = traitsActionEnabled;
         this.talentsActionVisible = talentsActionVisible;
         this.talentsActionEnabled = talentsActionEnabled;
-        this.reviveCostPresentation = null;
         this.rosterStatusPresentation = null;
     }
 
@@ -669,21 +667,11 @@ public final class LinkedNpcEntry {
 
     /** Returns an immutable presentation copy marked with its scoped recovery incident. */
     public LinkedNpcEntry withRecoveryHold(String incidentId) {
-        return new LinkedNpcEntry(this, true, incidentId, reviveCostPresentation, rosterStatusPresentation);
-    }
-
-    /** Returns an immutable presentation copy with the latest server-side revival cost quote. */
-    public LinkedNpcEntry withReviveCostPresentation(CommandReviveCostPresentation presentation) {
-        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId, presentation, rosterStatusPresentation);
-    }
-
-    public CommandReviveCostPresentation reviveCostPresentation() {
-        return reviveCostPresentation;
+        return new LinkedNpcEntry(this, true, incidentId, rosterStatusPresentation);
     }
 
     public LinkedNpcEntry withRosterStatusPresentation(CommandRosterStatusPresentation presentation) {
-        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
-                reviveCostPresentation, presentation);
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId, presentation);
     }
 
     public CommandRosterStatusPresentation rosterStatusPresentation() {
@@ -790,7 +778,6 @@ public final class LinkedNpcEntry {
     private LinkedNpcEntry(LinkedNpcEntry source,
                            boolean recoveryHeld,
                            String incidentId,
-                           CommandReviveCostPresentation reviveCostPresentation,
                            CommandRosterStatusPresentation rosterStatusPresentation) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
@@ -841,7 +828,6 @@ public final class LinkedNpcEntry {
         this.talentsActionEnabled = source.talentsActionEnabled;
         this.recoveryHeld = recoveryHeld;
         this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
-        this.reviveCostPresentation = reviveCostPresentation;
         this.rosterStatusPresentation = rosterStatusPresentation;
     }
 
@@ -934,7 +920,6 @@ public final class LinkedNpcEntry {
                 && Objects.equals(groupColorHex, other.groupColorHex)
                 && Objects.equals(futureStatA, other.futureStatA)
                 && Objects.equals(futureStatB, other.futureStatB)
-                && Objects.equals(reviveCostPresentation, other.reviveCostPresentation)
                 && Objects.equals(rosterStatusPresentation, other.rosterStatusPresentation)
                 && Arrays.equals(traitIndicators, other.traitIndicators);
     }
@@ -988,7 +973,6 @@ public final class LinkedNpcEntry {
                 traitsActionEnabled,
                 talentsActionVisible,
                 talentsActionEnabled,
-                reviveCostPresentation,
                 rosterStatusPresentation
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);

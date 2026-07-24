@@ -25,8 +25,8 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   (`persistence/*`, `ownership/reconciliation`) with durable scoped
   incidents/quarantines, resumable persisted scan sessions, capture attempts,
   population-group evidence, companion provisioning, command-family rosters,
-  timed summon leases, paid revival, and saved-world loading across profile
-  state, worlds, containers, inventories, and nonterminal journals
+  timed summon leases, free death restoration, and saved-world loading across
+  profile state, worlds, containers, inventories, and nonterminal journals
 - Experimental Public API 0.9 integration authorities and fail-closed feature
   gates (`api/*`, `items/capturepolicy`, `ownership/groups`, `command`,
   `provisioning`); see the

@@ -71,29 +71,6 @@ public final class CommandTimedSummoningService {
                 });
     }
 
-    /** Paid-revival seam: resets the same snapshotted lease only after the live spawn commits. */
-    @Nonnull
-    public CompletionStage<ActionResult> registerRevivedProjection(@Nonnull ActiveRegistration request) {
-        Objects.requireNonNull(request, "request");
-        return membership(request.ownerUuid(), request.commandFamilyId(), request.profileId())
-                .thenCompose(member -> {
-                    if (!member) return completed(ActionResult.denied("command-roster-membership-required"));
-                    String sessionId = deterministicId("revival-session", request.idempotencyKey());
-                    Long remaining = request.policy().unlimited() ? null : request.policy().activeDurationMs();
-                    CommandTimedSummonSessionRecord active = new CommandTimedSummonSessionRecord(
-                            request.ownerUuid(), request.commandFamilyId(), request.profileId(), 1L,
-                            CommandTimedSummonSessionRecord.State.ACTIVE, sessionId, remaining, 0L,
-                            request.configId(), request.configRevision(), request.policy(), Set.of(), request.nowMs(),
-                            null, request.nowMs(), request.nowMs());
-                    return write(repository.activateAfterRevivalAsync(active)).thenApply(result ->
-                            result.status() == CommandTimedSummonRepository.Status.CREATED
-                                    || result.status() == CommandTimedSummonRepository.Status.COMMITTED
-                                    || result.status() == CommandTimedSummonRepository.Status.IDEMPOTENT
-                                    ? ActionResult.success(result.session(), "revival-active-lease-registered")
-                                    : ActionResult.fromRepository(result));
-                });
-    }
-
     /** Creates the dormant session row after roster membership is durably committed. */
     @Nonnull
     public CompletionStage<ActionResult> registerRosterStored(@Nonnull StoredRegistration request) {

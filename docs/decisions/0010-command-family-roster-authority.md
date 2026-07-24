@@ -9,7 +9,7 @@ The unreleased roster implementation stores a second role, profile revision, and
 command lifecycle state on every membership. It also owns a feature-specific
 operation receipt table, synchronous repository reads, revision-proof caches,
 post-write listener lists, and direct update seams used independently by capture,
-death, provisioning, timed summon, and revival repositories.
+death/restoration, provisioning, and timed-summon repositories.
 
 The intended behavior is smaller:
 
@@ -59,7 +59,7 @@ display name, owner-world, active count, summon state, or recovery phase.
 - `companion_lifecycle` remains owner, owner-world, state, location, and revision
   authority.
 - population-group classification remains group-policy authority.
-- timed leases, provisioning, and revival add their own detail in later slices
+- timed leases, provisioning, and death restoration add their own focused detail
   but cannot redefine roster or lifecycle truth.
 
 Roster reads and projections join these authorities. A metadata or lifecycle
@@ -86,7 +86,7 @@ Two typed operation kinds use the shared envelope:
 The transition operation accepts the exact population-group policy snapshot used
 for positive active admission. A reusable preparation participant validates it
 against current group assignment and reserves only positive deltas. Later timed
-summon, provisioning, capture-link, and revival operations reuse the same
+summon, provisioning, capture-link, and restoration operations reuse the same
 participant rather than introducing group-specific extension callbacks.
 
 There is no roster receipt, roster operation, command-state, or roster recovery
@@ -109,7 +109,7 @@ lag. Item metadata and UI caches remain disposable projections.
 
 ### Cross-feature consistency
 
-Death, lost, capture, coop, provisioning, timed summon, and revival may not
+Death/restoration, lost, capture, coop, provisioning, and timed summon may not
 write roster tables independently. Their replacement operations either:
 
 - leave durable membership intact and change only canonical lifecycle/detail; or

@@ -141,7 +141,7 @@ Truly ambiguous effects use shared unknown containment.
 
 ### Cross-feature integration
 
-Provisioning, tame-and-link capture, paid revival, death, and lost handling may
+Provisioning, tame-and-link capture, death/restoration, and lost handling may
 not update a lease independently. Their later replacement slices either:
 
 - compose a focused lease participant into their existing shared transaction;

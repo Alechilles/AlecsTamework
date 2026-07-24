@@ -32,7 +32,11 @@ class SqliteSchemaV9MigrationTest {
             assertTrue(tableExists(connection, "command_family_roster_memberships"));
             assertTrue(tableExists(connection, "companion_provisioning_command_links"));
             assertTrue(tableExists(connection, "command_timed_summon_sessions"));
-            assertTrue(tableExists(connection, "paid_command_revival_operations"));
+            assertFalse(tableExists(connection, "paid_command_revival_operations"));
+            assertFalse(tableExists(connection, "paid_command_revival_costs"));
+            assertFalse(tableExists(connection, "paid_command_revival_reservations"));
+            assertFalse(tableExists(connection, "paid_command_revival_refund_claims"));
+            assertFalse(tableExists(connection, "paid_command_revival_apply_plans"));
             assertTrue(columnExists(connection, "capture_attempts", "source_spend_state"));
             assertTrue(columnExists(
                     connection, "capture_attempts", "source_spend_receipted_at_ms"));

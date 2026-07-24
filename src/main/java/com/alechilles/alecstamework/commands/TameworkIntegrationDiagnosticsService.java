@@ -56,8 +56,6 @@ final class TameworkIntegrationDiagnosticsService {
                 + source.hasCapability(TameworkApiCapability.COMMAND_FAMILY_ROSTERS)
                 + ", timedSummoning="
                 + source.hasCapability(TameworkApiCapability.COMMAND_TIMED_SUMMONING)
-                + ", paidRevival="
-                + source.hasCapability(TameworkApiCapability.PAID_COMMAND_REVIVAL)
                 + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS)
                 + ", provisioning=" + source.hasCapability(TameworkApiCapability.COMPANION_PROVISIONING));
         appendCaptureSummary(lines);

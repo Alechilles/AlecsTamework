@@ -144,13 +144,12 @@
     },
     {
       "id": "economic-claims-idempotent",
-      "contract": "Reservations, charges, and refunds are claim based and can reach their economic effect at most once.",
-      "status": "CHARACTERIZED",
-      "replacementGatePhase": 5,
-      "replacementTestClass": "com.alechilles.alecstamework.companion.command.EconomicClaimIdempotencyTest",
+      "contract": "Source consumption and refund delivery are claim based and can reach their economic effect at most once.",
+      "status": "REPLACEMENT_PROVEN",
+      "replacementGatePhase": 3,
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCaptureOperationsTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest",
-        "com.alechilles.alecstamework.persistence.sqlite.PaidCommandRevivalRepositoryTest"
+        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest"
       ]
     },
     {

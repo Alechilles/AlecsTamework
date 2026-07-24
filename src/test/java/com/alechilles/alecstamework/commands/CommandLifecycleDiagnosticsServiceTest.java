@@ -18,10 +18,9 @@ class CommandLifecycleDiagnosticsServiceTest {
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
             List<String> lines = new CommandLifecycleDiagnosticsService(runtime).overview();
 
-            assertEquals(3, lines.size());
+            assertEquals(2, lines.size());
             assertTrue(lines.get(0).startsWith("Command-family rosters:"));
             assertTrue(lines.get(1).startsWith("Timed summons:"));
-            assertTrue(lines.get(2).startsWith("Paid revival:"));
             assertTrue(lines.stream().noneMatch(line -> line.contains("diagnostic unavailable")));
         }
     }

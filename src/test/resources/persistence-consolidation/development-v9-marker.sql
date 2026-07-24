@@ -12,14 +12,9 @@ INSERT INTO schema_migrations(version, name, applied_at_ms) VALUES
     (6, 'schema_v6_population', 1004),
     (7, 'schema_v7_resilience', 1005),
     (8, 'schema_v8_feature_operations', 1006),
-    (9, 'schema_v9_command_revival', 1007);
+    (9, 'schema_v9_command_family_authorities', 1007);
 
 CREATE TABLE command_timed_summon_sessions (
     session_id TEXT PRIMARY KEY,
-    profile_id TEXT NOT NULL
-);
-
-CREATE TABLE paid_command_revival_operations (
-    operation_id TEXT PRIMARY KEY,
     profile_id TEXT NOT NULL
 );

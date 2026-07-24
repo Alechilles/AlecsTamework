@@ -123,10 +123,10 @@ snapshot and moves canonical lifecycle to `ROSTER_STORED`. Consequently:
 ### Death and revival
 
 Provisioning provenance is not a second lifecycle. Death, lost handling, and
-revival continue to mutate only canonical lifecycle, alias, snapshot, group,
-economic, and timed authorities through their shared operations. The immutable
+free restoration continue to mutate only canonical lifecycle, alias, snapshot,
+group, and timed authorities through their shared operations. The immutable
 provisioning record merely proves that an unlinked profile is eligible for
-configured revival. It survives those transitions unchanged.
+configured restoration. It survives those transitions unchanged.
 
 ### Projection, query, and diagnostics
 

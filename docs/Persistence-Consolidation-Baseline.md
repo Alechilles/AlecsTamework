@@ -32,8 +32,8 @@ and a runtime service locator:
   lifecycle stores;
 - owner population authority, admission operations, reconciliation evidence,
   scan sessions, and in-memory indexes;
-- capture, recovery, group, provisioning, command roster, timed summon, and paid
-  revival journals;
+- capture, recovery, group, provisioning, command-roster, and timed-summon
+  journals;
 - extension API data;
 - incidents, storage health, quarantines, circuits, coverage, and recovery
   evidence;
@@ -107,8 +107,8 @@ The public schema contained these domain tables:
 It also contained `schema_migrations`.
 
 Schema v4 added `coop_slots.state_snapshot_json`. The managed-coop, owner
-population, resilience, capture-attempt, provisioning, population-group, command
-roster, timed-summon, and paid-revival schemas are all unreleased.
+population, resilience, capture-attempt, provisioning, population-group,
+command-roster, and timed-summon schemas are all unreleased.
 
 Consequences:
 
@@ -189,11 +189,10 @@ follows.
 - timed summon sessions;
 - timed summon operations;
 - timed summon snapshots;
-- paid revival operations;
-- paid revival costs;
-- paid revival refunds;
-- paid revival reservations;
-- paid revival apply plans.
+
+The captured development lineage also contained five tables for an unreleased
+command-panel payment experiment. That experiment has since been rejected and
+deleted rather than becoming part of the replacement target; see ADR 0013.
 
 Table count is not itself the defect. The defect is that multiple tables make
 independent claims about the same companion lifecycle without one enforceable
@@ -379,9 +378,11 @@ Handlers manually stitch several repositories and state machines. Recovery polic
 varies by feature, and some old repository reads flatten a storage error into
 “not found.”
 
-### Command roster, timed summon, provisioning, and paid revival
+### Command roster, timed summon, provisioning, and free restoration
 
-These features are unreleased but represent real intended behavior.
+The command-roster, timed-summon, and provisioning features are unreleased but
+represent real intended behavior. Free companion restoration predates this
+development cycle and remains the supported death-recovery path.
 
 Required invariants:
 
@@ -390,7 +391,8 @@ Required invariants:
 - timed summon leases have one terminal owner and survive restart;
 - roster-stored, summoned, dead, and provisioned states agree with canonical
   lifecycle;
-- economic reservations, charges, refunds, and revival application are idempotent;
+- free restoration applies the persisted death snapshot to the same profile
+  exactly once;
 - delayed callbacks carry stable IDs and re-resolve live state on the world thread.
 
 Current weakness:
@@ -453,7 +455,6 @@ Examples include:
 - provisioning: its own operation states;
 - command roster: its own operation states;
 - timed summon: its own operation states;
-- paid revival: its own operation states.
 
 The shared need is one operation envelope and transaction protocol, not one giant
 domain operation class.
@@ -589,7 +590,6 @@ Startup is currently assembled manually in `Tamework.java` and
 - provisioning recovery;
 - timed summon recovery;
 - a later timed-summon retry after worlds load;
-- paid revival recovery;
 - feature capability activation.
 
 Readiness is spread across booleans, health services, coverage registries,
@@ -628,8 +628,8 @@ The current resilience work contains valuable concepts:
 But the catalog and wiring lag feature growth:
 
 - persistence domains primarily describe older population and coop features;
-- v8-v9 command, group, provisioning, timed summon, and revival features do not
-  have equivalent first-class domain coverage;
+- v8-v9 command, group, provisioning, timed summon, and death-restoration paths
+  do not have equivalent first-class domain coverage;
 - failure reason catalogs skew toward older workflows;
 - scoped verifier wiring is concentrated on owner population and managed coop;
 - evidence dimensions do not consistently cover newer feature readiness.
@@ -665,7 +665,6 @@ Largest persistence classes include:
 | `NpcProfileRepository` | 1,140 |
 | `CaptureAttemptRepository` | 1,135 |
 | `TameworkSettingsStore` | 994 |
-| `PaidCommandRevivalRepository` | 970 |
 | `TameworkPersistenceRuntime` | 847 |
 | `CoopLifecycleOperationTransactions` | 811 |
 | `DeathRepository` | 719 |
@@ -826,7 +825,7 @@ Canonical-state candidates:
 - companion population repository/store classes
 - managed-coop repositories and transaction helpers
 - capture/death/lost repositories
-- command roster, timed summon, provisioning, and paid revival repositories
+- command roster, timed summon, and provisioning repositories
 
 Control plane:
 

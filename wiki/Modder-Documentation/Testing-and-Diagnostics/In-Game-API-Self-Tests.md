@@ -50,8 +50,8 @@ Each fixture is marked with an internal self-test component, linked to the gener
 
 For API 0.9 builds, `run core` proves only the baseline capabilities it
 explicitly requires. `run hydragon-integrations` separately requires capture
-policy, command-family roster, timed-summoning, paid-revival,
-population-group reconciliation, provisioning, capture-finalization, and
+policy, command-family roster, timed-summoning, population-group
+reconciliation, provisioning, capture-finalization, and
 transactional profile-data capability evidence from the
 packaged runtime. It also runs isolated deterministic behavioral fixtures and
 does not require `prepare`, a live profile, player inventory, world fixture, or
@@ -60,7 +60,7 @@ an absent or degraded capability is a failed assertion.
 
 Use `/tw diagnose` alongside the self-tests. It reports the API version and
 advertised capabilities, capture-policy recovery readiness, the current
-command-family roster/timed-summoning/paid-revival capability availability,
+command-family roster/timed-summoning capability availability,
 population-group/provisioning readiness, and persistence health.
 
 `run profile` checks:
@@ -115,7 +115,7 @@ population-group/provisioning readiness, and persistence health.
 
 `run hydragon-integrations` checks:
 - capture-policy capability and bundled capture-mechanics resolution
-- command-family roster, timed-summoning, and paid-revival capabilities
+- command-family roster and timed-summoning capabilities
 - resolved-attempt source consumption and capture tame-and-link capabilities
 - population-group capability plus `READY` reconciliation state
 - companion-provisioning capability

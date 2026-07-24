@@ -185,9 +185,7 @@ class OwnerPopulationProcessCrashTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed(
                                 "provisioning_activation"
-                        ).completed(),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                        ).completed()
         );
     }
 

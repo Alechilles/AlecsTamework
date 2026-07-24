@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** Regression coverage for committed nonphysical state winning over a retiring live projection. */
 class CommandLinkedPanelEntryStateAuthorityTest {
@@ -29,12 +30,13 @@ class CommandLinkedPanelEntryStateAuthorityTest {
         assertTrue(source.contains("if (!dead && !captured && !inCoop && world != null)"));
         assertTrue(source.contains("liveTargetResolver.resolveRedirect(record)"),
                 "A released projection must be retried through its canonical profile UUID.");
-        assertTrue(source.contains("if (dead && reviveCostPresentation == null)"),
-                "A durable DEAD_REVIVABLE roster row must still present its role-configured revival costs "
+        assertTrue(source.contains("if (dead)"),
+                "A durable DEAD_REVIVABLE roster row must still apply its role-configured respawn policy "
                         + "when the in-memory death snapshot is unavailable.");
         assertTrue(source.contains("TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId)"),
-                "The durable-dead fallback must use the canonical roster role rather than a hard-coded cost.");
-        assertTrue(source.contains("Linked revival cost projection:"),
-                "The first resolved dead-card quote should expose its role, config, and row count for diagnosis.");
+                "The durable-dead fallback must use the canonical roster role.");
+        assertFalse(source.contains("CommandReviveCostPresentation")
+                        || source.contains("reviveCostQuoteService"),
+                "Panel entries must not carry the removed paid-revival quote protocol.");
     }
 }

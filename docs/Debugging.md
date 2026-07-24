@@ -64,7 +64,7 @@ also remains in-world because its authority key is bound to the executing player
 - `/tw debugdb integrity` runs the SQLite/foreign-key checks plus canonical identity, managed-coop lifecycle, and import-journal invariants.
 - In schema v8 it also checks capture-attempt origins, population-group
   nonterminal operations, and provisioning origins. Schema-v9 lifecycle
-  summaries cover command-family rosters, timed summons, and paid revival.
+  summaries cover command-family rosters and timed summons.
 - An import marked `attention required` is intentionally fail-closed. Preserve the database and save evidence; do not clear or respawn residents merely to make the count disappear.
 - A coop is Tamework-authoritative only when an enabled `TwCoopConfig` resolves for that exact coop id. Unmanaged coops remain vanilla and are not shadowed by a Tamework resident sidecar.
 
@@ -100,7 +100,7 @@ also remains in-world because its authority key is bound to the executing player
 - `Unavoidable companion relocation created a per-world owner over-cap condition` means a cross-world move was preserved even though the destination now exceeds its per-world owner cap. The warning is throttled, `unavoidablePerWorldOverCapRelocations` increments, and later positive admissions remain blocked until the count falls.
 - Population-bearing world work uses a lease-aligned start watchdog. If an accepted callback never starts during shutdown, its rejection cleanup runs exactly once and any late queued wrapper is inert. Repeated warnings here usually indicate world shutdown or executor backlog, not a second mutation.
 - `/tw api test prepare` and `/tw api test reset` use production journaled `ADMIN_FORCE` assignment and permanent-release authority. A readiness, admission, or durability failure from these commands is therefore meaningful and should not be bypassed with direct owner/profile edits.
-- `/tw api test run hydragon-integrations` does not require prepared live fixtures. Its capture, population, and provisioning transaction checks use fixed in-memory ports, never the live player/world/profile database. It also checks that command-family roster, timed-summoning, paid-revival, and tame-and-link capabilities are advertised. Verbose assertion details are single-line and capped before output.
+- `/tw api test run hydragon-integrations` does not require prepared live fixtures. Its capture, population, and provisioning transaction checks use fixed in-memory ports, never the live player/world/profile database. It also checks that command-family roster, timed-summoning, and tame-and-link capabilities are advertised. Verbose assertion details are single-line and capped before output.
 - API 0.9 DTO/schema tests do not prove a gated feature is live. Require its
   advertised capability and feature-specific runtime result. An unavailable
   facade or empty default read is a deliberate denial.

@@ -128,10 +128,6 @@ public final class ApiSelfTestRunner {
                 capabilities.contains(TameworkApiCapability.COMMAND_TIMED_SUMMONING),
                 "capabilities=" + capabilities));
         assertions.add(check(
-                "paid command revival capability ready",
-                capabilities.contains(TameworkApiCapability.PAID_COMMAND_REVIVAL),
-                "capabilities=" + capabilities));
-        assertions.add(check(
                 "resolved capture consumption capability ready",
                 capabilities.contains(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION),
                 "capabilities=" + capabilities));

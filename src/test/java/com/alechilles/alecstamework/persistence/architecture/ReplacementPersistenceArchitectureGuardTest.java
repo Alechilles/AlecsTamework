@@ -193,9 +193,9 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "provisionCompanion",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
+                        "releaseCapturedCompanion",
                         "releaseFromCoop",
                         "restore",
-                        "revivePaid",
                         "rotateAlias",
                         "transitionCommandRoster",
                         "transitionOwnerPopulation",
@@ -218,12 +218,12 @@ class ReplacementPersistenceArchitectureGuardTest {
         assertEquals(
                 List.of(
                         "captures",
+                        "capturedReleases",
                         "restorations",
                         "coopCaptures",
                         "coopReleases",
                         "timedSummons",
-                        "provisioningActivations",
-                        "paidRevivals"
+                        "provisioningActivations"
                 ),
                 boundaries
         );

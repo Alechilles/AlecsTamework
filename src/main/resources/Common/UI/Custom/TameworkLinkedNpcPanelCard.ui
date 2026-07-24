@@ -19,7 +19,6 @@ $C = "Common.ui";
 @RosterBlockedButtonStyle = TextButtonStyle(Default: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Hovered: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Pressed: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Disabled: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle));
 @TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
-@ReviveCostItemGridStyle = ItemGridStyle(SlotSize: 20, SlotSpacing: 0, SlotIconSize: 20);
 
 Group {
     Anchor: (Top: 3, Left: 0, Right: 0, Height: 126);
@@ -441,66 +440,6 @@ Group {
         Text: %server.tamework.ui.linkedPanel.card.inactive;
         Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
-    }
-
-    Label #ReviveCost0Quantity {
-        Anchor: (Top: 29, Right: 104, Width: 13, Height: 16);
-        Text: "";
-        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-    }
-
-    ItemGrid #ReviveCost0Item {
-        Anchor: (Top: 27, Right: 82, Width: 20, Height: 20);
-        SlotsPerRow: 1;
-        RenderItemQualityBackground: false;
-        InfoDisplay: None;
-        Style: @ReviveCostItemGridStyle;
-    }
-
-    Label #ReviveCost0Name {
-        Anchor: (Top: 29, Right: 0, Width: 80, Height: 16);
-        Text: "";
-        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    Label #ReviveCost1Quantity {
-        Anchor: (Top: 47, Right: 104, Width: 13, Height: 16);
-        Text: "";
-        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-    }
-
-    ItemGrid #ReviveCost1Item {
-        Anchor: (Top: 45, Right: 82, Width: 20, Height: 20);
-        SlotsPerRow: 1;
-        RenderItemQualityBackground: false;
-        InfoDisplay: None;
-        Style: @ReviveCostItemGridStyle;
-    }
-
-    Label #ReviveCost1Name {
-        Anchor: (Top: 47, Right: 0, Width: 80, Height: 16);
-        Text: "";
-        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    Label #ReviveCost2Quantity {
-        Anchor: (Top: 65, Right: 104, Width: 13, Height: 16);
-        Text: "";
-        Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fb, HorizontalAlignment: End, VerticalAlignment: Center);
-    }
-
-    ItemGrid #ReviveCost2Item {
-        Anchor: (Top: 63, Right: 82, Width: 20, Height: 20);
-        SlotsPerRow: 1;
-        RenderItemQualityBackground: false;
-        InfoDisplay: None;
-        Style: @ReviveCostItemGridStyle;
-    }
-
-    Label #ReviveCost2Name {
-        Anchor: (Top: 65, Right: 0, Width: 80, Height: 16);
-        Text: "";
-        Style: (FontSize: 8, TextColor: #eef4fb, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     TextButton #LinkButton {

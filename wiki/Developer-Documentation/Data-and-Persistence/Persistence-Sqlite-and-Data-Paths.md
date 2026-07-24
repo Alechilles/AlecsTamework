@@ -93,9 +93,9 @@ Unique indexes fence one caller/idempotency origin, one nonterminal
 population-group operation per profile, and one canonical profile per
 provisioning origin. Schema-v9 indexes additionally fence command-family roster
 membership, one summon session per roster profile, nonterminal summon
-operations, and active paid-revival operations. Operation rows retain
-config/policy revisions and exact recovery evidence so restart handling does
-not re-resolve changed live config or invent a second attempt.
+operations. Operation rows retain config/policy revisions and exact recovery
+evidence so restart handling does not re-resolve changed live config or invent
+a second attempt.
 
 The storage recovery probe requires the schema-v8 migration marker and performs
 a real transactional write/readback before returning storage to healthy state.

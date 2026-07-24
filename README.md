@@ -51,11 +51,11 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
   capability-gated, schema-v8 authorities for generic probabilistic capture,
   revision-fenced profile data, population groups, and idempotent companion
   provisioning, plus schema-v9 command-family rosters, timed summoning, and
-  data-driven paid revival. Each authority is installed through its production
-  runtime and is advertised only after its own recovery, persistence, and
-  mutation dependencies report ready. Missing capabilities remain fail-closed;
-  use `/tw diagnose` against the packaged server instead of assuming readiness
-  from the mod or API version.
+  roster-preserving companion lifecycle support. Each authority is installed
+  through its production runtime and is advertised only after its own recovery,
+  persistence, and mutation dependencies report ready. Missing capabilities
+  remain fail-closed; use `/tw diagnose` against the packaged server instead of
+  assuming readiness from the mod or API version.
 
 ## What Integration Looks Like
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
@@ -74,10 +74,10 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 
 Advanced integrations that create companions, add profiles to command-family
-rosters, enforce timed summons, perform paid revival, or coordinate their own
-transaction must use the experimental Public API instead of writing Tamework
-metadata or SQLite rows directly. API 0.9 types are binary-compatible defaults;
-always check the feature capability before use.
+rosters, enforce timed summons, or coordinate their own transaction must use the
+experimental Public API instead of writing Tamework metadata or SQLite rows
+directly. API 0.9 types are binary-compatible defaults; always check the feature
+capability before use.
 
 Player-facing Tamework config strings support `server.lang` keys. Built-in talents, traits, command labels, interaction messages, happiness labels, and major UI labels use language keys so translation packs can override copy without changing behavior assets.
 

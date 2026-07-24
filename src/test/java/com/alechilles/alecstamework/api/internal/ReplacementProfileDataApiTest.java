@@ -217,9 +217,7 @@ class ReplacementProfileDataApiTest {
                 (request, operation) -> LiveOperationResult
                         .confirmed("timed").completed(),
                 (request, operation) -> LiveOperationResult
-                        .confirmed("provisioning").completed(),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                        .confirmed("provisioning").completed()
         );
     }
 

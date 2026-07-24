@@ -489,9 +489,7 @@ class PublicPersistenceRuntimeTest {
                         .confirmed("timed_confirmed").completed(),
                 (request, operation) -> LiveOperationResult
                         .confirmed("provisioning_activation_confirmed")
-                        .completed(),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                        .completed()
         );
     }
 

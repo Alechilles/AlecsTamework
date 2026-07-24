@@ -49,42 +49,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
     private static final ArrayCodec<Long> LONG_ARRAY_CODEC = new ArrayCodec<>(Codec.LONG, Long[]::new);
 
-    private static final BuilderCodec<ReviveSettings> REVIVE_CODEC = BuilderCodec.builder(
-            ReviveSettings.class,
-            ReviveSettings::new
-    )
-            .<Boolean>append(
-                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
-                    (settings, value) -> settings.enabled = value == null || value,
-                    settings -> settings.enabled
-            )
-            .documentation("Enables command-panel revival for this role. Inheritance: an omitted value inherits.")
-            .add()
-            .<Long>append(
-                    new KeyedCodec<>("GameplayCooldownMs", Codec.LONG),
-                    (settings, value) -> settings.gameplayCooldownMs = nonNegative(value, settings.gameplayCooldownMs),
-                    settings -> settings.gameplayCooldownMs
-            )
-            .documentation("Non-negative balance cooldown after death. Inheritance: an omitted value inherits.")
-            .add()
-            .<TwItemCostComponent[]>append(
-                    new KeyedCodec<>("Costs", TwItemCostComponent.ARRAY_CODEC),
-                    (settings, value) -> settings.costs = TwItemCostComponent.validateAndCopy(value),
-                    settings -> settings.getCosts()
-            )
-            .documentation("Ordered AND item cost. Every component is required. Inheritance: an explicit array "
-                    + "replaces the parent array (no append or merge). Item IDs must be unique and quantities positive.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("InsufficientCostMessage", Codec.STRING),
-                    (settings, value) -> settings.insufficientCostMessage = normalizeOptional(value),
-                    settings -> settings.insufficientCostMessage
-            )
-            .documentation("Optional localization key used when any configured cost component is missing. "
-                    + "Inheritance: an omitted value inherits.")
-            .add()
-            .build();
-
     private static final BuilderCodec<SummonSettings> SUMMON_CODEC = BuilderCodec.builder(
             SummonSettings.class,
             SummonSettings::new
@@ -230,20 +194,14 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
-                    (settings, value) -> {
-                        settings.deadRespawnEnabled = value;
-                        settings.getRevive().enabled = value;
-                    },
+                    (settings, value) -> settings.deadRespawnEnabled = value,
                     settings -> settings.deadRespawnEnabled
             )
             .documentation("If true, dead linked NPCs can be respawned by command systems.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
-                    (settings, value) -> {
-                        settings.deadRespawnCooldownMs = value;
-                        settings.getRevive().gameplayCooldownMs = Math.max(0L, value);
-                    },
+                    (settings, value) -> settings.deadRespawnCooldownMs = value,
                     settings -> settings.deadRespawnCooldownMs
             )
             .documentation("Cooldown in milliseconds before dead respawn becomes available.")
@@ -253,7 +211,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> {
                         if (value != null) {
                             settings.deadRespawnCooldownMs = minutesToMillis(value, settings.deadRespawnCooldownMs);
-                            settings.getRevive().gameplayCooldownMs = settings.deadRespawnCooldownMs;
                         }
                     },
                     settings -> null
@@ -294,14 +251,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     settings -> settings.deadRespawnDistanceFar
             )
             .documentation("Distance threshold for the far respawn range.")
-            .add()
-            .<ReviveSettings>append(
-                    new KeyedCodec<>("Revive", REVIVE_CODEC),
-                    (settings, value) -> settings.revive = value == null ? new ReviveSettings() : value,
-                    settings -> settings.getRevive()
-            )
-            .documentation("Paid command revival settings. Inheritance: omitted section inherits; when present, "
-                    + "explicit nested fields override and missing nested fields inherit. Costs replace as an array.")
             .add()
             .<SummonSettings>append(
                     new KeyedCodec<>("Summon", SUMMON_CODEC),
@@ -748,7 +697,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
             currentCommand.placementMaxRelativeY = parentCommand.placementMaxRelativeY;
         }
-        inheritReviveSettings(parentCommand, currentCommand, nestedExplicit);
         inheritSummonSettings(parentCommand, currentCommand, nestedExplicit);
         if (!nestedExplicit.contains("Travel")) {
             currentCommand.travel = parentCommand.travel.copy();
@@ -767,29 +715,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
         return nestedExplicit.contains("DeadRespawnCooldownMs")
                 || nestedExplicit.contains("DeadRespawnCooldownMins");
-    }
-
-    private static void inheritReviveSettings(@Nonnull CommandSettings parent,
-                                              @Nonnull CommandSettings current,
-                                              @Nonnull Set<String> nestedExplicit) {
-        if (!nestedExplicit.contains("Revive")) {
-            current.revive = parent.getRevive().copy();
-            return;
-        }
-        ReviveSettings parentRevive = parent.getRevive();
-        ReviveSettings currentRevive = current.getRevive();
-        if (!nestedExplicit.contains("Revive.Enabled")) {
-            currentRevive.enabled = parentRevive.enabled;
-        }
-        if (!nestedExplicit.contains("Revive.GameplayCooldownMs")) {
-            currentRevive.gameplayCooldownMs = parentRevive.gameplayCooldownMs;
-        }
-        if (!nestedExplicit.contains("Revive.Costs")) {
-            currentRevive.costs = TwItemCostComponent.validateAndCopy(parentRevive.costs);
-        }
-        if (!nestedExplicit.contains("Revive.InsufficientCostMessage")) {
-            currentRevive.insufficientCostMessage = parentRevive.insufficientCostMessage;
-        }
     }
 
     private static void inheritSummonSettings(@Nonnull CommandSettings parent,
@@ -1037,7 +962,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private double deadRespawnDistanceFar = DEFAULT_DEAD_RESPAWN_DISTANCE_FAR;
         private double placementMinRelativeY = DEFAULT_PLACEMENT_MIN_RELATIVE_Y;
         private double placementMaxRelativeY = DEFAULT_PLACEMENT_MAX_RELATIVE_Y;
-        private ReviveSettings revive = new ReviveSettings();
         private SummonSettings summon = new SummonSettings();
         private TravelSettings travel = new TravelSettings();
 
@@ -1098,11 +1022,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
 
         @Nonnull
-        public ReviveSettings getRevive() {
-            return revive != null ? revive : new ReviveSettings();
-        }
-
-        @Nonnull
         public SummonSettings getSummon() {
             SummonSettings resolved = summon != null ? summon : new SummonSettings();
             resolved.validate();
@@ -1129,44 +1048,8 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             copy.deadRespawnDistanceFar = deadRespawnDistanceFar;
             copy.placementMinRelativeY = placementMinRelativeY;
             copy.placementMaxRelativeY = placementMaxRelativeY;
-            copy.revive = getRevive().copy();
             copy.summon = getSummon().copy();
             copy.travel = getTravel().copy();
-            return copy;
-        }
-    }
-
-    /** Data-driven command revival balance and payment settings. */
-    public static final class ReviveSettings {
-        private boolean enabled = DEFAULT_DEAD_RESPAWN_ENABLED;
-        private long gameplayCooldownMs = DEFAULT_DEAD_RESPAWN_COOLDOWN_MS;
-        private TwItemCostComponent[] costs = TwItemCostComponent.EMPTY_ARRAY;
-        private String insufficientCostMessage;
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public long getGameplayCooldownMs() {
-            return gameplayCooldownMs;
-        }
-
-        @Nonnull
-        public TwItemCostComponent[] getCosts() {
-            return TwItemCostComponent.validateAndCopy(costs);
-        }
-
-        @Nullable
-        public String getInsufficientCostMessage() {
-            return insufficientCostMessage;
-        }
-
-        private ReviveSettings copy() {
-            ReviveSettings copy = new ReviveSettings();
-            copy.enabled = enabled;
-            copy.gameplayCooldownMs = gameplayCooldownMs;
-            copy.costs = TwItemCostComponent.validateAndCopy(costs);
-            copy.insufficientCostMessage = insufficientCostMessage;
             return copy;
         }
     }
@@ -1254,7 +1137,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final TransferFailurePolicy onTransferFailure;
         private final boolean followMasterOnWorldChange;
         private final String[] followMasterOnWorldChangeStateFilter;
-        private final ReviveSettings revive;
         private final SummonSettings summon;
 
         private EffectiveSettings(boolean blockOwnerDamage,
@@ -1278,7 +1160,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   TransferFailurePolicy onTransferFailure,
                                   boolean followMasterOnWorldChange,
                                   @Nullable String[] followMasterOnWorldChangeStateFilter,
-                                  @Nonnull ReviveSettings revive,
                                   @Nonnull SummonSettings summon) {
             this.blockOwnerDamage = blockOwnerDamage;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
@@ -1304,7 +1185,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     followMasterOnWorldChangeStateFilter != null
                             ? normalizeStateFilter(followMasterOnWorldChangeStateFilter)
                             : ArrayUtil.EMPTY_STRING_ARRAY;
-            this.revive = revive.copy();
             this.summon = summon.copy();
         }
 
@@ -1313,10 +1193,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                 OwnershipProtectionSettings ownership = scoped.getOwnershipProtection();
                 CommandSettings command = scoped.getCommand();
                 TravelSettings travel = command.getTravel();
-                ReviveSettings revive = command.getRevive().copy();
-                if (global != null && !global.isCommandDeadRespawnEnabled()) {
-                    revive.enabled = false;
-                }
                 boolean blockOwnerDamage = global != null
                         ? global.isBlockOwnerDamage()
                         : ownership.isBlockOwnerDamage();
@@ -1335,8 +1211,12 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         command.getReturnHomeTeleportDelayMs(),
                         command.getRecallSafeSpawnDistance(),
                         command.getRecallForceRelocateDistance(),
-                        revive.isEnabled(),
-                        (int) Math.min(Integer.MAX_VALUE, revive.getGameplayCooldownMs()),
+                        global != null
+                                ? global.isCommandDeadRespawnEnabled()
+                                : command.isDeadRespawnEnabled(),
+                        global != null
+                                ? global.getCommandDeadRespawnCooldownMs()
+                                : command.getDeadRespawnCooldownMs(),
                         command.getDeadRespawnFollowRetryDelayMs(),
                         command.getDeadRespawnDistanceClose(),
                         command.getDeadRespawnDistanceNear(),
@@ -1348,7 +1228,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         travel.getOnTransferFailure(),
                         travel.isFollowMasterOnWorldChange(),
                         travel.getFollowMasterOnWorldChangeStateFilter(),
-                        revive,
                         command.getSummon()
                 );
             }
@@ -1356,11 +1235,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
 
         public static EffectiveSettings fromGlobal(@Nullable TwGlobalConfig global) {
-            ReviveSettings revive = new ReviveSettings();
-            revive.enabled = global == null || global.isCommandDeadRespawnEnabled();
-            revive.gameplayCooldownMs = global != null
-                    ? global.getCommandDeadRespawnCooldownMs()
-                    : DEFAULT_DEAD_RESPAWN_COOLDOWN_MS;
             return new EffectiveSettings(
                     global != null && global.isBlockOwnerDamage(),
                     global != null && global.isBlockAllPlayerDamageIfOwned(),
@@ -1389,7 +1263,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     TransferFailurePolicy.QueueForRecall,
                     DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE,
                     DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER,
-                    revive,
                     new SummonSettings()
             );
         }
@@ -1432,11 +1305,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
         public int getDeadRespawnCooldownMs() {
             return deadRespawnCooldownMs;
-        }
-
-        @Nonnull
-        public ReviveSettings getRevive() {
-            return revive.copy();
         }
 
         @Nonnull

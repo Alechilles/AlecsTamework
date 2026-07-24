@@ -138,9 +138,7 @@ class ReplacementPersistencePerformanceGateTest {
                 (request, operation) -> confirmed("coop_capture"),
                 (request, operation) -> confirmed("coop_release"),
                 (request, operation) -> confirmed("timed"),
-                (request, operation) -> confirmed("provisioning"),
-                com.alechilles.alecstamework.companion.revival
-                        .PaidRevivalBoundaries.unavailable()
+                (request, operation) -> confirmed("provisioning")
         );
     }
 

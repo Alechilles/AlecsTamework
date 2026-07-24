@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
@@ -11,7 +10,6 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
-import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -26,10 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -40,7 +35,6 @@ import javax.annotation.Nullable;
  * health snapshots, and home flags) from command orchestration flows.
  */
 final class CommandLinkedPanelEntryService {
-    private static final Set<String> LOGGED_REVIVE_COST_PROJECTIONS = ConcurrentHashMap.newKeySet();
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
@@ -56,7 +50,6 @@ final class CommandLinkedPanelEntryService {
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandLinkedPanelLiveTargetResolver liveTargetResolver;
     private final PersistenceQuarantineRegistry quarantineRegistry;
-    private final CommandReviveCostQuoteService reviveCostQuoteService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -95,7 +88,6 @@ final class CommandLinkedPanelEntryService {
                 ? null
                 : new CommandLinkedPanelLiveTargetResolver(profileActionResolver);
         this.quarantineRegistry = quarantineRegistry;
-        this.reviveCostQuoteService = new CommandReviveCostQuoteService();
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -121,7 +113,6 @@ final class CommandLinkedPanelEntryService {
             return List.of();
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
-        Map<String, Integer> reviveOwnedByItemId = reviveCostQuoteService.countInventory(player);
         World world = player.getWorld();
         String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
@@ -136,7 +127,6 @@ final class CommandLinkedPanelEntryService {
             boolean lost = "LOST".equals(record.cachedCommandState);
             long deadRespawnRemainingMs = 0L;
             String deathCauseHint = null;
-            CommandReviveCostPresentation reviveCostPresentation = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
             String groupId = normalizeOptional(record.groupId);
@@ -209,39 +199,25 @@ final class CommandLinkedPanelEntryService {
                     TwCompanionConfig.EffectiveSettings effectiveSettings =
                             TwCompanionConfig.resolveEffectiveForRole(roleId);
                     boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
-                            effectiveSettings.getRevive().isEnabled()
+                            effectiveSettings.isDeadRespawnEnabled()
                     );
                     if (deadRespawnEnabled) {
                         deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-                        reviveCostPresentation = reviveCostQuoteService.quote(
-                                reviveOwnedByItemId,
-                                player,
-                                effectiveSettings.getRevive()
-                        );
                     } else {
                         deadRespawnRemainingMs = -1L;
                     }
                     deathCauseHint = resolveDeathCauseHint(deadSnapshot, playerLanguage);
                 }
             }
-            if (dead && reviveCostPresentation == null) {
+            if (dead) {
                 TwCompanionConfig.EffectiveSettings effectiveSettings =
                         TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId);
                 boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
-                        effectiveSettings.getRevive().isEnabled()
+                        effectiveSettings.isDeadRespawnEnabled()
                 );
-                if (deadRespawnEnabled) {
-                    reviveCostPresentation = reviveCostQuoteService.quote(
-                            reviveOwnedByItemId,
-                            player,
-                            effectiveSettings.getRevive()
-                    );
-                } else {
+                if (!deadRespawnEnabled) {
                     deadRespawnRemainingMs = -1L;
                 }
-            }
-            if (reviveCostPresentation != null) {
-                logReviveCostProjection(record.cachedRoleId, reviveCostPresentation);
             }
             if (!loaded && !dead && captureService != null) {
                 CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
@@ -354,34 +330,9 @@ final class CommandLinkedPanelEntryService {
                     recallPending,
                     recallLostRemainingMs
             );
-            if (reviveCostPresentation != null) {
-                entry = entry.withReviveCostPresentation(reviveCostPresentation);
-            }
             entries.add(applyRecoveryHold(entry, record.profileId));
         }
         return entries;
-    }
-
-    private static void logReviveCostProjection(
-            @Nullable String roleId,
-            @Nonnull CommandReviveCostPresentation presentation) {
-        TwCompanionConfig scoped = TwCompanionConfig.resolveForRole(roleId);
-        String configId = scoped == null || scoped.getId() == null ? "<default>" : scoped.getId();
-        int costCount = presentation.costs().size();
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) {
-            return;
-        }
-        String key = String.valueOf(roleId) + '|' + configId + '|' + costCount;
-        if (!LOGGED_REVIVE_COST_PROJECTIONS.add(key)) {
-            return;
-        }
-        Level level = costCount == 0 ? Level.WARNING : Level.INFO;
-        plugin.getLogger().at(level).log(
-                "Linked revival cost projection: role=" + String.valueOf(roleId)
-                        + ", config=" + configId
-                        + ", costRows=" + costCount
-        );
     }
 
     private LinkedNpcEntry applyRecoveryHold(LinkedNpcEntry entry, @Nullable String profileId) {

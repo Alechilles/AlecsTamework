@@ -21,7 +21,7 @@ change role, despawn, damage, heal, or otherwise mutate the NPC. Source-item
 handling follows the spawner's snapshotted `SourceConsumption` policy: the
 default retains the item, while HyDragon opts into `ResolvedAttempt` and spends
 one stone on either terminal result. The generic spend/apply transaction is
-defined by [command-roster capture and revival](command-roster-capture-revival.md).
+defined by [command-roster capture and death restoration](command-roster-capture-revival.md).
 
 ## Non-goals
 
