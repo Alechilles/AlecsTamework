@@ -4,6 +4,8 @@ import com.hypixel.hytale.server.core.command.system.CommandOwner;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class TameworkCommandRootTest {
 
@@ -35,9 +37,12 @@ class TameworkCommandRootTest {
                 "tamework.command.tw.spawntamed",
                 root.getSubCommands().get("spawntamed").getPermission()
         );
-        assertEquals(
-                "tamework.command.tw.persistencecircuit",
-                root.getSubCommands().get("persistencecircuit").getPermission()
+        var debugDb = root.getSubCommands().get("debugdb");
+        assertNotNull(debugDb, "replacement persistence diagnostics must remain registered");
+        assertEquals("tamework.command.tw.debugdb", debugDb.getPermission());
+        assertFalse(
+                root.getSubCommands().containsKey("persistencecircuit"),
+                "the unreleased persistence circuit command must not be restored"
         );
     }
 
