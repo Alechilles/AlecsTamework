@@ -357,8 +357,13 @@ public final class SpawnerFeatureHandler {
             CaptureAttemptHandle attempt
     ) {
         ItemFeatureConfig config = resolveConfigForItem(source);
-        return config != null && captureFromNpcAction(
-                player, targetRef, source, config, attempt
+        return config != null && captureFromNpcActionInternal(
+                player,
+                targetRef,
+                source,
+                config,
+                attempt,
+                captureBurstParticleSystem
         );
     }
 
@@ -427,6 +432,19 @@ public final class SpawnerFeatureHandler {
             ItemFeatureConfig config,
             @Nonnull CaptureAttemptHandle attempt
     ) {
+        return captureFromNpcActionInternal(
+                player, targetRef, source, config, attempt, null
+        );
+    }
+
+    private boolean captureFromNpcActionInternal(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemStack source,
+            ItemFeatureConfig config,
+            @Nonnull CaptureAttemptHandle attempt,
+            @Nullable String captureParticleSystemOverride
+    ) {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(
                 config, null
         );
@@ -456,7 +474,13 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         SpawnerCaptureIntent intent = captureIntents.create(
-                player, targetRef, source, resolved, attempt, roll
+                player,
+                targetRef,
+                source,
+                resolved,
+                attempt,
+                roll,
+                captureParticleSystemOverride
         );
         if (intent == null) {
             return false;

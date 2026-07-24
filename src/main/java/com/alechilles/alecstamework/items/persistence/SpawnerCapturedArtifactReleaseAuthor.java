@@ -52,13 +52,20 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
                         artifacts, clock
                 ),
                 new SpawnerCaptureSnapshotMapper(),
-                (worldKey, actorUuid, result) -> completions.dispatch(
-                        worldKey,
-                        actorUuid,
-                        (world, store, actorRef, player) -> listener.complete(
-                                result, world, store, actorRef, player
+                (worldKey, actorUuid, publishedEffect, result) ->
+                        completions.dispatch(
+                                worldKey,
+                                actorUuid,
+                                (world, store, actorRef, player) ->
+                                        listener.complete(
+                                                result,
+                                                publishedEffect,
+                                                world,
+                                                store,
+                                                actorRef,
+                                                player
+                                        )
                         )
-                )
         );
     }
 
@@ -341,7 +348,10 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
     ) {
         try {
             dispatcher.dispatch(
-                    context.worldKey(), context.actorUuid(), value
+                    context.worldKey(),
+                    context.actorUuid(),
+                    context.publishedEffect(),
+                    value
             );
         } catch (RuntimeException | LinkageError ignored) {
             // Feedback cannot alter an already resolved durable workflow.
@@ -384,6 +394,7 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         void dispatch(
                 String worldKey,
                 java.util.UUID actorUuid,
+                SpawnerPublishedEffect publishedEffect,
                 SpawnerPersistenceAuthorResult result
         );
     }

@@ -1,19 +1,17 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Emits spawner particle and sound effects for capture/spawn events.
@@ -32,6 +30,22 @@ public final class SpawnerEffectService {
             return;
         }
         playEffects(world, targetRef, config.getCaptureParticleSystem(), config.getCaptureSoundEvent());
+    }
+
+    /** Emits one immutable effect plan after its canonical workflow publishes. */
+    public void playPublishedEffect(
+            World world,
+            SpawnerPublishedEffect effect
+    ) {
+        if (world == null || effect == null) {
+            return;
+        }
+        playEffects(
+                world,
+                new Vector3d(effect.x(), effect.y(), effect.z()),
+                effect.particleSystem(),
+                effect.soundEvent()
+        );
     }
 
     /** Emits the configured non-durable feedback for one terminal failed roll. */
@@ -56,13 +70,26 @@ public final class SpawnerEffectService {
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        if (transform == null) {
+        if (transform == null || transform.getPosition() == null) {
             return;
         }
-        Vector3d position = new Vector3d(transform.getPosition());
-        List<Ref<EntityStore>> playerRefs = resolvePlayerRefs(world);
-        if (particleSystem != null && !particleSystem.isBlank() && !playerRefs.isEmpty()) {
-            ParticleUtil.spawnParticleEffect(particleSystem, position, targetRef, playerRefs, store);
+        playEffects(
+                world,
+                new Vector3d(transform.getPosition()),
+                particleSystem,
+                soundEvent
+        );
+    }
+
+    private void playEffects(
+            World world,
+            Vector3d position,
+            String particleSystem,
+            String soundEvent
+    ) {
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (particleSystem != null && !particleSystem.isBlank()) {
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
         }
         if (soundEvent == null || soundEvent.isBlank()) {
             return;
@@ -73,20 +100,4 @@ public final class SpawnerEffectService {
         }
     }
 
-    private List<Ref<EntityStore>> resolvePlayerRefs(World world) {
-        if (world == null) {
-            return List.of();
-        }
-        List<Ref<EntityStore>> refs = new ArrayList<>();
-        for (PlayerRef playerRef : world.getPlayerRefs()) {
-            if (playerRef == null) {
-                continue;
-            }
-            Ref<EntityStore> ref = playerRef.getReference();
-            if (ref != null && ref.isValid()) {
-                refs.add(ref);
-            }
-        }
-        return refs;
-    }
 }

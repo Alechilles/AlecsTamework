@@ -18,7 +18,8 @@ record SpawnerCaptureContext(
         @Nonnull NpcAlias sourceAlias,
         @Nullable OwnerId liveOwnerId,
         @Nullable OwnerId resultingOwnerId,
-        @Nullable String roleId
+        @Nullable String roleId,
+        @Nullable SpawnerPublishedEffect publishedEffect
 ) {
     SpawnerCaptureContext {
         intentKey = requireText(intentKey, "intentKey");

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseIntent;
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
@@ -127,7 +128,14 @@ final class SpawnerReleaseIntentFactory {
                         source,
                         receipt,
                         ownerAssignment,
-                        ownerAssignmentName
+                        ownerAssignmentName,
+                        new SpawnerPublishedEffect(
+                                position.x,
+                                position.y,
+                                position.z,
+                                config.getSpawnParticleSystem(),
+                                config.getSpawnSoundEvent()
+                        )
                 );
         CompanionSpawnPlacement placement = new CompanionSpawnPlacement(
                 world.getName(),

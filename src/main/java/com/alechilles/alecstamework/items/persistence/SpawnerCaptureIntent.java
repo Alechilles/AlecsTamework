@@ -30,7 +30,8 @@ public record SpawnerCaptureIntent(
         @Nullable OwnerId liveOwnerId,
         @Nullable OwnerId resultingOwnerId,
         @Nullable String resultingOwnerName,
-        @Nullable String roleId
+        @Nullable String roleId,
+        @Nullable SpawnerPublishedEffect publishedEffect
 ) {
     public SpawnerCaptureIntent {
         if (intentKey == null || intentKey.isBlank()
@@ -68,7 +69,8 @@ public record SpawnerCaptureIntent(
                 liveOwnerId,
                 resultingOwnerId,
                 resultingOwnerName,
-                roleId
+                roleId,
+                publishedEffect
         );
     }
 
@@ -82,7 +84,8 @@ public record SpawnerCaptureIntent(
                 sourceAlias,
                 liveOwnerId,
                 resultingOwnerId,
-                roleId
+                roleId,
+                publishedEffect
         );
     }
 }

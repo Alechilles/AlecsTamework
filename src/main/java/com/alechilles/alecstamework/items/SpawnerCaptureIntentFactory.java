@@ -6,12 +6,14 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
@@ -49,7 +51,8 @@ final class SpawnerCaptureIntentFactory {
             ItemStack source,
             ItemFeatureConfig config,
             CaptureAttemptHandle attempt,
-            SpawnerCaptureRollService.Resolution roll
+            SpawnerCaptureRollService.Resolution roll,
+            @Nullable String particleSystemOverride
     ) {
         World world = player == null ? null : player.getWorld();
         Store<EntityStore> store = world == null
@@ -166,6 +169,9 @@ final class SpawnerCaptureIntentFactory {
         );
 
         ProfileId profileId = new ProfileId(roll.targetUuid());
+        SpawnerPublishedEffect publishedEffect = publishedEffect(
+                targetRef, store, config, particleSystemOverride
+        );
         return new SpawnerCaptureIntent(
                 attempt.attemptId().toString(),
                 player.getUuid(),
@@ -180,7 +186,36 @@ final class SpawnerCaptureIntentFactory {
                 existingOwner == null ? null : new OwnerId(existingOwner),
                 resultingOwner == null ? null : new OwnerId(resultingOwner),
                 resultingOwnerName,
-                roll.roleId()
+                roll.roleId(),
+                publishedEffect
+        );
+    }
+
+    @Nullable
+    private SpawnerPublishedEffect publishedEffect(
+            Ref<EntityStore> targetRef,
+            Store<EntityStore> store,
+            ItemFeatureConfig config,
+            @Nullable String particleSystemOverride
+    ) {
+        TransformComponent transform = store.getComponent(
+                targetRef, TransformComponent.getComponentType()
+        );
+        if (transform == null || transform.getPosition() == null) {
+            return null;
+        }
+        org.joml.Vector3d position = transform.getPosition();
+        String particleSystem =
+                particleSystemOverride == null
+                        || particleSystemOverride.isBlank()
+                        ? config.getCaptureParticleSystem()
+                        : particleSystemOverride;
+        return new SpawnerPublishedEffect(
+                position.x,
+                position.y,
+                position.z,
+                particleSystem,
+                config.getCaptureSoundEvent()
         );
     }
 

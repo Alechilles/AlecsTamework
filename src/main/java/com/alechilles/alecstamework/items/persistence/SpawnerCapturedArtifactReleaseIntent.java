@@ -19,7 +19,8 @@ public record SpawnerCapturedArtifactReleaseIntent(
         @Nonnull ItemStack sourceArtifactStack,
         @Nonnull ItemStack receiptArtifactStack,
         @Nullable OwnerId ownerAssignment,
-        @Nullable String ownerAssignmentName
+        @Nullable String ownerAssignmentName,
+        @Nullable SpawnerPublishedEffect publishedEffect
 ) {
     public SpawnerCapturedArtifactReleaseIntent {
         if (intentKey == null || intentKey.isBlank()
@@ -46,7 +47,7 @@ public record SpawnerCapturedArtifactReleaseIntent(
 
     SpawnerCaptureReleaseContext frozenContext() {
         return new SpawnerCaptureReleaseContext(
-                actorUuid, worldKey, sourceSlot
+                actorUuid, worldKey, sourceSlot, publishedEffect
         );
     }
 }

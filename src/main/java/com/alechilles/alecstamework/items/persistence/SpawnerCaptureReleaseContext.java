@@ -10,6 +10,7 @@ import java.util.UUID;
 record SpawnerCaptureReleaseContext(
         UUID actorUuid,
         String worldKey,
-        int sourceSlot
+        int sourceSlot,
+        SpawnerPublishedEffect publishedEffect
 ) {
 }

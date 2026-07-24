@@ -63,13 +63,20 @@ public final class SpawnerCaptureAuthor {
                 ),
                 new SpawnerCaptureAdoptionFactory(),
                 events,
-                (worldKey, actorUuid, result) -> completions.dispatch(
-                        worldKey,
-                        actorUuid,
-                        (world, store, actorRef, player) -> listener.complete(
-                                result, world, store, actorRef, player
+                (worldKey, actorUuid, publishedEffect, result) ->
+                        completions.dispatch(
+                                worldKey,
+                                actorUuid,
+                                (world, store, actorRef, player) ->
+                                        listener.complete(
+                                                result,
+                                                publishedEffect,
+                                                world,
+                                                store,
+                                                actorRef,
+                                                player
+                                        )
                         )
-                )
         );
     }
 
@@ -413,7 +420,10 @@ public final class SpawnerCaptureAuthor {
     ) {
         try {
             dispatcher.dispatch(
-                    context.worldKey(), context.actorUuid(), value
+                    context.worldKey(),
+                    context.actorUuid(),
+                    context.publishedEffect(),
+                    value
             );
         } catch (RuntimeException | LinkageError ignored) {
             // Feedback cannot alter an already resolved durable workflow.
@@ -473,6 +483,7 @@ public final class SpawnerCaptureAuthor {
         void dispatch(
                 String worldKey,
                 java.util.UUID actorUuid,
+                SpawnerPublishedEffect publishedEffect,
                 SpawnerPersistenceAuthorResult result
         );
     }

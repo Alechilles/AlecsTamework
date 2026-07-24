@@ -167,7 +167,7 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                         () -> -500L
                 ),
                 snapshots,
-                (world, actor, result) -> {
+                (world, actor, effect, result) -> {
                 }
         );
     }
@@ -197,7 +197,8 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 stack("capture-device-filled", sourceMetadata),
                 stack("capture-device-empty", new BsonDocument()),
                 ownerAssignment,
-                ownerName
+                ownerName,
+                null
         );
     }
 

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
 import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.SpawnerEffectService;
 import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
 import com.alechilles.alecstamework.items.persistence.HytaleUuidCompletionDispatcher;
@@ -17,6 +18,7 @@ import com.alechilles.alecstamework.items.persistence.SpawnerCapturePublishedEve
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseAuthor;
 import com.alechilles.alecstamework.items.persistence.SpawnerPersistenceAuthorResult;
 import com.alechilles.alecstamework.items.persistence.SpawnerPersistenceCompletionListener;
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.items.persistence.TameworkDormantCompanionEventSink;
 import com.alechilles.alecstamework.items.persistence.TameworkDormantSnapshotFactsReader;
 import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
@@ -201,6 +203,8 @@ final class TameworkPersistenceAuthors {
         private final HytaleLogger logger;
         private final TameworkUiMessageService messages =
                 new TameworkUiMessageService();
+        private final SpawnerEffectService effects =
+                new SpawnerEffectService();
 
         private SpawnerCompletionFeedback(HytaleLogger logger) {
             this.logger = logger;
@@ -209,6 +213,7 @@ final class TameworkPersistenceAuthors {
         @Override
         public void complete(
                 SpawnerPersistenceAuthorResult result,
+                SpawnerPublishedEffect publishedEffect,
                 com.hypixel.hytale.server.core.universe.world.World world,
                 com.hypixel.hytale.component.Store<
                         com.hypixel.hytale.server.core.universe.world.storage.EntityStore
@@ -219,6 +224,7 @@ final class TameworkPersistenceAuthors {
                 com.hypixel.hytale.server.core.entity.entities.Player player
         ) {
             if (result.published()) {
+                effects.playPublishedEffect(world, publishedEffect);
                 return;
             }
             messages.show(

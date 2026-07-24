@@ -186,7 +186,7 @@ class SpawnerCaptureAuthorTest {
                 ),
                 new SpawnerCaptureAdoptionFactory(),
                 events,
-                (world, actor, result) -> {
+                (world, actor, effect, result) -> {
                 }
         );
     }
@@ -206,7 +206,8 @@ class SpawnerCaptureAuthorTest {
                 null,
                 null,
                 null,
-                "tamework_test"
+                "tamework_test",
+                null
         );
     }
 
