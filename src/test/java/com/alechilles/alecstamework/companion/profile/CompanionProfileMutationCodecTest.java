@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.profile;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -10,17 +11,25 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Round-trip and invariant tests for versioned profile operation evidence. */
 class CompanionProfileMutationCodecTest {
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
+    private static final NpcAlias ALIAS =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000001");
+    private static final OwnerId OWNER =
+            OwnerId.parse("10000000-0000-0000-0000-000000000001");
 
     @Test
     void createRoundTripsIdentityLifecycleLinksAndSignedTimes() {
@@ -51,6 +60,75 @@ class CompanionProfileMutationCodecTest {
                 (CompanionProfileMutation.Update) decode(encode(update));
         assertEquals(update, decoded);
         assertEquals(earlier.toolId(), decoded.toolLinks().getFirst().toolId());
+    }
+
+    @Test
+    void liveAdoptionRoundTripsAndDerivesExactInitialLifecycle() {
+        CompanionProfileMutation.AdoptLive adoption =
+                new CompanionProfileMutation.AdoptLive(
+                        identity(0, "Companion", -9_000),
+                        ALIAS,
+                        OWNER,
+                        " world ",
+                        List.of(link(
+                                "50000000-0000-0000-0000-000000000001",
+                                -9_000
+                        )),
+                        -9_000
+                );
+
+        CompanionProfileMutation.AdoptLive decoded =
+                (CompanionProfileMutation.AdoptLive) decode(encode(adoption));
+
+        assertEquals(adoption, decoded);
+        assertEquals(LifecycleState.ACTIVE, decoded.initialLifecycle().state());
+        assertEquals(
+                LifecycleLocation.liveEntity(ALIAS.toString(), "world"),
+                decoded.initialLifecycle().location()
+        );
+        assertEquals(OWNER, decoded.initialLifecycle().ownerId());
+        assertEquals(LifecycleRevision.INITIAL, decoded.initialLifecycle().revision());
+    }
+
+    @Test
+    void liveAdoptionRejectsIdentityFromADifferentWorld() {
+        CompanionIdentity identity = identity(0, "Companion", -9_000);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionProfileMutation.AdoptLive(
+                        identity,
+                        ALIAS,
+                        OWNER,
+                        "different-world",
+                        List.of(),
+                        -9_000
+                )
+        );
+    }
+
+    @Test
+    void unownedLiveAdoptionRoundTripsExplicitNullAndAcceptsMissingOwner() {
+        CompanionProfileMutation.AdoptLive adoption =
+                new CompanionProfileMutation.AdoptLive(
+                        identity(0, "Wild Companion", -9_000),
+                        ALIAS,
+                        null,
+                        "world",
+                        List.of(),
+                        -9_000
+                );
+
+        JsonObject encoded = JsonParser.parseString(encode(adoption))
+                .getAsJsonObject();
+        assertTrue(encoded.has("ownerId"));
+        assertTrue(encoded.get("ownerId").isJsonNull());
+        assertEquals(adoption, decode(encoded.toString()));
+        assertNull(adoption.initialLifecycle().ownerId());
+        assertNull(adoption.initialLifecycle().ownerWorldKey());
+
+        encoded.remove("ownerId");
+        assertEquals(adoption, decode(encoded.toString()));
     }
 
     @Test

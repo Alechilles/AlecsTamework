@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -34,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,11 +43,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end operation tests for atomic profile identity and tool-link mutations. */
 class SqliteCompanionProfileOperationsTest {
     private static final ProfileId PROFILE =
             ProfileId.parse("20000000-0000-0000-0000-000000000001");
+    private static final ProfileId PROFILE_B =
+            ProfileId.parse("20000000-0000-0000-0000-000000000002");
+    private static final NpcAlias ALIAS_A =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000001");
+    private static final NpcAlias ALIAS_B =
+            NpcAlias.parse("30000000-0000-0000-0000-000000000002");
+    private static final OwnerId OWNER_A =
+            OwnerId.parse("10000000-0000-0000-0000-000000000001");
+    private static final OwnerId OWNER_B =
+            OwnerId.parse("10000000-0000-0000-0000-000000000002");
     private static final UUID TOOL_A =
             UUID.fromString("50000000-0000-0000-0000-000000000001");
     private static final UUID TOOL_B =
@@ -172,19 +187,213 @@ class SqliteCompanionProfileOperationsTest {
         assertEquals("Companion", storedIdentity().displayName());
     }
 
+    @Test
+    void adoptsLiveIdentityAliasOwnerLifecycleAndLinksAtomically()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive adoption = adoption(
+                PROFILE,
+                ALIAS_A,
+                OWNER_A,
+                "Companion",
+                List.of(link(PROFILE, TOOL_A, -9_000))
+        );
+
+        CompanionProfileMutationOutcome created =
+                submit(1, "profile-adopt", adoption);
+
+        assertEquals(CompanionProfileMutationOutcome.Status.CREATED, created.status());
+        assertEquals(adoption.identity(), storedIdentity());
+        assertEquals(adoption.initialLifecycle(), storedLifecycle(PROFILE));
+        assertEquals(ALIAS_A, storedAlias(ALIAS_A).alias());
+        assertEquals(PROFILE, storedAlias(ALIAS_A).profileId());
+        assertEquals(0, storedAlias(ALIAS_A).generation());
+        assertEquals(
+                com.alechilles.alecstamework.companion.identity.CompanionAlias.State.CURRENT,
+                storedAlias(ALIAS_A).state()
+        );
+        assertEquals(List.of(TOOL_A), storedToolIds());
+
+        CompanionProfileMutationOutcome retry =
+                submit(2, "profile-adopt-retry", adoption);
+
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UNCHANGED,
+                retry.status()
+        );
+        assertEquals(0, storedAlias(ALIAS_A).generation());
+    }
+
+    @Test
+    void liveAdoptionReturnsTypedConflictForDifferentIdentityOwnerOrAlias()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive adoption = adoption(
+                PROFILE,
+                ALIAS_A,
+                OWNER_A,
+                "Companion",
+                List.of(link(PROFILE, TOOL_A, -9_000))
+        );
+        submit(1, "profile-adopt", adoption);
+
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.CONFLICT,
+                submit(
+                        2,
+                        "profile-adopt-identity-conflict",
+                        adoption(
+                                PROFILE,
+                                ALIAS_A,
+                                OWNER_A,
+                                "Different",
+                                adoption.toolLinks()
+                        )
+                ).status()
+        );
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.CONFLICT,
+                submit(
+                        3,
+                        "profile-adopt-owner-conflict",
+                        adoption(
+                                PROFILE,
+                                ALIAS_A,
+                                null,
+                                "Companion",
+                                adoption.toolLinks()
+                        )
+                ).status()
+        );
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.CONFLICT,
+                submit(
+                        4,
+                        "profile-adopt-alias-conflict",
+                        adoption(
+                                PROFILE,
+                                ALIAS_B,
+                                OWNER_A,
+                                "Companion",
+                                adoption.toolLinks()
+                        )
+                ).status()
+        );
+
+        assertEquals(adoption.identity(), storedIdentity());
+        assertEquals(adoption.initialLifecycle(), storedLifecycle(PROFILE));
+        assertEquals(ALIAS_A, storedAlias(ALIAS_A).alias());
+        assertFalse(aliasExists(ALIAS_B));
+    }
+
+    @Test
+    void adoptsUnownedWildLiveProfileWithoutInventingAnOwnerBucket()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive adoption = adoption(
+                PROFILE,
+                ALIAS_A,
+                null,
+                "Wild Companion",
+                List.of()
+        );
+
+        CompanionProfileMutationOutcome created =
+                submit(1, "profile-adopt-wild", adoption);
+
+        assertEquals(CompanionProfileMutationOutcome.Status.CREATED, created.status());
+        CompanionLifecycle lifecycle = storedLifecycle(PROFILE);
+        assertEquals(adoption.initialLifecycle(), lifecycle);
+        assertNull(lifecycle.ownerId());
+        assertNull(lifecycle.ownerWorldKey());
+        assertEquals(LifecycleState.ACTIVE, lifecycle.state());
+        assertEquals(
+                LifecycleLocation.liveEntity(ALIAS_A.toString(), "world"),
+                lifecycle.location()
+        );
+        assertEquals(PROFILE, storedAlias(ALIAS_A).profileId());
+    }
+
+    @Test
+    void concurrentAdoptionsOfOneAliasLeaveExactlyOneCompleteProfile()
+            throws Exception {
+        CompanionProfileMutation.AdoptLive first = adoption(
+                PROFILE,
+                ALIAS_A,
+                OWNER_A,
+                "First",
+                List.of(link(PROFILE, TOOL_A, -9_000))
+        );
+        CompanionProfileMutation.AdoptLive second = adoption(
+                PROFILE_B,
+                ALIAS_A,
+                OWNER_B,
+                "Second",
+                List.of(link(PROFILE_B, TOOL_B, -9_000))
+        );
+
+        CompletableFuture<OperationWorkflowResult> firstResult = submitAsync(
+                1,
+                "profile-adopt-first",
+                first
+        );
+        CompletableFuture<OperationWorkflowResult> secondResult = submitAsync(
+                2,
+                "profile-adopt-second",
+                second
+        );
+        CompanionProfileMutationOutcome firstOutcome =
+                outcome(firstResult.get(10, TimeUnit.SECONDS));
+        CompanionProfileMutationOutcome secondOutcome =
+                outcome(secondResult.get(10, TimeUnit.SECONDS));
+
+        assertTrue(
+                firstOutcome.status() == CompanionProfileMutationOutcome.Status.CREATED
+                        ^ secondOutcome.status()
+                        == CompanionProfileMutationOutcome.Status.CREATED
+        );
+        assertTrue(
+                firstOutcome.status() == CompanionProfileMutationOutcome.Status.CONFLICT
+                        ^ secondOutcome.status()
+                        == CompanionProfileMutationOutcome.Status.CONFLICT
+        );
+        CompanionProfileMutation.AdoptLive winner =
+                firstOutcome.status() == CompanionProfileMutationOutcome.Status.CREATED
+                        ? first
+                        : second;
+        CompanionProfileMutation.AdoptLive loser = winner == first ? second : first;
+        assertEquals(winner.profileId(), storedAlias(ALIAS_A).profileId());
+        assertEquals(winner.identity(), storedIdentity(winner.profileId()));
+        assertEquals(winner.initialLifecycle(), storedLifecycle(winner.profileId()));
+        assertTrue(profileExists(winner.profileId()));
+        assertFalse(profileExists(loser.profileId()));
+    }
+
     private CompanionProfileMutationOutcome submit(
             int operationNumber,
             String idempotencyKey,
             CompanionProfileMutation mutation
     ) throws Exception {
-        OperationWorkflowResult result = operations.submit(
+        return outcome(submitAsync(
+                operationNumber,
+                idempotencyKey,
+                mutation
+        ).get(10, TimeUnit.SECONDS));
+    }
+
+    private CompletableFuture<OperationWorkflowResult> submitAsync(
+            int operationNumber,
+            String idempotencyKey,
+            CompanionProfileMutation mutation
+    ) {
+        return operations.submit(
                 OperationId.parse(String.format(
                         "40000000-0000-0000-0000-%012d",
                         operationNumber
                 )),
                 new IdempotencyKey(idempotencyKey),
                 mutation
-        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        ).completion().toCompletableFuture();
+    }
+
+    private CompanionProfileMutationOutcome outcome(OperationWorkflowResult result) {
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(OperationPhase.PUBLISHED, result.operation().phase());
         assertEquals(
@@ -222,6 +431,23 @@ class SqliteCompanionProfileOperationsTest {
         return outcome;
     }
 
+    private CompanionProfileMutation.AdoptLive adoption(
+            ProfileId profileId,
+            NpcAlias alias,
+            OwnerId ownerId,
+            String name,
+            List<CompanionToolLink> links
+    ) {
+        return new CompanionProfileMutation.AdoptLive(
+                identity(profileId, 0, name, -9_000),
+                alias,
+                ownerId,
+                "world",
+                links,
+                -9_000
+        );
+    }
+
     private CompanionProfileMutation.Create create(
             String name,
             List<CompanionToolLink> links
@@ -245,9 +471,18 @@ class SqliteCompanionProfileOperationsTest {
     }
 
     private CompanionIdentity identity(long revision, String name, long updatedAtMs) {
+        return identity(PROFILE, revision, name, updatedAtMs);
+    }
+
+    private CompanionIdentity identity(
+            ProfileId profileId,
+            long revision,
+            String name,
+            long updatedAtMs
+    ) {
         String metadata = "{\"source\":\"test\"}";
         return new CompanionIdentity(
-                PROFILE,
+                profileId,
                 name,
                 "role",
                 metadata,
@@ -261,8 +496,16 @@ class SqliteCompanionProfileOperationsTest {
     }
 
     private CompanionToolLink link(UUID toolId, long updatedAtMs) {
+        return link(PROFILE, toolId, updatedAtMs);
+    }
+
+    private CompanionToolLink link(
+            ProfileId profileId,
+            UUID toolId,
+            long updatedAtMs
+    ) {
         return new CompanionToolLink(
-                PROFILE,
+                profileId,
                 toolId,
                 "command",
                 -9_000,
@@ -271,9 +514,47 @@ class SqliteCompanionProfileOperationsTest {
     }
 
     private CompanionIdentity storedIdentity() throws Exception {
+        return storedIdentity(PROFILE);
+    }
+
+    private CompanionIdentity storedIdentity(ProfileId profileId) throws Exception {
         try (Connection connection = connections.openReadConnection()) {
             return new SqliteCompanionIdentityStore(connection)
-                    .findProfile(PROFILE)
+                    .findProfile(profileId)
+                    .orElseThrow();
+        }
+    }
+
+    private boolean profileExists(ProfileId profileId) throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionIdentityStore(connection)
+                    .findProfile(profileId)
+                    .isPresent();
+        }
+    }
+
+    private com.alechilles.alecstamework.companion.identity.CompanionAlias storedAlias(
+            NpcAlias alias
+    ) throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionIdentityStore(connection)
+                    .resolveAlias(alias)
+                    .orElseThrow();
+        }
+    }
+
+    private boolean aliasExists(NpcAlias alias) throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionIdentityStore(connection)
+                    .resolveAlias(alias)
+                    .isPresent();
+        }
+    }
+
+    private CompanionLifecycle storedLifecycle(ProfileId profileId) throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionLifecycleStore(connection)
+                    .findByProfile(profileId)
                     .orElseThrow();
         }
     }

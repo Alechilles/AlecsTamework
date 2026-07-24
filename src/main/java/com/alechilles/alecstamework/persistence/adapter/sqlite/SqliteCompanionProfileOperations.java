@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -68,7 +69,7 @@ public final class SqliteCompanionProfileOperations {
                 ),
                 (transaction, operation) -> events(
                         operation.operationId(),
-                        apply(transaction, mutation)
+                        apply(transaction, operation.operationId(), mutation)
                 ),
                 requiredConsumers
         );
@@ -76,10 +77,14 @@ public final class SqliteCompanionProfileOperations {
 
     private AppliedMutation apply(
             SqlitePersistenceTransactionContext transaction,
+            OperationId operationId,
             CompanionProfileMutation mutation
     ) {
         if (mutation instanceof CompanionProfileMutation.Create create) {
             return create(transaction, create);
+        }
+        if (mutation instanceof CompanionProfileMutation.AdoptLive adoption) {
+            return adoptLive(transaction, operationId, adoption);
         }
         return update(transaction, (CompanionProfileMutation.Update) mutation);
     }
@@ -138,6 +143,108 @@ public final class SqliteCompanionProfileOperations {
                         create.lifecycle()
                 )
         );
+    }
+
+    private AppliedMutation adoptLive(
+            SqlitePersistenceTransactionContext transaction,
+            OperationId operationId,
+            CompanionProfileMutation.AdoptLive adoption
+    ) {
+        CompanionIdentity existing =
+                transaction.identities().findProfile(adoption.profileId()).orElse(null);
+        CompanionAlias alias =
+                transaction.identities().resolveAlias(adoption.alias()).orElse(null);
+        if (existing != null) {
+            CompanionLifecycle lifecycle = transaction.lifecycles()
+                    .findByProfile(adoption.profileId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "profile_lifecycle_missing"
+                    ));
+            List<CompanionToolLink> links =
+                    transaction.toolLinks().findByProfile(adoption.profileId());
+            CompanionProfileMutationOutcome.Status status =
+                    adoptionMatches(existing, alias, lifecycle, links, adoption)
+                            ? CompanionProfileMutationOutcome.Status.UNCHANGED
+                            : CompanionProfileMutationOutcome.Status.CONFLICT;
+            return unchanged(outcome(status, adoption, existing.metadataRevision()));
+        }
+        if (alias != null) {
+            return unchanged(outcome(
+                    CompanionProfileMutationOutcome.Status.CONFLICT,
+                    adoption,
+                    0
+            ));
+        }
+        requireApplied(
+                transaction.identities().createProfile(adoption.identity()),
+                "profile_adopt_identity"
+        );
+        requireApplied(
+                transaction.identities().leaseAlias(
+                        adoption.profileId(),
+                        adoption.alias(),
+                        operationId,
+                        adoption.requestedAtMs()
+                ),
+                "profile_adopt_alias_lease"
+        );
+        CompanionAlias currentAlias = requireApplied(
+                transaction.identities().promoteAlias(
+                        adoption.alias(),
+                        operationId,
+                        adoption.requestedAtMs()
+                ),
+                "profile_adopt_alias_promote"
+        );
+        if (currentAlias.generation() != 0) {
+            throw new IllegalStateException("profile_adopt_alias_generation_not_initial");
+        }
+        CompanionLifecycle lifecycle = adoption.initialLifecycle();
+        requireApplied(
+                transaction.lifecycles().create(lifecycle),
+                "profile_adopt_lifecycle"
+        );
+        requireApplied(
+                transaction.toolLinks().replace(
+                        adoption.profileId(),
+                        adoption.toolLinks()
+                ),
+                "profile_adopt_tool_links"
+        );
+        CompanionProfileMutationOutcome outcome = outcome(
+                CompanionProfileMutationOutcome.Status.CREATED,
+                adoption,
+                adoption.identity().metadataRevision()
+        );
+        CompanionProfileProjectionState after =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        adoption.profileId()
+                );
+        return changed(
+                outcome,
+                null,
+                after,
+                CompanionProfileProjectionChange.Source.METADATA,
+                new CompanionLifecycleProjectionChange(null, lifecycle)
+        );
+    }
+
+    private boolean adoptionMatches(
+            CompanionIdentity identity,
+            CompanionAlias alias,
+            CompanionLifecycle lifecycle,
+            List<CompanionToolLink> links,
+            CompanionProfileMutation.AdoptLive adoption
+    ) {
+        return identity.equals(adoption.identity())
+                && alias != null
+                && alias.profileId().equals(adoption.profileId())
+                && alias.alias().equals(adoption.alias())
+                && alias.generation() == 0
+                && alias.state() == CompanionAlias.State.CURRENT
+                && lifecycle.equals(adoption.initialLifecycle())
+                && links.equals(adoption.toolLinks());
     }
 
     private AppliedMutation update(

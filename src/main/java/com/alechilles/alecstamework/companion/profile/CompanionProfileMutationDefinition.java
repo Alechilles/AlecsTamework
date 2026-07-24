@@ -3,10 +3,13 @@ package com.alechilles.alecstamework.companion.profile;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityJsonCodec;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.ArrayList;
@@ -46,6 +49,17 @@ public final class CompanionProfileMutationDefinition
             json.add("identity", CompanionIdentityJsonCodec.encode(create.identity()));
             json.add("lifecycle", CompanionLifecycleJsonCodec.encode(create.lifecycle()));
             json.add("toolLinks", encodeLinks(create.toolLinks()));
+        } else if (payload instanceof CompanionProfileMutation.AdoptLive adoption) {
+            json.addProperty("action", "ADOPT_LIVE");
+            json.add("identity", CompanionIdentityJsonCodec.encode(adoption.identity()));
+            json.addProperty("alias", adoption.alias().toString());
+            if (adoption.ownerId() == null) {
+                json.add("ownerId", JsonNull.INSTANCE);
+            } else {
+                json.addProperty("ownerId", adoption.ownerId().toString());
+            }
+            json.addProperty("worldKey", adoption.worldKey());
+            json.add("toolLinks", encodeLinks(adoption.toolLinks()));
         } else if (payload instanceof CompanionProfileMutation.Update update) {
             json.addProperty("action", "UPDATE");
             json.add("identity", CompanionIdentityJsonCodec.encode(update.nextIdentity()));
@@ -77,6 +91,14 @@ public final class CompanionProfileMutationDefinition
                     links,
                     requestedAtMs
             );
+            case "ADOPT_LIVE" -> new CompanionProfileMutation.AdoptLive(
+                    identity,
+                    NpcAlias.parse(json.get("alias").getAsString()),
+                    decodeOwner(json),
+                    json.get("worldKey").getAsString(),
+                    links,
+                    requestedAtMs
+            );
             case "UPDATE" -> new CompanionProfileMutation.Update(
                     identity,
                     json.get("expectedMetadataRevision").getAsLong(),
@@ -105,5 +127,11 @@ public final class CompanionProfileMutationDefinition
             ));
         }
         return List.copyOf(links);
+    }
+
+    private OwnerId decodeOwner(JsonObject json) {
+        return !json.has("ownerId") || json.get("ownerId").isJsonNull()
+                ? null
+                : OwnerId.parse(json.get("ownerId").getAsString());
     }
 }

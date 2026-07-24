@@ -2,16 +2,24 @@ package com.alechilles.alecstamework.companion.profile;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import java.util.HashSet;
 import java.util.List;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
-/** One typed profile create or metadata/tool-link update request. */
+/** One typed profile creation, live adoption, or metadata/tool-link update request. */
 public sealed interface CompanionProfileMutation
-        permits CompanionProfileMutation.Create, CompanionProfileMutation.Update {
+        permits CompanionProfileMutation.Create,
+                CompanionProfileMutation.AdoptLive,
+                CompanionProfileMutation.Update {
     @Nonnull
     ProfileId profileId();
 
@@ -43,6 +51,59 @@ public sealed interface CompanionProfileMutation
         @Override
         public ProfileId profileId() {
             return identity.profileId();
+        }
+    }
+
+    /**
+     * Atomically adopts one already-live companion into canonical persistence.
+     *
+     * <p>The initial lifecycle is deliberately derived rather than caller-supplied so identity,
+     * alias generation zero, owner, world, and ACTIVE location cannot disagree.</p>
+     */
+    record AdoptLive(
+            @Nonnull CompanionIdentity identity,
+            @Nonnull NpcAlias alias,
+            @Nullable OwnerId ownerId,
+            @Nonnull String worldKey,
+            @Nonnull List<CompanionToolLink> toolLinks,
+            long requestedAtMs
+    ) implements CompanionProfileMutation {
+        public AdoptLive {
+            if (identity == null || alias == null) {
+                throw new IllegalArgumentException(
+                        "Live adoption identity and alias are required"
+                );
+            }
+            worldKey = normalizeWorldKey(worldKey);
+            if (identity.metadataRevision() != 0
+                    || !worldKey.equals(identity.lastKnownWorldKey())) {
+                throw new IllegalArgumentException(
+                        "Live adoption identity must begin at revision zero in its exact world"
+                );
+            }
+            toolLinks = validateLinks(identity.profileId(), toolLinks);
+        }
+
+        @Override
+        public ProfileId profileId() {
+            return identity.profileId();
+        }
+
+        /** Returns the only valid initial lifecycle for this live adoption. */
+        @Nonnull
+        public CompanionLifecycle initialLifecycle() {
+            return new CompanionLifecycle(
+                    profileId(),
+                    ownerId,
+                    LifecycleState.ACTIVE,
+                    LifecycleLocation.liveEntity(alias.toString(), worldKey),
+                    LifecycleRevision.INITIAL,
+                    null,
+                    requestedAtMs,
+                    ReconciliationGeneration.INITIAL,
+                    null,
+                    ownerId == null ? null : worldKey
+            );
         }
     }
 
@@ -93,5 +154,12 @@ public sealed interface CompanionProfileMutation
                 .comparing((CompanionToolLink link) -> link.toolId().toString())
                 .thenComparing(CompanionToolLink::linkType));
         return List.copyOf(normalized);
+    }
+
+    private static String normalizeWorldKey(String worldKey) {
+        if (worldKey == null || worldKey.isBlank()) {
+            throw new IllegalArgumentException("Live adoption world key is required");
+        }
+        return worldKey.trim();
     }
 }
