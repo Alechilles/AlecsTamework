@@ -55,6 +55,10 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - `TwInteractionConfig` supports preset interactions (`Tame`, `Feed`, `Harvest`, `Mount`, `ModeCycle`, `Breed`) and custom requirement/effect combinations.
 - Shared progression state persists via happiness/needs/breeding/traits/life-stage/attachments components and is restored across capture/spawn + death/respawn flows.
 - Stable NPC `profile_id` is the durable identity; live entity UUIDs are replaceable aliases. Recovery and command records deduplicate by profile once canonical identity is available.
+- Live feature boundaries such as configured-coop capture resolve the current
+  entity UUID alias back to that stable profile before submitting a mutation;
+  an alias rotation never creates a second identity or makes the companion
+  ineligible by itself.
 - `ACTIVE`, `UNLOADED`, `CAPTURED`, `COOP`, `DEAD_REVIVABLE`, `LOST`,
   `RELEASED`, and `UNRESOLVED` form the sole durable companion lifecycle.
   Command status, restoration, capture, and coop behavior read that lifecycle
@@ -69,6 +73,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - The owner cap counts currently loaded owned NPCs. It is not a durable dormant
   ledger and does not reserve future capacity.
 - Linked companions restore from saved death or Lost state without payment.
+  The death snapshot's immutable respawn deadline is also projected into the
+  linked panel, so display and restoration admission use the same canonical
+  timing fact.
 - Dormant transitions require positive evidence: a saved death, an explicit
   destructive `REMOVE`, or terminal removal of a delete-on-remove world.
   Unload, absence, and timeout are not evidence that a companion is dead or

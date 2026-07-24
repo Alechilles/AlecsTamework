@@ -28,6 +28,10 @@ Spawner items are the Tamework item family that captures an NPC into an item and
 - Tamed and owner state when configured
 - Happiness, needs, breeding, traits, life stage, and other stored progression metadata
 
+Configured capture and spawn particles/sounds are emitted only after the
+canonical persistence operation publishes successfully. A failed or retryable
+operation does not play success feedback.
+
 ## Important design choices
 - Whether ownership is cleared on capture
 - Whether ownership is re-assigned on spawn

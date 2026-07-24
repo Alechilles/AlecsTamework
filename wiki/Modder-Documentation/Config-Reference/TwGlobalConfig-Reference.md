@@ -73,8 +73,10 @@ This section holds shared command infrastructure. Revive enablement is controlle
 - `RelocationRetryIntervalMs`: retry interval for queued off-screen relocations.
 - `RelocationMaxWaitMs`: total relocation wait budget before the runtime gives up. The shipped default is `10000` milliseconds.
 - `RelocationMaxRetryAttempts`: cap on relocation retry attempts.
-- `DeadRespawnCooldownMs`: respawn cooldown in milliseconds.
-- `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are present, the minutes key wins.
+- `DeadRespawnCooldownMs`: fallback respawn cooldown in milliseconds when no
+  enabled role-scoped `TwCompanionConfig` matches.
+- `DeadRespawnCooldownMins`: human-friendly alias for the same fallback
+  cooldown. If both are present, the minutes key wins.
 - `DeadRespawnFollowRetryDelayMs`: delay before follow retry after respawn.
 - `DeadRespawnDistanceClose`: first candidate revive placement ring.
 - `DeadRespawnDistanceNear`: second candidate revive placement ring.
@@ -128,7 +130,9 @@ Older packs may still contain ownership protection, ownership requirement, popul
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Global/TwGlobalConfig_Default.json` is the best reference for shipped baseline values.
-- `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes priority when both are authored.
+- `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes
+  priority when both are authored. A matching role-scoped companion config
+  still owns the effective cooldown.
 - Settings-owned legacy sections remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
 
 ## Minimal Example

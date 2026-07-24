@@ -28,6 +28,9 @@ Spawner behavior is not a single monolithic capture method. Each collaborator ow
 - Captured Tamework names and progression data travel through item metadata
 - Capture and release preserve canonical profile identity and tool-link state
   through the replacement full-state snapshot.
+- Capture/release intents carry only an immutable effect position and optional
+  asset IDs across the async boundary. The world-thread completion dispatcher
+  emits them only for a published operation.
 - A filled item is the exact source artifact for release. Coop intake accepts a
   live NPC instead and never consumes a filled spawner item.
 - Tooltip bridges may need invalidation on config reload

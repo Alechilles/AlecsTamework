@@ -84,6 +84,11 @@ captured-spawner release operation and consumes the filled item only after the
 release succeeds. It uses the shared lifecycle/operation protocol and never
 enters the coop-intake path.
 
+Configured capture/spawn particles and sounds are success feedback. Tamework
+freezes their asset IDs and position with the operation intent, then emits them
+only after the canonical operation publishes. A rejected, retryable, or failed
+operation does not play success effects.
+
 For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 
 ## Icon overrides

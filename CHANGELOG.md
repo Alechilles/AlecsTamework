@@ -79,6 +79,16 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed configured coops ignoring companions whose live UUID changed after a
+  spawner release. Coop intake now resolves the current UUID alias back to its
+  stable companion profile before capture.
+- Fixed successful spawner capture and release omitting their configured sound
+  and particle effects. Success feedback now plays only after the durable
+  operation publishes.
+- Fixed dead linked companions showing no respawn cooldown and becoming
+  revivable after the un-authored 60-second global default. The panel now shows
+  the canonical saved cooldown, hides Revive until it expires, and honors each
+  role's configured cooldown duration.
 - Fixed filled spawner release consuming the captured item without spawning
   its companion when Hytale could not clone a codec-less live player
   component. Player inventory receipts now use Hytale's own world-thread save

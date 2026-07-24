@@ -105,6 +105,11 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 - max retry attempts
 - linked-panel unlink confirmation
 
+When an enabled role-scoped config matches, its dead-respawn cooldown is
+authoritative even though a global config object also exists. The global
+cooldown is only the fallback for roles without an enabled matching
+`TwCompanionConfig`.
+
 ## Legacy Settings-Owned Fields Accepted
 Older packs may still contain ownership protection and revive enablement keys in `TwCompanionConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
 
@@ -164,6 +169,7 @@ Older packs may still contain ownership protection and revive enablement keys in
 - `Travel` is nested under `Command`, not a separate top-level section.
 - If a child asset explicitly authors `Travel`, only missing nested keys inherit. Authored arrays like `FollowMasterOnWorldChangeStateFilter` replace the parent list.
 - Global relocation retry settings still come from `TwGlobalConfig`.
+- A global cooldown value does not override a matching role-scoped cooldown.
 - Relocation timeout or retry exhaustion never creates canonical `LOST`
   state, regardless of `OnTransferFailure`.
 

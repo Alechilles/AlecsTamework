@@ -110,6 +110,12 @@ Confirm the target role or template includes the pieces needed by your commands:
 Put role-specific behavior in [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference):
 - revive enablement
 - revive cooldown
+
+For dead companions, the linked panel reads the exact deadline saved in the
+canonical death snapshot. Its countdown and Revive action therefore use the
+same timing fact as restoration admission. Role-scoped `TwCompanionConfig`
+owns the cooldown duration when one matches; the global value is only a
+fallback.
 - return-home and recall distance rules
 - cross-world follow policy
 

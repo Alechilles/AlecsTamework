@@ -248,6 +248,12 @@ Permanent worlds are not reclassified by this rule.
 - `PlacementMinRelativeY`
 - `PlacementMaxRelativeY`
 
+The role-scoped `TwCompanionConfig` owns the respawn cooldown duration when it
+exists. The linked panel projects the exact saved death deadline, shows the
+remaining cooldown, and keeps Revive unavailable until that same deadline
+passes. `TwGlobalConfig` supplies cooldown timing only when no enabled
+role-scoped companion config exists.
+
 ## Feedback notes
 Command feedback sounds are delivered as local 2D sound for the using player and in-world 3D sound for nearby others.
 
