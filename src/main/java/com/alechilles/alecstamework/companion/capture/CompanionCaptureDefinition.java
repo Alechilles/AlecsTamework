@@ -12,7 +12,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.UUID;
 
-/** Version-one typed operation definition for live companion capture. */
+/** Version-two typed operation definition for live companion capture. */
 public final class CompanionCaptureDefinition
         implements OperationDefinition<CompanionCaptureRequest> {
     public static final CompanionCaptureDefinition INSTANCE =

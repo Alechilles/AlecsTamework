@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -152,7 +153,7 @@ final class CaptureProcessCrashChild {
                         1,
                         0.0D,
                         0.0D,
-                        "{\"Tamework.CaptureSnapshotId\":\""
+                        "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID + "\":\""
                                 + snapshot.snapshotId() + "\"}"
                 ),
                 new CaptureSourceEvidence(

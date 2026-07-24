@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileProjection
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -329,7 +330,7 @@ class SqliteCompanionCaptureOperationsTest {
                         1,
                         0.0D,
                         0.0D,
-                        "{\"Tamework.CaptureSnapshotId\":\""
+                        "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID + "\":\""
                                 + snapshot.snapshotId() + "\"}"
                 ),
                 new CaptureSourceEvidence(

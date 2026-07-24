@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -109,6 +110,18 @@ class CompanionCaptureDefinitionTest {
         );
     }
 
+    @Test
+    void artifactReceiptMustBeTheExactStringCaptureReceipt() {
+        assertInvalidArtifactReceipt("{}");
+        assertInvalidArtifactReceipt(
+                "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID + "\":7}"
+        );
+        assertInvalidArtifactReceipt(
+                "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+                        + "\":\"not-the-snapshot\"}"
+        );
+    }
+
     private CompanionCaptureRequest request(
             ProfileId requestedProfile,
             LifecycleRevision expected
@@ -152,12 +165,46 @@ class CompanionCaptureDefinitionTest {
     }
 
     private CapturedArtifact artifact() {
+        return artifact(
+                "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID + "\":\""
+                        + SNAPSHOT_ID + "\"}"
+        );
+    }
+
+    private CapturedArtifact artifact(String metadata) {
         return CapturedArtifact.create(
                 "capture-device-filled",
                 1,
                 0.0D,
                 0.0D,
-                "{\"Tamework.CaptureSnapshotId\":\"" + SNAPSHOT_ID + "\"}"
+                metadata
+        );
+    }
+
+    private void assertInvalidArtifactReceipt(String metadata) {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionCaptureRequest(
+                        PROFILE,
+                        EXPECTED,
+                        null,
+                        NpcAlias.parse(
+                                "20000000-0000-0000-0000-000000000001"
+                        ),
+                        "world",
+                        snapshot(PROFILE, EXPECTED),
+                        artifact(metadata),
+                        new CaptureSourceEvidence(
+                                UUID.randomUUID(),
+                                "world",
+                                2,
+                                "capture-device",
+                                1,
+                                Sha256Hash.ofUtf8("before"),
+                                SNAPSHOT_ID
+                        ),
+                        -600
+                )
         );
     }
 }

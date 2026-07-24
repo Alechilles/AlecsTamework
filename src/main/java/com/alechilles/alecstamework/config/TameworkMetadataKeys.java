@@ -12,6 +12,8 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";
     public static final String CAPTURE_NAME_KEY = "Tamework.CaptureNameKey";
     public static final String CAPTURE_MODEL_ID = "Tamework.CaptureModelId";
+    /** Exact captured-artifact receipt, equal to the authoritative capture snapshot ID. */
+    public static final String CAPTURE_SNAPSHOT_ID = "Tamework.CaptureSnapshotId";
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
     public static final String CAPTURE_SOURCE_OWNER_UUID = "Tamework.CaptureSourceOwnerUuid";

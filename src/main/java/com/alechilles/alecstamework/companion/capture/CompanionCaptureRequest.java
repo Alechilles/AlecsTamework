@@ -6,8 +6,11 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonDocument;
+import org.bson.BsonValue;
 
 /** Immutable command to replace one live companion with one exact captured artifact. */
 public record CompanionCaptureRequest(
@@ -48,6 +51,25 @@ public record CompanionCaptureRequest(
         if (!snapshot.snapshotId().toString().equals(source.receiptKey())) {
             throw new IllegalArgumentException(
                     "Capture source receipt must equal the capture snapshot ID"
+            );
+        }
+        requireArtifactReceipt(artifact, source.receiptKey());
+    }
+
+    private static void requireArtifactReceipt(
+            CapturedArtifact artifact,
+            String expectedReceipt
+    ) {
+        BsonDocument metadata = BsonDocument.parse(
+                artifact.metadataExtendedJson()
+        );
+        BsonValue receipt = metadata.get(
+                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+        );
+        if (receipt == null || !receipt.isString()
+                || !expectedReceipt.equals(receipt.asString().getValue())) {
+            throw new IllegalArgumentException(
+                    "Captured artifact receipt must equal the capture source receipt"
             );
         }
     }

@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCaptureOperations;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionLifecycleStore;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
@@ -193,7 +194,7 @@ class ExactSourceFinalizationTest {
                         1,
                         0.0D,
                         0.0D,
-                        "{\"Tamework.CaptureSnapshotId\":\""
+                        "{\"" + TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID + "\":\""
                                 + snapshot.snapshotId() + "\"}"
                 ),
                 new CaptureSourceEvidence(
