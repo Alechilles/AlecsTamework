@@ -14,12 +14,11 @@
 
 ## Server-console command scope
 
-Server-wide diagnostics and controls do not require a player identity. This includes
-`/tw diagnose`, `/tw debugdb`, `/tw persistencecircuit`, `/tw patches status`,
-the read-only `/tw coop audit`, `/tw coop import-status`, and
-`/tw coop rollback-preflight` views, plus the server-global `debug*` logging toggles.
+Server-wide diagnostics and controls do not require a player identity. This
+includes `/tw patches status` and the server-global `debug*` logging toggles.
 `/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
+`/tw debugdb [status|health|integrity|detail]` is console-safe and read-only.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
@@ -30,8 +29,7 @@ is reported as `n/a` from the console.
 Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
 player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
 `/tw api test prepare|reset|run|status`, `/tw spawntamed`, `/tw showhitboxes`,
-and `/tw showspawnmarkers` need a live player. Managed-coop reconciliation confirmation
-also remains in-world because its authority key is bound to the executing player's world.
+and `/tw showspawnmarkers` need a live player.
 
 ## Interaction troubleshooting
 - Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
@@ -54,19 +52,29 @@ also remains in-world because its authority key is bound to the executing player
   - life-stage/adult gates
   - sleep/combat gates
   - cooldown state/alarm timing
-  - whether `/tw gethappiness` reports an active/latest job, including its id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result
+  - nearby same-type headroom and any direct SimpleClaims breeding limit
 
-## Managed-coop and persistence integrity
-- `/tw coop audit` summarizes active managed authorities and prints bounded per-resident/per-operation identity details: profile, slot, source/projection UUIDs, operation state, generation, retries, and queue lifecycle state.
-- `/tw coop import-status` prints the concise legacy-resident import view: active sessions, pending sources, sources awaiting exact absence proof, and unresolved conflicts.
-- `/tw coop reconcile <x> <y> <z>` prints the cached report for that exact coop. It is report-only until an authorized operator repeats the exact fingerprint with `confirm <fingerprint>`; `cancel` revokes process-local approval. A changed report or restart requires a new confirmation.
-- `/tw coop rollback-preflight` is read-only. It reports queue, integrity, active lifecycle/import work, and older SQLite snapshot evidence while explicitly rejecting unsafe live downgrade claims. Tamework never creates or restores whole-save backups; any full rollback is an operator-managed Hytale/host procedure using mutually consistent world and Tamework data.
-- `/tw debugdb integrity` runs the SQLite/foreign-key checks plus canonical identity, managed-coop lifecycle, and import-journal invariants.
-- In schema v8 it also checks capture-attempt origins, population-group
-  nonterminal operations, and provisioning origins. Schema-v9 lifecycle
-  summaries cover command-family rosters and timed summons.
-- An import marked `attention required` is intentionally fail-closed. Preserve the database and save evidence; do not clear or respawn residents merely to make the count disappear.
-- A coop is Tamework-authoritative only when an enabled `TwCoopConfig` resolves for that exact coop id. Unmanaged coops remain vanilla and are not shadowed by a Tamework resident sidecar.
+## Coop and persistence integrity
+
+- Confirm an enabled `TwCoopConfig` resolves for the exact coop under test.
+- Test live NPC intake and live resident release independently.
+- Captured items are not a coop-intake path.
+- Filled spawner items release their stored NPC through the normal spawner
+  interaction.
+- For death or Lost recovery, verify the linked panel shows the recorded state
+  and that restoration is free.
+- Released schema v2-v4 sources and released DAT records import into
+  `tamework-state.sqlite` without modifying the source. A v5-v9 source is a
+  deliberate refusal: restore a public backup or create a new world instead of
+  trying to repair or migrate that tester-only database.
+- Use `/tw debugdb status` for engine, target-origin, schema, startup, operation,
+  validation, and checkpoint state. `health` and `integrity` are aliases for
+  the same bounded summary.
+- Use `/tw debugdb detail` for bounded feature, outbox, operation-phase,
+  incident, quarantine, and `openCircuits` counts. It does not repair or retry
+  persistence work. Circuit evidence comes from the one replacement feature
+  registry and shared `feature_circuit` table, not an old failure catalog;
+  there is no separate persistence rehearsal runtime.
 
 ## Needs/resource seek troubleshooting
 - Confirm seek sensor/action components are in the role/template:
@@ -93,17 +101,16 @@ also remains in-world because its authority key is bound to the executing player
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
 ## Population and claim troubleshooting
-- Positive owner or claim admissions stay fail-closed until the required reconciliation dimensions are `READY`. Startup resumes the same persisted `ACTIVE` scan epoch and source cursors after a restart, and it asks Hytale to load saved worlds before catalog construction. A failed world load or changed mutable source keeps coverage unsealed instead of publishing false readiness.
-- A retained nonterminal operation can coexist with `READY` when `/tw debugdb incidents` shows active fences for both its exact operation and exact profile. This is intentional scoped quarantine: the ambiguous companion remains unavailable while unrelated companions work immediately. If only one fence exists, or durable quarantine failed, broader readiness must remain closed.
-- Conflicting saved evidence can coexist with `READY` only when `/tw debugdb incidents` reports `SCOPED_IDENTITY_CONTRADICTION` and every affected UUID resolved to an exact profile quarantine. The quarantined profile keeps its prior canonical state and still consumes its conservative owner slot; unrelated profiles remain usable. `reconciliation-evidence-conflict` with broadly degraded coverage means at least one identity could not be uniquely mapped or fenced, so do not hand-edit aliases or counters.
-- Claim providers are re-probed from live plugin state per operation. Reflected ready contracts are weak and generation-bound; plugin setup/reload, replacement, disable, or `/tw settings` changes invalidate stale sessions. An incompatible or incomplete QuestLines `getChunks()` contract is an admission error, not a SimpleClaims fallback condition.
-- `Unavoidable companion relocation created a per-world owner over-cap condition` means a cross-world move was preserved even though the destination now exceeds its per-world owner cap. The warning is throttled, `unavoidablePerWorldOverCapRelocations` increments, and later positive admissions remain blocked until the count falls.
-- Population-bearing world work uses a lease-aligned start watchdog. If an accepted callback never starts during shutdown, its rejection cleanup runs exactly once and any late queued wrapper is inert. Repeated warnings here usually indicate world shutdown or executor backlog, not a second mutation.
-- `/tw api test prepare` and `/tw api test reset` use production journaled `ADMIN_FORCE` assignment and permanent-release authority. A readiness, admission, or durability failure from these commands is therefore meaningful and should not be bypassed with direct owner/profile edits.
-- `/tw api test run hydragon-integrations` does not require prepared live fixtures. Its capture, population, and provisioning transaction checks use fixed in-memory ports, never the live player/world/profile database. It also checks that command-family roster, timed-summoning, and tame-and-link capabilities are advertised. Verbose assertion details are single-line and capped before output.
-- API 0.9 DTO/schema tests do not prove a gated feature is live. Require its
-  advertised capability and feature-specific runtime result. An unavailable
-  facade or empty default read is a deliberate denial.
+
+- The owner cap counts loaded NPCs currently owned by that player. If the result
+  looks wrong, inspect the live owner component and count other loaded owned
+  NPCs.
+- SimpleClaims affects breeding only through its direct claim-required,
+  per-chunk, and total-claim settings.
+- SimpleClaims damage protection uses its native tamed-NPC policy. Integration
+  errors fail open rather than making companions invulnerable.
+- There is no provider selector, QuestLines bridge, durable dormant count,
+  placement reservation, or batch-admission diagnostic to inspect.
 
 ## Debug toggles
 - `/tw debughook [on|off]`
@@ -145,10 +152,7 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw gettamed`, `/tw settamed`
 - `/tw getalarm [AlarmName] [NpcUuid]`
 - `/tw getflockdebug`
-- `/tw coop audit`, `/tw coop import-status`, `/tw coop reconcile`, `/tw coop rollback-preflight`
-- `/tw debugdb integrity`
-- `/tw debugdb health`, `incidents`, `incident`, `retry`, and `export`; exports are redacted, exclude the database/save, and produce a valid partial manifest if their 10-second or 4 MiB evidence budget is reached.
-- `/tw npcclean <roleId>` removes only matching NPCs proven unowned. It is unavailable until both owner-population and claim-occupancy reconciliation are `READY`, and it skips canonical identities with an owner or pending transition.
+- `/tw npcclean <roleId>`
 - `/tw reloadconfig` (item-feature assets only)
 
 ## Timestamp note

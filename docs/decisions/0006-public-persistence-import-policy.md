@@ -1,6 +1,6 @@
 # ADR 0006: Public Persistence Import Policy
 
-- Status: Accepted
+- Status: Accepted and implemented
 - Date: 2026-07-23
 
 ## Decision
@@ -67,7 +67,7 @@ An existing target is never merged with a different source. Failed work remains 
 owned temporary target and cannot enable mutation readiness. The legacy main database, WAL, and SHM
 remain byte-for-byte unchanged.
 
-## Phase-2 acceptance budget
+## Import regression budget
 
 The immutable representative-v4 fixture must import in at most 10 seconds on the development test
 host and produce a replacement main database no larger than 2 MiB. These are regression ceilings,

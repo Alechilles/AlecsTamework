@@ -11,9 +11,11 @@ The system is asset-driven around:
 Command runtime is split to keep the orchestrator thin:
 - Orchestrator: `CommandItemFeatureHandler`
 - Resolution/selection: `CommandResolutionService`, `CommandRecipientService`
-- Link persistence/mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`
+- Item link metadata/mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`
+- Canonical status and identity: `CommandPersistenceView`, `CommandNpcIdentityService`, `CommandNpcProfileActionResolver`
 - Step execution + move/home behavior: `CommandStepExecutionService`, `CommandMenuMoveService`
-- Off-screen relocation + revive: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLinkedNpcDeathService`
+- Off-screen relocation + restoration: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandCompanionRestorationService`
+- Live/dormant snapshot assembly: `CommandLiveNpcSnapshotFactory`, `CommandLinkedNpcStateSnapshotService`
 - Panel entry assembly/filter/sort: `CommandLinkedPanelEntryService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
 - Group metadata + group manager actions: `CommandGroupService`, `CommandGroupManagerPageService`
 - Player feedback: `CommandFeedbackService`
@@ -73,7 +75,7 @@ Link metadata includes:
 - stable profile id when the companion has entered canonical persistence
 - last-known position
 - optional home position
-- cached display/name key/role
+- fallback display/name key/role stored on the item
 - active/inactive flag
 - optional `groupId`
 
@@ -87,7 +89,11 @@ When a player tames a supported NPC, Tamework attempts to auto-link the new comp
 - linked: the notification names the animal and command item that was linked.
 - not linked: the notification names the animal, applicable command item, and crafting bench type.
 
-When a linked companion is placed in a compatible handheld capture item, its linked-panel row remains available and reports `CAPTURED` as soon as capture commits, even while the retired source projection finishes despawning and including capture configurations that clear live ownership. Spawning the companion restores its command links and remaps the panel record to the new projection UUID.
+When a linked companion is placed in a compatible handheld capture item, its
+linked-panel row remains available and reports `CAPTURED` as soon as capture
+commits, including when capture clears live ownership. Releasing the companion
+restores its command links and remaps the panel record to the new live entity
+UUID without changing the stable profile.
 
 ## Command list and steps
 Each `CommandList` entry supports:
@@ -130,7 +136,9 @@ Linked panel supports:
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
-- Status lanes for loaded/unloaded/dead/lost companions; ordinary unloaded rows keep the latest custom display name from the live snapshot or durable profile, including across restart
+- Status lanes for loaded, unloaded, captured, cooped, dead, and Lost
+  companions; ordinary unloaded rows keep the latest custom display name from
+  the live snapshot or durable profile, including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying
@@ -149,32 +157,55 @@ Loaded flow:
 - `/tw settings` can disable recall/return-home teleporting. When disabled, Recall is hidden from the linked panel and command wheel, loaded companions still receive normal move/home command hooks, and unloaded or distant forced relocation is skipped; use `Locate` to open a copyable current or last recorded world-position page.
 - A linked panel can remain open across a world or generated-instance transfer. Its Recall and Return Home actions resolve the player's current entity/store from the stable player reference at click time, rather than reusing the source-world entity reference captured when the panel opened.
 - Per-row movement actions validate and repair only the selected companion's canonical profile metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
-- Successful loaded Hold, Recall, and Return Home commands publish the state actually applied to the NPC into linked-item metadata. Cross-world following also rechecks the live source NPC against the configured state filter, so cached metadata alone cannot authorize travel.
+- Successful loaded Hold, Recall, and Return Home commands publish the state actually applied to the NPC into linked-item metadata. Cross-world following also rechecks the live source NPC against the configured state filter, so stored item metadata alone cannot authorize travel.
 
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.
 - Source/destination chunks are requested asynchronously.
 - Every loaded source or destination chunk is retained for the lifetime of the pending relocation and released on success, timeout, replacement, cancellation, or shutdown.
-- The source NPC is resolved after its chunk loads and its canonical population state reconciles; transient admission revision or claim-profile conflicts retry within the same bounded request.
+- The source NPC is resolved after its chunk loads and checked against its
+  canonical profile and current alias before any move is applied.
 - Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
 - Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
-- A persistence preflight denial reports its status-specific availability message to the player and emits an exact, privacy-bounded telemetry breadcrumb. A finalized lost-recovery source that remains serialized in an unloaded chunk is treated as superseded cleanup evidence, so it cannot degrade owner-population readiness or block the recovered companion's later Recall.
-- On-load relocation resumes after `CommandNpcRelocationOnLoadSystem` yields to population reconciliation.
-- A same-world relocation that attempted its physical move but remains temporarily unobservable settles as `UNLOADED`, not `LOST`; observing the destination projection restores normal loaded status. A cross-world transfer attempt that cannot establish its destination remains conservative and becomes recoverable `LOST`.
+- A persistence preflight denial reports its status-specific availability
+  message and leaves the last canonical state intact.
+- On-load relocation resumes through `CommandNpcRelocationOnLoadSystem` after
+  the saved source entity becomes available.
+- A relocation that attempted its physical move but remains temporarily
+  unobservable stays `UNLOADED`, not `LOST`. Observing the destination
+  projection restores normal loaded status. A failed or exhausted transfer
+  stops retrying without manufacturing a durable lifecycle transition.
 
 Lost flow:
-- If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.
-- If an external destructive command removes a linked companion with Hytale's `REMOVE` reason, Tamework preserves the final complete state and transitions it directly to `LOST`; it does not reinterpret destructive removal as a normal chunk unload.
+- If relocation retry windows are exhausted, the request stops and may retain
+  process-local presentation detail; timeout alone does not author durable
+  `LOST`. The shipped default wait budget is 10 seconds.
+- A durable Lost transition requires positive evidence. An external destructive
+  command using Hytale's `REMOVE` reason qualifies; ordinary unload, absence,
+  and timeout observations do not.
+- A delete-on-remove world can also provide terminal Lost evidence while the
+  companion's complete live state is still available.
 - `Recall`/`Return Home` are blocked while `LOST`.
-- `Revive`/`Respawn` can perform strict recovery (replacement spawn + stale-original suppression mapping).
+- `Revive`/`Respawn` uses the canonical free restoration path and the exact
+  saved snapshot. A successful restoration rotates the live alias without
+  creating a second profile.
 
-Managed-coop flow:
-- A linked companion housed by an enabled/configured managed coop stays attached to the same stable profile even when a later released projection has a different entity UUID.
-- Command status reads use the trusted managed-coop resident/lifecycle indexes. While those indexes are rebuilding or an import conflict is unresolved, recovery does not guess that the companion is missing.
+Configured-coop flow:
+
+- A configured coop captures a live linked companion directly into its
+  canonical coop slot and releases it through the same persistence authority.
+- The released live NPC may have a different entity UUID but remains attached
+  to the same stable profile and command links.
+- Filled spawner items never enter a coop; their release uses the canonical
+  captured-spawner release operation.
 
 Dead companions:
-- Death snapshots persist across relog/restart.
-- `Revive` enablement is controlled by `/tw settings`; cooldowns and placement tuning remain in `TwCompanionConfig.Command`.
+
+- Saved death is positive dormant evidence and its snapshot persists across
+  relog/restart.
+- `Revive` uses the same canonical free restoration path as Lost restoration.
+  Enablement is controlled by `/tw settings`; placement tuning remains in
+  `TwCompanionConfig.Command`.
 
 ## Global tuning
 `TwGlobalConfig.Command` remains the shared relocation infrastructure location:
@@ -199,6 +230,11 @@ config may deliberately opt in; configured followers are then selected after the
 installed in the destination world's entity store, and the source NPC's live state must still pass
 `FollowMasterOnWorldChangeStateFilter` when the relocation is prepared. Explicit Recall remains
 available across worlds when `CrossWorldRecallEnabled` is enabled.
+
+`Travel.OnTransferFailure: MarkLost` is retained as a legacy config spelling
+for stopping the failed transfer path. It does not authorize `LOST` from a
+timeout or missing observation; the canonical lifecycle still requires
+positive destructive-removal evidence.
 
 Generated portal instances are delete-on-remove worlds. If a linked companion remains inside when
 the instance closes, Tamework marks it during the world-removal event and publishes its complete

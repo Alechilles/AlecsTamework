@@ -9,7 +9,8 @@ Spawner runtime is split into an orchestrator plus focused services:
 - Policy + validation: `SpawnerCapturePolicyService`, `SpawnerRolePolicyService`, `SpawnerOwnershipPolicyService`
 - Metadata + identity/state: `SpawnerCaptureMetadataService`, `SpawnerNpcIdentityService`, `SpawnerNpcStateService`, `SpawnerItemStackMetadataService`
 - Placement/effects/inventory: `SpawnerSpawnPositionService`, `SpawnerEffectService`, `SpawnerPlayerInventoryService`
-- Capture finalization and linked-companion sync: `SpawnerCaptureFinalizerService`, `SpawnerLinkedNpcSyncService`
+- Source-item finalization: `SpawnerCaptureFinalizerService`, `SpawnerSourceItemTransaction`
+- Canonical persistence: `SpawnerCaptureAuthor`, `SpawnerCapturedArtifactReleaseAuthor`
 
 When extending spawner behavior, add logic to these service domains instead of centralizing it in the orchestrator.
 
@@ -58,28 +59,6 @@ Fields:
 - `FailureCooldownMs` (default `0`). Cooldown applied after one resolved failed
   probability roll.
 - `FailureParticleSystem` / `FailureSoundEvent` (optional). Failure feedback.
-- `SourceConsumption` (default `SuccessOnly`). `SuccessOnly` preserves filled-item
-  capture behavior. `ResolvedAttempt` spends exactly one fenced source item after
-  either a successful or failed terminal roll; preflight denial and cancellation
-  do not spend it.
-- `SuccessDisposition` (default `CapturedItem`). `CapturedItem` creates the
-  configured filled item. `TameAndCommandLink` keeps the existing NPC live,
-  assigns/tames it in place, preserves its canonical profile, and links that
-  profile to `CommandFamilyId`.
-- `CommandFamilyId` (optional). Required non-blank command-family namespace for
-  `TameAndCommandLink`.
-- `RequiredCommandConfigId` (optional). Exact command config used to validate a
-  compatible access item and the post-capture role.
-- `RequireCommandAccessItem` (default `false`). When true, the required command
-  item must be present before the roll and source spend.
-
-All five fields are nested-inherited scalars: omission inherits the parent and
-an explicit value, including `false`, overrides it. `TameAndCommandLink`
-requires `TamesTarget: true`, at least one valid `TamedRoleOverrides` result,
-and a non-blank `CommandFamilyId`. It ignores an inherited `FilledItemId`, but
-an explicitly authored non-blank `FilledItemId` is contradictory and rejects
-the config generation.
-
 Role-side minimum power, resistance, multiplier, missing-health bonus,
 guaranteed power, and custom requirements live in
 `Server/Tamework/CapturePolicies/*.json`. See the
@@ -98,22 +77,12 @@ Captured Tamework NPC names are stored on the spawner item and restored on spawn
 Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
 `TwAttachmentDisplayConfig`.
 
-Filled spawners also carry the canonical companion profile identity used by population accounting. Capture moves an owned companion to `CAPTURED`: it keeps consuming one owner slot unless capture clears ownership, but it stops occupying a physical claim. Spawn/release reserves destination owner and claim capacity before creating the NPC. The exact source stack is finalized only after a live NPC with the planned canonical identity exists; a denial or pre-spawn failure keeps the filled item intact, while a late durability failure is reported as degraded.
-
-Older filled items without a canonical profile ID are adopted through their stable legacy identity. Adoption is cap-checked and cannot create a second active representation of the same companion. Existing over-cap legacy companions are preserved during upgrade reconciliation, but a copied or newly restored item cannot bypass later admissions. A provisional legacy identity is promoted when its owner admission commits or released exactly once after denial/cancellation; retries and late callbacks cannot double-release it.
-
 `Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
 
-The spawn transition follows all four runtime-setting combinations:
-
-| `CaptureClearsOwner` | `SpawnSetsOwner` | Spawned owner | Spawn owner delta | Spawn claim delta |
-| --- | --- | --- | ---: | ---: |
-| `false` | `false` | Stored owner, or unowned if none was stored | Stored owner `0`; unowned `0` | Stored owner `+1`; unowned `0` |
-| `false` | `true` | Stored owner when non-null; otherwise spawning player | Stored owner `0`; null-to-owner `+1` | `+1` when owned |
-| `true` | `false` | Unowned | `0` | `0` |
-| `true` | `true` | Spawning player | `+1` | `+1` |
-
-The deltas assume the captured source itself occupies no physical claim. A canonical unowned profile restored to a non-null owner always uses normal cap-checked null-to-owner admission; it is never treated as an existing-owner zero delta. Conversely, a canonical non-null stored owner cannot be silently transferred or cleared by restore.
+Releasing a filled spawner recreates the stored NPC through the canonical
+captured-spawner release operation and consumes the filled item only after the
+release succeeds. It uses the shared lifecycle/operation protocol and never
+enters the coop-intake path.
 
 For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 

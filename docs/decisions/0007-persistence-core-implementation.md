@@ -47,6 +47,12 @@ been proved equivalent and a later ADR enables retention.
 Reconciliation generation is canonical lifecycle evidence. It is not an operation-envelope
 coordinate, and zero is valid.
 
+One static feature registry is the catalog for operation definitions, scope
+coverage, projection consumers, recovery, readiness, quarantine policy,
+shutdown, and diagnostics. Startup derives one dependency graph from that
+catalog. The registry is cross-cutting composition, not another gameplay or
+lifecycle authority.
+
 ## Complexity constraints
 
 - Replacement core classes must remain at or below 500 lines.
@@ -58,8 +64,9 @@ coordinate, and zero is valid.
 - Feature-specific phases, transaction runners, recovery queues, and projection journals are
   prohibited; feature differences belong in registered payload codecs and focused detail ports.
 
-These constraints are enforced by `ReplacementPersistenceArchitectureGuardTest`. At Phase 3
-completion, the largest replacement core class is `SqliteCompanionIdentityStore` at 484 lines.
+These constraints are enforced by
+`ReplacementPersistenceArchitectureGuardTest` and the persistence inventory
+gate.
 
 ## Verification
 
@@ -80,17 +87,29 @@ The core tests additionally prove exact unknown-commit readback without duplicat
 outbox replay and rebuild comparison, alias and lifecycle revision fencing, versioned snapshot
 decode failure, scoped incident containment, lease takeover, and starvation-free recovery.
 
-## Subsequent composition
+## Production composition
 
-Phase 4 composed the public behavior surface on this core. Static feature descriptors now drive
-one startup DAG, exhaustive recovery, projection catch-up, readiness, containment, diagnostics,
-and ordered shutdown. The public runtime imports released v2-v4 data, exposes one operation
-facade and one canonical query facade, and holds a process-wide engine lease from open through
-terminal shutdown.
+`TameworkPersistenceComposition` owns the single production bootstrap, process
+lease, startup graph, query facade, operation facade, diagnostics, and bounded
+shutdown. `TameworkPersistenceAuthors` composes the released gameplay authors
+over that one facade bundle.
 
-Unreleased July features remain intentionally outside this composition until their Phase 5
-behavior slices are reimplemented on the shared protocol. The superseded implementation is
-characterization evidence only; no feature may mix the two persistence engines at runtime.
+The final cutover includes canonical profile snapshots, filled-spawner capture
+and release, direct-live coop capture and release, saved death/destructive
+removal dormancy, free restoration, and transactional profile-extension data.
+Dormant state requires positive death, destructive removal, or
+delete-on-remove-world evidence; unload, absence, and timeout cannot author it.
+
+The public runtime imports released v2-v4 data, refuses the unreleased v5-v9
+lineage unchanged, and never dual-writes. The superseded persistence runtime
+and its alternate repositories, queues, recovery authorities, and adapters
+have been deleted from production.
+
+The unreleased durable owner-population/group, command-roster, timed-summon,
+provisioning, paid-revival, and companion-inventory designs are not dormant
+features of this core. They have no replacement table, operation kind, public
+capability, or compatibility promise. ADR 0001 records the retained released
+behavior and the reason their implementation-era documents were removed.
 
 ## Consequences
 
