@@ -61,9 +61,9 @@ public final class CommandNpcRelocationService {
                 lastKnownByNpc,
                 knownWorldByNpc,
                 pendingByNpc,
-                dropReporter,
-                (world, npcUuid) -> scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS),
-                this::removePending
+                (world, npcUuid) -> scheduleTryApply(
+                        world, npcUuid, INITIAL_APPLY_DELAY_MS
+                )
         );
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
         this.chunkRequests = new CommandRelocationChunkRequestService(
@@ -73,10 +73,6 @@ public final class CommandNpcRelocationService {
                 diagnostics,
                 this::scheduleTryApply
         );
-    }
-
-    public void setRelocationDropListener(@Nullable CommandRelocationDropListener relocationDropListener) {
-        dropReporter.setListener(relocationDropListener);
     }
 
     /**
@@ -137,11 +133,11 @@ public final class CommandNpcRelocationService {
         }
         long nowMs = System.currentTimeMillis();
         long maxWaitMs = Math.max(0L, timingPolicy.maxWaitMs());
-        long lostAtMs = pending.queuedAtMs + maxWaitMs;
+        long dropAtMs = pending.queuedAtMs + maxWaitMs;
         return new PendingRecallSnapshot(
                 pending.npcUuid,
                 pending.queuedAtMs,
-                Math.max(0L, lostAtMs - nowMs)
+                Math.max(0L, dropAtMs - nowMs)
         );
     }
 
@@ -262,7 +258,7 @@ public final class CommandNpcRelocationService {
                 chunkRequests.release(replaced);
                 replaced.markCrossWorldTransferFinished();
                 if (replaced.physicalMutationAttempted()) {
-                    commitUnconfirmedRelocationAsLost(
+                    dropUnconfirmedRelocation(
                             knownWorldByNpc.get(npcUuid), npcUuid, replaced, System.currentTimeMillis()
                     );
                 }
@@ -300,15 +296,6 @@ public final class CommandNpcRelocationService {
                              Store<EntityStore> store,
                              @Nullable UUID npcUuidHint) {
         npcLifecycle.onNpcRemoved(reference, reason, store, npcUuidHint);
-    }
-
-    /** Submits strict Lost recovery after a terminal world's live identity has been retired. */
-    public void onWorldRemoved(@Nullable World world) {
-        npcLifecycle.onWorldRemoved(world, System.currentTimeMillis());
-    }
-
-    public boolean isDeleteOnRemoveRecoveryPending(@Nullable UUID npcUuid) {
-        return npcLifecycle.isDeleteOnRemoveRecoveryPending(npcUuid);
     }
 
     public boolean tryApply(World world, UUID npcUuid) {
@@ -440,9 +427,9 @@ public final class CommandNpcRelocationService {
         removePending(npcUuid, pending);
     }
 
-    void commitUnconfirmedRelocationAsLost(
+    void dropUnconfirmedRelocation(
             @Nullable World world, UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
-        dropPendingAsLost(npcUuid, pending, droppedAtMs);
+        dropRetryExhausted(npcUuid, pending, droppedAtMs);
     }
 
     void commitUnconfirmedRelocationAsUnloaded(
@@ -519,7 +506,7 @@ public final class CommandNpcRelocationService {
                     pending.resetRelocationIssue();
                     knownWorldByNpc.remove(npcUuid, sourceWorld);
                     if (pending.physicalMutationAttempted()) {
-                        commitUnconfirmedRelocationAsLost(
+                        dropUnconfirmedRelocation(
                                 destinationWorld, npcUuid, pending, System.currentTimeMillis()
                         );
                     } else {
@@ -812,7 +799,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         if (sourceWorld == null || sourceStore == null || drainedHolder == null) {
-            commitUnconfirmedRelocationAsLost(
+            dropUnconfirmedRelocation(
                     destinationWorld, npcUuid, pending, System.currentTimeMillis()
             );
             return;
@@ -820,7 +807,7 @@ public final class CommandNpcRelocationService {
         worldAccess.execute(sourceWorld, () -> {
             if (!restoreSourceEntity(
                     sourceWorld, sourceStore, drainedHolder, sourceTransform, npcUuid)) {
-                commitUnconfirmedRelocationAsLost(
+                dropUnconfirmedRelocation(
                         destinationWorld, npcUuid, pending, System.currentTimeMillis()
                 );
                 return;
@@ -864,7 +851,7 @@ public final class CommandNpcRelocationService {
                 "Cross-world transfer became unobservable after source removal for npc="
                         + npcUuid + ", reason=" + reason
         );
-        commitUnconfirmedRelocationAsLost(
+        dropUnconfirmedRelocation(
                 null, npcUuid, pending, System.currentTimeMillis()
         );
     }
@@ -892,7 +879,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         pending.markCrossWorldTransferFinished();
-        commitUnconfirmedRelocationAsLost(
+        dropUnconfirmedRelocation(
                 destinationWorld, npcUuid, pending, System.currentTimeMillis()
         );
     }
@@ -910,7 +897,7 @@ public final class CommandNpcRelocationService {
     private void terminalizeRelocation(PendingRelocation pending, String reason) {
         pending.markCrossWorldTransferFinished();
         if (pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
+            dropUnconfirmedRelocation(
                     knownWorldByNpc.get(pending.npcUuid), pending.npcUuid, pending, System.currentTimeMillis()
             );
             return;
@@ -942,7 +929,9 @@ public final class CommandNpcRelocationService {
             return;
         }
         if (policy == TwCompanionConfig.TransferFailurePolicy.MarkLost) {
-            dropPendingAsLost(npcUuid, pending, System.currentTimeMillis());
+            dropRetryExhausted(
+                    npcUuid, pending, System.currentTimeMillis()
+            );
             return;
         }
         pending.resetRelocationIssue();
@@ -964,7 +953,11 @@ public final class CommandNpcRelocationService {
         );
     }
 
-    void dropPendingAsLost(UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
+    void dropRetryExhausted(
+            UUID npcUuid,
+            PendingRelocation pending,
+            long droppedAtMs
+    ) {
         if (npcUuid == null || pending == null) {
             return;
         }
@@ -999,7 +992,7 @@ public final class CommandNpcRelocationService {
             PendingRelocation pending
     ) {
         if (pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
+            dropUnconfirmedRelocation(
                     world, npcUuid, pending, System.currentTimeMillis()
             );
             return;
@@ -1040,7 +1033,11 @@ public final class CommandNpcRelocationService {
     public record LastKnownLocation(@Nullable String worldName, @Nullable Vector3d position) {
     }
 
-    public record PendingRecallSnapshot(UUID npcUuid, long queuedAtMs, long remainingUntilLostMs) {
+    public record PendingRecallSnapshot(
+            UUID npcUuid,
+            long queuedAtMs,
+            long remainingUntilDropMs
+    ) {
     }
 
 }

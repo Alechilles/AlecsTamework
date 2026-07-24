@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopCompletionTracker;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
-import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
@@ -58,17 +57,18 @@ public final class CommandDirectLiveCoopSystem
     private final Map<String, Boolean> previousRoaming =
             new ConcurrentHashMap<>();
 
-    /** Creates the production world system from the replacement composition root. */
+    /** Creates the world system from its author and projection-only boundary. */
     public CommandDirectLiveCoopSystem(
-            @Nonnull PersistenceDomainFacades facades
+            @Nonnull DirectLiveCoopAuthor author,
+            @Nonnull DirectLiveCoopProjectionView projections
     ) {
-        if (facades == null) {
+        if (author == null || projections == null) {
             throw new IllegalArgumentException(
-                    "Persistence domain facades are required"
+                    "Direct-live coop collaborators are required"
             );
         }
-        author = new DirectLiveCoopAuthor(facades);
-        projections = new DirectLiveCoopProjectionView(facades);
+        this.author = author;
+        this.projections = projections;
         scanner = new HytaleDirectLiveCoopScanner();
         evidence = new HytaleDirectLiveCoopEvidenceFactory();
         produce = new DirectLiveCoopProduceService();

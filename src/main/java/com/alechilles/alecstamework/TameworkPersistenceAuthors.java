@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.items.persistence.TameworkDormantCompanionEv
 import com.alechilles.alecstamework.items.persistence.TameworkDormantSnapshotFactsReader;
 import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.items.persistence.TameworkRestorationSnapshotResolver;
+import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
+import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -30,7 +32,7 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
- * Composes the released gameplay authors over one canonical facade bundle.
+ * Composes released gameplay authors and read-only views over one facade bundle.
  *
  * <p>This collaborator keeps author construction out of the bootstrap
  * orchestrator and makes the shared persistence authority explicit.</p>
@@ -87,7 +89,9 @@ final class TameworkPersistenceAuthors {
                         feedback
                 ),
                 restorationAuthor(facades, completions),
-                dormantAuthor(logger, events, facades, snapshots)
+                dormantAuthor(logger, events, facades, snapshots),
+                new DirectLiveCoopAuthor(facades),
+                new DirectLiveCoopProjectionView(facades)
         );
     }
 
@@ -166,13 +170,15 @@ final class TameworkPersistenceAuthors {
         );
     }
 
-    /** Released author bundle built over one immutable facade reference. */
+    /** Released gameplay boundaries built over one immutable facade reference. */
     record Bundle(
             CommandLinkedNpcStateSnapshotService snapshots,
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
-            PositiveEvidenceDormantAuthor dormantAuthor
+            PositiveEvidenceDormantAuthor dormantAuthor,
+            DirectLiveCoopAuthor directLiveCoopAuthor,
+            DirectLiveCoopProjectionView directLiveCoopProjections
     ) {
         Bundle {
             Objects.requireNonNull(snapshots, "snapshots");
@@ -180,6 +186,12 @@ final class TameworkPersistenceAuthors {
             Objects.requireNonNull(releaseAuthor, "releaseAuthor");
             Objects.requireNonNull(restorationAuthor, "restorationAuthor");
             Objects.requireNonNull(dormantAuthor, "dormantAuthor");
+            Objects.requireNonNull(
+                    directLiveCoopAuthor, "directLiveCoopAuthor"
+            );
+            Objects.requireNonNull(
+                    directLiveCoopProjections, "directLiveCoopProjections"
+            );
         }
     }
 

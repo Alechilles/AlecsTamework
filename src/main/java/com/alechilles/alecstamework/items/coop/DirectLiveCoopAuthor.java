@@ -169,6 +169,10 @@ public final class DirectLiveCoopAuthor {
                                             : Outcome.RESIDENCY_UNAVAILABLE
                             );
                         }
+                        if (!occupancy.residency().equals(
+                                residencyFound.value())) {
+                            return completed(Outcome.RESIDENCY_UNAVAILABLE);
+                        }
                         return submitRelease(
                                 slot,
                                 profileFound.value(),
@@ -213,13 +217,16 @@ public final class DirectLiveCoopAuthor {
                     idempotency("coop-adopt", source.alias().toString()),
                     source.adoption()
             );
-            if (!adoption.accepted()) {
+            if (adoption == null || !adoption.accepted()) {
                 return CompletableFuture.completedFuture(
                         PersistenceReadResult.absent()
                 );
             }
-            return adoption.completion().thenCompose(result -> {
-                if (!published(result)) {
+            return adoption.completion().handle(
+                    (result, failure) ->
+                            failure == null && published(result)
+            ).thenCompose(adopted -> {
+                if (!adopted) {
                     return CompletableFuture.completedFuture(
                             PersistenceReadResult.absent()
                     );
@@ -331,8 +338,11 @@ public final class DirectLiveCoopAuthor {
         if (submission == null || !submission.accepted()) {
             return completed(failure);
         }
-        return submission.completion().thenApply(
-                result -> published(result) ? success : failure
+        return submission.completion().handle(
+                (result, completionFailure) ->
+                        completionFailure == null && published(result)
+                                ? success
+                                : failure
         );
     }
 
@@ -346,6 +356,7 @@ public final class DirectLiveCoopAuthor {
     ) {
         CompanionAlias alias = profile.currentAlias();
         return profile.lifecycle().state() == LifecycleState.ACTIVE
+                && source.profileId().equals(profile.identity().profileId())
                 && alias != null
                 && alias.state() == CompanionAlias.State.CURRENT
                 && alias.alias().equals(source.alias())

@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
 @FunctionalInterface
 public interface CompanionProfileSnapshotSink {
     void publish(
-            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            @Nonnull CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             @Nonnull String worldKey
     );
 

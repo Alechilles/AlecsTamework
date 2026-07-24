@@ -12,8 +12,8 @@ class CommandAppliedStatePersistenceArchitectureTest {
         String execution = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandStepExecutionService.java"
         )).replace("\r\n", "\n");
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
+        String orchestrator = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandItemUseOrchestrator.java"
         )).replace("\r\n", "\n");
         String menuMove = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandMenuMoveService.java"
@@ -23,8 +23,19 @@ class CommandAppliedStatePersistenceArchitectureTest {
         )).replace("\r\n", "\n");
 
         assertTrue(execution.contains("new RelocationState(\n                            stateStep.getState()"));
-        assertTrue(handler.contains("appliedCommandStates.put"));
-        assertTrue(handler.contains("recipients, store, appliedCommandStates"));
+        int loadedDispatch = orchestrator.indexOf(
+                "LoadedDispatch loaded = executeLoadedRecipients(context, recipients);");
+        int linkedRecordRefresh = orchestrator.indexOf(
+                "refreshLinkedPositions(use, context, recipients, loaded.appliedCommandStates());");
+        int stepExecution = orchestrator.indexOf(
+                "StepResult result = stepExecutionService.executeCommand(context, candidate);");
+        int appliedStateCapture = orchestrator.indexOf(
+                "recordAppliedState(appliedStates, candidate, result);");
+        assertTrue(loadedDispatch >= 0 && linkedRecordRefresh > loadedDispatch);
+        assertTrue(stepExecution >= 0 && appliedStateCapture > stepExecution);
+        assertTrue(orchestrator.contains("String cachedState = result.appliedState.cachedValue();"));
+        assertTrue(orchestrator.contains("appliedStates.put(candidate.npc.getUuid(), cachedState);"));
+        assertTrue(orchestrator.contains("context.workingItem, recipients, use.store, appliedStates"));
         assertTrue(menuMove.contains("appliedCommandStates.put"));
         assertTrue(menuMove.contains("store,\n                    appliedCommandStates"));
         assertTrue(links.contains("commandState != null ? commandState : resolveCachedCommandState"));

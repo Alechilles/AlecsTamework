@@ -28,6 +28,18 @@ class DormantCompanionBridgeArchitectureTest {
     }
 
     @Test
+    void revivePolicyCannotSuppressAuthoritativeDormantEvidence()
+            throws IOException {
+        String factory = source(
+                "items/persistence/"
+                        + "HytaleDormantCompanionObservationFactory.java"
+        );
+
+        assertFalse(factory.contains("CompanionRevivePolicy"));
+        assertFalse(factory.contains("supportsRevive"));
+    }
+
+    @Test
     void asyncCompletionRetainsOnlyStableKey() throws IOException {
         String bridge = source(
                 "items/persistence/DormantCompanionEcsBridge.java"

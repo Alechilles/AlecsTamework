@@ -25,7 +25,7 @@ class CommandRelocationRestoreArchitectureTest {
     }
 
     @Test
-    void invalidAddRefRequiresUuidPresenceAndFailedRestoreReportsLost() throws Exception {
+    void invalidAddRefRequiresUuidPresenceAndFailedRestoreDropsUnconfirmedRequest() throws Exception {
         String access = source("CommandRelocationWorldAccess.java");
         String service = source("CommandNpcRelocationService.java");
 
@@ -33,8 +33,10 @@ class CommandRelocationRestoreArchitectureTest {
                 "A valid or invalid add ref must still be verified through UUID presence.");
         assertTrue(service.contains("if (!restoreSourceEntity(")
                         && service.contains("transferHolders.restoreSource(drainedHolder, sourceTransform)")
-                        && service.contains("commitUnconfirmedRelocationAsLost("),
-                "Failed/ambiguous transform or entity restoration must terminate through LOST reporting.");
+                        && service.contains("dropUnconfirmedRelocation("),
+                "Failed or ambiguous restoration must drop the request without inventing LOST lifecycle state.");
+        assertTrue(!service.contains("commitUnconfirmedRelocationAsLost("),
+                "Relocation failure is not admissible positive evidence for LOST.");
         int failedRestore = service.indexOf("if (!restoreSourceEntity(");
         assertTrue(service.indexOf("pending.markPhysicalMutationCompensated()", failedRestore)
                         > failedRestore,

@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CommandRelocationTimeoutDecisionTest {
 
     @Test
-    void exhaustedSameWorldMoveCancelsInsteadOfCommittingDestinationOrReportingLost() {
+    void exhaustedSameWorldMoveCancelsInsteadOfCommittingDestination() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.CANCEL_CONFIRMED_SAME_WORLD,
                 CommandRelocationTimeoutDecision.decide(true, true, true, false, false)
@@ -26,11 +26,11 @@ class CommandRelocationTimeoutDecisionTest {
     @Test
     void exhaustedCrossWorldMoveRemainsConservative() {
         assertEquals(
-                CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_LOST,
+                CommandRelocationTimeoutDecision.Outcome.DROP_UNCONFIRMED_TRANSFER,
                 CommandRelocationTimeoutDecision.decide(true, true, false, true, false)
         );
         assertEquals(
-                CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_LOST,
+                CommandRelocationTimeoutDecision.Outcome.DROP_UNCONFIRMED_TRANSFER,
                 CommandRelocationTimeoutDecision.decide(true, true, true, true, true)
         );
     }
@@ -42,7 +42,7 @@ class CommandRelocationTimeoutDecisionTest {
                 CommandRelocationTimeoutDecision.decide(false, true, true, false, false)
         );
         assertEquals(
-                CommandRelocationTimeoutDecision.Outcome.DROP_AS_LOST,
+                CommandRelocationTimeoutDecision.Outcome.DROP_RETRY_EXHAUSTED,
                 CommandRelocationTimeoutDecision.decide(true, false, false, false, false)
         );
     }

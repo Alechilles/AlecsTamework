@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-/** Classifies terminal relocation retries without conflating a visible NPC with a lost one. */
+/** Classifies terminal relocation retries without inferring durable lifecycle state. */
 final class CommandRelocationTimeoutDecision {
     private CommandRelocationTimeoutDecision() {
     }
@@ -14,13 +14,13 @@ final class CommandRelocationTimeoutDecision {
             return Outcome.RETRY;
         }
         if (!physicalMutationAttempted) {
-            return Outcome.DROP_AS_LOST;
+            return Outcome.DROP_RETRY_EXHAUSTED;
         }
         if (liveNpcObservedOutsideDestination && !crossWorldDestinationInstalled) {
             return Outcome.CANCEL_CONFIRMED_SAME_WORLD;
         }
         return crossWorldTransferAttempted
-                ? Outcome.COMMIT_UNCONFIRMED_AS_LOST
+                ? Outcome.DROP_UNCONFIRMED_TRANSFER
                 : Outcome.COMMIT_UNCONFIRMED_AS_UNLOADED;
     }
 
@@ -28,7 +28,7 @@ final class CommandRelocationTimeoutDecision {
         RETRY,
         CANCEL_CONFIRMED_SAME_WORLD,
         COMMIT_UNCONFIRMED_AS_UNLOADED,
-        COMMIT_UNCONFIRMED_AS_LOST,
-        DROP_AS_LOST
+        DROP_UNCONFIRMED_TRANSFER,
+        DROP_RETRY_EXHAUSTED
     }
 }

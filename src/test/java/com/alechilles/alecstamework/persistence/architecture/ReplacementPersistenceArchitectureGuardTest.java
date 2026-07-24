@@ -317,8 +317,6 @@ class ReplacementPersistenceArchitectureGuardTest {
     void replacementPersistenceDoesNotEnterPerTickSystemClasses()
             throws Exception {
         ArrayList<String> violations = new ArrayList<>();
-        String facadeImport = "import com.alechilles.alecstamework"
-                + ".persistence.runtime.PersistenceDomainFacades;";
         List<String> forbiddenBlockingOrAuthorityUse = List.of(
                 ".toCompletableFuture().join(",
                 "Thread.sleep(",
@@ -338,14 +336,11 @@ class ReplacementPersistenceArchitectureGuardTest {
                 continue;
             }
             String source = Files.readString(file);
-            String withoutCompositionImport = source.replace(
-                    facadeImport, ""
-            );
-            if (withoutCompositionImport.contains(
+            if (source.contains(
                     "com.alechilles.alecstamework.persistence.runtime"
-            ) || withoutCompositionImport.contains(
+            ) || source.contains(
                     "com.alechilles.alecstamework.persistence.adapter"
-            ) || withoutCompositionImport.contains(
+            ) || source.contains(
                     "com.alechilles.alecstamework.persistence.kernel"
             )) {
                 violations.add(
@@ -355,18 +350,9 @@ class ReplacementPersistenceArchitectureGuardTest {
             int facadeReferences = occurrences(
                     source, "PersistenceDomainFacades"
             );
-            boolean reviewedCoopComposition = relative(file).equals(
-                    "items/CommandDirectLiveCoopSystem.java"
-            );
-            if (facadeReferences != 0
-                    && (!reviewedCoopComposition
-                    || facadeReferences != 2
-                    || !source.contains(facadeImport)
-                    || source.contains("this.facades")
-                    || source.contains("facades."))) {
+            if (facadeReferences != 0) {
                 violations.add(
-                        relative(file)
-                                + " retains or invokes the composition facade"
+                        relative(file) + " references the composition facade"
                 );
             }
             for (String token : forbiddenBlockingOrAuthorityUse) {
@@ -379,9 +365,8 @@ class ReplacementPersistenceArchitectureGuardTest {
         }
         assertTrue(
                 violations.isEmpty(),
-                () -> "Tick systems may receive a facade only for constructor"
-                        + " composition; storage access, retained authority, and"
-                        + " blocking are forbidden: "
+                () -> "Tick systems cannot receive persistence composition,"
+                        + " storage access, or blocking collaborators: "
                         + violations
         );
     }

@@ -161,6 +161,9 @@ final class CommandNpcProfileActionResolver {
         if (durable.lost()) {
             return "profile_is_lost";
         }
+        if (durable.suppressesLiveAction()) {
+            return "profile_is_unavailable";
+        }
         return null;
     }
 

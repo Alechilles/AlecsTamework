@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,10 +12,9 @@ import javax.annotation.Nullable;
 /**
  * Resolves disposable command records against the canonical replacement profile projection.
  *
- * <p>Projection absence is deliberately not a failure or lifecycle fact. A new live companion can
- * be commanded immediately using its deterministic UUID-backed profile identity, then its item
- * record is canonicalized once a projection exists. Only contradictory projected identity or
- * duplicate live evidence blocks an action.</p>
+ * <p>A projected profile supplies durable identity and lifecycle. Before that projection exists,
+ * only one exact live ECS location can authorize an action; absence, ambiguity, and probe failure
+ * all fail closed.</p>
  */
 final class CommandNpcIdentityService {
     enum ResolutionStatus {
@@ -25,16 +25,38 @@ final class CommandNpcIdentityService {
     }
 
     record DurableStateFlags(
-            boolean captured,
-            boolean dead,
-            boolean lost,
-            boolean inCoop
+            @Nonnull LifecycleState lifecycleState
     ) {
-        private static final DurableStateFlags NONE =
-                new DurableStateFlags(false, false, false, false);
+        private static final DurableStateFlags LIVE =
+                new DurableStateFlags(LifecycleState.ACTIVE);
+        private static final DurableStateFlags UNAVAILABLE =
+                new DurableStateFlags(LifecycleState.UNRESOLVED);
+
+        DurableStateFlags {
+            Objects.requireNonNull(
+                    lifecycleState, "Lifecycle state is required"
+            );
+        }
+
+        boolean captured() {
+            return lifecycleState == LifecycleState.CAPTURED;
+        }
+
+        boolean dead() {
+            return lifecycleState == LifecycleState.DEAD_REVIVABLE;
+        }
+
+        boolean lost() {
+            return lifecycleState == LifecycleState.LOST;
+        }
+
+        boolean inCoop() {
+            return lifecycleState == LifecycleState.COOP;
+        }
 
         boolean suppressesLiveAction() {
-            return captured || dead || lost || inCoop;
+            return lifecycleState != LifecycleState.ACTIVE
+                    && lifecycleState != LifecycleState.UNLOADED;
         }
     }
 
@@ -208,21 +230,64 @@ final class CommandNpcIdentityService {
     private IdentityResolution resolveUnprojected(
             LinkedNpcRecord record
     ) {
-        UUID live = live(record.npcUuid);
         String profileId = persistence.profileId(record).toString();
-        return new IdentityResolution(
-                ResolutionStatus.RESOLVED,
-                profileId,
-                null,
-                record.npcUuid,
-                record.npcUuid,
-                List.of(record.npcUuid),
-                List.of(record.npcUuid),
-                live == null ? List.of() : List.of(live),
-                DurableStateFlags.NONE,
-                null,
-                null
-        );
+        try {
+            LoadedNpcIdentityIndex.Probe probe =
+                    liveNpcProbe.probe(record.npcUuid);
+            if (probe != null && probe.status()
+                    == LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION) {
+                return new IdentityResolution(
+                        ResolutionStatus.RESOLVED,
+                        profileId,
+                        null,
+                        record.npcUuid,
+                        record.npcUuid,
+                        List.of(record.npcUuid),
+                        List.of(record.npcUuid),
+                        List.of(record.npcUuid),
+                        DurableStateFlags.LIVE,
+                        null,
+                        null
+                );
+            }
+            if (probe != null && probe.status()
+                    == LoadedNpcIdentityIndex.ProbeStatus
+                    .MULTIPLE_LOCATIONS) {
+                return new IdentityResolution(
+                        ResolutionStatus.CONFLICT,
+                        profileId,
+                        null,
+                        record.npcUuid,
+                        null,
+                        List.of(record.npcUuid),
+                        List.of(record.npcUuid),
+                        List.of(record.npcUuid),
+                        DurableStateFlags.UNAVAILABLE,
+                        "multiple_live_locations_for_uuid",
+                        null
+                );
+            }
+            return new IdentityResolution(
+                    ResolutionStatus.UNRESOLVED,
+                    profileId,
+                    null,
+                    record.npcUuid,
+                    null,
+                    List.of(record.npcUuid),
+                    List.of(record.npcUuid),
+                    List.of(),
+                    DurableStateFlags.UNAVAILABLE,
+                    "canonical_profile_absent_and_live_identity_missing",
+                    null
+            );
+        } catch (RuntimeException failure) {
+            return failed(
+                    profileId,
+                    record.npcUuid,
+                    "live_identity_probe_failed",
+                    failure
+            );
+        }
     }
 
     @Nonnull
@@ -264,10 +329,7 @@ final class CommandNpcIdentityService {
             );
         }
         DurableStateFlags durable = new DurableStateFlags(
-                projected.captured(),
-                projected.dead(),
-                projected.lost(),
-                projected.inCoop()
+                projected.lifecycleState()
         );
         boolean conflict = multipleLocations || live.size() > 1;
         return new IdentityResolution(
@@ -310,26 +372,10 @@ final class CommandNpcIdentityService {
                         : List.of(projected.currentNpcUuid()),
                 List.of(record.npcUuid),
                 List.of(),
-                DurableStateFlags.NONE,
+                DurableStateFlags.UNAVAILABLE,
                 "record_profile_conflicts_with_current_alias",
                 null
         );
-    }
-
-    @Nullable
-    private UUID live(UUID npcUuid) {
-        try {
-            LoadedNpcIdentityIndex.Probe probe = liveNpcProbe.probe(npcUuid);
-            return probe != null
-                    && (probe.status()
-                    == LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION
-                    || probe.status()
-                    == LoadedNpcIdentityIndex.ProbeStatus.MULTIPLE_LOCATIONS)
-                    ? npcUuid
-                    : null;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
     }
 
     @Nonnull
@@ -348,7 +394,7 @@ final class CommandNpcIdentityService {
                 List.of(),
                 cachedUuid == null ? List.of() : List.of(cachedUuid),
                 List.of(),
-                DurableStateFlags.NONE,
+                DurableStateFlags.UNAVAILABLE,
                 reason,
                 failure
         );

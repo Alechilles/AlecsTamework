@@ -1,10 +1,9 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
-import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.util.Objects;
 import java.util.Optional;
@@ -138,22 +137,43 @@ final class CommandPersistenceView {
             @Nullable String displayName,
             @Nullable String customName,
             @Nonnull Set<UUID> toolIds,
-            boolean dead,
-            boolean captured,
-            boolean inCoop,
-            boolean lost
+            @Nonnull LifecycleState lifecycleState
     ) {
         ProfileSnapshot {
             Objects.requireNonNull(profileId, "Profile ID is required");
+            Objects.requireNonNull(
+                    lifecycleState, "Lifecycle state is required"
+            );
             toolIds = Set.copyOf(toolIds);
         }
 
+        boolean dead() {
+            return lifecycleState == LifecycleState.DEAD_REVIVABLE;
+        }
+
+        boolean captured() {
+            return lifecycleState == LifecycleState.CAPTURED;
+        }
+
+        boolean inCoop() {
+            return lifecycleState == LifecycleState.COOP;
+        }
+
+        boolean lost() {
+            return lifecycleState == LifecycleState.LOST;
+        }
+
         boolean dormant() {
-            return dead || captured || inCoop || lost;
+            return dead() || captured() || inCoop() || lost();
         }
 
         boolean restorable() {
-            return dead || lost;
+            return dead() || lost();
+        }
+
+        boolean blocksLiveAction() {
+            return lifecycleState != LifecycleState.ACTIVE
+                    && lifecycleState != LifecycleState.UNLOADED;
         }
 
         @Nonnull
@@ -172,19 +192,7 @@ final class CommandPersistenceView {
                     projection.displayName(),
                     projection.customName(),
                     projection.toolIds(),
-                    projection.activeSnapshotKinds().contains(
-                            TameworkSnapshotCodecs.DEATH
-                    ),
-                    projection.activeSnapshotKinds().contains(
-                            CompanionCaptureRequest.SNAPSHOT_KIND
-                    ),
-                    projection.coopId() != null
-                            || projection.activeSnapshotKinds().contains(
-                            TameworkSnapshotCodecs.COOP
-                    ),
-                    projection.activeSnapshotKinds().contains(
-                            TameworkSnapshotCodecs.LOST
-                    )
+                    projection.lifecycleState()
             );
         }
     }

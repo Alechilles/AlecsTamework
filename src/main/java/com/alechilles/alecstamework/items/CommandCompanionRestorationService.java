@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
 import com.hypixel.hytale.component.Ref;
@@ -66,16 +67,19 @@ final class CommandCompanionRestorationService {
         }
         CommandPersistenceView.ProfileSnapshot profile =
                 persistence.find(record).orElse(null);
-        if (profile != null && !profile.restorable()) {
+        if (profile == null) {
+            return RequestStatus.UNAVAILABLE;
+        }
+        if (!profile.restorable()) {
+            if (profile.lifecycleState() == LifecycleState.RELEASED
+                    || profile.lifecycleState()
+                    == LifecycleState.UNRESOLVED) {
+                return RequestStatus.UNAVAILABLE;
+            }
             return RequestStatus.NOT_DORMANT;
         }
-        ProfileId profileId = profile != null
-                ? profile.profileId()
-                : persistence.profileId(record);
-        if (profileId == null) {
-            return RequestStatus.INVALID_CONTEXT;
-        }
-        String roleId = profile != null && profile.roleId() != null
+        ProfileId profileId = profile.profileId();
+        String roleId = profile.roleId() != null
                 ? profile.roleId()
                 : record.cachedRoleId;
         CompanionSpawnPlacement placement =

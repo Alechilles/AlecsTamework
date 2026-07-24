@@ -244,6 +244,7 @@ class SpawnerCaptureAuthorTest {
         return new CompanionProfileProjectionState(
                 profileId,
                 ALIAS,
+                LifecycleState.ACTIVE,
                 null,
                 null,
                 "tamework_test",

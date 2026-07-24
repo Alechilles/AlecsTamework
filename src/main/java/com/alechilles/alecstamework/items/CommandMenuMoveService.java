@@ -35,10 +35,6 @@ import javax.annotation.Nullable;
 final class CommandMenuMoveService {
     private final CommandResolutionService resolutionService;
     private final CommandLinkMutationService linkMutationService;
-    private final CommandLinkedNpcDeathService deathService;
-    private final CommandLinkedNpcCaptureService captureService;
-    private final CommandLinkedNpcCoopService coopService;
-    private final CommandLinkedNpcLostService lostService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandFeedbackService feedbackService;
@@ -54,10 +50,6 @@ final class CommandMenuMoveService {
 
     CommandMenuMoveService(CommandResolutionService resolutionService,
                            CommandLinkMutationService linkMutationService,
-                           CommandLinkedNpcDeathService deathService,
-                           CommandLinkedNpcCaptureService captureService,
-                           CommandLinkedNpcCoopService coopService,
-                           CommandLinkedNpcLostService lostService,
                            CommandRelocationDispatchService relocationDispatchService,
                            CommandStepExecutionService stepExecutionService,
                            CommandFeedbackService feedbackService,
@@ -69,10 +61,6 @@ final class CommandMenuMoveService {
         this(
                 resolutionService,
                 linkMutationService,
-                deathService,
-                captureService,
-                coopService,
-                lostService,
                 relocationDispatchService,
                 stepExecutionService,
                 feedbackService,
@@ -87,10 +75,6 @@ final class CommandMenuMoveService {
 
     CommandMenuMoveService(CommandResolutionService resolutionService,
                            CommandLinkMutationService linkMutationService,
-                           CommandLinkedNpcDeathService deathService,
-                           CommandLinkedNpcCaptureService captureService,
-                           CommandLinkedNpcCoopService coopService,
-                           CommandLinkedNpcLostService lostService,
                            CommandRelocationDispatchService relocationDispatchService,
                            CommandStepExecutionService stepExecutionService,
                            CommandFeedbackService feedbackService,
@@ -102,10 +86,6 @@ final class CommandMenuMoveService {
                            @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.resolutionService = resolutionService;
         this.linkMutationService = linkMutationService;
-        this.deathService = deathService;
-        this.captureService = captureService;
-        this.coopService = coopService;
-        this.lostService = lostService;
         this.relocationDispatchService = relocationDispatchService;
         this.stepExecutionService = stepExecutionService;
         this.feedbackService = feedbackService;
@@ -215,33 +195,6 @@ final class CommandMenuMoveService {
                     stack = canonicalStack;
                     linkedRecords = repairedRecords;
                 }
-            }
-            if (deathService != null
-                    && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.dead");
-                return;
-            }
-            if (captureService != null
-                    && captureService.getCapturedSnapshotForToolOrOwner(
-                    npcUuid,
-                    toolId,
-                    player.getUuid()
-            ) != null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.captured");
-                return;
-            }
-            if (coopService != null
-                    && coopService.getCoopSnapshotForToolOrOwner(
-                    npcUuid,
-                    toolId,
-                    player.getUuid()
-            ) != null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.inCoop");
-                return;
-            }
-            if (lostService != null && lostService.isLost(npcUuid)) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.lost");
-                return;
             }
             TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
             if (config == null || !config.isEnabled()) {

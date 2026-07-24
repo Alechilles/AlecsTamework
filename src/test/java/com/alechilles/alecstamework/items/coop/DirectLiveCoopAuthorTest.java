@@ -1,9 +1,12 @@
 package com.alechilles.alecstamework.items.coop;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
@@ -112,6 +115,116 @@ class DirectLiveCoopAuthorTest {
     }
 
     @Test
+    void captureRejectsMismatchedAliasProfileWorldAndSlotEvidenceBeforeMutation() {
+        CoopSlotKey slot = slot(0);
+        DirectLiveCoopAuthor.LiveNpcSource valid = liveSource(slot);
+        NpcAlias otherAlias = new NpcAlias(UUID.fromString(
+                "00000000-0000-0000-0000-000000000111"
+        ));
+        ProfileId otherProfile = new ProfileId(UUID.fromString(
+                "00000000-0000-0000-0000-000000000112"
+        ));
+
+        assertInvalidSourceRejectedWithoutMutation(
+                slot,
+                new DirectLiveCoopAuthor.LiveNpcSource(
+                        valid.profileId(),
+                        otherAlias,
+                        valid.worldKey(),
+                        valid.adoption(),
+                        valid.observedSlot(),
+                        valid.encodedSnapshot()
+                )
+        );
+        assertInvalidSourceRejectedWithoutMutation(
+                slot,
+                new DirectLiveCoopAuthor.LiveNpcSource(
+                        otherProfile,
+                        valid.alias(),
+                        valid.worldKey(),
+                        valid.adoption(),
+                        valid.observedSlot(),
+                        valid.encodedSnapshot()
+                )
+        );
+        assertInvalidSourceRejectedWithoutMutation(
+                slot,
+                new DirectLiveCoopAuthor.LiveNpcSource(
+                        valid.profileId(),
+                        valid.alias(),
+                        "other-world",
+                        valid.adoption(),
+                        valid.observedSlot(),
+                        valid.encodedSnapshot()
+                )
+        );
+        assertInvalidSourceRejectedWithoutMutation(
+                slot,
+                new DirectLiveCoopAuthor.LiveNpcSource(
+                        valid.profileId(),
+                        valid.alias(),
+                        valid.worldKey(),
+                        valid.adoption(),
+                        slot(1),
+                        valid.encodedSnapshot()
+                )
+        );
+    }
+
+    @Test
+    void captureRejectsPersistedAliasProfileWorldAndLifecycleDisagreement() {
+        CoopSlotKey slot = slot(0);
+        DirectLiveCoopAuthor.LiveNpcSource source = liveSource(slot);
+        ProfileId otherProfile = new ProfileId(UUID.fromString(
+                "00000000-0000-0000-0000-000000000113"
+        ));
+        NpcAlias otherAlias = new NpcAlias(UUID.fromString(
+                "00000000-0000-0000-0000-000000000114"
+        ));
+
+        assertProfileDisagreementRejected(
+                slot,
+                source,
+                liveProfile(
+                        otherProfile,
+                        source.alias(),
+                        source.worldKey(),
+                        LifecycleState.ACTIVE
+                )
+        );
+        assertProfileDisagreementRejected(
+                slot,
+                source,
+                liveProfile(
+                        source.profileId(),
+                        otherAlias,
+                        source.worldKey(),
+                        LifecycleState.ACTIVE
+                )
+        );
+        assertProfileDisagreementRejected(
+                slot,
+                source,
+                liveProfile(
+                        source.profileId(),
+                        source.alias(),
+                        "other-world",
+                        LifecycleState.ACTIVE
+                )
+        );
+        assertProfileDisagreementRejected(
+                slot,
+                source,
+                liveProfile(
+                        source.profileId(),
+                        source.alias(),
+                        source.worldKey(),
+                        LifecycleState.DEAD_REVIVABLE
+                )
+        );
+    }
+
+    @Test
     void authoritativeReleaseSubmitsExactResidencySnapshotAndFrozenPlacement() {
         FakePersistence persistence = new FakePersistence();
         CoopSlotKey slot = slot(1);
@@ -142,6 +255,320 @@ class DirectLiveCoopAuthorTest {
         );
         assertSame(placement, release.placement());
         assertTrue(release.spawnReceiptKey().startsWith("coop-spawn:"));
+    }
+
+    @Test
+    void releaseRejectsOccupancyResidencyDisagreementWithoutSubmission() {
+        CoopSlotKey slot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(slot);
+        CompanionProfileReadModel profile = coopedProfile(occupancy);
+        CoopResidency projectedResidency = occupancy.residency();
+        CoopResidency disagreeingResidency = new CoopResidency(
+                projectedResidency.slotKey(),
+                projectedResidency.profileId(),
+                projectedResidency.housedNpcAlias(),
+                new SnapshotId(UUID.fromString(
+                        "00000000-0000-0000-0000-000000000215"
+                )),
+                projectedResidency.capturedAtMs(),
+                projectedResidency.updatedAtMs()
+        );
+
+        FakePersistence persistence = releasePersistence(
+                occupancy, profile, disagreeingResidency
+        );
+
+        DirectLiveCoopAuthor.Outcome outcome = author(persistence)
+                .releaseOccupied(slot, placement())
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.RESIDENCY_UNAVAILABLE,
+                outcome
+        );
+        assertEquals(0, persistence.releaseCalls);
+        assertNull(persistence.lastRelease);
+    }
+
+    @Test
+    void releaseRejectsOccupancyProfileDisagreementWithoutSubmission() {
+        CoopSlotKey slot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(slot);
+        CoopSlotKey otherSlot = slot(2);
+        CoopOccupancy otherOccupancy = occupancyFor(
+                otherSlot,
+                occupancy.residency().profileId(),
+                occupancy.residency().snapshotId()
+        );
+        CompanionProfileReadModel disagreeingProfile =
+                coopedProfile(otherOccupancy);
+        FakePersistence persistence = releasePersistence(
+                occupancy, disagreeingProfile, occupancy.residency()
+        );
+
+        DirectLiveCoopAuthor.Outcome outcome = author(persistence)
+                .releaseOccupied(slot, placement())
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.RESIDENCY_UNAVAILABLE,
+                outcome
+        );
+        assertEquals(0, persistence.releaseCalls);
+        assertNull(persistence.lastRelease);
+    }
+
+    @Test
+    void releaseRejectsResidencyProfileDisagreementWithoutSubmission() {
+        CoopSlotKey slot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(slot);
+        ProfileId otherProfile = new ProfileId(UUID.fromString(
+                "00000000-0000-0000-0000-000000000216"
+        ));
+        CoopResidency disagreeingResidency = new CoopResidency(
+                slot,
+                otherProfile,
+                occupancy.residency().housedNpcAlias(),
+                occupancy.residency().snapshotId(),
+                occupancy.residency().capturedAtMs(),
+                occupancy.residency().updatedAtMs()
+        );
+        FakePersistence persistence = releasePersistence(
+                occupancy, coopedProfile(occupancy), disagreeingResidency
+        );
+
+        DirectLiveCoopAuthor.Outcome outcome = author(persistence)
+                .releaseOccupied(slot, placement())
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.RESIDENCY_UNAVAILABLE,
+                outcome
+        );
+        assertEquals(0, persistence.releaseCalls);
+        assertNull(persistence.lastRelease);
+    }
+
+    @Test
+    void releaseRejectsSnapshotDisagreementWithoutSubmission() {
+        CoopSlotKey slot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(slot);
+        CompanionProfileReadModel valid = coopedProfile(occupancy);
+        SnapshotId otherSnapshotId = new SnapshotId(UUID.fromString(
+                "00000000-0000-0000-0000-000000000217"
+        ));
+        CompanionProfileReadModel disagreeingProfile =
+                new CompanionProfileReadModel(
+                        valid.identity(),
+                        valid.currentAlias(),
+                        valid.lifecycle(),
+                        valid.toolLinks(),
+                        List.of(canonicalSnapshot(
+                                otherSnapshotId,
+                                valid.identity().profileId(),
+                                slot,
+                                valid.lifecycle().revision()
+                        )),
+                        valid.currentCoopSlot()
+                );
+        FakePersistence persistence = releasePersistence(
+                occupancy, disagreeingProfile, occupancy.residency()
+        );
+
+        DirectLiveCoopAuthor.Outcome outcome = author(persistence)
+                .releaseOccupied(slot, placement())
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.SNAPSHOT_UNAVAILABLE,
+                outcome
+        );
+        assertEquals(0, persistence.releaseCalls);
+        assertNull(persistence.lastRelease);
+    }
+
+    @Test
+    void rejectedSubmissionsReturnExplicitFailureOutcomes() {
+        CoopSlotKey captureSlot = slot(0);
+        DirectLiveCoopAuthor.LiveNpcSource source = liveSource(captureSlot);
+
+        FakePersistence registrationRejected = new FakePersistence();
+        registrationRejected.registrationSubmission =
+                SubmissionBehavior.REJECTED;
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.REGISTRATION_FAILED,
+                author(registrationRejected).captureLive(captureSlot, source)
+                        .toCompletableFuture()
+                        .join()
+        );
+
+        FakePersistence adoptionRejected = new FakePersistence();
+        adoptionRejected.slots.put(
+                captureSlot, CoopSlot.unoccupied(captureSlot)
+        );
+        adoptionRejected.adoptionSubmission = SubmissionBehavior.REJECTED;
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.PROFILE_UNAVAILABLE,
+                author(adoptionRejected).captureLive(captureSlot, source)
+                        .toCompletableFuture()
+                        .join()
+        );
+
+        FakePersistence captureRejected = capturePersistence(source);
+        captureRejected.captureSubmission = SubmissionBehavior.REJECTED;
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.CAPTURE_FAILED,
+                author(captureRejected).captureLive(captureSlot, source)
+                        .toCompletableFuture()
+                        .join()
+        );
+
+        CoopSlotKey releaseSlot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(releaseSlot);
+        FakePersistence releaseRejected = releasePersistence(
+                occupancy, coopedProfile(occupancy), occupancy.residency()
+        );
+        releaseRejected.releaseSubmission = SubmissionBehavior.REJECTED;
+        assertEquals(
+                DirectLiveCoopAuthor.Outcome.RELEASE_FAILED,
+                author(releaseRejected)
+                        .releaseOccupied(releaseSlot, placement())
+                        .toCompletableFuture()
+                        .join()
+        );
+    }
+
+    @Test
+    void exceptionalSubmissionsReturnExplicitFailureOutcomes() {
+        CoopSlotKey captureSlot = slot(0);
+        DirectLiveCoopAuthor.LiveNpcSource source = liveSource(captureSlot);
+
+        FakePersistence registrationExceptional = new FakePersistence();
+        registrationExceptional.registrationSubmission =
+                SubmissionBehavior.EXCEPTIONAL;
+
+        FakePersistence adoptionExceptional = new FakePersistence();
+        adoptionExceptional.slots.put(
+                captureSlot, CoopSlot.unoccupied(captureSlot)
+        );
+        adoptionExceptional.adoptionSubmission =
+                SubmissionBehavior.EXCEPTIONAL;
+
+        FakePersistence captureExceptional = capturePersistence(source);
+        captureExceptional.captureSubmission =
+                SubmissionBehavior.EXCEPTIONAL;
+
+        CoopSlotKey releaseSlot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(releaseSlot);
+        FakePersistence releaseExceptional = releasePersistence(
+                occupancy, coopedProfile(occupancy), occupancy.residency()
+        );
+        releaseExceptional.releaseSubmission =
+                SubmissionBehavior.EXCEPTIONAL;
+        assertAll(
+                () -> assertEquals(
+                        DirectLiveCoopAuthor.Outcome.REGISTRATION_FAILED,
+                        author(registrationExceptional)
+                                .captureLive(captureSlot, source)
+                                .toCompletableFuture()
+                                .join()
+                ),
+                () -> assertEquals(
+                        DirectLiveCoopAuthor.Outcome.PROFILE_UNAVAILABLE,
+                        author(adoptionExceptional)
+                                .captureLive(captureSlot, source)
+                                .toCompletableFuture()
+                                .join()
+                ),
+                () -> assertEquals(
+                        DirectLiveCoopAuthor.Outcome.CAPTURE_FAILED,
+                        author(captureExceptional)
+                                .captureLive(captureSlot, source)
+                                .toCompletableFuture()
+                                .join()
+                ),
+                () -> assertEquals(
+                        DirectLiveCoopAuthor.Outcome.RELEASE_FAILED,
+                        author(releaseExceptional)
+                                .releaseOccupied(releaseSlot, placement())
+                                .toCompletableFuture()
+                                .join()
+                )
+        );
+    }
+
+    @Test
+    void captureRetryPreservesIdempotencySnapshotAndRetirementReceipt() {
+        CoopSlotKey slot = slot(0);
+        DirectLiveCoopAuthor.LiveNpcSource source = liveSource(slot);
+        FakePersistence persistence = capturePersistence(source);
+        DirectLiveCoopAuthor author = author(persistence);
+
+        DirectLiveCoopAuthor.Outcome first = author.captureLive(slot, source)
+                .toCompletableFuture()
+                .join();
+        DirectLiveCoopAuthor.Outcome retried = author.captureLive(slot, source)
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(DirectLiveCoopAuthor.Outcome.CAPTURE_SUBMITTED, first);
+        assertEquals(DirectLiveCoopAuthor.Outcome.CAPTURE_SUBMITTED, retried);
+        assertEquals(2, persistence.captureKeys.size());
+        assertEquals(persistence.captureKeys.get(0),
+                persistence.captureKeys.get(1));
+        CompanionCoopCaptureRequest firstRequest =
+                persistence.captureRequests.get(0);
+        CompanionCoopCaptureRequest retriedRequest =
+                persistence.captureRequests.get(1);
+        assertEquals(firstRequest.snapshot().snapshotId(),
+                retriedRequest.snapshot().snapshotId());
+        assertEquals(firstRequest.snapshot().payloadHash(),
+                retriedRequest.snapshot().payloadHash());
+        assertEquals(
+                firstRequest.source().retirementReceiptKey(),
+                retriedRequest.source().retirementReceiptKey()
+        );
+    }
+
+    @Test
+    void releaseRetryPreservesIdempotencySnapshotTargetAliasAndSpawnReceipt() {
+        CoopSlotKey slot = slot(1);
+        CoopOccupancy occupancy = coopedOccupancy(slot);
+        FakePersistence persistence = releasePersistence(
+                occupancy, coopedProfile(occupancy), occupancy.residency()
+        );
+        DirectLiveCoopAuthor author = author(persistence);
+        CompanionSpawnPlacement placement = placement();
+
+        DirectLiveCoopAuthor.Outcome first = author
+                .releaseOccupied(slot, placement)
+                .toCompletableFuture()
+                .join();
+        DirectLiveCoopAuthor.Outcome retried = author
+                .releaseOccupied(slot, placement)
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(DirectLiveCoopAuthor.Outcome.RELEASE_SUBMITTED, first);
+        assertEquals(DirectLiveCoopAuthor.Outcome.RELEASE_SUBMITTED, retried);
+        assertEquals(2, persistence.releaseKeys.size());
+        assertEquals(persistence.releaseKeys.get(0),
+                persistence.releaseKeys.get(1));
+        CompanionCoopReleaseRequest firstRequest =
+                persistence.releaseRequests.get(0);
+        CompanionCoopReleaseRequest retriedRequest =
+                persistence.releaseRequests.get(1);
+        assertEquals(firstRequest.sourceSnapshot().snapshotId(),
+                retriedRequest.sourceSnapshot().snapshotId());
+        assertEquals(firstRequest.targetAlias(), retriedRequest.targetAlias());
+        assertEquals(
+                firstRequest.spawnReceiptKey(),
+                retriedRequest.spawnReceiptKey()
+        );
     }
 
     @Test
@@ -199,6 +626,80 @@ class DirectLiveCoopAuthorTest {
         );
     }
 
+    private void assertInvalidSourceRejectedWithoutMutation(
+            CoopSlotKey slot,
+            DirectLiveCoopAuthor.LiveNpcSource source
+    ) {
+        FakePersistence persistence = new FakePersistence();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> author(persistence).captureLive(slot, source)
+        );
+
+        assertEquals(0, persistence.registrationCalls);
+        assertEquals(0, persistence.adoptionCalls);
+        assertEquals(0, persistence.captureCalls);
+        assertNull(persistence.lastCapture);
+    }
+
+    private void assertProfileDisagreementRejected(
+            CoopSlotKey slot,
+            DirectLiveCoopAuthor.LiveNpcSource source,
+            CompanionProfileReadModel disagreeingProfile
+    ) {
+        FakePersistence persistence = new FakePersistence();
+        persistence.slots.put(slot, CoopSlot.unoccupied(slot));
+        persistence.profilesByAlias.put(source.alias(), disagreeingProfile);
+
+        DirectLiveCoopAuthor.Outcome outcome = author(persistence)
+                .captureLive(slot, source)
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(DirectLiveCoopAuthor.Outcome.PROFILE_UNAVAILABLE, outcome);
+        assertEquals(0, persistence.registrationCalls);
+        assertEquals(0, persistence.adoptionCalls);
+        assertEquals(0, persistence.captureCalls);
+        assertNull(persistence.lastCapture);
+    }
+
+    private FakePersistence capturePersistence(
+            DirectLiveCoopAuthor.LiveNpcSource source
+    ) {
+        FakePersistence persistence = new FakePersistence();
+        persistence.slots.put(
+                source.observedSlot(),
+                CoopSlot.unoccupied(source.observedSlot())
+        );
+        CompanionProfileReadModel profile = observedLiveProfile(source);
+        persistence.profilesByAlias.put(source.alias(), profile);
+        persistence.profilesById.put(source.profileId(), profile);
+        return persistence;
+    }
+
+    private FakePersistence releasePersistence(
+            CoopOccupancy occupancy,
+            CompanionProfileReadModel profile,
+            CoopResidency residency
+    ) {
+        FakePersistence persistence = new FakePersistence();
+        persistence.occupancies.put(occupancy.slot().key(), occupancy);
+        persistence.profilesById.put(
+                occupancy.residency().profileId(), profile
+        );
+        persistence.residencies.put(
+                occupancy.residency().profileId(), residency
+        );
+        return persistence;
+    }
+
+    private CompanionSpawnPlacement placement() {
+        return new CompanionSpawnPlacement(
+                "world", 10.5, 65.0, 13.5, 0.0f, 0.0f, 0.0f
+        );
+    }
+
     private DirectLiveCoopAuthor.LiveNpcSource liveSource(CoopSlotKey slot) {
         UUID npcId = UUID.fromString("00000000-0000-0000-0000-000000000101");
         ProfileId profileId = new ProfileId(npcId);
@@ -245,20 +746,61 @@ class DirectLiveCoopAuthorTest {
     private CompanionProfileReadModel observedLiveProfile(
             DirectLiveCoopAuthor.LiveNpcSource source
     ) {
-        CompanionProfileMutation.AdoptLive adoption = source.adoption();
+        return liveProfile(
+                source.profileId(),
+                source.alias(),
+                source.worldKey(),
+                LifecycleState.ACTIVE
+        );
+    }
+
+    private CompanionProfileReadModel liveProfile(
+            ProfileId profileId,
+            NpcAlias alias,
+            String worldKey,
+            LifecycleState lifecycleState
+    ) {
+        String metadata = "{}";
+        CompanionIdentity identity = new CompanionIdentity(
+                profileId,
+                "Hen",
+                "hen_role",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                worldKey,
+                NOW,
+                NOW,
+                NOW,
+                0
+        );
+        LifecycleLocation location = lifecycleState == LifecycleState.ACTIVE
+                ? LifecycleLocation.liveEntity(alias.toString(), worldKey)
+                : LifecycleLocation.none();
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                profileId,
+                null,
+                lifecycleState,
+                location,
+                LifecycleRevision.INITIAL,
+                null,
+                NOW,
+                ReconciliationGeneration.INITIAL,
+                null,
+                null
+        );
         return new CompanionProfileReadModel(
-                adoption.identity(),
+                identity,
                 new CompanionAlias(
-                        adoption.alias(),
-                        adoption.profileId(),
+                        alias,
+                        profileId,
                         0,
                         CompanionAlias.State.CURRENT,
                         null,
-                        adoption.requestedAtMs(),
+                        NOW,
                         null
                 ),
-                adoption.initialLifecycle(),
-                adoption.toolLinks(),
+                lifecycle,
+                List.of(),
                 List.of(),
                 null
         );
@@ -271,6 +813,14 @@ class DirectLiveCoopAuthorTest {
         SnapshotId snapshotId = new SnapshotId(UUID.fromString(
                 "00000000-0000-0000-0000-000000000203"
         ));
+        return occupancyFor(slot, profileId, snapshotId);
+    }
+
+    private CoopOccupancy occupancyFor(
+            CoopSlotKey slot,
+            ProfileId profileId,
+            SnapshotId snapshotId
+    ) {
         CoopSlot structural = new CoopSlot(slot, 3, null, null);
         CoopResidency residency = new CoopResidency(
                 slot,
@@ -388,6 +938,12 @@ class DirectLiveCoopAuthorTest {
         return new CoopSlotKey("world", "hen_coop", 10, 64, 10, index);
     }
 
+    private enum SubmissionBehavior {
+        PUBLISHED,
+        REJECTED,
+        EXCEPTIONAL
+    }
+
     private static final class FakePersistence
             implements DirectLiveCoopPersistencePort {
         private final Map<CoopSlotKey, CoopSlot> slots = new HashMap<>();
@@ -405,6 +961,22 @@ class DirectLiveCoopAuthorTest {
         private int releaseCalls;
         private final List<CoopSlotKey> registrationOrder =
                 new java.util.ArrayList<>();
+        private final List<IdempotencyKey> captureKeys =
+                new java.util.ArrayList<>();
+        private final List<CompanionCoopCaptureRequest> captureRequests =
+                new java.util.ArrayList<>();
+        private final List<IdempotencyKey> releaseKeys =
+                new java.util.ArrayList<>();
+        private final List<CompanionCoopReleaseRequest> releaseRequests =
+                new java.util.ArrayList<>();
+        private SubmissionBehavior registrationSubmission =
+                SubmissionBehavior.PUBLISHED;
+        private SubmissionBehavior adoptionSubmission =
+                SubmissionBehavior.PUBLISHED;
+        private SubmissionBehavior captureSubmission =
+                SubmissionBehavior.PUBLISHED;
+        private SubmissionBehavior releaseSubmission =
+                SubmissionBehavior.PUBLISHED;
         private CompanionCoopCaptureRequest lastCapture;
         private CompanionCoopReleaseRequest lastRelease;
 
@@ -460,8 +1032,12 @@ class DirectLiveCoopAuthorTest {
         ) {
             registrationCalls++;
             registrationOrder.add(registration.slot().key());
-            slots.putIfAbsent(registration.slot().key(), registration.slot());
-            return published(operationId);
+            if (registrationSubmission == SubmissionBehavior.PUBLISHED) {
+                slots.putIfAbsent(
+                        registration.slot().key(), registration.slot()
+                );
+            }
+            return submission(operationId, registrationSubmission);
         }
 
         @Override
@@ -473,25 +1049,28 @@ class DirectLiveCoopAuthorTest {
             adoptionCalls++;
             CompanionProfileMutation.AdoptLive adoption =
                     (CompanionProfileMutation.AdoptLive) mutation;
-            CompanionProfileReadModel profile = new CompanionProfileReadModel(
-                    adoption.identity(),
-                    new CompanionAlias(
-                            adoption.alias(),
-                            adoption.profileId(),
-                            0,
-                            CompanionAlias.State.CURRENT,
-                            null,
-                            adoption.requestedAtMs(),
-                            null
-                    ),
-                    adoption.initialLifecycle(),
-                    adoption.toolLinks(),
-                    List.of(),
-                    null
-            );
-            profilesByAlias.put(adoption.alias(), profile);
-            profilesById.put(adoption.profileId(), profile);
-            return published(operationId);
+            if (adoptionSubmission == SubmissionBehavior.PUBLISHED) {
+                CompanionProfileReadModel profile =
+                        new CompanionProfileReadModel(
+                                adoption.identity(),
+                                new CompanionAlias(
+                                        adoption.alias(),
+                                        adoption.profileId(),
+                                        0,
+                                        CompanionAlias.State.CURRENT,
+                                        null,
+                                        adoption.requestedAtMs(),
+                                        null
+                                ),
+                                adoption.initialLifecycle(),
+                                adoption.toolLinks(),
+                                List.of(),
+                                null
+                        );
+                profilesByAlias.put(adoption.alias(), profile);
+                profilesById.put(adoption.profileId(), profile);
+            }
+            return submission(operationId, adoptionSubmission);
         }
 
         @Override
@@ -502,7 +1081,9 @@ class DirectLiveCoopAuthorTest {
         ) {
             captureCalls++;
             lastCapture = capture;
-            return published(operationId);
+            captureKeys.add(idempotencyKey);
+            captureRequests.add(capture);
+            return submission(operationId, captureSubmission);
         }
 
         @Override
@@ -513,7 +1094,9 @@ class DirectLiveCoopAuthorTest {
         ) {
             releaseCalls++;
             lastRelease = release;
-            return published(operationId);
+            releaseKeys.add(idempotencyKey);
+            releaseRequests.add(release);
+            return submission(operationId, releaseSubmission);
         }
 
         private <T> CompletionStage<PersistenceReadResult<T>> completed(
@@ -522,7 +1105,37 @@ class DirectLiveCoopAuthorTest {
             return CompletableFuture.completedFuture(result);
         }
 
-        private PublicOperationSubmission published(OperationId operationId) {
+        private PublicOperationSubmission submission(
+                OperationId operationId,
+                SubmissionBehavior behavior
+        ) {
+            if (behavior == SubmissionBehavior.REJECTED) {
+                return new PublicOperationSubmission(
+                        PublicOperationSubmission.Admission.REJECTED,
+                        CompletableFuture.completedFuture(
+                                new OperationWorkflowResult(
+                                        OperationWorkflowResult.Status
+                                                .PREPARE_FAILED,
+                                        null,
+                                        List.of(),
+                                        new IllegalStateException(
+                                                "test rejection"
+                                        )
+                                )
+                        )
+                );
+            }
+            if (behavior == SubmissionBehavior.EXCEPTIONAL) {
+                CompletableFuture<OperationWorkflowResult> completion =
+                        new CompletableFuture<>();
+                completion.completeExceptionally(
+                        new IllegalStateException("test completion failure")
+                );
+                return new PublicOperationSubmission(
+                        PublicOperationSubmission.Admission.ACCEPTED,
+                        completion
+                );
+            }
             OperationEnvelope envelope = new OperationEnvelope(
                     operationId,
                     new IdempotencyKey("test"),

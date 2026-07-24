@@ -4,16 +4,52 @@ import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityCom
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for operation-owned projection profile persistence. */
 class CommandLinkedNpcStateSnapshotServiceTest {
+    @Test
+    void liveSnapshotDefensivelyCopiesMutableValues() {
+        String[] toolIds = {"tool-a"};
+        Vector3d lastKnown = new Vector3d(1.0D, 2.0D, 3.0D);
+        Vector3d home = new Vector3d(4.0D, 5.0D, 6.0D);
+
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot =
+                new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
+                        UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                        null,
+                        null,
+                        toolIds,
+                        "Mob_Test",
+                        true,
+                        "Custom",
+                        "Display",
+                        lastKnown,
+                        home
+                );
+        toolIds[0] = "changed";
+        lastKnown.set(9.0D, 9.0D, 9.0D);
+        home.set(8.0D, 8.0D, 8.0D);
+
+        assertArrayEquals(new String[]{"tool-a"}, snapshot.toolIds());
+        assertEquals(new Vector3d(1.0D, 2.0D, 3.0D),
+                snapshot.lastKnownPosition());
+        assertEquals(new Vector3d(4.0D, 5.0D, 6.0D),
+                snapshot.homePosition());
+        assertNotSame(snapshot.toolIds(), snapshot.toolIds());
+        assertNotSame(snapshot.lastKnownPosition(), snapshot.lastKnownPosition());
+        assertNotSame(snapshot.homePosition(), snapshot.homePosition());
+    }
+
     @Test
     void exposesInjectedLoadedIdentityIndex() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();

@@ -103,10 +103,6 @@ import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandDirectLiveCoopSystem;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
@@ -269,10 +265,6 @@ public class Tamework extends JavaPlugin {
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
-    private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
-    private CommandLinkedNpcCoopService commandLinkedNpcCoopService;
-    private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
-    private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private Path runtimeDataDirectory;
     private TameworkPersistenceComposition persistenceComposition;
@@ -901,17 +893,6 @@ public class Tamework extends JavaPlugin {
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager();
         apiSelfTestRunner = new ApiSelfTestRunner();
-        commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService();
-        commandLinkedNpcCoopService = new CommandLinkedNpcCoopService();
-        commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
-                commandLinkedNpcStateSnapshotService
-        );
-        commandLinkedNpcLostService = new CommandLinkedNpcLostService(
-                getLogger(),
-                commandLinkedNpcCaptureService,
-                commandLinkedNpcCoopService
-        );
-        commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
@@ -920,7 +901,8 @@ public class Tamework extends JavaPlugin {
         );
         getChunkStoreRegistry().registerSystem(
                 new CommandDirectLiveCoopSystem(
-                        persistenceComposition.facades()
+                        persistenceComposition.directLiveCoopAuthor(),
+                        persistenceComposition.directLiveCoopProjections()
                 )
         );
         getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
@@ -992,10 +974,6 @@ public class Tamework extends JavaPlugin {
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
                 commandNpcRelocationService,
-                commandLinkedNpcDeathService,
-                commandLinkedNpcCaptureService,
-                commandLinkedNpcCoopService,
-                commandLinkedNpcLostService,
                 commandLinkedNpcStateSnapshotService,
                 persistenceComposition.facades(),
                 persistenceComposition.restorationAuthor()
@@ -1264,7 +1242,6 @@ public class Tamework extends JavaPlugin {
         }
         api = null;
         if (commandLinkedNpcStateSnapshotService != null) {
-            commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(null);
         }
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
@@ -2627,10 +2604,6 @@ public class Tamework extends JavaPlugin {
 
     public CommandItemFeatureHandler getCommandItemFeatureHandler() {
         return commandItemFeatureHandler;
-    }
-
-    public CommandLinkedNpcDeathService getCommandLinkedNpcDeathService() {
-        return commandLinkedNpcDeathService;
     }
 
     public ComponentType<EntityStore, TameworkOwnerComponent> getOwnerComponentType() {

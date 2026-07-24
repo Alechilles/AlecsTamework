@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.profile;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import com.google.gson.JsonArray;
@@ -80,6 +81,7 @@ public final class CompanionProfileProjectionChangeCodec {
         JsonObject json = new JsonObject();
         json.addProperty("profileId", state.profileId().toString());
         nullable(json, "currentAlias", text(state.currentAlias()));
+        json.addProperty("lifecycleState", state.lifecycleState().name());
         nullable(json, "ownerId", text(state.ownerId()));
         nullable(json, "ownerName", state.ownerName());
         nullable(json, "roleId", state.roleId());
@@ -124,6 +126,9 @@ public final class CompanionProfileProjectionChangeCodec {
         return new CompanionProfileProjectionState(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 alias == null ? null : NpcAlias.parse(alias),
+                LifecycleState.valueOf(
+                        json.get("lifecycleState").getAsString()
+                ),
                 owner == null ? null : OwnerId.parse(owner),
                 nullableText(json, "ownerName"),
                 nullableText(json, "roleId"),

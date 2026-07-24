@@ -132,6 +132,7 @@ class CompanionProfileProjectionChangeCodecTest {
         );
         assertEquals("Owner", actual.after().ownerName());
         assertEquals("Buddy", actual.after().customName());
+        assertEquals(LifecycleState.COOP, actual.after().lifecycleState());
         assertEquals("coop-a", actual.after().coopId());
         assertEquals(3, actual.after().coopSlot());
         assertEquals(-40, actual.after().lastUpdatedAtMs());

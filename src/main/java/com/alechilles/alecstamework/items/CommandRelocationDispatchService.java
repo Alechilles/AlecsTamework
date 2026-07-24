@@ -13,24 +13,15 @@ import java.util.UUID;
  */
 final class CommandRelocationDispatchService {
     private final CommandNpcRelocationService relocationService;
-    private final CommandLinkedNpcDeathService deathService;
-    private final CommandLinkedNpcCaptureService captureService;
-    private final CommandLinkedNpcCoopService coopService;
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
 
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcCoopService coopService,
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
                                      CommandCompanionPlacementService companionPlacementService) {
         this.relocationService = relocationService;
-        this.deathService = deathService;
-        this.captureService = captureService;
-        this.coopService = coopService;
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
@@ -57,29 +48,6 @@ final class CommandRelocationDispatchService {
         int queued = 0;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            if (relocationService.isDeleteOnRemoveRecoveryPending(record.npcUuid)) {
-                continue;
-            }
-            if (captureService != null
-                    && captureService.getCapturedSnapshotForToolOrOwner(
-                    record.npcUuid,
-                    context.toolId,
-                    ownerUuid
-            ) != null) {
-                continue;
-            }
-            if (coopService != null
-                    && coopService.getCoopSnapshotForToolOrOwner(
-                    record.npcUuid,
-                    context.toolId,
-                    ownerUuid
-            ) != null) {
-                continue;
-            }
-            if (deathService != null
-                    && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
                 continue;
             }
             relocationService.rememberSourceWorld(record.npcUuid, record.lastKnownWorldName);

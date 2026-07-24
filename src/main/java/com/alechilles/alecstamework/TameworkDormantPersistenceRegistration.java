@@ -27,7 +27,6 @@ final class TameworkDormantPersistenceRegistration {
         HytaleDormantCompanionObservationFactory observations =
                 new HytaleDormantCompanionObservationFactory(
                         NPCEntity.getComponentType(),
-                        components.commandLinks(),
                         components.projectionIdentity(),
                         components.persistenceRetirement(),
                         DeathComponent.getComponentType(),

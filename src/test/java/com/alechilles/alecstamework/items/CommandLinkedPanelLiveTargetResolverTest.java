@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import java.util.List;
 import java.util.Optional;
@@ -57,6 +58,7 @@ class CommandLinkedPanelLiveTargetResolverTest {
                 new CompanionProfileProjectionState(
                         new ProfileId(profileUuid),
                         new NpcAlias(liveUuid),
+                        LifecycleState.ACTIVE,
                         null,
                         null,
                         "Tamed_Chicken",

@@ -5,8 +5,6 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
-import com.alechilles.alecstamework.items.CompanionRevivePolicy;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -47,8 +45,6 @@ public final class HytaleDormantCompanionObservationFactory
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
 
     private final ComponentType<EntityStore, NPCEntity> npcType;
-    private final ComponentType<EntityStore, TameworkCommandLinksComponent>
-            linksType;
     private final ComponentType<EntityStore, TameworkProjectionIdentityComponent>
             projectionType;
     private final ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
@@ -60,8 +56,6 @@ public final class HytaleDormantCompanionObservationFactory
     /** Creates the production evidence freezer from already-registered component types. */
     public HytaleDormantCompanionObservationFactory(
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-            @Nonnull ComponentType<EntityStore, TameworkCommandLinksComponent>
-                    linksType,
             @Nonnull ComponentType<EntityStore,
                     TameworkProjectionIdentityComponent> projectionType,
             @Nonnull ComponentType<EntityStore,
@@ -71,7 +65,6 @@ public final class HytaleDormantCompanionObservationFactory
             @Nonnull LongSupplier clock
     ) {
         this.npcType = Objects.requireNonNull(npcType, "npcType");
-        this.linksType = Objects.requireNonNull(linksType, "linksType");
         this.projectionType = Objects.requireNonNull(
                 projectionType, "projectionType"
         );
@@ -154,14 +147,11 @@ public final class HytaleDormantCompanionObservationFactory
             @Nullable DeathComponent death
     ) {
         NPCEntity npc = store.getComponent(reference, npcType);
-        TameworkCommandLinksComponent links =
-                store.getComponent(reference, linksType);
         UUID npcUuid = npc == null ? null : npc.getUuid();
         String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
         String worldKey = worldKey(store);
         if (npcUuid == null || roleId == null || roleId.isBlank()
-                || worldKey == null
-                || !CompanionRevivePolicy.supportsRevive(roleId, links)) {
+                || worldKey == null) {
             return null;
         }
         TameworkProjectionIdentityComponent projection =

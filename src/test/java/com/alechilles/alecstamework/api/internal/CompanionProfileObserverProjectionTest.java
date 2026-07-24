@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -176,6 +177,7 @@ class CompanionProfileObserverProjectionTest {
         return new CompanionProfileProjectionState(
                 PROFILE,
                 alias,
+                LifecycleState.CAPTURED,
                 OWNER,
                 "Owner",
                 "role",

@@ -2,13 +2,13 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
-import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
-import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,7 +22,7 @@ class CommandNpcProfileActionResolverTest {
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcProfileActionResolver resolver =
-                resolver(profileUuid, currentUuid, Set.of());
+                resolver(profileUuid, currentUuid, LifecycleState.ACTIVE);
 
         CommandNpcProfileActionResolver.ActionTarget target =
                 resolver.resolveRelocation(
@@ -45,7 +45,7 @@ class CommandNpcProfileActionResolverTest {
         CommandNpcProfileActionResolver resolver = resolver(
                 profileUuid,
                 currentUuid,
-                Set.of(TameworkSnapshotCodecs.DEATH)
+                LifecycleState.DEAD_REVIVABLE
         );
 
         CommandNpcProfileActionResolver.ActionTarget target =
@@ -68,7 +68,7 @@ class CommandNpcProfileActionResolverTest {
         CommandNpcProfileActionResolver resolver = resolver(
                 profileUuid,
                 currentUuid,
-                Set.of(),
+                LifecycleState.ACTIVE,
                 this::oneLocation
         );
 
@@ -83,43 +83,74 @@ class CommandNpcProfileActionResolverTest {
     }
 
     @Test
-    void canonicalizationUpdatesOnlyIdentityFields() {
+    void canonicalizationUpdatesStaleAliasAndPreservesNonIdentityFields() {
         UUID profileUuid = UUID.randomUUID();
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcProfileActionResolver resolver =
-                resolver(profileUuid, currentUuid, Set.of());
+                resolver(profileUuid, currentUuid, LifecycleState.ACTIVE);
+        LinkedNpcRecord source = new LinkedNpcRecord(
+                staleUuid,
+                profileUuid.toString(),
+                new Vector3d(1.25, -2.5, 3.75),
+                "default",
+                new Vector3d(4.5, 5.25, -6.75),
+                "Clucky",
+                "npc.chicken.clucky",
+                "Tamed_Chicken",
+                "Stay",
+                false,
+                true,
+                "backyard-flock"
+        );
 
         CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                resolver.canonicalizeRecords(List.of(record(staleUuid, null)));
+                resolver.canonicalizeRecords(List.of(source));
 
         assertTrue(canonical.safeToPersist());
         assertTrue(canonical.identityChanged());
-        assertEquals(currentUuid, canonical.records().get(0).npcUuid);
+        LinkedNpcRecord result = canonical.records().getFirst();
+        assertEquals(currentUuid, result.npcUuid);
         assertEquals(
                 profileUuid.toString(),
-                canonical.records().get(0).profileId
+                result.profileId
+        );
+        assertEquals(source.lastKnownPosition, result.lastKnownPosition);
+        assertEquals(source.lastKnownWorldName, result.lastKnownWorldName);
+        assertEquals(source.homePosition, result.homePosition);
+        assertEquals(source.cachedDisplayName, result.cachedDisplayName);
+        assertEquals(source.cachedNameKey, result.cachedNameKey);
+        assertEquals(source.cachedRoleId, result.cachedRoleId);
+        assertEquals(source.cachedCommandState, result.cachedCommandState);
+        assertEquals(source.active, result.active);
+        assertEquals(source.breedingEnabled, result.breedingEnabled);
+        assertEquals(source.groupId, result.groupId);
+    }
+
+    private CommandNpcProfileActionResolver resolver(
+            UUID profileUuid,
+            UUID currentUuid,
+            LifecycleState lifecycleState
+    ) {
+        return resolver(
+                profileUuid,
+                currentUuid,
+                lifecycleState,
+                this::absent
         );
     }
 
     private CommandNpcProfileActionResolver resolver(
             UUID profileUuid,
             UUID currentUuid,
-            Set<SnapshotKind> snapshots
-    ) {
-        return resolver(profileUuid, currentUuid, snapshots, this::absent);
-    }
-
-    private CommandNpcProfileActionResolver resolver(
-            UUID profileUuid,
-            UUID currentUuid,
-            Set<SnapshotKind> snapshots,
+            LifecycleState lifecycleState,
             CommandNpcIdentityService.LiveNpcProbe probe
     ) {
         CompanionProfileProjectionState projection =
                 new CompanionProfileProjectionState(
                         new ProfileId(profileUuid),
                         new NpcAlias(currentUuid),
+                        lifecycleState,
                         null,
                         null,
                         "Tamed_Chicken",
@@ -129,7 +160,7 @@ class CommandNpcProfileActionResolverTest {
                         null,
                         null,
                         Set.of(),
-                        snapshots,
+                        Set.of(),
                         100L
                 );
         CommandPersistenceView view = new CommandPersistenceView(

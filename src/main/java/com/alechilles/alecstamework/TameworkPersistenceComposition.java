@@ -14,6 +14,8 @@ import com.alechilles.alecstamework.items.persistence
         .SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence
         .SpawnerCapturedArtifactReleaseAuthor;
+import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
+import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.npc.components
         .TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.lifecycle
@@ -54,7 +56,7 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
- * Owns the single production persistence bootstrap and released gameplay authors.
+ * Owns the single bootstrap and released gameplay persistence boundaries.
  *
  * <p>Tamework composes this object once. No repository, connection, migration,
  * queue, or recovery implementation crosses this boundary.</p>
@@ -71,6 +73,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final FreeCompanionRestorationAuthor restorationAuthor;
     private final PositiveEvidenceDormantAuthor dormantAuthor;
+    private final DirectLiveCoopAuthor directLiveCoopAuthor;
+    private final DirectLiveCoopProjectionView directLiveCoopProjections;
 
     private TameworkPersistenceComposition(
             HytaleLogger logger,
@@ -81,7 +85,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             SpawnerCaptureAuthor captureAuthor,
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             FreeCompanionRestorationAuthor restorationAuthor,
-            PositiveEvidenceDormantAuthor dormantAuthor
+            PositiveEvidenceDormantAuthor dormantAuthor,
+            DirectLiveCoopAuthor directLiveCoopAuthor,
+            DirectLiveCoopProjectionView directLiveCoopProjections
     ) {
         this.logger = logger;
         this.identityBootstrap = identityBootstrap;
@@ -92,6 +98,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.releaseAuthor = releaseAuthor;
         this.restorationAuthor = restorationAuthor;
         this.dormantAuthor = dormantAuthor;
+        this.directLiveCoopAuthor = directLiveCoopAuthor;
+        this.directLiveCoopProjections = directLiveCoopProjections;
     }
 
     /**
@@ -198,7 +206,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 authors.captureAuthor(),
                 authors.releaseAuthor(),
                 authors.restorationAuthor(),
-                authors.dormantAuthor()
+                authors.dormantAuthor(),
+                authors.directLiveCoopAuthor(),
+                authors.directLiveCoopProjections()
         );
     }
 
@@ -332,6 +342,16 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     @Nonnull
     PositiveEvidenceDormantAuthor dormantAuthor() {
         return dormantAuthor;
+    }
+
+    @Nonnull
+    DirectLiveCoopAuthor directLiveCoopAuthor() {
+        return directLiveCoopAuthor;
+    }
+
+    @Nonnull
+    DirectLiveCoopProjectionView directLiveCoopProjections() {
+        return directLiveCoopProjections;
     }
 
     /** Runs the bounded teardown protocol and returns its exact outcome. */

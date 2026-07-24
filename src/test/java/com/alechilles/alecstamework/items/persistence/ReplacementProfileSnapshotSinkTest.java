@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
@@ -125,12 +125,12 @@ class ReplacementProfileSnapshotSinkTest {
         return LiveOperationResult.confirmed(code).completed();
     }
 
-    private CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot(
+    private CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot(
             UUID npcUuid,
             UUID toolId,
             String customName
     ) {
-        return new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+        return new CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot(
                 npcUuid,
                 UUID.fromString(
                         "30000000-0000-0000-0000-000000000101"
@@ -142,43 +142,7 @@ class ReplacementProfileSnapshotSinkTest {
                 customName,
                 "Companion",
                 new Vector3d(1, 2, 3),
-                new Vector3d(4, 5, 6),
-                0L,
-                0L,
-                null,
-                null,
-                0L,
-                null,
-                null,
-                0L,
-                null,
-                null,
-                null,
-                0L,
-                null,
-                0L,
-                0L,
-                0L,
-                0L,
-                1.0D,
-                1.0D,
-                1.0D,
-                1.0D,
-                1.0D,
-                1.0D,
-                false,
-                null,
-                null,
-                false,
-                null,
-                1,
-                0.0D,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null
+                new Vector3d(4, 5, 6)
         );
     }
 

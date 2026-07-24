@@ -21,12 +21,29 @@ class TalentUtilityEffectContractTest {
     }
 
     @Test
-    void reviveCooldownUsesLiveAndSnapshotTalentMultipliers() throws IOException {
-        String content = readSource("items", "CommandLinkedNpcDeathService.java");
-        assertTrue(content.contains("REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY = \"ReviveCooldownMultiplier\""));
-        assertTrue(content.contains("resolveRespawnCooldownMs(roleId, reference, store)"));
-        assertTrue(content.contains("resolveRespawnCooldownMs(roleId, cached)"));
-        assertTrue(content.contains("resolveSnapshotTalentMultiplier(snapshot, REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY, 1.0)"));
+    void freeRestorationCooldownFreezesLiveTalentMultiplier() throws IOException {
+        String observation = readSource(
+                "items", "persistence",
+                "HytaleDormantCompanionObservationFactory.java"
+        );
+        assertTrue(observation.contains("REVIVE_COOLDOWN_MULTIPLIER"));
+        assertTrue(observation.contains("\"ReviveCooldownMultiplier\""));
+        assertTrue(observation.contains(
+                "CompanionProgressionModifierService.resolveMultiplier("
+        ));
+        assertTrue(observation.contains(
+                "long cooldown = reviveCooldownMs(reference, store, roleId)"
+        ));
+        assertTrue(observation.contains(
+                "saturatingAdd(diedAtMs, cooldown)"
+        ));
+
+        String author = readSource(
+                "items", "persistence", "PositiveEvidenceDormantAuthor.java"
+        );
+        assertTrue(author.contains(
+                "death.restorationAvailableAtMs()"
+        ));
     }
 
     @Test

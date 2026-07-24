@@ -9,7 +9,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CompanionProfileSnapshotSink;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -75,7 +75,7 @@ public final class ReplacementProfileSnapshotSink
 
     @Override
     public void publish(
-            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            @Nonnull CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             @Nonnull String worldKey
     ) {
         if (snapshot == null || snapshot.npcUuid() == null
@@ -116,7 +116,7 @@ public final class ReplacementProfileSnapshotSink
     private CompletionStage<Void> resolve(
             LiveSnapshot observed
     ) {
-        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot =
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot =
                 observed.snapshot();
         NpcAlias alias = new NpcAlias(snapshot.npcUuid());
         return queries.findProfile(alias).thenCompose(read -> {
@@ -152,7 +152,7 @@ public final class ReplacementProfileSnapshotSink
     private CompletionStage<Void> adopt(
             ProfileId profileId,
             NpcAlias alias,
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             String worldKey
     ) {
         long now = clock.getAsLong();
@@ -185,7 +185,7 @@ public final class ReplacementProfileSnapshotSink
 
     private CompletionStage<Void> update(
             CompanionProfileReadModel current,
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot
     ) {
         CompanionIdentity before = current.identity();
         String displayName = first(
@@ -335,7 +335,7 @@ public final class ReplacementProfileSnapshotSink
     private String metadata(
             String existingJson,
             CompanionLifecycle lifecycle,
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             boolean ownerMatches
     ) {
         JsonObject json = object(existingJson);
@@ -397,7 +397,7 @@ public final class ReplacementProfileSnapshotSink
     }
 
     private record LiveSnapshot(
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             String worldKey
     ) {
     }

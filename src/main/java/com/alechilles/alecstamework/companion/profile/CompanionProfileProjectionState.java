@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.google.gson.JsonElement;
@@ -30,6 +31,7 @@ import javax.annotation.Nullable;
 public record CompanionProfileProjectionState(
         @Nonnull ProfileId profileId,
         @Nullable NpcAlias currentAlias,
+        @Nonnull LifecycleState lifecycleState,
         @Nullable OwnerId ownerId,
         @Nullable String ownerName,
         @Nullable String roleId,
@@ -43,7 +45,8 @@ public record CompanionProfileProjectionState(
         long lastUpdatedAtMs
 ) {
     public CompanionProfileProjectionState {
-        if (profileId == null || toolIds == null || activeSnapshotKinds == null) {
+        if (profileId == null || lifecycleState == null
+                || toolIds == null || activeSnapshotKinds == null) {
             throw new IllegalArgumentException("Complete profile projection state is required");
         }
         ownerName = normalize(ownerName);
@@ -101,6 +104,7 @@ public record CompanionProfileProjectionState(
         return new CompanionProfileProjectionState(
                 identity.profileId(),
                 currentAlias == null ? null : currentAlias.alias(),
+                lifecycle.state(),
                 lifecycle.ownerId(),
                 metadata.ownerName(),
                 identity.roleId(),

@@ -2,8 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
-import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,7 +21,7 @@ class CommandNpcIdentityServiceTest {
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(profileUuid, currentUuid, Set.of()),
+                projection(profileUuid, currentUuid, LifecycleState.ACTIVE),
                 this::absent
         );
 
@@ -48,7 +48,7 @@ class CommandNpcIdentityServiceTest {
         UUID actualProfile = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(actualProfile, currentUuid, Set.of()),
+                projection(actualProfile, currentUuid, LifecycleState.ACTIVE),
                 this::absent
         );
 
@@ -66,7 +66,7 @@ class CommandNpcIdentityServiceTest {
     }
 
     @Test
-    void projectionAbsenceKeepsNewCompanionActionable() {
+    void projectionAbsenceWithoutExactLiveEvidenceFailsClosed() {
         UUID npcUuid = UUID.randomUUID();
         CommandPersistenceView empty = new CommandPersistenceView(
                 new EmptyProjectionLookup()
@@ -78,12 +78,11 @@ class CommandNpcIdentityServiceTest {
                 service.resolve(record(npcUuid, null));
 
         assertEquals(
-                CommandNpcIdentityService.ResolutionStatus.RESOLVED,
+                CommandNpcIdentityService.ResolutionStatus.UNRESOLVED,
                 resolution.status()
         );
         assertEquals(npcUuid.toString(), resolution.profileId());
-        assertEquals(npcUuid, resolution.currentNpcUuid());
-        assertFalse(resolution.durableState().suppressesLiveAction());
+        assertTrue(resolution.durableState().suppressesLiveAction());
     }
 
     @Test
@@ -92,7 +91,7 @@ class CommandNpcIdentityServiceTest {
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcIdentityService service = service(
-                projection(profileUuid, currentUuid, Set.of()),
+                projection(profileUuid, currentUuid, LifecycleState.ACTIVE),
                 this::oneLocation
         );
 
@@ -118,7 +117,7 @@ class CommandNpcIdentityServiceTest {
                 projection(
                         profileUuid,
                         currentUuid,
-                        Set.of(TameworkSnapshotCodecs.DEATH)
+                        LifecycleState.DEAD_REVIVABLE
                 ),
                 this::absent
         );
@@ -145,12 +144,12 @@ class CommandNpcIdentityServiceTest {
     private CompanionProfileProjectionState projection(
             UUID profileUuid,
             UUID currentUuid,
-            Set<com.alechilles.alecstamework.companion.snapshot.SnapshotKind>
-                    snapshotKinds
+            LifecycleState lifecycleState
     ) {
         return new CompanionProfileProjectionState(
                 new ProfileId(profileUuid),
                 new NpcAlias(currentUuid),
+                lifecycleState,
                 null,
                 null,
                 "Tamed_Chicken",
@@ -160,7 +159,7 @@ class CommandNpcIdentityServiceTest {
                 null,
                 null,
                 Set.of(),
-                snapshotKinds,
+                Set.of(),
                 100L
         );
     }

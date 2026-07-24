@@ -70,16 +70,18 @@ final class CommandRelocationRetryCoordinator {
                 owner.cancelObservedSameWorldRelocation(world, npcUuid, pending);
                 yield true;
             }
-            case COMMIT_UNCONFIRMED_AS_LOST -> {
-                owner.commitUnconfirmedRelocationAsLost(world, npcUuid, pending, now);
+            case DROP_UNCONFIRMED_TRANSFER -> {
+                owner.dropUnconfirmedRelocation(
+                        world, npcUuid, pending, now
+                );
                 yield true;
             }
             case COMMIT_UNCONFIRMED_AS_UNLOADED -> {
                 owner.commitUnconfirmedRelocationAsUnloaded(world, npcUuid, pending);
                 yield true;
             }
-            case DROP_AS_LOST -> {
-                owner.dropPendingAsLost(npcUuid, pending, now);
+            case DROP_RETRY_EXHAUSTED -> {
+                owner.dropRetryExhausted(npcUuid, pending, now);
                 yield true;
             }
             case RETRY -> false;

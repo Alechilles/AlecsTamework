@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import java.util.Optional;
@@ -26,6 +27,7 @@ class CommandPersistenceViewTest {
                 new CompanionProfileProjectionState(
                         new ProfileId(profileUuid),
                         new NpcAlias(currentUuid),
+                        LifecycleState.DEAD_REVIVABLE,
                         new OwnerId(ownerUuid),
                         "Owner",
                         "Tamed_Chicken",
@@ -55,9 +57,9 @@ class CommandPersistenceViewTest {
         assertEquals(ownerUuid, result.ownerUuid());
         assertEquals(Set.of(toolUuid), result.toolIds());
         assertTrue(result.dead());
-        assertTrue(result.captured());
-        assertTrue(result.lost());
-        assertTrue(result.inCoop());
+        assertFalse(result.captured());
+        assertFalse(result.lost());
+        assertFalse(result.inCoop());
         assertTrue(result.dormant());
         assertTrue(result.restorable());
     }
@@ -87,6 +89,61 @@ class CommandPersistenceViewTest {
         assertTrue(view.find(record).isEmpty());
         assertEquals(npcUuid, view.profileId(record).value());
         assertFalse(view.find(null).isPresent());
+    }
+
+    @Test
+    void lifecycleAloneControlsEveryCommandStatus() {
+        UUID profileUuid = UUID.randomUUID();
+        UUID npcUuid = UUID.randomUUID();
+        Set<com.alechilles.alecstamework.companion.snapshot.SnapshotKind>
+                misleadingSnapshots = Set.of(
+                TameworkSnapshotCodecs.DEATH,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                TameworkSnapshotCodecs.COOP,
+                TameworkSnapshotCodecs.LOST
+        );
+
+        for (LifecycleState state : LifecycleState.values()) {
+            CompanionProfileProjectionState projection =
+                    new CompanionProfileProjectionState(
+                            new ProfileId(profileUuid),
+                            new NpcAlias(npcUuid),
+                            state,
+                            null,
+                            null,
+                            "Tamed_Chicken",
+                            "Chicken",
+                            null,
+                            true,
+                            "misleading-coop",
+                            1,
+                            Set.of(),
+                            misleadingSnapshots,
+                            100L
+                    );
+            CommandPersistenceView.ProfileSnapshot result =
+                    new CommandPersistenceView(lookup(projection))
+                            .find(record(
+                                    npcUuid, profileUuid.toString()
+                            ))
+                            .orElseThrow();
+
+            assertEquals(
+                    state == LifecycleState.DEAD_REVIVABLE,
+                    result.dead()
+            );
+            assertEquals(
+                    state == LifecycleState.CAPTURED,
+                    result.captured()
+            );
+            assertEquals(state == LifecycleState.COOP, result.inCoop());
+            assertEquals(state == LifecycleState.LOST, result.lost());
+            assertEquals(
+                    state != LifecycleState.ACTIVE
+                            && state != LifecycleState.UNLOADED,
+                    result.blocksLiveAction()
+            );
+        }
     }
 
     private CommandPersistenceView.ProjectionLookup lookup(

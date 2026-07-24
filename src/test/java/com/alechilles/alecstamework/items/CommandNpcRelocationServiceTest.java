@@ -29,18 +29,18 @@ class CommandNpcRelocationServiceTest {
     }
 
     @Test
-    void pendingRecallSnapshotExposesCountdownForLinkedPanel() throws Exception {
+    void pendingRecallSnapshotExposesRetryDropCountdownForLinkedPanel() throws Exception {
         String service = source("CommandNpcRelocationService.java");
         String entryService = source("CommandLinkedPanelEntryService.java");
         String featureHandler = source("CommandItemFeatureHandler.java");
 
         assertTrue(service.contains("public PendingRecallSnapshot getPendingRecallSnapshot"));
         assertTrue(service.contains("record PendingRecallSnapshot"));
-        assertTrue(service.contains("remainingUntilLostMs"));
+        assertTrue(service.contains("remainingUntilDropMs"));
         assertTrue(entryService.contains("CommandNpcRelocationService relocationService"));
         assertTrue(entryService.contains("getPendingRecallSnapshot(record.npcUuid)"));
-        assertTrue(featureHandler.contains("lostService,\r\n                relocationService,")
-                || featureHandler.contains("lostService,\n                relocationService,"));
+        assertTrue(featureHandler.contains("relocationService,"));
+        assertFalse(featureHandler.contains("CommandLinkedNpcLostService"));
     }
 
     @Test

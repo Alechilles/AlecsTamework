@@ -274,6 +274,7 @@ class HytalePublicPersistenceWorldReconciliationTest {
         return new CompanionProfileProjectionState(
                 PROFILE,
                 IMPORTED_ALIAS,
+                LifecycleState.UNRESOLVED,
                 null,
                 null,
                 "role",

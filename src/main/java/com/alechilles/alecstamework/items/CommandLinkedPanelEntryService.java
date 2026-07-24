@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -21,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -32,10 +30,6 @@ import javax.annotation.Nullable;
  */
 final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
-    private final CommandLinkedNpcDeathService deathService;
-    private final CommandLinkedNpcCaptureService captureService;
-    private final CommandLinkedNpcCoopService coopService;
-    private final CommandLinkedNpcLostService lostService;
     private final CommandNpcRelocationService relocationService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelUnloadedNameService unloadedNameService;
@@ -48,10 +42,6 @@ final class CommandLinkedPanelEntryService {
     private final CommandPersistenceView persistenceView;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
-                                   CommandLinkedNpcDeathService deathService,
-                                   CommandLinkedNpcCaptureService captureService,
-                                   CommandLinkedNpcCoopService coopService,
-                                   CommandLinkedNpcLostService lostService,
                                    CommandNpcRelocationService relocationService,
                                    CommandNpcNameResolver npcNameResolver,
                                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
@@ -60,10 +50,6 @@ final class CommandLinkedPanelEntryService {
                                    CommandGroupService groupService,
                                    @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
-        this.deathService = deathService;
-        this.captureService = captureService;
-        this.coopService = coopService;
-        this.lostService = lostService;
         this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
         this.unloadedNameService = new CommandLinkedPanelUnloadedNameService(
@@ -109,17 +95,16 @@ final class CommandLinkedPanelEntryService {
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
         World world = player.getWorld();
-        String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
         for (LinkedNpcRecord record : records) {
             if (record == null || record.npcUuid == null) {
                 continue;
             }
             boolean loaded = false;
-            boolean dead = "DEAD_REVIVABLE".equals(record.cachedCommandState);
+            boolean dead = false;
             boolean captured = false;
             boolean inCoop = false;
-            boolean lost = "LOST".equals(record.cachedCommandState);
+            boolean lost = false;
             long deadRespawnRemainingMs = 0L;
             String deathCauseHint = null;
             boolean hasHome = record.homePosition != null;
@@ -180,45 +165,6 @@ final class CommandLinkedPanelEntryService {
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             boolean talentsActionVisible = false;
             boolean talentsActionEnabled = false;
-            if (!loaded && dead && deathService != null) {
-                CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
-                        record.profileId != null && !record.profileId.isBlank()
-                                ? deathService.getDeadSnapshotForOwner(
-                                        record.npcUuid, player.getUuid())
-                                : deathService.getDeadSnapshotForTool(
-                                        record.npcUuid, toolId, player.getUuid());
-                if (deadSnapshot != null) {
-                    dead = true;
-                    String deadName = npcNameResolver.resolveSnapshotDisplayName(
-                            deadSnapshot.displayName(),
-                            record.cachedNameKey,
-                            deadSnapshot.roleId()
-                    );
-                    if (deadName != null && !deadName.isBlank()) {
-                        displayName = deadName;
-                    }
-                    String roleId = deadSnapshot.roleId();
-                    if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-                        roleId = record.cachedRoleId;
-                    }
-                    String normalizedRoleId = normalize(roleId);
-                    if (normalizedRoleId != null) {
-                        speciesId = normalizedRoleId;
-                        speciesLabel = normalizedRoleId;
-                    }
-                    TwCompanionConfig.EffectiveSettings effectiveSettings =
-                            TwCompanionConfig.resolveEffectiveForRole(roleId);
-                    boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
-                            effectiveSettings.isDeadRespawnEnabled()
-                    );
-                    if (deadRespawnEnabled) {
-                        deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-                    } else {
-                        deadRespawnRemainingMs = -1L;
-                    }
-                    deathCauseHint = resolveDeathCauseHint(deadSnapshot, playerLanguage);
-                }
-            }
             if (dead) {
                 TwCompanionConfig.EffectiveSettings effectiveSettings =
                         TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId);
@@ -227,38 +173,6 @@ final class CommandLinkedPanelEntryService {
                 );
                 if (!deadRespawnEnabled) {
                     deadRespawnRemainingMs = -1L;
-                }
-            }
-            if (canonicalProfile == null
-                    && !loaded && !dead && captureService != null) {
-                CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
-                        captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
-                if (capturedSnapshot != null) {
-                    captured = true;
-                    String capturedName = npcNameResolver.resolveSnapshotDisplayName(
-                            capturedSnapshot.displayName(),
-                            record.cachedNameKey,
-                            capturedSnapshot.roleId()
-                    );
-                    if (capturedName != null && !capturedName.isBlank()) {
-                        displayName = capturedName;
-                    }
-                }
-            }
-            if (canonicalProfile == null
-                    && !loaded && !dead && !captured && coopService != null) {
-                CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot coopSnapshot =
-                        coopService.getCoopSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
-                if (coopSnapshot != null) {
-                    inCoop = true;
-                    String coopName = npcNameResolver.resolveSnapshotDisplayName(
-                            coopSnapshot.displayName(),
-                            record.cachedNameKey,
-                            coopSnapshot.roleId()
-                    );
-                    if (coopName != null && !coopName.isBlank()) {
-                        displayName = coopName;
-                    }
                 }
             }
             if (!dead && !captured && !inCoop && world != null) {
@@ -278,21 +192,13 @@ final class CommandLinkedPanelEntryService {
                     continue;
                 }
             }
-            if (canonicalProfile == null
-                    && !loaded && !dead && !captured && !inCoop
-                    && lostService != null) {
-                CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot =
-                        lostService.getLostSnapshot(record.npcUuid);
-                if (lostSnapshot != null) {
-                    lost = true;
-                }
-            }
             if (!loaded && !dead && !captured && !inCoop && !lost && relocationService != null) {
                 CommandNpcRelocationService.PendingRecallSnapshot pendingRecall =
                         relocationService.getPendingRecallSnapshot(record.npcUuid);
                 if (pendingRecall != null) {
                     recallPending = true;
-                    recallLostRemainingMs = pendingRecall.remainingUntilLostMs();
+                    recallLostRemainingMs =
+                            pendingRecall.remainingUntilDropMs();
                 }
             }
             LinkedNpcEntry entry = new LinkedNpcEntry(
@@ -386,45 +292,6 @@ final class CommandLinkedPanelEntryService {
                         record.cachedRoleId,
                         record.cachedNameKey
                 )
-        );
-    }
-
-    @Nullable
-    private String resolveDeathCauseHint(@Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
-                                         @Nullable String language) {
-        if (snapshot == null || snapshot.deathCauseKind() == null) {
-            return null;
-        }
-        return switch (snapshot.deathCauseKind()) {
-            case STARVATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvation");
-            case DEHYDRATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.dehydration");
-            case STARVATION_AND_DEHYDRATION ->
-                    LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvationAndDehydration");
-            case PLAYER -> LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.deathCause.killedByPlayer",
-                    fallbackDeathSourceName(snapshot.deathSourceName(), language, true)
-            );
-            case NPC -> LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.deathCause.killedByNpc",
-                    fallbackDeathSourceName(snapshot.deathSourceName(), language, false)
-            );
-            case ENVIRONMENT -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.environment");
-            case UNKNOWN -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.unknown");
-        };
-    }
-
-    @Nonnull
-    private String fallbackDeathSourceName(@Nullable String sourceName, @Nullable String language, boolean player) {
-        if (sourceName != null && !sourceName.isBlank()) {
-            return sourceName;
-        }
-        return LocalizedText.resolve(
-                language,
-                player
-                        ? "tamework.ui.linkedPanel.deathCause.killer.playerFallback"
-                        : "tamework.ui.linkedPanel.deathCause.killer.npcFallback"
         );
     }
 

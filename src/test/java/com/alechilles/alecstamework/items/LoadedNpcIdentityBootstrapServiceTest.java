@@ -415,8 +415,8 @@ class LoadedNpcIdentityBootstrapServiceTest {
         String snapshotSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkedNpcStateSnapshotService.java"
         ));
-        String pluginSource = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/Tamework.java"
+        String compositionSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java"
         ));
 
         assertTrue(source.contains("public void onStartWorld(@Nonnull StartWorldEvent event)"));
@@ -430,13 +430,14 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertTrue(snapshotSource.contains("LoadedNpcLocationResolver.resolve(store)"));
         assertTrue(snapshotSource.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
         assertTrue(snapshotSource.contains("projectionKey(marker)"));
-        int startWorldRegistration = pluginSource.indexOf("StartWorldEvent.class");
-        int initialBootstrap = pluginSource.indexOf("loadedNpcIdentityBootstrapService.bootstrapUniverse()");
+        int startWorldRegistration = compositionSource.indexOf("StartWorldEvent.class");
+        int initialBootstrap = compositionSource.indexOf("identityBootstrap.bootstrapUniverse()");
         assertTrue(startWorldRegistration >= 0 && initialBootstrap > startWorldRegistration);
-        assertTrue(pluginSource.contains(
-                "loadedNpcIdentityBootstrapService::awaitCurrentBootstrap"));
-        assertFalse(pluginSource.contains(
-                "loadedNpcIdentityBootstrapService.awaitCurrentBootstrap()"));
+        assertTrue(compositionSource.contains("identityBootstrap.onStartWorld(event)"));
+        assertTrue(compositionSource.contains("composition.resumeAfterWorldEvidence()"));
+        assertTrue(compositionSource.contains(
+                "identityBootstrap.awaitCurrentBootstrap().whenComplete("),
+                "World evidence readiness must resume asynchronously without blocking a world thread.");
     }
 
     private static LoadedNpcIdentityBootstrapService service(

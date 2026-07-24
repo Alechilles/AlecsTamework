@@ -52,7 +52,6 @@ import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicyResolver;
 import com.alechilles.alecstamework.damage.SimpleClaimsRawAccessDecision;
 import com.alechilles.alecstamework.damage.TamedDamageDecision;
 import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicy;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
@@ -1940,7 +1939,8 @@ public final class TameworkApiImpl
         if (npcUuid == null || stateSnapshotService == null) {
             return ResolvedCommandLinkState.empty();
         }
-        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot = stateSnapshotService.getSnapshot(npcUuid);
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot =
+                stateSnapshotService.getSnapshot(npcUuid);
         if (snapshot == null) {
             return ResolvedCommandLinkState.empty();
         }

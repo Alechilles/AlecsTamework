@@ -74,7 +74,7 @@ final class CommandLinkedPanelUnloadedNameService {
             @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
             UUID npcUuid
     ) {
-        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot = stateSnapshotService != null
+        CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot = stateSnapshotService != null
                 ? stateSnapshotService.getSnapshot(npcUuid)
                 : null;
         return snapshot == null
