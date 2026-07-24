@@ -469,10 +469,12 @@ class PublicPersistenceRuntimeTest {
 
         assertEquals(
                 PublicPersistenceShutdownReport.Status
-                        .KERNEL_DRAIN_TIMED_OUT,
+                        .FEATURE_DRAIN_TIMED_OUT,
                 timedOut.status()
         );
         assertEquals(1, timedOut.outstandingWorkflows());
+        assertFalse(timedOut.terminal());
+        assertNull(timedOut.kernel());
         assertThrows(
                 IllegalStateException.class,
                 () -> PersistenceEngineLease.acquireReplacement(tempDir)

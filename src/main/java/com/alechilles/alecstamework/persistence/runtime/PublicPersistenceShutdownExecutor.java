@@ -10,8 +10,11 @@ import com.alechilles.alecstamework.persistence.control
 import java.time.Duration;
 
 /**
- * Executes every public shutdown phase without letting an earlier failure skip
- * storage teardown.
+ * Executes public shutdown phases in dependency order.
+ *
+ * <p>A quiesce failure cannot skip independent storage teardown. Nonterminal
+ * accepted workflows intentionally defer kernel and lease teardown because
+ * their remaining publication steps may still require both storage lanes.</p>
  */
 final class PublicPersistenceShutdownExecutor {
     private PublicPersistenceShutdownExecutor() {
@@ -27,10 +30,17 @@ final class PublicPersistenceShutdownExecutor {
             Duration timeout
     ) {
         ShutdownEvidence evidence = new ShutdownEvidence();
+        long deadline = System.nanoTime() + timeout.toNanos();
         evidence.worldQuiesced = worldQuiesced;
         evidence.status = quiesce(startup, world, worldQuiesced, evidence);
-        drainWorkflows(workflows, timeout, evidence);
-        closeKernel(kernel, timeout, evidence);
+        boolean workflowsTerminal = drainWorkflows(
+                workflows,
+                remaining(deadline),
+                evidence
+        );
+        if (workflowsTerminal) {
+            closeKernel(kernel, remaining(deadline), evidence);
+        }
         closeLease(lease, kernel, evidence);
         return evidence.outcome();
     }
@@ -62,7 +72,7 @@ final class PublicPersistenceShutdownExecutor {
                 : null;
     }
 
-    private static void drainWorkflows(
+    private static boolean drainWorkflows(
             PublicPersistenceWorkflowTracker workflows,
             Duration timeout,
             ShutdownEvidence evidence
@@ -75,12 +85,20 @@ final class PublicPersistenceShutdownExecutor {
                 evidence.status = PublicPersistenceShutdownReport.Status
                         .FEATURE_DRAIN_TIMED_OUT;
             }
+            return drained.drained();
         } catch (Throwable failure) {
             evidence.outstandingWorkflows = workflows.outstanding();
             evidence.status = PublicPersistenceShutdownReport.Status
                     .FEATURE_DRAIN_FAILED;
             evidence.addFailure(failure);
+            return false;
         }
+    }
+
+    private static Duration remaining(long deadline) {
+        return Duration.ofNanos(
+                Math.max(0, deadline - System.nanoTime())
+        );
     }
 
     private static void closeKernel(

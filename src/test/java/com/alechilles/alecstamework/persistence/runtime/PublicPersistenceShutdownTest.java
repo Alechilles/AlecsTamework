@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for best-effort, one-owner persistence teardown. */
@@ -42,7 +45,7 @@ class PublicPersistenceShutdownTest {
     }
 
     @Test
-    void workflowTimeoutDoesNotSkipKernelOrLeaseTeardown() {
+    void workflowTimeoutDefersKernelAndLeaseUntilWorkflowCompletes() {
         PublicPersistenceWorkflowTracker workflows =
                 new PublicPersistenceWorkflowTracker();
         var registry = PublicPersistenceFeatureRegistry.create();
@@ -59,10 +62,11 @@ class PublicPersistenceShutdownTest {
         );
         state.bind(startup);
         assertTrue(startup.advance().toCompletableFuture().join().complete());
-        workflows.track(new CompletableFuture<>());
+        CompletableFuture<Void> acceptedWorkflow = new CompletableFuture<>();
+        workflows.track(acceptedWorkflow);
 
         PublicPersistenceShutdownReport report =
-                state.shutdown(Duration.ofSeconds(1));
+                state.shutdown(Duration.ZERO);
 
         assertEquals(
                 PublicPersistenceShutdownReport.Status
@@ -70,9 +74,24 @@ class PublicPersistenceShutdownTest {
                 report.status()
         );
         assertEquals(1, report.outstandingWorkflows());
-        assertTrue(report.terminal());
-        assertNotNull(report.kernel());
-        assertTrue(report.kernel().clean());
+        assertFalse(report.terminal());
+        assertNull(report.kernel());
+        assertThrows(
+                IllegalStateException.class,
+                () -> PersistenceEngineLease.acquireReplacement(tempDir)
+        );
+
+        acceptedWorkflow.complete(null);
+        PublicPersistenceShutdownReport resumed =
+                state.shutdown(Duration.ofSeconds(5));
+
+        assertEquals(
+                PublicPersistenceShutdownReport.Status.COMPLETE,
+                resumed.status()
+        );
+        assertTrue(resumed.terminal());
+        assertNotNull(resumed.kernel());
+        assertTrue(resumed.kernel().clean());
         assertLeaseCanBeReacquired();
     }
 

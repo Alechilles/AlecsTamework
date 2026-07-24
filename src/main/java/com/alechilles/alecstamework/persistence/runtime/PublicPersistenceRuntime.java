@@ -139,8 +139,9 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
     /**
      * Executes or resumes the ordered shutdown protocol.
      *
-     * <p>The timeout independently bounds the accepted-workflow drain and the
-     * kernel drain so one timed-out phase cannot skip storage teardown.</p>
+     * <p>The timeout bounds the entire attempt. If accepted workflows remain
+     * nonterminal, kernel and lease teardown are deferred so a later call can
+     * resume shutdown after those workflows finish.</p>
      */
     @Nonnull
     public PublicPersistenceShutdownReport shutdown(
