@@ -58,7 +58,7 @@ final class HytaleCaptureReleaseDurabilityBarrier {
             }
             CompletableFuture<Void> save = player.saveConfig(
                     world,
-                    store.copySerializableEntity(actor),
+                    HytalePlayerSaveHolderFactory.create(store, actor),
                     true
             );
             return mapPlayerSave(save);

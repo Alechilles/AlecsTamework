@@ -41,6 +41,25 @@ public final class TestEntityComponentStore extends Store<EntityStore> implement
         }
     }
 
+    @Nonnull
+    @Override
+    @SuppressWarnings("unchecked")
+    public Archetype<EntityStore> getArchetype(
+            @Nonnull Ref<EntityStore> reference
+    ) {
+        Map<ComponentType<EntityStore, ?>, Component<EntityStore>> byType =
+                components.get(reference);
+        if (byType == null) {
+            throw new IllegalArgumentException(
+                    "Unknown test entity reference."
+            );
+        }
+        ComponentType<EntityStore, ?>[] types = byType.keySet().toArray(
+                ComponentType[]::new
+        );
+        return Archetype.of(types);
+    }
+
     @Nullable
     @Override
     @SuppressWarnings("unchecked")
