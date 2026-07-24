@@ -82,11 +82,38 @@ class ReplacementProfileSnapshotSinkTest {
             assertEquals(java.util.Set.of(toolId), created.toolIds());
 
             clock.set(-50L);
-            sink.publish(snapshot(npcUuid, toolId, "Second"), "world");
+            sink.publish(
+                    snapshot(npcUuid, toolId, "Second"),
+                    "temporary-coop-world"
+            );
             assertTrue(await(() -> facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
             ).map(state -> "Second".equals(state.customName()))
                     .orElse(false)));
+            assertTrue(await(() -> {
+                var moved = facades.queries().findProfile(
+                        new NpcAlias(npcUuid)
+                ).toCompletableFuture().join();
+                if (!(moved instanceof PersistenceReadResult.Found<?> next)) {
+                    return false;
+                }
+                var profile = (com.alechilles.alecstamework.companion.profile
+                        .CompanionProfileReadModel) next.value();
+                return profile.lifecycle().location().equals(
+                        LifecycleLocation.liveEntity(
+                                npcUuid.toString(),
+                                "temporary-coop-world"
+                        )
+                );
+            }));
+            var moved = (com.alechilles.alecstamework.companion.profile
+                    .CompanionProfileReadModel) ((PersistenceReadResult.Found<?>)
+                    facades.queries().findProfile(new NpcAlias(npcUuid))
+                            .toCompletableFuture().join()).value();
+            assertEquals(
+                    "temporary-coop-world",
+                    moved.identity().lastKnownWorldKey()
+            );
             assertEquals(new OwnerId(ownerId), facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
             ).orElseThrow().ownerId());

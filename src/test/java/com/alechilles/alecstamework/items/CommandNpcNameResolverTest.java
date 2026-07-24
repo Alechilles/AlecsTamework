@@ -162,4 +162,18 @@ class CommandNpcNameResolverTest {
                 resolver.resolveRoleDisplayName("tamed_chicken", null)
         );
     }
+
+    @Test
+    void humanizesLowercaseSnapshotRoleWhenTranslationIsUnavailable() {
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(
+                new TranslationRegistry()
+        );
+
+        assertEquals(
+                "Chicken",
+                resolver.resolveSnapshotDisplayName(
+                        null, null, "tamed_chicken"
+                )
+        );
+    }
 }

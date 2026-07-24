@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
@@ -240,10 +239,18 @@ public final class PositiveEvidenceDormantAuthor {
         if (lifecycle.state() != LifecycleState.ACTIVE) {
             return "dormant_lifecycle_not_active";
         }
-        if (!lifecycle.location().equals(LifecycleLocation.liveEntity(
-                observation.sourceAlias().toString(),
-                observation.sourceWorldKey()
-        ))) {
+        boolean exactAliasLocation =
+                observation.sourceAlias().toString().equals(
+                        lifecycle.location().key()
+                );
+        boolean exactWorld = Objects.equals(
+                observation.sourceWorldKey(),
+                lifecycle.location().worldKey()
+        );
+        boolean deletionMayCorrectWorld =
+                observation.evidence()
+                        == DormantCompanionObservation.Evidence.WORLD_DELETION;
+        if (!exactAliasLocation || (!exactWorld && !deletionMayCorrectWorld)) {
             return "dormant_live_location_conflict";
         }
         if (lifecycle.activeOperationId() != null) {

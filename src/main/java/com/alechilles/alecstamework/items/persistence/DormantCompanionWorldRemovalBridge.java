@@ -86,12 +86,14 @@ public final class DormantCompanionWorldRemovalBridge {
         if (store == null) {
             return;
         }
-        store.forEachEntityParallel(
+        store.forEachChunk(
                 npcType,
-                (index, chunk, commandBuffer) -> {
-                    bridge.onWorldDeletion(
-                            chunk.getReferenceTo(index), store
-                    );
+                (chunk, commandBuffer) -> {
+                    for (int index = 0; index < chunk.size(); index++) {
+                        bridge.onWorldDeletion(
+                                chunk.getReferenceTo(index), store
+                        );
+                    }
                 }
         );
     }

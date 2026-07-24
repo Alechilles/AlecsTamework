@@ -86,6 +86,18 @@ class DormantCompanionBridgeArchitectureTest {
         assertFalse(bridge.contains(".get()"));
     }
 
+    @Test
+    void worldDeletionReadsComponentsOnlyOnTheWorldThread()
+            throws IOException {
+        String bridge = source(
+                "items/persistence/"
+                        + "DormantCompanionWorldRemovalBridge.java"
+        );
+
+        assertTrue(bridge.contains("store.forEachChunk("));
+        assertFalse(bridge.contains("store.forEachEntityParallel("));
+    }
+
     private String source(String relative) throws IOException {
         return Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework", relative

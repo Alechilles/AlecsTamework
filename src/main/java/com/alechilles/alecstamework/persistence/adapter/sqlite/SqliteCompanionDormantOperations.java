@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionEventCodec;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionOutcome;
 import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionRequest;
+import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
@@ -194,15 +195,22 @@ public final class SqliteCompanionDormantOperations {
         CompanionAlias alias = transaction.identities()
                 .resolveAlias(dormant.source().sourceAlias())
                 .orElse(null);
-        boolean exactLocation = current.state() == LifecycleState.ACTIVE
-                && current.location().equals(LifecycleLocation.liveEntity(
-                dormant.source().sourceAlias().toString(),
-                dormant.source().sourceWorldKey()
-        ));
+        boolean exactAliasLocation = current.state() == LifecycleState.ACTIVE
+                && dormant.source().sourceAlias().toString().equals(
+                current.location().key()
+        );
+        boolean exactWorld = dormant.source().sourceWorldKey().equals(
+                current.location().worldKey()
+        );
+        boolean deletionMayCorrectWorld =
+                dormant.source().kind()
+                        == DormantSourceEvidence.Kind.WORLD_DELETION;
         if (!current.revision().equals(
                 dormant.expectedLifecycleRevision()
         ) || current.activeOperationId() != null || current.quarantined()
-                || !exactLocation || alias == null
+                || !exactAliasLocation
+                || (!exactWorld && !deletionMayCorrectWorld)
+                || alias == null
                 || !alias.profileId().equals(dormant.profileId())
                 || alias.state() != CompanionAlias.State.CURRENT
                 || dormant.source().observedGeneration().compareTo(

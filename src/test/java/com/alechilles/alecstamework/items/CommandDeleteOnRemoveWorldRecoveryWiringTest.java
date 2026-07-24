@@ -31,7 +31,8 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
         assertTrue(registration.contains("worldRemoval::onWorldRemoved"));
         assertTrue(worldRemoval.contains("!event.isCancelled()"));
         assertTrue(worldRemoval.contains("isDeleteOnRemove()"));
-        assertTrue(worldRemoval.contains("store.forEachEntityParallel("));
+        assertTrue(worldRemoval.contains("store.forEachChunk("));
+        assertFalse(worldRemoval.contains("store.forEachEntityParallel("));
         assertTrue(worldRemoval.contains("bridge.onWorldDeletion("),
                 "World deletion must enter the same canonical dormant author as ECS evidence.");
         assertTrue(worldRemoval.contains(

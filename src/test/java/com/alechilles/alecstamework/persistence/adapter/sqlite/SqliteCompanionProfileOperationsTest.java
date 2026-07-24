@@ -399,6 +399,57 @@ class SqliteCompanionProfileOperationsTest {
         ).get(10, TimeUnit.SECONDS);
         assertEquals(result.events(), replay.events());
         assertEquals(lifecycle, storedLifecycle(PROFILE));
+
+        CompanionProfileMutation.ReconcileLoaded moved =
+                new CompanionProfileMutation.ReconcileLoaded(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        new ReconciliationGeneration(1),
+                        ALIAS_B,
+                        ALIAS_B,
+                        "temporary-world",
+                        -7_000
+                );
+        OperationWorkflowResult movedResult = submitAsync(
+                3,
+                "profile-reconcile-runtime-world",
+                moved
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UPDATED,
+                CompanionProfileMutationEventCodec.decode(
+                        movedResult.events().getFirst().payloadVersion(),
+                        movedResult.events().getFirst().payloadJson()
+                ).status()
+        );
+        CompanionLifecycle movedLifecycle = storedLifecycle(PROFILE);
+        assertEquals(
+                LifecycleLocation.liveEntity(
+                        ALIAS_B.toString(), "temporary-world"
+                ),
+                movedLifecycle.location()
+        );
+        assertEquals(new LifecycleRevision(2), movedLifecycle.revision());
+        assertEquals(
+                new ReconciliationGeneration(2),
+                movedLifecycle.lastReconciledGeneration()
+        );
+
+        OperationWorkflowResult stale = submitAsync(
+                4,
+                "profile-reconcile-stale-runtime-world",
+                moved
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, stale.status());
+        assertEquals(1, stale.events().size());
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UNCHANGED,
+                CompanionProfileMutationEventCodec.decode(
+                        stale.events().getFirst().payloadVersion(),
+                        stale.events().getFirst().payloadJson()
+                ).status()
+        );
+        assertEquals(movedLifecycle, storedLifecycle(PROFILE));
     }
 
     @Test

@@ -133,6 +133,21 @@ class SqliteCompanionDormantOperationsTest {
     }
 
     @Test
+    void worldDeletionCommitsLostForExactAliasDespiteStaleWorldHint()
+            throws Exception {
+        CompanionDormantTransitionRequest request = request(
+                DormantSourceEvidence.Kind.WORLD_DELETION,
+                4,
+                "deleted-instance"
+        );
+
+        OperationWorkflowResult result = submit(4, request);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertDormant(request, LifecycleState.LOST, 4);
+    }
+
+    @Test
     void staleReconciliationEvidenceFailsBeforeOperationPersists()
             throws Exception {
         CompanionDormantTransitionRequest request =
@@ -191,6 +206,14 @@ class SqliteCompanionDormantOperationsTest {
             DormantSourceEvidence.Kind kind,
             long generation
     ) {
+        return request(kind, generation, "world");
+    }
+
+    private CompanionDormantTransitionRequest request(
+            DormantSourceEvidence.Kind kind,
+            long generation,
+            String worldKey
+    ) {
         CompanionSnapshot snapshot = new CompanionSnapshot(
                 SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
                 PROFILE,
@@ -208,7 +231,7 @@ class SqliteCompanionDormantOperationsTest {
                 snapshot,
                 new DormantSourceEvidence(
                         ALIAS,
-                        "world",
+                        worldKey,
                         kind,
                         new ReconciliationGeneration(generation),
                         "dormant-receipt-" + kind.name().toLowerCase(),

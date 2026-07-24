@@ -115,11 +115,7 @@ final class CommandNpcNameResolver {
             return snapshotDisplayName;
         }
         if (roleId != null && !roleId.isBlank()) {
-            String translatedRole = translateNpcNameKey(roleId);
-            if (translatedRole != null && !translatedRole.isBlank()) {
-                return translatedRole;
-            }
-            return roleId;
+            return resolveRoleDisplayName(roleId, nameKey);
         }
         return null;
     }

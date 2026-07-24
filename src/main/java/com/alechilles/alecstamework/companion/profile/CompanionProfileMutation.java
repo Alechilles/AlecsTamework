@@ -109,13 +109,13 @@ public sealed interface CompanionProfileMutation
     }
 
     /**
-     * Resolves one imported, canonical {@code UNRESOLVED} lifecycle from a sealed
-     * positive loaded-entity observation.
+     * Reconciles canonical lifecycle location from a sealed positive
+     * loaded-entity observation.
      *
-     * <p>The expected current alias is part of the evidence fence. The observed
-     * alias may be newer when modern ECS identity differs from the imported
-     * legacy NPC UUID; any required rotation and the lifecycle transition commit
-     * in this same shared operation.</p>
+     * <p>An imported {@code UNRESOLVED} lifecycle may adopt a newer observed
+     * alias during startup. An {@code ACTIVE} lifecycle may only update the
+     * world of its exact current alias. The alias and lifecycle revisions are
+     * evidence fences, so stale runtime observations become no-ops.</p>
      */
     record ReconcileLoaded(
             @Nonnull ProfileId profileId,

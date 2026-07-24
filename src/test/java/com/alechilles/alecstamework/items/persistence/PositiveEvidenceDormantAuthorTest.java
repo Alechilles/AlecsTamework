@@ -163,6 +163,28 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     @Test
+    void worldDeletionCorrectsAStaleCanonicalWorldForTheExactLiveAlias() {
+        FakePersistence persistence = new FakePersistence(
+                profile("tamework_test", "old-world")
+        );
+        PositiveEvidenceDormantAuthor author = author(
+                persistence, reader(), -450L
+        );
+
+        CompanionLifecycleAuthorResult result = author.makeDormant(intent(
+                DormantCompanionObservation.Evidence.WORLD_DELETION,
+                "deleted-instance"
+        )).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(
+                "deleted-instance",
+                persistence.request.source().sourceWorldKey()
+        );
+        assertEquals(LifecycleState.LOST, persistence.request.targetState());
+    }
+
+    @Test
     void unloadAbsenceAndTimeoutNeverReadOrTransition() {
         AtomicInteger snapshotReads = new AtomicInteger();
         for (DormantCompanionObservation.Evidence evidence : List.of(
@@ -314,6 +336,13 @@ class PositiveEvidenceDormantAuthorTest {
     private PositiveEvidenceDormantAuthor.Intent intent(
             DormantCompanionObservation.Evidence evidence
     ) {
+        return intent(evidence, "world");
+    }
+
+    private PositiveEvidenceDormantAuthor.Intent intent(
+            DormantCompanionObservation.Evidence evidence,
+            String worldKey
+    ) {
         DormantCompanionObservation.DeathObservation death =
                 evidence == DormantCompanionObservation.Evidence
                         .SAVED_DEATH_COMPONENT
@@ -338,7 +367,7 @@ class PositiveEvidenceDormantAuthorTest {
                         "observation-" + evidence.name(),
                         PROFILE,
                         SOURCE,
-                        "world",
+                        worldKey,
                         evidence,
                         "receipt-" + evidence.name(),
                         -500L,
@@ -358,6 +387,13 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     private CompanionProfileReadModel profile(String roleId) {
+        return profile(roleId, "world");
+    }
+
+    private CompanionProfileReadModel profile(
+            String roleId,
+            String worldKey
+    ) {
         CompanionIdentity identity = new CompanionIdentity(
                 PROFILE,
                 "Test",
@@ -378,7 +414,7 @@ class PositiveEvidenceDormantAuthorTest {
                 PROFILE,
                 null,
                 LifecycleState.ACTIVE,
-                LifecycleLocation.liveEntity(SOURCE.toString(), "world"),
+                LifecycleLocation.liveEntity(SOURCE.toString(), worldKey),
                 REVISION,
                 null,
                 -800L,

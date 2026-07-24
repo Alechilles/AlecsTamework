@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.items.persistence;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
@@ -39,8 +39,9 @@ import javax.annotation.Nonnull;
  * Publishes observed live metadata through replacement profile operations.
  *
  * <p>A missing profile is atomically adopted as the exact observed live
- * identity, owner, alias, and world. Later publications remain metadata-only
- * and never compete with lifecycle workflows.</p>
+ * identity, owner, alias, and world. Later publications update metadata and
+ * may reconcile the world of the exact current live alias; they never create
+ * or rotate aliases.</p>
  */
 public final class ReplacementProfileSnapshotSink
         implements CompanionProfileSnapshotSink {
@@ -122,12 +123,9 @@ public final class ReplacementProfileSnapshotSink
         return queries.findProfile(alias).thenCompose(read -> {
             if (read instanceof PersistenceReadResult.Found<
                     CompanionProfileReadModel> found) {
-                return update(found.value(), snapshot)
-                        .thenCompose(ignored -> ensureAlias(
-                                found.value().identity().profileId(),
-                                found.value(),
-                                alias
-                        ));
+                return observeExisting(
+                        found.value(), alias, snapshot, observed.worldKey()
+                );
             }
             if (read instanceof PersistenceReadResult.Failed<?>) {
                 return failed("profile_snapshot_alias_read_failed");
@@ -136,10 +134,9 @@ public final class ReplacementProfileSnapshotSink
             return queries.findProfile(fallback).thenCompose(byProfile -> {
                 if (byProfile instanceof PersistenceReadResult.Found<
                         CompanionProfileReadModel> found) {
-                    return update(found.value(), snapshot)
-                            .thenCompose(ignored -> ensureAlias(
-                                    fallback, found.value(), alias
-                            ));
+                    return observeExisting(
+                            found.value(), alias, snapshot, observed.worldKey()
+                    );
                 }
                 if (byProfile instanceof PersistenceReadResult.Failed<?>) {
                     return failed("profile_snapshot_profile_read_failed");
@@ -147,6 +144,21 @@ public final class ReplacementProfileSnapshotSink
                 return adopt(fallback, alias, snapshot, observed.worldKey());
             });
         });
+    }
+
+    private CompletionStage<Void> observeExisting(
+            CompanionProfileReadModel current,
+            NpcAlias alias,
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
+            String worldKey
+    ) {
+        if (!exactCurrentLiveAlias(current, alias)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return update(current, snapshot, worldKey)
+                .thenCompose(ignored -> reconcileWorld(
+                        current, alias, worldKey
+                ));
     }
 
     private CompletionStage<Void> adopt(
@@ -185,7 +197,8 @@ public final class ReplacementProfileSnapshotSink
 
     private CompletionStage<Void> update(
             CompanionProfileReadModel current,
-            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot
+            CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
+            String worldKey
     ) {
         CompanionIdentity before = current.identity();
         String displayName = first(
@@ -213,6 +226,7 @@ public final class ReplacementProfileSnapshotSink
         boolean changed = !Objects.equals(displayName, before.displayName())
                 || !Objects.equals(roleId, before.roleId())
                 || !Objects.equals(metadata, before.metadataJson())
+                || !Objects.equals(worldKey, before.lastKnownWorldKey())
                 || !links.equals(current.toolLinks());
         if (!changed) {
             return CompletableFuture.completedFuture(null);
@@ -223,7 +237,7 @@ public final class ReplacementProfileSnapshotSink
                 roleId,
                 metadata,
                 hash(metadata),
-                before.lastKnownWorldKey(),
+                worldKey,
                 before.createdAtMs(),
                 now,
                 now,
@@ -237,23 +251,39 @@ public final class ReplacementProfileSnapshotSink
         ));
     }
 
-    private CompletionStage<Void> ensureAlias(
-            ProfileId profileId,
+    private CompletionStage<Void> reconcileWorld(
             CompanionProfileReadModel current,
-            NpcAlias alias
+            NpcAlias alias,
+            String worldKey
     ) {
-        if (current != null && current.currentAlias() != null
-                && current.currentAlias().alias().equals(alias)) {
+        CompanionLifecycle lifecycle = current.lifecycle();
+        if (worldKey.equals(lifecycle.location().worldKey())) {
             return CompletableFuture.completedFuture(null);
         }
         long now = clock.getAsLong();
-        OperationId operationId = OperationId.create();
-        PublicOperationSubmission submitted = operations.rotateAlias(
-                operationId,
-                idempotency("live-alias", operationId),
-                new CompanionAliasRotation(profileId, alias, now)
+        return submitProfile(new CompanionProfileMutation.ReconcileLoaded(
+                current.identity().profileId(),
+                lifecycle.revision(),
+                lifecycle.lastReconciledGeneration(),
+                alias,
+                alias,
+                worldKey,
+                now
+        ));
+    }
+
+    private boolean exactCurrentLiveAlias(
+            CompanionProfileReadModel current,
+            NpcAlias alias
+    ) {
+        return current.currentAlias() != null
+                && current.currentAlias().alias().equals(alias)
+                && current.lifecycle().state() == LifecycleState.ACTIVE
+                && current.lifecycle().activeOperationId() == null
+                && !current.lifecycle().quarantined()
+                && alias.toString().equals(
+                current.lifecycle().location().key()
         );
-        return completion("profile_snapshot_alias", submitted);
     }
 
     private CompletionStage<Void> submitProfile(

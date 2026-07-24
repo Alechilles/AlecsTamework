@@ -37,7 +37,13 @@ final class SqliteLoadedProfileReconciliation {
         )) {
             return unchanged(current.identity(), reconciliation);
         }
-        validateCurrent(current.lifecycle(), current.alias(), reconciliation);
+        if (!matchesCurrent(
+                current.lifecycle(),
+                current.alias(),
+                reconciliation
+        )) {
+            return unchanged(current.identity(), reconciliation);
+        }
         return transition(transaction, operationId, reconciliation, current);
     }
 
@@ -52,7 +58,7 @@ final class SqliteLoadedProfileReconciliation {
                         .orElseThrow(() -> failure("lifecycle_missing")),
                 transaction.identities().findCurrentAlias(
                         reconciliation.profileId()
-                ).orElseThrow(() -> failure("current_alias_missing"))
+                ).orElse(null)
         );
     }
 
@@ -134,26 +140,36 @@ final class SqliteLoadedProfileReconciliation {
         );
     }
 
-    private static void validateCurrent(
+    private static boolean matchesCurrent(
             CompanionLifecycle lifecycle,
             CompanionAlias alias,
             CompanionProfileMutation.ReconcileLoaded reconciliation
     ) {
-        if (lifecycle.state() != LifecycleState.UNRESOLVED
-                || lifecycle.quarantined()
+        if (lifecycle.quarantined()
                 || lifecycle.activeOperationId() != null
                 || !lifecycle.revision().equals(
                 reconciliation.expectedLifecycleRevision()
         )
                 || !lifecycle.lastReconciledGeneration().equals(
                 reconciliation.expectedReconciliationGeneration()
-        )
+                )
+                || alias == null
                 || alias.state() != CompanionAlias.State.CURRENT
                 || !alias.alias().equals(
                 reconciliation.expectedCurrentAlias()
         )) {
-            throw failure("evidence_fence_mismatch");
+            return false;
         }
+        if (lifecycle.state() == LifecycleState.UNRESOLVED) {
+            return true;
+        }
+        return lifecycle.state() == LifecycleState.ACTIVE
+                && reconciliation.observedAlias().equals(
+                reconciliation.expectedCurrentAlias()
+        )
+                && lifecycle.location().key().equals(
+                reconciliation.expectedCurrentAlias().toString()
+        );
     }
 
     private static boolean rotateAliasIfRequired(
@@ -207,6 +223,7 @@ final class SqliteLoadedProfileReconciliation {
                 && lifecycle.location().worldKey().equals(
                 reconciliation.worldKey()
         )
+                && alias != null
                 && alias.state() == CompanionAlias.State.CURRENT
                 && alias.alias().equals(reconciliation.observedAlias());
     }
