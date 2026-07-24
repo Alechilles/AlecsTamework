@@ -57,5 +57,6 @@ is no payment setting.
   limits.
 - SimpleClaims damage integration errors fail open; they do not make a target
   invulnerable.
-- Use `/tw debugdb [status|health|integrity|detail]` for bounded replacement
-  persistence diagnostics; those commands do not repair or mutate saved state.
+- Use `/tw debugdb [status|health|integrity|detail|export]` for bounded
+  replacement persistence diagnostics. None of these actions repairs or
+  mutates saved persistence state; `export` writes only a redacted support ZIP.

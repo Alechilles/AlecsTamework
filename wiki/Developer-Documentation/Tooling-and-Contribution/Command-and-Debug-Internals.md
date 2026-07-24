@@ -29,11 +29,13 @@ Additional diagnostics that are command-driven (not startup-toggle defaults) inc
 
 - `/tw showhitboxes`
 - `/tw debugcrashtelemetry`
-- `/tw debugdb [status|health|integrity|detail]`
+- `/tw debugdb [status|health|integrity|detail|export]`
 
 `TameworkDebugDbCommand` reads bounded status, metrics, and detail snapshots
-from the replacement `PersistenceBootstrap`. Its actions are observational:
-they do not repair data, retry operations, clear incidents, or change circuits.
+from the replacement `PersistenceBootstrap`. Status and detail actions are
+observational: they do not repair data, retry operations, clear incidents, or
+change circuits. `export` writes a bounded redacted ZIP from the same read-only
+diagnostic seam; it never copies the SQLite database or save.
 
 ## Supporting systems
 - `CompanionDespawnDiagnosticsSystem`

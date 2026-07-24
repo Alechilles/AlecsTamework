@@ -18,7 +18,9 @@ Server-wide diagnostics and controls do not require a player identity. This
 includes `/tw patches status` and the server-global `debug*` logging toggles.
 `/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
-`/tw debugdb [status|health|integrity|detail]` is console-safe and read-only.
+`/tw debugdb [status|health|integrity|detail|export]` is console-safe.
+Status and detail actions are read-only. `export` writes a bounded, redacted
+support ZIP without changing persistence state.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
@@ -75,6 +77,11 @@ and `/tw showspawnmarkers` need a live player.
   persistence work. Circuit evidence comes from the one replacement feature
   registry and shared `feature_circuit` table, not an old failure catalog;
   there is no separate persistence rehearsal runtime.
+- Use `/tw debugdb export` to create a bounded support ZIP under the universe's
+  Tamework `Data/diagnostics` directory. It contains sanitized operational
+  status, counters, and durable diagnostic summaries. It excludes the SQLite
+  database, save data, player identities, coordinates, inventory payloads,
+  secrets, and unrestricted logs.
 
 ## Needs/resource seek troubleshooting
 - Confirm seek sensor/action components are in the role/template:

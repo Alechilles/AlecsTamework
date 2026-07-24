@@ -26,7 +26,7 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw findnpc <uuid>`
 - `/tw npcclean <roleId>`
 - `/tw showhitboxes`
-- `/tw debugdb [status|health|integrity|detail]`
+- `/tw debugdb [status|health|integrity|detail|export]`
 
 ## Debug toggles
 
@@ -56,5 +56,7 @@ the debug toggles changes that rule.
 
 `/tw debugdb status`, `health`, and `integrity` print the same bounded
 replacement-persistence summary. `detail` adds bounded feature, outbox,
-operation-phase, incident, quarantine, and circuit counts. None of these
-actions retries work or mutates saved state.
+operation-phase, incident, quarantine, and circuit counts. `export` writes a
+bounded redacted support ZIP under Tamework's universe data directory without
+including the database or save. None of these actions retries work or mutates
+saved persistence state.

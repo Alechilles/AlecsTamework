@@ -3,6 +3,10 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
+- Restored `/tw debugdb export` for the replacement persistence system. It
+  creates a bounded, redacted support ZIP containing operational status,
+  counters, and durable diagnostic summaries without copying the database,
+  world save, player identities, coordinates, or inventory contents.
 - Added `TwCapturePolicyConfig` and opt-in probabilistic capture mechanics on
   `TwSpawnerConfig`. Existing spawner configs remain deterministic unless they
   explicitly select `ChanceMode: Probability`.
@@ -75,6 +79,10 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed filled spawner release consuming the captured item without spawning
+  its companion when Hytale could not clone a codec-less live player
+  component. Player inventory receipts now use Hytale's own world-thread save
+  holder pattern, preserving crash recovery without cloning the player entity.
 - Fixed grounded AvatarFlight transformations crashing the client when a transformed model supplied a shorter footstep-interval array than the preceding player animation. Generated AvatarFlight model variants now remove unsafe footstep intervals, while fake riders once again attach the player's full skin, cosmetics, and equipment immediately by default.
 - Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer, reusing one keyed HUD across flight toggles, and throttling changed state instead of continuously resending unchanged UI commands.
 - Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.

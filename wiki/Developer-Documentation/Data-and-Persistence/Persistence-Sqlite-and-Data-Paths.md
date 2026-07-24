@@ -107,3 +107,9 @@ status.
 `/tw debugdb detail` adds bounded feature, outbox, operation-phase, incident,
 quarantine, and circuit counts. It does not repair data, retry an operation,
 clear evidence, import coop residents, or change feature state.
+
+`/tw debugdb export` writes a bounded redacted support ZIP under
+`Data/diagnostics`. The bundle contains the same sanitized replacement status,
+metrics, and durable detail exposed by the diagnostic reader. It excludes the
+SQLite database, saves, player identities, coordinates, inventory payloads,
+secrets, and unrestricted logs.
