@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "companion_profile": 4,
+    "companion_alias": 4,
+    "companion_snapshot": 3,
+    "companion_tool_link": 7,
+    "companion_lifecycle": 4,
+    "coop_slot": 1,
+    "coop_residency": 0,
+    "persistence_incident": 1,
+    "persistence_quarantine": 1,
+    "import_manifest": 1
+  },
+  "lifecycles": {
+    "00000000-0000-0000-0000-000000000101": "CAPTURED",
+    "00000000-0000-0000-0000-000000000102": "DEAD_REVIVABLE",
+    "00000000-0000-0000-0000-000000000103": "LOST",
+    "00000000-0000-0000-0000-000000000104": "UNRESOLVED"
+  },
+  "coopQuarantineReason": "COOP_EVIDENCE_INCOMPLETE",
+  "deathPayload": {
+    "ownerId": "10000000-0000-0000-0000-000000000001",
+    "displayName": "Fen Ω",
+    "diedAtMs": -400,
+    "breedingCooldownUntilMs": -250,
+    "lifeStageFullyGrownAtMs": -700,
+    "levelingLevel": 4,
+    "levelingTotalXp": 50.0,
+    "deathCauseKind": "STARVATION",
+    "lifeStageGender": "Female"
+  }
+}

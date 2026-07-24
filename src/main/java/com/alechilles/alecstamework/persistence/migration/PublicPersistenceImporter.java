@@ -153,6 +153,18 @@ public final class PublicPersistenceImporter {
         }
     }
 
+    /** Publishes an already decoded and canonicalized source through the same atomic target gate. */
+    PublicImportResult publishPrepared(
+            Path targetPath,
+            PublicImportPlan plan,
+            PublicImportManifest manifest
+    ) {
+        if (targetPath == null || plan == null || manifest == null) {
+            throw new IllegalArgumentException("Prepared import target, plan, and manifest required");
+        }
+        return publishPlan(targetPath.toAbsolutePath().normalize(), plan, manifest);
+    }
+
     private PublicImportResult verifyExisting(
             Path target,
             PublicImportPlan plan,
