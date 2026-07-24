@@ -96,6 +96,9 @@
 - Fixed grounded AvatarFlight transformations crashing the client when a transformed model supplied a shorter footstep-interval array than the preceding player animation. Generated AvatarFlight model variants now remove unsafe footstep intervals, while fake riders once again attach the player's full skin, cosmetics, and equipment immediately by default.
 - Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer, reusing one keyed HUD across flight toggles, and throttling changed state instead of continuously resending unchanged UI commands.
 - Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
+- Fixed cross-world Recall allowing the source world's saved chunk to resurrect
+  an old copy of the companion. Transfers now make the source removal durable
+  before preserving and inserting the same NPC in the destination world.
 - Fixed individual unloaded recalls sometimes waiting until another companion
   happened to load the source area. Each request now leases its own canonical
   source chunk, including across worlds.

@@ -622,25 +622,19 @@ public final class CommandNpcRelocationService {
             rejectRelocation(pending, "relocation-live-owner-changed");
             return;
         }
-        Holder<EntityStore> drainedHolder;
         pending.markPhysicalMutationAttempted();
-        try {
-            drainedHolder = sourceStore.removeEntity(sourceRef, RemoveReason.UNLOAD);
-        } catch (RuntimeException | LinkageError exception) {
-            handleSourceRemoveFailure(
-                    sourceWorld, destinationWorld, npcUuid, pending,
-                    "exception=" + exception.getClass().getSimpleName()
-            );
-            return;
-        }
+        CommandRelocationTransferHolderService.DrainResult drainResult =
+                transferHolders.drainForDestination(sourceStore, sourceRef, pending.destination);
+        Holder<EntityStore> drainedHolder = drainResult.holder();
         if (drainedHolder == null) {
             handleSourceRemoveFailure(
-                    sourceWorld, destinationWorld, npcUuid, pending, "empty-holder"
+                    sourceWorld, destinationWorld, npcUuid, pending,
+                    drainResult.failureDetail()
             );
             return;
         }
         CommandRelocationTransferHolderService.SourceTransform sourceTransform =
-                transferHolders.prepareForDestination(drainedHolder, pending.destination);
+                drainResult.sourceTransform();
         if (sourceTransform == null) {
             logTravelDiagnostic(
                     Level.WARNING,

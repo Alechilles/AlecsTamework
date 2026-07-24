@@ -74,11 +74,24 @@ class CommandNpcRelocationServiceTest {
         assertTrue(service.contains("!chunkRequests.isDestinationReady(destinationWorld, pending)"));
         assertTrue(chunkRequests.contains("pending.markChunkReady(worldName, chunkX, chunkZ)"));
         assertTrue(service.contains(
-                "transferHolders.prepareForDestination(drainedHolder, pending.destination)"
+                "transferHolders.drainForDestination("
         ));
         assertTrue(service.contains(
                 "transferHolders.restoreSource(drainedHolder, sourceTransform)"
         ));
+    }
+
+    @Test
+    void crossWorldTransferMakesSourceRemovalDurableBeforePreservingHolder() throws Exception {
+        String holderService = source("CommandRelocationTransferHolderService.java");
+        int drainStart = holderService.indexOf("DrainResult drainForDestination");
+        int markDirty = holderService.indexOf("sourceTransform.markChunkDirty(sourceStore)", drainStart);
+        int unload = holderService.indexOf(
+                "sourceStore.removeEntity(sourceRef, RemoveReason.UNLOAD)", drainStart);
+
+        assertTrue(drainStart >= 0 && markDirty > drainStart);
+        assertTrue(unload > markDirty, "The source chunk must be dirty before UNLOAD.");
+        assertFalse(holderService.substring(markDirty, unload).contains("RemoveReason.REMOVE"));
     }
 
     private static String source(String fileName) throws Exception {
