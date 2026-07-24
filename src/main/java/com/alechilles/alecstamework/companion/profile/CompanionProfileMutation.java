@@ -19,7 +19,7 @@ import javax.annotation.Nullable;
 public sealed interface CompanionProfileMutation
         permits CompanionProfileMutation.Create,
                 CompanionProfileMutation.AdoptLive,
-                CompanionProfileMutation.ReconcileLoaded,
+                CompanionProfileMutation.StartupReconciliation,
                 CompanionProfileMutation.Update {
     @Nonnull
     ProfileId profileId();
@@ -108,14 +108,33 @@ public sealed interface CompanionProfileMutation
         }
     }
 
+    /** Revision-fenced startup resolution shared by loaded and unloaded evidence. */
+    sealed interface StartupReconciliation extends CompanionProfileMutation
+            permits ReconcileLoaded, ReconcileUnloaded {
+        @Nonnull
+        LifecycleRevision expectedLifecycleRevision();
+
+        @Nonnull
+        ReconciliationGeneration expectedReconciliationGeneration();
+
+        @Nonnull
+        NpcAlias expectedCurrentAlias();
+
+        @Nonnull
+        CompanionLifecycle resolvedLifecycle(
+                @Nonnull CompanionLifecycle current
+        );
+    }
+
     /**
      * Reconciles canonical lifecycle location from a sealed positive
      * loaded-entity observation.
      *
      * <p>An imported {@code UNRESOLVED} lifecycle may adopt a newer observed
-     * alias during startup. An {@code ACTIVE} lifecycle may only update the
-     * world of its exact current alias. The alias and lifecycle revisions are
-     * evidence fences, so stale runtime observations become no-ops.</p>
+     * alias during startup. An {@code UNLOADED} lifecycle may return to active,
+     * and an {@code ACTIVE} lifecycle may update its world, only for the exact
+     * current alias. The alias and lifecycle revisions are evidence fences, so
+     * stale runtime observations become no-ops.</p>
      */
     record ReconcileLoaded(
             @Nonnull ProfileId profileId,
@@ -125,7 +144,7 @@ public sealed interface CompanionProfileMutation
             @Nonnull NpcAlias observedAlias,
             @Nonnull String worldKey,
             long requestedAtMs
-    ) implements CompanionProfileMutation {
+    ) implements StartupReconciliation {
         public ReconcileLoaded {
             if (profileId == null || expectedLifecycleRevision == null
                     || expectedReconciliationGeneration == null
@@ -159,6 +178,56 @@ public sealed interface CompanionProfileMutation
                             observedAlias.toString(),
                             worldKey
                     ),
+                    current.revision().next(),
+                    null,
+                    requestedAtMs,
+                    current.lastReconciledGeneration().next(),
+                    null,
+                    current.ownerWorldKey()
+            );
+        }
+    }
+
+    /**
+     * Resolves one imported profile as unloaded from sealed startup-world
+     * absence while retaining its current alias and owner authority.
+     */
+    record ReconcileUnloaded(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            @Nonnull ReconciliationGeneration expectedReconciliationGeneration,
+            @Nonnull NpcAlias expectedCurrentAlias,
+            long requestedAtMs
+    ) implements StartupReconciliation {
+        public ReconcileUnloaded {
+            if (profileId == null || expectedLifecycleRevision == null
+                    || expectedReconciliationGeneration == null
+                    || expectedCurrentAlias == null) {
+                throw new IllegalArgumentException(
+                        "Complete unloaded-profile reconciliation evidence is required"
+                );
+            }
+        }
+
+        @Override
+        @Nonnull
+        public CompanionLifecycle resolvedLifecycle(
+                @Nonnull CompanionLifecycle current
+        ) {
+            if (current == null || !profileId.equals(current.profileId())
+                    || !expectedLifecycleRevision.equals(current.revision())
+                    || !expectedReconciliationGeneration.equals(
+                    current.lastReconciledGeneration()
+            )) {
+                throw new IllegalArgumentException(
+                        "Unloaded-profile reconciliation lifecycle fence mismatch"
+                );
+            }
+            return new CompanionLifecycle(
+                    profileId,
+                    current.ownerId(),
+                    LifecycleState.UNLOADED,
+                    LifecycleLocation.none(),
                     current.revision().next(),
                     null,
                     requestedAtMs,

@@ -46,14 +46,16 @@ import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
+import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
@@ -134,22 +136,31 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 components.coopCaptureReceipts(),
                 components.persistenceRetirement()
         );
-        boolean registered = TameworkEventRegistrationSupport.registerGlobal(
+        AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
+        TameworkEventRegistrationSupport.registerGlobal(
                 plugin,
                 StartWorldEvent.class,
                 event -> {
                     identityBootstrap.onStartWorld(event);
-                    composition.resumeAfterWorldEvidence();
+                    if (startupWorldsLoaded.get()) {
+                        composition.resumeAfterWorldEvidence();
+                    }
                 },
                 "replacement persistence identity bootstrap"
         );
-        if (registered) {
-            identityBootstrap.bootstrapUniverse();
-        }
+        TameworkEventRegistrationSupport.registerGlobal(
+                plugin,
+                AllWorldsLoadedEvent.class,
+                ignored -> {
+                    startupWorldsLoaded.set(true);
+                    identityBootstrap.bootstrapUniverse();
+                    composition.resumeAfterWorldEvidence();
+                },
+                "replacement persistence startup-world seal"
+        );
         TameworkDormantPersistenceRegistration.register(
                 plugin, components, composition.dormantAuthor()
         );
-        composition.resumeAfterWorldEvidence();
         return composition;
     }
 

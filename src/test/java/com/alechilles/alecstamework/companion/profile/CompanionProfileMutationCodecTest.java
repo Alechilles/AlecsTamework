@@ -158,6 +158,45 @@ class CompanionProfileMutationCodecTest {
     }
 
     @Test
+    void unloadedReconciliationRoundTripsAndDerivesOneCanonicalAdvance() {
+        CompanionProfileMutation.ReconcileUnloaded reconciliation =
+                new CompanionProfileMutation.ReconcileUnloaded(
+                        PROFILE,
+                        new LifecycleRevision(3),
+                        new ReconciliationGeneration(5),
+                        ALIAS,
+                        -8_000
+                );
+        CompanionProfileMutation.ReconcileUnloaded decoded =
+                (CompanionProfileMutation.ReconcileUnloaded) decode(
+                        encode(reconciliation)
+                );
+        CompanionLifecycle current = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.UNRESOLVED,
+                LifecycleLocation.unresolved(),
+                new LifecycleRevision(3),
+                null,
+                -9_000,
+                new ReconciliationGeneration(5),
+                null,
+                "owner-world"
+        );
+
+        assertEquals(reconciliation, decoded);
+        CompanionLifecycle resolved = decoded.resolvedLifecycle(current);
+        assertEquals(LifecycleState.UNLOADED, resolved.state());
+        assertEquals(LifecycleLocation.none(), resolved.location());
+        assertEquals(new LifecycleRevision(4), resolved.revision());
+        assertEquals(
+                new ReconciliationGeneration(6),
+                resolved.lastReconciledGeneration()
+        );
+        assertEquals("owner-world", resolved.ownerWorldKey());
+    }
+
+    @Test
     void unownedLiveAdoptionRoundTripsExplicitNullAndAcceptsMissingOwner() {
         CompanionProfileMutation.AdoptLive adoption =
                 new CompanionProfileMutation.AdoptLive(

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
@@ -29,10 +30,10 @@ import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
 /**
- * Reconciles imported unresolved profiles from sealed loaded-world identity evidence.
+ * Reconciles imported unresolved profiles from sealed startup-world identity evidence.
  *
  * <p>The Hytale bootstrap performs world-thread scans. This participant retains
- * only immutable observations and submits each canonical resolution through the
+ * loaded observations or sealed absence and submits each canonical resolution through the
  * existing shared profile operation; it never scans worlds or blocks a thread.</p>
  */
 public final class HytalePublicPersistenceWorldReconciliation
@@ -232,7 +233,13 @@ public final class HytalePublicPersistenceWorldReconciliation
         List<LoadedNpcIdentityIndex.LoadedNpcObservation> matches =
                 matching(snapshot, profile.currentAlias());
         if (matches.isEmpty()) {
-            return null;
+            return new Plan(new CompanionProfileMutation.ReconcileUnloaded(
+                    lifecycle.profileId(),
+                    lifecycle.revision(),
+                    lifecycle.lastReconciledGeneration(),
+                    profile.currentAlias(),
+                    clock.getAsLong()
+            ));
         }
         if (matches.size() != 1 || !claimed.add(matches.getFirst())) {
             throw new IllegalStateException(
@@ -249,13 +256,15 @@ public final class HytalePublicPersistenceWorldReconciliation
                     "world_reconciliation_observed_alias_conflict"
             );
         }
-        return new Plan(
-                lifecycle,
+        return new Plan(new CompanionProfileMutation.ReconcileLoaded(
+                lifecycle.profileId(),
+                lifecycle.revision(),
+                lifecycle.lastReconciledGeneration(),
                 profile.currentAlias(),
                 observedAlias,
                 observation.location().worldName(),
                 clock.getAsLong()
-        );
+        ));
     }
 
     private List<LoadedNpcIdentityIndex.LoadedNpcObservation> matching(
@@ -342,7 +351,7 @@ public final class HytalePublicPersistenceWorldReconciliation
             if (quiesced) {
                 return failed("world_reconciliation_quiesced");
             }
-            return access.reconcileLoaded(
+            return access.reconcileProfile(
                     identity.operationId(),
                     identity.idempotencyKey(),
                     plan.mutation()
@@ -351,18 +360,9 @@ public final class HytalePublicPersistenceWorldReconciliation
     }
 
     private OperationIdentity operationIdentity(Plan plan) {
-        String material = String.join(
-                "|",
-                IDEMPOTENCY_PREFIX,
-                plan.lifecycle().profileId().toString(),
-                Long.toString(plan.lifecycle().revision().value()),
-                Long.toString(
-                        plan.lifecycle().lastReconciledGeneration().value()
-                ),
-                plan.expectedAlias().toString(),
-                plan.observedAlias().toString(),
-                plan.worldKey(),
-                Long.toString(plan.requestedAtMs())
+        String material = IDEMPOTENCY_PREFIX
+                + CompanionProfileMutationDefinition.INSTANCE.encode(
+                plan.mutation()
         );
         return new OperationIdentity(
                 new OperationId(UUID.nameUUIDFromBytes(
@@ -428,30 +428,18 @@ public final class HytalePublicPersistenceWorldReconciliation
 
         Map<ProfileId, CompanionProfileProjectionState> projectedProfiles();
 
-        CompletionStage<Void> reconcileLoaded(
+        CompletionStage<Void> reconcileProfile(
                 OperationId operationId,
                 IdempotencyKey idempotencyKey,
-                CompanionProfileMutation.ReconcileLoaded reconciliation
+                CompanionProfileMutation.StartupReconciliation reconciliation
         );
     }
 
     private record Plan(
-            CompanionLifecycle lifecycle,
-            NpcAlias expectedAlias,
-            NpcAlias observedAlias,
-            String worldKey,
-            long requestedAtMs
+            CompanionProfileMutation.StartupReconciliation mutation
     ) {
-        private CompanionProfileMutation.ReconcileLoaded mutation() {
-            return new CompanionProfileMutation.ReconcileLoaded(
-                    lifecycle.profileId(),
-                    lifecycle.revision(),
-                    lifecycle.lastReconciledGeneration(),
-                    expectedAlias,
-                    observedAlias,
-                    worldKey,
-                    requestedAtMs
-            );
+        private Plan {
+            Objects.requireNonNull(mutation, "mutation");
         }
     }
 

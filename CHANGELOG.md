@@ -79,6 +79,10 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed public-world migration remaining permanently read-only when an ordinary
+  linked companion was unloaded. Startup now waits until Hytale reports all
+  startup worlds loaded, then resolves sealed live observations to Active and
+  sealed absence to Unloaded through the same canonical profile operation.
 - Fixed configured coops ignoring companions whose live UUID changed after a
   spawner release. Coop intake now resolves the current UUID alias back to its
   stable companion profile before capture.

@@ -87,8 +87,8 @@ public final class SqliteCompanionProfileOperations {
             return adoptLive(transaction, operationId, adoption);
         }
         if (mutation instanceof
-                CompanionProfileMutation.ReconcileLoaded reconciliation) {
-            return reconcileLoaded(
+                CompanionProfileMutation.StartupReconciliation reconciliation) {
+            return reconcileStartup(
                     transaction,
                     operationId,
                     reconciliation
@@ -100,18 +100,18 @@ public final class SqliteCompanionProfileOperations {
     private com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision
     expectedLifecycleRevision(CompanionProfileMutation mutation) {
         return mutation instanceof
-                CompanionProfileMutation.ReconcileLoaded reconciliation
+                CompanionProfileMutation.StartupReconciliation reconciliation
                 ? reconciliation.expectedLifecycleRevision()
                 : null;
     }
 
-    private AppliedMutation reconcileLoaded(
+    private AppliedMutation reconcileStartup(
             SqlitePersistenceTransactionContext transaction,
             OperationId operationId,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
-        SqliteLoadedProfileReconciliation.Result applied =
-                SqliteLoadedProfileReconciliation.apply(
+        SqliteStartupProfileReconciliation.Result applied =
+                SqliteStartupProfileReconciliation.apply(
                         transaction,
                         operationId,
                         reconciliation

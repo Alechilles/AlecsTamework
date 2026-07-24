@@ -63,6 +63,10 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   `RELEASED`, and `UNRESOLVED` form the sole durable companion lifecycle.
   Command status, restoration, capture, and coop behavior read that lifecycle
   instead of inferring durable state from feature-local snapshots or caches.
+- Public imports keep ordinary no-flag profiles `UNRESOLVED` offline. Once
+  Hytale reports all startup worlds loaded, sealed entity-store evidence
+  resolves a matching NPC to `ACTIVE` and sealed absence to `UNLOADED`; an
+  empty pre-world universe never proves absence.
 - Configured coops capture live NPCs and release live residents directly. Capture
   items are not a second coop-intake protocol.
 - Manual and passive breeding use the released breeding flow and apply direct

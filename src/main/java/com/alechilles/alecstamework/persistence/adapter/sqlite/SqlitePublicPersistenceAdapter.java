@@ -105,10 +105,10 @@ public final class SqlitePublicPersistenceAdapter {
      */
     @Nonnull
     public SqliteDatabaseOperationCoordinator.Submission
-    reconcileLoadedAtStartup(
+    reconcileProfileAtStartup(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull CompanionProfileMutation.ReconcileLoaded reconciliation
+            @Nonnull CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         return recoveryOperations.profiles().submit(
                 operationId,

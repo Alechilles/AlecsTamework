@@ -266,7 +266,7 @@ class SqlitePublicPersistenceAdapterTest {
                         reconciliation
                 )
         );
-        var submitted = adapter.reconcileLoadedAtStartup(
+        var submitted = adapter.reconcileProfileAtStartup(
                 OperationId.create(),
                 new IdempotencyKey("startup-reconciliation"),
                 reconciliation

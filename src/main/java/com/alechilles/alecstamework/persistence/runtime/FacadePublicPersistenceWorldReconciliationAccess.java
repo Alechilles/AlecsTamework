@@ -39,13 +39,13 @@ final class FacadePublicPersistenceWorldReconciliationAccess
     }
 
     @Override
-    public CompletionStage<Void> reconcileLoaded(
+    public CompletionStage<Void> reconcileProfile(
             OperationId operationId,
             IdempotencyKey idempotencyKey,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         PublicOperationSubmission submission =
-                facades.operations().reconcileLoadedDuringStartup(
+                facades.operations().reconcileProfileDuringStartup(
                         operationId,
                         idempotencyKey,
                         reconciliation

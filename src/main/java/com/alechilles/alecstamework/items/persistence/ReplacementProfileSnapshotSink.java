@@ -152,7 +152,7 @@ public final class ReplacementProfileSnapshotSink
             CommandLinkedNpcStateSnapshotService.LiveLinkedNpcSnapshot snapshot,
             String worldKey
     ) {
-        if (!exactCurrentLiveAlias(current, alias)) {
+        if (!currentAliasCanBecomeActive(current, alias)) {
             return CompletableFuture.completedFuture(null);
         }
         return update(current, snapshot, worldKey)
@@ -272,18 +272,19 @@ public final class ReplacementProfileSnapshotSink
         ));
     }
 
-    private boolean exactCurrentLiveAlias(
+    private boolean currentAliasCanBecomeActive(
             CompanionProfileReadModel current,
             NpcAlias alias
     ) {
         return current.currentAlias() != null
                 && current.currentAlias().alias().equals(alias)
-                && current.lifecycle().state() == LifecycleState.ACTIVE
                 && current.lifecycle().activeOperationId() == null
                 && !current.lifecycle().quarantined()
+                && (current.lifecycle().state() == LifecycleState.UNLOADED
+                || (current.lifecycle().state() == LifecycleState.ACTIVE
                 && alias.toString().equals(
-                current.lifecycle().location().key()
-        );
+                        current.lifecycle().location().key()
+                )));
     }
 
     private CompletionStage<Void> submitProfile(

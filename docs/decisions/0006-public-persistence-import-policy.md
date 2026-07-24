@@ -40,8 +40,11 @@ One positive, internally complete evidence set maps to one canonical state:
 | coop flag, matching slot/key, and valid coop snapshot | `COOP` / `COOP_SLOT` |
 | no positive dormant flag | `UNRESOLVED` / `UNRESOLVED` |
 
-`UNRESOLVED` is deliberately non-mutating. Startup reconciliation may later prove live or unloaded
-state from world evidence; the importer may not guess.
+`UNRESOLVED` is deliberately non-mutating. After Hytale reports all startup
+worlds loaded, startup reconciliation scans every active entity store. One
+matching observation resolves the profile to `ACTIVE`; sealed absence resolves
+it to `UNLOADED`. An empty pre-world universe is not sealed absence, and the
+offline importer may not guess either state.
 
 ## Bounded conflict policy
 

@@ -14,20 +14,20 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import javax.annotation.Nonnull;
 
 /**
- * Applies one positive loaded-world observation to imported canonical profile state.
+ * Applies one sealed startup-world resolution to imported canonical profile state.
  *
  * <p>Any required alias rotation and the sole lifecycle revision advance occur in
  * the caller's shared operation transaction.</p>
  */
-final class SqliteLoadedProfileReconciliation {
-    private SqliteLoadedProfileReconciliation() {
+final class SqliteStartupProfileReconciliation {
+    private SqliteStartupProfileReconciliation() {
     }
 
     @Nonnull
     static Result apply(
             @Nonnull SqlitePersistenceTransactionContext transaction,
             @Nonnull OperationId operationId,
-            @Nonnull CompanionProfileMutation.ReconcileLoaded reconciliation
+            @Nonnull CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         Current current = loadCurrent(transaction, reconciliation);
         if (alreadyApplied(
@@ -49,7 +49,7 @@ final class SqliteLoadedProfileReconciliation {
 
     private static Current loadCurrent(
             SqlitePersistenceTransactionContext transaction,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         return new Current(
                 transaction.identities().findProfile(reconciliation.profileId())
@@ -65,7 +65,7 @@ final class SqliteLoadedProfileReconciliation {
     private static Result transition(
             SqlitePersistenceTransactionContext transaction,
             OperationId operationId,
-            CompanionProfileMutation.ReconcileLoaded reconciliation,
+            CompanionProfileMutation.StartupReconciliation reconciliation,
             Current current
     ) {
         CompanionProfileProjectionState before =
@@ -117,7 +117,7 @@ final class SqliteLoadedProfileReconciliation {
 
     private static Result changed(
             Current current,
-            CompanionProfileMutation.ReconcileLoaded reconciliation,
+            CompanionProfileMutation.StartupReconciliation reconciliation,
             CompanionProfileProjectionState before,
             CompanionProfileProjectionState after,
             CompanionLifecycle next,
@@ -143,7 +143,7 @@ final class SqliteLoadedProfileReconciliation {
     private static boolean matchesCurrent(
             CompanionLifecycle lifecycle,
             CompanionAlias alias,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         if (lifecycle.quarantined()
                 || lifecycle.activeOperationId() != null
@@ -160,35 +160,45 @@ final class SqliteLoadedProfileReconciliation {
         )) {
             return false;
         }
+        if (reconciliation instanceof
+                CompanionProfileMutation.ReconcileUnloaded) {
+            return lifecycle.state() == LifecycleState.UNRESOLVED;
+        }
+        CompanionProfileMutation.ReconcileLoaded loaded =
+                (CompanionProfileMutation.ReconcileLoaded) reconciliation;
         if (lifecycle.state() == LifecycleState.UNRESOLVED) {
             return true;
         }
-        return lifecycle.state() == LifecycleState.ACTIVE
-                && reconciliation.observedAlias().equals(
-                reconciliation.expectedCurrentAlias()
+        return (lifecycle.state() == LifecycleState.ACTIVE
+                || lifecycle.state() == LifecycleState.UNLOADED)
+                && loaded.observedAlias().equals(
+                    loaded.expectedCurrentAlias()
         )
-                && lifecycle.location().key().equals(
-                reconciliation.expectedCurrentAlias().toString()
-        );
+                && (lifecycle.state() == LifecycleState.UNLOADED
+                || lifecycle.location().key().equals(
+                loaded.expectedCurrentAlias().toString()
+        ));
     }
 
     private static boolean rotateAliasIfRequired(
             SqlitePersistenceTransactionContext transaction,
             OperationId operationId,
             CompanionAlias currentAlias,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
-        if (currentAlias.alias().equals(reconciliation.observedAlias())) {
+        if (!(reconciliation instanceof
+                CompanionProfileMutation.ReconcileLoaded loaded)
+                || currentAlias.alias().equals(loaded.observedAlias())) {
             return false;
         }
         if (transaction.identities()
-                .resolveAlias(reconciliation.observedAlias()).isPresent()) {
+                .resolveAlias(loaded.observedAlias()).isPresent()) {
             throw failure("observed_alias_conflict");
         }
         requireApplied(
                 transaction.identities().leaseAlias(
                         reconciliation.profileId(),
-                        reconciliation.observedAlias(),
+                        loaded.observedAlias(),
                         operationId,
                         reconciliation.requestedAtMs()
                 ),
@@ -196,7 +206,7 @@ final class SqliteLoadedProfileReconciliation {
         );
         requireApplied(
                 transaction.identities().promoteAlias(
-                        reconciliation.observedAlias(),
+                        loaded.observedAlias(),
                         operationId,
                         reconciliation.requestedAtMs()
                 ),
@@ -208,29 +218,40 @@ final class SqliteLoadedProfileReconciliation {
     private static boolean alreadyApplied(
             CompanionLifecycle lifecycle,
             CompanionAlias alias,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
-        return lifecycle.state() == LifecycleState.ACTIVE
-                && lifecycle.revision().equals(
+        if (alias == null
+                || alias.state() != CompanionAlias.State.CURRENT
+                || !lifecycle.revision().equals(
                 reconciliation.expectedLifecycleRevision().next()
         )
-                && lifecycle.lastReconciledGeneration().equals(
+                || !lifecycle.lastReconciledGeneration().equals(
                 reconciliation.expectedReconciliationGeneration().next()
-        )
+        )) {
+            return false;
+        }
+        if (reconciliation instanceof
+                CompanionProfileMutation.ReconcileUnloaded) {
+            return lifecycle.state() == LifecycleState.UNLOADED
+                    && alias.alias().equals(
+                    reconciliation.expectedCurrentAlias()
+            );
+        }
+        CompanionProfileMutation.ReconcileLoaded loaded =
+                (CompanionProfileMutation.ReconcileLoaded) reconciliation;
+        return lifecycle.state() == LifecycleState.ACTIVE
+                && alias.alias().equals(loaded.observedAlias())
                 && lifecycle.location().key().equals(
-                reconciliation.observedAlias().toString()
+                loaded.observedAlias().toString()
         )
                 && lifecycle.location().worldKey().equals(
-                reconciliation.worldKey()
-        )
-                && alias != null
-                && alias.state() == CompanionAlias.State.CURRENT
-                && alias.alias().equals(reconciliation.observedAlias());
+                loaded.worldKey()
+        );
     }
 
     private static Result unchanged(
             CompanionIdentity identity,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         return new Result(
                 outcome(
@@ -250,7 +271,7 @@ final class SqliteLoadedProfileReconciliation {
     private static CompanionProfileMutationOutcome outcome(
             CompanionProfileMutationOutcome.Status status,
             CompanionIdentity identity,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
         return new CompanionProfileMutationOutcome(
                 status,
@@ -276,7 +297,7 @@ final class SqliteLoadedProfileReconciliation {
 
     private static IllegalStateException failure(String code) {
         return new IllegalStateException(
-                "loaded_profile_reconciliation_" + code
+                "startup_profile_reconciliation_" + code
         );
     }
 

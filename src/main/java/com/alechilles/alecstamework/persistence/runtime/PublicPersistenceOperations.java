@@ -56,12 +56,12 @@ public final class PublicPersistenceOperations {
     /**
      * Narrow internal path for the startup graph's evidence-backed resolution.
      */
-    PublicOperationSubmission reconcileLoadedDuringStartup(
+    PublicOperationSubmission reconcileProfileDuringStartup(
             OperationId operationId,
             IdempotencyKey idempotencyKey,
-            CompanionProfileMutation.ReconcileLoaded reconciliation
+            CompanionProfileMutation.StartupReconciliation reconciliation
     ) {
-        var submitted = adapter.reconcileLoadedAtStartup(
+        var submitted = adapter.reconcileProfileAtStartup(
                 operationId,
                 idempotencyKey,
                 reconciliation

@@ -312,6 +312,51 @@ class SqliteCompanionProfileOperationsTest {
     }
 
     @Test
+    void reconcilesImportedSealedAbsenceToUnloadedAtomically() throws Exception {
+        CompanionProfileMutation.Create imported =
+                new CompanionProfileMutation.Create(
+                        identity(0, "Imported", -9_000),
+                        new CompanionLifecycle(
+                                PROFILE, OWNER_A, LifecycleState.UNRESOLVED,
+                                LifecycleLocation.unresolved(),
+                                LifecycleRevision.INITIAL, null, -9_000,
+                                ReconciliationGeneration.INITIAL, null,
+                                "owner-world"
+                        ),
+                        List.of(),
+                        -9_000
+                );
+        submit(1, "profile-imported-unloaded", imported);
+        insertCurrentAlias(ALIAS_A);
+        CompanionProfileMutation.ReconcileUnloaded reconciliation =
+                new CompanionProfileMutation.ReconcileUnloaded(
+                        PROFILE, LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL, ALIAS_A, -8_000
+                );
+
+        OperationWorkflowResult result = submitAsync(
+                2, "profile-reconcile-unloaded", reconciliation
+        ).get(10, TimeUnit.SECONDS);
+
+        assertEquals(3, result.events().size());
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UPDATED,
+                CompanionProfileMutationEventCodec.decode(
+                        result.events().getFirst().payloadVersion(),
+                        result.events().getFirst().payloadJson()
+                ).status()
+        );
+        CompanionLifecycle lifecycle = storedLifecycle(PROFILE);
+        assertEquals(LifecycleState.UNLOADED, lifecycle.state());
+        assertEquals(LifecycleLocation.none(), lifecycle.location());
+        assertEquals(new LifecycleRevision(1), lifecycle.revision());
+        assertEquals(new ReconciliationGeneration(1),
+                lifecycle.lastReconciledGeneration());
+        assertEquals("owner-world", lifecycle.ownerWorldKey());
+        assertEquals(ALIAS_A, storedAlias(ALIAS_A).alias());
+    }
+
+    @Test
     void reconcilesImportedUnresolvedLifecycleAndModernAliasAtomically()
             throws Exception {
         CompanionProfileMutation.Create imported =

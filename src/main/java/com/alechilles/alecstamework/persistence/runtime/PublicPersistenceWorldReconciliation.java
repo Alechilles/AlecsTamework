@@ -20,7 +20,7 @@ public interface PublicPersistenceWorldReconciliation {
     @Nonnull
     CompletionStage<Result> awaitEvidence();
 
-    /** Reconciles canonical state only from complete, positive evidence. */
+    /** Reconciles canonical state only from complete sealed world evidence. */
     @Nonnull
     CompletionStage<Result> reconcile();
 

@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Regression coverage for sealed, positive-only public world reconciliation. */
+/** Regression coverage for sealed public startup-world reconciliation. */
 class HytalePublicPersistenceWorldReconciliationTest {
     private static final ProfileId PROFILE = ProfileId.parse(
             "20000000-0000-0000-0000-000000000001"
@@ -61,7 +61,8 @@ class HytalePublicPersistenceWorldReconciliationTest {
 
         assertEquals(1, access.submitted.size());
         CompanionProfileMutation.ReconcileLoaded submitted =
-                access.submitted.getFirst();
+                (CompanionProfileMutation.ReconcileLoaded)
+                        access.submitted.getFirst();
         assertEquals(PROFILE, submitted.profileId());
         assertEquals(IMPORTED_ALIAS, submitted.expectedCurrentAlias());
         assertEquals(COMPONENT_ALIAS, submitted.observedAlias());
@@ -73,29 +74,41 @@ class HytalePublicPersistenceWorldReconciliationTest {
     }
 
     @Test
-    void sealedAbsenceDefersAndNeverSubmitsMutation() {
+    void sealedAbsenceSubmitsOneCanonicalUnloadedReconciliation() {
         LoadedNpcIdentityIndex index = sealedIndex();
         FakeAccess access = access(List.of(unresolved()), profile());
         HytalePublicPersistenceWorldReconciliation reconciliation =
                 reconciliation(index, access);
 
         assertEquals(
-                PublicPersistenceWorldReconciliation.Result.DEFERRED,
+                PublicPersistenceWorldReconciliation.Result.COMPLETE,
                 reconciliation.awaitEvidence().toCompletableFuture().join()
         );
         assertEquals(
-                PublicPersistenceWorldReconciliation.Result.DEFERRED,
+                PublicPersistenceWorldReconciliation.Result.COMPLETE,
                 reconciliation.reconcile().toCompletableFuture().join()
         );
-        assertTrue(access.submitted.isEmpty());
+        assertEquals(1, access.submitted.size());
+        CompanionProfileMutation.ReconcileUnloaded submitted =
+                (CompanionProfileMutation.ReconcileUnloaded)
+                        access.submitted.getFirst();
+        assertEquals(PROFILE, submitted.profileId());
+        assertEquals(IMPORTED_ALIAS, submitted.expectedCurrentAlias());
     }
 
     @Test
-    void zeroWorldStartupDefersUntilANewWorldSuppliesPositiveEvidence() {
-        LoadedNpcIdentityIndex index = sealedIndex();
+    void unsealedZeroWorldStartupDefersUntilAWorldSuppliesPositiveEvidence() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         FakeAccess access = access(List.of(unresolved()), profile());
+        CompletableFuture<com.alechilles.alecstamework.items
+                .LoadedNpcIdentitySnapshot> evidence = new CompletableFuture<>();
         HytalePublicPersistenceWorldReconciliation reconciliation =
-                reconciliation(index, access);
+                new HytalePublicPersistenceWorldReconciliation(
+                        index,
+                        () -> evidence,
+                        access,
+                        () -> -8_000
+                );
 
         assertEquals(
                 PublicPersistenceWorldReconciliation.Result.DEFERRED,
@@ -103,6 +116,8 @@ class HytalePublicPersistenceWorldReconciliationTest {
         );
 
         index.recordAdded(observation(COMPONENT_ALIAS, IMPORTED_ALIAS));
+        index.markInitializationComplete();
+        evidence.complete(index.snapshot());
         assertEquals(
                 PublicPersistenceWorldReconciliation.Result.COMPLETE,
                 reconciliation.awaitEvidence().toCompletableFuture().join()
@@ -308,7 +323,7 @@ class HytalePublicPersistenceWorldReconciliationTest {
             implements HytalePublicPersistenceWorldReconciliation.Access {
         private PersistenceReadResult<List<CompanionLifecycle>> read;
         private final Map<ProfileId, CompanionProfileProjectionState> profiles;
-        private final List<CompanionProfileMutation.ReconcileLoaded> submitted =
+        private final List<CompanionProfileMutation.StartupReconciliation> submitted =
                 new ArrayList<>();
         private final List<OperationId> operationIds = new ArrayList<>();
         private final List<IdempotencyKey> idempotencyKeys = new ArrayList<>();
@@ -334,10 +349,10 @@ class HytalePublicPersistenceWorldReconciliationTest {
         }
 
         @Override
-        public CompletionStage<Void> reconcileLoaded(
+        public CompletionStage<Void> reconcileProfile(
                 OperationId operationId,
                 IdempotencyKey idempotencyKey,
-                CompanionProfileMutation.ReconcileLoaded reconciliation
+                CompanionProfileMutation.StartupReconciliation reconciliation
         ) {
             operationIds.add(operationId);
             idempotencyKeys.add(idempotencyKey);
