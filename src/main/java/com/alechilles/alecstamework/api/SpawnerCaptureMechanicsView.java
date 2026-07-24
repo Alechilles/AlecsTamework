@@ -16,34 +16,11 @@ public record SpawnerCaptureMechanicsView(@Nonnull String configId,
                                          double maximumChance,
                                          long failureCooldownMs,
                                          @Nullable String failureParticleSystem,
-                                         @Nullable String failureSoundEvent,
-                                         @Nonnull CaptureSourceConsumption sourceConsumption,
-                                         @Nonnull CaptureSuccessDisposition successDisposition) {
-    /** Source-compatible constructor for API 0.9 consumers. */
-    public SpawnerCaptureMechanicsView(String configId,
-                                      long configRevision,
-                                      String sourceItemId,
-                                      CaptureChanceMode chanceMode,
-                                      int power,
-                                      double baseChance,
-                                      double chancePerPower,
-                                      double minimumChance,
-                                      double maximumChance,
-                                      long failureCooldownMs,
-                                      String failureParticleSystem,
-                                      String failureSoundEvent) {
-        this(configId, configRevision, sourceItemId, chanceMode, power, baseChance,
-                chancePerPower, minimumChance, maximumChance, failureCooldownMs,
-                failureParticleSystem, failureSoundEvent,
-                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM);
-    }
-
+                                         @Nullable String failureSoundEvent) {
     public SpawnerCaptureMechanicsView {
         configId = requireText(configId, "configId");
         sourceItemId = requireText(sourceItemId, "sourceItemId");
         chanceMode = Objects.requireNonNull(chanceMode, "chanceMode");
-        sourceConsumption = Objects.requireNonNull(sourceConsumption, "sourceConsumption");
-        successDisposition = Objects.requireNonNull(successDisposition, "successDisposition");
         failureParticleSystem = normalizeBlank(failureParticleSystem);
         failureSoundEvent = normalizeBlank(failureSoundEvent);
         if (configRevision < 0L || power < 0 || failureCooldownMs < 0L) {

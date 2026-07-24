@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
-import com.alechilles.alecstamework.api.CaptureSourceConsumption;
-import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -87,18 +85,6 @@ final class TwSpawnerCaptureSettingsCodec {
             (settings, value) -> settings.failureSoundEvent = value,
             settings -> settings.failureSoundEvent)
         .documentation("Optional failed-roll sound event.").add()
-        .<String>append(new KeyedCodec<>("SourceConsumption", Codec.STRING),
-            (settings, value) -> settings.sourceConsumption = parseSourceConsumption(value),
-            settings -> settings.sourceConsumption == CaptureSourceConsumption.RESOLVED_ATTEMPT
-                    ? "ResolvedAttempt" : "SuccessOnly")
-        .documentation("When the exact source item is spent. Inheritance: an omitted value inherits the parent; "
-                + "SuccessOnly preserves captured-item behavior, while ResolvedAttempt spends one item after "
-                + "either terminal roll result.").add()
-        .<String>append(new KeyedCodec<>("SuccessDisposition", Codec.STRING),
-            (settings, value) -> settings.successDisposition = parseSuccessDisposition(value),
-            settings -> "CapturedItem")
-        .documentation("Successful capture creates the configured filled item. Inheritance: an omitted value "
-                + "inherits the parent.").add()
         .build();
 
     private TwSpawnerCaptureSettingsCodec() {
@@ -112,20 +98,4 @@ final class TwSpawnerCaptureSettingsCodec {
         throw new IllegalArgumentException("Unknown capture ChanceMode: " + value);
     }
 
-    private static CaptureSourceConsumption parseSourceConsumption(@Nullable String value) {
-        if (value == null || value.isBlank() || value.equalsIgnoreCase("SuccessOnly")) {
-            return CaptureSourceConsumption.SUCCESS_ONLY;
-        }
-        if (value.equalsIgnoreCase("ResolvedAttempt")) {
-            return CaptureSourceConsumption.RESOLVED_ATTEMPT;
-        }
-        throw new IllegalArgumentException("Unknown capture SourceConsumption: " + value);
-    }
-
-    private static CaptureSuccessDisposition parseSuccessDisposition(@Nullable String value) {
-        if (value == null || value.isBlank() || value.equalsIgnoreCase("CapturedItem")) {
-            return CaptureSuccessDisposition.CAPTURED_ITEM;
-        }
-        throw new IllegalArgumentException("Unknown capture SuccessDisposition: " + value);
-    }
 }

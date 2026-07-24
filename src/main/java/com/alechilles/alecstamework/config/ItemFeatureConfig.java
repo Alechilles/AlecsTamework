@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.config;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
-import com.alechilles.alecstamework.api.CaptureSourceConsumption;
-import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 
 import java.util.Collections;
 import java.util.List;
@@ -282,35 +280,13 @@ public final class ItemFeatureConfig {
                                        double maximumChance,
                                        int failureCooldownMs,
                                        String failureParticleSystem,
-                                       String failureSoundEvent,
-                                       CaptureSourceConsumption sourceConsumption,
-                                       CaptureSuccessDisposition successDisposition) {
+                                       String failureSoundEvent) {
         public static final CaptureItemMechanics GUARANTEED_DEFAULT = new CaptureItemMechanics(
-                CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null,
-                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM
+                CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null
         );
-
-        /** Source-compatible constructor for the original capture-policy mechanics. */
-        public CaptureItemMechanics(CaptureChanceMode chanceMode,
-                                    int power,
-                                    double baseChance,
-                                    double chancePerPower,
-                                    double minimumChance,
-                                    double maximumChance,
-                                    int failureCooldownMs,
-                                    String failureParticleSystem,
-                                    String failureSoundEvent) {
-            this(chanceMode, power, baseChance, chancePerPower, minimumChance, maximumChance,
-                    failureCooldownMs, failureParticleSystem, failureSoundEvent,
-                    CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM);
-        }
 
         public CaptureItemMechanics {
             chanceMode = chanceMode == null ? CaptureChanceMode.GUARANTEED : chanceMode;
-            sourceConsumption = sourceConsumption == null
-                    ? CaptureSourceConsumption.SUCCESS_ONLY : sourceConsumption;
-            successDisposition = successDisposition == null
-                    ? CaptureSuccessDisposition.CAPTURED_ITEM : successDisposition;
             failureParticleSystem = normalizeBlank(failureParticleSystem);
             failureSoundEvent = normalizeBlank(failureSoundEvent);
             if (power < 0 || failureCooldownMs < 0) {

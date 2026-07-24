@@ -22,9 +22,7 @@ final class TwSpawnerConfigRuntimeAdapter {
                 capture.maximumChance,
                 capture.failureCooldownMs,
                 capture.failureParticleSystem,
-                capture.failureSoundEvent,
-                capture.sourceConsumption,
-                capture.successDisposition);
+                capture.failureSoundEvent);
     }
 
     static SpawnerCaptureMechanicsView captureView(TwSpawnerConfig config, long revision) {
@@ -38,8 +36,7 @@ final class TwSpawnerConfigRuntimeAdapter {
                 config.getId(), revision, config.getEmptyItemId(), mechanics.chanceMode(),
                 mechanics.power(), mechanics.baseChance(), mechanics.chancePerPower(),
                 mechanics.minimumChance(), mechanics.maximumChance(), mechanics.failureCooldownMs(),
-                mechanics.failureParticleSystem(), mechanics.failureSoundEvent(),
-                mechanics.sourceConsumption(), mechanics.successDisposition());
+                mechanics.failureParticleSystem(), mechanics.failureSoundEvent());
     }
 
 }

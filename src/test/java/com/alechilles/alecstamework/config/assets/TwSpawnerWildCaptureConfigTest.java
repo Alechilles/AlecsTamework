@@ -2,15 +2,11 @@ package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.api.CaptureChanceMode;
-import com.alechilles.alecstamework.api.CaptureSourceConsumption;
-import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
-import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.bson.BsonDocument;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -95,33 +91,6 @@ class TwSpawnerWildCaptureConfigTest {
         assertEquals(2500, mechanics.failureCooldownMs());
         assertEquals(CaptureChanceMode.GUARANTEED,
                 new TwSpawnerConfig().toItemFeatureConfig().getCaptureMechanics().chanceMode());
-    }
-
-    @Test
-    void capturedItemDispositionAndResolvedSourceConsumptionDecode() {
-        TwSpawnerConfig config = TwSpawnerConfig.CODEC.decode(BsonDocument.parse("""
-                {
-                  "Capture": {
-                    "SourceConsumption": "ResolvedAttempt",
-                    "SuccessDisposition": "CapturedItem"
-                  }
-                }
-                """), new ExtraInfo());
-        ItemFeatureConfig.CaptureItemMechanics mechanics =
-                config.toItemFeatureConfig().getCaptureMechanics();
-
-        assertEquals(CaptureSourceConsumption.RESOLVED_ATTEMPT, mechanics.sourceConsumption());
-        assertEquals(CaptureSuccessDisposition.CAPTURED_ITEM,
-                mechanics.successDisposition());
-    }
-
-    @Test
-    void captureDispositionDefaultsToCapturedItemBehavior() {
-        ItemFeatureConfig.CaptureItemMechanics mechanics =
-                new TwSpawnerConfig().toItemFeatureConfig().getCaptureMechanics();
-
-        assertEquals(CaptureSourceConsumption.SUCCESS_ONLY, mechanics.sourceConsumption());
-        assertEquals(CaptureSuccessDisposition.CAPTURED_ITEM, mechanics.successDisposition());
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {
