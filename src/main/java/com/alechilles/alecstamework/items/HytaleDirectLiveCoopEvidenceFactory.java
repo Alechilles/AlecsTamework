@@ -46,6 +46,7 @@ final class HytaleDirectLiveCoopEvidenceFactory {
             @Nonnull HytaleDirectLiveCoopScanner.LoadedCoop coop,
             @Nonnull CoopSlotKey slot,
             @Nonnull HytaleDirectLiveCoopScanner.LiveNpc candidate,
+            @Nonnull ProfileId profileId,
             long observedAtMs
     ) {
         CoopResidentStateSnapshot snapshot =
@@ -59,7 +60,6 @@ final class HytaleDirectLiveCoopEvidenceFactory {
             return null;
         }
         snapshot = withSlot(snapshot, coop.coopId(), slot.residentSlot());
-        ProfileId profileId = new ProfileId(candidate.alias());
         NpcAlias alias = new NpcAlias(candidate.alias());
         String metadata = metadata(snapshot);
         CompanionIdentity identity = new CompanionIdentity(

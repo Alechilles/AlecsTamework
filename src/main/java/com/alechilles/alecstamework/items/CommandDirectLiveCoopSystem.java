@@ -96,6 +96,8 @@ public final class CommandDirectLiveCoopSystem
                 projections.coopSnapshot();
         Map<ProfileId, CompanionProfileProjectionState> profiles =
                 projections.profileSnapshot();
+        DirectLiveCoopProfileIndex profileIndex =
+                new DirectLiveCoopProfileIndex(profiles);
         registerLoadedSlots(scan.coops());
         pruneFrozenEvidence(scan, occupancies);
 
@@ -117,7 +119,12 @@ public final class CommandDirectLiveCoopSystem
                 }
             } else {
                 captureNearest(
-                        scan, coop, occupancies, profiles, consumedAliases, now
+                        scan,
+                        coop,
+                        occupancies,
+                        profileIndex,
+                        consumedAliases,
+                        now
                 );
             }
             produce.syncInteractionState(scan.world(), coop);
@@ -151,7 +158,7 @@ public final class CommandDirectLiveCoopSystem
             HytaleDirectLiveCoopScanner.Scan scan,
             HytaleDirectLiveCoopScanner.LoadedCoop coop,
             Map<CoopSlotKey, CoopOccupancy> occupancies,
-            Map<ProfileId, CompanionProfileProjectionState> profiles,
+            DirectLiveCoopProfileIndex profileIndex,
             Set<UUID> consumedAliases,
             long observedAtMs
     ) {
@@ -168,9 +175,14 @@ public final class CommandDirectLiveCoopSystem
             return;
         }
         HytaleDirectLiveCoopScanner.LiveNpc candidate = nearest(
-                coop, scan.liveNpcs(), profiles, consumedAliases
+                coop, scan.liveNpcs(), profileIndex, consumedAliases
         );
         if (candidate == null) {
+            return;
+        }
+        ProfileId profileId =
+                profileIndex.captureProfileId(candidate.alias());
+        if (profileId == null) {
             return;
         }
         String key = slot + "|" + candidate.alias();
@@ -178,7 +190,12 @@ public final class CommandDirectLiveCoopSystem
                 frozenCaptures.computeIfAbsent(
                         key,
                         ignored -> evidence.captureSource(
-                                scan, coop, slot, candidate, observedAtMs
+                                scan,
+                                coop,
+                                slot,
+                                candidate,
+                                profileId,
+                                observedAtMs
                         )
                 );
         if (source == null) {
@@ -205,7 +222,7 @@ public final class CommandDirectLiveCoopSystem
     private HytaleDirectLiveCoopScanner.LiveNpc nearest(
             HytaleDirectLiveCoopScanner.LoadedCoop coop,
             List<HytaleDirectLiveCoopScanner.LiveNpc> candidates,
-            Map<ProfileId, CompanionProfileProjectionState> profiles,
+            DirectLiveCoopProfileIndex profileIndex,
             Set<UUID> consumed
     ) {
         Set<String> accepted = normalizedRoles(
@@ -222,13 +239,12 @@ public final class CommandDirectLiveCoopSystem
         HytaleDirectLiveCoopScanner.LiveNpc best = null;
         double bestDistance = Double.POSITIVE_INFINITY;
         for (HytaleDirectLiveCoopScanner.LiveNpc candidate : candidates) {
-            CompanionProfileProjectionState profile =
-                    profiles.get(new ProfileId(candidate.alias()));
             if (consumed.contains(candidate.alias())
                     || (!accepted.isEmpty()
                     && !accepted.contains(candidate.roleId()))
                     || (requireTamed && !candidate.tamed())
-                    || (profile != null && profile.coopId() != null)) {
+                    || profileIndex.captureProfileId(candidate.alias())
+                    == null) {
                 continue;
             }
             double distance = distanceSquared(
