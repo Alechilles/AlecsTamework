@@ -9,13 +9,11 @@ public enum PopulationCompanionLifecycle {
     DEAD_REVIVABLE,
     LOST,
     RESTORING,
-    STORING,
-    ROSTER_STORED,
     UNKNOWN_DORMANT,
     RELEASED;
 
     /** Active and unloaded companions occupy their physical claim location while owned. */
     public boolean occupiesPhysicalClaim() {
-        return this == ACTIVE || this == UNLOADED || this == STORING;
+        return this == ACTIVE || this == UNLOADED;
     }
 }

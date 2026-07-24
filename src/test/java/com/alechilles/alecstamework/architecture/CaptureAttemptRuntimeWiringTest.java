@@ -43,8 +43,6 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_POLICY)"));
         assertTrue(api.contains(
                 "capabilities.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION)"));
-        assertTrue(api.contains("capabilities.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK)"));
-        assertTrue(plugin.contains("captureAttemptRuntimeReady && commandFamilyRosterService != null"));
     }
 
     @Test

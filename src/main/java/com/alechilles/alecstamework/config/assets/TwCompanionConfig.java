@@ -9,7 +9,6 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,52 +44,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static final boolean DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE = false;
     private static final String[] DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER =
             new String[] { "Follow", "Defend", "Aggressive" };
-    private static final Long[] EMPTY_LONG_OBJECT_ARRAY = new Long[0];
-
-    private static final ArrayCodec<Long> LONG_ARRAY_CODEC = new ArrayCodec<>(Codec.LONG, Long[]::new);
-
-    private static final BuilderCodec<SummonSettings> SUMMON_CODEC = BuilderCodec.builder(
-            SummonSettings.class,
-            SummonSettings::new
-    )
-            .<Boolean>append(
-                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
-                    (settings, value) -> settings.enabled = value != null && value,
-                    settings -> settings.enabled
-            )
-            .documentation("Enables roster Summon, Dismiss, and stored lifecycle. Inheritance: omitted inherits.")
-            .add()
-            .<Long>append(
-                    new KeyedCodec<>("ActiveDurationMs", Codec.LONG),
-                    (settings, value) -> settings.activeDurationMs = nonNegative(value, settings.activeDurationMs),
-                    settings -> settings.activeDurationMs
-            )
-            .documentation("Maximum active time per summon session; zero is unlimited. Inheritance: omitted inherits.")
-            .add()
-            .<Long>append(
-                    new KeyedCodec<>("ResummonCooldownMs", Codec.LONG),
-                    (settings, value) -> settings.resummonCooldownMs = nonNegative(value, settings.resummonCooldownMs),
-                    settings -> settings.resummonCooldownMs
-            )
-            .documentation("Cooldown after expiry or dismissal; zero disables it. Inheritance: omitted inherits.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("AutoStoreOnOwnerLogout", Codec.BOOLEAN),
-                    (settings, value) -> settings.autoStoreOnOwnerLogout = value == null || value,
-                    settings -> settings.autoStoreOnOwnerLogout
-            )
-            .documentation("Stores an active companion when its owner logs out. Inheritance: omitted inherits.")
-            .add()
-            .<Long[]>append(
-                    new KeyedCodec<>("ExpiryWarningThresholdsMs", LONG_ARRAY_CODEC),
-                    (settings, value) -> settings.expiryWarningThresholdsMs = validateWarningThresholdShape(value),
-                    settings -> settings.getExpiryWarningThresholdsBoxed()
-            )
-            .documentation("Strictly descending unique positive remaining-time warnings below ActiveDurationMs. "
-                    + "Inheritance: an explicit array replaces the parent array (no append or merge).")
-            .add()
-            .build();
-
     private static final BuilderCodec<OwnershipProtectionSettings> OWNERSHIP_PROTECTION_CODEC = BuilderCodec.builder(
             OwnershipProtectionSettings.class,
             OwnershipProtectionSettings::new
@@ -251,14 +204,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     settings -> settings.deadRespawnDistanceFar
             )
             .documentation("Distance threshold for the far respawn range.")
-            .add()
-            .<SummonSettings>append(
-                    new KeyedCodec<>("Summon", SUMMON_CODEC),
-                    (settings, value) -> settings.summon = value == null ? new SummonSettings() : value,
-                    settings -> settings.getSummon()
-            )
-            .documentation("Timed roster summoning settings. Inheritance: omitted section inherits; when present, "
-                    + "explicit nested fields override and missing nested fields inherit. Warning arrays replace.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
@@ -697,7 +642,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
             currentCommand.placementMaxRelativeY = parentCommand.placementMaxRelativeY;
         }
-        inheritSummonSettings(parentCommand, currentCommand, nestedExplicit);
         if (!nestedExplicit.contains("Travel")) {
             currentCommand.travel = parentCommand.travel.copy();
         } else if (currentCommand.travel != null && parentCommand.travel != null) {
@@ -715,76 +659,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
         return nestedExplicit.contains("DeadRespawnCooldownMs")
                 || nestedExplicit.contains("DeadRespawnCooldownMins");
-    }
-
-    private static void inheritSummonSettings(@Nonnull CommandSettings parent,
-                                              @Nonnull CommandSettings current,
-                                              @Nonnull Set<String> nestedExplicit) {
-        if (!nestedExplicit.contains("Summon")) {
-            current.summon = parent.getSummon().copy();
-            return;
-        }
-        SummonSettings parentSummon = parent.getSummon();
-        SummonSettings currentSummon = current.getSummon();
-        if (!nestedExplicit.contains("Summon.Enabled")) {
-            currentSummon.enabled = parentSummon.enabled;
-        }
-        if (!nestedExplicit.contains("Summon.ActiveDurationMs")) {
-            currentSummon.activeDurationMs = parentSummon.activeDurationMs;
-        }
-        if (!nestedExplicit.contains("Summon.ResummonCooldownMs")) {
-            currentSummon.resummonCooldownMs = parentSummon.resummonCooldownMs;
-        }
-        if (!nestedExplicit.contains("Summon.AutoStoreOnOwnerLogout")) {
-            currentSummon.autoStoreOnOwnerLogout = parentSummon.autoStoreOnOwnerLogout;
-        }
-        if (!nestedExplicit.contains("Summon.ExpiryWarningThresholdsMs")) {
-            currentSummon.expiryWarningThresholdsMs = parentSummon.getExpiryWarningThresholdsBoxed();
-        }
-        currentSummon.validate();
-    }
-
-    private static long nonNegative(@Nullable Long value, long fallback) {
-        return value == null ? fallback : Math.max(0L, value);
-    }
-
-    @Nullable
-    private static String normalizeOptional(@Nullable String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    @Nonnull
-    private static Long[] validateWarningThresholds(@Nullable Long[] values, long activeDurationMs) {
-        Long[] copy = validateWarningThresholdShape(values);
-        for (long threshold : copy) {
-            if (activeDurationMs <= 0L || threshold >= activeDurationMs) {
-                throw new IllegalArgumentException(
-                        "Summon warning threshold " + threshold + " must be below positive ActiveDurationMs."
-                );
-            }
-        }
-        return copy;
-    }
-
-    @Nonnull
-    private static Long[] validateWarningThresholdShape(@Nullable Long[] values) {
-        if (values == null || values.length == 0) {
-            return EMPTY_LONG_OBJECT_ARRAY;
-        }
-        Long[] copy = values.clone();
-        long previous = Long.MAX_VALUE;
-        for (int index = 0; index < copy.length; index++) {
-            Long boxed = copy[index];
-            if (boxed == null || boxed <= 0L) {
-                throw new IllegalArgumentException("Summon warning thresholds must be positive (index " + index + ").");
-            }
-            long threshold = boxed;
-            if (threshold >= previous) {
-                throw new IllegalArgumentException("Summon warning thresholds must be strictly descending and unique.");
-            }
-            previous = threshold;
-        }
-        return copy;
     }
 
     private static int minutesToMillis(double minutes, int fallbackMs) {
@@ -962,7 +836,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private double deadRespawnDistanceFar = DEFAULT_DEAD_RESPAWN_DISTANCE_FAR;
         private double placementMinRelativeY = DEFAULT_PLACEMENT_MIN_RELATIVE_Y;
         private double placementMaxRelativeY = DEFAULT_PLACEMENT_MAX_RELATIVE_Y;
-        private SummonSettings summon = new SummonSettings();
         private TravelSettings travel = new TravelSettings();
 
         public double getReturnHomeTeleportDistance() {
@@ -1021,13 +894,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return placementMaxRelativeY;
         }
 
-        @Nonnull
-        public SummonSettings getSummon() {
-            SummonSettings resolved = summon != null ? summon : new SummonSettings();
-            resolved.validate();
-            return resolved;
-        }
-
         public TravelSettings getTravel() {
             return travel != null ? travel : new TravelSettings();
         }
@@ -1048,63 +914,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             copy.deadRespawnDistanceFar = deadRespawnDistanceFar;
             copy.placementMinRelativeY = placementMinRelativeY;
             copy.placementMaxRelativeY = placementMaxRelativeY;
-            copy.summon = getSummon().copy();
             copy.travel = getTravel().copy();
-            return copy;
-        }
-    }
-
-    /** Data-driven roster summon lease and storage settings. */
-    public static final class SummonSettings {
-        private boolean enabled;
-        private long activeDurationMs;
-        private long resummonCooldownMs;
-        private boolean autoStoreOnOwnerLogout = true;
-        private Long[] expiryWarningThresholdsMs = EMPTY_LONG_OBJECT_ARRAY;
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public long getActiveDurationMs() {
-            return activeDurationMs;
-        }
-
-        public long getResummonCooldownMs() {
-            return resummonCooldownMs;
-        }
-
-        public boolean isAutoStoreOnOwnerLogout() {
-            return autoStoreOnOwnerLogout;
-        }
-
-        @Nonnull
-        public long[] getExpiryWarningThresholdsMs() {
-            Long[] boxed = getExpiryWarningThresholdsBoxed();
-            long[] result = new long[boxed.length];
-            for (int index = 0; index < boxed.length; index++) {
-                result[index] = boxed[index];
-            }
-            return result;
-        }
-
-        @Nonnull
-        private Long[] getExpiryWarningThresholdsBoxed() {
-            return expiryWarningThresholdsMs == null ? EMPTY_LONG_OBJECT_ARRAY : expiryWarningThresholdsMs.clone();
-        }
-
-        private void validate() {
-            expiryWarningThresholdsMs = validateWarningThresholds(expiryWarningThresholdsMs, activeDurationMs);
-        }
-
-        private SummonSettings copy() {
-            SummonSettings copy = new SummonSettings();
-            copy.enabled = enabled;
-            copy.activeDurationMs = activeDurationMs;
-            copy.resummonCooldownMs = resummonCooldownMs;
-            copy.autoStoreOnOwnerLogout = autoStoreOnOwnerLogout;
-            copy.expiryWarningThresholdsMs = getExpiryWarningThresholdsBoxed();
-            copy.validate();
             return copy;
         }
     }
@@ -1137,7 +947,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final TransferFailurePolicy onTransferFailure;
         private final boolean followMasterOnWorldChange;
         private final String[] followMasterOnWorldChangeStateFilter;
-        private final SummonSettings summon;
 
         private EffectiveSettings(boolean blockOwnerDamage,
                                   boolean blockAllPlayerDamageIfOwned,
@@ -1159,8 +968,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   boolean crossWorldRecallEnabled,
                                   TransferFailurePolicy onTransferFailure,
                                   boolean followMasterOnWorldChange,
-                                  @Nullable String[] followMasterOnWorldChangeStateFilter,
-                                  @Nonnull SummonSettings summon) {
+                                  @Nullable String[] followMasterOnWorldChangeStateFilter) {
             this.blockOwnerDamage = blockOwnerDamage;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
             this.invulnerableIfOwned = invulnerableIfOwned;
@@ -1185,7 +993,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     followMasterOnWorldChangeStateFilter != null
                             ? normalizeStateFilter(followMasterOnWorldChangeStateFilter)
                             : ArrayUtil.EMPTY_STRING_ARRAY;
-            this.summon = summon.copy();
         }
 
         public static EffectiveSettings from(@Nullable TwCompanionConfig scoped, @Nullable TwGlobalConfig global) {
@@ -1227,8 +1034,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         travel.isCrossWorldRecallEnabled(),
                         travel.getOnTransferFailure(),
                         travel.isFollowMasterOnWorldChange(),
-                        travel.getFollowMasterOnWorldChangeStateFilter(),
-                        command.getSummon()
+                        travel.getFollowMasterOnWorldChangeStateFilter()
                 );
             }
             return fromGlobal(global);
@@ -1262,8 +1068,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     DEFAULT_CROSS_WORLD_RECALL_ENABLED,
                     TransferFailurePolicy.QueueForRecall,
                     DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE,
-                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER,
-                    new SummonSettings()
+                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER
             );
         }
 
@@ -1305,11 +1110,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
         public int getDeadRespawnCooldownMs() {
             return deadRespawnCooldownMs;
-        }
-
-        @Nonnull
-        public SummonSettings getSummon() {
-            return summon.copy();
         }
 
         public int getDeadRespawnFollowRetryDelayMs() {

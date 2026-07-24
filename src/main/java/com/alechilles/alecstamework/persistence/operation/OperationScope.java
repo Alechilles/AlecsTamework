@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.persistence.operation;
 
-import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import javax.annotation.Nonnull;
@@ -44,19 +43,6 @@ public record OperationScope(@Nonnull OperationScopeType type, @Nonnull String k
     /** Creates a companion owner scope. */
     public static OperationScope owner(@Nonnull OwnerId ownerId) {
         return new OperationScope(OperationScopeType.OWNER, require(ownerId, "Owner ID").toString());
-    }
-
-    /** Creates one owner-scoped command-family participant. */
-    public static OperationScope commandFamily(
-            @Nonnull CommandFamilyKey familyKey
-    ) {
-        CommandFamilyKey key = require(
-                familyKey, "Command family"
-        );
-        return new OperationScope(
-                OperationScopeType.COMMAND_FAMILY,
-                key.ownerId() + ":" + key.familyId()
-        );
     }
 
     /** Creates one normalized coop slot scope. */

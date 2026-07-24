@@ -25,11 +25,11 @@ class PopulationGroupTransitionAdmissionPlannerTest {
             OperationId.parse("40000000-0000-0000-0000-000000000081");
 
     @Test
-    void storedToLiveReservesOnlyNewActiveCapacity() {
+    void capturedToLiveReservesOnlyNewActiveCapacity() {
         PopulationGroupReservation reservation =
                 PopulationGroupTransitionAdmissionPlanner.plan(
                         OPERATION,
-                        request(stored(3), active(4), List.of(policy())),
+                        request(captured(3), active(4), List.of(policy())),
                         assignment()
                 ).getFirst();
 
@@ -41,12 +41,12 @@ class PopulationGroupTransitionAdmissionPlannerTest {
     }
 
     @Test
-    void liveToStoredNeedsNoPositiveCapacityReservation() {
+    void liveToCapturedNeedsNoPositiveCapacityReservation() {
         assertEquals(
                 List.of(),
                 PopulationGroupTransitionAdmissionPlanner.plan(
                         OPERATION,
-                        request(active(3), stored(4), List.of(policy())),
+                        request(active(3), captured(4), List.of(policy())),
                         assignment()
                 )
         );
@@ -58,7 +58,7 @@ class PopulationGroupTransitionAdmissionPlannerTest {
                 IllegalArgumentException.class,
                 () -> PopulationGroupTransitionAdmissionPlanner.plan(
                         OPERATION,
-                        request(stored(3), active(4), List.of()),
+                        request(captured(3), active(4), List.of()),
                         assignment()
                 )
         );
@@ -104,11 +104,11 @@ class PopulationGroupTransitionAdmissionPlannerTest {
         );
     }
 
-    private CompanionLifecycle stored(long revision) {
+    private CompanionLifecycle captured(long revision) {
         return lifecycle(
-                LifecycleState.ROSTER_STORED,
+                LifecycleState.CAPTURED,
                 LifecycleLocation.keyed(
-                        LifecycleLocationKind.COMMAND_ROSTER,
+                        LifecycleLocationKind.CAPTURE_ITEM,
                         "50000000-0000-0000-0000-000000000081"
                 ),
                 revision

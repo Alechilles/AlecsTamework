@@ -185,19 +185,15 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "capture",
                         "captureToCoop",
                         "makeDormant",
-                        "mutateCommandRoster",
                         "mutateExtension",
                         "mutateProfile",
-                        "mutateTimedSummonLease",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseCapturedCompanion",
                         "releaseFromCoop",
                         "restore",
                         "rotateAlias",
-                        "transitionCommandRoster",
-                        "transitionOwnerPopulation",
-                        "transitionTimedSummon"
+                        "transitionOwnerPopulation"
                 ),
                 operations
         );
@@ -219,8 +215,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "capturedReleases",
                         "restorations",
                         "coopCaptures",
-                        "coopReleases",
-                        "timedSummons"
+                        "coopReleases"
                 ),
                 boundaries
         );
@@ -275,11 +270,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                 List.of(
                         "diagnoseCoopCapture",
                         "diagnoseCoopRelease",
-                        "findAllCommandRosters",
                         "findAllLifecycles",
                         "findAllPopulationGroupAssignments",
-                        "findCommandRoster",
-                        "findCommandRosterMembership",
                         "findCoopResidency",
                         "findCoopSlot",
                         "findExtension",
@@ -287,22 +279,17 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findOperation",
                         "findProfile",
                         "findStalePopulationGroupProfiles",
-                        "findTimedSummonLease",
-                        "projectedCommandRosterActions",
-                        "projectedCommandRosterRevisions",
                         "projectedCoopResidency",
                         "projectedCoopSnapshot",
                         "projectedExtension",
                         "projectedExtensions",
-                        "projectedLaggingCommandRosterProfiles",
                         "projectedLaggingPopulationGroupProfiles",
                         "projectedOwnerPopulationCount",
                         "projectedOwnerPopulationSnapshot",
                         "projectedPopulationGroupAssignments",
                         "projectedPopulationGroupCounts",
                         "projectedProfile",
-                        "projectedProfileSnapshot",
-                        "projectedTimedSummons"
+                        "projectedProfileSnapshot"
                 ),
                 queries
         );

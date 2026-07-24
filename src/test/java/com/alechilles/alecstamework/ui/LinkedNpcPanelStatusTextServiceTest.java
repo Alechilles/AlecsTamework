@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.List;
 import java.util.UUID;
@@ -196,26 +195,12 @@ class LinkedNpcPanelStatusTextServiceTest {
     }
 
     @Test
-    void snapshotMapperPreservesRosterPresentationAndDisabledRespawnSentinel() {
-        CommandRosterStatusPresentation roster = new CommandRosterStatusPresentation(
-                "profile-1",
-                "hydragon",
-                CommandTimedSummoningState.DEAD_REVIVABLE,
-                7L,
-                null,
-                0L,
-                false,
-                0L,
-                0,
-                2,
-                null,
-                null
-        );
+    void snapshotMapperPreservesDisabledRespawnSentinel() {
         LinkedNpcEntry entry = new LinkedNpcEntry(
                 UUID.randomUUID(), "Dead Dragon", 0, 0, 0, 0, null,
                 0, 0, 0, 0, false, false, true, false, false, false,
                 -1L, LinkedNpcTraitIndicator.EMPTY
-        ).withRosterStatusPresentation(roster);
+        );
 
         LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(List.of(entry));
 
@@ -226,25 +211,6 @@ class LinkedNpcPanelStatusTextServiceTest {
                         "tamework.ui.linkedPanel.health.deadRespawnDisabled"),
                 LinkedNpcPanelStatusTextService.resolveDeadHealthText(snapshots[0])
         );
-        assertEquals(roster, snapshots[0].rosterStatusPresentation());
-    }
-
-    @Test
-    void storedRosterStateOverridesGenericUnloadedStatus() {
-        LinkedNpcEntry entry = new LinkedNpcEntry(
-                UUID.randomUUID(), "Stored Dragon", 0, 0, 0, 0, null,
-                0, 0, 0, 0, false, false, false, false, false, false,
-                0L, LinkedNpcTraitIndicator.EMPTY
-        ).withRosterStatusPresentation(new CommandRosterStatusPresentation(
-                "profile-stored", "hydragon:dragon_horn",
-                CommandTimedSummoningState.ROSTER_STORED, 4L, null,
-                600_000L, false, 0L, 1, 1,
-                "hydragon:full_dragons", "active-cap-reached"));
-
-        assertEquals(
-                LocalizedText.resolve((String) null,
-                        "tamework.ui.linkedPanel.roster.state.stored"),
-                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
     }
 
     @Test

@@ -521,9 +521,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("FailureSoundEvent")) capture.failureSoundEvent = parent.capture.failureSoundEvent;
         if (!nestedExplicitKeys.contains("SourceConsumption")) capture.sourceConsumption = parent.capture.sourceConsumption;
         if (!nestedExplicitKeys.contains("SuccessDisposition")) capture.successDisposition = parent.capture.successDisposition;
-        if (!nestedExplicitKeys.contains("CommandFamilyId")) capture.commandFamilyId = parent.capture.commandFamilyId;
-        if (!nestedExplicitKeys.contains("RequiredCommandConfigId")) capture.requiredCommandConfigId = parent.capture.requiredCommandConfigId;
-        if (!nestedExplicitKeys.contains("RequireCommandAccessItem")) capture.requireCommandAccessItem = parent.capture.requireCommandAccessItem;
     }
 
     private void inheritSpawnSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -765,9 +762,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         String failureSoundEvent;
         CaptureSourceConsumption sourceConsumption = CaptureSourceConsumption.SUCCESS_ONLY;
         CaptureSuccessDisposition successDisposition = CaptureSuccessDisposition.CAPTURED_ITEM;
-        String commandFamilyId;
-        String requiredCommandConfigId;
-        boolean requireCommandAccessItem;
 
         public ItemFeatureConfig.CaptureItemMechanics toMechanics() {
             return TwSpawnerConfigRuntimeAdapter.captureMechanics(this);

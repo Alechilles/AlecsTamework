@@ -33,12 +33,7 @@ public record CompanionSpawnAdmissionRequest(
         targetRoleId = normalizeNullable(targetRoleId);
         CompanionSpawnSourceFinalizationContext.validateExtension(durableContextJson);
         Objects.requireNonNull(operation, "operation");
-        boolean canonicalNullNpcRestore = previousNpcUuid == null
-                && canonicalProfileId != null
-                && requiredSourceLifecycle == CompanionLifecycleState.ROSTER_STORED
-                && !allowLegacyAdoption
-                && operation == OwnerPopulationOperation.RESTORE;
-        if (previousNpcUuid == null && !canonicalNullNpcRestore) {
+        if (previousNpcUuid == null) {
             if (canonicalProfileId != null || requiredSourceLifecycle != null || allowLegacyAdoption) {
                 throw new IllegalArgumentException("New spawns cannot declare a dormant source.");
             }
@@ -54,8 +49,7 @@ public record CompanionSpawnAdmissionRequest(
             }
             if (requiredSourceLifecycle == CompanionLifecycleState.ACTIVE
                     || requiredSourceLifecycle == CompanionLifecycleState.UNLOADED
-                    || requiredSourceLifecycle == CompanionLifecycleState.RESTORING
-                    || requiredSourceLifecycle == CompanionLifecycleState.STORING) {
+                    || requiredSourceLifecycle == CompanionLifecycleState.RESTORING) {
                 throw new IllegalArgumentException("Replacement sources must be dormant.");
             }
         }
@@ -105,13 +99,6 @@ public record CompanionSpawnAdmissionRequest(
 
     public boolean replacement() {
         return previousNpcUuid != null || canonicalProfileId != null;
-    }
-
-    /** True only for a stored canonical profile that currently has no live NPC UUID. */
-    public boolean canonicalNullNpcRestore() {
-        return previousNpcUuid == null
-                && canonicalProfileId != null
-                && requiredSourceLifecycle == CompanionLifecycleState.ROSTER_STORED;
     }
 
     @Nullable

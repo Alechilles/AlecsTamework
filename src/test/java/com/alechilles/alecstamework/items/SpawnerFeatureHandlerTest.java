@@ -128,27 +128,18 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void tameAndCommandLinkKeepsNpcLiveAndCommitsRosterWithoutCreatingFilledItem() throws Exception {
+    void captureAlwaysCreatesTheDurableCapturedItem() throws Exception {
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
         String finalizer = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureFinalizerService.java"));
 
-        int itemBranch = handler.indexOf("if (!tameAndCommandLink) {");
-        int filledSwap = handler.indexOf("itemStackMetadataService.swapItemId(", itemBranch);
-        int tameApply = handler.indexOf("tameAndCommandLinkService.apply(");
-        int rosterUpsert = handler.indexOf("commandFamilyRosterService.upsert(rosterRequest)");
-        int attemptCommit = handler.indexOf(
-                "captureAttemptRuntime.commit(finalizedAttemptId)", rosterUpsert);
-
-        assertTrue(itemBranch >= 0 && filledSwap > itemBranch,
-                "only CapturedItem may create filled-item metadata");
-        assertTrue(tameApply > filledSwap, "live tame/role mutation must be explicit");
-        assertTrue(rosterUpsert > tameApply, "roster membership follows live population commit");
-        assertTrue(attemptCommit > rosterUpsert,
-                "capture must remain recoverable until the roster write is accepted");
-        assertTrue(finalizer.contains("? CompanionLifecycleState.ACTIVE"));
-        assertTrue(finalizer.contains("if (!keepsLiveNpc(prepared.config()))"));
+        assertTrue(handler.contains("itemStackMetadataService.swapItemId("));
+        assertTrue(handler.contains("captureAttemptRuntime.commit(finalizedAttemptId)"));
+        assertFalse(handler.contains("tameAndCommandLink"));
+        assertFalse(handler.contains("commandFamilyRoster"));
+        assertFalse(finalizer.contains("keepsLiveNpc"));
+        assertTrue(finalizer.contains("despawnNpc(player, context.npcRef(), liveNpc)"));
     }
 
     @Test

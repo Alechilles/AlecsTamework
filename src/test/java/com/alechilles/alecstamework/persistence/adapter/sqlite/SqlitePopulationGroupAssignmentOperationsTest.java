@@ -381,10 +381,6 @@ class SqlitePopulationGroupAssignmentOperationsTest {
                 (request, operation) ->
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed("coop-release")
-                                .completed(),
-                (request, operation) ->
-                        com.alechilles.alecstamework.persistence.operation
-                                .LiveOperationResult.confirmed("timed")
                                 .completed()
         );
     }

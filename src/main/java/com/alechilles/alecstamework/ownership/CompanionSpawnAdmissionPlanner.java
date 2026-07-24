@@ -189,18 +189,15 @@ final class CompanionSpawnAdmissionPlanner {
                     ? null
                     : "spawn-source-population-state-mismatch";
         }
-        if (owner == null || (claim == null
-                && requiredLifecycle != CompanionLifecycleState.ROSTER_STORED)) {
+        if (owner == null || claim == null) {
             return "spawn-source-population-profile-unavailable";
         }
         if (owner.lifecycleState() == CompanionLifecycleState.ACTIVE
                 || owner.lifecycleState() == CompanionLifecycleState.UNLOADED
                 || owner.lifecycleState() == CompanionLifecycleState.RESTORING
-                || owner.lifecycleState() == CompanionLifecycleState.STORING
                 || (claim != null && (claim.lifecycleState() == CompanionLifecycleState.ACTIVE
                 || claim.lifecycleState() == CompanionLifecycleState.UNLOADED
-                || claim.lifecycleState() == CompanionLifecycleState.RESTORING
-                || claim.lifecycleState() == CompanionLifecycleState.STORING))) {
+                || claim.lifecycleState() == CompanionLifecycleState.RESTORING))) {
             return "spawn-source-duplicate-active-profile";
         }
         if (owner.lifecycleState() != requiredLifecycle

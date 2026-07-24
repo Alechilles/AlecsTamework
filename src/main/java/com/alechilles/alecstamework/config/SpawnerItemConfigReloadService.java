@@ -70,12 +70,6 @@ public final class SpawnerItemConfigReloadService {
             }
             try {
                 ItemFeatureConfig itemFeature = source.toItemFeatureConfig();
-                List<String> captureErrors = SpawnerCaptureConfigValidator.validate(
-                        source, itemFeature);
-                if (!captureErrors.isEmpty()) {
-                    errors.addAll(captureErrors);
-                    continue;
-                }
                 ItemFeatureRegistry.CompiledSpawnerConfig entry =
                         new ItemFeatureRegistry.CompiledSpawnerConfig(
                                 configId,

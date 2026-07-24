@@ -84,9 +84,7 @@ final class CommandRecipientService {
                     continue;
                 }
                 UUID npcUuid = npc.getUuid();
-                boolean canonicalRosterMember = context.config.usesOwnerCommandFamilyRoster()
-                        && npcUuid != null && linkedRecordByUuid.containsKey(npcUuid);
-                if (!canonicalRosterMember && !linkPolicyService.matchesMembership(
+                if (!linkPolicyService.matchesMembership(
                         recipientMembershipMode,
                         requireOwner,
                         npcRef,

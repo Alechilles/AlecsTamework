@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 
 /**
@@ -59,10 +58,6 @@ final class LinkedNpcPanelStatusTextService {
                         entry.recoveryIncidentId());
             }
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.recoveryHeld");
-        }
-        CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
-        if (roster != null && roster.state() == CommandTimedSummoningState.ROSTER_STORED) {
-            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state.stored");
         }
         if (entry.dead()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.dead");

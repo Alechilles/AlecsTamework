@@ -20,11 +20,7 @@ class HyDragonBehavioralSelfTestFixturesTest {
                         "isolated population group rejects boundary overflow",
                         "isolated population reservations serialize and cancel exactly once",
                         "isolated population role change is evaluated all-or-none",
-                        "isolated unavailable population config fails closed without reservation",
-                        "isolated provisioning commits dormant profile",
-                        "isolated provisioning projects active profile",
-                        "isolated failed projection stays durable and recoverable",
-                        "isolated restart reacquires lost active projection token")),
+                        "isolated unavailable population config fails closed without reservation")),
                 () -> "Missing behavioral fixture assertions: " + names);
         assertTrue(names.size() == Set.copyOf(names).size(),
                 () -> "Behavioral assertion names must remain unique: " + names);

@@ -10,7 +10,6 @@ public enum LifecycleState {
     COOP(LifecycleLocationKind.COOP_SLOT),
     DEAD_REVIVABLE(LifecycleLocationKind.NONE),
     LOST(LifecycleLocationKind.NONE),
-    ROSTER_STORED(LifecycleLocationKind.COMMAND_ROSTER),
     RELEASED(LifecycleLocationKind.NONE),
     UNRESOLVED(LifecycleLocationKind.UNRESOLVED);
 

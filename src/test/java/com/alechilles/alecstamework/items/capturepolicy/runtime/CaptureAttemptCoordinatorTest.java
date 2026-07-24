@@ -69,8 +69,7 @@ class CaptureAttemptCoordinatorTest {
                         CaptureChanceMode.PROBABILITY, 1, 0.5D, 0.0D,
                         0.0D, 1.0D, 2_000, null, null,
                         CaptureSourceConsumption.RESOLVED_ATTEMPT,
-                        com.alechilles.alecstamework.api.CaptureSuccessDisposition.CAPTURED_ITEM,
-                        null, null, false);
+                        com.alechilles.alecstamework.api.CaptureSuccessDisposition.CAPTURED_ITEM);
         CaptureAttemptCoordinator.AttemptRequest baseline = request(
                 ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT);
         CaptureAttemptCoordinator.AttemptRequest request = new CaptureAttemptCoordinator.AttemptRequest(

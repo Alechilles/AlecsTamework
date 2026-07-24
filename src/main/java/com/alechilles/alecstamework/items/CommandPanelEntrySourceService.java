@@ -1,20 +1,9 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipView;
-import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
-import com.alechilles.alecstamework.api.CommandTimedSummoningState;
-import com.alechilles.alecstamework.api.CommandTimedSummoningView;
-import com.alechilles.alecstamework.api.PopulationGroupCountsView;
-import com.alechilles.alecstamework.api.PopulationGroupDefinitionView;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.persistence.sqlite.CommandFamilyRosterRepository;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
-import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -29,14 +18,10 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.Map;
 import java.util.UUID;
-import java.nio.charset.StandardCharsets;
-import javax.annotation.Nullable;
 
 /**
  * Builds command-panel entries using linked and nearby-owned companions.
@@ -47,35 +32,10 @@ final class CommandPanelEntrySourceService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
-    @Nullable private final CommandFamilyRosterRepository rosterRepository;
-    @Nullable private final NpcProfileRepository profileRepository;
-    @Nullable private final CommandRosterActionAuthority rosterAuthority;
-
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandNpcNameResolver npcNameResolver) {
-        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService,
-                npcNameResolver, null, null, null);
-    }
-
-    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
-                                   CommandPanelPreferenceService panelPreferenceService,
-                                   CommandLinkPolicyService linkPolicyService,
-                                   CommandNpcNameResolver npcNameResolver,
-                                   @Nullable CommandFamilyRosterRepository rosterRepository,
-                                   @Nullable NpcProfileRepository profileRepository) {
-        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService, npcNameResolver,
-                rosterRepository, profileRepository, null);
-    }
-
-    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
-                                   CommandPanelPreferenceService panelPreferenceService,
-                                   CommandLinkPolicyService linkPolicyService,
-                                   CommandNpcNameResolver npcNameResolver,
-                                   @Nullable CommandFamilyRosterRepository rosterRepository,
-                                   @Nullable NpcProfileRepository profileRepository,
-                                   @Nullable CommandRosterActionAuthority rosterAuthority) {
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -88,9 +48,6 @@ final class CommandPanelEntrySourceService {
                 new CommandLinkedPanelProgressionPresentationService(),
                 new CommandLinkedPanelCooldownSnapshotService()
         );
-        this.rosterRepository = rosterRepository;
-        this.profileRepository = profileRepository;
-        this.rosterAuthority = rosterAuthority;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -98,9 +55,8 @@ final class CommandPanelEntrySourceService {
                                       ItemStack stack,
                                       TwCommandItemConfig config,
                                       String toolId) {
-        List<LinkedNpcEntry> linkedEntries = config != null && config.usesOwnerCommandFamilyRoster()
-                ? buildRosterEntries(player, store, stack, config, toolId)
-                : linkedPanelEntryService.buildEntries(player, store, stack, toolId);
+        List<LinkedNpcEntry> linkedEntries =
+                linkedPanelEntryService.buildEntries(player, store, stack, toolId);
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -202,136 +158,6 @@ final class CommandPanelEntrySourceService {
             }
         });
         return applyFiltersAndSort(out, stack);
-    }
-
-    private List<LinkedNpcEntry> buildRosterEntries(Player player,
-                                                     Store<EntityStore> store,
-                                                     ItemStack stack,
-                                                     TwCommandItemConfig config,
-                                                     String toolId) {
-        if (player == null || config.getCommandFamilyId() == null) return List.of();
-        try {
-            if (rosterAuthority != null) {
-                CommandRosterActionAuthority.Resolution resolution =
-                        rosterAuthority.resolveCached(player.getUuid(), config, toolId);
-                if (resolution.snapshot() == null) return List.of();
-                List<LinkedNpcRecord> records = rosterAuthority.project(resolution.snapshot());
-                Map<UUID, CommandFamilyRosterMembershipView> memberships = new HashMap<>();
-                for (CommandRosterActionAuthority.Member member : resolution.snapshot().members()) {
-                    memberships.put(member.presentationUuid(), new CommandFamilyRosterMembershipView(
-                            member.ownerUuid(), member.commandFamilyId(), member.profileId(), member.roleId(),
-                            member.profileRevision(), member.state(), member.groupId(),
-                            member.activeForBulkCommands(), member.homePosition(), member.profileUpdatedAtMs()));
-                }
-                List<LinkedNpcEntry> entries = linkedPanelEntryService.buildEntriesFromRecords(
-                        player, store, stack, toolId, records);
-                ArrayList<LinkedNpcEntry> presented = new ArrayList<>(entries.size());
-                for (LinkedNpcEntry entry : entries) {
-                    CommandFamilyRosterMembershipView membership = memberships.get(entry.npcUuid());
-                    presented.add(membership == null ? entry : entry.withRosterStatusPresentation(
-                            rosterPresentation(player, membership)));
-                }
-                return List.copyOf(presented);
-            }
-            if (rosterRepository == null || profileRepository == null) return List.of();
-            var roster = rosterRepository.find(player.getUuid(), config.getCommandFamilyId());
-            if (roster == null || roster.memberships().isEmpty()) return List.of();
-            List<LinkedNpcRecord> records = new ArrayList<>(roster.memberships().size());
-            Map<UUID, CommandFamilyRosterMembershipView> membershipByPresentationId = new HashMap<>();
-            for (CommandFamilyRosterMembershipView membership : roster.memberships()) {
-                NpcProfileRepository.ProfileRecord profile =
-                        profileRepository.loadProfileById(membership.profileId());
-                if (profile == null || !player.getUuid().equals(profile.ownerUuid())) continue;
-                UUID presentationUuid = profile.currentNpcUuid() != null
-                        ? profile.currentNpcUuid()
-                        : UUID.nameUUIDFromBytes(("tamework-roster-profile\u0000" + membership.profileId())
-                                .getBytes(StandardCharsets.UTF_8));
-                Vector3d home = membership.homePosition() == null ? null
-                        : new Vector3d(membership.homePosition().x(), membership.homePosition().y(),
-                        membership.homePosition().z());
-                records.add(new LinkedNpcRecord(
-                        presentationUuid, membership.profileId(), null, null, home,
-                        profile.displayName(), null, profile.roleId(), membership.state().name(),
-                        membership.activeForBulkCommands(), false, membership.groupId()));
-                membershipByPresentationId.put(presentationUuid, membership);
-            }
-            List<LinkedNpcEntry> entries = linkedPanelEntryService.buildEntriesFromRecords(
-                    player, store, stack, toolId, records);
-            ArrayList<LinkedNpcEntry> presented = new ArrayList<>(entries.size());
-            for (LinkedNpcEntry entry : entries) {
-                CommandFamilyRosterMembershipView membership =
-                        membershipByPresentationId.get(entry.npcUuid());
-                presented.add(membership == null ? entry : entry.withRosterStatusPresentation(
-                        rosterPresentation(player, membership)));
-            }
-            return List.copyOf(presented);
-        } catch (Exception failure) {
-            return List.of();
-        }
-    }
-
-    private CommandRosterStatusPresentation rosterPresentation(
-            Player player, CommandFamilyRosterMembershipView membership) {
-        long now = System.currentTimeMillis();
-        CommandTimedSummoningState state = CommandTimedSummoningState.valueOf(membership.state().name());
-        Long remaining = null;
-        long cooldownRemaining = 0L;
-        boolean unlimited = false;
-        long revision = membership.profileRevision();
-        Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.getApi() != null) {
-            CommandTimedSummoningRequest identity = new CommandTimedSummoningRequest(
-                    player.getUuid(), membership.commandFamilyId(), membership.profileId(), "panel-query");
-            CommandTimedSummoningView timed = plugin.getApi().commandTimedSummoning().get(identity).orElse(null);
-            if (timed != null) {
-                state = timed.state();
-                revision = timed.revision();
-                remaining = timed.remainingMs();
-                unlimited = timed.unlimited();
-                cooldownRemaining = Math.max(0L, timed.cooldownUntilMs() - now);
-            }
-        }
-        long duration = TwCompanionConfig.resolveEffectiveForRole(membership.roleId())
-                .getSummon().getActiveDurationMs();
-        CapacityPresentation capacity = capacity(player, membership.roleId());
-        return new CommandRosterStatusPresentation(
-                membership.profileId(), membership.commandFamilyId(), state, revision, remaining, duration,
-                unlimited || duration == 0L, cooldownRemaining, capacity.activeCount(),
-                capacity.activeLimit(), capacity.blockingGroupId(), capacity.blockingReason());
-    }
-
-    private CapacityPresentation capacity(Player player, String roleId) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getApi() == null || roleId == null || roleId.isBlank()) {
-            return new CapacityPresentation(0, 0, null, null);
-        }
-        long selectedActive = 0L;
-        long selectedLimit = 0L;
-        long smallestHeadroom = Long.MAX_VALUE;
-        String selectedGroup = null;
-        for (PopulationGroupDefinitionView definition :
-                plugin.getApi().populationGroups().resolveForRole(roleId)) {
-            String worldName = definition.scope().name().equals("PER_WORLD")
-                    && player.getWorld() != null ? player.getWorld().getName() : null;
-            PopulationGroupCountsView counts = plugin.getApi().populationGroups()
-                    .getCounts(player.getUuid(), definition.groupId(), worldName).orElse(null);
-            if (counts == null || counts.maxActive() <= 0L) continue;
-            long active = counts.committedActive() + counts.pendingActive();
-            long headroom = counts.maxActive() - active;
-            if (headroom < smallestHeadroom) {
-                smallestHeadroom = headroom;
-                selectedActive = active;
-                selectedLimit = counts.maxActive();
-                selectedGroup = definition.groupId();
-            }
-        }
-        return new CapacityPresentation((int) Math.min(Integer.MAX_VALUE, selectedActive),
-                (int) Math.min(Integer.MAX_VALUE, selectedLimit), selectedGroup,
-                smallestHeadroom <= 0L ? "active-cap-reached" : null);
-    }
-
-    private record CapacityPresentation(int activeCount, int activeLimit,
-                                        String blockingGroupId, String blockingReason) {
     }
 
     private boolean resolveLinkingRequireOwner() {

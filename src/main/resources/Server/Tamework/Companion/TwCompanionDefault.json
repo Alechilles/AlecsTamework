@@ -21,13 +21,6 @@
       ]
     },
     "DeadRespawnCooldownMins": 10,
-    "Summon": {
-      "Enabled": false,
-      "ActiveDurationMs": 0,
-      "ResummonCooldownMs": 0,
-      "AutoStoreOnOwnerLogout": true,
-      "ExpiryWarningThresholdsMs": []
-    },
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,
     "DeadRespawnDistanceNear": 8.0,

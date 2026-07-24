@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
 import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
-import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationContext;
@@ -170,16 +169,6 @@ public final class CompanionPopulationOperationRecoveryService {
         CompanionPopulationOperationRecord.State decisionState =
                 operation.state() == CompanionPopulationOperationRecord.State.PREPARED
                         ? CompanionPopulationOperationRecord.State.APPLYING : operation.state();
-        if (observed == null
-                && CompanionPopulationRecoveryDecisionService.isAbsentRosterStorageCommit(
-                        decisionState, parsed.decisionContext()
-                )) {
-            String absenceFailure = authoritativeLoadedAbsenceFailure(parsed, loadedIdentities);
-            if (absenceFailure != null) {
-                result.ambiguous(operation, absenceFailure);
-                return CompletableFuture.completedFuture(null);
-            }
-        }
         Decision decision = CompanionPopulationRecoveryDecisionService.decide(
                 decisionState,
                 parsed.decisionContext(), observed, previousObserved
@@ -257,14 +246,10 @@ public final class CompanionPopulationOperationRecoveryService {
             @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
         boolean permanentRelease = parsed.permanentRelease();
-        boolean absentRosterStorage = observed == null
-                && CompanionPopulationRecoveryDecisionService.isAbsentRosterStorageCommit(
-                        operation.state(), parsed.decisionContext()
-                );
         String ownershipWorld = parsed.newState().worldSpecified()
                 ? parsed.newState().worldName()
                 : firstNonBlank(observed == null ? null : observed.worldName(), parsed.targetWorldName());
-        String lifecycleState = permanentRelease || absentRosterStorage
+        String lifecycleState = permanentRelease
                 ? Objects.requireNonNull(parsed.newState().lifecycleState()).name()
                 : Objects.requireNonNull(observed).lifecycleState().name();
         boolean persistPhysical = observed != null && observed.physical() && !permanentRelease;
@@ -292,32 +277,6 @@ public final class CompanionPopulationOperationRecoveryService {
                 result.ambiguous(operation, "operation-recovery-commit-failed");
             }
         });
-    }
-
-    @Nullable
-    private static String authoritativeLoadedAbsenceFailure(
-            @Nonnull ParsedOperation parsed,
-            @Nonnull LoadedNpcIdentitySnapshot loadedIdentities
-    ) {
-        if (!loadedIdentities.initializationComplete()) {
-            return "operation-recovery-loaded-identities-incomplete";
-        }
-        for (LoadedNpcIdentityIndex.LoadedNpcObservation observation
-                : loadedIdentities.observations()) {
-            if (matchesLoadedIdentity(observation, parsed.npcUuid())
-                    || matchesLoadedIdentity(observation, parsed.previousNpcUuid())) {
-                return "operation-recovery-live-target-not-persisted";
-            }
-        }
-        return null;
-    }
-
-    private static boolean matchesLoadedIdentity(
-            @Nonnull LoadedNpcIdentityIndex.LoadedNpcObservation observation,
-            @Nullable UUID expected
-    ) {
-        return expected != null && (expected.equals(observation.componentUuid())
-                || expected.equals(observation.legacyNpcUuid()));
     }
 
     @Nonnull

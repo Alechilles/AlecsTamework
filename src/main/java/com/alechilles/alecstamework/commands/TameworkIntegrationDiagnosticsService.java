@@ -48,10 +48,6 @@ final class TameworkIntegrationDiagnosticsService {
         lines.add("Tamework API=" + safe(source::apiVersion, "unavailable")
                 + " capabilities=" + safe(source::capabilities, "[]"));
         lines.add("Integration readiness: capturePolicy=" + source.captureReady()
-                + ", commandFamilyRosters="
-                + source.hasCapability(TameworkApiCapability.COMMAND_FAMILY_ROSTERS)
-                + ", timedSummoning="
-                + source.hasCapability(TameworkApiCapability.COMMAND_TIMED_SUMMONING)
                 + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS));
         appendCaptureSummary(lines);
         appendPopulationSummary(lines);

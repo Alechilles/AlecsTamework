@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
-import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
@@ -117,7 +116,7 @@ public final class SpawnerCaptureFinalizerService {
         return prepared.scheduler().prepareWithDurableContext(
                 prepared.targetRef(), prepared.store(), null, null,
                 prepared.expectedLiveOwnerId(), prepared.retainedOwnerId(),
-                prepared.retainedOwnerName(), targetLifecycle(prepared.config()),
+                prepared.retainedOwnerName(), targetLifecycle(),
                 prepared.operation(), false, idempotencyKey, scopedContext,
                 new OwnerMutationScheduler.PreparationCallbacks() {
                     @Override
@@ -197,7 +196,7 @@ public final class SpawnerCaptureFinalizerService {
         return scheduler.scheduleWithDurableContext(
                 prepared.targetRef(), prepared.store(), null, null,
                 prepared.expectedLiveOwnerId(), prepared.retainedOwnerId(),
-                prepared.retainedOwnerName(), targetLifecycle(prepared.config()),
+                prepared.retainedOwnerName(), targetLifecycle(),
                 prepared.operation(), false, idempotencyKey, scopedContext,
                 mutationCallbacks
         );
@@ -267,17 +266,14 @@ public final class SpawnerCaptureFinalizerService {
                         try {
                             callbacks.onApplied(profileId, context);
                         } finally {
-                            if (!keepsLiveNpc(prepared.config())
-                                    && prepared.config().isCaptureClearsOwner()
+                            if (prepared.config().isCaptureClearsOwner()
                                     && liveNpc != null
                                     && liveNpc.getRole() != null
                                     && liveNpc.getRole().getMarkedEntitySupport() != null) {
                                 liveNpc.getRole().getMarkedEntitySupport()
                                         .setMarkedEntity(MASTER_TARGET_SLOT, null);
                             }
-                            if (!keepsLiveNpc(prepared.config())) {
-                                despawnNpc(player, context.npcRef(), liveNpc);
-                            }
+                            despawnNpc(player, context.npcRef(), liveNpc);
                         }
                     }
 
@@ -295,15 +291,9 @@ public final class SpawnerCaptureFinalizerService {
         return mutationCallbacks;
     }
 
-    private static boolean keepsLiveNpc(@Nonnull ItemFeatureConfig config) {
-        return config.getCaptureMechanics().successDisposition()
-                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
-    }
-
     @Nonnull
-    private static CompanionLifecycleState targetLifecycle(@Nonnull ItemFeatureConfig config) {
-        return keepsLiveNpc(config)
-                ? CompanionLifecycleState.ACTIVE : CompanionLifecycleState.CAPTURED;
+    private static CompanionLifecycleState targetLifecycle() {
+        return CompanionLifecycleState.CAPTURED;
     }
 
     @Nullable

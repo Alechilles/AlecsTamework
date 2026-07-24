@@ -2,10 +2,6 @@ package com.alechilles.alecstamework;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -19,7 +15,6 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.api.internal.CommandTimedSummoningApiDelegate;
 import com.alechilles.alecstamework.api.internal.PopulationGroupApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.LegacyTameworkApiFactory;
@@ -45,7 +40,6 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
-import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
@@ -136,12 +130,6 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
-import com.alechilles.alecstamework.items.HytaleCommandTimedSummonProjectionPort;
-import com.alechilles.alecstamework.items.CommandFamilyRosterMembershipPort;
-import com.alechilles.alecstamework.items.CommandTimedSummonPopulationPort;
-import com.alechilles.alecstamework.items.CommandTimedSummoningService;
-import com.alechilles.alecstamework.items.CommandTimedSummoningTickSystem;
-import com.alechilles.alecstamework.items.CommandTimedProjectionRetirementIndex;
 import com.alechilles.alecstamework.items.RecoveryProjectionReconciliationService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
@@ -187,7 +175,6 @@ import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryW
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.legacy.LegacyPersistenceEventBridge;
-import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
@@ -305,7 +292,6 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
-    private ExecutorService commandRosterReadExecutor;
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
@@ -330,11 +316,6 @@ public class Tamework extends JavaPlugin {
     private PopulationGroupRegistry populationGroupRegistry;
     private PopulationGroupApiDelegate populationGroupApi;
     private boolean populationGroupRecoveryReady;
-    private CommandFamilyRosterService commandFamilyRosterService;
-    private CommandTimedSummoningApiDelegate commandTimedSummoningApi;
-    private CommandTimedSummoningService commandTimedSummoningService;
-    private CommandTimedSummoningTickSystem commandTimedSummoningTickSystem;
-    private boolean commandTimedSummoningRecoveryReady;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -873,8 +854,6 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
-        commandTimedSummoningTickSystem = new CommandTimedSummoningTickSystem();
-        getEntityStoreRegistry().registerSystem(commandTimedSummoningTickSystem);
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
@@ -975,19 +954,6 @@ public class Tamework extends JavaPlugin {
                 damagePolicy,
                 ownerPopulationRuntime.populationPolicyAuthority()
         );
-        commandFamilyRosterService = new CommandFamilyRosterService(
-                persistenceRuntime.getCommandFamilyRosterRepository(),
-                (familyId, configId, itemId, roleId) -> {
-                    String denial = commandItemRegistry.validateOwnerFamilyAccess(
-                            familyId, configId, itemId, roleId);
-                    return denial == null
-                            ? CommandFamilyRosterService.AccessDecision.allowedDecision()
-                            : CommandFamilyRosterService.AccessDecision.denied(denial);
-                },
-                apiEventBus);
-        if (api instanceof TameworkApiImpl implementation) {
-            implementation.activateCommandFamilyRosterRuntime(commandFamilyRosterService);
-        }
         if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl implementation) {
             implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
         }
@@ -1053,7 +1019,6 @@ public class Tamework extends JavaPlugin {
                         commandLinkedNpcLostService
                 );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
-        retryCommandTimedSummoningIfReady();
         managedCoopRuntime = new ManagedCoopRuntimeComposition(
                 persistenceRuntime,
                 ownerPopulationRuntime,
@@ -1148,23 +1113,14 @@ public class Tamework extends JavaPlugin {
                 ),
                 captureAttemptRuntimeReady ? captureAttemptCoordinator : null,
                 interactionExtensionRegistry::captureRequirementGeneration,
-                persistenceRuntime.getCaptureRepository(),
-                commandFamilyRosterService
+                persistenceRuntime.getCaptureRepository()
         );
         if (api instanceof TameworkApiImpl implementation) {
-            implementation.activateAdvancedCaptureRuntimes(
-                    captureAttemptRuntimeReady,
-                    captureAttemptRuntimeReady && commandFamilyRosterService != null);
+            implementation.activateAdvancedCaptureRuntimes(captureAttemptRuntimeReady);
         }
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
-        commandRosterReadExecutor = new ThreadPoolExecutor(
-                1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(64), runnable -> {
-                    Thread thread = new Thread(runnable, "tamework-command-roster-read");
-                    thread.setDaemon(true);
-                    return thread;
-                }, new ThreadPoolExecutor.AbortPolicy());
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
                 commandNpcRelocationService,
@@ -1174,9 +1130,7 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcLostService,
                 commandLinkedNpcStateSnapshotService,
                 persistenceRuntime,
-                ownerPopulationRuntime.identityResolver(),
-                commandFamilyRosterService,
-                commandRosterReadExecutor
+                ownerPopulationRuntime.identityResolver()
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
@@ -1243,12 +1197,6 @@ public class Tamework extends JavaPlugin {
                 PlayerDisconnectEvent.class,
                 ownerPresenceTimelineService::onPlayerDisconnect,
                 "owner presence disconnect tracking"
-        );
-        TameworkEventRegistrationSupport.registerGlobal(
-                this,
-                PlayerDisconnectEvent.class,
-                this::onTimedSummoningOwnerDisconnect,
-                "timed command summon logout storage"
         );
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
@@ -1455,15 +1403,6 @@ public class Tamework extends JavaPlugin {
         }
     }
 
-    private void onTimedSummoningOwnerDisconnect(@Nullable PlayerDisconnectEvent event) {
-        CommandTimedSummoningService service = commandTimedSummoningService;
-        if (service == null || event == null || event.getPlayerRef() == null
-                || event.getPlayerRef().getUuid() == null) {
-            return;
-        }
-        service.onOwnerLogout(event.getPlayerRef().getUuid(), System.currentTimeMillis());
-    }
-
     @Override
     protected void shutdown() {
         if (hStatsIntegration != null) {
@@ -1484,21 +1423,8 @@ public class Tamework extends JavaPlugin {
         api = null;
         populationGroupApi = null;
         populationGroupRecoveryReady = false;
-        commandTimedSummoningApi = null;
-        commandTimedSummoningService = null;
-        commandTimedSummoningRecoveryReady = false;
-        if (commandRosterReadExecutor != null) {
-            commandRosterReadExecutor.shutdownNow();
-            commandRosterReadExecutor = null;
-        }
         if (commandLinkedNpcStateSnapshotService != null) {
             commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(null);
-            commandLinkedNpcStateSnapshotService.installProjectionLoadSink(null);
-        }
-        CommandTimedProjectionRetirementIndex.clear();
-        if (commandTimedSummoningTickSystem != null) {
-            commandTimedSummoningTickSystem.install(null);
-            commandTimedSummoningTickSystem = null;
         }
         if (managedCoopRuntime != null) {
             managedCoopRuntime.close();
@@ -2683,123 +2609,8 @@ public class Tamework extends JavaPlugin {
                 }
             }
             activatePopulationGroupsIfReady();
-            retryCommandTimedSummoningIfReady();
         }
         return result.applied();
-    }
-
-    private void initializeCommandTimedSummoningRuntime() {
-        commandTimedSummoningApi = null;
-        commandTimedSummoningService = null;
-        commandTimedSummoningRecoveryReady = false;
-        if (!(api instanceof TameworkApiImpl implementation)
-                || persistenceRuntime == null || ownerPopulationRuntime == null
-                || commandFamilyRosterService == null || commandLinkedNpcStateSnapshotService == null
-                || coopResidentStateSnapshotService == null
-                || commandTimedSummoningTickSystem == null) {
-            return;
-        }
-        try {
-            var repository = persistenceRuntime.getCommandTimedSummonRepository();
-            var profiles = persistenceRuntime.getNpcProfileRepository();
-            CommandTimedSummonPopulationPort population = new CommandTimedSummonPopulationPort(
-                    ownerPopulationRuntime, implementation.populationAdmissions(), profileId -> {
-                        var profile = profiles.loadProfileById(profileId);
-                        return profile == null ? null : profile.roleId();
-                    });
-            HytaleCommandTimedSummonProjectionPort projection =
-                    new HytaleCommandTimedSummonProjectionPort(
-                            ownerPopulationRuntime, profiles, repository,
-                            persistenceRuntime.getReadExecutor(), population,
-                            coopResidentStateSnapshotService);
-            CommandTimedSummoningService service = new CommandTimedSummoningService(
-                    repository, persistenceRuntime.getReadExecutor(),
-                    new CommandFamilyRosterMembershipPort(commandFamilyRosterService),
-                    population,
-                    projection,
-                    (ownerUuid, profileId, remainingMs, thresholdMs) -> getLogger().at(Level.INFO).log(
-                            "Timed command summon nearing expiry owner=" + ownerUuid
-                                    + " profile=" + profileId + " remainingMs=" + remainingMs));
-            CommandTimedSummoningApiDelegate runtime = new CommandTimedSummoningApiDelegate(
-                    repository, service, persistenceRuntime.getReadExecutor(), (request, operation) -> {
-                        var profile = profiles.loadProfileById(request.profileId());
-                        var populationEntry = ownerPopulationRuntime.index()
-                                .entry(request.profileId()).orElse(null);
-                        if (profile == null || profile.ownerUuid() == null
-                                || !profile.ownerUuid().equals(request.ownerUuid())
-                                || profile.roleId() == null || populationEntry == null
-                                || populationEntry.ownerId() == null
-                                || !populationEntry.ownerId().equals(request.ownerUuid())) {
-                            return null;
-                        }
-                        TwCompanionConfig.SummonSettings settings =
-                                TwCompanionConfig.resolveEffectiveForRole(profile.roleId()).getSummon();
-                        if (!settings.isEnabled()) return null;
-                        return new CommandTimedSummoningApiDelegate.ResolvedRequest(
-                                populationEntry.revision(), profile.roleId(), profile.roleId(), null,
-                                new CommandTimedSummonPolicySnapshot(
-                                        settings.getActiveDurationMs(), settings.getResummonCooldownMs(),
-                                        settings.isAutoStoreOnOwnerLogout(),
-                                        settings.getExpiryWarningThresholdsMs()),
-                                ownerPopulationRuntime.identityResolver()
-                                    .currentNpcUuid(request.profileId()).orElse(null));
-                    }, System::currentTimeMillis);
-            persistenceRuntime.getReadExecutor().submit(repository::loadAllSessions)
-                    .toCompletableFuture().join();
-            var recovery = service.recover(System.currentTimeMillis()).toCompletableFuture().join();
-            var storedConvergence = service.convergeStoredPopulation().toCompletableFuture().join();
-            /*
-             * Worlds are not guaranteed to be loaded during plugin bootstrap, so projection
-             * inspection can legitimately remain unresolved here. Stored population convergence
-             * is the activation invariant; the installed lease tick safely retries stale
-             * projection operations once their worlds become available.
-             */
-            commandTimedSummoningRecoveryReady = storedConvergence.ready();
-            if (!recovery.ready()) {
-                getLogger().at(Level.INFO).log(
-                        "Deferred " + recovery.unresolved()
-                                + " timed command summon recovery operation(s) until world runtime.");
-            }
-            if (storedConvergence.converged() > 0) {
-                getLogger().at(Level.INFO).log(
-                        "Repaired " + storedConvergence.converged()
-                                + " stored command companion population projection(s).");
-            }
-            if (!commandTimedSummoningRecoveryReady || !projection.available()) {
-                getLogger().at(Level.WARNING).log(
-                        "Timed command summoning recovery/projection is not ready; capability remains unavailable.");
-                return;
-            }
-            commandTimedSummoningService = service;
-            commandTimedSummoningApi = runtime;
-            projection.installLifecycleService(service);
-            projection.recoverRetirementTombstones().toCompletableFuture().join();
-            commandLinkedNpcStateSnapshotService.installProjectionUnloadSnapshotSink(
-                    projection::captureUnloadedSnapshot);
-            commandLinkedNpcStateSnapshotService.installProjectionLoadSink(
-                    projection::projectionLoaded);
-            commandTimedSummoningTickSystem.install(service);
-            if (implementation.activateCommandTimedSummoningRuntime(
-                    runtime, true, ownerPopulationRuntime.populationGroupsReady(), true)) {
-                getLogger().at(Level.INFO).log(
-                        "Timed command summoning runtime recovered and activated.");
-            }
-        } catch (Exception | LinkageError failure) {
-            getLogger().at(Level.WARNING).withCause(failure).log(
-                    "Timed command summoning bootstrap failed; capability remains unavailable.");
-        }
-    }
-
-    private void retryCommandTimedSummoningIfReady() {
-        if (commandTimedSummoningService != null
-                || commandTimedSummoningApi != null
-                || !populationGroupRecoveryReady
-                || ownerPopulationRuntime == null
-                || !ownerPopulationRuntime.populationGroupsReady()
-                || coopResidentStateSnapshotService == null) {
-            return;
-        }
-        initializeCommandTimedSummoningRuntime();
     }
 
     private void initializePopulationGroupRuntime() {
@@ -2860,7 +2671,6 @@ public class Tamework extends JavaPlugin {
                     && ownerPopulationRuntime.populationGroupsReady();
             if (populationGroupRecoveryReady) {
                 activatePopulationGroupsIfReady();
-                retryCommandTimedSummoningIfReady();
             } else {
                 getLogger().at(Level.WARNING).log(
                         "Population-group recovery remained unresolved after canonical owner "
@@ -3215,24 +3025,12 @@ public class Tamework extends JavaPlugin {
                 if (itemId == null || itemId.isBlank()) {
                     continue;
                 }
-                commandItemRegistry.register(asset.getId(), itemId, asset);
+                commandItemRegistry.register(itemId, asset);
                 loaded++;
             }
         }
         return loaded;
     }
-
-    /** Focused durable roster seam for capture/provisioning runtime composition. */
-    @Nullable
-    public CommandFamilyRosterService getCommandFamilyRosterService() {
-        return commandFamilyRosterService;
-    }
-
-    @Nullable
-    public CommandTimedSummoningService getCommandTimedSummoningService() {
-        return commandTimedSummoningService;
-    }
-
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {
         return spawnerFeatureHandler;

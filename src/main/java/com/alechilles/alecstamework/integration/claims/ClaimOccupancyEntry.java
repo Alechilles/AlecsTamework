@@ -11,8 +11,7 @@ import javax.annotation.Nullable;
  *
  * <p>A physical coordinate may remain attached to a dormant entry as recovery context. Only an
  * owned {@link CompanionLifecycleState#ACTIVE ACTIVE} or
- * {@link CompanionLifecycleState#UNLOADED UNLOADED}, or
- * {@link CompanionLifecycleState#STORING STORING} entry consumes claim occupancy.</p>
+ * {@link CompanionLifecycleState#UNLOADED UNLOADED} entry consumes claim occupancy.</p>
  */
 public record ClaimOccupancyEntry(@Nonnull String profileId,
                                   @Nullable UUID ownerId,
@@ -31,8 +30,7 @@ public record ClaimOccupancyEntry(@Nonnull String profileId,
         return ownerId != null
                 && physicalChunk != null
                 && (lifecycleState == CompanionLifecycleState.ACTIVE
-                || lifecycleState == CompanionLifecycleState.UNLOADED
-                || lifecycleState == CompanionLifecycleState.STORING);
+                || lifecycleState == CompanionLifecycleState.UNLOADED);
     }
 
     @Nonnull

@@ -121,32 +121,6 @@ class TwCompanionConfigInheritanceTest {
         );
     }
 
-    @Test
-    void summonNestedFieldsAndWarningReplacementFollowContract() throws Exception {
-        TwCompanionConfig parent = new TwCompanionConfig();
-        TwCompanionConfig child = new TwCompanionConfig();
-        Object parentSummon = getNestedObject(parent, "command", "summon");
-        Object childSummon = getNestedObject(child, "command", "summon");
-        setBooleanField(parentSummon, "enabled", true);
-        setLongField(parentSummon, "activeDurationMs", 600_000L);
-        setLongField(parentSummon, "resummonCooldownMs", 60_000L);
-        setField(parentSummon, "expiryWarningThresholdsMs", new Long[] { 60_000L, 10_000L });
-        setLongField(childSummon, "activeDurationMs", 900_000L);
-        setField(childSummon, "expiryWarningThresholdsMs", new Long[] { 30_000L });
-
-        child.inheritMissingTopLevelFrom(
-                parent,
-                Set.of("Command"),
-                Map.of("Command", Set.of("Summon", "Summon.ActiveDurationMs", "Summon.ExpiryWarningThresholdsMs"))
-        );
-
-        TwCompanionConfig.SummonSettings result = child.getCommand().getSummon();
-        assertTrue(result.isEnabled());
-        assertEquals(900_000L, result.getActiveDurationMs());
-        assertEquals(60_000L, result.getResummonCooldownMs());
-        assertArrayEquals(new long[] { 30_000L }, result.getExpiryWarningThresholdsMs());
-    }
-
     private void setNestedIntField(Object target, String nestedFieldName, String fieldName, int value)
             throws Exception {
         Field nestedField = target.getClass().getDeclaredField(nestedFieldName);

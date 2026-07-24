@@ -87,10 +87,6 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.ownerPopulationOperations());
         assertNotNull(adapter.ownerPopulationReconciliationOperations());
         assertNotNull(adapter.populationGroupOperations());
-        assertNotNull(adapter.commandRosterOperations());
-        assertNotNull(adapter.commandRosterTransitionOperations());
-        assertNotNull(adapter.timedSummonOperations());
-        assertNotNull(adapter.timedSummonTransitionOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -103,26 +99,22 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.coopReader());
         assertNotNull(adapter.extensionReader());
         assertNotNull(adapter.populationGroupReader());
-        assertNotNull(adapter.commandRosterReader());
-        assertNotNull(adapter.timedSummonReader());
         assertNotNull(adapter.coopIndex());
         assertNotNull(adapter.ownerPopulationIndex());
         assertNotNull(adapter.populationGroupIndex());
-        assertNotNull(adapter.commandRosterIndex());
-        assertNotNull(adapter.timedSummonIndex());
         assertNotNull(adapter.extensionIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
         );
         assertEquals(
-                5,
+                3,
                 adapter.projections().requiredFor(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                6,
+                4,
                 adapter.projections().requiredFor(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 ).size()
@@ -148,15 +140,11 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(7, result.catchUps().size());
+        assertEquals(5, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
         assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
         assertEquals(0, adapter.populationGroupIndex()
                 .assignmentSnapshot().size());
-        assertEquals(0, adapter.commandRosterIndex()
-                .actionSnapshot().size());
-        assertEquals(0, adapter.timedSummonIndex()
-                .readySnapshot().size());
     }
 
     @Test
@@ -318,9 +306,7 @@ class SqlitePublicPersistenceAdapterTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed("coop_capture").completed(),
                 (request, operation) ->
-                        LiveOperationResult.confirmed("coop_release").completed(),
-                (request, operation) ->
-                        LiveOperationResult.confirmed("timed").completed()
+                        LiveOperationResult.confirmed("coop_release").completed()
         );
     }
 

@@ -213,9 +213,7 @@ class ReplacementProfileDataApiTest {
                 (request, operation) -> LiveOperationResult
                         .confirmed("coop_capture").completed(),
                 (request, operation) -> LiveOperationResult
-                        .confirmed("coop_release").completed(),
-                (request, operation) -> LiveOperationResult
-                        .confirmed("timed").completed()
+                        .confirmed("coop_release").completed()
         );
     }
 

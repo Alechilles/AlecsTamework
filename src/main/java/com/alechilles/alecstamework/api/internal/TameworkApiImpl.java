@@ -2,10 +2,8 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
 import com.alechilles.alecstamework.api.CommandItemConfigView;
-import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
-import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.GlobalConfigView;
@@ -289,9 +287,6 @@ public final class TameworkApiImpl
     @Nullable
     private volatile CapturePolicyRegistry capturePolicies;
     private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
-    private volatile CommandTimedSummoningApi commandTimedSummoningApi =
-            CommandTimedSummoningApi.unavailable();
-    private volatile CommandFamilyRosterApi commandFamilyRosterApi = CommandFamilyRosterApi.unavailable();
 
     public TameworkApiImpl(@Nonnull NpcProfilesApi profilesApi,
                            @Nonnull ProfileDataApi profileDataApi,
@@ -342,23 +337,11 @@ public final class TameworkApiImpl
         }
     }
 
-    /** Publishes command-family rosters only after the durable repository is available. */
-    public void activateCommandFamilyRosterRuntime(@Nonnull CommandFamilyRosterApi runtime) {
-        commandFamilyRosterApi = Objects.requireNonNull(runtime, "runtime");
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.COMMAND_FAMILY_ROSTERS);
-        }
-    }
-
     /** Advertises capture mutations only after their durable runtime authorities are composed. */
-    public void activateAdvancedCaptureRuntimes(boolean resolvedAttemptConsumptionReady,
-                                                boolean tameAndLinkReady) {
+    public void activateAdvancedCaptureRuntimes(boolean resolvedAttemptConsumptionReady) {
         synchronized (capabilities) {
             if (resolvedAttemptConsumptionReady) {
                 capabilities.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION);
-            }
-            if (tameAndLinkReady) {
-                capabilities.add(TameworkApiCapability.CAPTURE_TAME_AND_LINK);
             }
         }
     }
@@ -378,27 +361,6 @@ public final class TameworkApiImpl
             capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
         }
         return true;
-    }
-
-    /** Publishes timed command summoning only after durable recovery and population wiring are ready. */
-    public boolean activateCommandTimedSummoningRuntime(@Nonnull CommandTimedSummoningApi runtime,
-                                                        boolean recoveryReady,
-                                                        boolean populationAuthorityReady,
-                                                        boolean projectionAuthorityReady) {
-        Objects.requireNonNull(runtime, "runtime");
-        if (!recoveryReady || !populationAuthorityReady || !projectionAuthorityReady) {
-            return false;
-        }
-        commandTimedSummoningApi = runtime;
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.COMMAND_TIMED_SUMMONING);
-        }
-        return true;
-    }
-
-    @Override
-    public CommandTimedSummoningApi commandTimedSummoning() {
-        return commandTimedSummoningApi;
     }
 
     /** Drops reflected optional-claim contracts after a settings change. */
@@ -440,11 +402,6 @@ public final class TameworkApiImpl
     @Override
     public TraitEffectApi traitEffects() {
         return traitEffectApi;
-    }
-
-    @Override
-    public CommandFamilyRosterApi commandFamilyRosters() {
-        return commandFamilyRosterApi;
     }
 
     @Override

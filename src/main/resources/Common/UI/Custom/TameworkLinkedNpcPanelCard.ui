@@ -15,13 +15,11 @@ $C = "Common.ui";
 @LinkedBreedingStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 220, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
 @LinkedProgressionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 360, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
-@RosterBlockedButtonLabelStyle = LabelStyle(FontSize: 9, RenderBold: true, TextColor: #8799ad, HorizontalAlignment: Center, VerticalAlignment: Center);
-@RosterBlockedButtonStyle = TextButtonStyle(Default: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Hovered: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Pressed: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle), Disabled: (Background: (Color: #172334), LabelStyle: @RosterBlockedButtonLabelStyle));
 @TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 
 Group {
-    Anchor: (Top: 3, Left: 0, Right: 0, Height: 126);
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 88);
     Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
     Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
@@ -1018,47 +1016,6 @@ Group {
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
-    }
-
-    Label #RosterState {
-        Anchor: (Top: 84, Left: 0, Width: 150, Height: 16);
-        Style: (FontSize: 10, TextColor: #c8d9ea, VerticalAlignment: Center);
-        Visible: false;
-    }
-
-    Label #RosterTimer {
-        Anchor: (Top: 101, Left: 0, Width: 180, Height: 16);
-        Style: (FontSize: 10, TextColor: #9fc4e7, VerticalAlignment: Center);
-        Visible: false;
-    }
-
-    Label #RosterCapacity {
-        Anchor: (Top: 84, Left: 154, Width: 115, Height: 16);
-        Style: (FontSize: 10, TextColor: #f1c77c, VerticalAlignment: Center);
-        Visible: false;
-    }
-
-    TextButton #RosterSummonButton {
-        Anchor: (Top: 92, Right: 0, Width: 76, Height: 24);
-        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
-        Text: %server.tamework.ui.linkedPanel.roster.summon;
-        Visible: false;
-    }
-
-    TextButton #RosterSummonBlockedButton {
-        Anchor: (Top: 92, Right: 0, Width: 96, Height: 24);
-        Style: @RosterBlockedButtonStyle;
-        Text: %server.tamework.ui.linkedPanel.roster.blocked.limit;
-        TooltipText: "";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-        Visible: false;
-    }
-
-    TextButton #RosterDismissButton {
-        Anchor: (Top: 92, Right: 0, Width: 76, Height: 24);
-        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
-        Text: %server.tamework.ui.linkedPanel.roster.dismiss;
-        Visible: false;
     }
 
     Group #TalentPointAction {

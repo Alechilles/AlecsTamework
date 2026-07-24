@@ -38,6 +38,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -95,7 +96,12 @@ class PublicPersistenceRuntimeTest {
         assertTrue(performance.reads().execution().count() > 0);
         assertTrue(performance.reads().maximumDepth() > 0);
         assertEquals(metrics.features().size(), diagnostics.features().size());
-        assertEquals(7, diagnostics.projectionCheckpoints().size());
+        assertEquals(
+                PublicPersistenceFeatureRegistry.create().descriptors().stream()
+                        .flatMap(descriptor -> descriptor.projectionConsumers().stream())
+                        .collect(Collectors.toUnmodifiableSet()),
+                diagnostics.projectionCheckpoints().keySet()
+        );
         assertEquals(0, diagnostics.outboxHead());
         assertTrue(diagnostics.openIncidentsByCode().isEmpty());
         assertTrue(diagnostics.activeQuarantinesByScope().isEmpty());
@@ -484,9 +490,7 @@ class PublicPersistenceRuntimeTest {
                 (request, operation) -> LiveOperationResult
                         .confirmed("coop_capture_confirmed").completed(),
                 (request, operation) -> LiveOperationResult
-                        .confirmed("coop_release_confirmed").completed(),
-                (request, operation) -> LiveOperationResult
-                        .confirmed("timed_confirmed").completed()
+                        .confirmed("coop_release_confirmed").completed()
         );
     }
 

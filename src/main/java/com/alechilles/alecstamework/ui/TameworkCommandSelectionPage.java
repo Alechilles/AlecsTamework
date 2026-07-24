@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -27,7 +25,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -64,8 +61,6 @@ public final class TameworkCommandSelectionPage
     private static final String RELEASE_COMMAND_PREFIX = "__release__:";
     private static final String CULL_COMMAND_PREFIX = "__cull__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
-    private static final String SUMMON_COMMAND_PREFIX = "__roster_summon__:";
-    private static final String DISMISS_COMMAND_PREFIX = "__roster_dismiss__:";
     private static final String LOCATE_COMMAND_PREFIX = "__locate__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
@@ -541,15 +536,6 @@ public final class TameworkCommandSelectionPage
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
-            return;
-        }
-        if (commandId.startsWith(SUMMON_COMMAND_PREFIX)
-                || commandId.startsWith(DISMISS_COMMAND_PREFIX)) {
-            boolean summon = commandId.startsWith(SUMMON_COMMAND_PREFIX);
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
-                    summon ? SUMMON_COMMAND_PREFIX : DISMISS_COMMAND_PREFIX);
-            LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
-            if (entry != null) requestTimedRosterAction(entry, summon);
             return;
         }
         if (commandId.startsWith(LOCATE_COMMAND_PREFIX)) {
@@ -1038,20 +1024,6 @@ public final class TameworkCommandSelectionPage
         groupAssignOverlay.applyTo(commandBuilder, resolveLanguage());
     }
 
-    private void requestTimedRosterAction(@Nonnull LinkedNpcEntry entry, boolean summon) {
-        CommandRosterStatusPresentation status = entry.rosterStatusPresentation();
-        Tamework plugin = Tamework.getInstance();
-        if (status == null || plugin == null || plugin.getApi() == null || playerUuid == null) return;
-        String key = "command-panel:" + (summon ? "summon:" : "dismiss:")
-                + status.profileId() + ":" + status.state().name() + ":" + status.revision();
-        CommandTimedSummoningRequest request = new CommandTimedSummoningRequest(
-                playerUuid, status.commandFamilyId(), status.profileId(), key);
-        CompletionStage<?> action = summon
-                ? plugin.getApi().commandTimedSummoning().summon(request)
-                : plugin.getApi().commandTimedSummoning().dismiss(request);
-        action.whenComplete((ignored, failure) -> dispatchRefreshTick());
-    }
-
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {
         LinkedNpcEntry entry = resolveLinkedNpcEntry(npcUuid);
         if (entry == null) {
@@ -1305,8 +1277,6 @@ public final class TameworkCommandSelectionPage
                 RELEASE_COMMAND_PREFIX,
                 CULL_COMMAND_PREFIX,
                 RESPAWN_COMMAND_PREFIX,
-                SUMMON_COMMAND_PREFIX,
-                DISMISS_COMMAND_PREFIX,
                 LOCATE_COMMAND_PREFIX,
                 RECALL_COMMAND_PREFIX,
                 SET_HOME_COMMAND_PREFIX,

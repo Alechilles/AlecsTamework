@@ -14,7 +14,7 @@ class SqliteSchemaV9MigrationTest {
     @TempDir Path tempDir;
 
     @Test
-    void createsGenericCommandAuthoritiesAndRemovesUnreleasedVesselTables() throws Exception {
+    void retainsCaptureSourceEvidenceWithoutUnreleasedCommandAuthorities() throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve("v9.sqlite"));
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
         try (Connection connection = connections.openConnection()) {
@@ -28,9 +28,12 @@ class SqliteSchemaV9MigrationTest {
             migrator.migrate(connection);
 
             assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V9));
-            assertTrue(tableExists(connection, "command_family_rosters"));
-            assertTrue(tableExists(connection, "command_family_roster_memberships"));
-            assertTrue(tableExists(connection, "command_timed_summon_sessions"));
+            assertFalse(tableExists(connection, "command_family_rosters"));
+            assertFalse(tableExists(connection, "command_family_roster_memberships"));
+            assertFalse(tableExists(connection, "command_family_roster_operations"));
+            assertFalse(tableExists(connection, "command_timed_summon_sessions"));
+            assertFalse(tableExists(connection, "command_timed_summon_snapshots"));
+            assertFalse(tableExists(connection, "command_timed_summon_operations"));
             assertFalse(tableExists(connection, "paid_command_revival_operations"));
             assertFalse(tableExists(connection, "paid_command_revival_costs"));
             assertFalse(tableExists(connection, "paid_command_revival_reservations"));

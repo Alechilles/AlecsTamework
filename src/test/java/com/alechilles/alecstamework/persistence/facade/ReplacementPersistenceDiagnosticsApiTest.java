@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.api.PersistenceMutationDomain;
 import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
@@ -53,7 +54,7 @@ class ReplacementPersistenceDiagnosticsApiTest {
                     diagnostics.getPersistenceResilience().storageState()
             );
             assertEquals(
-                    13,
+                    PublicPersistenceFeatureRegistry.create().descriptors().size(),
                     diagnostics.getPersistenceResilience().circuits().size()
             );
             assertFalse(
@@ -87,8 +88,7 @@ class ReplacementPersistenceDiagnosticsApiTest {
                 (request, operation) -> confirmed("capture_release"),
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),
-                (request, operation) -> confirmed("coop_release"),
-                (request, operation) -> confirmed("timed")
+                (request, operation) -> confirmed("coop_release")
         );
     }
 

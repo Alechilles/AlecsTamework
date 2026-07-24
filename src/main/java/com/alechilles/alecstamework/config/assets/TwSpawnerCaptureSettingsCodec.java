@@ -96,26 +96,9 @@ final class TwSpawnerCaptureSettingsCodec {
                 + "either terminal roll result.").add()
         .<String>append(new KeyedCodec<>("SuccessDisposition", Codec.STRING),
             (settings, value) -> settings.successDisposition = parseSuccessDisposition(value),
-            settings -> settings.successDisposition == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                    ? "TameAndCommandLink" : "CapturedItem")
-        .documentation("Successful capture result. Inheritance: an omitted value inherits the parent; CapturedItem "
-                + "creates the configured filled item, while TameAndCommandLink keeps the NPC live and links its "
-                + "canonical profile to a command family.").add()
-        .<String>append(new KeyedCodec<>("CommandFamilyId", Codec.STRING),
-            (settings, value) -> settings.commandFamilyId = value,
-            settings -> settings.commandFamilyId)
-        .documentation("Command-family namespace used by TameAndCommandLink. Inheritance: an omitted value inherits "
-                + "the parent; an explicit scalar replaces it.").add()
-        .<String>append(new KeyedCodec<>("RequiredCommandConfigId", Codec.STRING),
-            (settings, value) -> settings.requiredCommandConfigId = value,
-            settings -> settings.requiredCommandConfigId)
-        .documentation("Optional exact command config fence for capture access. Inheritance: an omitted value "
-                + "inherits the parent; an explicit scalar replaces it.").add()
-        .<Boolean>append(new KeyedCodec<>("RequireCommandAccessItem", Codec.BOOLEAN),
-            (settings, value) -> settings.requireCommandAccessItem = value,
-            settings -> settings.requireCommandAccessItem)
-        .documentation("Require a compatible command access item before rolling. Inheritance: an omitted value "
-                + "inherits the parent; an explicit false overrides an inherited true.").add()
+            settings -> "CapturedItem")
+        .documentation("Successful capture creates the configured filled item. Inheritance: an omitted value "
+                + "inherits the parent.").add()
         .build();
 
     private TwSpawnerCaptureSettingsCodec() {
@@ -142,9 +125,6 @@ final class TwSpawnerCaptureSettingsCodec {
     private static CaptureSuccessDisposition parseSuccessDisposition(@Nullable String value) {
         if (value == null || value.isBlank() || value.equalsIgnoreCase("CapturedItem")) {
             return CaptureSuccessDisposition.CAPTURED_ITEM;
-        }
-        if (value.equalsIgnoreCase("TameAndCommandLink")) {
-            return CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
         }
         throw new IllegalArgumentException("Unknown capture SuccessDisposition: " + value);
     }

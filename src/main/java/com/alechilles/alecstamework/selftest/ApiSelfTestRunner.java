@@ -120,22 +120,9 @@ public final class ApiSelfTestRunner {
                 api.configs().resolveSpawnerCaptureMechanicsForItemId(EXAMPLE_SPAWNER_ITEM_ID).isPresent(),
                 "item=" + EXAMPLE_SPAWNER_ITEM_ID));
         assertions.add(check(
-                "command-family roster capability ready",
-                capabilities.contains(TameworkApiCapability.COMMAND_FAMILY_ROSTERS),
-                "capabilities=" + capabilities));
-        assertions.add(check(
-                "timed command summoning capability ready",
-                capabilities.contains(TameworkApiCapability.COMMAND_TIMED_SUMMONING),
-                "capabilities=" + capabilities));
-        assertions.add(check(
                 "resolved capture consumption capability ready",
                 capabilities.contains(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION),
                 "capabilities=" + capabilities));
-        assertions.add(check(
-                "capture tame-and-link capability ready",
-                capabilities.contains(TameworkApiCapability.CAPTURE_TAME_AND_LINK),
-                "capabilities=" + capabilities));
-
         PopulationGroupReconciliationView groupReadiness =
                 api.policies().populationGroups().getReconciliationStatus();
         assertions.add(check(

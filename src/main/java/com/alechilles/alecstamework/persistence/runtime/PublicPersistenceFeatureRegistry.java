@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
-import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
-import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -37,10 +35,6 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("owner_population");
     public static final PersistenceFeatureId POPULATION_GROUPS =
             new PersistenceFeatureId("population_groups");
-    public static final PersistenceFeatureId COMMAND_ROSTER =
-            new PersistenceFeatureId("command_roster");
-    public static final PersistenceFeatureId TIMED_SUMMON =
-            new PersistenceFeatureId("timed_summon");
     public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
             new PersistenceFeatureId("economic_compensation");
     public static final PersistenceFeatureId CAPTURE =
@@ -59,10 +53,6 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("owner_population_index");
     public static final ProjectionConsumerId POPULATION_GROUP_INDEX =
             new ProjectionConsumerId("population_group_index");
-    public static final ProjectionConsumerId COMMAND_ROSTER_INDEX =
-            new ProjectionConsumerId("command_roster_index");
-    public static final ProjectionConsumerId TIMED_SUMMON_INDEX =
-            new ProjectionConsumerId("timed_summon_index");
     public static final ProjectionConsumerId EXTENSION_INDEX =
             ProfileExtensionProjectionIndex.CONSUMER_ID;
 
@@ -75,8 +65,6 @@ public final class PublicPersistenceFeatureRegistry {
                 lifecycle(),
                 ownerPopulation(),
                 populationGroups(),
-                commandRoster(),
-                PublicPersistenceTimedFeature.create(),
                 economicCompensation(),
                 capture(),
                 dormant(),
@@ -108,9 +96,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -135,9 +121,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -179,9 +163,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
@@ -229,55 +211,6 @@ public final class PublicPersistenceFeatureRegistry {
         );
     }
 
-    private static PersistenceFeatureDescriptor commandRoster() {
-        return PublicPersistenceFeatureDescriptorFactory.create(
-                COMMAND_ROSTER,
-                PersistenceFeatureDomain.COMMAND,
-                Set.of(
-                        "command_family",
-                        "command_roster_membership"
-                ),
-                List.of(
-                        CommandRosterMembershipDefinition.INSTANCE,
-                        CommandRosterTransitionDefinition.INSTANCE
-                ),
-                PublicPersistenceFeatureDescriptorFactory.scopes(
-                        CommandRosterMembershipDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER,
-                                OperationScopeType.COMMAND_FAMILY
-                        ),
-                        CommandRosterTransitionDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER,
-                                OperationScopeType.COMMAND_FAMILY
-                        )
-                ),
-                Set.of(
-                        IDENTITY,
-                        LIFECYCLE,
-                        OWNER_POPULATION,
-                        POPULATION_GROUPS
-                ),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
-                ),
-                PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
-                Set.of(
-                        OperationScopeType.OPERATION,
-                        OperationScopeType.PROFILE,
-                        OperationScopeType.OWNER,
-                        OperationScopeType.COMMAND_FAMILY
-                )
-        );
-    }
-
     private static PersistenceFeatureDescriptor capture() {
         return PublicPersistenceFeatureDescriptorFactory.create(
                 CAPTURE,
@@ -300,9 +233,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
@@ -352,9 +283,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         PROFILE_OBSERVER,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
@@ -393,9 +322,7 @@ public final class PublicPersistenceFeatureRegistry {
                         PROFILE_OBSERVER,
                         COOP_INDEX,
                         OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX,
-                        COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        POPULATION_GROUP_INDEX
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(

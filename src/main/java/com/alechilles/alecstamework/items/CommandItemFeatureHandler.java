@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.api.Vector3View;
-import com.alechilles.alecstamework.command.roster.CommandFamilyRosterService;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -81,7 +79,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.function.Supplier;
@@ -140,7 +137,6 @@ public final class CommandItemFeatureHandler {
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandGroupActivationService groupActivationService;
     private final CommandTalentPageService talentPageService;
-    @Nullable private final CommandRosterActionAuthority rosterActionAuthority;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -174,35 +170,6 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                      @Nullable TameworkPersistenceRuntime persistenceRuntime,
                                      @Nullable CompanionIdentityResolver populationIdentityResolver) {
-        this(registry, relocationService, deathService, captureService, coopService, lostService,
-                stateSnapshotService, persistenceRuntime, populationIdentityResolver, null);
-    }
-
-    public CommandItemFeatureHandler(CommandItemRegistry registry,
-                                     CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcCoopService coopService,
-                                     CommandLinkedNpcLostService lostService,
-                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable TameworkPersistenceRuntime persistenceRuntime,
-                                     @Nullable CompanionIdentityResolver populationIdentityResolver,
-                                     @Nullable CommandFamilyRosterService rosterService) {
-        this(registry, relocationService, deathService, captureService, coopService, lostService,
-                stateSnapshotService, persistenceRuntime, populationIdentityResolver, rosterService, null);
-    }
-
-    public CommandItemFeatureHandler(CommandItemRegistry registry,
-                                     CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcCoopService coopService,
-                                     CommandLinkedNpcLostService lostService,
-                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable TameworkPersistenceRuntime persistenceRuntime,
-                                     @Nullable CompanionIdentityResolver populationIdentityResolver,
-                                     @Nullable CommandFamilyRosterService rosterService,
-                                     @Nullable Executor rosterReadExecutor) {
         this.registry = registry;
         this.persistenceRuntime = persistenceRuntime;
         this.relocationService = relocationService;
@@ -211,10 +178,6 @@ public final class CommandItemFeatureHandler {
         this.coopService = coopService;
         this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
-        this.rosterActionAuthority = persistenceRuntime == null || rosterReadExecutor == null ? null
-                : new CommandRosterActionAuthority(
-                persistenceRuntime.getCommandFamilyRosterRepository(),
-                persistenceRuntime.getNpcProfileRepository(), rosterReadExecutor, rosterService);
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.groupService = new CommandGroupService();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
@@ -251,10 +214,7 @@ public final class CommandItemFeatureHandler {
                 panelEntryService,
                 panelPreferenceService,
                 linkPolicyService,
-                npcNameResolver,
-                persistenceRuntime != null ? persistenceRuntime.getCommandFamilyRosterRepository() : null,
-                persistenceRuntime != null ? persistenceRuntime.getNpcProfileRepository() : null,
-                rosterActionAuthority
+                npcNameResolver
         );
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
@@ -366,8 +326,7 @@ public final class CommandItemFeatureHandler {
                 toolInventoryService,
                 panelPreferenceService,
                 feedbackService,
-                this.groupService,
-                rosterActionAuthority
+                this.groupService
         );
         this.groupManagerPageService = new CommandGroupManagerPageService(
                 panelActionService,
@@ -484,18 +443,12 @@ public final class CommandItemFeatureHandler {
             if (toolId == null || toolId.isBlank()) {
                 continue;
             }
-            List<LinkedNpcRecord> linkedRecords;
-            if (config.usesOwnerCommandFamilyRoster()) {
-                CommandRosterActionAuthority.Resolution roster = resolveRoster(player, config, toolId);
-                linkedRecords = roster.snapshot() == null || rosterActionAuthority == null
-                        ? List.of() : rosterActionAuthority.project(roster.snapshot());
-            } else {
-                linkedRecords = linkMutationService.readLinkedNpcRecords(stack);
-            }
+            List<LinkedNpcRecord> linkedRecords =
+                    linkMutationService.readLinkedNpcRecords(stack);
             if (linkedRecords.isEmpty()) {
                 continue;
             }
-            if (!config.usesOwnerCommandFamilyRoster() && profileActionResolver != null) {
+            if (profileActionResolver != null) {
                 CommandNpcProfileActionResolver.CanonicalRecords canonical =
                         profileActionResolver.canonicalizeRecords(linkedRecords);
                 if (!canonical.safeToPersist()) {
@@ -651,24 +604,10 @@ public final class CommandItemFeatureHandler {
         if (tool.toolId == null || tool.toolId.isBlank()) {
             return false;
         }
-        if (config.usesOwnerCommandFamilyRoster()) {
-            CommandRosterActionAuthority.Resolution roster = resolveRoster(player, config, tool.toolId);
-            if (roster.snapshot() == null) {
-                if (isOpenSelectionMenuCommand(commandIdOverride)) {
-                    if (updateHeldItem) updateHeldItem(player, working);
-                    if (queueRosterMenuAfterRefresh(player, config, tool.toolId)) return true;
-                }
-                feedbackService.showWarningKey(
-                        player, "tamework.ui.notifications.persistence.authorityNotReady");
-                if (updateHeldItem) updateHeldItem(player, working);
-                return false;
-            }
-            working = linkMutationService.writeLinkedNpcRecords(
-                    working, rosterActionAuthority.project(roster.snapshot()));
-            updateHeldItem = true;
-        }
-        ItemStack reconciled = config.usesOwnerCommandFamilyRoster() ? working
-                : reconcileStaleLinkedNpcRecords(player, store, config, working, tool.toolId);
+        ItemStack reconciled =
+                reconcileStaleLinkedNpcRecords(
+                        player, store, config, working, tool.toolId
+                );
         if (reconciled != working) {
             working = reconciled;
             updateHeldItem = true;
@@ -703,8 +642,8 @@ public final class CommandItemFeatureHandler {
             return true;
         }
 
-        if (targetRef != null && config.isLinkEnabled() && config.isLinkUseTogglesMembership()
-                && !config.usesOwnerCommandFamilyRoster()) {
+        if (targetRef != null && config.isLinkEnabled()
+                && config.isLinkUseTogglesMembership()) {
             LinkToggleResult link = linkMutationService.tryToggleLink(
                     player,
                     store,
@@ -1033,50 +972,6 @@ public final class CommandItemFeatureHandler {
         }
     }
 
-    /**
-     * Completes a cold roster-cache menu open without blocking the world thread. Only immutable
-     * player identity is carried across the persistence read; the live player is resolved again
-     * inside the owning world's executor before inventory or UI access.
-     */
-    private boolean queueRosterMenuAfterRefresh(@Nonnull Player player,
-                                                @Nonnull TwCommandItemConfig config,
-                                                @Nonnull String toolId) {
-        WorldPlayerResolver.ResolvedPlayer current = WorldPlayerResolver.resolveCurrent(player);
-        if (current == null || rosterActionAuthority == null) return false;
-        World world = current.world();
-        UUID ownerUuid = current.player().getUuid();
-        rosterActionAuthority.refreshAsync(ownerUuid, config).whenComplete((refresh, failure) ->
-                world.execute(() -> {
-                    WorldPlayerResolver.ResolvedPlayer live =
-                            WorldPlayerResolver.resolve(world, ownerUuid);
-                    if (live == null) return;
-                    CommandRosterActionAuthority.Resolution roster =
-                            resolveRoster(live.player(), config, toolId);
-                    if (failure != null || refresh == null || roster.snapshot() == null) {
-                        feedbackService.showWarningKey(live.player(),
-                                "tamework.ui.notifications.persistence.authorityNotReady");
-                        return;
-                    }
-                    ItemStack stack = findCommandToolStack(live.player(), toolId);
-                    Store<EntityStore> store = live.world().getEntityStore() == null
-                            ? null : live.world().getEntityStore().getStore();
-                    if (stack == null || stack.isEmpty() || store == null) {
-                        feedbackService.showWarningKey(live.player(),
-                                "tamework.ui.notifications.command.shared.itemNotFound");
-                        return;
-                    }
-                    ItemStack projected = linkMutationService.writeLinkedNpcRecords(
-                            stack, rosterActionAuthority.project(roster.snapshot()));
-                    toolInventoryService.mutateToolStack(
-                            live.player(), toolId, ignored -> projected);
-                    if (!openSelectionMenu(live.player(), store, config, projected, toolId)) {
-                        feedbackService.showWarningKey(live.player(),
-                                "tamework.ui.notifications.command.selection.reopenFailed");
-                    }
-                }));
-        return true;
-    }
-
     private void openGroupManagerFromSelection(Player player,
                                                TwCommandItemConfig config,
                                                String toolId) {
@@ -1148,18 +1043,6 @@ public final class CommandItemFeatureHandler {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.unlink.unavailable");
             return;
         }
-        if (config != null && config.usesOwnerCommandFamilyRoster()
-                && rosterActionAuthority != null) {
-            ItemStack access = toolInventoryService.findToolStack(player, toolId);
-            rosterActionAuthority.removeMember(player.getUuid(), config,
-                    access == null ? null : access.getItemId(), npcUuid).thenAccept(removed -> {
-                if (removed) feedbackService.showSuccessKey(player,
-                        "tamework.ui.notifications.command.unlink.success");
-                else feedbackService.showWarningKey(player,
-                        "tamework.ui.notifications.persistence.authorityNotReady");
-            });
-            return;
-        }
         ItemContainer hotbar = inventory.getHotbar();
         short capacity = hotbar.getCapacity();
         for (short slot = 0; slot < capacity; slot++) {
@@ -1189,88 +1072,18 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID presentationUuid) {
-        if (config == null || !config.usesOwnerCommandFamilyRoster()) {
-            ownerReleaseService.release(player, toolId, config, presentationUuid);
-            return;
-        }
-        WorldPlayerResolver.ResolvedPlayer resolved = player == null
-                ? null : WorldPlayerResolver.resolveCurrent(player);
-        UUID ownerUuid = resolved == null ? null : resolved.player().getUuid();
-        if (resolved == null || ownerUuid == null || rosterActionAuthority == null) {
-            if (player != null) feedbackService.showWarningKey(
-                    player, "tamework.ui.notifications.command.release.unavailable");
-            return;
-        }
-        CommandRosterActionAuthority.Resolution roster = resolveRoster(
-                resolved.player(), config, toolId);
-        CommandRosterActionAuthority.Member member = roster.snapshot() == null ? null
-                : roster.snapshot().findByPresentationUuid(presentationUuid);
-        UUID liveNpcUuid = member == null ? null : member.currentNpcUuid();
-        if (liveNpcUuid == null
-                || !ownerReleaseService.canReleaseNow(resolved.player(), config, liveNpcUuid)) {
-            feedbackService.showWarningKey(
-                    resolved.player(), "tamework.ui.notifications.command.release.unavailable");
-            return;
-        }
-        ItemStack access = toolInventoryService.findToolStack(resolved.player(), toolId);
-        World owningWorld = resolved.world();
-        rosterActionAuthority.removeMember(ownerUuid, config,
-                access == null ? null : access.getItemId(), presentationUuid).whenComplete(
-                (removed, failure) -> owningWorld.execute(() -> {
-                    WorldPlayerResolver.ResolvedPlayer live =
-                            WorldPlayerResolver.resolve(owningWorld, ownerUuid);
-                    if (live == null) return;
-                    if (failure != null || !Boolean.TRUE.equals(removed)) {
-                        feedbackService.showWarningKey(live.player(),
-                                "tamework.ui.notifications.persistence.authorityNotReady");
-                        return;
-                    }
-                    ownerReleaseService.release(live.player(), toolId, config, liveNpcUuid);
-                }));
+        ownerReleaseService.release(
+                player, toolId, config, presentationUuid
+        );
     }
 
     private void applyMenuCull(Player player,
                                String toolId,
                                TwCommandItemConfig config,
                                UUID presentationUuid) {
-        if (config == null || !config.usesOwnerCommandFamilyRoster()) {
-            ownerCullService.cull(player, toolId, config, presentationUuid);
-            return;
-        }
-        WorldPlayerResolver.ResolvedPlayer resolved = player == null
-                ? null : WorldPlayerResolver.resolveCurrent(player);
-        UUID ownerUuid = resolved == null ? null : resolved.player().getUuid();
-        if (resolved == null || ownerUuid == null || rosterActionAuthority == null) {
-            if (player != null) feedbackService.showWarningKey(
-                    player, "tamework.ui.notifications.command.cull.unavailable");
-            return;
-        }
-        CommandRosterActionAuthority.Resolution roster = resolveRoster(
-                resolved.player(), config, toolId);
-        CommandRosterActionAuthority.Member member = roster.snapshot() == null ? null
-                : roster.snapshot().findByPresentationUuid(presentationUuid);
-        UUID liveNpcUuid = member == null ? null : member.currentNpcUuid();
-        if (liveNpcUuid == null
-                || !ownerCullService.canCullNow(resolved.player(), config, liveNpcUuid)) {
-            feedbackService.showWarningKey(
-                    resolved.player(), "tamework.ui.notifications.command.cull.unavailable");
-            return;
-        }
-        ItemStack access = toolInventoryService.findToolStack(resolved.player(), toolId);
-        World owningWorld = resolved.world();
-        rosterActionAuthority.removeMember(ownerUuid, config,
-                access == null ? null : access.getItemId(), presentationUuid).whenComplete(
-                (removed, failure) -> owningWorld.execute(() -> {
-                    WorldPlayerResolver.ResolvedPlayer live =
-                            WorldPlayerResolver.resolve(owningWorld, ownerUuid);
-                    if (live == null) return;
-                    if (failure != null || !Boolean.TRUE.equals(removed)) {
-                        feedbackService.showWarningKey(live.player(),
-                                "tamework.ui.notifications.persistence.authorityNotReady");
-                        return;
-                    }
-                    ownerCullService.cull(live.player(), toolId, config, liveNpcUuid);
-                }));
+        ownerCullService.cull(
+                player, toolId, config, presentationUuid
+        );
     }
 
     private void applyMenuRespawn(Player player,
@@ -1300,12 +1113,6 @@ public final class CommandItemFeatureHandler {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
             return;
         }
-        if (commandConfig != null && commandConfig.usesOwnerCommandFamilyRoster()
-                && refreshRosterProjection(player, toolId, commandConfig) == null) {
-            feedbackService.showWarningKey(player,
-                    "tamework.ui.notifications.command.respawn.trackingUnavailable");
-            return;
-        }
         ItemContainer hotbar = inventory.getHotbar();
         short capacity = hotbar.getCapacity();
         for (short slot = 0; slot < capacity; slot++) {
@@ -1322,10 +1129,12 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService == null ? null
-                    : commandConfig != null && commandConfig.usesOwnerCommandFamilyRoster()
-                    ? deathService.getDeadSnapshot(npcUuid)
-                    : deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid());
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
+                    deathService == null
+                            ? null
+                            : deathService.getDeadSnapshotForTool(
+                                    npcUuid, toolId, player.getUuid()
+                            );
             if (deadSnapshot != null) {
                 String roleId = deadSnapshot.roleId();
                 if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
@@ -1516,31 +1325,6 @@ public final class CommandItemFeatureHandler {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.unavailable");
             return;
         }
-        if (config.usesOwnerCommandFamilyRoster() && rosterActionAuthority != null) {
-            LinkedNpcRecord record = resolveRosterRecord(player, config, toolId, npcUuid);
-            UUID liveUuid = record == null ? null : record.npcUuid;
-            Ref<EntityStore> npcRef = liveUuid == null ? null : world.getEntityRef(liveUuid);
-            TransformComponent transform = npcRef == null || !npcRef.isValid() ? null
-                    : store.getComponent(npcRef, TransformComponent.getComponentType());
-            if (transform == null) {
-                feedbackService.showWarningKey(player,
-                        "tamework.ui.notifications.command.setHome.mustBeLoaded");
-                return;
-            }
-            Vector3d home = new Vector3d(transform.getPosition());
-            ItemStack access = toolInventoryService.findToolStack(player, toolId);
-            rosterActionAuthority.updateMember(player.getUuid(), config,
-                    access == null ? null : access.getItemId(), npcUuid,
-                    CommandRosterActionAuthority.MemberUpdate.home(
-                            new Vector3View(home.x, home.y, home.z))).thenAccept(updated -> {
-                if (updated) feedbackService.showSuccessKey(player,
-                        "tamework.ui.notifications.command.setHome.success",
-                        record.cachedDisplayName == null ? record.cachedRoleId : record.cachedDisplayName);
-                else feedbackService.showWarningKey(player,
-                        "tamework.ui.notifications.persistence.authorityNotReady");
-            });
-            return;
-        }
         ItemContainer hotbar = inventory.getHotbar();
         short capacity = hotbar.getCapacity();
         for (short slot = 0; slot < capacity; slot++) {
@@ -1620,8 +1404,6 @@ public final class CommandItemFeatureHandler {
                                  String toolId,
                                  TwCommandItemConfig config,
                                  UUID npcUuid) {
-        if (config.usesOwnerCommandFamilyRoster()
-                && refreshRosterProjection(player, toolId, config) == null) return;
         locateService.locate(player, toolId, npcUuid);
     }
 
@@ -1637,8 +1419,6 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        if (config.usesOwnerCommandFamilyRoster()
-                && refreshRosterProjection(player, toolId, config) == null) return;
         menuMoveService.applyMenuMoveCommand(
                 player,
                 toolId,
@@ -1940,46 +1720,6 @@ public final class CommandItemFeatureHandler {
         return toolInventoryService.findToolStack(player, toolId);
     }
 
-    @Nonnull
-    private CommandRosterActionAuthority.Resolution resolveRoster(
-            @Nonnull Player player, @Nonnull TwCommandItemConfig config, @Nullable String toolId) {
-        if (rosterActionAuthority == null || player.getUuid() == null) {
-            return CommandRosterActionAuthority.Resolution.denied(
-                    "command-roster-authority-unavailable");
-        }
-        return rosterActionAuthority.resolveCached(player.getUuid(), config, toolId);
-    }
-
-    @Nullable
-    private LinkedNpcRecord resolveRosterRecord(Player player, TwCommandItemConfig config,
-                                                String toolId, UUID presentationUuid) {
-        if (player == null || config == null || !config.usesOwnerCommandFamilyRoster()
-                || presentationUuid == null) return null;
-        CommandRosterActionAuthority.Resolution resolution = resolveRoster(player, config, toolId);
-        CommandRosterActionAuthority.Member member = resolution.snapshot() == null ? null
-                : resolution.snapshot().findByPresentationUuid(presentationUuid);
-        if (member == null) return null;
-        return rosterActionAuthority.project(new CommandRosterActionAuthority.Snapshot(
-                resolution.snapshot().ownerUuid(), resolution.snapshot().commandFamilyId(),
-                resolution.snapshot().rosterRevision(), List.of(member),
-                Map.of(member.profileId(), member), Map.of(member.presentationUuid(), member),
-                resolution.snapshot().loadedAtMs())).getFirst();
-    }
-
-    @Nullable
-    private ItemStack refreshRosterProjection(Player player, String toolId,
-                                              TwCommandItemConfig config) {
-        if (player == null || config == null || !config.usesOwnerCommandFamilyRoster()) {
-            return toolInventoryService.findToolStack(player, toolId);
-        }
-        CommandRosterActionAuthority.Resolution resolution = resolveRoster(player, config, toolId);
-        if (resolution.snapshot() == null) return null;
-        List<LinkedNpcRecord> records = rosterActionAuthority.project(resolution.snapshot());
-        toolInventoryService.mutateToolStack(player, toolId,
-                stack -> linkMutationService.writeLinkedNpcRecords(stack, records));
-        return toolInventoryService.findToolStack(player, toolId);
-    }
-
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
         if (config == null || stack == null) {
             return CommandSelectionResult.none(stack);
@@ -2061,10 +1801,6 @@ public final class CommandItemFeatureHandler {
                                     Ref<EntityStore> targetRef,
                                     String toolId,
                                     TwCommandItemConfig config) {
-        if (config != null && config.usesOwnerCommandFamilyRoster()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.unavailable");
-            return;
-        }
         LinkToggleResult[] resultHolder = new LinkToggleResult[1];
         boolean mutated = toolInventoryService.mutateToolStack(player, toolId, stack -> {
             LinkToggleResult result = linkMutationService.tryToggleLink(

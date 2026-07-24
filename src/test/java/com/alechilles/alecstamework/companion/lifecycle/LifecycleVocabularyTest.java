@@ -21,8 +21,6 @@ class LifecycleVocabularyTest {
                         LifecycleLocation.keyed(LifecycleLocationKind.COOP_SLOT, "coop-a:0")),
                 Map.entry(LifecycleState.DEAD_REVIVABLE, LifecycleLocation.none()),
                 Map.entry(LifecycleState.LOST, LifecycleLocation.none()),
-                Map.entry(LifecycleState.ROSTER_STORED,
-                        LifecycleLocation.keyed(LifecycleLocationKind.COMMAND_ROSTER, "family-a:0")),
                 Map.entry(LifecycleState.RELEASED, LifecycleLocation.none()),
                 Map.entry(LifecycleState.UNRESOLVED, LifecycleLocation.unresolved())
         );

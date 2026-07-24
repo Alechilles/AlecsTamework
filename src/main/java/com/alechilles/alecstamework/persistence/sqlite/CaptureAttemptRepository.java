@@ -450,25 +450,6 @@ public final class CaptureAttemptRepository {
         }
     }
 
-    /** Blocking read intended only for background tame-link restart convergence. */
-    @Nonnull
-    public List<CaptureAttemptRecord> loadPendingTameLinkConvergence(@Nonnull UUID actorUuid)
-            throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     SELECT_COLUMNS + " WHERE actor_uuid = ? AND source_spend_state = 'CONSUMED' "
-                             + "AND success_disposition = 'TAME_AND_COMMAND_LINK' "
-                             + "AND state IN ('RESOLVED_SUCCESS','APPLYING','QUARANTINED') "
-                             + "ORDER BY resolved_at_ms, attempt_id")) {
-            statement.setString(1, Objects.requireNonNull(actorUuid, "actorUuid").toString());
-            try (ResultSet result = statement.executeQuery()) {
-                List<CaptureAttemptRecord> attempts = new ArrayList<>();
-                while (result.next()) attempts.add(read(result));
-                return List.copyOf(attempts);
-            }
-        }
-    }
-
     @Nonnull
     private PrepareResult prepareInTransaction(@Nonnull Connection connection,
                                                @Nonnull CaptureAttemptRecord attempt) throws Exception {
@@ -662,11 +643,8 @@ public final class CaptureAttemptRepository {
 
     private static boolean requiresSourceSpend(
             @Nonnull CaptureAttemptRecord.ConfigEvidence config, boolean success) {
-        return success
-                ? config.successDisposition()
-                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                : config.sourceConsumption()
-                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
+        return !success && config.sourceConsumption()
+                == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
     }
 
     private void upsertCooldown(@Nonnull Connection connection,
@@ -805,10 +783,9 @@ public final class CaptureAttemptRepository {
                     profile_id, expected_profile_revision, source_item_id, source_role_id,
                     source_context_json, spawner_config_id, spawner_config_revision,
                     target_policy_config_id, target_policy_config_revision, target_policy_bypassed,
-                    source_consumption, success_disposition, command_family_id,
-                    required_command_config_id, require_command_access_item,
+                    source_consumption, success_disposition,
                     state, guaranteed, recovery_status, expires_at_ms, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                           'PREPARED', ?, ?, ?, ?, ?)
                 """)) {
             CaptureAttemptRecord.Identity identity = attempt.identity();
@@ -830,14 +807,11 @@ public final class CaptureAttemptRepository {
             statement.setInt(15, config.targetPolicyBypassed() ? 1 : 0);
             statement.setString(16, config.sourceConsumption().name());
             statement.setString(17, config.successDisposition().name());
-            setText(statement, 18, config.commandFamilyId());
-            setText(statement, 19, config.requiredCommandConfigId());
-            statement.setInt(20, config.requireCommandAccessItem() ? 1 : 0);
-            statement.setInt(21, config.guaranteed() ? 1 : 0);
-            statement.setString(22, attempt.recoveryStatus());
-            statement.setLong(23, attempt.expiresAtMs());
-            statement.setLong(24, attempt.createdAtMs());
-            statement.setLong(25, attempt.updatedAtMs());
+            statement.setInt(18, config.guaranteed() ? 1 : 0);
+            statement.setString(19, attempt.recoveryStatus());
+            statement.setLong(20, attempt.expiresAtMs());
+            statement.setLong(21, attempt.createdAtMs());
+            statement.setLong(22, attempt.updatedAtMs());
             statement.executeUpdate();
         }
     }

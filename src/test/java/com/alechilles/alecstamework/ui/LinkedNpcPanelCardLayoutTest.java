@@ -32,7 +32,7 @@ class LinkedNpcPanelCardLayoutTest {
             "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelProgressionBinder.java"
     );
     private static final Pattern CARD_HEIGHT = Pattern.compile(
-            "CARD_HEIGHT\\s*=\\s*(\\d+)"
+            "COMPACT_CARD_HEIGHT\\s*=\\s*(\\d+)"
     );
     private static final Pattern XP_RING_ANCHOR = Pattern.compile(
             "Group #XpProgressRing \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
@@ -62,7 +62,7 @@ class LinkedNpcPanelCardLayoutTest {
         Matcher talentPoint = TALENT_POINT_ANCHOR.matcher(cardUi);
         Matcher talentPointBadge = TALENT_POINT_BADGE_BORDER_ANCHOR.matcher(cardUi);
 
-        assertTrue(cardHeight.find(), "LinkedNpcPanelCardBinder must define CARD_HEIGHT.");
+        assertTrue(cardHeight.find(), "LinkedNpcPanelCardBinder must define its compact card height.");
         assertTrue(xpRing.find(), "XpProgressRing anchor must stay parseable by the layout guard.");
         assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
         assertTrue(talentPointBadge.find(), "Talent point badge anchor must stay parseable by the layout guard.");
@@ -96,12 +96,10 @@ class LinkedNpcPanelCardLayoutTest {
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
         assertTrue(
                 binder.contains("COMPACT_CARD_HEIGHT = 88"),
-                "Cards without actionable roster details should not retain a blank roster row."
+                "Linked cards should retain the released compact height."
         );
-        assertTrue(
-                binder.contains("showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT"),
-                "Card height should only reserve the roster detail row when it is rendered."
-        );
+        assertFalse(binder.contains("showRosterDetails"),
+                "The unreleased roster detail row must not affect card layout.");
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
         int xpRingLeft = Integer.parseInt(xpRing.group(2));
@@ -178,25 +176,9 @@ class LinkedNpcPanelCardLayoutTest {
                 binder.contains("respawnSelector + \".Enabled\""),
                 "TextButton has no runtime-settable Enabled markup property; binding it disconnects the client."
         );
-        assertFalse(
-                binder.contains("summonSelector + \".Enabled\"")
-                        || binder.contains("summonBlockedSelector + \".Enabled\"")
-                        || binder.contains("dismissSelector + \".Enabled\""),
-                "Roster TextButtons must not bind the unsupported Enabled markup property."
-        );
-        assertTrue(
-                binder.contains("summonSelector + \".Visible\", visible && roster.summonEnabled()")
-                        && binder.contains("summonBlockedSelector + \".Visible\"")
-                        && binder.contains("visible && roster.summonVisible() && !roster.summonEnabled()")
-                        && binder.contains("dismissSelector + \".Visible\", visible && roster.dismissEnabled()"),
-                "Roster actions should expose a non-interactive explanation when summoning is blocked."
-        );
-        assertTrue(cardUi.contains("TextButton #RosterSummonBlockedButton")
-                        && cardUi.contains("TooltipText: \"\""),
-                "The blocked summon facade should provide a safe tooltip target without Enabled binding.");
         assertTrue(
                 binder.contains("respawnSelector + \".Visible\", showRespawn"),
-                "A cap-blocked revive action should be hidden rather than bound through unsupported Enabled state."
+                "A ready free-respawn action should be shown without an unsupported Enabled binding."
         );
     }
 

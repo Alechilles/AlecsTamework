@@ -32,9 +32,6 @@ final class CompanionPopulationRecoveryDecisionService {
             if (isAppliedPhase(operationState) && isPermanentRelease(context)) {
                 return Decision.commit("startup-recovery-permanent-release-target-absent");
             }
-            if (isAbsentRosterStorageCommit(operationState, context)) {
-                return Decision.commit("startup-recovery-roster-storage-target-absent");
-            }
             if (canRetryAbsentBreedingTarget(operationState, context)) {
                 return Decision.retry("startup-recovery-breeding-target-absent");
             }
@@ -217,27 +214,6 @@ final class CompanionPopulationRecoveryDecisionService {
     private static boolean isAppliedPhase(CompanionPopulationOperationRecord.State state) {
         return state == CompanionPopulationOperationRecord.State.APPLYING
                 || state == CompanionPopulationOperationRecord.State.APPLIED;
-    }
-
-    /**
-     * A timed-roster store removes the live projection before committing the dormant lifecycle.
-     * Once a complete live-identity scan proves that projection absent, an interrupted final commit
-     * is recoverable from the explicit STORING -> ROSTER_STORED journal intent.
-     */
-    static boolean isAbsentRosterStorageCommit(
-            @Nonnull CompanionPopulationOperationRecord.State operationState,
-            @Nonnull Context context
-    ) {
-        return isAppliedPhase(operationState)
-                && context.operation() == OwnerPopulationOperation.LIFECYCLE_CHANGE
-                && context.oldState().ownerUuid() != null
-                && Objects.equals(
-                        context.oldState().ownerUuid(), context.newState().ownerUuid()
-                )
-                && context.oldState().lifecycleSpecified()
-                && context.oldState().lifecycleState() == CompanionLifecycleState.STORING
-                && context.newState().lifecycleSpecified()
-                && context.newState().lifecycleState() == CompanionLifecycleState.ROSTER_STORED;
     }
 
     private static boolean isPermanentRelease(@Nonnull Context context) {

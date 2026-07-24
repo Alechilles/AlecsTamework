@@ -284,14 +284,10 @@ public final class ItemFeatureConfig {
                                        String failureParticleSystem,
                                        String failureSoundEvent,
                                        CaptureSourceConsumption sourceConsumption,
-                                       CaptureSuccessDisposition successDisposition,
-                                       String commandFamilyId,
-                                       String requiredCommandConfigId,
-                                       boolean requireCommandAccessItem) {
+                                       CaptureSuccessDisposition successDisposition) {
         public static final CaptureItemMechanics GUARANTEED_DEFAULT = new CaptureItemMechanics(
                 CaptureChanceMode.GUARANTEED, 0, 1.0D, 0.0D, 0.0D, 1.0D, 0, null, null,
-                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
-                null, null, false
+                CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM
         );
 
         /** Source-compatible constructor for the original capture-policy mechanics. */
@@ -306,8 +302,7 @@ public final class ItemFeatureConfig {
                                     String failureSoundEvent) {
             this(chanceMode, power, baseChance, chancePerPower, minimumChance, maximumChance,
                     failureCooldownMs, failureParticleSystem, failureSoundEvent,
-                    CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM,
-                    null, null, false);
+                    CaptureSourceConsumption.SUCCESS_ONLY, CaptureSuccessDisposition.CAPTURED_ITEM);
         }
 
         public CaptureItemMechanics {
@@ -318,8 +313,6 @@ public final class ItemFeatureConfig {
                     ? CaptureSuccessDisposition.CAPTURED_ITEM : successDisposition;
             failureParticleSystem = normalizeBlank(failureParticleSystem);
             failureSoundEvent = normalizeBlank(failureSoundEvent);
-            commandFamilyId = normalizeBlank(commandFamilyId);
-            requiredCommandConfigId = normalizeBlank(requiredCommandConfigId);
             if (power < 0 || failureCooldownMs < 0) {
                 throw new IllegalArgumentException("Capture power and failure cooldown cannot be negative.");
             }
@@ -331,15 +324,6 @@ public final class ItemFeatureConfig {
             }
             if (minimumChance > maximumChance) {
                 throw new IllegalArgumentException("MinimumChance cannot exceed MaximumChance.");
-            }
-            if (successDisposition == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                    && commandFamilyId == null) {
-                throw new IllegalArgumentException(
-                        "TameAndCommandLink requires a non-blank CommandFamilyId.");
-            }
-            if (requireCommandAccessItem && requiredCommandConfigId == null) {
-                throw new IllegalArgumentException(
-                        "RequireCommandAccessItem requires RequiredCommandConfigId.");
             }
         }
 

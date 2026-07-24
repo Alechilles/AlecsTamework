@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionDataPort;
-import com.alechilles.alecstamework.companion.command.CommandRosterPort;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeasePort;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopPort;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentityPort;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLinkPort;
@@ -38,8 +36,6 @@ public final class SqlitePersistenceTransactionContext {
     private final OwnerPopulationPort population;
     private final OwnerPopulationEvidencePort populationEvidence;
     private final PopulationGroupPort populationGroups;
-    private final CommandRosterPort commandRosters;
-    private final TimedSummonLeasePort timedSummons;
 
     public SqlitePersistenceTransactionContext(@Nonnull Connection connection) {
         if (connection == null) {
@@ -58,8 +54,6 @@ public final class SqlitePersistenceTransactionContext {
         population = new SqliteOwnerPopulationStore(connection);
         populationEvidence = new SqliteOwnerPopulationEvidenceStore(connection);
         populationGroups = new SqlitePopulationGroupStore(connection);
-        commandRosters = new SqliteCommandRosterStore(connection);
-        timedSummons = new SqliteTimedSummonLeaseStore(connection);
     }
 
     @Nonnull
@@ -129,16 +123,6 @@ public final class SqlitePersistenceTransactionContext {
     @Nonnull
     PopulationGroupPort populationGroups() {
         return populationGroups;
-    }
-
-    @Nonnull
-    CommandRosterPort commandRosters() {
-        return commandRosters;
-    }
-
-    @Nonnull
-    TimedSummonLeasePort timedSummons() {
-        return timedSummons;
     }
 
 }

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
@@ -13,7 +12,6 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int CARD_HEIGHT = 126;
     private static final int COMPACT_CARD_HEIGHT = 88;
 
     private LinkedNpcPanelCardBinder() {
@@ -61,12 +59,6 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
-        String summonSelector = entrySelector + " #RosterSummonButton";
-        String summonBlockedSelector = entrySelector + " #RosterSummonBlockedButton";
-        String dismissSelector = entrySelector + " #RosterDismissButton";
-        String rosterStateSelector = entrySelector + " #RosterState";
-        String rosterTimerSelector = entrySelector + " #RosterTimer";
-        String rosterCapacitySelector = entrySelector + " #RosterCapacity";
         String locateSelector = entrySelector + " #LocateButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -120,9 +112,8 @@ final class LinkedNpcPanelCardBinder {
                 isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
                 isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        CommandRosterStatusPresentation roster = entry.rosterStatusPresentation();
         boolean showInactiveBadge = isLinked && !entry.active() && !showReviveAction
-                && roster == null && !pendingUnlink;
+                && !pendingUnlink;
         boolean showRecallCountdown = isLinked
                 && entry.recallPending()
                 && !entry.loaded()
@@ -131,8 +122,7 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
-        boolean reviveBlocked = roster != null && roster.reviveCapBlocked();
-        boolean showRespawn = showReviveAction && !reviveBlocked;
+        boolean showRespawn = showReviveAction;
 
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showReviveAction);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
@@ -165,9 +155,7 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        boolean showRosterDetails = roster != null
-                && roster.state() != CommandTimedSummoningState.DEAD_REVIVABLE;
-        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor(showRosterDetails));
+        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -195,9 +183,6 @@ final class LinkedNpcPanelCardBinder {
                 showTalentPointAction
         );
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
-        bindRosterStatus(commandBuilder, rosterStateSelector, rosterTimerSelector,
-                rosterCapacitySelector, summonSelector, summonBlockedSelector, dismissSelector,
-                showRosterDetails ? roster : null, language);
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
@@ -319,14 +304,6 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
-        if (roster != null && roster.summonEnabled()) {
-            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, summonSelector,
-                    EventData.of(config.eventCommandId(), config.summonCommandPrefix() + entry.npcUuid()), false);
-        }
-        if (roster != null && roster.dismissEnabled()) {
-            eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, dismissSelector,
-                    EventData.of(config.eventCommandId(), config.dismissCommandPrefix() + entry.npcUuid()), false);
-        }
         if (canOpenTalentsFromLevelIndicator) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -345,73 +322,13 @@ final class LinkedNpcPanelCardBinder {
         }
     }
 
-    private static Anchor buildCardAnchor(boolean showRosterDetails) {
+    private static Anchor buildCardAnchor() {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(showRosterDetails ? CARD_HEIGHT : COMPACT_CARD_HEIGHT));
+        anchor.setHeight(Value.of(COMPACT_CARD_HEIGHT));
         return anchor;
-    }
-
-    private static void bindRosterStatus(UICommandBuilder builder, String stateSelector,
-                                         String timerSelector, String capacitySelector,
-                                         String summonSelector, String summonBlockedSelector,
-                                         String dismissSelector,
-                                         CommandRosterStatusPresentation roster, String language) {
-        boolean visible = roster != null;
-        builder.set(stateSelector + ".Visible", visible);
-        builder.set(timerSelector + ".Visible", visible);
-        builder.set(capacitySelector + ".Visible", visible);
-        builder.set(summonSelector + ".Visible", visible && roster.summonEnabled());
-        builder.set(summonBlockedSelector + ".Visible",
-                visible && roster.summonVisible() && !roster.summonEnabled());
-        builder.set(dismissSelector + ".Visible", visible && roster.dismissEnabled());
-        if (!visible) return;
-        if (roster.summonVisible() && !roster.summonEnabled()) {
-            boolean capBlocked = roster.capBlocked();
-            builder.set(summonBlockedSelector + ".Text", LocalizedText.resolve(language,
-                    capBlocked
-                            ? "tamework.ui.linkedPanel.roster.blocked.limit"
-                            : "tamework.ui.linkedPanel.roster.blocked.cooldown"));
-            builder.set(summonBlockedSelector + ".TooltipText", capBlocked
-                    ? LocalizedText.format(language,
-                    "tamework.ui.linkedPanel.roster.blocked.limitTooltip",
-                    roster.activeCount(), roster.activeLimit())
-                    : LocalizedText.format(language,
-                    "tamework.ui.linkedPanel.roster.blocked.cooldownTooltip",
-                    LinkedNpcPanelStatusTextService.formatRemainingTime(
-                            roster.cooldownRemainingMs(), language)));
-        }
-        String stateKey = switch (roster.state()) {
-            case ACTIVE -> "active";
-            case UNLOADED -> "unloaded";
-            case RESTORING -> "restoring";
-            case STORING -> "storing";
-            case ROSTER_STORED -> "stored";
-            case DEAD_REVIVABLE -> "dead";
-            case LOST -> "lost";
-        };
-        builder.set(stateSelector + ".Text", LocalizedText.format(language,
-                "tamework.ui.linkedPanel.roster.state",
-                LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.state." + stateKey)));
-        String timer = roster.remainingMs() != null
-                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.remaining",
-                LinkedNpcPanelStatusTextService.formatRemainingTime(roster.remainingMs(), language))
-                : roster.cooldownRemainingMs() > 0L
-                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.cooldown",
-                LinkedNpcPanelStatusTextService.formatRemainingTime(roster.cooldownRemainingMs(), language))
-                : LocalizedText.format(language, "tamework.ui.linkedPanel.roster.duration",
-                roster.unlimitedDuration()
-                        ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.roster.unlimited")
-                        : LinkedNpcPanelStatusTextService.formatRemainingTime(
-                        roster.configuredDurationMs(), language));
-        builder.set(timerSelector + ".Text", timer);
-        builder.set(capacitySelector + ".Text", roster.capUnlimited()
-                ? LocalizedText.format(language, "tamework.ui.linkedPanel.roster.capacityUnlimited",
-                roster.activeCount())
-                : LocalizedText.format(language, "tamework.ui.linkedPanel.roster.capacity",
-                roster.activeCount(), roster.activeLimit()));
     }
 
     record CardBindingConfig(String linkedPanelCardUiPath,
@@ -424,8 +341,6 @@ final class LinkedNpcPanelCardBinder {
                              String releaseCommandPrefix,
                              String cullCommandPrefix,
                              String respawnCommandPrefix,
-                             String summonCommandPrefix,
-                             String dismissCommandPrefix,
                              String locateCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,

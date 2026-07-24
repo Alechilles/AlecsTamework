@@ -16,14 +16,8 @@ public enum TameworkApiCapability {
     PERSISTENCE_RESILIENCE,
     CAPTURE_POLICY,
     POPULATION_GROUPS,
-    /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
-    COMMAND_TIMED_SUMMONING,
-    /** Durable owner/command-family/profile roster authority. */
-    COMMAND_FAMILY_ROSTERS,
     /** Exact source decrement after either terminal capture roll. */
     CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
-    /** Successful capture can tame the live NPC and commit command-roster membership. */
-    CAPTURE_TAME_AND_LINK,
     /** Durable revision-fenced profile-data mutations and restart-visible operation queries. */
     PROFILE_DATA_TRANSACTIONS
 }

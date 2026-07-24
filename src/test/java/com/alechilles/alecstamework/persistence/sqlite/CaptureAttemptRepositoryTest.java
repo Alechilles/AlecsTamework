@@ -22,40 +22,24 @@ class CaptureAttemptRepositoryTest {
     Path tempDir;
 
     @Test
-    void crashRecoveryCancelsUnreceiptedSuccessOrCreatesOneReplacementClaimAfterCharge()
-            throws Exception {
+    void genericRefundClaimConvergesConsumedSuccessfulEvidence() throws Exception {
         try (HydragonPersistenceTestHarness harness = harness("capture-refund.sqlite")) {
             CaptureAttemptRepository repository = new CaptureAttemptRepository(
                     harness.connections, harness.queue);
             UUID actor = UUID.randomUUID();
-            CaptureAttemptRecord unreceipted = tameLinkAttempt(
-                    "attempt-unreceipted", actor, "profile-unreceipted");
-            insertProfile(harness, actor, unreceipted.identity().profileId());
-            await(repository.prepareAsync(unreceipted));
-            await(repository.resolveAsync(successResolution("attempt-unreceipted")));
-            assertTrue(await(repository.cancelUnreceiptedSuccessAsync(
-                    "attempt-unreceipted", "restart-before-receipt", 100L)));
-            CaptureAttemptRecord canceled = repository.find("attempt-unreceipted");
-            assertEquals(CaptureAttemptRecord.State.CANCELED, canceled.state());
-            assertEquals(CaptureAttemptRecord.SourceSpendState.NOT_REQUIRED,
-                    canceled.sourceSpend().state());
+            CaptureAttemptRecord attempt = capturedItemAttempt("attempt-charged", actor);
+            await(repository.prepareAsync(attempt));
+            await(repository.resolveAsync(successResolution(attempt.identity().attemptId())));
 
-            CaptureAttemptRecord charged = tameLinkAttempt(
-                    "attempt-charged", actor, "profile-charged");
-            insertProfile(harness, actor, charged.identity().profileId());
-            await(repository.prepareAsync(charged));
-            await(repository.resolveAsync(successResolution("attempt-charged")));
-            await(repository.markSourceReceiptedAsync("attempt-charged", 200L));
-            await(repository.markSourceConsumedAsync("attempt-charged", 210L));
-            assertEquals(1, repository.loadPendingTameLinkConvergence(actor).size());
-            assertEquals("attempt-charged", repository.loadPendingTameLinkConvergence(actor)
-                    .get(0).identity().attemptId());
+            markSuccessfulSourceConsumed(harness, attempt.identity().attemptId());
+
             assertTrue(await(repository.requireSourceRefundAsync(
-                    "attempt-charged", "restart-live-continuation-lost", 220L)));
+                    attempt.identity().attemptId(), "successful-apply-lost", 220L)));
             assertEquals(1, repository.loadPendingSourceRefunds(actor).size());
-            assertTrue(await(repository.completeSourceRefundAsync("attempt-charged", 230L)));
+            assertTrue(await(repository.completeSourceRefundAsync(
+                    attempt.identity().attemptId(), 230L)));
             assertEquals(CaptureAttemptRecord.State.CANCELED,
-                    repository.find("attempt-charged").state());
+                    repository.find(attempt.identity().attemptId()).state());
             assertTrue(repository.loadPendingSourceRefunds(actor).stream()
                     .allMatch(CaptureAttemptRepository.SourceRefundClaim::delivered));
         }
@@ -75,7 +59,7 @@ class CaptureAttemptRepositoryTest {
                     new CaptureAttemptRecord.ConfigEvidence(
                             "stone-config", 8L, "dragon-policy", 3L, false, false,
                             CaptureSourceConsumption.RESOLVED_ATTEMPT,
-                            CaptureSuccessDisposition.CAPTURED_ITEM, null, null, false),
+                            CaptureSuccessDisposition.CAPTURED_ITEM),
                     CaptureAttemptRecord.State.PREPARED, null, null, null,
                     0L, "NONE", 5_000L, 1L, 1L, 0L, null);
             await(repository.prepareAsync(prepared));
@@ -266,18 +250,15 @@ class CaptureAttemptRepositoryTest {
                 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
     }
 
-    private CaptureAttemptRecord tameLinkAttempt(
-            String attemptId, UUID actor, String profileId) {
+    private CaptureAttemptRecord capturedItemAttempt(String attemptId, UUID actor) {
         return new CaptureAttemptRecord(
                 new CaptureAttemptRecord.Identity(
                         attemptId, "hydragon", attemptId, actor, UUID.randomUUID(),
-                        profileId, 0L, "draconic-stone", "wild-dragon",
-                        "{\"version\":1,\"world\":\"default\",\"inventory\":\"hotbar\",\"slot\":2,\"fingerprint\":\"before\"}"),
+                        null, null, "draconic-stone", "wild-dragon",
+                        "{\"version\":1,\"world\":\"default\",\"inventory\":\"hotbar\","
+                                + "\"slot\":2,\"fingerprint\":\"before\"}"),
                 new CaptureAttemptRecord.ConfigEvidence(
-                        "stone-config", 9L, "dragon-policy", 4L, false, false,
-                        CaptureSourceConsumption.RESOLVED_ATTEMPT,
-                        CaptureSuccessDisposition.TAME_AND_COMMAND_LINK,
-                        "hydragon-dragons", "hydragon-horn", true),
+                        "stone-config", 9L, null, null, true, true),
                 CaptureAttemptRecord.State.PREPARED, null, "population-" + attemptId,
                 null, 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
     }
@@ -289,7 +270,25 @@ class CaptureAttemptRepositoryTest {
                         5, 1, 1, 10, 0.9, 0.1, 1.0,
                         null, "CAPTURED", "captured", 0L, 50L),
                 "population-" + attemptId, "capture-" + attemptId,
-                true, "before", "after");
+                false, null, null);
+    }
+
+    private void markSuccessfulSourceConsumed(
+            HydragonPersistenceTestHarness harness, String attemptId) throws Exception {
+        // Retain compensation coverage independently from the deleted tame-link producer.
+        try (Connection connection = harness.connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE capture_attempts
+                     SET source_spend_state = 'CONSUMED',
+                         source_spend_before_fingerprint = 'before',
+                         source_spend_after_fingerprint = 'after',
+                         source_spend_receipted_at_ms = 200,
+                         source_spend_at_ms = 210
+                     WHERE attempt_id = ?
+                     """)) {
+            statement.setString(1, attemptId);
+            assertEquals(1, statement.executeUpdate());
+        }
     }
 
     private CaptureAttemptRecord guaranteedAttempt() {
@@ -301,21 +300,6 @@ class CaptureAttemptRepositoryTest {
                         "legacy-config", 1L, null, null, true, true),
                 CaptureAttemptRecord.State.PREPARED, null, null, null,
                 0L, "NONE", 5_000L, 1L, 1L, 0L, null);
-    }
-
-    private void insertProfile(HydragonPersistenceTestHarness harness,
-                               UUID ownerUuid, String profileId) throws Exception {
-        try (Connection connection = harness.connections.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     INSERT INTO npc_profiles (
-                         profile_id, owner_uuid, role_id, last_world_name,
-                         created_at_ms, updated_at_ms, last_active_at_ms
-                     ) VALUES (?, ?, 'wild-dragon', 'default', 1, 1, 1)
-                     """)) {
-            statement.setString(1, profileId);
-            statement.setString(2, ownerUuid.toString());
-            statement.executeUpdate();
-        }
     }
 
     private HydragonPersistenceTestHarness harness(String filename) throws Exception {

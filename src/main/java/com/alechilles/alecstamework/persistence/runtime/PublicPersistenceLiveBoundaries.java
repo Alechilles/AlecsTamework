@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseLiveBoundary;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
@@ -14,14 +13,12 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull CompanionCaptureReleaseLiveBoundary capturedReleases,
         @Nonnull CompanionRestorationLiveBoundary restorations,
         @Nonnull CompanionCoopCaptureLiveBoundary coopCaptures,
-        @Nonnull CompanionCoopReleaseLiveBoundary coopReleases,
-        @Nonnull TimedSummonLiveBoundary timedSummons
+        @Nonnull CompanionCoopReleaseLiveBoundary coopReleases
 ) {
     public PublicPersistenceLiveBoundaries {
         if (captures == null || capturedReleases == null
                 || restorations == null
-                || coopCaptures == null || coopReleases == null
-                || timedSummons == null) {
+                || coopCaptures == null || coopReleases == null) {
             throw new IllegalArgumentException(
                     "Every public live persistence boundary is required"
             );

@@ -19,7 +19,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -123,8 +122,6 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             @Nonnull CaptureAttemptHandle attempt,
             @Nullable String durableDetachContextJson,
-            @Nullable SpawnerTameLinkDurableContext.Evidence tameLinkEvidence,
-            @Nonnull BooleanSupplier successSourceSpendPreflight,
             @Nonnull ResolvedCaptureContinuation continuation) {
         if (attempts == null) return false;
         return finalizer.prepareCapture(
@@ -137,8 +134,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                         if (!scheduleResolution(
                                 player, targetRef, itemStack, config,
                                 captureBurstParticleSystem, attempt, mutation,
-                                tameLinkEvidence,
-                                successSourceSpendPreflight, continuation)) {
+                                continuation)) {
                             mutation.cancel("capture-attempt-preparation-failed");
                         }
                     }
@@ -211,8 +207,6 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nullable String captureBurstParticleSystem,
             CaptureAttemptHandle attempt,
             SpawnerCaptureFinalizerService.PreparedCaptureMutation mutation,
-            @Nullable SpawnerTameLinkDurableContext.Evidence tameLinkEvidence,
-            BooleanSupplier successSourceSpendPreflight,
             ResolvedCaptureContinuation continuation) {
         UUID attemptId = attempt.attemptId();
         World world = player.getWorld();
@@ -243,10 +237,6 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
                 health.currentHealth() / health.maximumHealth(),
                 CaptureRequirementContext.UNKNOWN_PROFILE_REVISION);
         String sourceContextJson = attempt.sourceContextJson(world.getName());
-        if (tameLinkEvidence != null) {
-            sourceContextJson = SpawnerTameLinkDurableContext.merge(
-                    sourceContextJson, tameLinkEvidence);
-        }
         CaptureAttemptCoordinator.AttemptRequest request =
                 new CaptureAttemptCoordinator.AttemptRequest(
                         attemptId,
@@ -309,8 +299,7 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             if (result.attempt().sourceSpend().state()
                     == CaptureAttemptRecord.SourceSpendState.PENDING) {
                 return consumeAndConfirm(
-                        world, player.getUuid(), itemStack, effective, result.attempt(),
-                        successSourceSpendPreflight)
+                        world, player.getUuid(), itemStack, effective, result.attempt())
                         .thenCompose(consumed -> consumed
                                 ? attempts.beginApply(effective.attemptId())
                                 : CompletableFuture.completedFuture(false));
@@ -361,26 +350,11 @@ final class SpawnerCaptureAttemptRuntimeCoordinator {
             @Nonnull ItemStack source,
             @Nonnull CaptureAttemptHandle handle,
             @Nonnull CaptureAttemptRecord resolved) {
-        return consumeAndConfirm(world, playerUuid, source, handle, resolved, () -> true);
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> consumeAndConfirm(
-            @Nonnull World world,
-            @Nonnull UUID playerUuid,
-            @Nonnull ItemStack source,
-            @Nonnull CaptureAttemptHandle handle,
-            @Nonnull CaptureAttemptRecord resolved,
-            @Nonnull BooleanSupplier worldPreflight) {
         CompletableFuture<Boolean> completion = new CompletableFuture<>();
         world.execute(() -> {
             final SpawnerSourceItemTransaction receiptTransaction;
             final ItemStack receipt;
             try {
-                if (!worldPreflight.getAsBoolean()) {
-                    completion.complete(false);
-                    return;
-                }
                 UUID attemptId = UUID.fromString(resolved.identity().attemptId());
                 receipt = SpawnerCaptureSourceReceipt.mark(source, attemptId);
                 receiptTransaction = new SpawnerSourceItemTransaction(

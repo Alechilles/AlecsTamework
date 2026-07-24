@@ -95,8 +95,7 @@ final class CompanionSpawnAdmissionPlanFactory {
         ClaimChunkCoordinate physical = claim == null ? null : claim.physicalChunk();
         return new CompanionPopulationStateRecord(
                 profileId,
-                request.canonicalNullNpcRestore() ? null
-                        : request.previousNpcUuid() == null ? plannedNpcUuid : request.previousNpcUuid(),
+                request.previousNpcUuid() == null ? plannedNpcUuid : request.previousNpcUuid(),
                 owner == null ? null : owner.ownerId(),
                 physical == null ? request.worldName() : physical.worldName(),
                 owner == null ? request.worldName() : owner.ownershipWorldName(),

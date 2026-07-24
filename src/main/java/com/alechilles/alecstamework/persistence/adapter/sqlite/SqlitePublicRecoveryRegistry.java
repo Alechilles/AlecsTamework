@@ -3,14 +3,6 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
-import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
-import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
-import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
-import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
@@ -109,51 +101,6 @@ final class SqlitePublicRecoveryRegistry {
                                         claim,
                                         PopulationGroupAssignmentRequest.class
                                 )
-                        ).completion()
-                ),
-                Map.entry(
-                        CommandRosterMembershipDefinition.INSTANCE.kind(),
-                        claim -> operations.commandRosters().submit(
-                                claim.operation().operationId(),
-                                claim.operation().idempotencyKey(),
-                                payload(
-                                        claim,
-                                        CommandRosterMembershipRequest.class
-                                )
-                        ).completion()
-                ),
-                Map.entry(
-                        CommandRosterTransitionDefinition.INSTANCE.kind(),
-                        claim -> operations.commandTransitions().submit(
-                                claim.operation().operationId(),
-                                claim.operation().idempotencyKey(),
-                                payload(
-                                        claim,
-                                        CommandRosterTransitionRequest.class
-                                )
-                        ).completion()
-                ),
-                Map.entry(
-                        TimedSummonLeaseMutationDefinition.INSTANCE.kind(),
-                        claim -> operations.timedSummons().submit(
-                                claim.operation().operationId(),
-                                claim.operation().idempotencyKey(),
-                                payload(
-                                        claim,
-                                        TimedSummonLeaseMutationRequest.class
-                                )
-                        ).completion()
-                ),
-                Map.entry(
-                        TimedSummonTransitionDefinition.INSTANCE.kind(),
-                        claim -> operations.timedTransitions().submit(
-                                claim.operation().operationId(),
-                                claim.operation().idempotencyKey(),
-                                payload(
-                                        claim,
-                                        TimedSummonTransitionRequest.class
-                                ),
-                                boundaries.timedSummons()
                         ).completion()
                 ),
                 Map.entry(

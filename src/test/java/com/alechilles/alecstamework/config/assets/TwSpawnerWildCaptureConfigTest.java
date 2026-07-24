@@ -98,43 +98,30 @@ class TwSpawnerWildCaptureConfigTest {
     }
 
     @Test
-    void commandLinkFieldsDecodeAndNestedScalarsInheritWithExplicitFalseOverride() throws Exception {
-        TwSpawnerConfig parent = TwSpawnerConfig.CODEC.decode(BsonDocument.parse("""
+    void capturedItemDispositionAndResolvedSourceConsumptionDecode() {
+        TwSpawnerConfig config = TwSpawnerConfig.CODEC.decode(BsonDocument.parse("""
                 {
                   "Capture": {
                     "SourceConsumption": "ResolvedAttempt",
-                    "SuccessDisposition": "TameAndCommandLink",
-                    "CommandFamilyId": "hydragon:dragon_horn",
-                    "RequiredCommandConfigId": "HyDragonDragonHorn",
-                    "RequireCommandAccessItem": true
+                    "SuccessDisposition": "CapturedItem"
                   }
                 }
                 """), new ExtraInfo());
-        TwSpawnerConfig child = TwSpawnerConfig.CODEC.decode(BsonDocument.parse("""
-                { "Capture": { "RequireCommandAccessItem": false } }
-                """), new ExtraInfo());
-
-        child.inheritMissingTopLevelFrom(parent, Set.of("Capture"),
-                Map.of("Capture", Set.of("RequireCommandAccessItem")));
         ItemFeatureConfig.CaptureItemMechanics mechanics =
-                child.toItemFeatureConfig().getCaptureMechanics();
+                config.toItemFeatureConfig().getCaptureMechanics();
 
         assertEquals(CaptureSourceConsumption.RESOLVED_ATTEMPT, mechanics.sourceConsumption());
-        assertEquals(CaptureSuccessDisposition.TAME_AND_COMMAND_LINK,
+        assertEquals(CaptureSuccessDisposition.CAPTURED_ITEM,
                 mechanics.successDisposition());
-        assertEquals("hydragon:dragon_horn", mechanics.commandFamilyId());
-        assertEquals("HyDragonDragonHorn", mechanics.requiredCommandConfigId());
-        assertFalse(mechanics.requireCommandAccessItem());
     }
 
     @Test
-    void commandLinkFieldsDefaultToLegacyCapturedItemBehavior() {
+    void captureDispositionDefaultsToCapturedItemBehavior() {
         ItemFeatureConfig.CaptureItemMechanics mechanics =
                 new TwSpawnerConfig().toItemFeatureConfig().getCaptureMechanics();
 
         assertEquals(CaptureSourceConsumption.SUCCESS_ONLY, mechanics.sourceConsumption());
         assertEquals(CaptureSuccessDisposition.CAPTURED_ITEM, mechanics.successDisposition());
-        assertFalse(mechanics.requireCommandAccessItem());
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {

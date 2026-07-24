@@ -48,7 +48,7 @@ public record LifecycleLocation(@Nonnull LifecycleLocationKind kind,
                 requireKey(key, "Live entity key");
                 requireKey(worldKey, "Live entity world key");
             }
-            case CAPTURE_ITEM, COOP_SLOT, COMMAND_ROSTER -> {
+            case CAPTURE_ITEM, COOP_SLOT -> {
                 requireKey(key, kind + " key");
                 if (worldKey != null) {
                     throw new IllegalArgumentException(kind + " cannot carry a world key");

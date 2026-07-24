@@ -23,15 +23,13 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "capturePolicy=true"));
         assertTrue(contains(lines, "Capture attempts: prepared=2"));
         assertTrue(contains(lines, "duplicateCallbacksSinceBoot=4"));
-        assertTrue(contains(lines, "commandFamilyRosters=true"));
-        assertTrue(contains(lines, "timedSummoning=true"));
         assertTrue(contains(lines, "openOperations=3"));
         assertTrue(contains(lines, "classified=21"));
         assertTrue(contains(lines, "oldestCorrelation=population-op-4"));
         assertTrue(contains(lines, "configs=[hydragon:miniwyvern->HyDragon_Miniwyvern]"));
         assertTrue(contains(lines, "API events: dispatched=12"));
         assertTrue(contains(lines, "listenerFailuresSinceBoot=2"));
-        assertTrue(contains(lines, "lastFailedEventType=CommandTimedSummoningChangedEvent"));
+        assertTrue(contains(lines, "lastFailedEventType=NpcProfileChangedEvent"));
         assertTrue(contains(lines, "activeQuarantines=2"));
     }
 
@@ -85,8 +83,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
 
     private static final class FakeSource implements TameworkIntegrationDiagnosticsService.Source {
         private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
-                TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
-                TameworkApiCapability.COMMAND_TIMED_SUMMONING,
                 TameworkApiCapability.POPULATION_GROUPS);
         private TameworkIntegrationDiagnosticsService.CaptureAttemptDetail captureAttempt =
                 new TameworkIntegrationDiagnosticsService.CaptureAttemptDetail(
@@ -102,8 +98,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
 
         @Override public String apiVersion() { return "0.9.0"; }
         @Override public String capabilities() {
-            return "[COMMAND_FAMILY_ROSTERS, COMMAND_TIMED_SUMMONING, "
-                    + "POPULATION_GROUPS]";
+            return "[POPULATION_GROUPS]";
         }
         @Override public boolean captureReady() { return true; }
         @Override public boolean hasCapability(TameworkApiCapability capability) {
@@ -140,7 +135,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         }
         @Override public TameworkIntegrationDiagnosticsService.EventDeliverySummary eventDeliverySummary() {
             return new TameworkIntegrationDiagnosticsService.EventDeliverySummary(
-                    12L, 9L, 7L, 2L, "CommandTimedSummoningChangedEvent");
+                    12L, 9L, 7L, 2L, "NpcProfileChangedEvent");
         }
         @Override public TameworkIntegrationDiagnosticsService.CaptureAttemptDetail findCaptureAttempt(
                 String ignoredAttemptId) {

@@ -294,23 +294,6 @@ public final class CaptureAttemptCoordinator {
         }).exceptionally(failure -> false);
     }
 
-    /** Closes a restart-replayed tame-link only after profile, roster, and lease proof converge. */
-    @Nonnull
-    public CompletableFuture<Boolean> commitRecoveredTameLink(
-            @Nonnull UUID attemptId, @Nonnull CaptureAttemptRecord.State expectedState) {
-        return journal.reconcileTerminal(
-                attemptId.toString(), Objects.requireNonNull(expectedState, "expectedState"),
-                CaptureAttemptRecord.State.COMMITTED,
-                "capture-recovery-tame-link-converged", clock.millis())
-                .thenCompose(result -> {
-                    if (result.attempt() == null || result.attempt().state()
-                            != CaptureAttemptRecord.State.COMMITTED) {
-                        return CompletableFuture.completedFuture(false);
-                    }
-                    return emitOnce(result.attempt()).thenApply(ignored -> true);
-                }).exceptionally(failure -> false);
-    }
-
     /** Contains an apply failure without changing or re-rolling its successful outcome. */
     @Nonnull
     public CompletableFuture<Boolean> quarantineApply(@Nonnull UUID attemptId, @Nonnull String reason) {
@@ -447,10 +430,7 @@ public final class CaptureAttemptCoordinator {
                         policy == null ? null : policy.configRevision(),
                         bypass, bypass,
                         request.itemMechanics().sourceConsumption(),
-                        request.itemMechanics().successDisposition(),
-                        request.itemMechanics().commandFamilyId(),
-                        request.itemMechanics().requiredCommandConfigId(),
-                        request.itemMechanics().requireCommandAccessItem()),
+                        request.itemMechanics().successDisposition()),
                 CaptureAttemptRecord.State.PREPARED, null, request.populationOperationId(),
                 request.operationId().toString(), 0L, "READY",
                 request.expiresAtMs(), now, now, 0L, null);
@@ -499,11 +479,8 @@ public final class CaptureAttemptCoordinator {
 
     private static boolean requiresSourceSpend(
             ItemFeatureConfig.CaptureItemMechanics mechanics, boolean success) {
-        return success
-                ? mechanics.successDisposition()
-                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                : mechanics.sourceConsumption()
-                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
+        return !success && mechanics.sourceConsumption()
+                == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
     }
 
     private static String requireText(String value, String field) {
@@ -595,9 +572,7 @@ public final class CaptureAttemptCoordinator {
             sourceSpendAfterFingerprint = normalizeFingerprint(
                     sourceSpendAfterFingerprint, "sourceSpendAfterFingerprint");
             boolean mayNeedSpend = itemMechanics.sourceConsumption()
-                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT
-                    || itemMechanics.successDisposition()
-                    == com.alechilles.alecstamework.api.CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
+                    == com.alechilles.alecstamework.api.CaptureSourceConsumption.RESOLVED_ATTEMPT;
             if (mayNeedSpend && (sourceSpendBeforeFingerprint == null
                     || sourceSpendAfterFingerprint == null)) {
                 throw new IllegalArgumentException(

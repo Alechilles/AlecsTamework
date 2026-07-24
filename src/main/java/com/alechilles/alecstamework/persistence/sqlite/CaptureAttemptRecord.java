@@ -106,10 +106,7 @@ public record CaptureAttemptRecord(
             boolean targetPolicyBypassed,
             boolean guaranteed,
             @Nonnull CaptureSourceConsumption sourceConsumption,
-            @Nonnull CaptureSuccessDisposition successDisposition,
-            @Nullable String commandFamilyId,
-            @Nullable String requiredCommandConfigId,
-            boolean requireCommandAccessItem
+            @Nonnull CaptureSuccessDisposition successDisposition
     ) {
         /** Source-compatible constructor for legacy/default captured-item attempts. */
         public ConfigEvidence(String spawnerConfigId, long spawnerConfigRevision,
@@ -118,7 +115,7 @@ public record CaptureAttemptRecord(
             this(spawnerConfigId, spawnerConfigRevision, targetPolicyConfigId,
                     targetPolicyConfigRevision, targetPolicyBypassed, guaranteed,
                     CaptureSourceConsumption.SUCCESS_ONLY,
-                    CaptureSuccessDisposition.CAPTURED_ITEM, null, null, false);
+                    CaptureSuccessDisposition.CAPTURED_ITEM);
         }
 
         public ConfigEvidence {
@@ -126,8 +123,6 @@ public record CaptureAttemptRecord(
             targetPolicyConfigId = normalize(targetPolicyConfigId);
             sourceConsumption = Objects.requireNonNull(sourceConsumption, "sourceConsumption");
             successDisposition = Objects.requireNonNull(successDisposition, "successDisposition");
-            commandFamilyId = normalize(commandFamilyId);
-            requiredCommandConfigId = normalize(requiredCommandConfigId);
             if (spawnerConfigRevision < 0L) {
                 throw new IllegalArgumentException("spawnerConfigRevision must be non-negative.");
             }
@@ -142,14 +137,6 @@ public record CaptureAttemptRecord(
             }
             if (guaranteed && !targetPolicyBypassed) {
                 throw new IllegalArgumentException("Guaranteed capture must explicitly bypass target policy.");
-            }
-            if (successDisposition == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                    && commandFamilyId == null) {
-                throw new IllegalArgumentException("TameAndCommandLink requires CommandFamilyId.");
-            }
-            if (requireCommandAccessItem && requiredCommandConfigId == null) {
-                throw new IllegalArgumentException(
-                        "RequireCommandAccessItem requires RequiredCommandConfigId.");
             }
         }
     }

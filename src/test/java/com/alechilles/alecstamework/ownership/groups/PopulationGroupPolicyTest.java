@@ -22,14 +22,13 @@ class PopulationGroupPolicyTest {
                     PopulationGroupLifecycleClassifier.consumesOwned(state), state.name());
             assertEquals(state == CompanionLifecycleState.ACTIVE
                             || state == CompanionLifecycleState.UNLOADED
-                            || state == CompanionLifecycleState.RESTORING
-                            || state == CompanionLifecycleState.STORING,
+                            || state == CompanionLifecycleState.RESTORING,
                     PopulationGroupLifecycleClassifier.consumesActive(state), state.name());
         }
     }
 
     @Test
-    void unloadedToActiveIsZeroAndDormantProvisioningConsumesOnlyOwned() throws Exception {
+    void unloadedToActiveIsZeroAndDormantCaptureConsumesOnlyOwned() throws Exception {
         PopulationGroupIndex index = PopulationGroupIndex.compile(List.of(group()), 1L);
         PopulationGroupCountDeltaPlanner planner = new PopulationGroupCountDeltaPlanner(index);
         UUID owner = UUID.randomUUID();
@@ -39,7 +38,7 @@ class PopulationGroupPolicyTest {
                 owner, "Mini", null, CompanionLifecycleState.ACTIVE)).isEmpty());
         Map<PopulationGroupBucket, PopulationGroupCountDelta> provisioned = planner.plan(
                 new PopulationGroupTransition(null, null, null, null,
-                        owner, "Mini", null, CompanionLifecycleState.ROSTER_STORED));
+                        owner, "Mini", null, CompanionLifecycleState.CAPTURED));
         assertEquals(new PopulationGroupCountDelta(1, 0), provisioned.values().iterator().next());
     }
 
@@ -70,7 +69,7 @@ class PopulationGroupPolicyTest {
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> planner.plan(
                 new PopulationGroupTransition(null, null, null, null,
-                        UUID.randomUUID(), "Mini", null, CompanionLifecycleState.ROSTER_STORED)));
+                        UUID.randomUUID(), "Mini", null, CompanionLifecycleState.CAPTURED)));
     }
 
     private static TwPopulationGroupConfig group() throws Exception {

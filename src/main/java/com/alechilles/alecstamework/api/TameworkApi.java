@@ -11,11 +11,6 @@ public interface TameworkApi {
 
     CommandLinksApi commandLinks();
 
-    /** Timed roster operations; require {@link TameworkApiCapability#COMMAND_TIMED_SUMMONING}. */
-    default CommandTimedSummoningApi commandTimedSummoning() {
-        return CommandTimedSummoningApi.unavailable();
-    }
-
     ProgressionApi progression();
 
     PolicyApi policies();
@@ -31,11 +26,6 @@ public interface TameworkApi {
     TameworkConfigReadApi configs();
 
     DiagnosticsApi diagnostics();
-
-    /** Returns the durable owner/command-family roster authority when advertised. */
-    default CommandFamilyRosterApi commandFamilyRosters() {
-        return CommandFamilyRosterApi.unavailable();
-    }
 
     /** Read-only population-group counts used by roster capacity presentation. */
     default PopulationGroupApi populationGroups() {

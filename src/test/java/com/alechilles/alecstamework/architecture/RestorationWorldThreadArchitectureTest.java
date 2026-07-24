@@ -32,7 +32,9 @@ class RestorationWorldThreadArchitectureTest {
                 "current.getEntityStore().getStore()"
         ));
         assertTrue(restoration.contains("dispatcher.applyOrResolve("));
-        assertTrue(capture.contains("dispatcher.applyOrResolve("));
+        assertTrue(capture.contains("scheduled.execute(() ->"));
+        assertTrue(capture.contains("World current = findWorld(worldKey)"));
+        assertTrue(capture.contains("current.getEntityStore().getStore()"));
         assertTrue(release.contains("dispatcher.applyOrResolve("));
         String all = dispatcher + restoration + capture + release;
         assertFalse(all.contains("PlayerRef.getComponent"));

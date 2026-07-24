@@ -88,8 +88,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
     private final CaptureAttemptRepository captureAttemptRepository;
     private final PopulationGroupRepository populationGroupRepository;
-    private final CommandFamilyRosterRepository commandFamilyRosterRepository;
-    private final CommandTimedSummonRepository commandTimedSummonRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     private final PersistenceResilienceRuntime resilienceRuntime;
     private final StorageRecoveryCoordinator storageRecoveryCoordinator;
@@ -124,8 +122,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
             @Nonnull CaptureAttemptRepository captureAttemptRepository,
             @Nonnull PopulationGroupRepository populationGroupRepository,
-            @Nonnull CommandFamilyRosterRepository commandFamilyRosterRepository,
-            @Nonnull CommandTimedSummonRepository commandTimedSummonRepository,
             @Nonnull SqliteSchemaMigrator schemaMigrator,
             @Nonnull PersistenceResilienceRuntime resilienceRuntime,
             @Nonnull StorageRecoveryCoordinator storageRecoveryCoordinator,
@@ -157,8 +153,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.populationReconciliationPersistence = populationReconciliationPersistence;
         this.captureAttemptRepository = captureAttemptRepository;
         this.populationGroupRepository = populationGroupRepository;
-        this.commandFamilyRosterRepository = commandFamilyRosterRepository;
-        this.commandTimedSummonRepository = commandTimedSummonRepository;
         this.schemaMigrator = schemaMigrator;
         this.resilienceRuntime = resilienceRuntime;
         this.storageRecoveryCoordinator = storageRecoveryCoordinator;
@@ -301,10 +295,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CaptureAttemptRepository(connectionManager, writeQueue);
         PopulationGroupRepository populationGroupRepository =
                 new PopulationGroupRepository(connectionManager, writeQueue);
-        CommandFamilyRosterRepository commandFamilyRosterRepository =
-                new CommandFamilyRosterRepository(connectionManager, writeQueue);
-        CommandTimedSummonRepository commandTimedSummonRepository =
-                new CommandTimedSummonRepository(connectionManager, writeQueue);
         SqliteMaintenanceService maintenanceService =
                 new SqliteMaintenanceService(connectionManager, npcProfileRepository, logger);
         StorageRecoveryProbe storageRecoveryProbe = new StorageRecoveryProbe(
@@ -342,8 +332,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 populationReconciliationPersistence,
                 captureAttemptRepository,
                 populationGroupRepository,
-                commandFamilyRosterRepository,
-                commandTimedSummonRepository,
                 schemaMigrator,
                 resilienceRuntime,
                 storageRecoveryCoordinator,
@@ -354,21 +342,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         startup.registerOwner(runtime);
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
-            try {
-                DeathRepository.OrphanedRosterDeathRecovery recovery =
-                        deathRepository.recoverOrphanedCommandRosterDeaths();
-                if (logger != null && (recovery.recovered() > 0 || recovery.conflicted() > 0)) {
-                    logger.at(recovery.conflicted() > 0 ? Level.WARNING : Level.INFO).log(
-                            "Command-roster death recovery completed: recovered="
-                                    + recovery.recovered() + ", conflicted=" + recovery.conflicted());
-                }
-            } catch (Exception failure) {
-                if (logger != null) {
-                    logger.at(Level.WARNING).log(
-                            "Command-roster death recovery failed; roster authority will remain fail-closed: "
-                                    + failure.getMessage());
-                }
-            }
             boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
             if (health.isHealthy()) {
                 if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
@@ -593,18 +566,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PopulationGroupRepository getPopulationGroupRepository() {
         return populationGroupRepository;
-    }
-
-    /** Durable authority for owner/command-family/profile roster membership. */
-    @Nonnull
-    public CommandFamilyRosterRepository getCommandFamilyRosterRepository() {
-        return commandFamilyRosterRepository;
-    }
-
-    /** Durable lease/session authority for finite and unlimited command-family summons. */
-    @Nonnull
-    public CommandTimedSummonRepository getCommandTimedSummonRepository() {
-        return commandTimedSummonRepository;
     }
 
     /** Bounded executor for connection-opening reads that must not block world/event threads. */

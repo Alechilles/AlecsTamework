@@ -127,8 +127,7 @@ class ReplacementTameworkApiFactoryTest {
                 (request, operation) -> confirmed("capture_release"),
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),
-                (request, operation) -> confirmed("coop_release"),
-                (request, operation) -> confirmed("timed")
+                (request, operation) -> confirmed("coop_release")
         );
     }
 

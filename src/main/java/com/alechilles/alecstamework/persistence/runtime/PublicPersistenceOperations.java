@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseRequest;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistration;
@@ -11,8 +9,6 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
-import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
-import com.alechilles.alecstamework.companion.command.CommandRosterTransitionRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
@@ -132,33 +128,6 @@ public final class PublicPersistenceOperations {
     }
 
     @Nonnull
-    public PublicOperationSubmission mutateTimedSummonLease(
-            @Nonnull OperationId operationId,
-            @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull TimedSummonLeaseMutationRequest mutation
-    ) {
-        var submitted = adapter.timedSummonOperations().submit(
-                operationId, idempotencyKey, mutation
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
-    public PublicOperationSubmission transitionTimedSummon(
-            @Nonnull OperationId operationId,
-            @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull TimedSummonTransitionRequest transition
-    ) {
-        var submitted = adapter.timedSummonTransitionOperations().submit(
-                operationId,
-                idempotencyKey,
-                transition,
-                boundaries.timedSummons()
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
     public PublicOperationSubmission registerCoopSlot(
             @Nonnull OperationId operationId,
             @Nonnull IdempotencyKey idempotencyKey,
@@ -246,30 +215,6 @@ public final class PublicPersistenceOperations {
     ) {
         var submitted = adapter.populationGroupOperations().submit(
                 operationId, idempotencyKey, assignment
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
-    public PublicOperationSubmission mutateCommandRoster(
-            @Nonnull OperationId operationId,
-            @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull CommandRosterMembershipRequest request
-    ) {
-        var submitted = adapter.commandRosterOperations().submit(
-                operationId, idempotencyKey, request
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
-    public PublicOperationSubmission transitionCommandRoster(
-            @Nonnull OperationId operationId,
-            @Nonnull IdempotencyKey idempotencyKey,
-            @Nonnull CommandRosterTransitionRequest transition
-    ) {
-        var submitted = adapter.commandRosterTransitionOperations().submit(
-                operationId, idempotencyKey, transition
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

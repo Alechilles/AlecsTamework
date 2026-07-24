@@ -120,8 +120,7 @@ final class CompanionPopulationOperationRecoveryTestSupport {
                                     String oldWorld) throws Exception {
         boolean oldPhysical = oldLifecycle == CompanionLifecycleState.ACTIVE
                 || oldLifecycle == CompanionLifecycleState.UNLOADED
-                || oldLifecycle == CompanionLifecycleState.RESTORING
-                || oldLifecycle == CompanionLifecycleState.STORING;
+                || oldLifecycle == CompanionLifecycleState.RESTORING;
         try (PreparedStatement state = connection.prepareStatement("""
                 INSERT INTO companion_population_state (
                     profile_id, ownership_world_name, lifecycle_state, physical_world_name,

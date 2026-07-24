@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
-import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
@@ -166,11 +165,6 @@ public final class TameworkEventBus
             throw new IllegalArgumentException("Only canonical population-group events are accepted.");
         }
         dispatch(event);
-    }
-
-    /** Isolated post-commit delivery seam for canonical command-family roster events. */
-    public void emitCommandFamilyRosterEvent(@Nonnull CommandFamilyRosterMembershipChangedEvent event) {
-        dispatch(Objects.requireNonNull(event, "event"));
     }
 
     @Override

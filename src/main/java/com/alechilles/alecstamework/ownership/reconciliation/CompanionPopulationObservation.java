@@ -42,8 +42,7 @@ public record CompanionPopulationObservation(
             throw new IllegalArgumentException("Physical location must be entirely present or absent.");
         }
         if ((lifecycleState == CompanionLifecycleState.ACTIVE
-                || lifecycleState == CompanionLifecycleState.UNLOADED
-                || lifecycleState == CompanionLifecycleState.STORING) && !completeLocation) {
+                || lifecycleState == CompanionLifecycleState.UNLOADED) && !completeLocation) {
             throw new IllegalArgumentException("Physical lifecycle observations require a chunk location.");
         }
     }

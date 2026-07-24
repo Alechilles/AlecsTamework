@@ -7,7 +7,6 @@ public enum OperationScopeType {
     OWNER,
     COOP,
     TOOL,
-    COMMAND_FAMILY,
     FEATURE,
     GLOBAL
 }
