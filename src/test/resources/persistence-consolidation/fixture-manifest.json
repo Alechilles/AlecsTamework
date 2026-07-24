@@ -29,7 +29,11 @@
     },
     {
       "resource": "public-v4-representative.sql",
-      "normalizedLfSha256": "0de2bd712c248650838ad59c67c0db65272e518b5cb095d4ed8366b8d3290903"
+      "normalizedLfSha256": "f335f5c0edc57af7da68b6d6cad7d61636d61e8c9d963df60cf7e3185167b8a2"
+    },
+    {
+      "resource": "public-v4-coop-history.sql",
+      "normalizedLfSha256": "9a550ad071f7c008c1e9f8f41033af9493aaa6eb7a3d2c3825b02ca691af8bb3"
     },
     {
       "resource": "public-v4-conflicting-flags.sql",
@@ -107,6 +111,24 @@
         "npc_uuid_aliases": 1,
         "npc_snapshots": 2,
         "profile_states": 1
+      }
+    },
+    {
+      "id": "public-v4-coop-history",
+      "resource": "public-v4-coop-history.sql",
+      "classification": "PUBLIC_V4_COOP_HISTORY",
+      "maximumSchemaVersion": 4,
+      "expectedTableCount": 8,
+      "expectedForeignKeyViolations": 0,
+      "rowCounts": {
+        "schema_migrations": 3,
+        "npc_profiles": 6,
+        "npc_uuid_aliases": 7,
+        "npc_tool_links": 2,
+        "npc_snapshots": 3,
+        "coop_slots": 3,
+        "profile_states": 6,
+        "api_profile_data": 1
       }
     },
     {

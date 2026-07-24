@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Pure mapping tests for public evidence, lifecycle resolution, and quarantine. */
@@ -48,6 +50,96 @@ class PublicImportPlannerTest {
         assertEquals(-62135596800000L, plan.profiles().getFirst().createdAtMs());
         assertEquals(64, plan.profiles().getFirst().metadataHash().length());
         assertTrue(plan.snapshots().stream().allMatch(PublicImportPlan.Snapshot::current));
+    }
+
+    /**
+     * Protects the copied-save failure where released rows retained by v2.16.1 were mistaken for
+     * simultaneous current coop residency.
+     */
+    @Test
+    void retainedReleasedCoopHistoryIsInactiveEvidenceNotCurrentResidency() throws Exception {
+        PublicImportPlan plan = plan("public-v4-coop-history.sql", 4);
+        Map<String, PublicImportPlan.Lifecycle> lifecycle = plan.lifecycles().stream()
+                .collect(Collectors.toMap(PublicImportPlan.Lifecycle::profileId, value -> value));
+
+        assertEquals(3, plan.coopSlots().size());
+        assertEquals(1, plan.coopResidencies().size());
+        assertTrue(plan.incidents().isEmpty());
+        assertEquals("COOP", lifecycle.get(profile(5)).state());
+        assertEquals("UNRESOLVED", lifecycle.get(profile(1)).state());
+        assertEquals(3, plan.snapshots().stream()
+                .filter(snapshot -> snapshot.kind().equals("coop"))
+                .count());
+        assertEquals(1, plan.snapshots().stream()
+                .filter(snapshot -> snapshot.kind().equals("coop") && snapshot.current())
+                .count());
+    }
+
+    @Test
+    void coopStateWithoutPositiveHousedEvidenceRemainsQuarantined() throws Exception {
+        LegacyPublicData source = read("public-v4-representative.sql", 4);
+        LegacyPublicData.CoopSlot row = source.coopSlots().getFirst();
+        LegacyPublicData.CoopSlot released = new LegacyPublicData.CoopSlot(
+                row.worldName(), row.coopId(), row.x(), row.y(), row.z(),
+                row.residentSlot(), row.profileId(), null, row.housedNpcUuid(),
+                row.capturedAtMs(), 300, 300, row.stateSnapshotJson()
+        );
+
+        PublicImportPlan plan = new PublicImportPlanner().plan(
+                withCoopSlots(source, List.of(released)), FINGERPRINT, -500
+        );
+
+        assertEquals(1, plan.incidents().size());
+        assertEquals("COOP_EVIDENCE_INCOMPLETE",
+                plan.incidents().getFirst().reasonCode());
+        assertTrue(plan.coopResidencies().isEmpty());
+        assertFalse(plan.snapshots().stream()
+                .filter(snapshot -> snapshot.kind().equals("coop"))
+                .anyMatch(PublicImportPlan.Snapshot::current));
+    }
+
+    @Test
+    void multipleCurrentHousedRowsStillFailClosed() throws Exception {
+        LegacyPublicData source = read("public-v4-representative.sql", 4);
+        ArrayList<LegacyPublicData.CoopSlot> rows = new ArrayList<>(source.coopSlots());
+        rows.add(new LegacyPublicData.CoopSlot(
+                "world-a", "second-current-coop", 30, 64, 40, 0,
+                profile(5), "00000000-0000-0000-0000-000000000055", null,
+                300, 0, 300, "{\"version\":\"1\",\"current\":true}"
+        ));
+
+        PublicImportPlan plan = new PublicImportPlanner().plan(
+                withCoopSlots(source, rows), FINGERPRINT, -500
+        );
+
+        assertEquals(1, plan.incidents().size());
+        assertEquals("MULTIPLE_COOP_SLOTS",
+                plan.incidents().getFirst().reasonCode());
+        assertTrue(plan.coopResidencies().isEmpty());
+        assertFalse(plan.snapshots().stream()
+                .filter(snapshot -> snapshot.kind().equals("coop"))
+                .anyMatch(PublicImportPlan.Snapshot::current));
+    }
+
+    @Test
+    void housedRowWithoutProfileRefusesWholeImport() throws Exception {
+        LegacyPublicData source = read("public-v4-representative.sql", 4);
+        LegacyPublicData.CoopSlot row = source.coopSlots().getFirst();
+        LegacyPublicData.CoopSlot orphaned = new LegacyPublicData.CoopSlot(
+                row.worldName(), row.coopId(), row.x(), row.y(), row.z(),
+                row.residentSlot(), null, row.housedNpcUuid(), null,
+                row.capturedAtMs(), row.releasedAtMs(), row.updatedAtMs(),
+                row.stateSnapshotJson()
+        );
+
+        PublicImportException failure = assertThrows(
+                PublicImportException.class,
+                () -> new PublicImportPlanner().plan(
+                        withCoopSlots(source, List.of(orphaned)), FINGERPRINT, -500
+                )
+        );
+
+        assertEquals("COOP_PROFILE_MISSING", failure.code());
     }
 
     @Test
@@ -146,6 +238,16 @@ class PublicImportPlannerTest {
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + source)) {
             return new LegacyPublicDataReader().read(connection, version);
         }
+    }
+
+    private LegacyPublicData withCoopSlots(
+            LegacyPublicData source,
+            List<LegacyPublicData.CoopSlot> slots
+    ) {
+        return new LegacyPublicData(
+                source.profiles(), source.aliases(), source.toolLinks(), source.snapshots(),
+                slots, source.profileStates(), source.extensionData()
+        );
     }
 
     private String profile(int suffix) {

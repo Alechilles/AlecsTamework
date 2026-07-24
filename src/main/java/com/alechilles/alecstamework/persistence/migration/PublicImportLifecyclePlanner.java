@@ -117,8 +117,8 @@ final class PublicImportLifecyclePlanner {
                     key.toString(), key.worldKey(), key.coopId(),
                     slot.x(), slot.y(), slot.z(), slot.residentSlot()
             ));
-            if (slot.profileId() != null) {
-                addOccupiedCoop(slot, profiles, snapshots, fingerprint, byProfile);
+            if (slot.housedNpcUuid() != null || slot.profileId() != null) {
+                addCoopEvidence(slot, profiles, snapshots, fingerprint, byProfile);
             }
         }
         byProfile.forEach((profileId, rows) -> {
@@ -131,7 +131,7 @@ final class PublicImportLifecyclePlanner {
         );
     }
 
-    private void addOccupiedCoop(
+    private void addCoopEvidence(
             LegacyPublicData.CoopSlot slot,
             Map<String, PublicImportPlanningModel.ProfileDraft> profiles,
             List<PublicImportPlanningModel.SnapshotDraft> snapshots,
@@ -143,9 +143,12 @@ final class PublicImportLifecyclePlanner {
         requireOptionalUuid(slot.housedNpcUuid(), "INVALID_COOP_NPC_UUID");
         requireOptionalUuid(slot.lastReleasedNpcUuid(), "INVALID_RELEASED_NPC_UUID");
         PublicImportPlanningModel.SnapshotDraft snapshot =
-                coopSnapshot(slot, profile, fingerprint);
+                coopSnapshot(slot, profile, fingerprint, slot.housedNpcUuid() != null);
         if (snapshot != null) {
             snapshots.add(snapshot);
+        }
+        if (slot.housedNpcUuid() == null) {
+            return;
         }
         byProfile.computeIfAbsent(slot.profileId(), ignored -> new ArrayList<>())
                 .add(new PublicImportPlanningModel.CoopDraft(slot, snapshot));
@@ -155,24 +158,28 @@ final class PublicImportLifecyclePlanner {
     private PublicImportPlanningModel.SnapshotDraft coopSnapshot(
             LegacyPublicData.CoopSlot slot,
             PublicImportPlanningModel.ProfileDraft profile,
-            LegacySourceFingerprint fingerprint
+            LegacySourceFingerprint fingerprint,
+            boolean currentResidencyEvidence
     ) throws Exception {
         if (slot.stateSnapshotJson() == null) {
             return null;
         }
         if (!validJsonObject(slot.stateSnapshotJson())) {
             profile.conflict("INVALID_COOP_SNAPSHOT_JSON");
-            profile.rawEvidence("coop-" + slot.coopKey(), slot.stateSnapshotJson());
+            profile.rawEvidence(
+                    "coop-" + targetCoopKey(slot),
+                    slot.stateSnapshotJson()
+            );
             return null;
         }
         return new PublicImportPlanningModel.SnapshotDraft(
-                deterministicId(fingerprint.snapshotSha256(), "coop:" + slot.coopKey()),
+                deterministicId(fingerprint.snapshotSha256(), "coop:" + targetCoopKey(slot)),
                 slot.profileId(),
                 "coop",
                 1,
                 slot.stateSnapshotJson(),
                 sha256(slot.stateSnapshotJson()),
-                true,
+                currentResidencyEvidence,
                 slot.updatedAtMs()
         );
     }
@@ -293,7 +300,9 @@ final class PublicImportLifecyclePlanner {
     ) {
         boolean complete = coopRows.size() == 1
                 && state.coopKey() != null
-                && state.coopKey().equals(coopRows.getFirst().slot().coopKey())
+                && state.coopKey().equals(
+                        legacyProfileStateKey(coopRows.getFirst().slot())
+                )
                 && coopRows.getFirst().snapshot() != null;
         if (!complete) {
             profile.conflict("COOP_EVIDENCE_INCOMPLETE");
@@ -349,6 +358,11 @@ final class PublicImportLifecyclePlanner {
                 slot.z(),
                 slot.residentSlot()
         );
+    }
+
+    private String legacyProfileStateKey(LegacyPublicData.CoopSlot slot) {
+        return slot.worldName() + "|" + slot.x() + "," + slot.y() + "," + slot.z()
+                + "|" + slot.residentSlot();
     }
 
     private void finalizeProfile(
