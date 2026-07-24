@@ -21,15 +21,25 @@ public final class HytaleCompanionCoopReleaseWorldGateway
         implements CompanionCoopReleaseWorldGateway {
     private final SnapshotCodecRegistry snapshotCodecs;
     private final HytaleCompanionProjectionSpawnExecutor projections;
+    private final CoopTransitionEffectSink effects;
 
     public HytaleCompanionCoopReleaseWorldGateway(
             @Nonnull SnapshotCodecRegistry snapshotCodecs,
             @Nonnull HytaleCompanionProjectionSpawnExecutor projections
     ) {
+        this(snapshotCodecs, projections, CoopTransitionEffectSink.NONE);
+    }
+
+    public HytaleCompanionCoopReleaseWorldGateway(
+            @Nonnull SnapshotCodecRegistry snapshotCodecs,
+            @Nonnull HytaleCompanionProjectionSpawnExecutor projections,
+            @Nonnull CoopTransitionEffectSink effects
+    ) {
         this.snapshotCodecs = Objects.requireNonNull(
                 snapshotCodecs, "snapshotCodecs"
         );
         this.projections = Objects.requireNonNull(projections, "projections");
+        this.effects = Objects.requireNonNull(effects, "effects");
     }
 
     @Override
@@ -62,12 +72,34 @@ public final class HytaleCompanionCoopReleaseWorldGateway
                         request.expectedLifecycleRevision().value(),
                         request.placement()
                 );
-        return projections.applyOrResolve(
+        LiveOperationResult result = projections.applyOrResolve(
                 world,
                 store,
                 command,
                 () -> decodeProjection(request)
         );
+        if (result.status() == LiveOperationResult.Status.CONFIRMED
+                && "coop_release_spawned".equals(result.code())) {
+            playTransitionEffect(world, request);
+        }
+        return result;
+    }
+
+    private void playTransitionEffect(
+            World world,
+            CompanionCoopReleaseRequest request
+    ) {
+        try {
+            effects.play(
+                    world,
+                    request.placement().x(),
+                    request.placement().y(),
+                    request.placement().z(),
+                    request.sourceResidency().slotKey().coopId()
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+            // Presentation cannot change an exact spawn result.
+        }
     }
 
     @Nonnull

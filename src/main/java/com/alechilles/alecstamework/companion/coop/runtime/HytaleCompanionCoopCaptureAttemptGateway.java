@@ -17,6 +17,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.block.BlockModule;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Thin Hytale bridge for physical coop receipts and exact source retirement.
@@ -46,6 +48,7 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
             receiptType;
     private final ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
             retirementType;
+    private final CoopTransitionEffectSink effects;
 
     HytaleCompanionCoopCaptureAttemptGateway(
             World world,
@@ -54,7 +57,8 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
             OperationEnvelope operation,
             ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> receiptType,
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
-                    retirementType
+                    retirementType,
+            CoopTransitionEffectSink effects
     ) {
         this.world = world;
         this.entityStore = entityStore;
@@ -65,6 +69,7 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
         );
         this.receiptType = receiptType;
         this.retirementType = retirementType;
+        this.effects = effects;
     }
 
     @Override
@@ -236,6 +241,8 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
                 TameworkPersistenceRetirementComponent.exact(
                         request.profileId(), operation
                 );
+        Vector3d effectPosition = transitionPosition(source);
+        Throwable removalFailure = null;
         try {
             TameworkPersistenceRetirementComponent existing =
                     entityStore.getComponent(source, retirementType);
@@ -252,9 +259,45 @@ final class HytaleCompanionCoopCaptureAttemptGateway implements AttemptGateway {
             }
             entityStore.removeEntity(source, RemoveReason.REMOVE);
         } catch (RuntimeException | LinkageError failure) {
-            return classifyRetirementReadback(failure);
+            removalFailure = failure;
         }
-        return classifyRetirementReadback(null);
+        RetirementAttempt result = classifyRetirementReadback(removalFailure);
+        if (result.status()
+                == CompanionCoopCaptureWorldExecutor.RetirementStatus.ABSENT) {
+            playTransitionEffect(effectPosition);
+        }
+        return result;
+    }
+
+    @Nullable
+    private Vector3d transitionPosition(Ref<EntityStore> source) {
+        TransformComponent transform = entityStore.getComponent(
+                source, TransformComponent.getComponentType()
+        );
+        Vector3d position = transform == null ? null : transform.getPosition();
+        return position == null
+                || !Double.isFinite(position.x)
+                || !Double.isFinite(position.y)
+                || !Double.isFinite(position.z)
+                ? null
+                : new Vector3d(position);
+    }
+
+    private void playTransitionEffect(@Nullable Vector3d position) {
+        if (position == null || effects == null) {
+            return;
+        }
+        try {
+            effects.play(
+                    world,
+                    position.x,
+                    position.y,
+                    position.z,
+                    request.targetSlot().coopId()
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+            // Presentation cannot change an exact retirement result.
+        }
     }
 
     private RetirementAttempt classifyRetirementReadback(

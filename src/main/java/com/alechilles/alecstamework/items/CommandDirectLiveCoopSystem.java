@@ -45,7 +45,6 @@ public final class CommandDirectLiveCoopSystem
     private final HytaleDirectLiveCoopScanner scanner;
     private final HytaleDirectLiveCoopEvidenceFactory evidence;
     private final DirectLiveCoopProduceService produce;
-    private final CoopEffectService effects;
     private final DirectLiveCoopCompletionTracker completions =
             new DirectLiveCoopCompletionTracker();
     private final StoreScopedState<TickState> tickStates =
@@ -72,7 +71,6 @@ public final class CommandDirectLiveCoopSystem
         scanner = new HytaleDirectLiveCoopScanner();
         evidence = new HytaleDirectLiveCoopEvidenceFactory();
         produce = new DirectLiveCoopProduceService();
-        effects = new CoopEffectService();
     }
 
     @Override
@@ -91,7 +89,6 @@ public final class CommandDirectLiveCoopSystem
         if (scan == null) {
             return;
         }
-        playPublishedEffects(scan);
         Map<CoopSlotKey, CoopOccupancy> occupancies =
                 projections.coopSnapshot();
         Map<ProfileId, CompanionProfileProjectionState> profiles =
@@ -205,16 +202,8 @@ public final class CommandDirectLiveCoopSystem
             return;
         }
         consumedAliases.add(candidate.alias());
-        DirectLiveCoopCompletionTracker.PublishedEffect effect =
-                new DirectLiveCoopCompletionTracker.PublishedEffect(
-                        coop.worldKey(),
-                        coop.physicalKey(),
-                        candidate.position().x,
-                        candidate.position().y,
-                        candidate.position().z
-                );
         completions.trackCapture(
-                key, effect, author.captureLive(slot, source)
+                key, author.captureLive(slot, source)
         );
     }
 
@@ -343,49 +332,9 @@ public final class CommandDirectLiveCoopSystem
         if (!completions.beginRelease(key)) {
             return;
         }
-        DirectLiveCoopCompletionTracker.PublishedEffect effect =
-                new DirectLiveCoopCompletionTracker.PublishedEffect(
-                        coop.worldKey(),
-                        coop.physicalKey(),
-                        placement.x(),
-                        placement.y(),
-                        placement.z()
-                );
         completions.trackRelease(
-                key, effect, author.releaseOccupied(slot, placement)
+                key, author.releaseOccupied(slot, placement)
         );
-    }
-
-    private void playPublishedEffects(
-            HytaleDirectLiveCoopScanner.Scan scan
-    ) {
-        int pending = completions.pendingEffectCount();
-        for (int index = 0; index < pending; index++) {
-            DirectLiveCoopCompletionTracker.PublishedEffect effect =
-                    completions.pollEffect();
-            if (effect == null) {
-                return;
-            }
-            if (!effect.worldKey().equalsIgnoreCase(
-                    scan.world().getName()
-            )) {
-                completions.requeueEffect(effect);
-                continue;
-            }
-            HytaleDirectLiveCoopScanner.LoadedCoop coop =
-                    scan.coops().stream()
-                            .filter(candidate -> candidate.physicalKey()
-                                    .equals(effect.physicalCoopKey()))
-                            .findFirst()
-                            .orElse(null);
-            if (coop != null) {
-                playEffect(
-                        scan,
-                        new Vector3d(effect.x(), effect.y(), effect.z()),
-                        coop.config()
-                );
-            }
-        }
     }
 
     private void pruneFrozenEvidence(
@@ -402,23 +351,6 @@ public final class CommandDirectLiveCoopSystem
                         + occupancy.residency().snapshotId()
         ));
         frozenReleases.keySet().retainAll(activeReleases);
-    }
-
-    private void playEffect(
-            HytaleDirectLiveCoopScanner.Scan scan,
-            Vector3d position,
-            @Nullable TwCoopConfig config
-    ) {
-        if (config == null) {
-            return;
-        }
-        try {
-            effects.playIntakeEffects(
-                    scan.world(), position, config.getCapturePolicy()
-            );
-        } catch (RuntimeException ignored) {
-            // Optional presentation can be dropped during world shutdown.
-        }
     }
 
     private boolean roaming(

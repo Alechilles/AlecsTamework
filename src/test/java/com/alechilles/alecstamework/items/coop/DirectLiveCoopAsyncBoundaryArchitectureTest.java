@@ -26,6 +26,14 @@ class DirectLiveCoopAsyncBoundaryArchitectureTest {
             "src/main/java/com/alechilles/alecstamework/items/"
                     + "HytaleDirectLiveCoopEvidenceFactory.java"
     );
+    private static final Path CAPTURE_GATEWAY = Path.of(
+            "src/main/java/com/alechilles/alecstamework/companion/coop/runtime/"
+                    + "HytaleCompanionCoopCaptureAttemptGateway.java"
+    );
+    private static final Path RELEASE_GATEWAY = Path.of(
+            "src/main/java/com/alechilles/alecstamework/companion/coop/runtime/"
+                    + "HytaleCompanionCoopReleaseWorldGateway.java"
+    );
 
     @Test
     void worldFacingSystemDoesNotOwnFacadeCompletionCallbacks()
@@ -57,15 +65,41 @@ class DirectLiveCoopAsyncBoundaryArchitectureTest {
     }
 
     @Test
-    void queuedPresentationEvidenceIsStringsAndPrimitiveCoordinates()
+    void presentationIsNotQueuedBehindTheOneSecondScannerSweep()
             throws Exception {
-        String compact = Files.readString(TRACKER)
-                .replaceAll("\\s+", " ");
+        String system = Files.readString(SYSTEM);
+        String tracker = Files.readString(TRACKER);
 
-        assertTrue(compact.contains(
-                "public record PublishedEffect( @Nonnull String worldKey, "
-                        + "@Nonnull String physicalCoopKey, double x, "
-                        + "double y, double z )"
+        assertFalse(system.contains("playPublishedEffects"));
+        assertFalse(system.contains("CoopEffectService"));
+        assertFalse(tracker.contains("PublishedEffect"));
+        assertFalse(tracker.contains("pendingEffectCount"));
+    }
+
+    @Test
+    void transitionEffectsRunOnlyAtNewPhysicalRemovalOrInsertion()
+            throws Exception {
+        String capture = Files.readString(CAPTURE_GATEWAY);
+        String release = Files.readString(RELEASE_GATEWAY);
+
+        int remove = capture.indexOf(
+                "entityStore.removeEntity(source, RemoveReason.REMOVE)"
+        );
+        int captureEffect = capture.indexOf(
+                "playTransitionEffect(effectPosition)", remove
+        );
+        assertTrue(remove >= 0 && captureEffect > remove);
+        assertTrue(capture.contains(
+                "RetirementStatus.ABSENT"
+        ));
+
+        int spawn = release.indexOf("projections.applyOrResolve(");
+        int releaseEffect = release.indexOf(
+                "playTransitionEffect(world, request)", spawn
+        );
+        assertTrue(spawn >= 0 && releaseEffect > spawn);
+        assertTrue(release.contains(
+                "\"coop_release_spawned\".equals(result.code())"
         ));
     }
 

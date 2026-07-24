@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.coop.runtime.HytaleCompanionCoopRe
 import com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent;
 import com.alechilles.alecstamework.companion.restoration.runtime.HytaleCompanionRestorationBoundary;
 import com.alechilles.alecstamework.companion.restoration.runtime.HytaleCompanionRestorationWorldGateway;
+import com.alechilles.alecstamework.items.CoopEffectService;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
@@ -44,6 +45,7 @@ public final class HytalePersistenceLiveBoundariesFactory {
         }
         var codecs = TameworkSnapshotCodecs.create();
         var projections = new HytaleCompanionProjectionSpawnExecutor();
+        var coopEffects = new CoopEffectService();
         return new PublicPersistenceLiveBoundaries(
                 new HytaleCompanionCaptureBoundary(
                         new HytaleCompanionCaptureWorldGateway()
@@ -60,12 +62,14 @@ public final class HytalePersistenceLiveBoundariesFactory {
                 ),
                 new HytaleCompanionCoopCaptureBoundary(
                         new HytaleCompanionCoopCaptureWorldGateway(
-                                coopCaptureReceiptsType, retirementType
+                                coopCaptureReceiptsType,
+                                retirementType,
+                                coopEffects
                         )
                 ),
                 new HytaleCompanionCoopReleaseBoundary(
                         new HytaleCompanionCoopReleaseWorldGateway(
-                                codecs, projections
+                                codecs, projections, coopEffects
                         )
                 )
         );

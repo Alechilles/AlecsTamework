@@ -21,6 +21,7 @@ public final class HytaleCompanionCoopCaptureWorldGateway
     private final ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
             retirementType;
     private final CompanionCoopCaptureWorldExecutor executor;
+    private final CoopTransitionEffectSink effects;
 
     public HytaleCompanionCoopCaptureWorldGateway(
             @Nonnull ComponentType<
@@ -32,7 +33,31 @@ public final class HytaleCompanionCoopCaptureWorldGateway
                     TameworkPersistenceRetirementComponent
                     > retirementType
     ) {
-        this(receiptType, retirementType, new CompanionCoopCaptureWorldExecutor());
+        this(
+                receiptType,
+                retirementType,
+                CoopTransitionEffectSink.NONE,
+                new CompanionCoopCaptureWorldExecutor()
+        );
+    }
+
+    public HytaleCompanionCoopCaptureWorldGateway(
+            @Nonnull ComponentType<
+                    ChunkStore,
+                    TameworkCoopCaptureReceiptsComponent
+                    > receiptType,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkPersistenceRetirementComponent
+                    > retirementType,
+            @Nonnull CoopTransitionEffectSink effects
+    ) {
+        this(
+                receiptType,
+                retirementType,
+                effects,
+                new CompanionCoopCaptureWorldExecutor()
+        );
     }
 
     HytaleCompanionCoopCaptureWorldGateway(
@@ -40,6 +65,7 @@ public final class HytaleCompanionCoopCaptureWorldGateway
                     receiptType,
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
                     retirementType,
+            CoopTransitionEffectSink effects,
             CompanionCoopCaptureWorldExecutor executor
     ) {
         this.receiptType = Objects.requireNonNull(
@@ -48,6 +74,7 @@ public final class HytaleCompanionCoopCaptureWorldGateway
         this.retirementType = Objects.requireNonNull(
                 retirementType, "retirementType"
         );
+        this.effects = Objects.requireNonNull(effects, "effects");
         this.executor = Objects.requireNonNull(executor, "executor");
     }
 
@@ -81,7 +108,8 @@ public final class HytaleCompanionCoopCaptureWorldGateway
                         request,
                         operation,
                         receiptType,
-                        retirementType
+                        retirementType,
+                        effects
                 )
         );
     }
