@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
@@ -152,7 +153,7 @@ class TameworkRestorationSnapshotResolverTest {
         );
         assertNull(state.needs());
         assertNull(state.healthPercent());
-        assertEquals(2, projection.fullState().payloadVersion());
+        assertEquals(1, projection.fullState().payloadVersion());
     }
 
     @Test
@@ -202,46 +203,57 @@ class TameworkRestorationSnapshotResolverTest {
     }
 
     @Test
-    void completeDeathAndLostPayloadsRemainByteExact() {
-        for (SnapshotKind kind : List.of(
+    void modernDeathAndLostNormalizeToTheSharedProjectionArtifact() {
+        CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(
+                SOURCE,
+                null,
+                -1,
+                "tamework_exact",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                -77L
+        );
+        SnapshotCodecRegistry.EncodedSnapshot death = codecs.encode(
                 TameworkSnapshotCodecs.DEATH,
-                TameworkSnapshotCodecs.LOST
-        )) {
-            CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(
-                    SOURCE,
-                    null,
-                    -1,
-                    "tamework_exact",
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    -77L
-            );
-            SnapshotCodecRegistry.EncodedSnapshot encoded = codecs.encode(
-                    kind,
-                    2,
-                    CoopResidentStateSnapshot.class,
-                    state
-            );
+                2,
+                DeathSnapshotV2Payload.class,
+                DeathSnapshotV2Payload.capture(
+                        state,
+                        -260L,
+                        -1_000L,
+                        DeathSnapshotV2Payload.DeathCauseKind.ENVIRONMENT,
+                        "Lava"
+                )
+        );
+        SnapshotCodecRegistry.EncodedSnapshot lost = codecs.encode(
+                TameworkSnapshotCodecs.LOST,
+                2,
+                CoopResidentStateSnapshot.class,
+                state
+        );
+
+        for (SnapshotCodecRegistry.EncodedSnapshot encoded
+                : List.of(death, lost)) {
             CompanionSnapshot source = snapshot(
-                    kind,
+                    encoded.kind(),
                     2,
                     encoded.payloadJson(),
                     -77L
             );
             CompanionProfileReadModel profile = profile(
                     source,
-                    kind.equals(TameworkSnapshotCodecs.DEATH)
+                    encoded.kind().equals(TameworkSnapshotCodecs.DEATH)
                             ? LifecycleState.DEAD_REVIVABLE
                             : LifecycleState.LOST,
                     "Tamework_Exact",
@@ -253,8 +265,15 @@ class TameworkRestorationSnapshotResolverTest {
                     resolver.resolve(profile, source)
             );
 
-            assertEquals(encoded.payloadJson(), projection.fullState().payloadJson());
-            assertEquals(encoded.payloadHash(), projection.fullState().payloadHash());
+            assertEquals(
+                    CompanionFullStateProjection.KIND,
+                    projection.fullState().kind()
+            );
+            assertEquals(
+                    CompanionFullStateProjection.VERSION,
+                    projection.fullState().payloadVersion()
+            );
+            assertEquals(-77L, fullState(projection).capturedAtMs());
         }
     }
 

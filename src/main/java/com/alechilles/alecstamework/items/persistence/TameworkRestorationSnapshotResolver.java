@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
@@ -173,6 +174,9 @@ public final class TameworkRestorationSnapshotResolver {
             CompanionSnapshot source,
             NpcAlias sourceAlias
     ) {
+        if (source.kind().equals(TameworkSnapshotCodecs.DEATH)) {
+            return resolveCompleteDeath(profile, source, sourceAlias);
+        }
         SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 codecs.decode(source, CoopResidentStateSnapshot.class);
         if (decoded instanceof SnapshotDecodeResult.Failed<
@@ -182,16 +186,26 @@ public final class TameworkRestorationSnapshotResolver {
         CoopResidentStateSnapshot state = ((SnapshotDecodeResult.Decoded<
                 CoopResidentStateSnapshot>) decoded).value();
         validateComplete(profile, sourceAlias, state);
-        SnapshotCodecRegistry.EncodedSnapshot artifact =
-                new SnapshotCodecRegistry.EncodedSnapshot(
-                        source.kind(),
-                        source.payloadVersion(),
-                        source.payloadJson(),
-                        source.payloadHash()
-                );
-        return new Resolution.Resolved(
-                new RestorationProjection(sourceAlias, artifact)
-        );
+        return encodeProjection(sourceAlias, state);
+    }
+
+    private Resolution resolveCompleteDeath(
+            CompanionProfileReadModel profile,
+            CompanionSnapshot source,
+            NpcAlias sourceAlias
+    ) {
+        SnapshotDecodeResult<DeathSnapshotV2Payload> decoded =
+                codecs.decode(source, DeathSnapshotV2Payload.class);
+        if (decoded instanceof SnapshotDecodeResult.Failed<
+                DeathSnapshotV2Payload> failed) {
+            return decodeFailure(failed);
+        }
+        DeathSnapshotV2Payload death =
+                ((SnapshotDecodeResult.Decoded<DeathSnapshotV2Payload>) decoded)
+                        .value();
+        CoopResidentStateSnapshot state = death.fullState();
+        validateComplete(profile, sourceAlias, state);
+        return encodeProjection(sourceAlias, state);
     }
 
     private Resolution resolveLegacyDeath(
@@ -241,7 +255,7 @@ public final class TameworkRestorationSnapshotResolver {
                         legacy,
                         source.createdAtMs()
                 );
-        return encodeProjection(source.kind(), sourceAlias, state);
+        return encodeProjection(sourceAlias, state);
     }
 
     private Resolution resolveLegacyLost(
@@ -279,17 +293,16 @@ public final class TameworkRestorationSnapshotResolver {
                         legacy,
                         source.createdAtMs()
                 );
-        return encodeProjection(source.kind(), sourceAlias, state);
+        return encodeProjection(sourceAlias, state);
     }
 
     private Resolution encodeProjection(
-            SnapshotKind kind,
             NpcAlias sourceAlias,
             CoopResidentStateSnapshot state
     ) {
         SnapshotCodecRegistry.EncodedSnapshot artifact = codecs.encode(
-                kind,
-                COMPLETE_STATE_VERSION,
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
                 CoopResidentStateSnapshot.class,
                 state
         );

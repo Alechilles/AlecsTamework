@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -78,9 +79,8 @@ class HytaleCompanionRestorationBoundaryTest {
                                 "20000000-0000-0000-0000-000000000002"
                         ),
                         new SnapshotCodecRegistry.EncodedSnapshot(
-                                DormantSourceEvidence.Kind.DEATH_COMPONENT
-                                        .snapshotKind(),
-                                2,
+                                CompanionFullStateProjection.KIND,
+                                CompanionFullStateProjection.VERSION,
                                 projectionPayload,
                                 Sha256Hash.ofUtf8(projectionPayload)
                         )

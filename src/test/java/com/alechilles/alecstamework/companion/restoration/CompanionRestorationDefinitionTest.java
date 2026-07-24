@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -149,7 +150,10 @@ class CompanionRestorationDefinitionTest {
                 IllegalArgumentException.class,
                 () -> requestWithProjection(new RestorationProjection(
                         SOURCE,
-                        encoded(source.kind(), 1)
+                        encoded(
+                                CompanionFullStateProjection.KIND,
+                                CompanionFullStateProjection.VERSION + 1
+                        )
                 ))
         );
         assertThrows(
@@ -204,7 +208,10 @@ class CompanionRestorationDefinitionTest {
     private RestorationProjection projection(CompanionSnapshot source) {
         return new RestorationProjection(
                 SOURCE,
-                encoded(source.kind(), 2)
+                encoded(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION
+                )
         );
     }
 

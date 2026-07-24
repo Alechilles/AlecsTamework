@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationOu
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
@@ -371,9 +372,8 @@ class SqliteCompanionRestorationOperationsTest {
         return new RestorationProjection(
                 SOURCE_ALIAS,
                 new SnapshotCodecRegistry.EncodedSnapshot(
-                        DormantSourceEvidence.Kind.DEATH_COMPONENT
-                                .snapshotKind(),
-                        2,
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION,
                         payload,
                         Sha256Hash.ofUtf8(payload)
                 )

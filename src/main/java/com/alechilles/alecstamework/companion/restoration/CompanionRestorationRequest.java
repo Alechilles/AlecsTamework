@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import javax.annotation.Nonnull;
 
 /** Immutable command to restore one exact death or lost snapshot under a pre-leased alias. */
@@ -45,8 +46,11 @@ public record CompanionRestorationRequest(
                     "Restoration snapshot must be the exact current source artifact"
             );
         }
-        if (!sourceSnapshot.kind().equals(projection.fullState().kind())
-                || projection.fullState().payloadVersion() != 2
+        if (!CompanionFullStateProjection.KIND.equals(
+                projection.fullState().kind()
+        )
+                || projection.fullState().payloadVersion()
+                != CompanionFullStateProjection.VERSION
                 || projection.sourceAlias().equals(targetAlias)) {
             throw new IllegalArgumentException(
                     "Restoration projection must be complete modern state for a distinct source alias"

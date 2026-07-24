@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDe
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.HytaleCompanionProjectionSpawnExecutor;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
@@ -71,7 +72,11 @@ public final class HytaleCompanionRestorationWorldGateway
     ) {
         SnapshotCodecRegistry.EncodedSnapshot projection =
                 request.projection().fullState();
-        if (!request.sourceSnapshot().kind().equals(projection.kind())) {
+        if (!CompanionFullStateProjection.KIND.equals(
+                projection.kind()
+        )
+                || projection.payloadVersion()
+                != CompanionFullStateProjection.VERSION) {
             return new SnapshotDecodeResult.Failed<>(
                     SnapshotDecodeResult.Failure.TYPE_MISMATCH,
                     "projection_kind_mismatch",

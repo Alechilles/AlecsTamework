@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.companion.restoration;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.google.gson.JsonObject;
@@ -22,8 +23,8 @@ class RestorationProjectionJsonCodecTest {
                         "00000000-0000-0000-0000-000000000001"
                 )),
                 new SnapshotCodecRegistry.EncodedSnapshot(
-                        new SnapshotKind("death"),
-                        2,
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION,
                         payload,
                         Sha256Hash.ofUtf8(payload)
                 )

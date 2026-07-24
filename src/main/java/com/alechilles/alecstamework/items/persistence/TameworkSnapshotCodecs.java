@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -14,16 +15,18 @@ public final class TameworkSnapshotCodecs {
     private TameworkSnapshotCodecs() {
     }
 
-    /**
-     * Creates exactly the two released payload codecs and three complete-state codecs.
-     */
+    /** Creates exactly the released and modern payload codecs for the three snapshot kinds. */
     @Nonnull
     public static SnapshotCodecRegistry create() {
         return new SnapshotCodecRegistry(List.of(
                 new LegacyDeathV1SnapshotCodec(),
                 new LegacyLostV1SnapshotCodec(),
                 new FullStateSnapshotCodecAdapter(COOP, 1),
-                new FullStateSnapshotCodecAdapter(DEATH, 2),
+                new DeathSnapshotV2Codec(),
+                new FullStateSnapshotCodecAdapter(
+                        CompanionFullStateProjection.KIND,
+                        CompanionFullStateProjection.VERSION
+                ),
                 new FullStateSnapshotCodecAdapter(LOST, 2)
         ));
     }
