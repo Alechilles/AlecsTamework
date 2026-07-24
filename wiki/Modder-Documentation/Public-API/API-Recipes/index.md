@@ -29,7 +29,7 @@ This subsection provides task-focused examples for common Tamework API integrati
 - [Keep Companion Cache in Sync with Profile Changed Events Recipe](/mod/alecs-tamework/keep-companion-cache-in-sync-with-profile-changed-events-recipe)
 - [Credit External Skill XP from Companion XP Recipe](/mod/alecs-tamework/credit-external-skill-xp-from-companion-xp-recipe)
 - [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
-- [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
+- [Check the Live Owner Cap before Taming](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
 - [Register Custom Trait Effect Key Recipe](/mod/alecs-tamework/register-custom-trait-effect-key-recipe)
 

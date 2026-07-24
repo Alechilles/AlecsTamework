@@ -84,6 +84,11 @@ Accepted `OnTransferFailure` values:
 - `MarkLost`
 - `Ignore`
 
+`MarkLost` is a retained config name, not permission to author the canonical
+`LOST` lifecycle. In the replacement runtime it abandons the failed relocation
+retry and logs the drop. Only positive destructive-removal evidence can create
+`LOST`.
+
 ## Global vs Role Boundary
 Use `TwCompanionConfig` for behavior policy:
 - how far recall or return-home can go
@@ -159,6 +164,8 @@ Older packs may still contain ownership protection and revive enablement keys in
 - `Travel` is nested under `Command`, not a separate top-level section.
 - If a child asset explicitly authors `Travel`, only missing nested keys inherit. Authored arrays like `FollowMasterOnWorldChangeStateFilter` replace the parent list.
 - Global relocation retry settings still come from `TwGlobalConfig`.
+- Relocation timeout or retry exhaustion never creates canonical `LOST`
+  state, regardless of `OnTransferFailure`.
 
 ## Related Pages
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)

@@ -58,40 +58,16 @@ What it enables:
 Fallback behavior:
 - if NameplateBuilder is missing, Tamework naming still works normally and no external nameplate override is registered
 
-### Claim providers
+### SimpleClaims
 Relevant family:
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 
 What it enables:
-- QuestLines Claims `1.3.1`: claim-aware owner assignment, placement, restore, relocation, and breeding admissions
-- SimpleClaims `>=1.0.38 <1.1.0`: the same population admissions plus SimpleClaims-native tamed-target damage policy
+- Direct breeding-per-claim limits and optional claim-required breeding.
+- SimpleClaims-native tamed-target damage policy.
 
-Build metadata is accepted within those release gates. Prerelease versions are rejected until
-their reflected provider contracts have been explicitly verified.
-
-Provider selection:
-
-- `Off` disables claim population checks.
-- An explicit `QuestLinesClaims` or `SimpleClaims` selection is never substituted.
-- `Auto` probes QuestLines Claims first and probes SimpleClaims only when QuestLines Claims is absent or disabled.
-- An installed but not-ready, incompatible, or broken QuestLines Claims is not treated as absent. Active population admissions fail closed instead of falling through to SimpleClaims.
-- Provider and settings changes are picked up by the next operation. A reservation already in flight keeps the provider generation and settings revision with which it was prepared.
-- Apply-time validation refreshes provider topology and committed occupancy, then recomputes headroom while excluding only the reservation's own pending slots. Capacity consumed after preparation therefore invalidates the stale reservation unless the operation is explicitly forced.
-
-Activation and failure behavior:
-
-| Master integration | Relevant population rule | Damage protection | Result |
-| --- | --- | --- | --- |
-| Off | Any | Any | Neither population nor damage probes a provider. Owner limits still work. |
-| On | No positive cap, and not a breeding `BreedingRequiresClaim` check | Off | No claim-provider work. |
-| On | Positive claim cap, or breeding with `BreedingRequiresClaim` | Any | Population resolves the selected provider and fails closed on an unavailable/invalid result. |
-| On | Any | On | Eligible live tamed targets use SimpleClaims damage policy; lookup/integration errors fail open. |
-
-The legacy setting/config name remains `SimpleClaimsEnabled`, but it is the master switch for both claim providers. QuestLines Claims does not provide damage protection.
-
-Claim limits are admission caps, not movement walls. Tamework gates explicit tame/set-owner, owned spawn/release, coop release, recall/teleport, revive, lost recovery, and breeding placements. Natural movement remains allowed; if it makes a claim over-cap, later explicit admissions are denied until occupancy falls.
-
-Owned `ACTIVE` and durably `UNLOADED` companions occupy claims. `CAPTURED`, `COOP`, `DEAD_REVIVABLE`, and `LOST` companions keep their owner slot but do not occupy a claim. SimpleClaims claim extent is resolved within the requested world, so a party's chunks in another world do not inflate the current claim.
+These checks do not create a general claim-population or placement-admission
+system. The ordinary owner cap remains a separate loaded-NPC count.
 
 ### SimpleClaims damage policy
 
@@ -129,7 +105,6 @@ Use `AssetSets` when you want to enable optional bundled assets such as:
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
-- [Population Admission API Reference](/mod/alecs-tamework/population-admission-api-reference)
 
 
 

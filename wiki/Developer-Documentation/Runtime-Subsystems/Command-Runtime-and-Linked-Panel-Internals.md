@@ -17,7 +17,10 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - Command execution: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Panel entry assembly and preferences: `CommandLinkedPanelEntryService`, `CommandLinkedPanelUnloadedNameService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
 - Group flows: `CommandGroupService`, `CommandGroupAssignPageService`, `CommandGroupManagerPageService`
-- Relocation and recovery: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLostRecoveryCoordinator`, `CommandLinkedNpcDeathService`, `CommandLinkedNpcLostService`
+- Relocation: `CommandRelocationDispatchService`, `CommandNpcRelocationService`,
+  `CommandRelocationRetryCoordinator`
+- Canonical status and restoration: `CommandPersistenceView`,
+  `CommandNpcProfileActionResolver`, `CommandCompanionRestorationService`
 
 ## UI layer
 - `TameworkCommandSelectionPage`
@@ -27,16 +30,29 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - `LinkedNpcTraitIndicatorBinder`
 
 ## Persistence model
-Command tools persist linked NPC metadata, group metadata, panel preferences, and active or inactive state directly on the item, while deeper recovery flows use the shared persistence runtime.
+Command tools persist their link list, group metadata, panel preferences, and
+active or inactive selection on item metadata. A link record may also carry the
+stable profile ID so an old entity UUID can be canonicalized.
 
-When canonical identity is known, a command record also carries the stable profile id. Entity UUIDs are replaceable aliases: historical UUIDs resolve back to the same profile before relocation, lost marking, recovery, or spawn decisions. The facade deduplicates by profile and consults only trusted managed-coop indexes; ambiguous legacy identity or rebuilding indexes fail closed.
+The replacement profile projection is the authority for lifecycle status,
+canonical name, and restorable state. Entity UUIDs are replaceable aliases:
+historical UUIDs resolve back to the same profile before relocation,
+restoration, or spawn decisions.
 
 ## Important runtime seams
 - Nearby and linked modes are separate entry sources
-- `LOST` is not just a label; it is part of the recovery model
-- Dead companion flows depend on persisted snapshots and companion policy
-- Ordinary unloaded presentation resolves the latest live state snapshot, then memoized durable profile metadata, before the older display name cached on the command item. Committed dead, captured, and managed-coop snapshots remain higher-priority state authorities.
-- Managed-coop housing is a profile state, not evidence that the companion vanished. Recovery must not spawn while any alias is live, housed, captured, dead, or already replaced.
+- The canonical lifecycle alone determines dead, captured, coop, lost,
+  released, or unresolved status. Command-item display caches cannot override
+  it.
+- Death and Lost restoration require the matching canonical lifecycle plus its
+  persisted snapshot and companion policy.
+- Ordinary unloaded presentation resolves the latest live state snapshot, then
+  durable profile metadata, before the older display name cached on the command
+  item.
+- Death and Lost restoration are free and must not create a second live alias.
+- Relocation retry exhaustion removes the pending relocation and reports a
+  warning. It does not create `LOST`; only positive destructive-removal
+  evidence can author that lifecycle.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

@@ -37,12 +37,14 @@ Capability: `COMMAND_LINKS`
 ## Home Position Resolution
 Tamework resolves `homePosition` in this order:
 1. Live NPC command-links component.
-2. In-memory linked-state snapshot cache.
+2. Last-live immutable command snapshot.
 3. Active persisted snapshot payload (`capture`, `death`, `lost`).
 
 ## Notes
 - Values are detached immutable snapshots (`record` + defensive copies).
 - `listLinkedToolIds(...)` returns an empty set when the profile is not found.
+- Command links are a read model over the canonical profile and current
+  evidence. They are not a second lifecycle or persistence authority.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

@@ -32,7 +32,9 @@ public void start(TameworkApi api) {
 ```
 
 ## Notes
-- `event.profile()` can be `null`; use `npcUuid` as a fallback key if needed.
+- `event.profile()` is nullable for API safety. If it is absent, defer the
+  registration or resolve the profile again; do not promote the live
+  `npcUuid` to a durable cross-mod identity.
 - Close the subscription during plugin shutdown.
 
 ## Related Pages

@@ -11,13 +11,12 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 > **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `profileData()` contract in `TameworkApi`.
 
-Capabilities: `PROFILE_DATA` for legacy reads/writes and
+Capabilities: `PROFILE_DATA` for basic reads/writes and
 `PROFILE_DATA_TRANSACTIONS` for revision-fenced, restart-visible mutations.
 
-Tamework 3.0.0 advertises `PROFILE_DATA_TRANSACTIONS` after the schema-v8
-profile-data repository and idempotent operation journal initialize. Older API
-implementations retain fail-closed binary-compatible defaults, so consumers
-must still require the capability before using the transactional methods.
+Tamework 3.0.0 advertises `PROFILE_DATA_TRANSACTIONS` when the replacement
+profile-data operations are installed over the canonical facade bundle.
+Consumers must require the capability before using the transactional methods.
 
 ## Entry Point
 `TameworkApi.profileData() -> ProfileDataApi`
@@ -28,8 +27,8 @@ must still require the capability before using the transactional methods.
 - `boolean put(String profileId, String namespace, String key, String jsonPayload)`
 - `boolean delete(String profileId, String namespace, String key)`
 
-The legacy `put`/`delete` methods remain for API compatibility, but queue
-acceptance is not a durable cross-mod transaction result. Integrations that
+The simple `put`/`delete` methods return queue acceptance, not a durable
+cross-mod transaction result. Integrations that
 must coordinate material consumption, cooldowns, entitlement, or another
 durable domain should require `PROFILE_DATA_TRANSACTIONS` and use the methods
 below.
@@ -63,8 +62,9 @@ conflicting retry does not overwrite the original operation.
 never authorizes a caller to invent a second idempotency key or compensate as
 though the mutation failed.
 
-The API 0.8-compatible defaults are deliberately empty/unavailable. Require
-`PROFILE_DATA_TRANSACTIONS` before calling them.
+When `PROFILE_DATA_TRANSACTIONS` is not advertised, transactional methods are
+deliberately unavailable. Do not infer support from the presence of their DTO
+classes.
 
 ## Data Model
 Profile-scoped extension data is stored as UTF-8 JSON text keyed by:
@@ -76,8 +76,8 @@ Profile-scoped extension data is stored as UTF-8 JSON text keyed by:
 - `namespace` and `key` must be nonblank.
 - `jsonPayload` must parse as JSON text.
 - `Alechilles:Tamework` is reserved for internal use.
-- Writes go through Tamework's persistence write queue.
-- `put(...)` and `delete(...)` returning `true` proves legacy queue acceptance,
+- Writes go through Tamework's canonical persistence operation boundary.
+- `put(...)` and `delete(...)` returning `true` proves queue acceptance,
   not a restart-visible cross-domain commit.
 
 ## Recommended Namespace

@@ -32,9 +32,6 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "ItemIds": [],
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
-  "CommandFamilyId": null,
-  "RosterStorage": "ItemMetadata",
-  "ProjectRosterToItemMetadata": true,
   "LinkEnabled": true,
   "LinkUseTogglesMembership": true,
   "RequireTamed": true,
@@ -55,9 +52,6 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `ItemIds`: item ids that resolve this config.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.
-- `CommandFamilyId`: stable owner-scoped family shared by equivalent command access items. Required for `OwnerCommandFamily`.
-- `RosterStorage`: `ItemMetadata` (compatibility default) or `OwnerCommandFamily` (durable canonical roster).
-- `ProjectRosterToItemMetadata`: optionally writes a disposable item cache. Copied, stale, or missing metadata never creates or removes canonical membership.
 - `LinkEnabled`: allows persistent link and unlink actions for the tool.
 - `LinkUseTogglesMembership`: makes the link action toggle whether the NPC is in the active membership set.
 - `RequireTamed`: requires targets to be tamed.
@@ -76,7 +70,10 @@ Accepted `MembershipMode` values:
 - `MasterTarget`: target only the current resolved master target.
 - `LinkedOrMasterTarget`: linked companions plus the current master target.
 
-For `RosterStorage: OwnerCommandFamily`, every configured `ItemIds` entry is an equivalent access key to the same `(owner UUID, command family ID)` roster. The panel and command runtime reconstruct membership from SQLite/profile state; the physical item is not the authority.
+Linked membership is stored on the command item. When a record has a canonical
+profile ID, the runtime uses it to resolve entity-UUID aliases and reads
+lifecycle status from the replacement profile projection. The item does not
+maintain independent death, lost, captured, or coop status caches.
 
 ## `AllowedRoles`
 Accepted `Mode` values:

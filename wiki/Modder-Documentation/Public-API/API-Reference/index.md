@@ -20,15 +20,12 @@ This subsection contains the reference contract for each public API family.
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
 - [Policies API Reference](/mod/alecs-tamework/policies-api-reference)
-- [Population Admission API Reference](/mod/alecs-tamework/population-admission-api-reference)
 - [Config Reads API Reference](/mod/alecs-tamework/config-reads-api-reference)
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
-- [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
-- [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
 
 
 

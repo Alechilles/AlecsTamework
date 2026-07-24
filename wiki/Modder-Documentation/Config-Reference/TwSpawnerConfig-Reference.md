@@ -138,7 +138,9 @@ Accepted values:
 - The shipped example asset is `src/main/resources/Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json`.
 - Captured Tamework names and progression metadata are preserved on the item and restored on spawn.
 - Capture owner clearing and spawn owner assignment are settings-owned runtime policy.
-- Spawner capture and spawn also integrate with linked-companion sync and other runtime systems. This config only defines the author-facing policy.
+- Spawner capture and release preserve canonical profile identity and tool-link
+  state through the replacement full-state snapshot. This config only defines
+  the author-facing item policy.
 
 ## Minimal Example
 ```json

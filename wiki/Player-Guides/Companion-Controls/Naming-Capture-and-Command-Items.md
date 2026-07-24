@@ -17,17 +17,22 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Usually store the chosen name so it survives reloads and respawns
 
 ## Capture and spawner items
-- Capture an NPC into an item and later restore that same NPC from the item
+- Capture an NPC into a filled item and later release that same companion from
+  the item
 - Can preserve name, role, attachment choices, tame state, owner state, and progression data
 - May optionally clear ownership on capture and reassign ownership on spawn
 - Can have different empty and filled item variants
+- A successful capture and release move one saved companion between its live
+  and filled-item states; they do not create a second copy
 
 ## Command items
 - Link specific companions to a tool
-- Store command selection and linked companion metadata on the item itself
+- Store command selection, links, and display preferences on the item itself
 - Open the radial menu and linked panel for deeper management
 - Can limit how many linked companions stay active at once
 - Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
+- Read captured, coop, dead, and `LOST` status from the companion's saved
+  lifecycle rather than deciding those states from stale item metadata
 
 Tamework's bundled example command whistle is a development/reference item and
 has no recipe. Servers may give it directly for testing, while production mods
@@ -43,7 +48,13 @@ method.
 - If an item works on one creature but not another, that is usually a role filter from the mod's config.
 - If spawning or naming fails, it is usually because of ownership, tame, cooldown, or allowed-role rules.
 - If a command item looks empty, it may simply have no linked companions yet.
-- A companion shown as housed in a managed coop is not missing. Recovery waits for authoritative coop state instead of creating a replacement.
+- A companion shown as housed in a configured coop is not missing. Release it
+  through that coop instead of trying to create a replacement.
+- A filled capture item cannot be placed directly into a configured coop.
+  Release the companion from the item first, then use the coop's live-creature
+  intake.
+- Restoring a command-linked dead or `LOST` companion is free; the configured
+  policy or death cooldown may still delay or disable the action.
 
 ## Related Pages
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)

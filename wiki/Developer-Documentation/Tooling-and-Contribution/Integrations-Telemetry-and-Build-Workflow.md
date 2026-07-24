@@ -46,6 +46,25 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - Dev runs reference `src/main/resources` directly for faster iteration
 - Asset-pack precedence follows manifest load-order configuration; Tamework does not reorder the engine's pack list at runtime
 
+## Release checklist
+
+The persistence replacement uses the normal Tamework release workflow; it does
+not have a separate candidate builder or rehearsal runtime.
+
+1. Update `pom.xml`, filtered manifests, `CHANGELOG.md`, and user-facing docs to
+   the same version.
+2. Run `./mvnw test`, including the replacement architecture, migration, and
+   crash-recovery gates in the normal suite.
+3. Build the ordinary release artifact and verify its embedded assets and
+   manifest version.
+4. Smoke-test a new world, one public v2-v4 import, direct-live coop
+   capture/release, filled-spawner capture/release, and exact Death/Lost
+   restoration.
+5. Confirm an unreleased v5-v9 source is refused unchanged before publishing.
+
+Whole-world backups remain the server operator's responsibility. The importer
+never modifies a public source database or tester-only refused source.
+
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
 - [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)

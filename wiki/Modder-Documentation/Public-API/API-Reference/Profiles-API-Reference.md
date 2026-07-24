@@ -42,6 +42,9 @@ Capability: `PROFILES`
 - Values are detached immutable snapshots (`record` + defensive copies).
 - Prefer `profileId` for long-lived references; UUIDs can remap.
 - `getActiveSnapshot(...)` returns raw JSON payload text for the active snapshot type.
+- Snapshot names and payloads are data views, not a substitute for Tamework's
+  canonical lifecycle decisions. Do not create a parallel lifecycle state from
+  them.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

@@ -29,6 +29,5 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)
 - [TwDebugConfig Reference](/mod/alecs-tamework/twdebugconfig-reference)
 - [TwCapturePolicyConfig Reference](/mod/alecs-tamework/twcapturepolicyconfig-reference)
-- [TwPopulationGroupConfig Reference](/mod/alecs-tamework/twpopulationgroupconfig-reference)
 
 

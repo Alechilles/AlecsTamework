@@ -28,9 +28,9 @@ Capability: `INTERACTION_EXTENSIONS`
 - `Set<String> listCaptureRequirementIds()`
 
 Capture-requirement methods require `CAPTURE_POLICY` in addition to the base
-`INTERACTION_EXTENSIONS` capability. Older/unwired implementations inherit a
-fail-closed default: registration throws `UnsupportedOperationException` and
-the ID set is empty.
+`INTERACTION_EXTENSIONS` capability. When capture policy is unavailable,
+registration fails closed with `UnsupportedOperationException` and the ID set
+is empty.
 
 ## ID Rules
 - IDs must be nonblank.

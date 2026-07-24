@@ -15,11 +15,15 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 ## What the panel shows
 - Linked companions for the current tool
 - Active and inactive status
-- Loaded, unloaded, dead, or lost state
+- Loaded, unloaded, captured, housed in a coop, dead, or `LOST` state
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
+
+The panel derives captured, coop, dead, and `LOST` status from one saved
+companion lifecycle. Item metadata and an expired recall timer do not override
+that status.
 
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
@@ -41,26 +45,41 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - `Set Home`
 - `Return Home`
 - `Unlink`
-- `Revive` when the command item and companion policy allow it
+- `Revive`, a free restoration action for dead or `LOST` companions when the
+  companion policy and death cooldown allow it
 - Nearby-only `Release` and `Cull` when the mod exposes those actions
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.
-- `Attempting recall` means the tool is still retrying an unloaded companion relocation. The timer
-  shows the remaining retry window. If the companion is confirmed still live at its same-world
-  source when that window expires, it stays linked there instead of being marked lost. Chunks loaded
-  for the attempt remain active until that relocation reaches a terminal result.
-- `Dead` means the tool has a persisted death snapshot and may allow revive after policy and cooldown checks.
-- `LOST` means the tool could not safely complete relocation or travel recovery. In that state, normal recall and return-home actions are usually blocked.
+- `Captured` means the companion is stored in its filled capture item. Release
+  that item normally; recall and return-home do not replace it.
+- `In Coop` means the companion is housed in a configured coop. Release it
+  through that coop; a filled capture item cannot be inserted as a coop
+  resident.
+- `Attempting recall` means the tool is retrying relocation for an unloaded
+  companion. The timer shows only the remaining retry window. When it ends,
+  the attempt stops without inventing a new `LOST` state from timeout or
+  absence.
+- `Dead` means Tamework saved a confirmed death state. `Revive` becomes
+  available when restoration is enabled and the configured cooldown ends.
+- `LOST` means Tamework saved a restorable state after confirmed destructive
+  removal or world-deletion evidence. It is not inferred solely because the
+  companion is off-screen, absent, or took too long to recall.
 
 ## Group tools
 - Some tools support assigning a companion to a group.
 - Group tabs and a group manager let you create, rename, recolor, or delete groups.
 - Group sorting and filtering are especially useful when one tool manages many companions.
+- These groups organize the command UI. They do not change companion storage
+  or owner limits.
 
 ## Practical tips
-- If a companion is `LOST`, look for revive or recovery behavior rather than repeatedly using recall.
-- If a row says `Attempting recall`, wait for the countdown to finish before deciding whether revive or lost recovery is needed.
+- If a companion is dead or `LOST`, use the free `Revive` action when it
+  becomes available instead of repeatedly using recall.
+- If a row says `Attempting recall`, let the current attempt finish before
+  trying again. An expired countdown is not proof that the companion is lost.
+- If a row says `Captured` or `In Coop`, use the matching filled-item or coop
+  release interaction.
 - If the row stays inactive, check whether you intentionally toggled it off for bulk commands.
 - If nearby actions appear only sometimes, move closer and confirm the creature is loaded and owned by you.
 
@@ -69,6 +88,6 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
 
-> [Screenshot Placeholder: Linked panel showing active, inactive, dead, and lost rows]
+> [Screenshot Placeholder: Linked panel showing active, inactive, captured, coop, dead, and lost rows]
 
 

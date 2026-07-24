@@ -8,17 +8,25 @@ draft: false
 
 Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-Tamework can manage certain coop behaviors and can also participate in feed-trough hydration or refill flows.
+Tamework can add direct live-NPC behavior to configured coops and can also
+participate in feed-trough hydration or refill flows.
 
-## Managed coops
+## Configured coops
+
 - Config asset: `TwCoopConfig`
 - Keyed by `CoopId`
-- Used when you want resident continuity, capture and release policy, or coop-specific produce and lifecycle rules
-- An enabled/configured coop is wholly Tamework-authoritative for occupancy and lifecycle; an unmanaged coop remains wholly vanilla.
-- The matching vanilla `FarmingCoopAsset` must explicitly disable `CaptureWildNPCsInRange`; Tamework checks the exact coop id and flag before it accepts authority.
-- Do not add a vanilla-resident observer or second resident ledger beside a managed coop. The current model intentionally avoids the old v2.5 hybrid that caused projection remaps and state drift.
-- Existing vanilla residents are imported through a durable audit journal. Exact matches move into managed slots without a replacement spawn; ambiguous evidence is quarantined and visible through `/tw coop import-status`.
-- Stable profile identity survives projection UUID changes, so command links should follow the profile rather than assuming one permanent entity UUID.
+- Used for live-NPC capture policy, resident capacity, roam/release timing,
+  produce, and state continuity
+- Tamework scans loaded configured coops, captures an eligible live NPC into a
+  canonical coop slot, and later releases that resident as a live NPC.
+- Coops without an enabled matching config retain their ordinary behavior.
+- Filled spawner items never enter this flow. Release the filled item through
+  its normal spawner interaction first.
+- Stable profile identity survives the release UUID change, so command links
+  follow the profile rather than assuming one permanent entity UUID.
+
+There is no second resident ledger, captured-item intake protocol, vanilla
+resident importer, reconciliation journal, or coop repair command surface.
 
 ## Feed-trough support
 - Enabled through feature wiring and, optionally, `TwGlobalConfig.AssetSets.FeedTrough`
@@ -26,12 +34,15 @@ Tamework can manage certain coop behaviors and can also participate in feed-trou
 - Water support includes staged water variants and bucket refill mappings
 
 ## Implementation advice
-- Keep coop behavior scoped to the exact coop ids you intend to hand over to Tamework
-- Keep vanilla automatic wild intake disabled on those exact base coop assets; use the Tamework lifecycle setting for managed automatic capture.
+
+- Keep Tamework behavior scoped to the exact coop IDs you intend to configure.
+- Avoid a second integration that captures or releases the same residents.
 - Treat trough support as part of the needs ecosystem rather than a separate isolated feature
 - Verify that the target item, particle, and resource assets exist before enabling an asset set gate
-- Leave `IdentityRules.PreserveUUID` omitted or `false`; `true` invalidates an enabled managed overlay.
-- Use `/tw coop audit` and `/tw debugdb integrity` after enabling management on an established save.
+- Leave `IdentityRules.PreserveUUID` omitted or `false`; a released live NPC may
+  receive a new entity UUID while retaining its stable profile.
+- Use `/tw debugcoop` for coop-specific runtime logging and `/tw debugdb
+  integrity` for bounded replacement-persistence status.
 
 ## Related Pages
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)

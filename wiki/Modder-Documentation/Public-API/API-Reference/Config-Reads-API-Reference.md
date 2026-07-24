@@ -27,7 +27,9 @@ Role-scoped config families:
 - `getHappinessConfigById(...)` / `resolveHappinessConfigForRole(...)`
 - `getNeedsConfigById(...)` / `resolveNeedsConfigForRole(...)`
 - `getBreedingConfigById(...)` / `resolveBreedingConfigForRole(...)`
+- `getLevelingConfigById(...)` / `resolveLevelingConfigForRole(...)`
 - `getTraitConfigById(...)` / `resolveTraitConfigForRole(...)`
+- `getTalentConfigById(...)` / `resolveTalentConfigForRole(...)`
 
 Item-scoped config families:
 - `getSpawnerConfigById(...)` / `resolveSpawnerConfigForItemId(...)`
@@ -39,10 +41,6 @@ API 0.9 capture views:
 - `getSpawnerCaptureMechanicsById(...)` / `resolveSpawnerCaptureMechanicsForItemId(...)`
 - `getCapturePolicyById(...)` / `resolveCapturePolicyForRole(...)`
 
-API 0.9 population-group views:
-
-- `getPopulationGroupById(...)`
-- `resolvePopulationGroupsForRole(...)`
 
 ## View Types
 - `GlobalConfigView`
@@ -53,15 +51,14 @@ API 0.9 population-group views:
 - `CommandItemConfigView`
 - `SpawnerCaptureMechanicsView`
 - `CapturePolicyConfigView`
-- `PopulationGroupDefinitionView`
 
 ## Notes
 - Returned views are detached immutable DTOs.
 - `detailsJson` fields provide a compact JSON representation of resolved config details.
 - Config reload events are emitted through `events()` as `ConfigReloadedEvent`.
-- API 0.9 default methods return empty views for older/unwired
-  implementations. Require the corresponding feature capability before using
-  a view to enable gameplay.
+- Capture-specific reads return `Optional.empty()` when the capture-policy
+  surface is unavailable. Require `CAPTURE_POLICY` before using those views to
+  enable gameplay.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
