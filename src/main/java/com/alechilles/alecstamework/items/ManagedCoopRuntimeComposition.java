@@ -20,14 +20,12 @@ import javax.annotation.Nonnull;
  * Owns the complete live schema-v5 managed-coop graph and its process-local intake binding.
  *
  * <p>The plugin registers only the three exposed systems. Every lifecycle collaborator shares one
- * trusted composite index epoch, and shutdown clears only this composition's captured-item
- * handler before persistence begins draining.</p>
+ * trusted composite index epoch.</p>
  */
 public final class ManagedCoopRuntimeComposition implements AutoCloseable {
     private final ManagedCoopRuntimeSystem runtimeSystem;
     private final ManagedCoopCaptureSourceRetirementSystem sourceRetirementSystem;
     private final ManagedCoopStaleEntitySuppressionSystem staleEntitySuppressionSystem;
-    private final ManagedCoopItemIntakeHandler itemIntakeHandler;
     private final ManagedCoopImportControl importControl;
     private final ManagedCoopAuthorityEligibilityIndex authorityEligibility;
     private final ManagedCoopCrossWorldAliasRetirementCoordinator crossWorldAliasRetirement;
@@ -69,10 +67,6 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.residentIndex(),
                         services.lifecycleIndex());
 
-        ManagedCoopItemCaptureFinalizer itemFinalizer = new ManagedCoopItemCaptureFinalizer(
-                services.lifecycleRepository(), services.compositeIndexRefreshService());
-        ManagedCoopItemCaptureRecoveryService itemRecovery =
-                new ManagedCoopItemCaptureRecoveryService(itemFinalizer);
         ManagedCoopReleasePresentationDispatcher presentation =
                 new ManagedCoopReleasePresentationDispatcher(
                         services.compositeIndexRefreshService(),
@@ -115,7 +109,6 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.lifecycleIndex(),
                         services.compositeIndexRefreshService(),
                         sourceRetirements,
-                        itemRecovery,
                         releaseRecovery,
                         releaseAdapter,
                         releasePopulations,
@@ -189,17 +182,6 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 sourceRetirements,
                 UUIDComponent.getComponentType(),
                 projectionIdentityType);
-        itemIntakeHandler = new ManagedCoopItemIntakeHandler(
-                new ManagedCoopCapturedItemEnvelopeCodec(),
-                services.occupancyService()::resolveCapturePlacement,
-                persistence.getNpcProfileRepository()::resolveProfileId,
-                captureCoordinator::coordinate,
-                itemFinalizer::complete,
-                persistenceGate);
-        ManagedCoopCapturedItemAuthoringService itemAuthoring =
-                new ManagedCoopCapturedItemAuthoringService(
-                        persistence.getNpcProfileRepository(), snapshots, breedingCancellation);
-        ManagedCoopItemIntakeRuntime.install(itemIntakeHandler, itemAuthoring);
     }
 
     @Nonnull
@@ -233,7 +215,6 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
-            ManagedCoopItemIntakeRuntime.clear(itemIntakeHandler);
             importControl.clearAll();
             authorityEligibility.close();
             crossWorldAliasRetirement.close();

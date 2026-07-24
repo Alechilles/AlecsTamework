@@ -58,7 +58,6 @@ public final class ManagedCoopLifecycleRecoveryService {
     private final CaptureAdvanceGateway captureAdvances;
     private final RefreshGateway refresh;
     private final EntityRetirementGateway entityRetirements;
-    private final ItemRetirementGateway itemRetirements;
     private final ReleaseRecoveryGateway releaseRecovery;
     private final ProjectionGateway projections;
     private final LongSupplier clock;
@@ -73,12 +72,11 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
             @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
             @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
-            @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
             @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations) {
         this(repository, residentIndex, operationIndex, compositeIndexes,
-                entityRetirements, itemRetirements, releaseRecovery, releaseAdapter,
+                entityRetirements, releaseRecovery, releaseAdapter,
                 releasePopulations, ignored -> false);
     }
 
@@ -88,13 +86,12 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
             @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
             @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
-            @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
             @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations,
             @Nonnull Predicate<String> processReleaseInFlight) {
         this(repository, residentIndex, operationIndex, compositeIndexes,
-                entityRetirements, itemRetirements, releaseRecovery, releaseAdapter,
+                entityRetirements, releaseRecovery, releaseAdapter,
                 releasePopulations, processReleaseInFlight,
                 new ManagedCoopLifecycleMutationGate());
     }
@@ -105,7 +102,6 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
             @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
             @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
-            @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
             @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations,
@@ -120,7 +116,6 @@ public final class ManagedCoopLifecycleRecoveryService {
                                 operationId, generation, nowMs)),
                 () -> refresh(compositeIndexes),
                 entityRetirements::retire,
-                itemRetirements::recover,
                 releaseRecovery::resume,
                 new HytaleManagedCoopReleaseProjectionGateway(
                         releaseAdapter, residentIndex, compositeIndexes,
@@ -136,11 +131,10 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull CaptureAdvanceGateway captureAdvances,
             @Nonnull RefreshGateway refresh,
             @Nonnull EntityRetirementGateway entityRetirements,
-            @Nonnull ItemRetirementGateway itemRetirements,
             @Nonnull ReleaseRecoveryGateway releaseRecovery,
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock) {
-        this(evidence, captureAdvances, refresh, entityRetirements, itemRetirements,
+        this(evidence, captureAdvances, refresh, entityRetirements,
                 releaseRecovery, projections, clock, ignored -> false,
                 new ManagedCoopLifecycleMutationGate());
     }
@@ -150,12 +144,11 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull CaptureAdvanceGateway captureAdvances,
             @Nonnull RefreshGateway refresh,
             @Nonnull EntityRetirementGateway entityRetirements,
-            @Nonnull ItemRetirementGateway itemRetirements,
             @Nonnull ReleaseRecoveryGateway releaseRecovery,
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock,
             @Nonnull Predicate<String> processReleaseInFlight) {
-        this(evidence, captureAdvances, refresh, entityRetirements, itemRetirements,
+        this(evidence, captureAdvances, refresh, entityRetirements,
                 releaseRecovery, projections, clock, processReleaseInFlight,
                 new ManagedCoopLifecycleMutationGate());
     }
@@ -165,7 +158,6 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull CaptureAdvanceGateway captureAdvances,
             @Nonnull RefreshGateway refresh,
             @Nonnull EntityRetirementGateway entityRetirements,
-            @Nonnull ItemRetirementGateway itemRetirements,
             @Nonnull ReleaseRecoveryGateway releaseRecovery,
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock,
@@ -175,7 +167,6 @@ public final class ManagedCoopLifecycleRecoveryService {
         this.captureAdvances = Objects.requireNonNull(captureAdvances, "captureAdvances");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
         this.entityRetirements = Objects.requireNonNull(entityRetirements, "entityRetirements");
-        this.itemRetirements = Objects.requireNonNull(itemRetirements, "itemRetirements");
         this.releaseRecovery = Objects.requireNonNull(releaseRecovery, "releaseRecovery");
         this.projections = Objects.requireNonNull(projections, "projections");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -325,8 +316,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                     "capture_recovery_command_invalid");
         }
         if (command.captureSource() == ManagedCoopCaptureSourceEvidence.Status.CAPTURED_ITEM) {
-            return itemRetirements.recover(ready, command.resident())
-                    .thenApply(outcome -> mapItem(command, outcome));
+            return completedStage(RecoveryStatus.BLOCKED, command,
+                    "captured_item_capture_unsupported");
         }
         if (command.captureSource() == ManagedCoopCaptureSourceEvidence.Status.ENTITY_SOURCE) {
             return entityRetirements.retire(ready)
@@ -426,21 +417,6 @@ public final class ManagedCoopLifecycleRecoveryService {
         return switch (outcome.status()) {
             case COMPLETED, ALREADY_COMPLETE ->
                     outcome(RecoveryStatus.CAPTURE_COMPLETED, command, outcome.detail());
-            case BLOCKED -> outcome(RecoveryStatus.BLOCKED, command, outcome.detail());
-            case FAILED -> outcome(RecoveryStatus.FAILED, command, outcome.detail());
-        };
-    }
-
-    private Outcome mapItem(
-            RecoveryCommand command,
-            @Nullable ManagedCoopItemCaptureRecoveryService.Outcome outcome) {
-        if (outcome == null) {
-            return outcome(RecoveryStatus.FAILED, command, "item_recovery_outcome_missing");
-        }
-        return switch (outcome.status()) {
-            case COMPLETED -> outcome(RecoveryStatus.CAPTURE_COMPLETED, command, outcome.detail());
-            case DEDUPLICATED -> outcome(RecoveryStatus.DEDUPLICATED, command, outcome.detail());
-            case WAITING -> outcome(RecoveryStatus.WAITING, command, outcome.detail());
             case BLOCKED -> outcome(RecoveryStatus.BLOCKED, command, outcome.detail());
             case FAILED -> outcome(RecoveryStatus.FAILED, command, outcome.detail());
         };
@@ -582,13 +558,6 @@ public final class ManagedCoopLifecycleRecoveryService {
         @Nonnull
         CompletionStage<ManagedCoopCaptureSourceRetirementService.Outcome> retire(
                 @Nonnull RetirementReady ready);
-    }
-
-    @FunctionalInterface
-    interface ItemRetirementGateway {
-        @Nonnull
-        CompletionStage<ManagedCoopItemCaptureRecoveryService.Outcome> recover(
-                @Nonnull RetirementReady ready, @Nonnull ResidentRecord resident);
     }
 
     @FunctionalInterface

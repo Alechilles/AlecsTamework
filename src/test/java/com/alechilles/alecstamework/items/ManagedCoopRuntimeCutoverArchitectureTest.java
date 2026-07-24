@@ -84,7 +84,7 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
     }
 
     @Test
-    void pluginRegistersOnlyTheV5CompositionAndOwnsStaticIntakeLifecycle() throws Exception {
+    void pluginRegistersOnlyTheV5CompositionWithoutCapturedItemIntake() throws Exception {
         String plugin = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/Tamework.java"));
         String composition = Files.readString(MAIN.resolve(
@@ -97,8 +97,7 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
         assertTrue(plugin.contains("managedCoopRuntime.close()"));
         assertFalse(plugin.contains("CommandCoopManagedWildCaptureSystem"));
         assertFalse(Files.exists(MAIN.resolve("CommandCoopManagedWildCaptureSystem.java")));
-        assertTrue(composition.contains("ManagedCoopItemIntakeRuntime.install("));
-        assertTrue(composition.contains("ManagedCoopItemIntakeRuntime.clear(itemIntakeHandler)"));
+        assertFalse(composition.contains("ManagedCoopItemIntakeRuntime"));
         assertTrue(composition.contains("ManagedCoopVanillaImportBehavior"));
         assertTrue(composition.contains("ManagedCoopRemovedCoopReconciler"));
         assertTrue(composition.contains("new ManagedCoopStaleEntitySuppressionSystem("));

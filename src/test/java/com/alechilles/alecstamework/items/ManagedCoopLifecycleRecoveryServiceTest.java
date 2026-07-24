@@ -67,11 +67,7 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                             new ManagedCoopCaptureSourceRetirementService.Outcome(
                                     ManagedCoopCaptureSourceRetirementService.OutcomeStatus.COMPLETED,
                                     null, null));
-                },
-                (ready, resident) -> CompletableFuture.completedFuture(
-                        new ManagedCoopItemCaptureRecoveryService.Outcome(
-                                ManagedCoopItemCaptureRecoveryService.RecoveryStatus.FAILED,
-                                "wrong_source_route"))
+                }
         );
 
         ManagedCoopLifecycleRecoveryService.Outcome outcome =
@@ -84,10 +80,9 @@ class ManagedCoopLifecycleRecoveryServiceTest {
     }
 
     @Test
-    void capturedItemSourceNeverEntersEntityAbsenceRetirement() {
+    void capturedItemEvidenceFailsClosedAfterCapturedItemFlowRemoval() {
         Fixture fixture = captureFixture(OperationState.SOURCE_RETIRE_REQUESTED, true);
         AtomicInteger entityCalls = new AtomicInteger();
-        AtomicInteger itemCalls = new AtomicInteger();
         ManagedCoopLifecycleRecoveryService service = service(
                 fixture,
                 unexpectedAdvance(),
@@ -95,25 +90,16 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                 ready -> {
                     entityCalls.incrementAndGet();
                     return CompletableFuture.completedFuture(null);
-                },
-                (ready, resident) -> {
-                    itemCalls.incrementAndGet();
-                    assertTrue(resident.snapshotJson().contains(
-                            ManagedCoopCaptureSourceEvidence.SNAPSHOT_FIELD));
-                    return CompletableFuture.completedFuture(
-                            new ManagedCoopItemCaptureRecoveryService.Outcome(
-                                    ManagedCoopItemCaptureRecoveryService.RecoveryStatus.COMPLETED,
-                                    null));
                 }
         );
 
         ManagedCoopLifecycleRecoveryService.Outcome outcome =
                 service.recover("world", List.of()).join();
 
-        assertEquals(ManagedCoopLifecycleRecoveryService.RecoveryStatus.CAPTURE_COMPLETED,
+        assertEquals(ManagedCoopLifecycleRecoveryService.RecoveryStatus.BLOCKED,
                 outcome.status());
+        assertEquals("captured_item_capture_unsupported", outcome.detail());
         assertEquals(0, entityCalls.get());
-        assertEquals(1, itemCalls.get());
     }
 
     @Test
@@ -129,8 +115,7 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                 ready -> {
                     entityCalls.incrementAndGet();
                     return retirement;
-                },
-                (ready, resident) -> CompletableFuture.completedFuture(null));
+                });
 
         CompletableFuture<ManagedCoopLifecycleRecoveryService.Outcome> first =
                 service.recover("world", List.of());
@@ -157,7 +142,6 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
                 fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
                 ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null),
                 operation -> {
                     recoveryCalls.incrementAndGet();
                     return CompletableFuture.completedFuture(
@@ -203,7 +187,6 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
                 fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
                 ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null),
                 operation -> {
                     recoveryCalls.incrementAndGet();
                     return CompletableFuture.failedFuture(
@@ -233,7 +216,6 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
                 fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
                 ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null),
                 operation -> {
                     recoveryCalls.incrementAndGet();
                     return CompletableFuture.failedFuture(
@@ -265,7 +247,6 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
                 fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
                 ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null),
                 operation -> {
                     recoveryCalls.incrementAndGet();
                     return CompletableFuture.completedFuture(
@@ -306,7 +287,6 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
                 fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
                 ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null),
                 operation -> CompletableFuture.completedFuture(
                         new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
                                 ManagedCoopReleaseRecoveryService.Status.READY,
@@ -334,8 +314,7 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         Fixture fixture = importFixture();
         ManagedCoopLifecycleRecoveryService service = service(
                 fixture, unexpectedAdvance(), unexpectedRefresh(),
-                ready -> CompletableFuture.completedFuture(null),
-                (ready, resident) -> CompletableFuture.completedFuture(null));
+                ready -> CompletableFuture.completedFuture(null));
 
         ManagedCoopLifecycleRecoveryService.Outcome outcome =
                 service.recover("world", List.of()).join();
@@ -348,10 +327,9 @@ class ManagedCoopLifecycleRecoveryServiceTest {
             Fixture fixture,
             ManagedCoopLifecycleRecoveryService.CaptureAdvanceGateway advances,
             ManagedCoopLifecycleRecoveryService.RefreshGateway refresh,
-            ManagedCoopLifecycleRecoveryService.EntityRetirementGateway entity,
-            ManagedCoopLifecycleRecoveryService.ItemRetirementGateway item) {
+            ManagedCoopLifecycleRecoveryService.EntityRetirementGateway entity) {
         return new ManagedCoopLifecycleRecoveryService(
-                fixture.evidence(), advances, refresh, entity, item,
+                fixture.evidence(), advances, refresh, entity,
                 operation -> CompletableFuture.completedFuture(
                         new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
                                 ManagedCoopReleaseRecoveryService.Status.FAILED,
