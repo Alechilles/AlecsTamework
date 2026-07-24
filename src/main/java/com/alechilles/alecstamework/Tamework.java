@@ -1004,7 +1004,8 @@ public class Tamework extends JavaPlugin {
         if (getCommandRegistry() != null) {
             getCommandRegistry().registerCommand(
                     new TameworkCommandRoot(
-                            persistenceComposition.diagnosticsReader()
+                            persistenceComposition.diagnosticsReader(),
+                            persistenceComposition.diagnosticsExporter()
                     )
             );
         }

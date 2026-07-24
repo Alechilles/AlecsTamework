@@ -28,6 +28,8 @@ import com.alechilles.alecstamework.persistence.control
         .PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.control
         .PersistenceStartupReport;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.runtime
         .HytalePersistenceLiveBoundariesFactory;
 import com.alechilles.alecstamework.persistence.runtime
@@ -67,6 +69,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final HytaleLogger logger;
     private final LoadedNpcIdentityBootstrapService identityBootstrap;
     private final PersistenceBootstrap bootstrap;
+    private final PersistenceDiagnosticExporter diagnosticsExporter;
     private final PersistenceDomainFacades facades;
     private final CommandLinkedNpcStateSnapshotService snapshots;
     private final SpawnerCaptureAuthor captureAuthor;
@@ -80,6 +83,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             HytaleLogger logger,
             LoadedNpcIdentityBootstrapService identityBootstrap,
             PersistenceBootstrap bootstrap,
+            PersistenceDiagnosticExporter diagnosticsExporter,
             PersistenceDomainFacades facades,
             CommandLinkedNpcStateSnapshotService snapshots,
             SpawnerCaptureAuthor captureAuthor,
@@ -92,6 +96,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.logger = logger;
         this.identityBootstrap = identityBootstrap;
         this.bootstrap = bootstrap;
+        this.diagnosticsExporter = diagnosticsExporter;
         this.facades = facades;
         this.snapshots = snapshots;
         this.captureAuthor = captureAuthor;
@@ -190,6 +195,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 .join();
         requireProjectionsBuilt(initial, bootstrap);
         PersistenceDomainFacades facades = bootstrap.facades();
+        PersistenceDiagnosticExporter diagnosticsExporter =
+                new PersistenceDiagnosticExporter(
+                        paths.targetDirectory(),
+                        bootstrap.diagnosticsReader()
+                );
         TameworkPersistenceAuthors.Bundle authors =
                 TameworkPersistenceAuthors.create(
                         logger,
@@ -201,6 +211,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 logger,
                 identityBootstrap,
                 bootstrap,
+                diagnosticsExporter,
                 facades,
                 authors.snapshots(),
                 authors.captureAuthor(),
@@ -307,6 +318,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     @Nonnull
     PersistenceDiagnosticsReader diagnosticsReader() {
         return bootstrap.diagnosticsReader();
+    }
+
+    @Nonnull
+    PersistenceDiagnosticExporter diagnosticsExporter() {
+        return diagnosticsExporter;
     }
 
     @Nonnull

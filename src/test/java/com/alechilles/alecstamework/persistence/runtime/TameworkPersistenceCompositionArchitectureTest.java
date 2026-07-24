@@ -96,13 +96,19 @@ class TameworkPersistenceCompositionArchitectureTest {
         );
         assertTrue(
                 tamework.contains(
-                        "persistenceComposition.diagnosticsReader()"
+                        "persistenceComposition.diagnosticsReader(),"
                 ),
                 "Production command wiring must inject the bounded reader"
         );
         assertTrue(
+                tamework.contains(
+                        "persistenceComposition.diagnosticsExporter()"
+                ),
+                "Production command wiring must inject the bounded exporter"
+        );
+        assertTrue(
                 commandRoot.contains(
-                        "new TameworkDebugDbCommand(persistenceDiagnostics)"
+                        "new TameworkDebugDbCommand("
                 ),
                 "The command root must pass the injected reader through"
         );

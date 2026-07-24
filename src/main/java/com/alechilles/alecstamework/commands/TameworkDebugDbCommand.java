@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDiagnosticsReader;
@@ -19,15 +21,24 @@ import javax.annotation.Nullable;
 public final class TameworkDebugDbCommand
         extends AbstractTameworkServerCommand {
     private final PersistenceDiagnosticsReader diagnostics;
+    private final PersistenceDiagnosticExporter exporter;
 
     public TameworkDebugDbCommand(
             @Nullable PersistenceDiagnosticsReader diagnostics
+    ) {
+        this(diagnostics, null);
+    }
+
+    public TameworkDebugDbCommand(
+            @Nullable PersistenceDiagnosticsReader diagnostics,
+            @Nullable PersistenceDiagnosticExporter exporter
     ) {
         super(
                 "debugdb",
                 "Inspect bounded replacement persistence diagnostics."
         );
         this.diagnostics = diagnostics;
+        this.exporter = exporter;
         setAllowsExtraArguments(true);
     }
 
@@ -47,7 +58,15 @@ public final class TameworkDebugDbCommand
             printDetail(context);
             return;
         }
-        send(context, "Usage: /tw debugdb [status|health|integrity|detail]");
+        if ("export".equals(action)) {
+            export(context);
+            return;
+        }
+        send(
+                context,
+                "Usage: /tw debugdb "
+                        + "[status|health|integrity|detail|export]"
+        );
     }
 
     private void printStatus(CommandContext context) {
@@ -105,6 +124,32 @@ public final class TameworkDebugDbCommand
         });
     }
 
+    private void export(CommandContext context) {
+        if (exporter == null) {
+            send(context, "Persistence diagnostic export is unavailable.");
+            return;
+        }
+        send(context, "Collecting bounded persistence diagnostics...");
+        exporter.export().whenComplete((result, failure) -> {
+            if (failure != null || result == null) {
+                send(
+                        context,
+                        "Persistence diagnostic export failed; "
+                                + "see the server log."
+                );
+                return;
+            }
+            send(
+                    context,
+                    "Persistence bundle "
+                            + shortId(result.supportId())
+                            + " created (" + result.memberCount()
+                            + " files, " + result.sizeBytes()
+                            + " bytes): " + result.path()
+            );
+        });
+    }
+
     private long accepted(PublicPersistenceMetricsSnapshot metrics) {
         return metrics.features().values().stream()
                 .mapToLong(value -> value.writesAccepted()).sum();
@@ -147,6 +192,10 @@ public final class TameworkDebugDbCommand
 
     private String text(@Nullable String value) {
         return value == null || value.isBlank() ? "<none>" : value;
+    }
+
+    private String shortId(String value) {
+        return value.substring(0, Math.min(12, value.length()));
     }
 
     private void send(CommandContext context, String message) {
