@@ -411,6 +411,9 @@ class SqliteProvisioningActivationOperationsTest {
                         LiveOperationResult.confirmed("capture")
                                 .completed(),
                 (request, operation) ->
+                        LiveOperationResult.confirmed("capture-release")
+                                .completed(),
+                (request, operation) ->
                         LiveOperationResult.confirmed("restore")
                                 .completed(),
                 (request, operation) ->

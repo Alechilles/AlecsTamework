@@ -511,6 +511,11 @@ class SqliteOwnerPopulationReconciliationOperationsTest {
                 (request, operation) ->
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed(
+                                        "capture_release"
+                                ).completed(),
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed(
                                         "restoration"
                                 ).completed(),
                 (request, operation) ->

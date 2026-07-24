@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
@@ -87,6 +88,21 @@ public final class PublicPersistenceOperations {
                 idempotencyKey,
                 capture,
                 boundaries.captures()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission releaseCapturedCompanion(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionCaptureReleaseRequest release
+    ) {
+        var submitted = adapter.captureReleaseOperations().submit(
+                operationId,
+                idempotencyKey,
+                release,
+                boundaries.capturedReleases()
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

@@ -116,6 +116,9 @@ class PublicPersistenceRuntimeImportTest {
                                         .confirmed("capture_confirmed")
                                         .completed(),
                                 (request, operation) -> LiveOperationResult
+                                        .confirmed("capture_release_confirmed")
+                                        .completed(),
+                                (request, operation) -> LiveOperationResult
                                         .confirmed("restoration_confirmed")
                                         .completed(),
                                 (request, operation) -> LiveOperationResult

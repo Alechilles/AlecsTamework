@@ -1,0 +1,371 @@
+package com.alechilles.alecstamework.persistence.adapter.sqlite;
+
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseEventCodec;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseLiveBoundary;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseOutcome;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationRequest;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
+import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.LongSupplier;
+import javax.annotation.Nonnull;
+
+/** One lifecycle-fenced, receipt-first captured-artifact release workflow. */
+public final class SqliteCompanionCaptureReleaseOperations {
+    public static final String FEATURE_SCOPE = "companion_capture_release";
+    public static final ProjectionEventType EVENT_TYPE =
+            new ProjectionEventType("companion_capture_released");
+
+    private final SqliteLiveOperationCoordinator workflow;
+    private final SqliteOperationEngine operations;
+    private final LongSupplier clock;
+    private final List<ProjectionConsumer> requiredConsumers;
+
+    public SqliteCompanionCaptureReleaseOperations(
+            @Nonnull SqliteOperationEngine operations,
+            @Nonnull SqliteOperationPublisher publisher,
+            @Nonnull LongSupplier clock,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers
+    ) {
+        if (operations == null || publisher == null || clock == null
+                || requiredConsumers == null) {
+            throw new IllegalArgumentException(
+                    "Captured-artifact release dependencies are required"
+            );
+        }
+        workflow = new SqliteLiveOperationCoordinator(
+                operations,
+                publisher,
+                clock
+        );
+        this.operations = operations;
+        this.clock = clock;
+        this.requiredConsumers = List.copyOf(requiredConsumers);
+    }
+
+    /** Starts or resumes one exact inventory- and spawn-receipt-correlated release. */
+    @Nonnull
+    public Submission submit(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionCaptureReleaseRequest release,
+            @Nonnull CompanionCaptureReleaseLiveBoundary liveBoundary
+    ) {
+        if (operationId == null || idempotencyKey == null
+                || release == null || liveBoundary == null) {
+            throw new IllegalArgumentException(
+                    "Complete captured-artifact release is required"
+            );
+        }
+        OperationRequest<CompanionCaptureReleaseRequest> request =
+                new OperationRequest<>(
+                        operationId,
+                        idempotencyKey,
+                        release,
+                        FEATURE_SCOPE,
+                        release.expectedLifecycleRevision(),
+                        List.of(OperationScope.profile(release.profileId())),
+                        release.requestedAtMs()
+                );
+        SqliteLiveOperationCoordinator.Submission submission =
+                workflow.execute(
+                        CompanionCaptureReleaseDefinition.INSTANCE,
+                        request,
+                        new SqliteCompanionCaptureReleasePreparation(release),
+                        liveBoundary,
+                        this::commitRelease,
+                        requiredConsumers,
+                        FEATURE_SCOPE
+                );
+        CompletionStage<OperationWorkflowResult> completion =
+                submission.completion().thenCompose(result -> {
+                    if (result.status()
+                            != OperationWorkflowResult.Status.LIVE_UNKNOWN
+                            || result.operation() == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    return containUnknown(result.operation(), release, result);
+                }).thenCompose(result -> releaseProjectionHold(
+                        liveBoundary,
+                        release,
+                        result
+                ));
+        return new Submission(submission.acceptance(), completion);
+    }
+
+    private CompletionStage<OperationWorkflowResult> releaseProjectionHold(
+            CompanionCaptureReleaseLiveBoundary liveBoundary,
+            CompanionCaptureReleaseRequest release,
+            OperationWorkflowResult result
+    ) {
+        if (result.status() != OperationWorkflowResult.Status.PUBLISHED
+                || result.operation() == null) {
+            return CompletableFuture.completedFuture(result);
+        }
+        CompletionStage<Void> releaseStage;
+        try {
+            releaseStage = liveBoundary.releaseProjectionHold(
+                    release,
+                    result.operation()
+            );
+        } catch (Throwable ignored) {
+            return CompletableFuture.completedFuture(result);
+        }
+        if (releaseStage == null) {
+            return CompletableFuture.completedFuture(result);
+        }
+        return releaseStage.handle((ignored, failure) -> result);
+    }
+
+    private CompletionStage<OperationWorkflowResult> containUnknown(
+            OperationEnvelope operation,
+            CompanionCaptureReleaseRequest release,
+            OperationWorkflowResult result
+    ) {
+        return operations.containUnknown(
+                operation,
+                operation.failureCode() == null
+                        ? "capture_release_live_outcome_unknown"
+                        : operation.failureCode(),
+                "Captured-artifact release could not prove both the exact "
+                        + "inventory and entity receipts",
+                List.of(
+                        OperationScope.operation(operation.operationId()),
+                        OperationScope.profile(release.profileId())
+                ),
+                clock.getAsLong()
+        ).completion().thenApply(containment -> {
+            if (containment instanceof
+                    com.alechilles.alecstamework.persistence.kernel
+                    .PersistenceTransactionResult.Committed<?>) {
+                return result;
+            }
+            return new OperationWorkflowResult(
+                    OperationWorkflowResult.Status.LIVE_UNKNOWN,
+                    operation,
+                    List.of(),
+                    new IllegalStateException(
+                            "capture_release_unknown_containment_failed",
+                            result.failure()
+                    )
+            );
+        });
+    }
+
+    private List<ProjectionEventDraft> commitRelease(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionCaptureReleaseRequest release,
+            long releasedAtMs
+    ) {
+        CompanionLifecycle fenced = requireFencedLifecycle(
+                transaction,
+                operation,
+                release
+        );
+        CompanionProfileProjectionState before =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        release.profileId()
+                );
+        requireApplied(
+                transaction.identities().promoteAlias(
+                        release.targetAlias(),
+                        operation.operationId(),
+                        releasedAtMs
+                ),
+                "capture_release_alias_promotion"
+        );
+        requireApplied(
+                transaction.snapshots().retireCurrent(
+                        release.sourceSnapshot().snapshotId()
+                ),
+                "capture_release_snapshot_retirement"
+        );
+        CompanionLifecycle active = active(
+                fenced,
+                release,
+                releasedAtMs
+        );
+        requireApplied(
+                transaction.lifecycles().transition(new LifecycleTransition(
+                        fenced.revision(),
+                        operation.operationId(),
+                        active
+                )),
+                "capture_release_lifecycle"
+        );
+        CompanionProfileProjectionState after =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction,
+                        release.profileId()
+                );
+        return events(
+                operation,
+                release,
+                fenced,
+                active,
+                before,
+                after,
+                releasedAtMs
+        );
+    }
+
+    private CompanionLifecycle active(
+            CompanionLifecycle fenced,
+            CompanionCaptureReleaseRequest release,
+            long releasedAtMs
+    ) {
+        return new CompanionLifecycle(
+                release.profileId(),
+                fenced.ownerId(),
+                LifecycleState.ACTIVE,
+                LifecycleLocation.liveEntity(
+                        release.targetAlias().toString(),
+                        release.targetWorldKey()
+                ),
+                fenced.revision().next(),
+                null,
+                releasedAtMs,
+                fenced.lastReconciledGeneration(),
+                fenced.quarantineIncidentId(),
+                fenced.ownerId() == null
+                        ? null
+                        : release.targetWorldKey()
+        );
+    }
+
+    private List<ProjectionEventDraft> events(
+            OperationEnvelope operation,
+            CompanionCaptureReleaseRequest release,
+            CompanionLifecycle fenced,
+            CompanionLifecycle active,
+            CompanionProfileProjectionState before,
+            CompanionProfileProjectionState after,
+            long releasedAtMs
+    ) {
+        CompanionCaptureReleaseOutcome outcome =
+                new CompanionCaptureReleaseOutcome(
+                        release.profileId(),
+                        release.sourceSnapshot().snapshotId(),
+                        release.targetAlias(),
+                        release.targetWorldKey(),
+                        active.revision(),
+                        release.inventoryReceiptKey(),
+                        release.spawnReceiptKey(),
+                        releasedAtMs
+                );
+        CompanionProfileProjectionChange change =
+                new CompanionProfileProjectionChange(
+                        CompanionProfileProjectionChange.Source.LIFECYCLE,
+                        release.profileId(),
+                        active.revision().value(),
+                        before,
+                        after,
+                        releasedAtMs
+                );
+        return List.of(
+                new ProjectionEventDraft(
+                        operation.operationId(),
+                        EVENT_TYPE,
+                        "capture-release-result:" + release.profileId(),
+                        active.revision().value(),
+                        CompanionCaptureReleaseEventCodec.VERSION,
+                        CompanionCaptureReleaseEventCodec.encode(outcome),
+                        releasedAtMs
+                ),
+                SqliteCompanionProfileProjectionComposer.event(
+                        operation.operationId(),
+                        change
+                ),
+                CompanionLifecycleProjectionChangeCodec.draft(
+                        operation.operationId(),
+                        fenced,
+                        active,
+                        releasedAtMs
+                )
+        );
+    }
+
+    private CompanionLifecycle requireFencedLifecycle(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionCaptureReleaseRequest release
+    ) {
+        CompanionLifecycle lifecycle = transaction.lifecycles()
+                .findByProfile(release.profileId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "capture_release_lifecycle_missing"
+                ));
+        if (!lifecycle.revision().equals(
+                release.expectedLifecycleRevision().next()
+        )
+                || lifecycle.state() != LifecycleState.CAPTURED
+                || !operation.operationId().equals(
+                lifecycle.activeOperationId()
+        )
+                || lifecycle.quarantined()
+                || transaction.snapshots()
+                .findById(release.sourceSnapshot().snapshotId())
+                .filter(release.sourceSnapshot()::equals)
+                .filter(snapshot -> transaction.snapshots()
+                        .findCurrent(
+                                release.profileId(),
+                                release.sourceSnapshot().kind()
+                        )
+                        .filter(snapshot::equals)
+                        .isPresent())
+                .isEmpty()) {
+            throw new IllegalStateException(
+                    "capture_release_lifecycle_fence_mismatch"
+            );
+        }
+        return lifecycle;
+    }
+
+    private <T> T requireApplied(
+            PersistenceMutationResult<T> result,
+            String operation
+    ) {
+        if (result == null || !result.applied()) {
+            throw new IllegalStateException(
+                    operation + "_" + (result == null
+                            ? "null"
+                            : result.status().name().toLowerCase())
+            );
+        }
+        return result.value();
+    }
+
+    /** Writer admission for preparation plus the eventual exact workflow result. */
+    public record Submission(
+            @Nonnull SqliteSingleWriter.WriteAcceptance acceptance,
+            @Nonnull CompletionStage<OperationWorkflowResult> completion
+    ) {
+        public Submission {
+            if (acceptance == null || completion == null) {
+                throw new IllegalArgumentException(
+                        "Captured-artifact release submission is incomplete"
+                );
+            }
+        }
+    }
+}

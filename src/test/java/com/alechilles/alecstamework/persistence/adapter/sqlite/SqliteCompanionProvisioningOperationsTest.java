@@ -417,6 +417,10 @@ class SqliteCompanionProvisioningOperationsTest {
                                 .completed(),
                 (request, operation) ->
                         com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.confirmed("capture-release")
+                                .completed(),
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed("restore")
                                 .completed(),
                 (request, operation) ->

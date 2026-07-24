@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
@@ -43,6 +44,7 @@ final class SqlitePublicOperationSet {
     private final SqliteProvisioningActivationOperations
             provisioningActivations;
     private final SqliteCompanionCaptureOperations captures;
+    private final SqliteCompanionCaptureReleaseOperations captureReleases;
     private final SqliteCompanionDormantOperations dormant;
     private final SqliteCompanionRestorationOperations restorations;
     private final SqlitePaidRevivalOperations paidRevivals;
@@ -171,6 +173,14 @@ final class SqlitePublicOperationSet {
                         CompanionCaptureDefinition.INSTANCE.kind()
                 )
         );
+        captureReleases = new SqliteCompanionCaptureReleaseOperations(
+                engine,
+                publisher,
+                clock,
+                projections.requiredFor(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind()
+                )
+        );
         dormant = new SqliteCompanionDormantOperations(
                 engine,
                 evidence,
@@ -279,6 +289,10 @@ final class SqlitePublicOperationSet {
 
     SqliteCompanionCaptureOperations captures() {
         return captures;
+    }
+
+    SqliteCompanionCaptureReleaseOperations captureReleases() {
+        return captureReleases;
     }
 
     SqliteCompanionDormantOperations dormant() {

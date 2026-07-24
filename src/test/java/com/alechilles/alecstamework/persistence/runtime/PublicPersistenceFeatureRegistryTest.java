@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
@@ -53,7 +54,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(19, operationKinds.size());
+        assertEquals(20, operationKinds.size());
 
         PersistenceFeatureDescriptor economics = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
@@ -69,6 +70,12 @@ class PublicPersistenceFeatureRegistryTest {
         assertTrue(capture.startupDependencies().contains(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
         ));
+        assertEquals(
+                Set.of(OperationScopeType.PROFILE),
+                capture.operationScopes().get(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind()
+                )
+        );
         PersistenceFeatureDescriptor paidRevival =
                 registry.requireFeature(
                         PublicPersistenceFeatureRegistry.PAID_REVIVAL

@@ -105,6 +105,9 @@ class CommandLinkedNpcStateSnapshotServiceTest {
                 TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE
         )));
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
+                TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE
+        )));
+        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE
         )));
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(

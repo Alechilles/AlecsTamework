@@ -23,6 +23,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 /**
@@ -32,6 +33,7 @@ import javax.annotation.Nonnull;
  * operation transaction. No feature-specific phase vocabulary is permitted here.</p>
  */
 public final class SqliteOperationStore implements OperationStore {
+    static final int MAX_RECOVERY_EXCLUSIONS = 30_000;
     private static final String SELECT_COLUMNS = """
             operation_id, idempotency_key, operation_kind, payload_version, payload_json,
             phase, feature_scope, expected_lifecycle_revision, lease_owner, lease_until_ms,
@@ -194,13 +196,47 @@ public final class SqliteOperationStore implements OperationStore {
 
     @Override
     public List<OperationEnvelope> findRecoverable(long nowMs, int limit) {
+        return findRecoverable(nowMs, limit, Set.of());
+    }
+
+    @Override
+    public List<OperationEnvelope> findRecoverable(
+            long nowMs,
+            int limit,
+            Set<OperationId> excludedOperationIds
+    ) {
         if (limit <= 0 || limit > 10_000) {
             throw new IllegalArgumentException("Recovery operation limit must be between 1 and 10000");
         }
+        if (excludedOperationIds == null
+                || excludedOperationIds.stream()
+                .anyMatch(java.util.Objects::isNull)
+                || excludedOperationIds.size()
+                > MAX_RECOVERY_EXCLUSIONS) {
+            throw new IllegalArgumentException(
+                    "Recovery operation exclusions must contain at most "
+                            + MAX_RECOVERY_EXCLUSIONS
+                            + " operation IDs"
+            );
+        }
+        List<OperationId> excluded = excludedOperationIds.stream()
+                .sorted(java.util.Comparator.comparing(
+                        OperationId::toString
+                ))
+                .toList();
+        String exclusionClause = excluded.isEmpty()
+                ? ""
+                : " AND operation_id NOT IN ("
+                + String.join(
+                        ",",
+                        java.util.Collections.nCopies(excluded.size(), "?")
+                )
+                + ")";
         String sql = "SELECT " + SELECT_COLUMNS + """
                  FROM operation_envelope
                  WHERE phase NOT IN (%s)
                    AND (lease_owner IS NULL OR lease_until_ms <= ?)
+                   %s
                    AND NOT EXISTS (
                        SELECT 1
                        FROM persistence_quarantine quarantine
@@ -210,10 +246,14 @@ public final class SqliteOperationStore implements OperationStore {
                    )
                  ORDER BY created_at_ms, operation_id
                  LIMIT ?
-                """.formatted(TERMINAL_PHASES);
+                """.formatted(TERMINAL_PHASES, exclusionClause);
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, nowMs);
-            statement.setInt(2, limit);
+            int parameter = 1;
+            statement.setLong(parameter++, nowMs);
+            for (OperationId operationId : excluded) {
+                statement.setString(parameter++, operationId.toString());
+            }
+            statement.setInt(parameter, limit);
             ArrayList<OperationEnvelope> operations = new ArrayList<>();
             try (ResultSet row = statement.executeQuery()) {
                 while (row.next()) {

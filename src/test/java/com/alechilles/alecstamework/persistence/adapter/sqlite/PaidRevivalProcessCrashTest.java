@@ -184,6 +184,9 @@ class PaidRevivalProcessCrashTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed("capture").completed(),
                 (request, operation) ->
+                        LiveOperationResult.confirmed("capture_release")
+                                .completed(),
+                (request, operation) ->
                         LiveOperationResult.confirmed("restoration").completed(),
                 (request, operation) ->
                         LiveOperationResult.confirmed("coop_capture").completed(),

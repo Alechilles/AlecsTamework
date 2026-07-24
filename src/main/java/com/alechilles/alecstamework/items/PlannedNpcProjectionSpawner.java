@@ -84,7 +84,8 @@ public final class PlannedNpcProjectionSpawner {
         return isNonBlank(marker.getProfileId())
                 && isNonBlank(marker.getOperationId())
                 && (TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(kind)
-                    || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind));
+                    || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
+                    || TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE.equals(kind));
     }
 
     private boolean matchesExpectedIdentity(@Nullable SpawnedProjection spawned,

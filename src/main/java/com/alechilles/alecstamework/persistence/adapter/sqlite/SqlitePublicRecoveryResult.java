@@ -10,11 +10,13 @@ public record SqlitePublicRecoveryResult(
         @Nonnull Status status,
         int passCount,
         int completedCount,
+        int deferredCount,
         @Nonnull List<OperationScope> quarantinedScopes,
         @Nullable Throwable failure
 ) {
     public SqlitePublicRecoveryResult {
         if (status == null || passCount < 0 || completedCount < 0
+                || deferredCount < 0
                 || quarantinedScopes == null
                 || quarantinedScopes.stream().anyMatch(java.util.Objects::isNull)
                 || (status == Status.COMPLETE) != (failure == null)) {

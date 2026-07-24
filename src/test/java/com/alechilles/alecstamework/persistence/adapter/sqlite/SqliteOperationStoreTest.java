@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -142,6 +143,61 @@ class SqliteOperationStoreTest {
                     OPERATION_A, OperationPhase.PREPARED, OperationPhase.LIVE_APPLYING,
                     "worker-b", null, null, -6_000
             )).applied());
+            connection.commit();
+        }
+    }
+
+    @Test
+    void retryableRecoveryClearsItsLeaseForAnHonestFutureClaim()
+            throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteOperationStore store = new SqliteOperationStore(connection);
+            store.prepare(prepared(OPERATION_A, "retry-key", "{}"));
+            OperationEnvelope claimed = store.acquireLease(
+                    new OperationLeaseRequest(
+                            OPERATION_A,
+                            "startup-worker",
+                            -9_000,
+                            -8_000
+                    )
+            ).value();
+            OperationEnvelope applying = store.transition(
+                    new OperationTransition(
+                            OPERATION_A,
+                            OperationPhase.PREPARED,
+                            OperationPhase.LIVE_APPLYING,
+                            claimed.leaseOwner(),
+                            null,
+                            null,
+                            -8_900
+                    )
+            ).value();
+
+            OperationEnvelope retryable = store.transition(
+                    new OperationTransition(
+                            OPERATION_A,
+                            OperationPhase.LIVE_APPLYING,
+                            OperationPhase.RETRYABLE,
+                            applying.leaseOwner(),
+                            "live",
+                            "actor_unavailable",
+                            -8_800
+                    )
+            ).value();
+
+            assertEquals(null, retryable.leaseOwner());
+            assertEquals(0, retryable.leaseUntilMs());
+            assertEquals(
+                    List.of(OPERATION_A),
+                    store.findRecoverable(-8_500, 10).stream()
+                            .map(OperationEnvelope::operationId)
+                            .toList()
+            );
+            assertTrue(store.findRecoverable(
+                    -8_500,
+                    10,
+                    Set.of(OPERATION_A)
+            ).isEmpty());
             connection.commit();
         }
     }

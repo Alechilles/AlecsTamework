@@ -133,6 +133,7 @@ class ReplacementPersistencePerformanceGateTest {
     private PublicPersistenceLiveBoundaries boundaries() {
         return new PublicPersistenceLiveBoundaries(
                 (request, operation) -> confirmed("capture"),
+                (request, operation) -> confirmed("capture_release"),
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),
                 (request, operation) -> confirmed("coop_release"),

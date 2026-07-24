@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.operation;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 /**
@@ -35,4 +36,11 @@ public interface OperationStore {
 
     @Nonnull
     List<OperationEnvelope> findRecoverable(long nowMs, int limit);
+
+    @Nonnull
+    List<OperationEnvelope> findRecoverable(
+            long nowMs,
+            int limit,
+            @Nonnull Set<OperationId> excludedOperationIds
+    );
 }

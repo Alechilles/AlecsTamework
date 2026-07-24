@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
@@ -188,6 +190,18 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().idempotencyKey(),
                                 payload(claim, CompanionCaptureRequest.class),
                                 boundaries.captures()
+                        ).completion()
+                ),
+                Map.entry(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                        claim -> operations.captureReleases().submit(
+                                claim.operation().operationId(),
+                                claim.operation().idempotencyKey(),
+                                payload(
+                                        claim,
+                                        CompanionCaptureReleaseRequest.class
+                                ),
+                                boundaries.capturedReleases()
                         ).completion()
                 ),
                 Map.entry(

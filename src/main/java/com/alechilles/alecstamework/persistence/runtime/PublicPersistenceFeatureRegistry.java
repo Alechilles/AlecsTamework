@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
@@ -291,13 +292,18 @@ public final class PublicPersistenceFeatureRegistry {
                 CAPTURE,
                 PersistenceFeatureDomain.CAPTURE,
                 Set.of(),
-                List.of(CompanionCaptureDefinition.INSTANCE),
+                List.of(
+                        CompanionCaptureDefinition.INSTANCE,
+                        CompanionCaptureReleaseDefinition.INSTANCE
+                ),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionCaptureDefinition.INSTANCE,
                         Set.of(
                                 OperationScopeType.PROFILE,
                                 OperationScopeType.OWNER
-                        )
+                        ),
+                        CompanionCaptureReleaseDefinition.INSTANCE,
+                        Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE, ECONOMIC_COMPENSATION),
                 Set.of(

@@ -307,16 +307,64 @@ class HytaleCompanionProjectionSpawnExecutorTest {
         }
     }
 
+    @Test
+    void productionAttemptAcceptsCaptureReleaseProjectionMarker() {
+        ComponentRegistry<EntityStore> registry = new ComponentRegistry<>();
+        Store<EntityStore> store = registry.addStore(null, null);
+        CapturingSpawnGateway capture = new CapturingSpawnGateway();
+        PlannedNpcProjectionSpawner spawner = new PlannedNpcProjectionSpawner(
+                (request, target) -> {
+                    throw new AssertionError("Failed gateway must not install");
+                },
+                capture
+        );
+        HytaleCompanionProjectionAttemptGateway attempts =
+                new HytaleCompanionProjectionAttemptGateway(
+                        null,
+                        store,
+                        spawner,
+                        new PlannedNpcProjectionPostAddService()
+                );
+        ProjectionCommand release = command(
+                "capture_release",
+                TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE
+        );
+        try {
+            SpawnAttempt result = attempts.spawn(
+                    release,
+                    snapshot(),
+                    release.projectionMarker()
+            );
+
+            assertEquals(SpawnStatus.ROLE_NOT_FOUND, result.status());
+            assertSame(store, capture.request.store());
+            assertEquals(
+                    TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE,
+                    capture.request.projectionMarker().getProjectionKind()
+            );
+        } finally {
+            registry.removeStore(store);
+            registry.shutdown();
+        }
+    }
+
     private RecordingAttempts attempts(ReceiptResult... receipts) {
         return new RecordingAttempts(List.of(receipts));
     }
 
     private ProjectionCommand command() {
-        return new ProjectionCommand(
+        return command(
                 "restoration",
+                TameworkProjectionIdentityComponent.KIND_RECOVERY
+        );
+    }
+
+    private ProjectionCommand command(String operationCode, String kind) {
+        return new ProjectionCommand(
+                operationCode,
                 PROFILE,
                 OPERATION,
-                TameworkProjectionIdentityComponent.KIND_RECOVERY,
+                kind,
                 TARGET,
                 SOURCE.value(),
                 "receipt-a",

@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
@@ -139,6 +140,31 @@ class SqliteOperationRecoveryCoordinatorTest {
         ).toCompletableFuture().get(10, TimeUnit.SECONDS);
         assertTrue(third.claims().isEmpty());
         assertTrue(third.issues().isEmpty());
+    }
+
+    @Test
+    void currentRunExclusionsDoNotStarveLaterRecoverableWork()
+            throws Exception {
+        try (Connection connection = transaction()) {
+            prepare(connection, PREPARED, KIND, -10_000);
+            prepare(connection, APPLYING, KIND, -9_000);
+            connection.commit();
+        }
+
+        OperationRecoveryScanResult result = recovery.scanAndClaim(
+                "worker",
+                -8_000,
+                -7_000,
+                1,
+                Set.of(PREPARED)
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                List.of(APPLYING),
+                result.claims().stream()
+                        .map(claim -> claim.operation().operationId())
+                        .toList()
+        );
     }
 
     @Test

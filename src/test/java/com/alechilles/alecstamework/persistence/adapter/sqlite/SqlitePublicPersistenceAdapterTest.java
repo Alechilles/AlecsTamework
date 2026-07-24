@@ -26,6 +26,8 @@ import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Registry-driven composition checks for the complete public SQLite adapter. */
 class SqlitePublicPersistenceAdapterTest {
@@ -49,6 +52,7 @@ class SqlitePublicPersistenceAdapterTest {
     Path tempDir;
 
     private SqlitePersistenceKernel kernel;
+    private SqliteConnectionFactory connections;
 
     @AfterEach
     void tearDown() {
@@ -169,6 +173,7 @@ class SqlitePublicPersistenceAdapterTest {
 
         assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, result.status());
         assertEquals(1, result.completedCount());
+        assertEquals(0, result.deferredCount());
         assertEquals(List.of(), result.quarantinedScopes());
         PersistenceReadResult.Found<?> found = assertInstanceOf(
                 PersistenceReadResult.Found.class,
@@ -199,6 +204,15 @@ class SqlitePublicPersistenceAdapterTest {
                 -80
         ).completion().toCompletableFuture()
                 .get(10, TimeUnit.SECONDS));
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO operation_participant(
+                         operation_id, scope_type, scope_key
+                     ) VALUES (?, 'GLOBAL', '*')
+                     """)) {
+            statement.setString(1, OPERATION.toString());
+            statement.executeUpdate();
+        }
 
         SqlitePublicRecoveryResult result = adapter.recover(
                 boundaries(),
@@ -208,13 +222,21 @@ class SqlitePublicPersistenceAdapterTest {
         assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE, result.status());
         assertEquals(0, result.completedCount());
         assertEquals(
-                List.of(OperationScope.operation(OPERATION)),
+                List.of(
+                        OperationScope.operation(OPERATION),
+                        OperationScope.profile(PROFILE)
+                ),
                 result.quarantinedScopes()
         );
+        try (Connection connection = connections.openReadConnection()) {
+            assertTrue(new SqliteIncidentStore(connection)
+                    .findQuarantine(OperationScope.global())
+                    .isEmpty());
+        }
     }
 
     private SqlitePublicPersistenceAdapter adapter() {
-        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+        connections = new SqliteConnectionFactory(
                 tempDir.resolve("projection-state.sqlite")
         );
         new SqliteSchemaV1Manager(connections, () -> -100).initialize();
@@ -290,6 +312,9 @@ class SqlitePublicPersistenceAdapterTest {
         return new PublicPersistenceLiveBoundaries(
                 (request, operation) ->
                         LiveOperationResult.confirmed("capture").completed(),
+                (request, operation) ->
+                        LiveOperationResult.confirmed("capture_release")
+                                .completed(),
                 (request, operation) ->
                         LiveOperationResult.confirmed("restoration").completed(),
                 (request, operation) ->

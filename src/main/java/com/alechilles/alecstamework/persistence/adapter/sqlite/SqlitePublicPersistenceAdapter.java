@@ -172,6 +172,12 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqliteCompanionCaptureReleaseOperations
+    captureReleaseOperations() {
+        return publicOperations.captureReleases();
+    }
+
+    @Nonnull
     public SqliteCompanionDormantOperations dormantOperations() {
         return publicOperations.dormant();
     }

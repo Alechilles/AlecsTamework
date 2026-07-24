@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.persistence.operation.DecodedOperationPayloa
 import com.alechilles.alecstamework.persistence.operation.OperationDecodeResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationLeaseRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryAction;
@@ -25,6 +26,7 @@ import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryScanRe
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -67,11 +69,33 @@ public final class SqliteOperationRecoveryCoordinator {
             long leaseUntilMs,
             int limit
     ) {
+        return scanAndClaim(
+                workerId,
+                nowMs,
+                leaseUntilMs,
+                limit,
+                Set.of()
+        );
+    }
+
+    /** Claims recoverable work except operations deferred by this recovery run. */
+    @Nonnull
+    public CompletionStage<OperationRecoveryScanResult> scanAndClaim(
+            @Nonnull String workerId,
+            long nowMs,
+            long leaseUntilMs,
+            int limit,
+            @Nonnull Set<OperationId> excludedOperationIds
+    ) {
         if (workerId == null || workerId.isBlank() || leaseUntilMs == 0
-                || leaseUntilMs <= nowMs || limit <= 0 || limit > 10_000) {
+                || leaseUntilMs <= nowMs || limit <= 0 || limit > 10_000
+                || excludedOperationIds == null
+                || excludedOperationIds.stream()
+                .anyMatch(java.util.Objects::isNull)) {
             throw new IllegalArgumentException("Valid recovery worker, lease, and limit are required");
         }
         String normalizedWorker = workerId.trim();
+        Set<OperationId> exclusions = Set.copyOf(excludedOperationIds);
         return reads.execute(new SqliteReadCommand<>(
                 RECOVERY_READ,
                 PersistenceReadPriority.GAMEPLAY_CRITICAL,
@@ -79,7 +103,11 @@ public final class SqliteOperationRecoveryCoordinator {
                     SqlitePersistenceTransactionContext transaction =
                             new SqlitePersistenceTransactionContext(connection);
                     List<OperationEnvelope> recoverable =
-                            transaction.operations().findRecoverable(nowMs, limit);
+                            transaction.operations().findRecoverable(
+                                    nowMs,
+                                    limit,
+                                    exclusions
+                            );
                     ArrayList<OperationEnvelope> eligible = new ArrayList<>();
                     int skipped = 0;
                     for (OperationEnvelope operation : recoverable) {
