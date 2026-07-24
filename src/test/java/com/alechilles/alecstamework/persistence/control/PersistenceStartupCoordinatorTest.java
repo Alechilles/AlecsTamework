@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.control;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
@@ -166,6 +167,65 @@ class PersistenceStartupCoordinatorTest {
                 CompanionCaptureDefinition.INSTANCE.kind(),
                 "companion_capture",
                 captureScopes(PROFILE)
+        );
+    }
+
+    @Test
+    void captureReleaseAdmitsOptionalOwnerAssignmentWithoutWeakeningPolicy() {
+        PersistenceStartupCoordinator coordinator = readyCoordinator();
+
+        coordinator.requireAdmission(
+                CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                "companion_capture",
+                List.of(OperationScope.profile(PROFILE))
+        );
+        coordinator.requireAdmission(
+                CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                "companion_capture",
+                captureScopes(PROFILE)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> coordinator.requireAdmission(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                        "companion_capture",
+                        List.of(OperationScope.owner(OWNER))
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> coordinator.requireAdmission(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                        "companion_capture",
+                        List.of(
+                                OperationScope.profile(PROFILE),
+                                OperationScope.coop("unexpected")
+                        )
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> coordinator.requireAdmission(
+                        CompanionCaptureDefinition.INSTANCE.kind(),
+                        "companion_capture",
+                        List.of(OperationScope.profile(PROFILE))
+                )
+        );
+
+        coordinator.quarantine(OperationScope.owner(OWNER), "owner_review");
+        assertThrows(
+                IllegalStateException.class,
+                () -> coordinator.requireAdmission(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                        "companion_capture",
+                        captureScopes(PROFILE)
+                )
+        );
+        coordinator.requireAdmission(
+                CompanionCaptureReleaseDefinition.INSTANCE.kind(),
+                "companion_capture",
+                List.of(OperationScope.profile(PROFILE))
         );
     }
 

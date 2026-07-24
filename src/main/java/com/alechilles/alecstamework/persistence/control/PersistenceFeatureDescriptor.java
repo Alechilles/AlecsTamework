@@ -15,7 +15,7 @@ public record PersistenceFeatureDescriptor(
         @Nonnull PersistenceFeatureDomain domain,
         @Nonnull Set<String> ownedAuthorities,
         @Nonnull List<OperationDefinition<?>> operationDefinitions,
-        @Nonnull Map<OperationKind, Set<OperationScopeType>> operationScopes,
+        @Nonnull Map<OperationKind, OperationScopePolicy> operationScopes,
         @Nonnull Set<PersistenceFeatureId> startupDependencies,
         @Nonnull PersistenceFeatureHookId canonicalLoader,
         @Nonnull Set<ProjectionConsumerId> projectionConsumers,
@@ -67,26 +67,25 @@ public record PersistenceFeatureDescriptor(
         return Set.copyOf(normalized);
     }
 
-    private static Map<OperationKind, Set<OperationScopeType>> copyScopes(
-            Map<OperationKind, Set<OperationScopeType>> scopes
+    private static Map<OperationKind, OperationScopePolicy> copyScopes(
+            Map<OperationKind, OperationScopePolicy> scopes
     ) {
-        java.util.HashMap<OperationKind, Set<OperationScopeType>> copied =
+        java.util.HashMap<OperationKind, OperationScopePolicy> copied =
                 new java.util.HashMap<>();
-        scopes.forEach((kind, values) -> {
-            if (kind == null || values == null || values.isEmpty()
-                    || values.stream().anyMatch(java.util.Objects::isNull)) {
+        scopes.forEach((kind, policy) -> {
+            if (kind == null || policy == null) {
                 throw new IllegalArgumentException(
                         "Complete operation scope policy is required"
                 );
             }
-            copied.put(kind, Set.copyOf(values));
+            copied.put(kind, policy);
         });
         return Map.copyOf(copied);
     }
 
     private static void validateOperations(
             List<OperationDefinition<?>> definitions,
-            Map<OperationKind, Set<OperationScopeType>> scopes
+            Map<OperationKind, OperationScopePolicy> scopes
     ) {
         java.util.HashSet<OperationKind> kinds = new java.util.HashSet<>();
         for (OperationDefinition<?> definition : definitions) {

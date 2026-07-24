@@ -129,7 +129,10 @@ public final class PublicPersistenceFeatureRegistry {
                                 OperationScopeType.OWNER
                         ),
                         CompanionCaptureReleaseDefinition.INSTANCE,
-                        Set.of(OperationScopeType.PROFILE)
+                        PublicPersistenceFeatureDescriptorFactory.policy(
+                                Set.of(OperationScopeType.PROFILE),
+                                Set.of(OperationScopeType.OWNER)
+                        )
                 ),
                 Set.of(IDENTITY, LIFECYCLE, ECONOMIC_COMPENSATION),
                 Set.of(PROFILE_OBSERVER),

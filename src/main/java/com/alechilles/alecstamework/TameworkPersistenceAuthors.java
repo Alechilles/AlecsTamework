@@ -228,11 +228,18 @@ final class TameworkPersistenceAuthors {
                             : "Companion release could not be completed.",
                     NotificationStyle.Warning
             );
-            logger.at(Level.WARNING).log(
+            String message =
                     "Spawner persistence workflow did not publish (kind="
                             + result.kind() + ", status=" + result.status()
-                            + ", detail=" + result.detail() + ")."
-            );
+                            + ", workflowStatus=" + result.workflowStatus()
+                            + ", detail=" + result.detail() + ").";
+            if (result.failure() == null) {
+                logger.at(Level.WARNING).log(message);
+            } else {
+                logger.at(Level.WARNING)
+                        .withCause(result.failure())
+                        .log(message);
+            }
         }
     }
 }

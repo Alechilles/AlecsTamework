@@ -426,9 +426,9 @@ public final class PersistenceStartupCoordinator
                 .map(OperationScope::type)
                 .filter(type -> type != OperationScopeType.OPERATION)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        Set<OperationScopeType> expected =
+        OperationScopePolicy policy =
                 descriptor.operationScopes().get(kind);
-        if (!actual.equals(expected)) {
+        if (!policy.admits(actual)) {
             throw new IllegalArgumentException(
                     "operation_scope_policy_mismatch:" + kind
             );

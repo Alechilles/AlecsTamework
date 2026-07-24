@@ -66,7 +66,13 @@ class PublicPersistenceFeatureRegistryTest {
                 Set.of(OperationScopeType.PROFILE),
                 capture.operationScopes().get(
                         CompanionCaptureReleaseDefinition.INSTANCE.kind()
-                )
+                ).required()
+        );
+        assertEquals(
+                Set.of(OperationScopeType.OWNER),
+                capture.operationScopes().get(
+                        CompanionCaptureReleaseDefinition.INSTANCE.kind()
+                ).optional()
         );
     }
 }

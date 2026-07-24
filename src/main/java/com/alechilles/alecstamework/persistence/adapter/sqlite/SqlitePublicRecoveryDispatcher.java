@@ -348,7 +348,7 @@ final class SqlitePublicRecoveryDispatcher {
         Set<OperationScopeType> allowed = new HashSet<>(
                 descriptor.operationScopes().get(
                         claim.operation().kind()
-                )
+                ).allowed()
         );
         allowed.retainAll(descriptor.quarantineGranularity());
         allowed.add(OperationScopeType.OPERATION);

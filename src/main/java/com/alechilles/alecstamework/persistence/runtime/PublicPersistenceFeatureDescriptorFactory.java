@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.persistence.control.OperationScopePolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -24,7 +25,7 @@ final class PublicPersistenceFeatureDescriptorFactory {
             PersistenceFeatureDomain domain,
             Set<String> authorities,
             List<OperationDefinition<?>> definitions,
-            Map<OperationKind, Set<OperationScopeType>> scopes,
+            Map<OperationKind, OperationScopePolicy> scopes,
             Set<PersistenceFeatureId> dependencies,
             Set<ProjectionConsumerId> consumers,
             Set<PersistenceStartupNode> readiness,
@@ -59,7 +60,7 @@ final class PublicPersistenceFeatureDescriptorFactory {
         );
     }
 
-    static Map<OperationKind, Set<OperationScopeType>> scopes(
+    static Map<OperationKind, OperationScopePolicy> scopes(
             Object... pairs
     ) {
         if (pairs == null || pairs.length == 0
@@ -68,22 +69,40 @@ final class PublicPersistenceFeatureDescriptorFactory {
                     "Operation scope pairs are required"
             );
         }
-        java.util.HashMap<OperationKind, Set<OperationScopeType>> result =
+        java.util.HashMap<OperationKind, OperationScopePolicy> result =
                 new java.util.HashMap<>();
         for (int index = 0; index < pairs.length; index += 2) {
             OperationDefinition<?> definition =
                     (OperationDefinition<?>) pairs[index];
-            @SuppressWarnings("unchecked")
-            Set<OperationScopeType> value =
-                    (Set<OperationScopeType>) pairs[index + 1];
-            if (definition == null || value == null
-                    || result.put(definition.kind(), value) != null) {
+            OperationScopePolicy policy = policy(pairs[index + 1]);
+            if (definition == null || policy == null
+                    || result.put(definition.kind(), policy) != null) {
                 throw new IllegalArgumentException(
                         "Operation scope pairs must be complete and unique"
                 );
             }
         }
         return Map.copyOf(result);
+    }
+
+    static OperationScopePolicy policy(
+            Set<OperationScopeType> required,
+            Set<OperationScopeType> optional
+    ) {
+        return new OperationScopePolicy(required, optional);
+    }
+
+    private static OperationScopePolicy policy(Object value) {
+        if (value instanceof OperationScopePolicy policy) {
+            return policy;
+        }
+        if (value instanceof Set<?> values) {
+            @SuppressWarnings("unchecked")
+            Set<OperationScopeType> scopes =
+                    (Set<OperationScopeType>) values;
+            return OperationScopePolicy.exact(scopes);
+        }
+        return null;
     }
 
     private static boolean global(PersistenceFeatureId id) {

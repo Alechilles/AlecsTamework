@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.persistence.control.OperationScopePolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceCircuitPolicy;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureCircuit;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -59,7 +60,7 @@ public record PublicPersistenceDiagnosticsSnapshot(
             @Nonnull PersistenceCircuitPolicy circuitPolicy,
             @Nonnull PersistenceFeatureCircuit circuit,
             @Nonnull Set<String> ownedAuthorities,
-            @Nonnull Map<OperationKind, Set<OperationScopeType>>
+            @Nonnull Map<OperationKind, OperationScopePolicy>
                     operationScopes,
             @Nonnull Map<OperationKind, Map<OperationPhase, Long>>
                     operationCounts,
@@ -91,7 +92,7 @@ public record PublicPersistenceDiagnosticsSnapshot(
                 );
             }
             ownedAuthorities = Set.copyOf(ownedAuthorities);
-            operationScopes = copySets(operationScopes);
+            operationScopes = Map.copyOf(operationScopes);
             operationCounts = copyNestedCounts(operationCounts);
             startupDependencies = Set.copyOf(startupDependencies);
             projectionConsumers = Set.copyOf(projectionConsumers);
@@ -133,21 +134,6 @@ public record PublicPersistenceDiagnosticsSnapshot(
                 );
             }
             copied.put(key, count);
-        });
-        return Map.copyOf(copied);
-    }
-
-    private static <K, V> Map<K, Set<V>> copySets(
-            Map<K, Set<V>> source
-    ) {
-        HashMap<K, Set<V>> copied = new HashMap<>();
-        source.forEach((key, values) -> {
-            if (key == null || values == null) {
-                throw new IllegalArgumentException(
-                        "Diagnostic scope declarations are incomplete"
-                );
-            }
-            copied.put(key, Set.copyOf(values));
         });
         return Map.copyOf(copied);
     }
