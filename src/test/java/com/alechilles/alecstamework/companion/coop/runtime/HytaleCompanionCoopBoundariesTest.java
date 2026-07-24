@@ -47,7 +47,7 @@ class HytaleCompanionCoopBoundariesTest {
         HytaleCompanionCoopCaptureBoundary boundary =
                 new HytaleCompanionCoopCaptureBoundary(
                         unreachableCaptureGateway(),
-                        dispatcher
+                        ignored -> null
                 );
 
         LiveOperationResult result = boundary.applyOrResolve(
