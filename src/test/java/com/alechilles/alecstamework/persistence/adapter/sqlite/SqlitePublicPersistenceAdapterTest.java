@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -23,6 +24,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.nio.file.Path;
@@ -39,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Registry-driven composition checks for the complete public SQLite adapter. */
@@ -212,6 +215,82 @@ class SqlitePublicPersistenceAdapterTest {
         }
     }
 
+    @Test
+    void startupReconciliationUsesSharedProtocolBeforePublicAdmission()
+            throws Exception {
+        connections = new SqliteConnectionFactory(
+                tempDir.resolve("startup-reconciliation.sqlite")
+        );
+        new SqliteSchemaV1Manager(connections, () -> -100).initialize();
+        kernel = new SqlitePersistenceKernel(connections);
+        SqlitePublicPersistenceAdapter adapter =
+                new SqlitePublicPersistenceAdapter(
+                        PublicPersistenceFeatureRegistry.create(),
+                        kernel,
+                        (kind, feature, participants) -> {
+                            throw new IllegalStateException(
+                                    "public_mutation_not_ready"
+                            );
+                        },
+                        () -> -100,
+                        (claim, operation) -> LiveOperationResult
+                                .confirmed("test_refund").completed(),
+                        event -> {
+                        }
+                );
+        NpcAlias alias = NpcAlias.parse(
+                "30000000-0000-0000-0000-000000000001"
+        );
+        seedUnresolvedProfile(alias);
+        assertEquals(
+                SqlitePublicProjectionStartupResult.Status.COMPLETE,
+                adapter.buildProjections().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS).status()
+        );
+        CompanionProfileMutation.ReconcileLoaded reconciliation =
+                new CompanionProfileMutation.ReconcileLoaded(
+                        PROFILE,
+                        LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL,
+                        alias,
+                        alias,
+                        "loaded-world",
+                        -90
+                );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> adapter.profileOperations().submit(
+                        OperationId.create(),
+                        new IdempotencyKey("public-reconciliation"),
+                        reconciliation
+                )
+        );
+        var submitted = adapter.reconcileLoadedAtStartup(
+                OperationId.create(),
+                new IdempotencyKey("startup-reconciliation"),
+                reconciliation
+        );
+        OperationWorkflowResult result = submitted.completion()
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        try (Connection connection = connections.openReadConnection()) {
+            CompanionLifecycle lifecycle =
+                    new SqliteCompanionLifecycleStore(connection)
+                            .findByProfile(PROFILE)
+                            .orElseThrow();
+            assertEquals(LifecycleState.ACTIVE, lifecycle.state());
+            assertEquals(
+                    LifecycleLocation.liveEntity(
+                            alias.toString(),
+                            "loaded-world"
+                    ),
+                    lifecycle.location()
+            );
+        }
+    }
+
     private SqlitePublicPersistenceAdapter adapter() {
         connections = new SqliteConnectionFactory(
                 tempDir.resolve("projection-state.sqlite")
@@ -283,6 +362,39 @@ class SqlitePublicPersistenceAdapterTest {
                 -100,
                 0
         );
+    }
+
+    private void seedUnresolvedProfile(NpcAlias alias) throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            assertTrue(new SqliteCompanionIdentityStore(connection)
+                    .createProfile(identity()).applied());
+            assertTrue(new SqliteCompanionLifecycleStore(connection)
+                    .create(new CompanionLifecycle(
+                            PROFILE,
+                            OwnerId.parse(
+                                    "10000000-0000-0000-0000-000000000001"
+                            ),
+                            LifecycleState.UNRESOLVED,
+                            LifecycleLocation.unresolved(),
+                            LifecycleRevision.INITIAL,
+                            null,
+                            -100,
+                            ReconciliationGeneration.INITIAL,
+                            null,
+                            "owner-world"
+                    )).applied());
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO companion_alias(
+                        npc_uuid, profile_id, alias_generation, alias_state,
+                        lease_operation_id, mapped_at_ms, retired_at_ms
+                    ) VALUES (?, ?, 0, 'CURRENT', NULL, ?, NULL)
+                    """)) {
+                statement.setString(1, alias.toString());
+                statement.setString(2, PROFILE.toString());
+                statement.setLong(3, -100);
+                statement.executeUpdate();
+            }
+        }
     }
 
     private PublicPersistenceLiveBoundaries boundaries() {

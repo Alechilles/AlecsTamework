@@ -74,6 +74,8 @@ class SqliteCompanionCaptureReleaseOperationsTest {
             NpcAlias.parse("20000000-0000-0000-0000-000000000002");
     private static final OwnerId OWNER =
             OwnerId.parse("30000000-0000-0000-0000-000000000001");
+    private static final OwnerId ASSIGNED_OWNER =
+            OwnerId.parse("30000000-0000-0000-0000-000000000002");
     private static final UUID ACTOR =
             UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final SnapshotId SNAPSHOT =
@@ -534,6 +536,55 @@ class SqliteCompanionCaptureReleaseOperationsTest {
     }
 
     @Test
+    void ownerAssignmentAppliesOnlyToAnUnownedCapturedProfile()
+            throws Exception {
+        setCapturedOwner(null);
+
+        OperationWorkflowResult result = submit(
+                11,
+                request(new LifecycleRevision(1), ASSIGNED_OWNER),
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "capture_release_both_receipts_confirmed"
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                result.status(),
+                String.valueOf(result.failure())
+        );
+        assertEquals(ASSIGNED_OWNER, lifecycle().ownerId());
+        assertTrue(result.operation().participants().contains(
+                OperationScope.owner(ASSIGNED_OWNER)
+        ));
+    }
+
+    @Test
+    void ownerAssignmentCannotReplaceAnExistingCapturedOwner()
+            throws Exception {
+        AtomicBoolean liveCalled = new AtomicBoolean();
+
+        OperationWorkflowResult result = submit(
+                12,
+                request(new LifecycleRevision(1), ASSIGNED_OWNER),
+                (request, operation) -> {
+                    liveCalled.set(true);
+                    return LiveOperationResult.confirmed(
+                            "capture_release_both_receipts_confirmed"
+                    ).completed();
+                }
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertTrue(!liveCalled.get());
+        assertEquals(OWNER, lifecycle().ownerId());
+        assertEquals(LifecycleState.CAPTURED, lifecycle().state());
+    }
+
+    @Test
     void offlineStartupDefersReleaseAndSameRequestLaterCompletes()
             throws Exception {
         OperationWorkflowResult initial = submit(
@@ -659,6 +710,13 @@ class SqliteCompanionCaptureReleaseOperationsTest {
     private CompanionCaptureReleaseRequest request(
             LifecycleRevision expectedRevision
     ) {
+        return request(expectedRevision, null);
+    }
+
+    private CompanionCaptureReleaseRequest request(
+            LifecycleRevision expectedRevision,
+            OwnerId ownerAssignment
+    ) {
         String projection = "{\"state\":\"frozen\"}";
         return new CompanionCaptureReleaseRequest(
                 PROFILE,
@@ -679,6 +737,7 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                         receiptArtifact()
                 ),
                 TARGET_ALIAS,
+                ownerAssignment,
                 new CompanionSpawnPlacement(
                         "world-two",
                         -12.5,
@@ -692,6 +751,25 @@ class SqliteCompanionCaptureReleaseOperationsTest {
                 "spawn-receipt",
                 -600
         );
+    }
+
+    private void setCapturedOwner(OwnerId ownerId) throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE companion_lifecycle
+                     SET owner_uuid = ?, owner_world_key = ?
+                     WHERE profile_id = ?
+                     """)) {
+            if (ownerId == null) {
+                statement.setNull(1, java.sql.Types.VARCHAR);
+                statement.setNull(2, java.sql.Types.VARCHAR);
+            } else {
+                statement.setString(1, ownerId.toString());
+                statement.setString(2, "world");
+            }
+            statement.setString(3, PROFILE.toString());
+            assertEquals(1, statement.executeUpdate());
+        }
     }
 
     private void seedCapturedProfile() throws Exception {

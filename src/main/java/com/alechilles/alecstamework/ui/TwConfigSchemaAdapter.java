@@ -19,8 +19,6 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
-import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
-import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
@@ -155,7 +153,6 @@ final class TwConfigSchemaAdapter {
             case NEEDS -> TwNeedsConfig.CODEC;
             case BREEDING -> TwBreedingConfig.CODEC;
             case CAPTURE_POLICY -> TwCapturePolicyConfig.CODEC;
-            case POPULATION_GROUP -> TwPopulationGroupConfig.CODEC;
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
             case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;
@@ -164,7 +161,6 @@ final class TwConfigSchemaAdapter {
             case TALENT -> TwTalentConfig.CODEC;
             case COOP -> TwCoopConfig.CODEC;
             case DEBUG -> TwDebugConfig.CODEC;
-            case PERSISTENCE -> TwPersistenceConfig.CODEC;
             case OTHER -> null;
         };
     }

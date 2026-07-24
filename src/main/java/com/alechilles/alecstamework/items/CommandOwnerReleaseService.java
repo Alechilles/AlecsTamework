@@ -1,16 +1,11 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
-import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
-import com.alechilles.alecstamework.ownership.OwnerMutationContext;
-import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
-import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -20,10 +15,9 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Coordinates command-item release only after owner admission has applied. */
+/** Applies the released command-item release behavior on the current world thread. */
 final class CommandOwnerReleaseService {
     private static final float RELEASE_DESPAWN_DELAY_SECONDS = 4.0F;
     private static final String[] RELEASE_STATE_CANDIDATES = new String[] { "Flee", "Wander", "Idle" };
@@ -41,24 +35,6 @@ final class CommandOwnerReleaseService {
         this.stepExecutionService = stepExecutionService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
-    }
-
-    /** Pure world-thread preflight used before a canonical roster membership is removed. */
-    boolean canReleaseNow(@Nullable Player player,
-                          @Nullable TwCommandItemConfig config,
-                          @Nullable UUID npcUuid) {
-        if (player == null || npcUuid == null || resolveScheduler() == null) {
-            return false;
-        }
-        World world = player.getWorld();
-        Store<EntityStore> store = world == null || world.getEntityStore() == null
-                ? null
-                : world.getEntityStore().getStore();
-        Ref<EntityStore> npcRef = store == null ? null : world.getEntityRef(npcUuid);
-        NPCEntity npc = npcRef == null || !npcRef.isValid()
-                ? null
-                : store.getComponent(npcRef, NPCEntity.getComponentType());
-        return npc != null && canRelease(player, config, npcRef, store);
     }
 
     void release(Player player,
@@ -88,59 +64,17 @@ final class CommandOwnerReleaseService {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
             return;
         }
-        OwnerMutationScheduler scheduler = resolveScheduler();
-        if (scheduler == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.unavailable");
-            return;
-        }
         String displayName = resolveDisplayName(player, npcRef, store, npc);
-        scheduler.schedule(
-                npcRef,
-                store,
-                null,
-                null,
-                CompanionLifecycleState.RELEASED,
-                OwnerPopulationOperation.OWNER_CLEAR,
-                false,
-                "command-release:" + npcUuid,
-                callbacks(player, displayName)
+        clearOwner(npcRef, store);
+        clearTamedAndLinks(npcRef, store);
+        applyReleaseState(npcRef, npc, store);
+        npc.setToDespawn();
+        npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
+        feedbackService.showSuccessKey(
+                player,
+                "tamework.ui.notifications.command.release.success",
+                displayName
         );
-    }
-
-    @Nonnull
-    private OwnerMutationScheduler.MutationCallbacks callbacks(
-            Player player,
-            String displayName) {
-        return new OwnerMutationScheduler.MutationCallbacks() {
-            @Override
-            public void onDenied(@Nonnull String reason, @Nullable OwnerPopulationDecision decision) {
-                feedbackService.showWarningKey(
-                        player,
-                        "tamework.ui.notifications.command.release.unavailable"
-                );
-            }
-
-            @Override
-            public void onApplied(@Nonnull OwnerPopulationDecision decision,
-                                  @Nonnull String profileId,
-                                  @Nonnull OwnerMutationContext context) {
-                NPCEntity liveNpc = context.store().getComponent(
-                        context.npcRef(), NPCEntity.getComponentType()
-                );
-                if (liveNpc == null) {
-                    throw new IllegalStateException("Applied release target is no longer an NPC");
-                }
-                clearTamedAndLinks(context.npcRef(), context.store());
-                applyReleaseState(context.npcRef(), liveNpc, context.store());
-                liveNpc.setToDespawn();
-                liveNpc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
-                feedbackService.showSuccessKey(
-                        player,
-                        "tamework.ui.notifications.command.release.success",
-                        displayName
-                );
-            }
-        };
     }
 
     private boolean canRelease(Player player,
@@ -186,6 +120,17 @@ final class CommandOwnerReleaseService {
         store.putComponent(npcRef, linksType, links);
     }
 
+    private void clearOwner(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent owner = ownerType == null ? null : store.getComponent(npcRef, ownerType);
+        if (owner != null && (owner.getOwnerId() != null || owner.getOwnerName() != null)) {
+            owner.setOwnerId(null);
+            owner.setOwnerName(null);
+            store.putComponent(npcRef, ownerType, owner);
+        }
+    }
+
     private void applyReleaseState(Ref<EntityStore> npcRef,
                                    NPCEntity npc,
                                    Store<EntityStore> store) {
@@ -205,11 +150,5 @@ final class CommandOwnerReleaseService {
         return displayName == null || displayName.isBlank()
                 ? LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName")
                 : displayName;
-    }
-
-    @Nullable
-    private OwnerMutationScheduler resolveScheduler() {
-        Tamework plugin = Tamework.getInstance();
-        return plugin == null ? null : plugin.getOwnerMutationScheduler();
     }
 }

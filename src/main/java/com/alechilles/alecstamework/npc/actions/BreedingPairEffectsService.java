@@ -3,10 +3,6 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
-import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
-import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
-import com.alechilles.alecstamework.npc.breeding.ParentBreedingSnapshot;
-import com.alechilles.alecstamework.npc.breeding.AppliedCooldownFingerprint;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -22,7 +18,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Applies provisional cooldown and approach movement after a job reservation is registered. */
+/** Applies the released parent cooldown and approach movement for a live pairing. */
 final class BreedingPairEffectsService {
     private static final String PAIR_HOOK_ID = "Tamework.Breeding.Pair.Start";
     private static final String PAIR_STATE = "BreedPair";
@@ -30,7 +26,6 @@ final class BreedingPairEffectsService {
     private static final double APPROACH_SPACING = 0.45;
 
     private final BreedingCooldownService cooldownService = new BreedingCooldownService();
-    private final BreedingParentStateService parentStateService = new BreedingParentStateService();
 
     boolean apply(@Nonnull EffectContext context) {
         cooldownService.applyParentCooldown(
@@ -47,52 +42,6 @@ final class BreedingPairEffectsService {
         logCooldown(context.sourceNpc(), context.sourceOwner(), context.sourceCooldown());
         logCooldown(context.partnerNpc(), context.partnerOwner(), context.partnerCooldown());
         return true;
-    }
-
-    /** Replays only presentation/movement; the original durable cooldown generation is retained. */
-    boolean resume(@Nonnull EffectContext context) {
-        moveParents(context);
-        return true;
-    }
-
-    void rollback(@Nonnull EffectContext context, @Nonnull BreedingBirthJob job) {
-        rollbackParent(
-                context.sourceRef(), context.sourceNpc(), context.sourceBreeding(), context, job
-        );
-        rollbackParent(
-                context.partnerRef(), context.partnerNpc(), context.partnerBreeding(), context, job
-        );
-    }
-
-    private void rollbackParent(Ref<EntityStore> ref,
-                                NPCEntity npc,
-                                TameworkBreedingComponent breeding,
-                                EffectContext context,
-                                BreedingBirthJob job) {
-        BreedingParentIdentity identity;
-        ParentBreedingSnapshot snapshot;
-        AppliedCooldownFingerprint fingerprint;
-        if (job.firstParent().entityUuid().equals(npc.getUuid())) {
-            identity = job.firstParent();
-            snapshot = job.firstParentSnapshot();
-            fingerprint = job.firstParentCooldownFingerprint();
-        } else if (job.secondParent().entityUuid().equals(npc.getUuid())) {
-            identity = job.secondParent();
-            snapshot = job.secondParentSnapshot();
-            fingerprint = job.secondParentCooldownFingerprint();
-        } else {
-            return;
-        }
-        parentStateService.restoreIfFingerprintMatches(
-                identity,
-                snapshot,
-                fingerprint,
-                ref,
-                npc,
-                breeding,
-                context.store(),
-                context.commandBuffer()
-        );
     }
 
     private void moveParents(EffectContext context) {

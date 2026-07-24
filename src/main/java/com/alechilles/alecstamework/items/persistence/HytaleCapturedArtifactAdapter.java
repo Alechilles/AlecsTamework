@@ -66,6 +66,30 @@ public final class HytaleCapturedArtifactAdapter {
         }
     }
 
+    /**
+     * Copies an exact stack value with the supplied persisted metadata additions.
+     */
+    @Nonnull
+    ItemStack withMetadata(
+            @Nonnull ItemStack stack,
+            @Nonnull BsonDocument additions
+    ) {
+        Objects.requireNonNull(stack, "stack");
+        Objects.requireNonNull(additions, "additions");
+        BsonDocument metadata = new BsonDocument();
+        if (stack.getMetadata() != null) {
+            metadata.putAll(stack.getMetadata());
+        }
+        metadata.putAll(additions);
+        return stackFactory.create(
+                stack.getItemId(),
+                stack.getQuantity(),
+                stack.getDurability(),
+                stack.getMaxDurability(),
+                metadata
+        );
+    }
+
     /** Recreates the exact persisted item value without consulting mutable item assets. */
     @Nonnull
     public ItemStack toItemStack(@Nonnull CapturedArtifact artifact) {

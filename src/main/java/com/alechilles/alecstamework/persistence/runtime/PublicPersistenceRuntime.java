@@ -136,7 +136,12 @@ public final class PublicPersistenceRuntime implements AutoCloseable {
         return state.requireQueries();
     }
 
-    /** Executes or resumes the ordered, bounded shutdown protocol. */
+    /**
+     * Executes or resumes the ordered shutdown protocol.
+     *
+     * <p>The timeout independently bounds the accepted-workflow drain and the
+     * kernel drain so one timed-out phase cannot skip storage teardown.</p>
+     */
     @Nonnull
     public PublicPersistenceShutdownReport shutdown(
             @Nonnull Duration timeout

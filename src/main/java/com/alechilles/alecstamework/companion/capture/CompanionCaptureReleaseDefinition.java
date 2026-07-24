@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
@@ -56,6 +57,12 @@ public final class CompanionCaptureReleaseDefinition
         json.add("projection", encodeProjection(payload.projection()));
         json.add("source", encodeSource(payload.source()));
         json.addProperty("targetAlias", payload.targetAlias().toString());
+        if (payload.ownerAssignment() != null) {
+            json.addProperty(
+                    "ownerAssignment",
+                    payload.ownerAssignment().toString()
+            );
+        }
         json.add(
                 "placement",
                 CompanionSpawnPlacementJsonCodec.encode(payload.placement())
@@ -84,6 +91,12 @@ public final class CompanionCaptureReleaseDefinition
                 decodeProjection(json.getAsJsonObject("projection")),
                 decodeSource(json.getAsJsonObject("source")),
                 NpcAlias.parse(json.get("targetAlias").getAsString()),
+                json.has("ownerAssignment")
+                        && !json.get("ownerAssignment").isJsonNull()
+                        ? OwnerId.parse(
+                                json.get("ownerAssignment").getAsString()
+                        )
+                        : null,
                 CompanionSpawnPlacementJsonCodec.decode(
                         json.getAsJsonObject("placement")
                 ),

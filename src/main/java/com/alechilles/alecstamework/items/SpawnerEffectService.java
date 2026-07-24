@@ -12,7 +12,6 @@ import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,18 +19,6 @@ import java.util.List;
  * Emits spawner particle and sound effects for capture/spawn events.
  */
 public final class SpawnerEffectService {
-
-    public void playCaptureSuccessParticle(String particleSystem, OwnerMutationContext context) {
-        if (particleSystem == null || particleSystem.isBlank()
-                || context == null || context.npcRef() == null || !context.npcRef().isValid()) {
-            return;
-        }
-        TransformComponent transform = context.store().getComponent(
-                context.npcRef(), TransformComponent.getComponentType());
-        if (transform != null && transform.getPosition() != null) {
-            ParticleUtil.spawnParticleEffect(particleSystem, transform.getPosition(), context.store());
-        }
-    }
 
     public void playSpawnEffects(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
         if (config == null) {
@@ -47,7 +34,23 @@ public final class SpawnerEffectService {
         playEffects(world, targetRef, config.getCaptureParticleSystem(), config.getCaptureSoundEvent());
     }
 
-    public void playEffects(World world, Ref<EntityStore> targetRef, String particleSystem, String soundEvent) {
+    /** Emits the configured non-durable feedback for one terminal failed roll. */
+    public void playCaptureFailureEffects(
+            World world,
+            Ref<EntityStore> targetRef,
+            ItemFeatureConfig.CaptureItemMechanics mechanics) {
+        if (mechanics == null) {
+            return;
+        }
+        playEffects(
+                world,
+                targetRef,
+                mechanics.failureParticleSystem(),
+                mechanics.failureSoundEvent()
+        );
+    }
+
+    private void playEffects(World world, Ref<EntityStore> targetRef, String particleSystem, String soundEvent) {
         if (world == null || targetRef == null || !targetRef.isValid()) {
             return;
         }
@@ -87,4 +90,3 @@ public final class SpawnerEffectService {
         return refs;
     }
 }
-

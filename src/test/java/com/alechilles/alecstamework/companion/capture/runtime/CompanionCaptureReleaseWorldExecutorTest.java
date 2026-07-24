@@ -391,6 +391,7 @@ class CompanionCaptureReleaseWorldExecutorTest {
                         )
                 ),
                 TARGET_ALIAS,
+                null,
                 new CompanionSpawnPlacement(
                         "world", 1, 2, 3, 0, 0, 0
                 ),

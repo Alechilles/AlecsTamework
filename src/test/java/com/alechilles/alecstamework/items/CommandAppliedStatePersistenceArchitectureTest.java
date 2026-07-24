@@ -39,20 +39,4 @@ class CommandAppliedStatePersistenceArchitectureTest {
         assertTrue(interaction.contains("(int) context.getHeldItemSlot()"));
     }
 
-    @Test
-    void pendingSpawnerRecoveryRequiresExactSourceBeforeClosingAndReconciling() throws Exception {
-        String recovery = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerPendingSourceRecoveryService.java"
-        ));
-
-        int sourceMutation = recovery.indexOf("source.prepare(replacement)");
-        int journalClose = recovery.indexOf("repository.completeSourceFinalizationAsync");
-
-        assertTrue(recovery.contains("State.APPLIED"));
-        assertTrue(recovery.contains("Kind.SPAWNER_ITEM"));
-        assertTrue(recovery.contains("SpawnerSourceSlotResolver.resolveMatching("));
-        assertTrue(sourceMutation >= 0);
-        assertTrue(journalClose > sourceMutation);
-        assertTrue(recovery.contains("restartReconciliationAfterExternalRepair"));
-    }
 }

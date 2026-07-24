@@ -250,6 +250,35 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
+    void publicDiagnosticsRetainsOnlyTheReleasedSnapshotContract()
+            throws Exception {
+        List<String> methods = Stream.of(
+                        com.alechilles.alecstamework.api.DiagnosticsApi.class
+                                .getDeclaredMethods()
+                )
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .map(Method::getName)
+                .sorted()
+                .toList();
+        assertEquals(List.of("getPersistenceDiagnostics"), methods);
+        assertTrue(
+                javaFiles(MAIN.resolve("persistence/health")).isEmpty(),
+                "The retired health package must contain no production code"
+        );
+
+        String adapter = Files.readString(MAIN.resolve(
+                "persistence/facade/ReplacementPersistenceDiagnosticsApi.java"
+        ));
+        for (String removedAuthority : List.of(
+                "queryPersistenceAvailability",
+                "getPersistenceResilience",
+                "findPersistenceIncident"
+        )) {
+            assertFalse(adapter.contains(removedAuthority), removedAuthority);
+        }
+    }
+
+    @Test
     void publicQueryFacadeDeclaresOnlyValueOrReadResultQueries() {
         List<String> queries = Stream.of(
                         com.alechilles.alecstamework.persistence.runtime
@@ -288,26 +317,99 @@ class ReplacementPersistenceArchitectureGuardTest {
     void replacementPersistenceDoesNotEnterPerTickSystemClasses()
             throws Exception {
         ArrayList<String> violations = new ArrayList<>();
+        String facadeImport = "import com.alechilles.alecstamework"
+                + ".persistence.runtime.PersistenceDomainFacades;";
+        List<String> forbiddenBlockingOrAuthorityUse = List.of(
+                ".toCompletableFuture().join(",
+                "Thread.sleep(",
+                "LockSupport.park",
+                "CountDownLatch",
+                ".await(",
+                "java.sql.",
+                "DataSource",
+                "new PersistenceBootstrap(",
+                "new PublicPersistence",
+                "new Sqlite",
+                "facades.operations(",
+                "facades.queries("
+        );
         for (Path file : javaFiles(MAIN)) {
             if (!file.getFileName().toString().endsWith("System.java")) {
                 continue;
             }
             String source = Files.readString(file);
-            if (source.contains(
+            String withoutCompositionImport = source.replace(
+                    facadeImport, ""
+            );
+            if (withoutCompositionImport.contains(
                     "com.alechilles.alecstamework.persistence.runtime"
-            ) || source.contains(
+            ) || withoutCompositionImport.contains(
                     "com.alechilles.alecstamework.persistence.adapter"
-            ) || source.contains(
+            ) || withoutCompositionImport.contains(
                     "com.alechilles.alecstamework.persistence.kernel"
             )) {
-                violations.add(relative(file));
+                violations.add(
+                        relative(file) + " imports persistence authority"
+                );
+            }
+            int facadeReferences = occurrences(
+                    source, "PersistenceDomainFacades"
+            );
+            boolean reviewedCoopComposition = relative(file).equals(
+                    "items/CommandDirectLiveCoopSystem.java"
+            );
+            if (facadeReferences != 0
+                    && (!reviewedCoopComposition
+                    || facadeReferences != 2
+                    || !source.contains(facadeImport)
+                    || source.contains("this.facades")
+                    || source.contains("facades."))) {
+                violations.add(
+                        relative(file)
+                                + " retains or invokes the composition facade"
+                );
+            }
+            for (String token : forbiddenBlockingOrAuthorityUse) {
+                if (source.contains(token)) {
+                    violations.add(
+                            relative(file) + " contains " + token
+                    );
+                }
             }
         }
         assertTrue(
                 violations.isEmpty(),
-                () -> "Tick systems must not allocate or block on persistence: "
+                () -> "Tick systems may receive a facade only for constructor"
+                        + " composition; storage access, retained authority, and"
+                        + " blocking are forbidden: "
                         + violations
         );
+    }
+
+    @Test
+    void tickProjectionCollaboratorOnlyReadsRebuildableSnapshots()
+            throws Exception {
+        String projections = Files.readString(
+                MAIN.resolve(
+                        "items/coop/DirectLiveCoopProjectionView.java"
+                )
+        );
+        assertTrue(projections.contains(
+                "facades.queries().projectedCoopSnapshot()"
+        ));
+        assertTrue(projections.contains(
+                "facades.queries().projectedProfileSnapshot()"
+        ));
+        for (String forbidden : List.of(
+                "facades.operations()",
+                "findProfile(",
+                "findCoop",
+                "CompletionStage",
+                ".join(",
+                ".get("
+        )) {
+            assertFalse(projections.contains(forbidden), forbidden);
+        }
     }
 
     @Test
@@ -315,9 +417,28 @@ class ReplacementPersistenceArchitectureGuardTest {
         String api = Files.readString(
                 MAIN.resolve("api/internal/TameworkApiImpl.java")
         );
-        assertTrue(api.contains("@Nonnull PopulationGroupApi runtime"));
+        assertTrue(
+                com.alechilles.alecstamework.api.ProfileDataApi.class
+                        .isInterface()
+        );
+        assertTrue(api.contains(
+                "@Nonnull ProfileDataApi profileDataApi"
+        ));
+        assertTrue(api.contains(
+                "capabilities.add("
+                        + "TameworkApiCapability.PROFILE_DATA_TRANSACTIONS)"
+        ));
         assertFalse(api.contains(
-                "@Nonnull PopulationGroupApiDelegate runtime"
+                "@Nonnull ReplacementProfileDataApi profileDataApi"
+        ));
+        assertFalse(api.contains(
+                "com.alechilles.alecstamework.persistence.facade"
+        ));
+        assertFalse(api.contains(
+                "activateCompanionProvisioningRuntime"
+        ));
+        assertFalse(api.contains(
+                "activatePopulationGroupRuntime"
         ));
     }
 

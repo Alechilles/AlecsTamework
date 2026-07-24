@@ -108,6 +108,56 @@ class CompanionProfileMutationCodecTest {
     }
 
     @Test
+    void loadedReconciliationRoundTripsAndDerivesOneCanonicalAdvance() {
+        CompanionProfileMutation.ReconcileLoaded reconciliation =
+                new CompanionProfileMutation.ReconcileLoaded(
+                        PROFILE,
+                        new LifecycleRevision(3),
+                        new ReconciliationGeneration(5),
+                        ALIAS,
+                        NpcAlias.parse(
+                                "30000000-0000-0000-0000-000000000002"
+                        ),
+                        " loaded-world ",
+                        -8_000
+                );
+
+        CompanionProfileMutation.ReconcileLoaded decoded =
+                (CompanionProfileMutation.ReconcileLoaded) decode(
+                        encode(reconciliation)
+                );
+        CompanionLifecycle current = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.UNRESOLVED,
+                LifecycleLocation.unresolved(),
+                new LifecycleRevision(3),
+                null,
+                -9_000,
+                new ReconciliationGeneration(5),
+                null,
+                "owner-world"
+        );
+
+        assertEquals(reconciliation, decoded);
+        CompanionLifecycle resolved = decoded.resolvedLifecycle(current);
+        assertEquals(LifecycleState.ACTIVE, resolved.state());
+        assertEquals(
+                LifecycleLocation.liveEntity(
+                        decoded.observedAlias().toString(),
+                        "loaded-world"
+                ),
+                resolved.location()
+        );
+        assertEquals(new LifecycleRevision(4), resolved.revision());
+        assertEquals(
+                new ReconciliationGeneration(6),
+                resolved.lastReconciledGeneration()
+        );
+        assertEquals("owner-world", resolved.ownerWorldKey());
+    }
+
+    @Test
     void unownedLiveAdoptionRoundTripsExplicitNullAndAcceptsMissingOwner() {
         CompanionProfileMutation.AdoptLive adoption =
                 new CompanionProfileMutation.AdoptLive(

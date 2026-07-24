@@ -7,8 +7,6 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -387,23 +385,12 @@ final class CommandMenuMoveService {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
             }
             if (affected <= 0 && queued <= 0) {
-                if (relocationResult.firstRejection() != null) {
-                    feedbackService.showWarning(
-                            player,
-                            PersistencePlayerFeedback.resolve(
-                                    player,
-                                    PersistenceDomain.RECALL_RELOCATION,
-                                    relocationResult.firstRejection()
-                            )
-                    );
-                } else {
-                    feedbackService.showWarningKey(
-                            player,
-                            returnHome
-                                    ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
-                                    : "tamework.ui.notifications.command.execution.none"
-                    );
-                }
+                feedbackService.showWarningKey(
+                        player,
+                        returnHome
+                                ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
+                                : "tamework.ui.notifications.command.execution.none"
+                );
                 return;
             }
             feedbackService.emitCommandExecutionFeedback(

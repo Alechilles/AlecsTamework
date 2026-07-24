@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Guards conservative population handling when cross-world source restoration is ambiguous. */
+/** Guards conservative request handling when cross-world source restoration is ambiguous. */
 class CommandRelocationRestoreArchitectureTest {
 
     @Test
@@ -25,7 +25,7 @@ class CommandRelocationRestoreArchitectureTest {
     }
 
     @Test
-    void invalidAddRefRequiresUuidPresenceAndFailedRestoreCommitsAsLost() throws Exception {
+    void invalidAddRefRequiresUuidPresenceAndFailedRestoreReportsLost() throws Exception {
         String access = source("CommandRelocationWorldAccess.java");
         String service = source("CommandNpcRelocationService.java");
 
@@ -34,11 +34,11 @@ class CommandRelocationRestoreArchitectureTest {
         assertTrue(service.contains("if (!restoreSourceEntity(")
                         && service.contains("transferHolders.restoreSource(drainedHolder, sourceTransform)")
                         && service.contains("commitUnconfirmedRelocationAsLost("),
-                "Failed/ambiguous transform or entity restoration must retain capacity and terminate through LOST commit.");
+                "Failed/ambiguous transform or entity restoration must terminate through LOST reporting.");
         int failedRestore = service.indexOf("if (!restoreSourceEntity(");
         assertTrue(service.indexOf("pending.markPhysicalMutationCompensated()", failedRestore)
                         > failedRestore,
-                "APPLYING may be canceled/retried only after verified source compensation.");
+                "A physical transfer may be retried only after verified source compensation.");
     }
 
     private static String source(String fileName) throws Exception {

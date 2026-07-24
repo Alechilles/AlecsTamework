@@ -20,11 +20,13 @@ import javax.annotation.Nonnull;
  */
 public final class PersistenceBootstrap implements AutoCloseable {
     private final PublicPersistenceRuntime runtime;
+    private final PersistenceDiagnosticsReader diagnostics;
 
     public PersistenceBootstrap(
             @Nonnull PublicPersistenceRuntimeConfiguration configuration
     ) {
         runtime = new PublicPersistenceRuntime(configuration);
+        diagnostics = new PersistenceDiagnosticsReader(runtime);
     }
 
     /** Starts or resumes the descriptor-derived readiness graph. */
@@ -93,7 +95,13 @@ public final class PersistenceBootstrap implements AutoCloseable {
         return runtime.diagnostics();
     }
 
-    /** Executes or resumes the ordered shutdown protocol. */
+    /** Returns bounded operator reads without lifecycle or mutation authority. */
+    @Nonnull
+    public PersistenceDiagnosticsReader diagnosticsReader() {
+        return diagnostics;
+    }
+
+    /** Executes or resumes every ordered shutdown phase. */
     @Nonnull
     public PublicPersistenceShutdownReport shutdown(
             @Nonnull Duration timeout

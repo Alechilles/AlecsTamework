@@ -8,14 +8,9 @@ import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.PopulationGroupLimitChangedEvent;
-import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -74,60 +69,19 @@ public final class TameworkEventBus
         return () -> subscriptions.remove(subscription);
     }
 
-    public void publishCaptureRecorded(
-            @Nonnull CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot,
-            @Nullable NpcProfileView profile
-    ) {
-        dispatch(new NpcCapturedEvent(
-                profile,
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                toOrderedSet(snapshot.toolIds()),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.capturedAtMs(),
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement capture event without legacy service types. */
+    public void publishCaptureRecorded(@Nonnull NpcCapturedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
-    public void publishDeathRecorded(
-            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
-            @Nullable NpcProfileView profile
-    ) {
-        dispatch(new NpcDeathRecordedEvent(
-                profile,
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                snapshot.ownerName(),
-                toOrderedSet(snapshot.toolIds()),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                snapshot.customName(),
-                snapshot.tamed(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.diedAtMs(),
-                snapshot.respawnAvailableAtMs(),
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement death event without legacy service types. */
+    public void publishDeathRecorded(@Nonnull NpcDeathRecordedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
-    public void publishLostRecorded(
-            @Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot,
-            @Nullable NpcProfileView profile
-    ) {
-        dispatch(new NpcLostRecordedEvent(
-                profile,
-                snapshot.npcUuid(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.lastRelocationQueuedAtMs(),
-                snapshot.lostAtMs(),
-                snapshot.relocationRetryAttempts(),
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement lost event without legacy service types. */
+    public void publishLostRecorded(@Nonnull NpcLostRecordedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
     public void emitConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Collection<String> changedIds) {
@@ -154,16 +108,6 @@ public final class TameworkEventBus
     }
 
     public void emitCaptureAttemptResolved(@Nonnull CaptureAttemptResolvedEvent event) {
-        dispatch(event);
-    }
-
-    /** Isolated post-commit delivery seam for canonical population-group events. */
-    public void emitPopulationGroupEvent(@Nonnull TameworkEvent event) {
-        Objects.requireNonNull(event, "event");
-        if (!(event instanceof PopulationGroupMembershipChangedEvent)
-                && !(event instanceof PopulationGroupLimitChangedEvent)) {
-            throw new IllegalArgumentException("Only canonical population-group events are accepted.");
-        }
         dispatch(event);
     }
 
@@ -210,24 +154,6 @@ public final class TameworkEventBus
             lastFailedEventType = lastFailedEventType == null
                     || lastFailedEventType.isBlank() ? null : lastFailedEventType.trim();
         }
-    }
-
-    @Nonnull
-    private LinkedHashSet<String> toOrderedSet(@Nullable String[] values) {
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        if (values == null) {
-            return normalized;
-        }
-        for (String value : values) {
-            if (value == null) {
-                continue;
-            }
-            String trimmed = value.trim();
-            if (!trimmed.isEmpty()) {
-                normalized.add(trimmed);
-            }
-        }
-        return normalized;
     }
 
     private static final class Subscription<E extends TameworkEvent> {

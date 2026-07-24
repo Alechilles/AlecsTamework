@@ -110,6 +110,27 @@ class TameworkSettingsPageLocalizationTest {
         assertTrue(lang.contains("tamework.ui.settings.needsResourceMode.autoFast="));
     }
 
+    @Test
+    void settingsPageDoesNotExposeUnreleasedClaimProviderSelection() throws Exception {
+        String page = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/ui/TameworkSettingsPage.java"),
+                StandardCharsets.UTF_8
+        );
+        String ui = Files.readString(
+                Path.of("src/main/resources/Common/UI/Custom/TameworkSettingsPage.ui"),
+                StandardCharsets.UTF_8
+        );
+        String binder = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/ui/TameworkSettingsPageTextBinder.java"),
+                StandardCharsets.UTF_8
+        );
+
+        assertFalse(page.contains("ClaimProvider"));
+        assertFalse(ui.contains("TwSettingsClaimProvider"));
+        assertFalse(binder.contains("claimProvider"));
+        assertTrue(ui.contains("TwSettingsSimpleClaimsEnabledCheck"));
+    }
+
     private static LinkedHashSet<String> extractLanguageKeys(String source) {
         LinkedHashSet<String> keys = new LinkedHashSet<>();
         Matcher matcher = Pattern.compile("\"(tamework\\.ui\\.[^\"]+)\"").matcher(source);

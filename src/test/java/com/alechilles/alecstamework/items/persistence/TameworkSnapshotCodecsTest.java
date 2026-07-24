@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
@@ -24,7 +25,7 @@ class TameworkSnapshotCodecsTest {
             ProfileId.parse("30000000-0000-0000-0000-000000000003");
 
     @Test
-    void createsExactlyTheSixSupportedKeysWithoutRuntimeComposition() {
+    void createsExactlyTheSevenSupportedKeysWithoutRuntimeComposition() {
         SnapshotCodecRegistry registry = TameworkSnapshotCodecs.create();
         LegacyDeathV1Payload death = new LegacyDeathV1SnapshotCodec().decode(
                 "{\"diedAtMs\":-1,\"respawnAvailableAtMs\":-2}"
@@ -44,11 +45,24 @@ class TameworkSnapshotCodecsTest {
         assertRoundTrip(registry, TameworkSnapshotCodecs.DEATH, 1, LegacyDeathV1Payload.class, death);
         assertRoundTrip(registry, TameworkSnapshotCodecs.LOST, 1, LegacyLostV1Payload.class, lost);
         assertRoundTrip(registry, TameworkSnapshotCodecs.COOP, 1, CoopResidentStateSnapshot.class, full);
+        assertRoundTrip(
+                registry,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
+                CoopResidentStateSnapshot.class,
+                full
+        );
         assertRoundTrip(registry, TameworkSnapshotCodecs.DEATH, 2, DeathSnapshotV2Payload.class, modernDeath);
         assertRoundTrip(registry, CompanionFullStateProjection.KIND, CompanionFullStateProjection.VERSION, CoopResidentStateSnapshot.class, full);
         assertRoundTrip(registry, TameworkSnapshotCodecs.LOST, 2, CoopResidentStateSnapshot.class, full);
 
         assertUnsupported(registry, TameworkSnapshotCodecs.COOP, 2, CoopResidentStateSnapshot.class);
+        assertUnsupported(
+                registry,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                CompanionCaptureRequest.SNAPSHOT_VERSION + 1,
+                CoopResidentStateSnapshot.class
+        );
         assertUnsupported(registry, TameworkSnapshotCodecs.DEATH, 3, DeathSnapshotV2Payload.class);
         assertUnsupported(registry, CompanionFullStateProjection.KIND, CompanionFullStateProjection.VERSION + 1, CoopResidentStateSnapshot.class);
         assertUnsupported(registry, TameworkSnapshotCodecs.LOST, 99, CoopResidentStateSnapshot.class);

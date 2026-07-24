@@ -155,35 +155,13 @@ final class CommandNpcProfileActionResolver {
         if (durable.dead()) {
             return "profile_is_dead";
         }
-        if (durable.legacyCoop() || durable.managedCoopBlocksRelocation()) {
+        if (durable.inCoop()) {
             return "profile_is_cooped";
         }
-        if (durable.activeRecovery()) {
-            return "profile_recovery_active";
-        }
-        if (durable.lostAwaitingRecovery()) {
+        if (durable.lost()) {
             return "profile_is_lost";
         }
-        if (durable.lostReplacementUuid() != null
-                && actionKind == ActionKind.LOST_TRANSITION
-                && !isCurrentRecoveredProjection(identity, record)) {
-            return "profile_already_recovered";
-        }
         return null;
-    }
-
-    /**
-     * Completed recovery evidence still suppresses historical removal events, but the profile's
-     * current canonical projection can enter a later lost-recovery cycle. Its UUID can legitimately
-     * rotate after recovery when Hytale republishes the projection. Relocation remains profile-level
-     * and may separately redirect a historical command record to this canonical current projection.
-     */
-    private boolean isCurrentRecoveredProjection(
-            @Nonnull CommandNpcIdentityService.IdentityResolution identity,
-            @Nullable LinkedNpcRecord record) {
-        UUID projectedNpcUuid = record != null ? record.npcUuid : null;
-        return projectedNpcUuid != null
-                && projectedNpcUuid.equals(identity.currentNpcUuid());
     }
 
     @Nullable

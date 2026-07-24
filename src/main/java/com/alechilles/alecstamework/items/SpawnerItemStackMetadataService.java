@@ -97,6 +97,8 @@ final class SpawnerItemStackMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_NAME_KEY);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_MODEL_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_RELEASE_RECEIPT);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID);

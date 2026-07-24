@@ -102,6 +102,7 @@ final class SqliteCaptureCompensation {
         return new RefundClaim(
                 operationId,
                 capture.source().actorUuid(),
+                capture.source().worldKey(),
                 List.of(new RefundItem(
                         capture.source().sourceItemId(),
                         capture.source().quantity()
@@ -120,6 +121,9 @@ final class SqliteCaptureCompensation {
     ) {
         return expected.operationId().equals(actual.operationId())
                 && expected.recipientUuid().equals(actual.recipientUuid())
+                && expected.recipientWorldKey().equals(
+                        actual.recipientWorldKey()
+                )
                 && expected.items().equals(actual.items())
                 && expected.reasonCode().equals(actual.reasonCode())
                 && expected.receiptKey().equals(actual.receiptKey())

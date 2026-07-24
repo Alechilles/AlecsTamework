@@ -150,6 +150,7 @@ class SqliteCompensationCoordinatorTest {
         return new RefundClaim(
                 OPERATION,
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                "world:test",
                 List.of(new RefundItem("capture-device", 1)),
                 "capture_aborted",
                 "refund:" + OPERATION,
@@ -180,6 +181,9 @@ class SqliteCompensationCoordinatorTest {
     private static boolean sameClaim(RefundClaim expected, RefundClaim actual) {
         return expected.operationId().equals(actual.operationId())
                 && expected.recipientUuid().equals(actual.recipientUuid())
+                && expected.recipientWorldKey().equals(
+                        actual.recipientWorldKey()
+                )
                 && expected.items().equals(actual.items())
                 && expected.reasonCode().equals(actual.reasonCode())
                 && expected.receiptKey().equals(actual.receiptKey())

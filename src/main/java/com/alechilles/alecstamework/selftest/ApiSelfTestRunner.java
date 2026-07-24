@@ -21,7 +21,6 @@ import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
-import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
@@ -120,22 +119,9 @@ public final class ApiSelfTestRunner {
                 api.configs().resolveSpawnerCaptureMechanicsForItemId(EXAMPLE_SPAWNER_ITEM_ID).isPresent(),
                 "item=" + EXAMPLE_SPAWNER_ITEM_ID));
         assertions.add(check(
-                "resolved capture consumption capability ready",
-                capabilities.contains(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION),
-                "capabilities=" + capabilities));
-        PopulationGroupReconciliationView groupReadiness =
-                api.policies().populationGroups().getReconciliationStatus();
-        assertions.add(check(
-                "population group capability ready",
-                capabilities.contains(TameworkApiCapability.POPULATION_GROUPS)
-                        && groupReadiness.readiness()
-                        == PopulationGroupReconciliationView.Readiness.READY,
-                "readiness=" + groupReadiness.readiness() + " reason=" + groupReadiness.reason()));
-        assertions.add(check(
                 "profile data transactions capability ready",
                 capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS),
                 "capabilities=" + capabilities));
-        assertions.addAll(HyDragonBehavioralSelfTestFixtures.run());
         return new ApiSelfTestSuiteResult("hydragon-integrations", assertions);
     }
 
@@ -162,8 +148,7 @@ public final class ApiSelfTestRunner {
                 TameworkApiCapability.EVENTS,
                 TameworkApiCapability.COMPANION_XP_EVENTS,
                 TameworkApiCapability.CONFIG_READ,
-                TameworkApiCapability.DIAGNOSTICS,
-                TameworkApiCapability.PERSISTENCE_RESILIENCE
+                TameworkApiCapability.DIAGNOSTICS
         );
         EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
         assertions.add(check(

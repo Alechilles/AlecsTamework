@@ -56,7 +56,7 @@ class CommandLinkedPanelUnloadedNameServiceTest {
     }
 
     @Test
-    void durableProfileLookupIsMemoizedAcrossPanelRefreshes() {
+    void canonicalProfileNameIsRefreshedAcrossPanelReads() {
         LinkedNpcRecord record = record("Chicken");
         int[] lookups = {0};
         CommandLinkedPanelUnloadedNameService service = new CommandLinkedPanelUnloadedNameService(
@@ -72,7 +72,7 @@ class CommandLinkedPanelUnloadedNameServiceTest {
 
         assertEquals("Kaitlin", service.resolve(record));
         assertEquals("Kaitlin", service.resolve(record));
-        assertEquals(1, lookups[0]);
+        assertEquals(2, lookups[0]);
     }
 
     private static CommandLinkedPanelUnloadedNameService service(

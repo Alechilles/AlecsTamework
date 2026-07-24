@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseEve
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseLiveBoundary;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseOutcome;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -82,7 +83,7 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         release,
                         FEATURE_SCOPE,
                         release.expectedLifecycleRevision(),
-                        List.of(OperationScope.profile(release.profileId())),
+                        participantScopes(release),
                         release.requestedAtMs()
                 );
         SqliteLiveOperationCoordinator.Submission submission =
@@ -147,10 +148,7 @@ public final class SqliteCompanionCaptureReleaseOperations {
                         : operation.failureCode(),
                 "Captured-artifact release could not prove both the exact "
                         + "inventory and entity receipts",
-                List.of(
-                        OperationScope.operation(operation.operationId()),
-                        OperationScope.profile(release.profileId())
-                ),
+                containmentScopes(operation, release),
                 clock.getAsLong()
         ).completion().thenApply(containment -> {
             if (containment instanceof
@@ -234,9 +232,12 @@ public final class SqliteCompanionCaptureReleaseOperations {
             CompanionCaptureReleaseRequest release,
             long releasedAtMs
     ) {
+        OwnerId ownerId = release.ownerAssignment() == null
+                ? fenced.ownerId()
+                : release.ownerAssignment();
         return new CompanionLifecycle(
                 release.profileId(),
-                fenced.ownerId(),
+                ownerId,
                 LifecycleState.ACTIVE,
                 LifecycleLocation.liveEntity(
                         release.targetAlias().toString(),
@@ -247,10 +248,37 @@ public final class SqliteCompanionCaptureReleaseOperations {
                 releasedAtMs,
                 fenced.lastReconciledGeneration(),
                 fenced.quarantineIncidentId(),
-                fenced.ownerId() == null
+                ownerId == null
                         ? null
                         : release.targetWorldKey()
         );
+    }
+
+    private List<OperationScope> participantScopes(
+            CompanionCaptureReleaseRequest release
+    ) {
+        return release.ownerAssignment() == null
+                ? List.of(OperationScope.profile(release.profileId()))
+                : List.of(
+                        OperationScope.profile(release.profileId()),
+                        OperationScope.owner(release.ownerAssignment())
+                );
+    }
+
+    private List<OperationScope> containmentScopes(
+            OperationEnvelope operation,
+            CompanionCaptureReleaseRequest release
+    ) {
+        return release.ownerAssignment() == null
+                ? List.of(
+                        OperationScope.operation(operation.operationId()),
+                        OperationScope.profile(release.profileId())
+                )
+                : List.of(
+                        OperationScope.operation(operation.operationId()),
+                        OperationScope.profile(release.profileId()),
+                        OperationScope.owner(release.ownerAssignment())
+                );
     }
 
     private List<ProjectionEventDraft> events(

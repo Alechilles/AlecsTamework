@@ -28,11 +28,9 @@ public final class ReplacementTameworkApiFactory {
             @Nullable CommandLinkedNpcStateSnapshotService snapshots,
             @Nonnull InteractionExtensionApi interactionExtensions,
             @Nonnull TraitEffectApi traitEffects,
-            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
-            @Nonnull PopulationPolicyAuthority populationAuthority
+            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy
     ) {
-        if (persistence == null || readTimeout == null || clock == null
-                || populationAuthority == null) {
+        if (persistence == null || readTimeout == null || clock == null) {
             throw new IllegalArgumentException(
                     "Complete replacement API composition is required"
             );
@@ -45,17 +43,12 @@ public final class ReplacementTameworkApiFactory {
                 new ReplacementProfileDataApi(
                         facades.queries(), facades.operations(), clock
                 ),
-                new ReplacementPersistenceDiagnosticsApi(
-                        persistence,
-                        populationAuthority::populationDiagnostics,
-                        readTimeout
-                ),
+                new ReplacementPersistenceDiagnosticsApi(persistence),
                 eventBus,
                 snapshots,
                 interactionExtensions,
                 traitEffects,
-                damagePolicy,
-                populationAuthority
+                damagePolicy
         );
     }
 }

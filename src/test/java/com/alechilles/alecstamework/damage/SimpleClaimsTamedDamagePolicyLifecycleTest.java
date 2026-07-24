@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -36,8 +34,8 @@ class SimpleClaimsTamedDamagePolicyLifecycleTest {
         @Override
         public Resolution resolve() {
             return Resolution.unavailable(
-                    ClaimProviderState.ABSENT,
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginState.ABSENT,
+                    SimpleClaimsPluginGeneration.NONE,
                     null,
                     "not installed"
             );

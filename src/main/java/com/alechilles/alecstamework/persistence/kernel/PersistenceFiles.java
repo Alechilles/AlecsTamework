@@ -1,9 +1,7 @@
 package com.alechilles.alecstamework.persistence.kernel;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import javax.annotation.Nonnull;
 
 /** Canonical filenames for the legacy source and replacement persistence lineage. */
@@ -34,18 +32,6 @@ public final class PersistenceFiles {
         } catch (Exception ignored) {
             return 0L;
         }
-    }
-
-    /** Backs up and removes one SQLite database plus its WAL and shared-memory sidecars. */
-    public static void backupAndRemoveSqliteFamily(
-            @Nonnull Path database,
-            @Nonnull String backupFilename
-    ) throws IOException {
-        Path backup = database.resolveSibling(backupFilename);
-        Files.copy(database, backup, StandardCopyOption.REPLACE_EXISTING);
-        Files.deleteIfExists(database);
-        Files.deleteIfExists(database.resolveSibling(database.getFileName() + "-wal"));
-        Files.deleteIfExists(database.resolveSibling(database.getFileName() + "-shm"));
     }
 
     private static Path requireDirectory(Path dataDirectory) {

@@ -13,13 +13,8 @@ import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
-import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
-import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PolicyApi;
-import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
-import com.alechilles.alecstamework.api.PopulationGroupApi;
-import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -88,6 +83,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -133,7 +129,6 @@ public final class TameworkApiImpl
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final SimpleClaimsTamedDamagePolicy damagePolicy;
-    private final PopulationPolicyApiDelegate populationPolicy;
     private final DiagnosticsApi diagnosticsApi;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
@@ -278,15 +273,13 @@ public final class TameworkApiImpl
             TameworkApiCapability.EVENTS,
             TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
-            TameworkApiCapability.DIAGNOSTICS,
-            TameworkApiCapability.PERSISTENCE_RESILIENCE
+            TameworkApiCapability.DIAGNOSTICS
     );
     private final Gson gson = new Gson();
     @Nullable
     private volatile ItemFeatureRegistry captureItemConfigs;
     @Nullable
     private volatile CapturePolicyRegistry capturePolicies;
-    private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
 
     public TameworkApiImpl(@Nonnull NpcProfilesApi profilesApi,
                            @Nonnull ProfileDataApi profileDataApi,
@@ -295,8 +288,7 @@ public final class TameworkApiImpl
                            @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                            @Nonnull InteractionExtensionApi interactionExtensionApi,
                            @Nonnull TraitEffectApi traitEffectApi,
-                           @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
-                           @Nonnull PopulationPolicyAuthority populationPolicyAuthority) {
+                           @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
         this.profilesApi = Objects.requireNonNull(profilesApi, "profilesApi");
         this.profileDataApi = Objects.requireNonNull(
                 profileDataApi, "profileDataApi"
@@ -310,7 +302,6 @@ public final class TameworkApiImpl
         this.eventBus = Objects.requireNonNull(eventBus);
         this.stateSnapshotService = stateSnapshotService;
         this.damagePolicy = Objects.requireNonNull(damagePolicy);
-        this.populationPolicy = new PopulationPolicyApiDelegate(populationPolicyAuthority);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
@@ -335,32 +326,6 @@ public final class TameworkApiImpl
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.CAPTURE_POLICY);
         }
-    }
-
-    /** Advertises capture mutations only after their durable runtime authorities are composed. */
-    public void activateAdvancedCaptureRuntimes(boolean resolvedAttemptConsumptionReady) {
-        synchronized (capabilities) {
-            if (resolvedAttemptConsumptionReady) {
-                capabilities.add(TameworkApiCapability.CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION);
-            }
-        }
-    }
-
-    /** Publishes group projections only after durable reconciliation reports READY. */
-    public boolean activatePopulationGroupRuntime(
-            @Nonnull PopulationGroupApi runtime,
-            boolean allPositivePathsInstalled) {
-        Objects.requireNonNull(runtime, "runtime");
-        if (!allPositivePathsInstalled
-                || runtime.getReconciliationStatus().readiness()
-                != PopulationGroupReconciliationView.Readiness.READY) {
-            return false;
-        }
-        populationGroupApi = runtime;
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
-        }
-        return true;
     }
 
     /** Drops reflected optional-claim contracts after a settings change. */
@@ -951,27 +916,19 @@ public final class TameworkApiImpl
 
     @Nonnull
     @Override
-    @Deprecated(since = "0.7.0", forRemoval = false)
     public PopulationCapDecisionView evaluatePopulationCap(@Nullable UUID ownerUuid) {
-        return populationPolicy.evaluateLegacy(ownerUuid);
-    }
-
-    @Nonnull
-    @Override
-    public OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
-        return populationPolicy.evaluate(request);
-    }
-
-    @Nonnull
-    @Override
-    public PopulationAdmissionApi populationAdmissions() {
-        return populationPolicy.admissions();
-    }
-
-    @Nonnull
-    @Override
-    public PopulationGroupApi populationGroups() {
-        return populationGroupApi;
+        OwnerPopulationCapService.Decision decision =
+                OwnerPopulationCapService.evaluateAcquisition(null, ownerUuid);
+        return new PopulationCapDecisionView(
+                ownerUuid,
+                decision.allowed(),
+                decision.capEnabled(),
+                decision.limit(),
+                decision.currentCount(),
+                decision.remainingHeadroom(),
+                decision.scope() != null ? decision.scope().name() : null,
+                decision.reason()
+        );
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
@@ -66,6 +67,45 @@ final class CommandCompanionPlacementService {
                 safeSpawnDistance,
                 sourcePosition,
                 settings
+        );
+    }
+
+    /**
+     * Freezes one exact canonical restoration placement from current world-thread state.
+     */
+    @Nullable
+    CompanionSpawnPlacement computeRestorationPlacement(
+            Ref<EntityStore> playerRef,
+            Store<EntityStore> store,
+            double safeSpawnDistance,
+            @Nullable String roleId,
+            @Nullable Vector3d sourcePosition
+    ) {
+        Vector3d position = computeSafeRespawnPosition(
+                playerRef,
+                store,
+                safeSpawnDistance,
+                roleId,
+                sourcePosition
+        );
+        World world = store != null && store.getExternalData() != null
+                ? store.getExternalData().getWorld()
+                : null;
+        if (position == null || world == null || world.getName() == null
+                || world.getName().isBlank()) {
+            return null;
+        }
+        Rotation3f rotation = resolvePlacementRotation(
+                store, playerRef, position
+        );
+        return new CompanionSpawnPlacement(
+                world.getName(),
+                position.x,
+                position.y,
+                position.z,
+                rotation.pitch(),
+                rotation.yaw(),
+                rotation.roll()
         );
     }
 
@@ -244,6 +284,31 @@ final class CommandCompanionPlacementService {
         }
         out.normalize();
         return out;
+    }
+
+    private Rotation3f resolvePlacementRotation(
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            Vector3d spawnPosition
+    ) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return new Rotation3f();
+        }
+        TransformComponent transform = store.getComponent(
+                playerRef, TransformComponent.getComponentType()
+        );
+        if (transform == null) {
+            return new Rotation3f();
+        }
+        Vector3d playerPosition = new Vector3d(transform.getPosition());
+        Vector3d relative = new Vector3d(
+                playerPosition.x - spawnPosition.x,
+                0.0,
+                playerPosition.z - spawnPosition.z
+        );
+        return relative.lengthSquared() > 0.0001
+                ? Rotation3f.lookAt(relative)
+                : new Rotation3f(transform.getRotation());
     }
 
     private Vector3d projectToSurface(World world,

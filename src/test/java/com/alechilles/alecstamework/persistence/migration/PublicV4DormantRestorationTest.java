@@ -169,12 +169,16 @@ class PublicV4DormantRestorationTest {
                         profiles.findByProfile(profile).toCompletableFuture()
                                 .get(10, TimeUnit.SECONDS)
                 );
+        TameworkRestorationSnapshotResolver.Resolution resolution =
+                new TameworkRestorationSnapshotResolver()
+                        .resolve(found.value(), snapshot);
         TameworkRestorationSnapshotResolver.Resolution.Resolved resolved =
                 assertInstanceOf(
                         TameworkRestorationSnapshotResolver.Resolution
                                 .Resolved.class,
-                        new TameworkRestorationSnapshotResolver()
-                                .resolve(found.value(), snapshot)
+                        resolution,
+                        () -> "Imported dormant snapshot did not resolve: "
+                                + resolution
                 );
         RestorationProjection projection = resolved.projection();
         assertEquals(oldAlias, projection.sourceAlias());

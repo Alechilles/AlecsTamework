@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,49 +55,19 @@ class PersistenceConsolidationInventoryGuardTest {
     );
 
     @Test
-    void legacyPersistenceSurfaceCanOnlyShrink() throws Exception {
+    void supersededPersistenceSurfaceIsAbsent() throws Exception {
         JsonObject baseline = loadBaseline();
         Inventory inventory = inventory();
 
-        assertAtMost(baseline, "legacySqlite", "javaFiles", inventory.legacyFiles());
-        assertAtMost(baseline, "legacySqlite", "javaLines", inventory.legacyLines());
-        assertAtMost(baseline, "legacySqlite", "schemaTables", inventory.legacyTables().size());
-        assertAtMost(
-                baseline,
-                "legacySqlite",
-                "classesAtOrAbove1000Lines",
-                inventory.legacyClassesAtOrAbove1000()
-        );
-        assertAtMost(
-                baseline,
-                "crossPackageCoupling",
-                "nonPersistenceFilesImportingLegacySqlite",
-                inventory.nonPersistenceFilesImportingLegacySqlite()
-        );
-        assertAtMost(
-                baseline,
-                "crossPackageCoupling",
-                "legacySqliteImportStatementsOutsidePersistence",
-                inventory.legacySqliteImportsOutsidePersistence()
-        );
-        assertAtMost(
-                baseline,
-                "legacyWriteApi",
-                "submitTrackedCalls",
-                inventory.submitTrackedCalls()
-        );
-        assertAtMost(
-                baseline,
-                "legacyWriteApi",
-                "submitWithCompletionCalls",
-                inventory.submitWithCompletionCalls()
-        );
-        assertAtMost(
-                baseline,
-                "legacyWriteApi",
-                "untrackedSubmitCalls",
-                inventory.untrackedSubmitCalls()
-        );
+        assertEquals(0, inventory.legacyFiles());
+        assertEquals(0L, inventory.legacyLines());
+        assertTrue(inventory.legacyTables().isEmpty());
+        assertEquals(0, inventory.legacyClassesAtOrAbove1000());
+        assertEquals(0, inventory.nonPersistenceFilesImportingLegacySqlite());
+        assertEquals(0, inventory.legacySqliteImportsOutsidePersistence());
+        assertEquals(0, inventory.submitTrackedCalls());
+        assertEquals(0, inventory.submitWithCompletionCalls());
+        assertEquals(0, inventory.untrackedSubmitCalls());
 
         writeReport(baseline, inventory);
     }
@@ -113,21 +84,14 @@ class PersistenceConsolidationInventoryGuardTest {
     }
 
     @Test
-    void temporaryLegacyBridgePackageCannotGrow() throws Exception {
-        Set<String> expected = Set.of(
-                "LegacyNpcProfilesApi.java",
-                "LegacyPersistenceEventBridge.java",
-                "LegacyProfileDataApi.java",
-                "LegacyProfileSnapshotSink.java"
-        );
+    void supersededLegacyBridgePackageIsEmpty() throws Exception {
         Set<String> actual = new LinkedHashSet<>();
         for (Path file : javaFiles(LEGACY_BRIDGE_ROOT)) {
             actual.add(file.getFileName().toString());
         }
         assertTrue(
-                actual.equals(expected),
-                () -> "Temporary legacy bridges changed: " + actual
-                        + "; expected exactly " + expected
+                actual.isEmpty(),
+                () -> "Superseded legacy bridges remain: " + actual
         );
     }
 

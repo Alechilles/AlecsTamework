@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.persistence.migration;
 
+import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceFiles;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -15,7 +18,10 @@ import javax.annotation.Nonnull;
  */
 public final class PublicPersistenceTargetOpener {
     private final PublicPersistenceImporter importer;
+    private final LegacyDatPersistenceImporter datImporter;
     private final FreshReplacementTargetCreator fresh;
+    private final PublicPersistenceSourceDiscovery sources =
+            new PublicPersistenceSourceDiscovery();
 
     public PublicPersistenceTargetOpener() {
         this(System::currentTimeMillis);
@@ -26,13 +32,49 @@ public final class PublicPersistenceTargetOpener {
             throw new IllegalArgumentException("Target open clock is required");
         }
         importer = new PublicPersistenceImporter(clock);
+        datImporter = new LegacyDatPersistenceImporter(clock);
         fresh = new FreshReplacementTargetCreator(clock);
     }
 
-    /** Opens or constructs exactly one canonical replacement database path. */
+    /**
+     * Opens from a single-directory layout retained for focused callers.
+     */
     @Nonnull
     public PublicPersistenceTarget open(@Nonnull Path dataDirectory) {
-        Path target = PersistenceFiles.replacementDatabase(dataDirectory);
+        return open(dataDirectory, List.of(dataDirectory));
+    }
+
+    /** Opens using the canonical target and immutable path-service candidates. */
+    @Nonnull
+    public PublicPersistenceTarget open(
+            @Nonnull TameworkDataPathLayout layout
+    ) {
+        if (layout == null) {
+            throw new IllegalArgumentException(
+                    "Tamework persistence path layout is required"
+            );
+        }
+        return open(
+                layout.targetDirectory(),
+                layout.persistenceSourceDirectories()
+        );
+    }
+
+    /**
+     * Opens or constructs exactly one canonical replacement database path after
+     * selecting at most one immutable source across the supplied directories.
+     */
+    @Nonnull
+    public PublicPersistenceTarget open(
+            @Nonnull Path targetDirectory,
+            @Nonnull List<Path> sourceDirectories
+    ) {
+        if (targetDirectory == null || sourceDirectories == null) {
+            throw new IllegalArgumentException(
+                    "Target and source directories are required"
+            );
+        }
+        Path target = PersistenceFiles.replacementDatabase(targetDirectory);
         if (Files.exists(target)) {
             if (!Files.isRegularFile(target)) {
                 throw new IllegalStateException(
@@ -44,9 +86,26 @@ public final class PublicPersistenceTargetOpener {
                     PublicPersistenceTarget.Origin.EXISTING
             );
         }
-        Path source = PersistenceFiles.legacyDatabase(dataDirectory);
-        if (Files.exists(source)) {
-            return imported(source, target);
+        ArrayList<Path> candidates = new ArrayList<>();
+        candidates.add(targetDirectory);
+        candidates.addAll(sourceDirectories);
+        PublicPersistenceSourceDiscovery.Result discovered =
+                sources.discover(candidates);
+        if (discovered instanceof
+                PublicPersistenceSourceDiscovery.Refused refused) {
+            throw new IllegalStateException(
+                    "public_persistence_source_refused:" + refused.code()
+            );
+        }
+        if (discovered instanceof
+                PublicPersistenceSourceDiscovery.Selected source) {
+            PublicImportResult result =
+                    source.format()
+                            == PublicPersistenceSourceDiscovery.Format.SQLITE
+                            ? importer.importSource(source.source(), target)
+                            : datImporter.importDirectory(
+                                    source.directory(), target);
+            return imported(result, target);
         }
         try {
             fresh.create(target);
@@ -62,8 +121,10 @@ public final class PublicPersistenceTargetOpener {
         }
     }
 
-    private PublicPersistenceTarget imported(Path source, Path target) {
-        PublicImportResult result = importer.importSource(source, target);
+    private PublicPersistenceTarget imported(
+            PublicImportResult result,
+            Path target
+    ) {
         if (result instanceof PublicImportResult.Imported
                 || result instanceof PublicImportResult.AlreadyImported) {
             return new PublicPersistenceTarget(

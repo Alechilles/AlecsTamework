@@ -1,39 +1,26 @@
 package com.alechilles.alecstamework.ownership;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Bridges legacy vanilla-tamed NPCs into Tamework ownership when mods are added mid-playthrough.
  *
- * <p>Adoption is asynchronous and never exposes the requested owner as committed until the
- * scheduler's world-thread apply callback fires. Callers that depend on ownership must continue
- * their work through {@link ClaimContinuation}.
+ * <p>Callers invoke this bridge on the owning world thread. Adoption applies the released live
+ * cap and owner component directly; no durable reservation or cross-world lookup participates.
  */
 public final class LegacyTamedOwnershipBridge {
-    private static final ConcurrentHashMap<UUID, PendingClaim> PENDING = new ConcurrentHashMap<>();
-
     private LegacyTamedOwnershipBridge() {
     }
 
@@ -47,7 +34,7 @@ public final class LegacyTamedOwnershipBridge {
     }
 
     /**
-     * Schedules legacy adoption and invokes the continuation only after the owner component applies.
+     * Applies eligible legacy adoption and then invokes the optional continuation synchronously.
      */
     public static ClaimResult claimForPlayerIfEligible(Ref<EntityStore> npcRef,
                                                         Store<EntityStore> store,
@@ -57,8 +44,7 @@ public final class LegacyTamedOwnershipBridge {
             return ClaimResult.none();
         }
         UUID playerId = player.getUuid();
-        UUID npcUuid = resolveNpcUuid(npcRef, store);
-        if (playerId == null || npcUuid == null) {
+        if (playerId == null || resolveNpcUuid(npcRef, store) == null) {
             return ClaimResult.none();
         }
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
@@ -74,89 +60,22 @@ public final class LegacyTamedOwnershipBridge {
         if (!TamedStateResolver.isTamed(npcRef, store)) {
             return ClaimResult.none();
         }
-
-        PendingClaim pending = PENDING.get(npcUuid);
-        if (pending != null) {
-            if (pending.ownerId().equals(playerId)) {
-                pending.add(continuation);
-                return ClaimResult.scheduled();
-            }
-            sendUnavailable(player, "legacy-adoption-pending-for-another-player");
-            return ClaimResult.denied("legacy-adoption-pending-for-another-player");
+        OwnerPopulationCapService.Decision cap =
+                OwnerPopulationCapService.evaluateAcquisition(store, playerId);
+        if (!cap.allowed()) {
+            sendCapDenial(player, cap);
+            return ClaimResult.denied(cap.reason());
         }
-
-        Tamework plugin = Tamework.getInstance();
-        OwnerMutationScheduler scheduler = plugin == null ? null : plugin.getOwnerMutationScheduler();
-        if (scheduler == null) {
-            sendUnavailable(player, "owner-mutation-service-unavailable");
-            return ClaimResult.denied("owner-mutation-service-unavailable");
-        }
-
-        PendingClaim candidate = new PendingClaim(playerId);
-        candidate.add(continuation);
-        PendingClaim prior = PENDING.putIfAbsent(npcUuid, candidate);
-        if (prior != null) {
-            if (prior.ownerId().equals(playerId)) {
-                prior.add(continuation);
-                return ClaimResult.scheduled();
-            }
-            sendUnavailable(player, "legacy-adoption-pending-for-another-player");
-            return ClaimResult.denied("legacy-adoption-pending-for-another-player");
-        }
-        CompletableFuture.delayedExecutor(30L, TimeUnit.SECONDS).execute(
-                () -> PENDING.remove(npcUuid, candidate)
-        );
-
         String ownerName = OwnerNameUtil.resolve(player);
-        boolean scheduled = scheduler.schedule(
+        store.putComponent(
                 npcRef,
-                store,
-                playerId,
-                ownerName,
-                CompanionLifecycleState.ACTIVE,
-                OwnerPopulationOperation.LEGACY_ADOPTION,
-                false,
-                "legacy-tamed-adoption:" + npcUuid + ":" + UUID.randomUUID(),
-                new OwnerMutationScheduler.MutationCallbacks() {
-                    private boolean claimDenialSent;
-
-                    @Override
-                    public void onPopulationDenied(CompanionPopulationPreparationResult result) {
-                        claimDenialSent = sendClaimDenial(store, playerId, result);
-                    }
-
-                    @Override
-                    public void onDenied(String reason, OwnerPopulationDecision decision) {
-                        PENDING.remove(npcUuid, candidate);
-                        if (!claimDenialSent) {
-                            sendDenial(store, playerId, reason, decision);
-                        }
-                    }
-
-                    @Override
-                    public void onApplied(OwnerPopulationDecision decision) {
-                        PendingClaim completed = PENDING.remove(npcUuid);
-                        LiveClaimContext live = resolveLiveContext(store, npcUuid, playerId);
-                        if (live == null) {
-                            return;
-                        }
-                        ensureTamedComponent(live.store(), live.npcRef());
-                        ClaimResult result = ClaimResult.claimed(playerId, ownerName);
-                        PendingClaim callbacks = completed == null ? candidate : completed;
-                        callbacks.complete(new ClaimContext(
-                                live.npcRef(),
-                                live.store(),
-                                live.player(),
-                                result
-                        ));
-                    }
-                }
+                ownerType,
+                new TameworkOwnerComponent(playerId, ownerName)
         );
-        if (!scheduled) {
-            PENDING.remove(npcUuid, candidate);
-            return ClaimResult.denied("legacy-adoption-schedule-failed");
-        }
-        return ClaimResult.scheduled();
+        ensureTamedComponent(store, npcRef);
+        ClaimResult result = ClaimResult.claimed(playerId, ownerName);
+        invokeContinuation(continuation, npcRef, store, player, result);
+        return result;
     }
 
     /** Resolves owner metadata without mutating NPC state. */
@@ -181,30 +100,6 @@ public final class LegacyTamedOwnershipBridge {
         return uuid == null ? null : uuid.getUuid();
     }
 
-    @Nullable
-    private static LiveClaimContext resolveLiveContext(Store<EntityStore> originalStore,
-                                                       UUID npcUuid,
-                                                       UUID playerId) {
-        if (originalStore == null || originalStore.getExternalData() == null) {
-            return null;
-        }
-        World world = originalStore.getExternalData().getWorld();
-        if (world == null || world.getEntityStore() == null) {
-            return null;
-        }
-        Store<EntityStore> liveStore = world.getEntityStore().getStore();
-        Ref<EntityStore> liveNpcRef = world.getEntityRef(npcUuid);
-        if (liveStore == null || liveNpcRef == null || !liveNpcRef.isValid()) {
-            return null;
-        }
-        Ref<EntityStore> livePlayerRef = world.getEntityRef(playerId);
-        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
-        Player livePlayer = livePlayerRef == null || !livePlayerRef.isValid() || playerType == null
-                ? null
-                : liveStore.getComponent(livePlayerRef, playerType);
-        return new LiveClaimContext(liveNpcRef, liveStore, livePlayer);
-    }
-
     private static void ensureTamedComponent(Store<EntityStore> store, Ref<EntityStore> npcRef) {
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType == null) {
@@ -216,93 +111,20 @@ public final class LegacyTamedOwnershipBridge {
         }
     }
 
-    private static void sendDenial(Store<EntityStore> store,
-                                   UUID playerId,
-                                   String reason,
-                                   @Nullable OwnerPopulationDecision decision) {
-        Player player = resolvePlayer(store, playerId);
-        if (player == null) {
-            return;
-        }
-        if ("claim-cap-reached".equals(reason)) {
-            sendUnavailable(player, "the claim population cap has been reached");
-            return;
-        }
-        if (decision != null && "owner-cap-reached".equals(reason)) {
-            long observed = decision.committedCount() + decision.pendingCount();
+    private static void sendCapDenial(
+            @Nonnull Player player,
+            @Nonnull OwnerPopulationCapService.Decision decision
+    ) {
+        if ("owner-cap-reached".equals(decision.reason())) {
             OwnerMessageUtil.sendPopulationCapReached(
                     player,
-                    observed >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) observed,
+                    decision.currentCount(),
                     decision.limit(),
-                    resolveLimitScope()
+                    decision.scope()
             );
             return;
         }
-        if (player.getPlayerRef() != null && decision != null
-                && decision.persistenceAvailability() != null
-                && !decision.persistenceAvailability().allowed()) {
-            player.getPlayerRef().sendMessage(Message.raw(PersistencePlayerFeedback.resolve(
-                    player,
-                    PersistenceDomain.TAMING_OWNERSHIP,
-                    decision.persistenceAvailability()
-            )));
-            return;
-        }
-        sendUnavailable(player, reason);
-    }
-
-    private static boolean sendClaimDenial(Store<EntityStore> store,
-                                           UUID playerId,
-                                           CompanionPopulationPreparationResult result) {
-        if (result == null
-                || result.claimDecision() == null
-                || !"claim-cap-reached".equals(result.claimDecision().reason())) {
-            return false;
-        }
-        Player player = resolvePlayer(store, playerId);
-        if (player == null) {
-            return false;
-        }
-        long current = Math.max(
-                0L,
-                result.claimDecision().committedPopulation()
-                        - result.claimDecision().creditedDepartures()
-                        + result.claimDecision().pendingPopulation()
-        );
-        OwnerMessageUtil.sendClaimPopulationCapReached(
-                player,
-                saturatingInt(current),
-                saturatingInt(result.claimDecision().effectiveCapacity())
-        );
-        return true;
-    }
-
-    private static int saturatingInt(long value) {
-        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
-    }
-
-    @Nullable
-    private static Player resolvePlayer(Store<EntityStore> store, UUID playerId) {
-        if (store == null || store.getExternalData() == null) {
-            return null;
-        }
-        World world = store.getExternalData().getWorld();
-        if (world == null || world.getEntityStore() == null) {
-            return null;
-        }
-        Ref<EntityStore> playerRef = world.getEntityRef(playerId);
-        ComponentType<EntityStore, Player> playerType = Player.getComponentType();
-        return playerRef == null || !playerRef.isValid() || playerType == null
-                ? null
-                : world.getEntityStore().getStore().getComponent(playerRef, playerType);
-    }
-
-    private static TwGlobalConfig.PerPlayerLimitScope resolveLimitScope() {
-        TwGlobalConfig config = TwGlobalConfig.resolveActive();
-        TwGlobalConfig.PerPlayerLimitScope configured = config == null
-                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
-                : config.getPopulationPerPlayerLimitScope();
-        return TameworkRuntimeSettings.populationPerPlayerLimitScope(configured);
+        sendUnavailable(player, decision.reason());
     }
 
     private static void sendUnavailable(@Nullable Player player, String reason) {
@@ -313,10 +135,24 @@ public final class LegacyTamedOwnershipBridge {
         }
     }
 
-    /**
-     * Continuation invoked on the owning world thread after ownership applies.
-     * Callers must capture stable IDs/config only and use the supplied live context.
-     */
+    private static void invokeContinuation(
+            @Nullable ClaimContinuation continuation,
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Player player,
+            @Nonnull ClaimResult result
+    ) {
+        if (continuation == null) {
+            return;
+        }
+        try {
+            continuation.onApplied(new ClaimContext(npcRef, store, player, result));
+        } catch (RuntimeException | LinkageError ignored) {
+            // Optional consumers cannot roll back a completed owner assignment.
+        }
+    }
+
+    /** Continuation invoked on the owning world thread after ownership applies. */
     @FunctionalInterface
     public interface ClaimContinuation {
         void onApplied(@Nonnull ClaimContext context);
@@ -375,10 +211,6 @@ public final class LegacyTamedOwnershipBridge {
             return new ClaimResult(ownerId, ownerName, Status.RESOLVED, "legacy-owner-resolved");
         }
 
-        static ClaimResult scheduled() {
-            return new ClaimResult(null, null, Status.SCHEDULED, "legacy-adoption-scheduled");
-        }
-
         static ClaimResult claimed(UUID ownerId, String ownerName) {
             return new ClaimResult(ownerId, ownerName, Status.CLAIMED, "legacy-adoption-applied");
         }
@@ -396,37 +228,4 @@ public final class LegacyTamedOwnershipBridge {
         }
     }
 
-    private static final class PendingClaim {
-        private final UUID ownerId;
-        private final CopyOnWriteArrayList<ClaimContinuation> continuations = new CopyOnWriteArrayList<>();
-
-        private PendingClaim(UUID ownerId) {
-            this.ownerId = ownerId;
-        }
-
-        private UUID ownerId() {
-            return ownerId;
-        }
-
-        private void add(@Nullable ClaimContinuation continuation) {
-            if (continuation != null) {
-                continuations.add(continuation);
-            }
-        }
-
-        private void complete(ClaimContext context) {
-            for (ClaimContinuation continuation : continuations) {
-                try {
-                    continuation.onApplied(context);
-                } catch (RuntimeException | LinkageError ignored) {
-                    // One optional continuation must not suppress the remaining ownership consumers.
-                }
-            }
-        }
-    }
-
-    private record LiveClaimContext(Ref<EntityStore> npcRef,
-                                    Store<EntityStore> store,
-                                    @Nullable Player player) {
-    }
 }

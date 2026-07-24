@@ -25,21 +25,18 @@ final class CommandRelocationNpcLifecycle {
     private final CommandRelocationDropReporter dropReporter;
     private final ApplyScheduler applyScheduler;
     private final PendingRemover pendingRemover;
-    private final AdmissionCanceller admissionCanceller;
 
     CommandRelocationNpcLifecycle(@Nonnull Map<UUID, Vector3d> lastKnownByNpc,
                                   @Nonnull Map<UUID, World> knownWorldByNpc,
                                   @Nonnull Map<UUID, PendingRelocation> pendingByNpc,
                                   @Nonnull CommandRelocationDropReporter dropReporter,
                                   @Nonnull ApplyScheduler applyScheduler,
-                                  @Nonnull PendingRemover pendingRemover,
-                                  @Nonnull AdmissionCanceller admissionCanceller) {
+                                  @Nonnull PendingRemover pendingRemover) {
         this.pendingByNpc = Objects.requireNonNull(pendingByNpc, "pendingByNpc");
         this.npcTracker = new CommandRelocationNpcTracker(lastKnownByNpc, knownWorldByNpc);
         this.dropReporter = Objects.requireNonNull(dropReporter, "dropReporter");
         this.applyScheduler = Objects.requireNonNull(applyScheduler, "applyScheduler");
         this.pendingRemover = Objects.requireNonNull(pendingRemover, "pendingRemover");
-        this.admissionCanceller = Objects.requireNonNull(admissionCanceller, "admissionCanceller");
     }
 
     void onNpcAdded(@Nullable Ref<EntityStore> reference,
@@ -48,7 +45,6 @@ final class CommandRelocationNpcLifecycle {
         if (tracked == null || tracked.world() == null) {
             return;
         }
-        // Population reconciliation runs after this observer and must publish ACTIVE first.
         PendingRelocation pending = pendingByNpc.get(tracked.npcUuid());
         if (pending != null
                 && Objects.equals(pending.destinationWorldName, tracked.world().getName())) {
@@ -74,7 +70,6 @@ final class CommandRelocationNpcLifecycle {
             if (pending != null && !pending.physicalMutationAttempted()
                     && pendingRemover.remove(candidate.npcUuid(), pending)) {
                 pending.markCrossWorldTransferFinished();
-                admissionCanceller.cancel(pending);
             }
             dropReporter.reportWorldRemoval(candidate);
             npcTracker.completeWorldRemoval(candidate.npcUuid());
@@ -95,8 +90,4 @@ final class CommandRelocationNpcLifecycle {
         boolean remove(@Nonnull UUID npcUuid, @Nonnull PendingRelocation pending);
     }
 
-    @FunctionalInterface
-    interface AdmissionCanceller {
-        void cancel(@Nonnull PendingRelocation pending);
-    }
 }

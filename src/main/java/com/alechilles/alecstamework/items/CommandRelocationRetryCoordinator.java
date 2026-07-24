@@ -18,40 +18,23 @@ final class CommandRelocationRetryCoordinator {
         if (world == null || npcUuid == null || pending == null) {
             return;
         }
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            keepingAdmission(world, npcUuid, pending, false);
-            return;
-        }
-        if (pending.admissionPrepared()) {
-            owner.cancelAdmission(
-                    pending, true, world, () -> retry(world, npcUuid, pending)
-            );
-            return;
-        }
-        if (!pending.admissionTransitionInProgress()) {
-            keepingAdmission(world, npcUuid, pending, false);
-        }
+        continueRetry(world, npcUuid, pending, false);
     }
 
     void afterLiveStateUnavailable(World world, UUID npcUuid, PendingRelocation pending) {
         pending.resetRelocationIssue();
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            keepingAdmission(world, npcUuid, pending, false);
-        } else {
-            retry(world, npcUuid, pending);
-        }
+        retry(world, npcUuid, pending);
     }
 
-    void keepingAdmission(World world,
-                          UUID npcUuid,
-                          PendingRelocation pending,
-                          boolean liveNpcObservedOutsideDestination) {
+    void continueRetry(World world,
+                       UUID npcUuid,
+                       PendingRelocation pending,
+                       boolean liveNpcObservedOutsideDestination) {
         long now = System.currentTimeMillis();
         long retryInterval = Math.max(250L, timingPolicy.retryIntervalMs());
         recordRetry(pending, now, retryInterval);
         CommandRelocationTimeoutDecision.Outcome outcome = CommandRelocationTimeoutDecision.decide(
                 exhausted(pending, now),
-                pending.admissionApplying(),
                 pending.physicalMutationAttempted(),
                 liveNpcObservedOutsideDestination,
                 pending.crossWorldTransferAttempted(),

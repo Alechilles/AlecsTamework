@@ -94,6 +94,8 @@ final class SqliteCompanionCaptureReleasePreparation
                 && operation.operationId().equals(
                 lifecycle.activeOperationId()
         )
+                && (release.ownerAssignment() == null
+                || lifecycle.ownerId() == null)
                 && alias.state() == CompanionAlias.State.LEASED
                 && operation.operationId().equals(alias.leaseOperationId())
                 && sourceAlias.state() == CompanionAlias.State.CURRENT
@@ -134,6 +136,8 @@ final class SqliteCompanionCaptureReleasePreparation
                 release.targetWorldKey()
         ))
                 && lifecycle.activeOperationId() == null
+                && (release.ownerAssignment() == null
+                || release.ownerAssignment().equals(lifecycle.ownerId()))
                 && alias.state() == CompanionAlias.State.CURRENT
                 && operation.operationId().equals(alias.leaseOperationId())
                 && sourceAlias.state() == CompanionAlias.State.RETIRED
@@ -184,7 +188,9 @@ final class SqliteCompanionCaptureReleasePreparation
                 || current.state() != LifecycleState.CAPTURED
                 || !current.location().equals(capturedLocation())
                 || current.activeOperationId() != null
-                || current.quarantined()) {
+                || current.quarantined()
+                || (release.ownerAssignment() != null
+                && current.ownerId() != null)) {
             throw new IllegalStateException(
                     "capture_release_captured_lifecycle_mismatch"
             );

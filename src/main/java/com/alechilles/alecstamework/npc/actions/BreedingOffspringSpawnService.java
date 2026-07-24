@@ -1,16 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
-import com.alechilles.alecstamework.ownership.BreedingChildProjectionMarker;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
-import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -21,9 +17,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import javax.annotation.Nullable;
-import javax.annotation.Nonnull;
 
 /**
  * Resolves offspring role IDs and performs resilient spawn placement attempts.
@@ -179,207 +173,6 @@ final class BreedingOffspringSpawnService {
             }
         }
         return null;
-    }
-
-    /** Spawns only after a prepared population unit initializes the pre-add holder. */
-    @Nonnull
-    BreedingPreparedSpawnResult spawnPreparedWithFallback(
-            @Nullable NPCPlugin npcPlugin,
-            @Nullable Store<EntityStore> store,
-            int roleIndex,
-            @Nullable Vector3d spawnPosition,
-            @Nullable Rotation3f spawnRotation,
-            @Nullable ClaimChunkCoordinate requiredDestination,
-            @Nonnull UUID requiredNpcUuid,
-            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
-            @Nonnull BreedingSpawnHolderPreparation holderPreparation
-    ) {
-        if (npcPlugin == null || store == null || roleIndex < 0
-                || spawnPosition == null || spawnRotation == null) {
-            return BreedingPreparedSpawnResult.failed("breeding-spawn-context-invalid");
-        }
-        BreedingPreparedSpawnResult preflight = recoverSpawn(
-                store, requiredNpcUuid, expectedProjectionMarker,
-                "breeding-spawn-preflight-absent"
-        );
-        if (preflight.spawned() != null || preflight.outcomeAmbiguous()) {
-            return preflight;
-        }
-        for (double yOffset : SPAWN_VERTICAL_OFFSETS) {
-            for (double[] offset : SPAWN_POSITION_OFFSETS) {
-                Vector3d candidate = new Vector3d(
-                        spawnPosition.x + offset[0],
-                        spawnPosition.y + yOffset,
-                        spawnPosition.z + offset[1]
-                );
-                Vector3d safeCandidate = resolveSafeSpawnCandidate(candidate, store);
-                if (safeCandidate == null || !matchesDestination(safeCandidate, requiredDestination)) {
-                    continue;
-                }
-                BreedingPreparedSpawnResult attempt = tryPreparedSpawn(
-                        npcPlugin,
-                        store,
-                        roleIndex,
-                        safeCandidate,
-                        spawnRotation,
-                        requiredNpcUuid,
-                        expectedProjectionMarker,
-                        holderPreparation
-                );
-                if (terminalPreparedAttempt(attempt)) {
-                    return attempt;
-                }
-            }
-        }
-        return BreedingPreparedSpawnResult.failed("breeding-spawn-placement-failed");
-    }
-
-    /** An unknown add outcome must never fall through to another placement candidate. */
-    static boolean terminalPreparedAttempt(@Nonnull BreedingPreparedSpawnResult attempt) {
-        return attempt.spawned() != null
-                || attempt.preparationFailed()
-                || attempt.outcomeAmbiguous();
-    }
-
-    private static boolean matchesDestination(@Nonnull Vector3d candidate,
-                                              @Nullable ClaimChunkCoordinate requiredDestination) {
-        if (requiredDestination == null) {
-            return true;
-        }
-        int blockX = (int) Math.floor(candidate.x);
-        int blockZ = (int) Math.floor(candidate.z);
-        return ChunkUtil.chunkCoordinate(blockX) == requiredDestination.chunkX()
-                && ChunkUtil.chunkCoordinate(blockZ) == requiredDestination.chunkZ();
-    }
-
-    @Nonnull
-    private BreedingPreparedSpawnResult tryPreparedSpawn(
-            @Nonnull NPCPlugin npcPlugin,
-            @Nonnull Store<EntityStore> store,
-            int roleIndex,
-            @Nonnull Vector3d candidate,
-            @Nonnull Rotation3f spawnRotation,
-            @Nonnull UUID requiredNpcUuid,
-            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
-            @Nonnull BreedingSpawnHolderPreparation holderPreparation
-    ) {
-        PreparationFailure failure = new PreparationFailure();
-        Pair<Ref<EntityStore>, NPCEntity> spawned = null;
-        try {
-            spawned = npcPlugin.spawnEntity(
-                    store,
-                    roleIndex,
-                    candidate,
-                    spawnRotation,
-                    null,
-                    (npc, holder, spawnStore) -> {
-                        String reason = holderPreparation.prepare(npc, holder, spawnStore);
-                        if (reason != null) {
-                            failure.reason = reason;
-                            throw new SpawnHolderPreparationException(reason);
-                        }
-                    },
-                    null
-            );
-            if (spawned == null || spawned.first() == null || spawned.second() == null) {
-                despawnQuietly(spawned);
-                return recoverSpawn(
-                        store, requiredNpcUuid, expectedProjectionMarker,
-                        "breeding-spawn-store-rejected"
-                );
-            }
-            UUIDComponent uuid = store.getComponent(
-                    spawned.first(), UUIDComponent.getComponentType()
-            );
-            TameworkProjectionIdentityComponent marker = store.getComponent(
-                    spawned.first(), TameworkProjectionIdentityComponent.getComponentType()
-            );
-            if (!matchesPreparedIdentity(
-                    requiredNpcUuid,
-                    expectedProjectionMarker,
-                    uuid,
-                    spawned.second(),
-                    marker
-            )) {
-                despawnQuietly(spawned);
-                return BreedingPreparedSpawnResult.ambiguous(
-                        "breeding-spawn-identity-mismatch"
-                );
-            }
-            return new BreedingPreparedSpawnResult(spawned, null, false, false);
-        } catch (SpawnHolderPreparationException exception) {
-            return new BreedingPreparedSpawnResult(null, failure.reason, true, false);
-        } catch (RuntimeException | LinkageError exception) {
-            return recoverSpawn(
-                    store, requiredNpcUuid, expectedProjectionMarker,
-                    "breeding-spawn-exception"
-            );
-        }
-    }
-
-    @Nonnull
-    private static BreedingPreparedSpawnResult recoverSpawn(
-            @Nonnull Store<EntityStore> store,
-            @Nonnull UUID requiredNpcUuid,
-            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
-            @Nonnull String absentReason
-    ) {
-        BreedingChildProjectionProbe.Result probe = BreedingChildProjectionProbe.probe(
-                store, requiredNpcUuid, expectedProjectionMarker
-        );
-        if (probe.present()) {
-            try {
-                UUIDComponent uuid = store.getComponent(
-                        probe.ref(), UUIDComponent.getComponentType()
-                );
-                TameworkProjectionIdentityComponent marker = store.getComponent(
-                        probe.ref(), TameworkProjectionIdentityComponent.getComponentType()
-                );
-                if (matchesPreparedIdentity(
-                        requiredNpcUuid,
-                        expectedProjectionMarker,
-                        uuid,
-                        probe.npc(),
-                        marker
-                )) {
-                    return new BreedingPreparedSpawnResult(
-                            Pair.of(probe.ref(), probe.npc()), null, false, false
-                    );
-                }
-            } catch (RuntimeException | LinkageError ignored) {
-                // Identity must remain fully observable before an applying unit can commit.
-            }
-            return BreedingPreparedSpawnResult.ambiguous(
-                    absentReason + "-identity-mismatch"
-            );
-        }
-        return probe.absenceProven()
-                ? BreedingPreparedSpawnResult.failed(absentReason)
-                : BreedingPreparedSpawnResult.ambiguous(absentReason + "-outcome-ambiguous");
-    }
-
-    /** Requires every live identity representation to agree with the reserved child. */
-    static boolean matchesPreparedIdentity(
-            @Nonnull UUID requiredNpcUuid,
-            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
-            @Nullable UUIDComponent uuid,
-            @Nullable NPCEntity npc,
-            @Nullable TameworkProjectionIdentityComponent marker) {
-        return uuid != null
-                && requiredNpcUuid.equals(uuid.getUuid())
-                && npc != null
-                && requiredNpcUuid.equals(npc.getUuid())
-                && BreedingChildProjectionMarker.matches(marker, expectedProjectionMarker);
-    }
-
-    private static void despawnQuietly(@Nullable Pair<Ref<EntityStore>, NPCEntity> spawned) {
-        try {
-            if (spawned != null && spawned.second() != null) {
-                spawned.second().setToDespawn();
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // Caller cancels the applying population unit; reconciliation covers despawn ambiguity.
-        }
     }
 
     @Nullable
@@ -568,13 +361,4 @@ final class BreedingOffspringSpawnService {
         return second != null && !second.isBlank() ? second : null;
     }
 
-    private static final class PreparationFailure {
-        private String reason;
-    }
-
-    private static final class SpawnHolderPreparationException extends RuntimeException {
-        private SpawnHolderPreparationException(String message) {
-            super(message);
-        }
-    }
 }

@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
@@ -35,10 +34,7 @@ final class InteractionBreedingEffects {
 
     InteractionBreedingEffects(ActionTameworkInteract owner) {
         this.owner = owner;
-        this.offspringService = new BreedingOffspringService(
-                new BreedingPartnerService(),
-                TameworkBreedingServices.shared()
-        );
+        this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
     }
 
     boolean applyStartBreeding(@Nullable BreedInteraction interaction,

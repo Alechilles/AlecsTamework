@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
-import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -19,8 +17,6 @@ final class PendingRelocation {
     final String destinationWorldName;
     final Vector3d sourceHintPosition;
     final Vector3d alternateSourceHintPosition;
-    @Nullable
-    final ClaimChunkCoordinate canonicalSource;
     final UUID ownerUuid;
     final boolean assignOwnerAsMasterTarget;
     final boolean clearLockedTarget;
@@ -30,7 +26,6 @@ final class PendingRelocation {
     final long queuedAtMs;
     final boolean allowCrossWorldTransfer;
     final TwCompanionConfig.TransferFailurePolicy onTransferFailure;
-    final CompanionRelocationAdmissionService.ForcePolicy forcePolicy;
     private final Set<String> requiredStateFilter;
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
             new ConcurrentHashMap<>();
@@ -46,16 +41,12 @@ final class PendingRelocation {
     long lastRetryCountedAtMs;
     private boolean crossWorldTransferInProgress;
     private boolean sourceWorldMissingLogged;
-    private AdmissionPhase admissionPhase = AdmissionPhase.NONE;
-    private CompanionRelocationAdmissionService.Admission admission;
-    private boolean cancellationRequestedDuringClaim;
 
     PendingRelocation(UUID npcUuid,
                       Vector3d destination,
                       String destinationWorldName,
                       Vector3d sourceHintPosition,
                       Vector3d alternateSourceHintPosition,
-                      @Nullable ClaimChunkCoordinate canonicalSource,
                       UUID ownerUuid,
                       boolean assignOwnerAsMasterTarget,
                       boolean clearLockedTarget,
@@ -65,16 +56,12 @@ final class PendingRelocation {
                       long queuedAtMs,
                       boolean allowCrossWorldTransfer,
                       @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
-                      @Nullable String[] requiredStateFilter,
-                      CompanionRelocationAdmissionService.ForcePolicy forcePolicy) {
+                      @Nullable String[] requiredStateFilter) {
         this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
         this.destination = Objects.requireNonNull(destination, "destination");
-        this.destinationWorldName = Objects.requireNonNull(
-                destinationWorldName, "destinationWorldName"
-        );
+        this.destinationWorldName = Objects.requireNonNull(destinationWorldName, "destinationWorldName");
         this.sourceHintPosition = sourceHintPosition;
         this.alternateSourceHintPosition = alternateSourceHintPosition;
-        this.canonicalSource = canonicalSource;
         this.ownerUuid = ownerUuid;
         this.assignOwnerAsMasterTarget = assignOwnerAsMasterTarget;
         this.clearLockedTarget = clearLockedTarget;
@@ -86,7 +73,6 @@ final class PendingRelocation {
         this.onTransferFailure = onTransferFailure == null
                 ? TwCompanionConfig.TransferFailurePolicy.QueueForRecall : onTransferFailure;
         this.requiredStateFilter = normalizeStateFilter(requiredStateFilter);
-        this.forcePolicy = Objects.requireNonNull(forcePolicy, "forcePolicy");
         this.lastRetryCountedAtMs = queuedAtMs;
     }
 
@@ -110,12 +96,6 @@ final class PendingRelocation {
 
     boolean isChunkReady(String worldName, int chunkX, int chunkZ) {
         return readyChunks.contains(new ChunkRequestKey(worldName, chunkX, chunkZ));
-    }
-
-    private record ChunkRequestKey(String worldName, int chunkX, int chunkZ) {
-        private ChunkRequestKey {
-            worldName = Objects.requireNonNull(worldName, "worldName");
-        }
     }
 
     synchronized boolean reserveScheduledApply(long dueAtMs) {
@@ -227,142 +207,6 @@ final class PendingRelocation {
         return requiredStateFilter.isEmpty() ? "[]" : requiredStateFilter.toString();
     }
 
-    synchronized boolean beginAdmissionPreparation() {
-        if (admissionPhase != AdmissionPhase.NONE) {
-            return false;
-        }
-        admissionPhase = AdmissionPhase.PREPARING;
-        return true;
-    }
-
-    synchronized boolean installReservedAdmission(CompanionRelocationAdmissionService.Decision decision) {
-        if (admissionPhase != AdmissionPhase.PREPARING || decision == null
-                || decision.status() != CompanionRelocationAdmissionService.Status.RESERVED
-                || decision.admission() == null) {
-            return false;
-        }
-        admission = decision.admission();
-        admissionPhase = AdmissionPhase.RESERVED;
-        return true;
-    }
-
-    synchronized void finishUnclaimedPreparation(boolean retry) {
-        if (admissionPhase == AdmissionPhase.PREPARING) {
-            admissionPhase = retry ? AdmissionPhase.NONE : AdmissionPhase.TERMINAL;
-        }
-    }
-
-    synchronized boolean admissionPrepared() {
-        return admissionPhase == AdmissionPhase.RESERVED || admissionPhase == AdmissionPhase.APPLYING;
-    }
-
-    synchronized boolean admissionReserved() {
-        return admissionPhase == AdmissionPhase.RESERVED;
-    }
-
-    synchronized boolean admissionApplying() {
-        return admissionPhase == AdmissionPhase.APPLYING;
-    }
-
-    synchronized boolean admissionTransitionInProgress() {
-        return admissionPhase == AdmissionPhase.PREPARING
-                || admissionPhase == AdmissionPhase.CLAIMING
-                || admissionPhase == AdmissionPhase.CANCELING
-                || admissionPhase == AdmissionPhase.COMMITTING;
-    }
-
-    @Nullable
-    synchronized CompanionRelocationAdmissionService.Admission beginApplyClaim() {
-        if (admissionPhase != AdmissionPhase.RESERVED || admission == null) {
-            return null;
-        }
-        admissionPhase = AdmissionPhase.CLAIMING;
-        return admission;
-    }
-
-    synchronized ClaimCompletion finishApplyClaim(
-            CompanionRelocationAdmissionService.Admission claimedAdmission,
-            CompanionRelocationAdmissionService.Decision decision,
-            boolean retryable
-    ) {
-        if (admissionPhase != AdmissionPhase.CLAIMING || admission == null
-                || !admission.equals(claimedAdmission)) {
-            return ClaimCompletion.REJECTED;
-        }
-        if (decision == null || decision.status() != CompanionRelocationAdmissionService.Status.APPLYING
-                || decision.admission() == null
-                || !decision.admission().equals(claimedAdmission)) {
-            admission = null;
-            cancellationRequestedDuringClaim = false;
-            admissionPhase = retryable ? AdmissionPhase.NONE : AdmissionPhase.TERMINAL;
-            return retryable ? ClaimCompletion.RETRY_REQUIRED : ClaimCompletion.REJECTED;
-        }
-        if (cancellationRequestedDuringClaim) {
-            admissionPhase = AdmissionPhase.CANCELING;
-            return ClaimCompletion.CANCEL_REQUIRED;
-        }
-        admissionPhase = AdmissionPhase.APPLYING;
-        physicalMutationAttempted = true;
-        return ClaimCompletion.APPLYING;
-    }
-
-    @Nullable
-    synchronized CompanionRelocationAdmissionService.Admission failApplyClaimForCancellation() {
-        if (admissionPhase != AdmissionPhase.CLAIMING || admission == null) {
-            return null;
-        }
-        admissionPhase = AdmissionPhase.CANCELING;
-        return admission;
-    }
-
-    @Nullable
-    synchronized CompanionRelocationAdmissionService.Admission beginCancellation() {
-        if (admissionPhase == AdmissionPhase.CLAIMING) {
-            cancellationRequestedDuringClaim = true;
-            return null;
-        }
-        if ((admissionPhase != AdmissionPhase.RESERVED && admissionPhase != AdmissionPhase.APPLYING)
-                || admission == null) {
-            return null;
-        }
-        admissionPhase = AdmissionPhase.CANCELING;
-        return admission;
-    }
-
-    synchronized void finishCancellation(boolean retry) {
-        admission = null;
-        cancellationRequestedDuringClaim = false;
-        admissionPhase = retry ? AdmissionPhase.NONE : AdmissionPhase.TERMINAL;
-    }
-
-    @Nullable
-    synchronized CompanionRelocationAdmissionService.Admission beginCommit() {
-        if (admissionPhase != AdmissionPhase.APPLYING || admission == null) {
-            return null;
-        }
-        admissionPhase = AdmissionPhase.COMMITTING;
-        return admission;
-    }
-
-    synchronized boolean admissionCommitInProgress() {
-        return admissionPhase == AdmissionPhase.COMMITTING;
-    }
-
-    synchronized void finishCommit() {
-        admission = null;
-        admissionPhase = AdmissionPhase.TERMINAL;
-    }
-
-    synchronized void terminateAdmission() {
-        admission = null;
-        cancellationRequestedDuringClaim = false;
-        admissionPhase = AdmissionPhase.TERMINAL;
-    }
-
-    synchronized String admissionPhaseName() {
-        return admissionPhase.name();
-    }
-
     /** Treats repeated clicks for the same command as one request even if the player moved. */
     boolean hasSameCommandIntent(PendingRelocation other) {
         return other != null
@@ -374,7 +218,6 @@ final class PendingRelocation {
                 && Objects.equals(subState, other.subState)
                 && allowCrossWorldTransfer == other.allowCrossWorldTransfer
                 && onTransferFailure == other.onTransferFailure
-                && forcePolicy == other.forcePolicy
                 && requiredStateFilter.equals(other.requiredStateFilter);
     }
 
@@ -409,21 +252,9 @@ final class PendingRelocation {
         return false;
     }
 
-    private enum AdmissionPhase {
-        NONE,
-        PREPARING,
-        RESERVED,
-        CLAIMING,
-        APPLYING,
-        CANCELING,
-        COMMITTING,
-        TERMINAL
-    }
-
-    enum ClaimCompletion {
-        APPLYING,
-        CANCEL_REQUIRED,
-        RETRY_REQUIRED,
-        REJECTED
+    private record ChunkRequestKey(String worldName, int chunkX, int chunkZ) {
+        private ChunkRequestKey {
+            worldName = Objects.requireNonNull(worldName, "worldName");
+        }
     }
 }

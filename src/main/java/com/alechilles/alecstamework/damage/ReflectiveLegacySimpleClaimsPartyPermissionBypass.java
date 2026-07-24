@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
-import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -70,18 +68,18 @@ final class ReflectiveLegacySimpleClaimsPartyPermissionBypass
         if (position == null || worldName == null || worldName.isBlank()) {
             return new Result(Status.ERROR, null, "Legacy bypass target context is missing.");
         }
-        ClaimLookupResult lookup = bridge.lookupClaimIdentity(worldName, position);
-        if (lookup.status() == ClaimLookupResult.Status.NO_CLAIM) {
+        SimpleClaimsBreedingBridge.LookupResult lookup = bridge.lookupClaimIdentity(worldName, position);
+        if (lookup.status() == SimpleClaimsBreedingBridge.LookupStatus.NO_CLAIM) {
             return Result.notGranted();
         }
-        if (lookup.status() != ClaimLookupResult.Status.CLAIM_FOUND || lookup.key() == null) {
-            Status status = lookup.status() == ClaimLookupResult.Status.UNAVAILABLE
+        if (lookup.status() != SimpleClaimsBreedingBridge.LookupStatus.CLAIM_FOUND
+                || lookup.claimInfo() == null) {
+            Status status = lookup.status() == SimpleClaimsBreedingBridge.LookupStatus.UNAVAILABLE
                     ? Status.UNAVAILABLE
                     : Status.ERROR;
             return new Result(status, null, lookup.message());
         }
-        ClaimPopulationKey key = lookup.key();
-        UUID claimPartyId = key.ownerId();
+        UUID claimPartyId = lookup.claimInfo().partyId();
         try {
             Object manager = getInstance.invoke(null);
             Object party = manager != null ? getPartyById.invoke(manager, claimPartyId) : null;

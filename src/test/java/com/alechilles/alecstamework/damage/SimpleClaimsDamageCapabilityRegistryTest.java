@@ -1,9 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
-import com.alechilles.alecstamework.integration.claims.ClaimPluginLocator;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class SimpleClaimsDamageCapabilityRegistryTest {
     @Test
     void absentReadyStopAndReplacementNeverUseStickyNegativeOrStalePositiveState() {
-        FakeLocator locator = new FakeLocator(unavailable(ClaimProviderState.ABSENT, "not installed"));
+        FakeLocator locator = new FakeLocator(unavailable(SimpleClaimsPluginState.ABSENT, "not installed"));
         AtomicInteger reflections = new AtomicInteger();
         SimpleClaimsDamageCapabilityRegistry registry = new SimpleClaimsDamageCapabilityRegistry(
                 locator,
@@ -27,18 +23,18 @@ class SimpleClaimsDamageCapabilityRegistryTest {
                 }
         );
 
-        assertEquals(ClaimProviderState.ABSENT, registry.resolve().state());
+        assertEquals(SimpleClaimsPluginState.ABSENT, registry.resolve().state());
         assertEquals(0, reflections.get());
 
         locator.location.set(ready("plugin-a", "1.0.38"));
         SimpleClaimsDamageCapabilityResolver.Resolution first = registry.resolve();
         SimpleClaimsDamageCapabilityResolver.Resolution repeated = registry.resolve();
-        assertEquals(ClaimProviderState.READY, first.state());
+        assertEquals(SimpleClaimsPluginState.READY, first.state());
         assertSame(first, repeated);
         assertEquals(1, reflections.get());
 
-        locator.location.set(unavailable(ClaimProviderState.DISABLED, "stopped"));
-        assertEquals(ClaimProviderState.DISABLED, registry.resolve().state());
+        locator.location.set(unavailable(SimpleClaimsPluginState.DISABLED, "stopped"));
+        assertEquals(SimpleClaimsPluginState.DISABLED, registry.resolve().state());
 
         locator.location.set(ready("plugin-a", "1.0.38"));
         SimpleClaimsDamageCapabilityResolver.Resolution restarted = registry.resolve();
@@ -61,7 +57,7 @@ class SimpleClaimsDamageCapabilityRegistryTest {
 
         SimpleClaimsDamageCapabilityResolver.Resolution resolution = registry.resolve();
 
-        assertEquals(ClaimProviderState.READY, resolution.state());
+        assertEquals(SimpleClaimsPluginState.READY, resolution.state());
         assertEquals(true, resolution.capability().nativeDamageAvailable());
         assertEquals(false, resolution.capability().claimIdentityAvailable());
     }
@@ -77,7 +73,7 @@ class SimpleClaimsDamageCapabilityRegistryTest {
                 }
         );
 
-        assertEquals(ClaimProviderState.READY, buildRegistry.resolve().state());
+        assertEquals(SimpleClaimsPluginState.READY, buildRegistry.resolve().state());
         assertEquals(1, reflections.get());
         for (String version : new String[]{
                 "1.0.37+vendor.7",
@@ -97,7 +93,7 @@ class SimpleClaimsDamageCapabilityRegistryTest {
                             }
                     );
             assertEquals(
-                    ClaimProviderState.INCOMPATIBLE,
+                    SimpleClaimsPluginState.INCOMPATIBLE,
                     prereleaseRegistry.resolve().state(),
                     () -> "Unsupported damage-contract release should be rejected: " + version
             );
@@ -113,13 +109,13 @@ class SimpleClaimsDamageCapabilityRegistryTest {
                 plugin -> generation(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, true)
         );
 
-        assertEquals(ClaimProviderState.READY, registry.resolve().state());
+        assertEquals(SimpleClaimsPluginState.READY, registry.resolve().state());
         assertEquals(1, locator.locateCalls.get());
 
         registry.close();
         registry.close();
 
-        assertEquals(ClaimProviderState.ERROR, registry.resolve().state());
+        assertEquals(SimpleClaimsPluginState.ERROR, registry.resolve().state());
         assertEquals(1, locator.locateCalls.get());
         assertEquals(1, locator.closeCalls.get());
     }
@@ -146,39 +142,37 @@ class SimpleClaimsDamageCapabilityRegistryTest {
         );
     }
 
-    private static ClaimPluginLocation ready(String token, String version) {
-        return new ClaimPluginLocation(
-                "simpleclaims-damage",
-                ClaimProviderState.READY,
+    private static SimpleClaimsPluginLocation ready(String token, String version) {
+        return new SimpleClaimsPluginLocation(
+                SimpleClaimsPluginState.READY,
                 version,
                 null,
-                new ClaimProviderGeneration(token, token + "-loader", 0L),
+                new SimpleClaimsPluginGeneration(token, token + "-loader", 0L),
                 new Object()
         );
     }
 
-    private static ClaimPluginLocation unavailable(ClaimProviderState state, String reason) {
-        return new ClaimPluginLocation(
-                "simpleclaims-damage",
+    private static SimpleClaimsPluginLocation unavailable(SimpleClaimsPluginState state, String reason) {
+        return new SimpleClaimsPluginLocation(
                 state,
                 null,
                 reason,
-                ClaimProviderGeneration.NONE,
+                SimpleClaimsPluginGeneration.NONE,
                 null
         );
     }
 
-    private static final class FakeLocator implements ClaimPluginLocator {
-        private final AtomicReference<ClaimPluginLocation> location;
+    private static final class FakeLocator implements SimpleClaimsPluginLocator {
+        private final AtomicReference<SimpleClaimsPluginLocation> location;
         private final AtomicInteger locateCalls = new AtomicInteger();
         private final AtomicInteger closeCalls = new AtomicInteger();
 
-        private FakeLocator(ClaimPluginLocation location) {
+        private FakeLocator(SimpleClaimsPluginLocation location) {
             this.location = new AtomicReference<>(location);
         }
 
         @Override
-        public ClaimPluginLocation locate() {
+        public SimpleClaimsPluginLocation locate() {
             locateCalls.incrementAndGet();
             return location.get();
         }

@@ -4,12 +4,9 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
-import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
@@ -41,9 +38,9 @@ import javax.annotation.Nonnull;
 /**
  * Publishes observed live metadata through replacement profile operations.
  *
- * <p>This sink is ownership-neutral. It creates an unowned unloaded lifecycle
- * only when no profile exists, and never changes canonical owner or lifecycle
- * state during later metadata refreshes.</p>
+ * <p>A missing profile is atomically adopted as the exact observed live
+ * identity, owner, alias, and world. Later publications remain metadata-only
+ * and never compete with lifecycle workflows.</p>
  */
 public final class ReplacementProfileSnapshotSink
         implements CompanionProfileSnapshotSink {
@@ -55,8 +52,8 @@ public final class ReplacementProfileSnapshotSink
     private final Consumer<String> warnings;
     private final ConcurrentHashMap<UUID, CompletableFuture<Void>> inFlight =
             new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService
-            .DeadLinkedNpcSnapshot> pending = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, LiveSnapshot> pending =
+            new ConcurrentHashMap<>();
 
     public ReplacementProfileSnapshotSink(
             @Nonnull PublicPersistenceQueries queries,
@@ -78,13 +75,15 @@ public final class ReplacementProfileSnapshotSink
 
     @Override
     public void publish(
-            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot
+            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            @Nonnull String worldKey
     ) {
-        if (snapshot == null || snapshot.npcUuid() == null) {
+        if (snapshot == null || snapshot.npcUuid() == null
+                || worldKey == null || worldKey.isBlank()) {
             return;
         }
         UUID npcUuid = snapshot.npcUuid();
-        pending.put(npcUuid, snapshot);
+        pending.put(npcUuid, new LiveSnapshot(snapshot, worldKey.trim()));
         drain(npcUuid);
     }
 
@@ -93,7 +92,7 @@ public final class ReplacementProfileSnapshotSink
         if (inFlight.putIfAbsent(npcUuid, marker) != null) {
             return;
         }
-        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot =
+        LiveSnapshot snapshot =
                 pending.remove(npcUuid);
         if (snapshot == null) {
             inFlight.remove(npcUuid, marker);
@@ -115,8 +114,10 @@ public final class ReplacementProfileSnapshotSink
     }
 
     private CompletionStage<Void> resolve(
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot
+            LiveSnapshot observed
     ) {
+        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot =
+                observed.snapshot();
         NpcAlias alias = new NpcAlias(snapshot.npcUuid());
         return queries.findProfile(alias).thenCompose(read -> {
             if (read instanceof PersistenceReadResult.Found<
@@ -143,45 +144,40 @@ public final class ReplacementProfileSnapshotSink
                 if (byProfile instanceof PersistenceReadResult.Failed<?>) {
                     return failed("profile_snapshot_profile_read_failed");
                 }
-                return create(fallback, snapshot)
-                        .thenCompose(ignored ->
-                                ensureAlias(fallback, null, alias));
+                return adopt(fallback, alias, snapshot, observed.worldKey());
             });
         });
     }
 
-    private CompletionStage<Void> create(
+    private CompletionStage<Void> adopt(
             ProfileId profileId,
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot
+            NpcAlias alias,
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            String worldKey
     ) {
         long now = clock.getAsLong();
-        String metadata = metadata(null, null, snapshot, false);
+        OwnerId ownerId = snapshot.ownerId() == null
+                ? null : new OwnerId(snapshot.ownerId());
+        String metadata = metadata(
+                null, null, snapshot, ownerId != null
+        );
         CompanionIdentity identity = new CompanionIdentity(
                 profileId,
                 normalize(snapshot.displayName()),
                 normalize(snapshot.roleId()),
                 metadata,
                 hash(metadata),
-                null,
+                worldKey,
                 now,
                 now,
                 now,
                 0L
         );
-        CompanionLifecycle lifecycle = new CompanionLifecycle(
-                profileId,
-                null,
-                LifecycleState.UNLOADED,
-                LifecycleLocation.none(),
-                LifecycleRevision.INITIAL,
-                null,
-                now,
-                ReconciliationGeneration.INITIAL,
-                null
-        );
-        return submitProfile(new CompanionProfileMutation.Create(
+        return submitProfile(new CompanionProfileMutation.AdoptLive(
                 identity,
-                lifecycle,
+                alias,
+                ownerId,
+                worldKey,
                 links(profileId, List.of(), snapshot.toolIds(), now),
                 now
         ));
@@ -398,5 +394,11 @@ public final class ReplacementProfileSnapshotSink
         } catch (RuntimeException ignored) {
             // Diagnostics must never break ECS snapshot publication.
         }
+    }
+
+    private record LiveSnapshot(
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            String worldKey
+    ) {
     }
 }

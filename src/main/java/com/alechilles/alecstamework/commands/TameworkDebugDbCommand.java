@@ -1,177 +1,155 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceIntegrityService;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.persistence.diagnostics.LegacyPersistenceDiagnostics;
+import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
+import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceDiagnosticsReader;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceDiagnosticsSnapshot;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceMetricsSnapshot;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceOperationalStatus;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Prints SQLite persistence diagnostics and allows manual maintenance triggers.
+ * Prints bounded replacement-persistence status without exposing storage maintenance internals.
  */
-public final class TameworkDebugDbCommand extends AbstractTameworkServerCommand {
-    private static final DateTimeFormatter TIMESTAMP_FORMATTER =
-            DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
+public final class TameworkDebugDbCommand
+        extends AbstractTameworkServerCommand {
+    private final PersistenceDiagnosticsReader diagnostics;
 
-    public TameworkDebugDbCommand() {
-        super("debugdb", "Inspect, verify, or export bounded persistence diagnostics.");
+    public TameworkDebugDbCommand(
+            @Nullable PersistenceDiagnosticsReader diagnostics
+    ) {
+        super(
+                "debugdb",
+                "Inspect bounded replacement persistence diagnostics."
+        );
+        this.diagnostics = diagnostics;
         setAllowsExtraArguments(true);
     }
 
     @Override
-    protected void executeServer(@Nonnull CommandContext commandContext) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
+    protected void executeServer(@Nonnull CommandContext context) {
+        if (diagnostics == null) {
+            send(context, "Replacement persistence runtime is not available.");
             return;
         }
-        TameworkPersistenceRuntime runtime = plugin.getPersistenceRuntime();
-        if (runtime == null) {
-            commandContext.sender().sendMessage(Message.raw("SQLite persistence runtime is not available."));
+        String action = action(context);
+        if (action == null || "health".equals(action)
+                || "status".equals(action) || "integrity".equals(action)) {
+            printStatus(context);
             return;
         }
-
-        String action = normalizeAction(getFirstArg(commandContext));
-        if (TameworkPersistenceDiagnosticsCommandHandler.supports(action)) {
-            new TameworkPersistenceDiagnosticsCommandHandler().handle(
-                    commandContext, plugin, runtime, action);
-            return;
-        } else if ("integrity".equals(action)) {
-            printIntegrity(commandContext, runtime.getIntegrityService().inspect());
-        } else if ("checkpoint".equals(action)) {
-            boolean scheduled = runtime.requestWalCheckpoint();
-            commandContext.sender().sendMessage(Message.raw(
-                    scheduled
-                            ? "Requested SQLite WAL checkpoint."
-                            : "Unable to schedule SQLite WAL checkpoint (runtime may be shutting down)."
-            ));
-        } else if ("vacuum".equals(action)) {
-            boolean scheduled = runtime.requestVacuum();
-            commandContext.sender().sendMessage(Message.raw(
-                    scheduled
-                            ? "Requested SQLite VACUUM."
-                            : "Unable to schedule SQLite VACUUM (runtime may be shutting down)."
-            ));
-        } else if (action != null) {
-            commandContext.sender().sendMessage(
-                    Message.raw("Usage: /tw debugdb [health|incidents|incident|retry|export|integrity|checkpoint|vacuum]"));
+        if ("detail".equals(action)) {
+            printDetail(context);
             return;
         }
-
-        LegacyPersistenceDiagnostics diagnostics = runtime.collectDiagnostics();
-        PersistenceWriteQueue.QueueMetrics queueMetrics = diagnostics.queueMetrics();
-        PersistenceWriteQueue.QueueLifecycleMetrics lifecycleMetrics =
-                runtime.getWriteQueueLifecycleMetrics();
-
-        String healthReason = diagnostics.healthState().reason();
-        String failureTime = formatTimestamp(diagnostics.healthState().lastFailureAtMs());
-        commandContext.sender().sendMessage(Message.raw(
-                "Persistence health=" + diagnostics.healthState().status()
-                        + ", reason=" + (healthReason == null ? "<none>" : healthReason)
-                        + ", lastFailure=" + failureTime
-        ));
-
-        commandContext.sender().sendMessage(Message.raw(
-                "SQLite files: main=" + formatBytes(diagnostics.sqliteBytes())
-                        + ", wal=" + formatBytes(diagnostics.walBytes())
-                        + ", shm=" + formatBytes(diagnostics.shmBytes())
-                        + ", total=" + formatBytes(diagnostics.totalBytes())
-        ));
-
-        commandContext.sender().sendMessage(Message.raw(
-                "Write queue: depth=" + queueMetrics.queueDepth()
-                        + ", lastBatch=" + queueMetrics.lastBatchSize()
-                        + ", lastBatchWriteMs=" + formatDecimal(queueMetrics.lastBatchWriteMs())
-                        + ", maxBatch=" + queueMetrics.maxBatchSize()
-                        + ", avgBatch=" + formatDecimal(queueMetrics.averageBatchSize())
-                        + ", avgWriteMs=" + formatDecimal(queueMetrics.averageWriteMs())
-                        + ", retries=" + queueMetrics.retryAttempts()
-                        + ", failures=" + queueMetrics.failedBatches()
-                        + ", processedOps=" + queueMetrics.operationsProcessed()
-                        + ", lastFailureReason="
-                        + (queueMetrics.lastFailureReason() == null
-                        ? "<none>"
-                        : queueMetrics.lastFailureReason())
-        ));
-        commandContext.sender().sendMessage(Message.raw(
-                "Write queue lifecycle: state=" + lifecycleMetrics.state()
-                        + ", pending=" + lifecycleMetrics.pendingTaskCount()
-                        + ", activeBatch=" + lifecycleMetrics.activeBatchSize()
-                        + ", failedAccepted=" + lifecycleMetrics.failedAcceptedTasks()
-                        + ", drainTimedOut=" + lifecycleMetrics.drainTimedOut()
-        ));
+        send(context, "Usage: /tw debugdb [status|health|integrity|detail]");
     }
 
-    private void printIntegrity(
-            @Nonnull CommandContext commandContext,
-            @Nonnull PersistenceIntegrityService.IntegrityReport report) {
-        if (report.status() == PersistenceIntegrityService.ReportStatus.FAILED) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "SQLite integrity audit FAILED: " + report.failureReason()));
-        } else if (report.isClean()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "SQLite integrity audit: clean (SQLite, foreign keys, identity, lifecycle, and import invariants)."));
-        }
-        for (PersistenceIntegrityService.IntegrityIssue issue : report.issues()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "Integrity issue " + issue.id()
-                            + ": groups=" + issue.affectedGroups()
-                            + ", detail=" + issue.detail()));
-        }
+    private void printStatus(CommandContext context) {
+        PublicPersistenceOperationalStatus status =
+                diagnostics.status();
+        PublicPersistenceMetricsSnapshot metrics = diagnostics.metrics();
+        send(context, "Persistence engine=" + status.engine()
+                + ", mode=" + status.storageMode()
+                + ", origin=" + status.targetOrigin()
+                .map(Enum::name).orElse("<pending>")
+                + ", schema=" + (status.schemaVersion().isPresent()
+                ? status.schemaVersion().getAsInt() : "<pending>"));
+        send(context, "Startup readiness=" + status.startup().readiness()
+                + ", running=" + value(status.startup().runningNode())
+                + ", deferred=" + value(status.startup().deferredNode())
+                + ", failed=" + value(status.startup().failedNode())
+                + ", detail=" + text(status.startup().detail()));
+        send(context, "Operations: accepted=" + accepted(metrics)
+                + ", rejected=" + rejected(metrics)
+                + ", completed=" + completed(metrics)
+                + ", failed=" + failed(metrics)
+                + ", busyRetries=" + retries(metrics)
+                + ", readsFailed=" + metrics.readsFailed());
+        boolean schemaVerified = status.startupNodes().get(
+                PersistenceStartupNode.VALIDATE_SCHEMA
+        ) == PublicPersistenceOperationalStatus.NodeState.COMPLETED;
+        send(context, "Schema/integrity validation="
+                + (schemaVerified ? "complete" : "not complete")
+                + ", checkpoint=" + status.lastCheckpoint().status());
+    }
+
+    private void printDetail(CommandContext context) {
+        diagnostics.details().whenComplete((read, failure) -> {
+            if (failure != null || read == null) {
+                send(context, "Persistence detail is unavailable.");
+                return;
+            }
+            if (!(read instanceof PersistenceReadResult.Found<
+                    PublicPersistenceDiagnosticsSnapshot> found)) {
+                send(context, "Persistence detail read did not complete.");
+                return;
+            }
+            PublicPersistenceDiagnosticsSnapshot detail = found.value();
+            long incidents = detail.openIncidentsByCode().values().stream()
+                    .mapToLong(Long::longValue).sum();
+            long quarantines = detail.activeQuarantinesByScope().values()
+                    .stream().mapToLong(Long::longValue).sum();
+            send(context, "Persistence detail: features="
+                    + detail.features().size()
+                    + ", outboxHead=" + detail.outboxHead()
+                    + ", openIncidents=" + incidents
+                    + ", activeQuarantines=" + quarantines
+                    + ", openCircuits=" + detail.openCircuitCount()
+                    + ", operationPhases=" + detail.operationsByPhase());
+        });
+    }
+
+    private long accepted(PublicPersistenceMetricsSnapshot metrics) {
+        return metrics.features().values().stream()
+                .mapToLong(value -> value.writesAccepted()).sum();
+    }
+
+    private long rejected(PublicPersistenceMetricsSnapshot metrics) {
+        return metrics.features().values().stream()
+                .mapToLong(value -> value.writesRejected()).sum();
+    }
+
+    private long completed(PublicPersistenceMetricsSnapshot metrics) {
+        return metrics.features().values().stream()
+                .mapToLong(value -> value.unitsCompleted()).sum();
+    }
+
+    private long failed(PublicPersistenceMetricsSnapshot metrics) {
+        return metrics.features().values().stream()
+                .mapToLong(value -> value.unitsFailed()).sum();
+    }
+
+    private long retries(PublicPersistenceMetricsSnapshot metrics) {
+        return metrics.features().values().stream()
+                .mapToLong(value -> value.busyRetries()).sum();
     }
 
     @Nullable
-    private static String getFirstArg(@Nonnull CommandContext commandContext) {
-        String input = commandContext.getInputString();
+    private String action(CommandContext context) {
+        String input = context.getInputString();
         if (input == null) {
             return null;
         }
         String[] tokens = input.trim().split("\\s+");
-        if (tokens.length < 3) {
-            return null;
-        }
-        return tokens[2];
+        return tokens.length < 3
+                ? null : tokens[2].toLowerCase(Locale.ROOT);
     }
 
-    @Nullable
-    private static String normalizeAction(@Nullable String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        return raw.trim().toLowerCase(Locale.ROOT);
+    private String value(@Nullable Object value) {
+        return value == null ? "<none>" : value.toString();
     }
 
-    @Nonnull
-    private static String formatTimestamp(long epochMs) {
-        if (epochMs <= 0L) {
-            return "<never>";
-        }
-        return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(epochMs));
+    private String text(@Nullable String value) {
+        return value == null || value.isBlank() ? "<none>" : value;
     }
 
-    @Nonnull
-    private static String formatDecimal(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
-    }
-
-    @Nonnull
-    private static String formatBytes(long bytes) {
-        if (bytes < 1024L) {
-            return bytes + " B";
-        }
-        double kb = bytes / 1024.0;
-        if (kb < 1024.0) {
-            return String.format(Locale.ROOT, "%.1f KB", kb);
-        }
-        double mb = kb / 1024.0;
-        return String.format(Locale.ROOT, "%.2f MB", mb);
+    private void send(CommandContext context, String message) {
+        context.sender().sendMessage(Message.raw(message));
     }
 }

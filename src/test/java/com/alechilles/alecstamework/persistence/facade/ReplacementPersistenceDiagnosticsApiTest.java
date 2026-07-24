@@ -1,24 +1,16 @@
 package com.alechilles.alecstamework.persistence.facade;
 
-import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityRequest;
-import com.alechilles.alecstamework.api.PersistenceMutationDirection;
-import com.alechilles.alecstamework.api.PersistenceMutationDomain;
-import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
-import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplacementPersistenceDiagnosticsApiTest {
@@ -26,22 +18,12 @@ class ReplacementPersistenceDiagnosticsApiTest {
     Path tempDir;
 
     @Test
-    void mapsOneReplacementControlPlaneWithoutLegacyCatalogs() {
-        PopulationDiagnosticsView population =
-                PopulationDiagnosticsView.unavailable();
+    void mapsReleasedDiagnosticsFromOneReplacementControlPlane() {
         try (PersistenceBootstrap persistence = new PersistenceBootstrap(
                 configuration()
         )) {
             ReplacementPersistenceDiagnosticsApi diagnostics =
-                    new ReplacementPersistenceDiagnosticsApi(
-                            persistence,
-                            () -> population,
-                            Duration.ofSeconds(5)
-                    );
-            assertEquals(
-                    "GLOBAL_READ_ONLY",
-                    diagnostics.queryPersistenceAvailability(request()).status()
-            );
+                    new ReplacementPersistenceDiagnosticsApi(persistence);
 
             assertTrue(persistence.start().toCompletableFuture().join().complete());
 
@@ -49,22 +31,6 @@ class ReplacementPersistenceDiagnosticsApiTest {
                     "HEALTHY",
                     diagnostics.getPersistenceDiagnostics().health().status()
             );
-            assertEquals(
-                    "HEALTHY",
-                    diagnostics.getPersistenceResilience().storageState()
-            );
-            assertEquals(
-                    PublicPersistenceFeatureRegistry.create().descriptors().size(),
-                    diagnostics.getPersistenceResilience().circuits().size()
-            );
-            assertFalse(
-                    diagnostics.getPersistenceResilience().coverage().isEmpty()
-            );
-            assertEquals(population, diagnostics.getPopulationDiagnostics());
-            assertTrue(diagnostics.queryPersistenceAvailability(
-                    request()
-            ).allowed());
-            assertTrue(diagnostics.findPersistenceIncident("abcd").isEmpty());
         }
     }
 
@@ -96,19 +62,5 @@ class ReplacementPersistenceDiagnosticsApiTest {
             String code
     ) {
         return LiveOperationResult.confirmed(code).completed();
-    }
-
-    private PersistenceMutationAvailabilityRequest request() {
-        return new PersistenceMutationAvailabilityRequest(
-                PersistenceMutationDomain.ALL_PERSISTENCE,
-                "diagnostics",
-                List.of(),
-                Set.of(),
-                PersistenceMutationDirection.ZERO,
-                null,
-                null,
-                false,
-                false
-        );
     }
 }

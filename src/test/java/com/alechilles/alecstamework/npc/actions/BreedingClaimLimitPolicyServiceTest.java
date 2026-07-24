@@ -1,9 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
@@ -15,30 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests population-cap policy behavior for claim and per-player breeding limits. */
 class BreedingClaimLimitPolicyServiceTest {
-
-    @Test
-    void missingPopulationRuntimeFailsClosedWithoutLegacyAutoFallback() {
-        ClaimIntegrationBridge bridge =
-                BreedingClaimLimitPolicyService.unavailableWithoutPopulationRuntime(
-                        ClaimProviderRequest.forProvider(ClaimIntegrationProvider.AUTO)
-                );
-
-        assertFalse(bridge.isAvailable());
-        assertEquals("auto", bridge.providerId());
-        assertTrue(bridge.getUnavailableReason().contains("cannot be resolved safely"));
-    }
-
-    @Test
-    void missingPopulationRuntimePreservesInvalidProviderDiagnostic() {
-        ClaimIntegrationBridge bridge =
-                BreedingClaimLimitPolicyService.unavailableWithoutPopulationRuntime(
-                        ClaimProviderRequest.fromConfigValue("surprise-provider")
-                );
-
-        assertFalse(bridge.isAvailable());
-        assertEquals("invalid", bridge.providerId());
-        assertTrue(bridge.getUnavailableReason().contains("surprise-provider"));
-    }
 
     @Test
     void noClaimAllowsBreedingWhenClaimIsNotRequired() throws Exception {
@@ -198,61 +171,46 @@ class BreedingClaimLimitPolicyServiceTest {
         assertEquals("simpleclaims-lookup-error", errorDecision.reason());
     }
 
+    /** Regression: the limiting cap must retain both ephemeral sweep reservation keys. */
     @Test
-    void perPlayerDisabledSkipsCap() {
-        BreedingClaimLimitPolicyService.Decision decision =
-                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(0, 999, 999);
+    void combinedCapRetainsClaimAndOwnerSweepKeys() {
+        BreedingClaimLimitPolicyService.ClaimReservationKey claimKey =
+                new BreedingClaimLimitPolicyService.ClaimReservationKey(
+                        "world", UUID.randomUUID()
+                );
+        BreedingClaimLimitPolicyService.PlayerReservationKey ownerKey =
+                BreedingClaimLimitPolicyService.PlayerReservationKey.perWorld(
+                        "world", UUID.randomUUID()
+                );
+        BreedingClaimLimitPolicyService.Decision claim =
+                BreedingClaimLimitPolicyService.Decision.allowWithCap(
+                        BreedingClaimLimitPolicyService.ConstraintType.CLAIM,
+                        10,
+                        8,
+                        0,
+                        2,
+                        claimKey,
+                        List.of()
+                );
+        BreedingClaimLimitPolicyService.Decision owner =
+                new BreedingClaimLimitPolicyService.Decision(
+                        true,
+                        true,
+                        10,
+                        7,
+                        0,
+                        3,
+                        null,
+                        List.of(ownerKey),
+                        "owner-cap-allow"
+                );
 
-        assertTrue(decision.allowed());
-        assertFalse(decision.capEnforced());
-    }
+        BreedingClaimLimitPolicyService.Decision combined =
+                BreedingClaimLimitPolicyService.combineAllowed(claim, owner);
 
-    @Test
-    void perPlayerCapReachedDeniesWhenAtLimit() {
-        BreedingClaimLimitPolicyService.Decision decision =
-                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(8, 8, 0);
-
-        assertFalse(decision.allowed());
-        assertEquals("player-cap-reached", decision.reason());
-        assertEquals(0, decision.remainingHeadroom());
-    }
-
-    @Test
-    void perPlayerCapAllowsWhenUnderLimit() {
-        BreedingClaimLimitPolicyService.Decision decision =
-                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(8, 5, 1);
-
-        assertTrue(decision.allowed());
-        assertTrue(decision.capEnforced());
-        assertEquals(2, decision.remainingHeadroom());
-        assertEquals("player-cap-allow", decision.reason());
-    }
-
-    @Test
-    void ownerBasisForInheritOwnerUsesFirstAvailableParent() {
-        UUID ownerA = UUID.randomUUID();
-        UUID ownerB = UUID.randomUUID();
-        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(true, ownerA, ownerB);
-
-        assertEquals(1, targets.size());
-        assertEquals(ownerA, targets.get(0));
-    }
-
-    @Test
-    void ownerBasisForNoInheritanceLeavesChildUnowned() {
-        UUID ownerA = UUID.randomUUID();
-        UUID ownerB = UUID.randomUUID();
-        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, ownerA, ownerB);
-
-        assertTrue(targets.isEmpty());
-    }
-
-    @Test
-    void ownerBasisForNoInheritanceDoesNotReserveSharedOwner() {
-        UUID owner = UUID.randomUUID();
-        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, owner, owner);
-
-        assertTrue(targets.isEmpty());
+        assertEquals(2, combined.remainingHeadroom());
+        assertEquals(claimKey, combined.claimReservationKey());
+        assertEquals(List.of(ownerKey), combined.playerReservationKeys());
     }
 
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {

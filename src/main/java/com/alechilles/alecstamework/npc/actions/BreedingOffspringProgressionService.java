@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentInheritanceService;
@@ -198,6 +199,15 @@ final class BreedingOffspringProgressionService {
         boolean inheritTamed = inheritance == null || inheritance.isInheritTamed();
 
         OwnerSnapshot owner = resolveInheritedOwner(parentAOwner, parentBOwner);
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (inheritOwner && ownerType != null && owner.ownerId() != null) {
+            store.putComponent(
+                    childRef,
+                    ownerType,
+                    new TameworkOwnerComponent(owner.ownerId(), owner.ownerName())
+            );
+        }
 
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         boolean tamed = inheritTamed && (parentATamed || parentBTamed);

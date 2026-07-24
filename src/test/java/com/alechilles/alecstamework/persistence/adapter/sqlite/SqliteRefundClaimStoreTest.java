@@ -71,6 +71,7 @@ class SqliteRefundClaimStoreTest {
                     .findByReceipt(claim.receiptKey())
                     .orElseThrow();
             assertTrue(delivered.delivered());
+            assertEquals("world:test", delivered.recipientWorldKey());
             assertEquals(
                     List.of(
                             new RefundItem("capture-device", 1),
@@ -98,6 +99,7 @@ class SqliteRefundClaimStoreTest {
             RefundClaim conflicting = new RefundClaim(
                     claim.operationId(),
                     claim.recipientUuid(),
+                    claim.recipientWorldKey(),
                     List.of(new RefundItem("different-item", 1)),
                     claim.reasonCode(),
                     claim.receiptKey(),
@@ -127,6 +129,7 @@ class SqliteRefundClaimStoreTest {
         assertThrows(IllegalArgumentException.class, () -> new RefundClaim(
                 OPERATION,
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                "world:test",
                 List.of(
                         new RefundItem("life-essence", 1),
                         new RefundItem("life-essence", 2)
@@ -139,10 +142,26 @@ class SqliteRefundClaimStoreTest {
         ));
     }
 
+    @Test
+    void rejectsMissingRecipientWorldBeforeAnyClaimCanBeStored() {
+        assertThrows(IllegalArgumentException.class, () -> new RefundClaim(
+                OPERATION,
+                UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                " ",
+                List.of(new RefundItem("life-essence", 1)),
+                "capture_aborted",
+                "refund:missing-world",
+                -900,
+                null,
+                null
+        ));
+    }
+
     private RefundClaim claim(String receipt) {
         return new RefundClaim(
                 OPERATION,
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                "world:test",
                 List.of(
                         new RefundItem("capture-device", 1),
                         new RefundItem("life-essence", 3)

@@ -18,8 +18,6 @@ import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
-import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -46,7 +44,6 @@ public enum TwConfigFamily {
     NEEDS("needs", "Needs", "Tamework/Needs", true, true),
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
     CAPTURE_POLICY("capture-policy", "Capture Policies", "Tamework/CapturePolicies", true, true),
-    POPULATION_GROUP("population-group", "Population Groups", "Tamework/PopulationGroups", true, true),
     ATTACHMENT_MIGRATION("attachment-migration", "Attachment Migrations", "Tamework/AttachmentMigrations", true, true),
     ATTACHMENT_DISPLAY("attachment-display", "Attachment Displays", "Tamework/AttachmentDisplays", true, true),
     DYNAMIC_ATTACHMENTS("dynamic-attachments", "Dynamic Attachments", "Tamework/DynamicAttachments", true, true),
@@ -55,7 +52,6 @@ public enum TwConfigFamily {
     TALENT("talent", "Talents", "Tamework/Talents", true, true),
     COOP("coop", "Coops", "Tamework/Items/Coops", true, true),
     DEBUG("debug", "Debug", "Tamework/Debug", true, true),
-    PERSISTENCE("persistence", "Persistence", "Tamework/Persistence", true, true),
     OTHER("other", "Other", "", false, false);
 
     private final String id;
@@ -150,8 +146,6 @@ public enum TwConfigFamily {
             case BREEDING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwBreedingConfig.getAssetStore();
             case CAPTURE_POLICY ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCapturePolicyConfig.getAssetStore();
-            case POPULATION_GROUP ->
-                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwPopulationGroupConfig.getAssetStore();
             case ATTACHMENT_MIGRATION ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
             case ATTACHMENT_DISPLAY ->
@@ -163,8 +157,6 @@ public enum TwConfigFamily {
             case TALENT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTalentConfig.getAssetStore();
             case COOP -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCoopConfig.getAssetStore();
             case DEBUG -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDebugConfig.getAssetStore();
-            case PERSISTENCE ->
-                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwPersistenceConfig.getAssetStore();
             case OTHER -> null;
         };
     }

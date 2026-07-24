@@ -1,14 +1,9 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
-import com.alechilles.alecstamework.items.CommandUnexpectedRemovalRecoveryService;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -39,23 +34,14 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     private static final Field STATE_CONTEXTUAL_INTERACTIONS_FIELD = resolveStateSupportField("contextualInteractions");
 
     private final CommandNpcRelocationService relocationService;
-    private final CommandLinkedNpcDeathService deathService;
-    private final CommandLinkedNpcLostService lostService;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
-    @Nullable
-    private final CommandUnexpectedRemovalRecoveryService unexpectedRemovalRecoveryService;
 
-    public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService,
-                                            CommandLinkedNpcDeathService deathService,
-                                            CommandLinkedNpcLostService lostService,
-                                            CommandLinkedNpcStateSnapshotService stateSnapshotService) {
+    public CommandNpcRelocationOnLoadSystem(
+            CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService
+    ) {
         this.relocationService = relocationService;
-        this.deathService = deathService;
-        this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
-        this.unexpectedRemovalRecoveryService = lostService != null
-                ? new CommandUnexpectedRemovalRecoveryService(lostService)
-                : null;
     }
 
     @Override
@@ -67,21 +53,8 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
         if (stateSnapshotService != null) {
             stateSnapshotService.onNpcAdded(reference, store);
         }
-        if (relocationService == null) {
-            if (deathService != null) {
-                deathService.onNpcAdded(reference, store);
-            }
-            if (lostService != null) {
-                lostService.onNpcAdded(reference, store);
-            }
-            return;
-        }
-        relocationService.onNpcAdded(reference, store);
-        if (deathService != null) {
-            deathService.onNpcAdded(reference, store);
-        }
-        if (lostService != null) {
-            lostService.onNpcAdded(reference, store);
+        if (relocationService != null) {
+            relocationService.onNpcAdded(reference, store);
         }
     }
 
@@ -97,57 +70,11 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
             if (relocationService != null) {
                 relocationService.onNpcRemoved(reference, reason, store, npcUuid);
             }
-            if (deathService != null) {
-                deathService.onNpcRemoved(reference, reason, store);
-            }
-            if (lostService != null) {
-                lostService.onNpcRemoved(reference, reason, store);
-            }
-            recordUnexpectedRemoval(reference, store, npcUuid, reason);
         } finally {
             if (stateSnapshotService != null) {
                 stateSnapshotService.completeNpcRemoval(reference, reason, store, npcUuid);
             }
         }
-    }
-
-    private void recordUnexpectedRemoval(@Nonnull Ref<EntityStore> reference,
-                                         @Nonnull Store<EntityStore> store,
-                                         @Nullable UUID npcUuid,
-                                         @Nonnull RemoveReason reason) {
-        if (unexpectedRemovalRecoveryService == null || stateSnapshotService == null || npcUuid == null) {
-            return;
-        }
-        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot =
-                stateSnapshotService.getSnapshot(npcUuid);
-        unexpectedRemovalRecoveryService.recordIfRecoverable(
-                new CommandUnexpectedRemovalRecoveryService.RemovalEvidence(
-                        npcUuid,
-                        reason,
-                        snapshot != null ? snapshot.ownerId() : null,
-                        snapshot != null ? snapshot.lastKnownPosition() : null,
-                        snapshot != null ? snapshot.homePosition() : null,
-                        stateSnapshotService.getFullSnapshot(npcUuid) != null,
-                        deathService != null && deathService.getDeadSnapshot(npcUuid) != null,
-                        deathService != null && deathService.isPermanentlyReleasedDeath(npcUuid),
-                        isManagedCaptureHandoff(reference, store),
-                        System.currentTimeMillis()
-                )
-        );
-    }
-
-    private boolean isManagedCaptureHandoff(@Nonnull Ref<EntityStore> reference,
-                                            @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
-                TameworkProjectionIdentityComponent.getComponentType();
-        TameworkProjectionIdentityComponent marker = markerType != null
-                ? store.getComponent(reference, markerType)
-                : null;
-        return marker != null
-                && TameworkProjectionIdentityComponent
-                        .KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(
-                                marker.getProjectionKind()
-                        );
     }
 
     @Nullable

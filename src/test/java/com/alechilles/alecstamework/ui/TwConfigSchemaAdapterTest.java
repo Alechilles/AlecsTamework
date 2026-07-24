@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwConfigSchemaAdapterTest {
@@ -24,6 +25,7 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "General.Enabled"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "OwnershipProtection.BlockOwnerDamage"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SimpleClaims.Breeding.LimitPerClaimChunk"));
+        assertNull(TwConfigEditorFieldPolicy.findField(fields, "SimpleClaims.Provider"));
 
         TwConfigEditorFieldPolicy.EditorFieldSpec parent = TwConfigEditorFieldPolicy.findField(fields, "Parent");
         assertNotNull(parent);
@@ -100,23 +102,6 @@ class TwConfigSchemaAdapterTest {
     }
 
     @Test
-    void persistenceSchemaExposesLocalFeatureCircuitDefaults() {
-        TwConfigAssetDescriptor descriptor =
-                descriptor(TwConfigFamily.PERSISTENCE, "TwPersistenceDefault");
-
-        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields =
-                TwConfigSchemaAdapter.fieldsFor(descriptor);
-
-        assertFalse(fields.isEmpty());
-        assertNotNull(TwConfigEditorFieldPolicy.findField(
-                fields, "FeatureCircuits.AllPersistenceMutations"));
-        assertNotNull(TwConfigEditorFieldPolicy.findField(
-                fields, "FeatureCircuits.ManagedCoopAutomation"));
-        assertNotNull(TwConfigEditorFieldPolicy.findField(
-                fields, "FeatureCircuits.AutomaticScopedRecovery"));
-    }
-
-    @Test
     void capturePolicySchemaIsEditableWithInheritanceTooltips() {
         TwConfigAssetDescriptor descriptor =
                 descriptor(TwConfigFamily.CAPTURE_POLICY, "Hydragon_CapturePolicy");
@@ -143,36 +128,6 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(requirements);
         assertTrue(requirements.handoffOnly());
         assertTrue(requirements.tooltip().contains("replaces parent"));
-    }
-
-    @Test
-    void populationGroupSchemaIsEditableWithBoundedScopeOptions() {
-        TwConfigAssetDescriptor descriptor =
-                descriptor(TwConfigFamily.POPULATION_GROUP, "Hydragon_FullDragons");
-
-        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields =
-                TwConfigSchemaAdapter.fieldsFor(descriptor);
-
-        assertFalse(fields.isEmpty());
-        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Parent"));
-        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "GroupId"));
-        TwConfigEditorFieldPolicy.EditorFieldSpec roleIds =
-                TwConfigEditorFieldPolicy.findField(fields, "RoleIds");
-        assertNotNull(roleIds);
-        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.STRING_LIST, roleIds.type());
-        assertTrue(roleIds.tooltip().contains("replaces parent"));
-        TwConfigEditorFieldPolicy.EditorFieldSpec maxOwned =
-                TwConfigEditorFieldPolicy.findField(fields, "Limits.MaxOwnedPerOwner");
-        assertNotNull(maxOwned);
-        assertTrue(maxOwned.tooltip().contains("0 is unlimited"));
-        assertTrue(maxOwned.tooltip().contains("omission inherits"));
-        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Limits.MaxActivePerOwner"));
-        TwConfigEditorFieldPolicy.EditorFieldSpec scope =
-                TwConfigEditorFieldPolicy.findField(fields, "Limits.Scope");
-        assertNotNull(scope);
-        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, scope.type());
-        assertEquals(List.of("Global", "PerWorld"), scope.options());
-        assertTrue(scope.tooltip().contains("omission inherits"));
     }
 
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {

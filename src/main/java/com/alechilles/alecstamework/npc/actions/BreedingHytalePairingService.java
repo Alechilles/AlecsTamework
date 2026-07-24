@@ -2,116 +2,51 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.alechilles.alecstamework.npc.breeding.AppliedCooldownFingerprint;
-import com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinator;
-import com.alechilles.alecstamework.npc.breeding.BreedingPopulationAdmissionService;
-import com.alechilles.alecstamework.npc.breeding.PlannedChild;
-import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
-/** Gathers live Hytale parent state and submits one guarded pairing admission transaction. */
+/**
+ * Matches a live pair, applies released cooldown/effects, and queues a live birth.
+ *
+ * <p>The pairing owns no durable job, replay identity, reservation, or persistence
+ * callback. Delayed work carries stable UUIDs and resolves both parents on the
+ * world thread before spawning.
+ */
 final class BreedingHytalePairingService {
+    private static final double SPAWN_HEIGHT_OFFSET = 1.0;
+
     private final BreedingPartnerService partnerService;
-    private final BreedingPairingCoordinator coordinator;
-    private final BreedingFertilityOffspringService fertilityService =
-            new BreedingFertilityOffspringService();
-    private final BreedingOffspringRoleResolver roleResolver =
-            new BreedingOffspringRoleResolver();
-    private final BreedingPopulationTypeService populationTypeService =
-            new BreedingPopulationTypeService();
-    private final BreedingCapacityRequestFactory capacityFactory =
-            new BreedingCapacityRequestFactory();
-    private final BreedingPairEffectsService pairEffectsService =
+    private final BreedingParentCooldownResolver cooldownResolver =
+            new BreedingParentCooldownResolver();
+    private final BreedingPairEffectsService pairEffects =
             new BreedingPairEffectsService();
-    private final BreedingJobPlanSnapshotMapper planSnapshotMapper;
-    private final BreedingParentPreparationService parentPreparation;
-    private final BreedingPairingAttemptSelector attemptSelector;
-    private final BreedingPairingPopulationPreparationService populationPreparation;
-    private final TameworkBreedingServices breedingServices;
+    private final BreedingPairingEffectsService delayedEffects =
+            new BreedingPairingEffectsService(new BreedingParticleOffsetResolver());
+    private final BreedingOffspringBirthService birthService =
+            new BreedingOffspringBirthService();
+    private final BreedingClaimLimitPolicyService limitPolicy =
+            new BreedingClaimLimitPolicyService();
 
-    BreedingHytalePairingService(
-            @Nonnull BreedingPartnerService partnerService,
-            @Nonnull BreedingPairingCoordinator coordinator) {
-        this(partnerService, coordinator, TameworkBreedingServices.shared());
-    }
-
-    BreedingHytalePairingService(
-            @Nonnull BreedingPartnerService partnerService,
-            @Nonnull BreedingPairingCoordinator coordinator,
-            @Nonnull TameworkBreedingServices services) {
-        this(
-                partnerService,
-                coordinator,
-                services,
-                new BreedingParentPreparationService(),
-                new BreedingPairingAttemptSelector(),
-                new BreedingJobPlanSnapshotMapper()
-        );
-    }
-
-    BreedingHytalePairingService(
-            @Nonnull BreedingPartnerService partnerService,
-            @Nonnull BreedingPairingCoordinator coordinator,
-            @Nonnull TameworkBreedingServices services,
-            @Nonnull BreedingParentPreparationService parentPreparation,
-            @Nonnull BreedingPairingAttemptSelector attemptSelector,
-            @Nonnull BreedingJobPlanSnapshotMapper planSnapshotMapper) {
-        this.partnerService = Objects.requireNonNull(partnerService, "partnerService");
-        this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
-        this.parentPreparation = Objects.requireNonNull(
-                parentPreparation, "parentPreparation"
-        );
-        this.attemptSelector = Objects.requireNonNull(attemptSelector, "attemptSelector");
-        this.planSnapshotMapper = Objects.requireNonNull(
-                planSnapshotMapper, "planSnapshotMapper"
-        );
-        TameworkBreedingServices requiredServices = Objects.requireNonNull(
-                services, "services"
-        );
-        this.breedingServices = requiredServices;
-        BreedingPreparedPairingHandoffService handoff =
-                new BreedingPreparedPairingHandoffService(
-                        requiredServices,
-                        this::logWarning,
-                        this::logInfo
-                );
-        this.populationPreparation = new BreedingPairingPopulationPreparationService(
-                coordinator,
-                requiredServices,
-                parentPreparation,
-                planSnapshotMapper,
-                handoff,
-                this::logWarning
-        );
-    }
-
-    boolean tryPassive(
-            @Nullable Ref<EntityStore> sourceRef,
-            @Nullable Store<EntityStore> store,
-            @Nullable TameworkBreedingComponent sourceBreeding,
-            @Nullable TwBreedingConfig config) {
-        long now = store != null ? BreedingTimeService.resolveCurrentTimeMs(store) : 0L;
-        return tryPair(
-                sourceRef,
-                store,
-                sourceBreeding,
-                config,
-                BreedingReadinessPolicy.passive(now),
-                BreedingPopulationAdmissionService.BreedingMode.PASSIVE,
-                null
-        );
+    BreedingHytalePairingService(@Nonnull BreedingPartnerService partnerService) {
+        this.partnerService = partnerService;
     }
 
     boolean tryPassive(
@@ -119,16 +54,22 @@ final class BreedingHytalePairingService {
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
             @Nullable TwBreedingConfig config,
-            @Nonnull BreedingPopulationSweepContext populationContext) {
-        long now = store != null ? BreedingTimeService.resolveCurrentTimeMs(store) : 0L;
+            @Nonnull Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
+                    pendingClaims,
+            @Nonnull Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
+                    pendingOwners,
+            @Nullable CommandBuffer<EntityStore> commandBuffer
+    ) {
+        long now = store == null ? 0L : BreedingTimeService.resolveCurrentTimeMs(store);
         return tryPair(
                 sourceRef,
                 store,
                 sourceBreeding,
                 config,
+                commandBuffer,
                 BreedingReadinessPolicy.passive(now),
-                BreedingPopulationAdmissionService.BreedingMode.PASSIVE,
-                populationContext
+                pendingClaims,
+                pendingOwners
         );
     }
 
@@ -137,14 +78,16 @@ final class BreedingHytalePairingService {
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
             @Nullable TwBreedingConfig config,
-            @Nonnull UUID playerUuid) {
+            @Nonnull UUID playerUuid
+    ) {
         return tryPair(
                 sourceRef,
                 store,
                 sourceBreeding,
                 config,
+                null,
                 BreedingReadinessPolicy.manual(playerUuid, ManualBreedingClock.nowMs()),
-                BreedingPopulationAdmissionService.BreedingMode.MANUAL,
+                null,
                 null
         );
     }
@@ -154,315 +97,319 @@ final class BreedingHytalePairingService {
             @Nullable Store<EntityStore> store,
             @Nullable TameworkBreedingComponent sourceBreeding,
             @Nullable TwBreedingConfig config,
-            @Nonnull BreedingReadinessPolicy readinessPolicy,
-            @Nonnull BreedingPopulationAdmissionService.BreedingMode mode,
-            @Nullable BreedingPopulationSweepContext populationContext) {
-        if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
-            return false;
-        }
-        BreedingPreparedParents prepared = prepareParents(
-                sourceRef, store, sourceBreeding, config, readinessPolicy
+            @Nullable CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull BreedingReadinessPolicy readiness,
+            @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
+                    pendingClaims,
+            @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
+                    pendingOwners
+    ) {
+        PairCandidate candidate = resolveCandidate(
+                sourceRef, store, sourceBreeding, config, readiness
         );
-        if (prepared == null) {
+        BreedingClaimLimitPolicyService.Decision population = candidate == null
+                ? null
+                : evaluatePopulation(candidate, config, pendingClaims, pendingOwners);
+        if (candidate == null || population == null || !population.allowed()) {
             return false;
         }
-        com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionService
-                populationService = resolvePopulationService();
-        if (populationService == null) {
-            logWarning("Breeding pairing blocked because shared population authority is unavailable.");
+        World world = candidate.world();
+        BreedingPairContext context = createContext(candidate, config);
+        if (!applyPairEffects(candidate, config, commandBuffer)) {
             return false;
         }
-        BreedingPairingAttemptSelector.Selection selection;
-        try {
-            selection = attemptSelector.selectDetailed(prepared, populationService);
-        } catch (RuntimeException | LinkageError failure) {
-            logWarning("Breeding pairing blocked because durable pair replay lookup failed: "
-                    + replayContext(prepared)
-                    + " reason=" + failure.getClass().getSimpleName() + ".");
-            return false;
-        }
-        BreedingPairingAttempt attempt = selection.attempt();
-        if (attempt == null) {
-            logWarning("Breeding pairing blocked by restart replay safety: "
-                    + replayContext(prepared) + " reason=" + selection.reason() + ".");
-            return false;
-        }
-        if (!breedingServices.pairingPersistenceGate().allows(
-                prepared.sourceIdentity().profileId(),
-                prepared.partnerIdentity().profileId(),
-                attempt.jobId(),
-                prepared.worldId())) {
-            logInfo("Breeding pairing admission rejected: status=PERSISTENCE_UNAVAILABLE"
-                    + " reason=breeding-pairing-persistence-unavailable");
-            return false;
-        }
-        BreedingPairingCoordinator.PairingRequest request = request(
-                prepared, store, config, mode, attempt
+        reserveSweepHeadroom(population, pendingClaims, pendingOwners);
+        delayedEffects.schedule(
+                world,
+                context.parentAUuid(),
+                context.parentBUuid(),
+                () -> birthService.spawn(world, context),
+                () -> logDebug("Breeding delayed pairing canceled before spawn.")
         );
-        BreedingPairingCoordinator.PairingResult reserved = coordinator.reserve(request);
-        if (!reserved.reserved() || reserved.job().isEmpty()) {
-            logInfo("Breeding pairing admission rejected: status=" + reserved.status()
-                    + " reason=" + reserved.reason());
-            return false;
-        }
-        return populationPreparation.begin(
-                prepared,
-                request,
-                reserved.job().orElseThrow(),
-                attempt,
-                populationService,
-                populationContext,
-                config,
-                store
-        );
-    }
-
-    @Nonnull
-    private static String replayContext(@Nonnull BreedingPreparedParents parents) {
-        return "source=" + parents.sourceIdentity().entityUuid()
-                + " sourceProfile=" + parents.sourceIdentity().profileId()
-                + " partner=" + parents.partnerIdentity().entityUuid()
-                + " partnerProfile=" + parents.partnerIdentity().profileId()
-                + " world=" + parents.worldId();
+        return true;
     }
 
     @Nullable
-    private BreedingPreparedParents prepareParents(
-            Ref<EntityStore> sourceRef,
-            Store<EntityStore> store,
-            TameworkBreedingComponent sourceBreeding,
+    private PairCandidate resolveCandidate(
+            @Nullable Ref<EntityStore> sourceRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable TameworkBreedingComponent sourceBreeding,
             @Nullable TwBreedingConfig config,
-            BreedingReadinessPolicy readinessPolicy) {
+            @Nonnull BreedingReadinessPolicy readiness
+    ) {
+        if (sourceRef == null || !sourceRef.isValid()
+                || store == null || sourceBreeding == null) {
+            return null;
+        }
         BreedingPartnerService.PartnerCandidate partner = partnerService.findNearestPartner(
-                sourceRef,
-                store,
-                sourceBreeding,
-                config,
-                readinessPolicy
+                sourceRef, store, sourceBreeding, config, readiness
         );
         if (partner == null || partner.ref == null || !partner.ref.isValid()) {
             return null;
         }
-        NPCEntity sourceNpc = store.getComponent(sourceRef, NPCEntity.getComponentType());
-        NPCEntity partnerNpc = store.getComponent(partner.ref, NPCEntity.getComponentType());
-        TameworkBreedingComponent partnerBreeding = parentPreparation.breedingComponent(
-                partner.ref, store
+        return resolveLiveCandidate(
+                sourceRef, partner.ref, sourceBreeding, store, readiness
         );
+    }
+
+    @Nullable
+    private PairCandidate resolveLiveCandidate(
+            @Nonnull Ref<EntityStore> sourceRef,
+            @Nonnull Ref<EntityStore> partnerRef,
+            @Nonnull TameworkBreedingComponent sourceBreeding,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull BreedingReadinessPolicy readiness
+    ) {
+        NPCEntity sourceNpc = store.getComponent(sourceRef, NPCEntity.getComponentType());
+        NPCEntity partnerNpc = store.getComponent(partnerRef, NPCEntity.getComponentType());
+        TameworkBreedingComponent partnerBreeding = breeding(partnerRef, store);
+        World world = resolveWorld(store);
         if (sourceNpc == null || sourceNpc.getUuid() == null
                 || partnerNpc == null || partnerNpc.getUuid() == null
-                || !BreedingOffspringService.acceptsPartnerReadiness(
-                        readinessPolicy, partnerBreeding
-                )) {
+                || !BreedingOffspringService.acceptsPartnerReadiness(readiness, partnerBreeding)
+                || world == null || !world.isAlive()) {
             return null;
         }
-        try {
-            BreedingPreparedParents prepared = parentPreparation.prepare(
-                    sourceRef,
-                    sourceNpc,
-                    sourceBreeding,
-                    partner.ref,
-                    partnerNpc,
-                    partnerBreeding,
-                    store,
-                    config
-            );
-            if (prepared == null) {
-                logInfo("Breeding pairing did not reach admission: source="
-                        + sourceNpc.getUuid()
-                        + " partner="
-                        + partnerNpc.getUuid()
-                        + " reason="
-                        + parentPreparation.preparationIssue(
-                                sourceRef,
-                                sourceNpc,
-                                sourceBreeding,
-                                partner.ref,
-                                partnerNpc,
-                                partnerBreeding,
-                                store
-                        ));
-            }
-            return prepared;
-        } catch (RuntimeException | LinkageError failure) {
-            logWarning("Breeding pairing blocked because canonical parent identity conflicted.");
-            return null;
-        }
-    }
-
-    private BreedingPairingCoordinator.PairingRequest request(
-            BreedingPreparedParents prepared,
-            Store<EntityStore> store,
-            @Nullable TwBreedingConfig config,
-            BreedingPopulationAdmissionService.BreedingMode mode,
-            BreedingPairingAttempt attempt) {
-        BreedingFertilityOffspringService.FertilityMultipliers fertility =
-                fertilityService.resolveMultipliers(
-                        prepared.sourceRef(), prepared.partnerRef(), store
-                );
-        AppliedCooldownFingerprint sourceFingerprint = attempt.replay()
-                ? parentPreparation.persistedFingerprint(prepared.sourceSnapshot())
-                : prepared.sourceFingerprint();
-        AppliedCooldownFingerprint partnerFingerprint = attempt.replay()
-                ? parentPreparation.persistedFingerprint(prepared.partnerSnapshot())
-                : prepared.partnerFingerprint();
-        return new BreedingPairingCoordinator.PairingRequest(
+        return new PairCandidate(
+                sourceRef,
+                partnerRef,
+                sourceNpc,
+                partnerNpc,
+                sourceBreeding,
+                partnerBreeding,
                 store,
-                prepared.worldId(),
-                mode,
-                prepared.sourceIdentity(),
-                prepared.partnerIdentity(),
-                fertility.parentAMultiplier(),
-                fertility.parentBMultiplier(),
-                index -> plannedChild(prepared, config),
-                (jobId, plan) -> capacityDecision(
-                        prepared, store, config, mode, attempt, jobId, plan
-                ),
-                prepared.sourceSnapshot(),
-                prepared.partnerSnapshot(),
-                sourceFingerprint,
-                partnerFingerprint,
-                prepared.anchor(),
-                job -> attempt.replay()
-                        ? pairEffectsService.resume(effectContext(prepared, store))
-                        : pairEffectsService.apply(effectContext(prepared, store)),
-                job -> pairEffectsService.rollback(effectContext(prepared, store), job),
-                (jobId, freshPlan) -> resolvePlan(attempt, freshPlan),
-                attempt.jobId()
+                world,
+                resolveSpawnAnchor(sourceRef, partnerRef, store),
+                owner(sourceRef, store),
+                owner(partnerRef, store)
         );
     }
 
-    private BreedingPairingCoordinator.CapacityDecision capacityDecision(
-            BreedingPreparedParents prepared,
-            Store<EntityStore> store,
+    @Nonnull
+    private BreedingClaimLimitPolicyService.Decision evaluatePopulation(
+            @Nonnull PairCandidate candidate,
             @Nullable TwBreedingConfig config,
-            BreedingPopulationAdmissionService.BreedingMode mode,
-            BreedingPairingAttempt attempt,
-            UUID jobId,
-            com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan plan) {
-        BreedingPairingCoordinator.CapacityDecision decision = capacityFactory.prepare(
-                jobId,
-                mode,
-                plan,
-                prepared.anchor(),
-                store,
+            @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
+                    pendingClaims,
+            @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
+                    pendingOwners
+    ) {
+        BreedingClaimLimitPolicyService.Decision decision = limitPolicy.evaluate(
+                candidate.store(),
+                candidate.spawnAnchor(),
                 config,
-                prepared.sourceRoleId(),
-                prepared.sourceOwner(),
-                prepared.partnerOwner(),
-                null
+                roleId(candidate.sourceNpc()),
+                candidate.sourceOwner().ownerId(),
+                candidate.partnerOwner().ownerId(),
+                pendingClaims,
+                pendingOwners
         );
-        return decision.allowed()
-                ? BreedingPairingCoordinator.CapacityDecision.allow(
-                        decision.request(),
-                        planSnapshotMapper.outstandingChildren(
-                                plan, attempt.replayState()
-                        )
+        if (!decision.allowed()) {
+            logDebug("Breeding pairing blocked by population limit: " + decision.reason());
+        }
+        return decision;
+    }
+
+    private static void reserveSweepHeadroom(
+            @Nonnull BreedingClaimLimitPolicyService.Decision decision,
+            @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
+                    pendingClaims,
+            @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
+                    pendingOwners
+    ) {
+        if (!decision.capEnforced()) {
+            return;
+        }
+        int amount = Math.min(
+                BreedingFertilityOffspringService.maxOffspringPerBreed(),
+                Math.max(0, decision.remainingHeadroom())
+        );
+        if (amount <= 0) {
+            return;
+        }
+        if (pendingClaims != null && decision.claimReservationKey() != null) {
+            pendingClaims.merge(decision.claimReservationKey(), amount, Integer::sum);
+        }
+        if (pendingOwners != null) {
+            for (BreedingClaimLimitPolicyService.PlayerReservationKey key
+                    : decision.playerReservationKeys()) {
+                pendingOwners.merge(key, amount, Integer::sum);
+            }
+        }
+    }
+
+    private boolean applyPairEffects(
+            @Nonnull PairCandidate candidate,
+            @Nullable TwBreedingConfig config,
+            @Nullable CommandBuffer<EntityStore> commandBuffer
+    ) {
+        long now = BreedingTimeService.resolveCurrentTimeMs(candidate.store());
+        BreedingParentCooldownResolver.ResolvedCooldown sourceCooldown =
+                cooldownResolver.resolve(config, candidate.sourceRef(), candidate.store());
+        BreedingParentCooldownResolver.ResolvedCooldown partnerCooldown =
+                cooldownResolver.resolve(config, candidate.partnerRef(), candidate.store());
+        return pairEffects.apply(new BreedingPairEffectsService.EffectContext(
+                candidate.sourceRef(),
+                candidate.sourceNpc(),
+                candidate.sourceBreeding(),
+                candidate.partnerRef(),
+                candidate.partnerNpc(),
+                candidate.partnerBreeding(),
+                sourceCooldown,
+                partnerCooldown,
+                candidate.sourceOwner(),
+                candidate.partnerOwner(),
+                now,
+                System.currentTimeMillis(),
+                candidate.store(),
+                commandBuffer
+        ));
+    }
+
+    @Nonnull
+    private BreedingPairContext createContext(
+            @Nonnull PairCandidate candidate,
+            @Nullable TwBreedingConfig config
+    ) {
+        return new BreedingPairContext(
+                candidate.sourceNpc().getUuid(),
+                candidate.partnerNpc().getUuid(),
+                roleId(candidate.sourceNpc()),
+                roleId(candidate.partnerNpc()),
+                candidate.sourceNpc().getRoleIndex(),
+                candidate.partnerNpc().getRoleIndex(),
+                candidate.spawnAnchor(),
+                candidate.sourceOwner(),
+                candidate.partnerOwner(),
+                TamedStateResolver.isTamed(candidate.sourceRef(), candidate.store()),
+                TamedStateResolver.isTamed(candidate.partnerRef(), candidate.store()),
+                resolveConfigId(
+                        config, candidate.sourceBreeding(), candidate.partnerBreeding()
                 )
-                : decision;
-    }
-
-    private com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan resolvePlan(
-            BreedingPairingAttempt attempt,
-            java.util.function.Supplier<
-                    com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan> freshPlan) {
-        if (attempt.replayState().birthPlan() == null) {
-            return freshPlan.get();
-        }
-        com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan restored =
-                planSnapshotMapper.restore(attempt.replayState().birthPlan());
-        if (restored == null) {
-            throw new IllegalStateException("Durable breeding birth plan cannot be restored");
-        }
-        return restored;
-    }
-
-    @Nullable
-    private PlannedChild plannedChild(
-            BreedingPreparedParents prepared,
-            @Nullable TwBreedingConfig config) {
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        BreedingOffspringRoleResolver.OffspringRoleSelection role =
-                roleResolver.selectOffspringRole(
-                        prepared.sourceRoleId(),
-                        prepared.partnerRoleId(),
-                        config,
-                        npcPlugin,
-                        Math.random(),
-                        Math.random(),
-                        Math.random(),
-                        Math.random()
-                );
-        if (role == null || npcPlugin == null || npcPlugin.getIndex(role.roleId()) < 0) {
-            return null;
-        }
-        String populationType = populationTypeService.resolveTypeKey(role.roleId(), config);
-        if (populationType == null) {
-            return null;
-        }
-        return new PlannedChild(
-                role.roleId(),
-                role.adultRoleId(),
-                role.gender() != null ? role.gender().toConfigValue() : null,
-                lifecycleKey(role.lifecycleFamily()),
-                populationType
-        );
-    }
-
-    private BreedingPairEffectsService.EffectContext effectContext(
-            BreedingPreparedParents prepared,
-            Store<EntityStore> store) {
-        return new BreedingPairEffectsService.EffectContext(
-                prepared.sourceRef(),
-                prepared.sourceNpc(),
-                prepared.sourceBreeding(),
-                prepared.partnerRef(),
-                prepared.partnerNpc(),
-                prepared.partnerBreeding(),
-                prepared.sourceCooldown(),
-                prepared.partnerCooldown(),
-                prepared.sourceOwner(),
-                prepared.partnerOwner(),
-                prepared.nowMs(),
-                prepared.happinessUpdatedAtMs(),
-                store,
-                null
         );
     }
 
     @Nullable
-    private String lifecycleKey(@Nullable TwBreedingConfig.RoleFamily family) {
-        if (family == null) {
-            return null;
-        }
-        String id = family.getId();
-        String line = family.getSelectedLineId();
-        if (id == null || id.isBlank()) {
-            return line;
-        }
-        return line == null || line.isBlank() ? id : id + ":" + line;
+    private static TameworkBreedingComponent breeding(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkBreedingComponent> type =
+                TameworkBreedingComponent.getComponentType();
+        return type == null ? null : store.getComponent(ref, type);
     }
 
-    @Nullable
-    private com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionService
-            resolvePopulationService() {
-        Tamework plugin = Tamework.getInstance();
-        OwnerPopulationRuntime runtime = plugin == null
+    @Nonnull
+    private static BreedingOffspringProgressionService.OwnerSnapshot owner(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent owner = ownerType == null
                 ? null
-                : plugin.getOwnerPopulationRuntime();
-        return runtime == null ? null : runtime.breedingAdmissionService();
+                : store.getComponent(ref, ownerType);
+        UUID ownerId = owner == null ? null : owner.getOwnerId();
+        if (ownerId == null) {
+            ownerId = commandOwner(ref, store);
+        }
+        return ownerId == null
+                ? BreedingOffspringProgressionService.OwnerSnapshot.empty()
+                : new BreedingOffspringProgressionService.OwnerSnapshot(
+                        ownerId, owner == null ? null : owner.getOwnerName()
+                );
     }
 
-    private void logInfo(String message) {
+    @Nullable
+    private static UUID commandOwner(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkCommandLinksComponent> type =
+                TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = type == null
+                ? null
+                : store.getComponent(ref, type);
+        return links == null ? null : links.getOwnerId();
+    }
+
+    @Nullable
+    private static Vector3d resolveSpawnAnchor(
+            @Nonnull Ref<EntityStore> parentA,
+            @Nonnull Ref<EntityStore> parentB,
+            @Nonnull Store<EntityStore> store
+    ) {
+        TransformComponent a = store.getComponent(parentA, TransformComponent.getComponentType());
+        TransformComponent b = store.getComponent(parentB, TransformComponent.getComponentType());
+        if (a == null || b == null) {
+            return null;
+        }
+        return new Vector3d(
+                (a.getPosition().x + b.getPosition().x) * 0.5,
+                Math.max(a.getPosition().y, b.getPosition().y) + SPAWN_HEIGHT_OFFSET,
+                (a.getPosition().z + b.getPosition().z) * 0.5
+        );
+    }
+
+    @Nullable
+    private static World resolveWorld(@Nonnull Store<EntityStore> store) {
+        return store.getExternalData() == null
+                ? null
+                : store.getExternalData().getWorld();
+    }
+
+    @Nullable
+    private static String roleId(@Nullable NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        if (npc.getRoleName() != null && !npc.getRoleName().isBlank()) {
+            return npc.getRoleName();
+        }
+        NPCPlugin plugin = NPCPlugin.get();
+        return plugin != null && npc.getRoleIndex() >= 0
+                ? plugin.getName(npc.getRoleIndex())
+                : null;
+    }
+
+    @Nullable
+    private static String resolveConfigId(
+            @Nullable TwBreedingConfig config,
+            @Nonnull TameworkBreedingComponent source,
+            @Nonnull TameworkBreedingComponent partner
+    ) {
+        if (config != null && config.getId() != null && !config.getId().isBlank()) {
+            return config.getId();
+        }
+        if (source.getConfigId() != null && !source.getConfigId().isBlank()) {
+            return source.getConfigId();
+        }
+        return partner.getConfigId() == null || partner.getConfigId().isBlank()
+                ? null
+                : partner.getConfigId();
+    }
+
+    private static void logDebug(@Nullable String message) {
         Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.getLogger() != null && plugin.isDebugBreedingEnabled()) {
+        if (plugin != null && plugin.getLogger() != null
+                && plugin.isDebugBreedingEnabled()
+                && message != null && !message.isBlank()) {
             plugin.getLogger().at(Level.INFO).log(message);
         }
     }
 
-    private void logWarning(String message) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.getLogger() != null) {
-            plugin.getLogger().at(Level.WARNING).log(message);
-        }
+    private record PairCandidate(
+            Ref<EntityStore> sourceRef,
+            Ref<EntityStore> partnerRef,
+            NPCEntity sourceNpc,
+            NPCEntity partnerNpc,
+            TameworkBreedingComponent sourceBreeding,
+            TameworkBreedingComponent partnerBreeding,
+            Store<EntityStore> store,
+            World world,
+            @Nullable Vector3d spawnAnchor,
+            BreedingOffspringProgressionService.OwnerSnapshot sourceOwner,
+            BreedingOffspringProgressionService.OwnerSnapshot partnerOwner
+    ) {
     }
 }

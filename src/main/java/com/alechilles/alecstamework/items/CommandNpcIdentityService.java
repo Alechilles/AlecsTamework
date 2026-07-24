@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
-import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,12 +9,12 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Resolves command records to stable profiles while failing closed on ambiguous durable or live state.
+ * Resolves disposable command records against the canonical replacement profile projection.
  *
- * <p>This service is intended for command/event boundaries. Its adapters keep SQLite and loaded-world
- * access out of the identity rules, allowing deterministic tests and avoiding accidental tick polling.
- * An explicit stable profile ID takes precedence over a cached projection UUID that durable identity
- * now assigns to another profile; the profile is reloaded independently before any rewrite.</p>
+ * <p>Projection absence is deliberately not a failure or lifecycle fact. A new live companion can
+ * be commanded immediately using its deterministic UUID-backed profile identity, then its item
+ * record is canonicalized once a projection exists. Only contradictory projected identity or
+ * duplicate live evidence blocks an action.</p>
  */
 final class CommandNpcIdentityService {
     enum ResolutionStatus {
@@ -26,45 +24,33 @@ final class CommandNpcIdentityService {
         FAILED
     }
 
-    record DurableStateFlags(boolean captured,
-                             boolean dead,
-                             boolean lost,
-                             @Nullable UUID lostReplacementUuid,
-                             boolean legacyCoop,
-                             boolean managedCoop,
-                             boolean managedCoopProjectionRelocatable,
-                             boolean activeRecovery) {
+    record DurableStateFlags(
+            boolean captured,
+            boolean dead,
+            boolean lost,
+            boolean inCoop
+    ) {
         private static final DurableStateFlags NONE =
-                new DurableStateFlags(false, false, false, null, false, false, false, false);
+                new DurableStateFlags(false, false, false, false);
 
-        boolean lostAwaitingRecovery() {
-            return lost && lostReplacementUuid == null;
-        }
-
-        boolean suppressesReplacement() {
-            return captured || dead || lostReplacementUuid != null
-                    || legacyCoop || managedCoop || activeRecovery;
-        }
-
-        /** A released projection remains managed, but is eligible for normal command relocation. */
-        boolean managedCoopBlocksRelocation() {
-            return managedCoop && !managedCoopProjectionRelocatable;
+        boolean suppressesLiveAction() {
+            return captured || dead || lost || inCoop;
         }
     }
 
-    record IdentityResolution(@Nonnull ResolutionStatus status,
-                              @Nullable String profileId,
-                              @Nullable String conflictingProfileId,
-                              @Nullable UUID cachedHistoricalUuid,
-                              @Nullable UUID currentNpcUuid,
-                              @Nonnull List<UUID> aliases,
-                              @Nonnull List<UUID> checkedUuids,
-                              @Nonnull List<UUID> liveUuids,
-                              boolean historicalUuidKnown,
-                              @Nonnull DurableStateFlags durableState,
-                              boolean replacementAllowed,
-                              @Nullable String failureReason,
-                              @Nullable Throwable failure) {
+    record IdentityResolution(
+            @Nonnull ResolutionStatus status,
+            @Nullable String profileId,
+            @Nullable String conflictingProfileId,
+            @Nullable UUID cachedHistoricalUuid,
+            @Nullable UUID currentNpcUuid,
+            @Nonnull List<UUID> aliases,
+            @Nonnull List<UUID> checkedUuids,
+            @Nonnull List<UUID> liveUuids,
+            @Nonnull DurableStateFlags durableState,
+            @Nullable String failureReason,
+            @Nullable Throwable failure
+    ) {
         IdentityResolution {
             aliases = List.copyOf(aliases);
             checkedUuids = List.copyOf(checkedUuids);
@@ -72,26 +58,26 @@ final class CommandNpcIdentityService {
         }
     }
 
-    record CanonicalizationResult(@Nonnull List<LinkedNpcRecord> records,
-                                  @Nonnull List<IdentityResolution> resolutions) {
+    record CanonicalizationResult(
+            @Nonnull List<LinkedNpcRecord> records,
+            @Nonnull List<IdentityResolution> resolutions
+    ) {
         CanonicalizationResult {
             records = List.copyOf(records);
             resolutions = List.copyOf(resolutions);
         }
 
         boolean hasConflicts() {
-            return resolutions.stream().anyMatch(result -> result.status() == ResolutionStatus.CONFLICT);
+            return resolutions.stream().anyMatch(
+                    result -> result.status() == ResolutionStatus.CONFLICT
+            );
         }
 
         boolean hasFailures() {
-            return resolutions.stream().anyMatch(result -> result.status() == ResolutionStatus.FAILED);
+            return resolutions.stream().anyMatch(
+                    result -> result.status() == ResolutionStatus.FAILED
+            );
         }
-    }
-
-    @FunctionalInterface
-    interface ProfileIdentityLoader {
-        NpcIdentityRepository.IdentityLoadResult load(@Nullable String profileId,
-                                                       @Nullable UUID historicalUuid);
     }
 
     @FunctionalInterface
@@ -100,28 +86,42 @@ final class CommandNpcIdentityService {
         LoadedNpcIdentityIndex.Probe probe(@Nonnull UUID npcUuid);
     }
 
-    private final ProfileIdentityLoader identityLoader;
+    private final CommandPersistenceView persistence;
     private final LiveNpcProbe liveNpcProbe;
     private final LinkedNpcRecordCollection recordCollection;
 
-    CommandNpcIdentityService(@Nonnull NpcIdentityRepository identityRepository,
-                              @Nonnull CommandNpcExistenceService existenceService) {
-        this(identityRepository::load,
+    CommandNpcIdentityService(
+            @Nonnull CommandPersistenceView persistence,
+            @Nonnull CommandNpcExistenceService existenceService
+    ) {
+        this(
+                persistence,
                 existenceService::probe,
-                new LinkedNpcRecordCollection());
+                new LinkedNpcRecordCollection()
+        );
     }
 
-    CommandNpcIdentityService(@Nonnull ProfileIdentityLoader identityLoader,
-                              @Nonnull LiveNpcProbe liveNpcProbe) {
-        this(identityLoader, liveNpcProbe, new LinkedNpcRecordCollection());
+    CommandNpcIdentityService(
+            @Nonnull CommandPersistenceView persistence,
+            @Nonnull LiveNpcProbe liveNpcProbe
+    ) {
+        this(persistence, liveNpcProbe, new LinkedNpcRecordCollection());
     }
 
-    CommandNpcIdentityService(@Nonnull ProfileIdentityLoader identityLoader,
-                              @Nonnull LiveNpcProbe liveNpcProbe,
-                              @Nonnull LinkedNpcRecordCollection recordCollection) {
-        this.identityLoader = Objects.requireNonNull(identityLoader, "identityLoader");
-        this.liveNpcProbe = Objects.requireNonNull(liveNpcProbe, "liveNpcProbe");
-        this.recordCollection = Objects.requireNonNull(recordCollection, "recordCollection");
+    CommandNpcIdentityService(
+            @Nonnull CommandPersistenceView persistence,
+            @Nonnull LiveNpcProbe liveNpcProbe,
+            @Nonnull LinkedNpcRecordCollection recordCollection
+    ) {
+        this.persistence = Objects.requireNonNull(
+                persistence, "Command persistence view is required"
+        );
+        this.liveNpcProbe = Objects.requireNonNull(
+                liveNpcProbe, "Live NPC probe is required"
+        );
+        this.recordCollection = Objects.requireNonNull(
+                recordCollection, "Linked record collection is required"
+        );
     }
 
     @Nonnull
@@ -129,59 +129,28 @@ final class CommandNpcIdentityService {
         if (record == null || record.npcUuid == null) {
             return failed(null, null, "record_identity_required", null);
         }
-        NpcIdentityRepository.IdentityLoadResult loaded;
-        try {
-            loaded = identityLoader.load(record.profileId, record.npcUuid);
-        } catch (RuntimeException exception) {
-            return failed(record.profileId, record.npcUuid, "identity_loader_threw", exception);
+        CommandPersistenceView.ProfileSnapshot projected =
+                persistence.find(record).orElse(null);
+        if (projected == null) {
+            return resolveUnprojected(record);
         }
-        if (loaded == null) {
-            return failed(record.profileId, record.npcUuid, "identity_loader_returned_null", null);
+        String explicitProfile = LinkedNpcRecordCodec.normalizeProfileId(
+                record.profileId
+        );
+        if (explicitProfile != null
+                && !explicitProfile.equals(projected.profileId().toString())) {
+            return conflict(record, explicitProfile, projected);
         }
-        return switch (loaded.status()) {
-            case FOUND -> resolveFound(record, loaded.identity());
-            case NOT_FOUND -> unresolved(record);
-            case CONFLICT -> resolveProfileAuthoritativeConflict(record, loaded);
-            case FAILED -> failed(record.profileId, record.npcUuid,
-                    loaded.failureReason(), loaded.failure());
-        };
-    }
-
-    /**
-     * Repairs a crossed cached UUID by reloading the record's stable profile without that foreign
-     * projection hint. The profile's own aliases are still fully checked for duplicate live state.
-     */
-    @Nonnull
-    private IdentityResolution resolveProfileAuthoritativeConflict(
-            @Nonnull LinkedNpcRecord record,
-            @Nonnull NpcIdentityRepository.IdentityLoadResult conflict) {
-        String profileId = LinkedNpcRecordCodec.normalizeProfileId(record.profileId);
-        if (profileId == null) {
-            return repositoryConflict(record, conflict);
-        }
-        NpcIdentityRepository.IdentityLoadResult profileLoaded;
-        try {
-            profileLoaded = identityLoader.load(profileId, null);
-        } catch (RuntimeException exception) {
-            return failed(profileId, record.npcUuid,
-                    "profile_authoritative_identity_loader_threw", exception);
-        }
-        if (profileLoaded == null) {
-            return failed(profileId, record.npcUuid,
-                    "profile_authoritative_identity_loader_returned_null", null);
-        }
-        if (profileLoaded.status() != NpcIdentityRepository.LoadStatus.FOUND
-                || profileLoaded.identity() == null
-                || !profileId.equals(profileLoaded.identity().profileId())) {
-            return repositoryConflict(record, conflict);
-        }
-        return resolveFound(record, profileLoaded.identity());
+        return resolveProjected(record, projected);
     }
 
     @Nonnull
-    LinkedNpcRecord canonicalRecord(@Nonnull LinkedNpcRecord original,
-                                    @Nonnull IdentityResolution resolution) {
-        if (resolution.status() != ResolutionStatus.RESOLVED || resolution.profileId() == null) {
+    LinkedNpcRecord canonicalRecord(
+            @Nonnull LinkedNpcRecord original,
+            @Nonnull IdentityResolution resolution
+    ) {
+        if (resolution.status() != ResolutionStatus.RESOLVED
+                || resolution.profileId() == null) {
             return original;
         }
         UUID canonicalUuid = resolution.currentNpcUuid() != null
@@ -204,192 +173,184 @@ final class CommandNpcIdentityService {
     }
 
     @Nonnull
-    CanonicalizationResult canonicalize(@Nullable List<LinkedNpcRecord> input) {
+    CanonicalizationResult canonicalize(
+            @Nullable List<LinkedNpcRecord> input
+    ) {
         if (input == null || input.isEmpty()) {
             return new CanonicalizationResult(List.of(), List.of());
         }
+        ArrayList<LinkedNpcRecord> original = new ArrayList<>(input.size());
         ArrayList<LinkedNpcRecord> canonical = new ArrayList<>(input.size());
-        ArrayList<LinkedNpcRecord> originals = new ArrayList<>(input.size());
-        ArrayList<IdentityResolution> resolutions = new ArrayList<>(input.size());
+        ArrayList<IdentityResolution> resolutions =
+                new ArrayList<>(input.size());
         for (LinkedNpcRecord record : input) {
             if (record == null || record.npcUuid == null) {
                 continue;
             }
-            originals.add(record);
+            original.add(record);
             IdentityResolution resolution = resolve(record);
             resolutions.add(resolution);
             canonical.add(canonicalRecord(record, resolution));
         }
-        boolean unsafeToRewrite = resolutions.stream().anyMatch(resolution ->
-                resolution.status() == ResolutionStatus.CONFLICT
-                        || resolution.status() == ResolutionStatus.FAILED);
-        List<LinkedNpcRecord> output = unsafeToRewrite
-                ? List.copyOf(originals)
-                : recordCollection.deduplicate(canonical);
-        return new CanonicalizationResult(output, resolutions);
+        boolean unsafe = resolutions.stream().anyMatch(result ->
+                result.status() == ResolutionStatus.CONFLICT
+                        || result.status() == ResolutionStatus.FAILED
+        );
+        return new CanonicalizationResult(
+                unsafe
+                        ? original
+                        : recordCollection.deduplicate(canonical),
+                resolutions
+        );
     }
 
     @Nonnull
-    private IdentityResolution resolveFound(@Nonnull LinkedNpcRecord record,
-                                            @Nullable NpcIdentityRepository.ProfileIdentity identity) {
-        if (identity == null) {
-            return failed(record.profileId, record.npcUuid, "found_identity_missing_payload", null);
+    private IdentityResolution resolveUnprojected(
+            LinkedNpcRecord record
+    ) {
+        UUID live = live(record.npcUuid);
+        String profileId = persistence.profileId(record).toString();
+        return new IdentityResolution(
+                ResolutionStatus.RESOLVED,
+                profileId,
+                null,
+                record.npcUuid,
+                record.npcUuid,
+                List.of(record.npcUuid),
+                List.of(record.npcUuid),
+                live == null ? List.of() : List.of(live),
+                DurableStateFlags.NONE,
+                null,
+                null
+        );
+    }
+
+    @Nonnull
+    private IdentityResolution resolveProjected(
+            LinkedNpcRecord record,
+            CommandPersistenceView.ProfileSnapshot projected
+    ) {
+        LinkedHashSet<UUID> checked = new LinkedHashSet<>();
+        checked.add(record.npcUuid);
+        if (projected.currentNpcUuid() != null) {
+            checked.add(projected.currentNpcUuid());
         }
-        DurableStateFlags durable = durableFlags(identity);
-        LinkedHashSet<UUID> checked = new LinkedHashSet<>(identity.aliases());
-        if (identity.currentNpcUuid() != null) {
-            checked.add(identity.currentNpcUuid());
-        }
-        addEvidence(checked, identity.flags().lostReplacementUuid());
-        addManagedEvidence(checked, identity.managedAssignment());
-        addRecoveryEvidence(checked, identity.activeRecovery());
-        if (!identity.historicalUuidKnown()) {
-            checked.add(record.npcUuid);
-        }
-        ArrayList<UUID> live = new ArrayList<>();
-        boolean unknownPresence = false;
+        ArrayList<UUID> live = new ArrayList<>(checked.size());
         boolean multipleLocations = false;
         try {
             for (UUID candidate : checked) {
-                if (candidate == null) {
+                LoadedNpcIdentityIndex.Probe probe =
+                        liveNpcProbe.probe(candidate);
+                if (probe == null
+                        || probe.status()
+                        == LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN) {
                     continue;
                 }
-                LoadedNpcIdentityIndex.Probe probe = liveNpcProbe.probe(candidate);
-                if (probe == null) {
-                    return failedFound(
-                            record, identity, checked, live, durable,
-                            "live_identity_probe_returned_null", null
-                    );
-                }
-                switch (probe.status()) {
-                    case UNKNOWN -> unknownPresence = true;
-                    case ABSENT -> {
-                    }
-                    case ONE_LOCATION -> live.add(candidate);
-                    case MULTIPLE_LOCATIONS -> {
-                        live.add(candidate);
-                        multipleLocations = true;
-                    }
+                if (probe.status()
+                        == LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION) {
+                    live.add(candidate);
+                } else if (probe.status()
+                        == LoadedNpcIdentityIndex.ProbeStatus.MULTIPLE_LOCATIONS) {
+                    live.add(candidate);
+                    multipleLocations = true;
                 }
             }
-        } catch (RuntimeException exception) {
-            return failedFound(
-                    record, identity, checked, live, durable,
-                    "live_identity_probe_failed", exception
+        } catch (RuntimeException failure) {
+            return failed(
+                    projected.profileId().toString(),
+                    record.npcUuid,
+                    "live_identity_probe_failed",
+                    failure
             );
         }
-        if (unknownPresence) {
-            return failedFound(
-                    record, identity, checked, live, durable,
-                    "loaded_identity_index_incomplete", null
-            );
+        DurableStateFlags durable = new DurableStateFlags(
+                projected.captured(),
+                projected.dead(),
+                projected.lost(),
+                projected.inCoop()
+        );
+        boolean conflict = multipleLocations || live.size() > 1;
+        return new IdentityResolution(
+                conflict
+                        ? ResolutionStatus.CONFLICT
+                        : ResolutionStatus.RESOLVED,
+                projected.profileId().toString(),
+                null,
+                record.npcUuid,
+                projected.currentNpcUuid(),
+                projected.currentNpcUuid() == null
+                        ? List.of()
+                        : List.of(projected.currentNpcUuid()),
+                List.copyOf(checked),
+                live,
+                durable,
+                multipleLocations
+                        ? "multiple_live_locations_for_uuid"
+                        : live.size() > 1
+                        ? "multiple_live_profile_aliases"
+                        : null,
+                null
+        );
+    }
+
+    @Nonnull
+    private IdentityResolution conflict(
+            LinkedNpcRecord record,
+            String explicitProfile,
+            CommandPersistenceView.ProfileSnapshot projected
+    ) {
+        return new IdentityResolution(
+                ResolutionStatus.CONFLICT,
+                explicitProfile,
+                projected.profileId().toString(),
+                record.npcUuid,
+                projected.currentNpcUuid(),
+                projected.currentNpcUuid() == null
+                        ? List.of()
+                        : List.of(projected.currentNpcUuid()),
+                List.of(record.npcUuid),
+                List.of(),
+                DurableStateFlags.NONE,
+                "record_profile_conflicts_with_current_alias",
+                null
+        );
+    }
+
+    @Nullable
+    private UUID live(UUID npcUuid) {
+        try {
+            LoadedNpcIdentityIndex.Probe probe = liveNpcProbe.probe(npcUuid);
+            return probe != null
+                    && (probe.status()
+                    == LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION
+                    || probe.status()
+                    == LoadedNpcIdentityIndex.ProbeStatus.MULTIPLE_LOCATIONS)
+                    ? npcUuid
+                    : null;
+        } catch (RuntimeException ignored) {
+            return null;
         }
-        ResolutionStatus status = multipleLocations || live.size() > 1
-                ? ResolutionStatus.CONFLICT
-                : ResolutionStatus.RESOLVED;
-        String reason = multipleLocations
-                ? "multiple_live_locations_for_uuid"
-                : live.size() > 1 ? "multiple_live_profile_aliases" : null;
-        boolean replacementAllowed = status == ResolutionStatus.RESOLVED
-                && live.isEmpty()
-                && durable.lostAwaitingRecovery()
-                && !durable.suppressesReplacement();
-        return new IdentityResolution(
-                status, identity.profileId(), null, record.npcUuid, identity.currentNpcUuid(),
-                identity.aliases(), List.copyOf(checked), live, identity.historicalUuidKnown(),
-                durable, replacementAllowed, reason, null
-        );
     }
 
     @Nonnull
-    private IdentityResolution unresolved(@Nonnull LinkedNpcRecord record) {
+    private IdentityResolution failed(
+            @Nullable String profileId,
+            @Nullable UUID cachedUuid,
+            @Nonnull String reason,
+            @Nullable Throwable failure
+    ) {
         return new IdentityResolution(
-                ResolutionStatus.UNRESOLVED, record.profileId, null, record.npcUuid, null,
-                List.of(), List.of(record.npcUuid), List.of(), false,
-                DurableStateFlags.NONE, false, "profile_not_found", null
+                ResolutionStatus.FAILED,
+                profileId,
+                null,
+                cachedUuid,
+                null,
+                List.of(),
+                cachedUuid == null ? List.of() : List.of(cachedUuid),
+                List.of(),
+                DurableStateFlags.NONE,
+                reason,
+                failure
         );
-    }
-
-    @Nonnull
-    private IdentityResolution repositoryConflict(
-            @Nonnull LinkedNpcRecord record,
-            @Nonnull NpcIdentityRepository.IdentityLoadResult loaded) {
-        String requested = loaded.requestedProfileId() != null
-                ? loaded.requestedProfileId()
-                : record.profileId;
-        return new IdentityResolution(
-                ResolutionStatus.CONFLICT, requested, loaded.uuidProfileId(), record.npcUuid, null,
-                List.of(), List.of(record.npcUuid), List.of(), false,
-                DurableStateFlags.NONE, false, loaded.failureReason(), loaded.failure()
-        );
-    }
-
-    @Nonnull
-    private IdentityResolution failedFound(@Nonnull LinkedNpcRecord record,
-                                           @Nonnull NpcIdentityRepository.ProfileIdentity identity,
-                                           @Nonnull LinkedHashSet<UUID> checked,
-                                           @Nonnull List<UUID> live,
-                                           @Nonnull DurableStateFlags durable,
-                                           @Nonnull String reason,
-                                           @Nullable Throwable failure) {
-        return new IdentityResolution(
-                ResolutionStatus.FAILED, identity.profileId(), null, record.npcUuid,
-                identity.currentNpcUuid(), identity.aliases(), List.copyOf(checked), live,
-                identity.historicalUuidKnown(), durable, false, reason, failure
-        );
-    }
-
-    @Nonnull
-    private IdentityResolution failed(@Nullable String profileId,
-                                      @Nullable UUID cachedUuid,
-                                      @Nullable String reason,
-                                      @Nullable Throwable failure) {
-        String resolvedReason = reason == null || reason.isBlank() ? "identity_read_failed" : reason;
-        return new IdentityResolution(
-                ResolutionStatus.FAILED, profileId, null, cachedUuid, null,
-                List.of(), cachedUuid != null ? List.of(cachedUuid) : List.of(), List.of(), false,
-                DurableStateFlags.NONE, false, resolvedReason, failure
-        );
-    }
-
-    @Nonnull
-    private DurableStateFlags durableFlags(@Nonnull NpcIdentityRepository.ProfileIdentity identity) {
-        NpcIdentityRepository.ProfileFlags flags = identity.flags();
-        NpcIdentityRepository.ManagedAssignment assignment = identity.managedAssignment();
-        return new DurableStateFlags(
-                flags.captured(), flags.dead(), flags.lost(), flags.lostReplacementUuid(),
-                flags.legacyInCoop(),
-                assignment != null,
-                assignment != null
-                        && assignment.state() == ResidentState.DEPLOYED
-                        && Objects.equals(assignment.deployedNpcUuid(), identity.currentNpcUuid())
-                        && Objects.equals(assignment.residentUuid(), identity.currentNpcUuid()),
-                identity.activeRecovery() != null
-        );
-    }
-
-    private void addManagedEvidence(@Nonnull LinkedHashSet<UUID> checked,
-                                    @Nullable NpcIdentityRepository.ManagedAssignment assignment) {
-        if (assignment == null) {
-            return;
-        }
-        addEvidence(checked, assignment.residentUuid());
-        addEvidence(checked, assignment.sourceNpcUuid());
-        addEvidence(checked, assignment.deployedNpcUuid());
-    }
-
-    private void addRecoveryEvidence(@Nonnull LinkedHashSet<UUID> checked,
-                                     @Nullable NpcIdentityRepository.ActiveRecovery recovery) {
-        if (recovery == null) {
-            return;
-        }
-        addEvidence(checked, recovery.plannedTargetUuid());
-        addEvidence(checked, recovery.actualTargetUuid());
-    }
-
-    private void addEvidence(@Nonnull LinkedHashSet<UUID> checked, @Nullable UUID npcUuid) {
-        if (npcUuid != null) {
-            checked.add(npcUuid);
-        }
     }
 }

@@ -39,14 +39,12 @@ class PersistenceConsolidationInvariantManifestTest {
             assertTrue(statuses.contains(status), id + ": " + status);
             assertTrue(replacementPhase >= 1 && replacementPhase <= 8, id);
             assertFalse(replacementTest.isBlank(), id);
+            assertNotNull(Class.forName(replacementTest), id + ": " + replacementTest);
             assertFalse(invariant.getAsJsonArray("currentTests").isEmpty(), id);
 
             for (JsonElement currentTest : invariant.getAsJsonArray("currentTests")) {
                 String className = currentTest.getAsString();
                 assertNotNull(Class.forName(className), id + ": " + className);
-            }
-            if ("REPLACEMENT_PROVEN".equals(status)) {
-                assertNotNull(Class.forName(replacementTest), id + ": " + replacementTest);
             }
         }
 

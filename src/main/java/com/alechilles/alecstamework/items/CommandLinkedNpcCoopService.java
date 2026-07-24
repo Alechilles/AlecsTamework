@@ -1,332 +1,112 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.persistence.sqlite.CoopLedgerRepository;
-import com.alechilles.alecstamework.persistence.sqlite.CoopLedgerRow;
-import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Compatibility and command-query facade over coop assignment state.
+ * Keeps process-local coop presentation detail for command-linked companions.
  *
- * <p>Trusted schema-v5 assignments are the only managed-coop view exposed to command panels,
- * movement, relocation, and lost checks. The legacy ledger collaborator remains available solely
- * for unmanaged rollback compatibility and DAT/v4 migration; it never mutates managed state.</p>
+ * <p>The direct-live coop author and canonical profile projection own durable
+ * occupancy. This cache exists only for same-process presentation fallbacks and
+ * command filtering while a gameplay transition is still in memory.</p>
  */
 public final class CommandLinkedNpcCoopService {
-    private final LegacyCommandCoopLedger legacy;
-    private final ManagedCoopAssignmentQuery managed;
-
-    public CommandLinkedNpcCoopService() {
-        this(null, null, null, null, null, null);
-    }
-
-    public CommandLinkedNpcCoopService(@Nullable Path persistencePath) {
-        this(persistencePath, null, null, null, null, null);
-    }
-
-    public CommandLinkedNpcCoopService(@Nonnull CoopLedgerRepository repository,
-                                       @Nonnull PersistenceHealthService healthService,
-                                       @Nullable NpcProfileRepository profileRepository) {
-        this(null, repository, healthService, profileRepository, null, null);
-    }
-
-    /** Creates the runtime facade with trusted schema-v5 managed-assignment visibility. */
-    public CommandLinkedNpcCoopService(@Nonnull CoopLedgerRepository repository,
-                                       @Nonnull PersistenceHealthService healthService,
-                                       @Nonnull NpcProfileRepository profileRepository,
-                                       @Nonnull ManagedCoopResidentIndex managedResidentIndex,
-                                       @Nonnull BooleanSupplier managedTrustGate) {
-        this(null, repository, healthService, profileRepository, managedResidentIndex, managedTrustGate);
-    }
-
-    private CommandLinkedNpcCoopService(@Nullable Path persistencePath,
-                                        @Nullable CoopLedgerRepository repository,
-                                        @Nullable PersistenceHealthService healthService,
-                                        @Nullable NpcProfileRepository profileRepository,
-                                        @Nullable ManagedCoopResidentIndex managedResidentIndex,
-                                        @Nullable BooleanSupplier managedTrustGate) {
-        legacy = new LegacyCommandCoopLedger(
-                new LegacyCoopLedgerPersistence(persistencePath, repository), healthService);
-        managed = new ManagedCoopAssignmentQuery(
-                managedResidentIndex, managedTrustGate, profileRepository);
-    }
-
-    @Nonnull
-    public static List<CoopLedgerRow> loadLegacyLedgerRows(@Nullable Path legacyPath) {
-        return LegacyCoopLedgerPersistence.loadDatRows(legacyPath);
-    }
+    private final ConcurrentHashMap<UUID, CoopLinkedNpcSnapshot> snapshots =
+            new ConcurrentHashMap<>();
 
     @Nullable
     public CoopLinkedNpcSnapshot getCoopSnapshot(@Nullable UUID npcUuid) {
-        if (npcUuid == null) {
-            return null;
-        }
-        ManagedCoopAssignmentQuery.Lookup lookup = managed.byUuid(npcUuid);
-        if (lookup.managedAssignment() || managed.configured() && !managed.trusted()) {
-            return lookup.snapshot();
-        }
-        return legacy.snapshot(npcUuid);
+        return npcUuid == null ? null : snapshots.get(npcUuid);
     }
 
     @Nullable
-    public CoopLinkedNpcSnapshot getCoopSnapshotForTool(@Nullable UUID npcUuid,
-                                                        @Nullable String toolId,
-                                                        @Nullable UUID ownerUuid) {
+    public CoopLinkedNpcSnapshot getCoopSnapshotForTool(
+            @Nullable UUID npcUuid,
+            @Nullable String toolId,
+            @Nullable UUID ownerUuid
+    ) {
         CoopLinkedNpcSnapshot snapshot = getCoopSnapshot(npcUuid);
-        return snapshot != null && snapshot.containsToolId(toolId) && ownerCompatible(snapshot, ownerUuid)
+        return snapshot != null
+                && snapshot.containsToolId(toolId)
+                && ownerCompatible(snapshot, ownerUuid)
                 ? snapshot
                 : null;
     }
 
     @Nullable
-    public CoopLinkedNpcSnapshot getCoopSnapshotForOwner(@Nullable UUID npcUuid,
-                                                         @Nullable UUID ownerUuid) {
+    public CoopLinkedNpcSnapshot getCoopSnapshotForOwner(
+            @Nullable UUID npcUuid,
+            @Nullable UUID ownerUuid
+    ) {
         CoopLinkedNpcSnapshot snapshot = getCoopSnapshot(npcUuid);
-        return snapshot != null && ownerCompatible(snapshot, ownerUuid) ? snapshot : null;
+        return snapshot != null && ownerCompatible(snapshot, ownerUuid)
+                ? snapshot
+                : null;
     }
 
     @Nullable
-    public CoopLinkedNpcSnapshot getCoopSnapshotForToolOrOwner(@Nullable UUID npcUuid,
-                                                               @Nullable String toolId,
-                                                               @Nullable UUID ownerUuid) {
-        CoopLinkedNpcSnapshot byTool = getCoopSnapshotForTool(npcUuid, toolId, ownerUuid);
-        return byTool != null ? byTool : getCoopSnapshotForOwner(npcUuid, ownerUuid);
+    public CoopLinkedNpcSnapshot getCoopSnapshotForToolOrOwner(
+            @Nullable UUID npcUuid,
+            @Nullable String toolId,
+            @Nullable UUID ownerUuid
+    ) {
+        CoopLinkedNpcSnapshot byTool =
+                getCoopSnapshotForTool(npcUuid, toolId, ownerUuid);
+        return byTool != null
+                ? byTool
+                : getCoopSnapshotForOwner(npcUuid, ownerUuid);
     }
 
-    /** Legacy rollback shim; managed assignments are rejected rather than rewritten. */
-    public void recordCoopSnapshot(@Nullable CoopLinkedNpcSnapshot snapshot) {
-        if (snapshot == null) {
-            return;
-        }
-        CoopSlotContext context = CoopSlotContext.legacy(
-                snapshot.coopId(), snapshot.residentSlot(), snapshot.npcUuid());
-        if (managed.permitsLegacyMutation(snapshot.npcUuid(), context)) {
-            legacy.record(snapshot);
+    public void recordCoopSnapshot(
+            @Nullable CoopLinkedNpcSnapshot snapshot
+    ) {
+        if (snapshot != null) {
+            snapshots.put(snapshot.npcUuid(), snapshot);
         }
     }
 
     public void clearCoopSnapshot(@Nullable UUID npcUuid) {
-        legacy.clearSnapshot(npcUuid);
-    }
-
-    public void clearLedgerEntry(@Nullable CoopSlotContext context) {
-        if (managed.permitsLegacyMutation(null, context)) {
-            legacy.clearEntry(context);
+        if (npcUuid != null) {
+            snapshots.remove(npcUuid);
         }
     }
 
-    @Nullable
-    public CoopResidentStateSnapshotService.CoopResidentStateSnapshot getStateSnapshotForSlot(
-            @Nullable CoopSlotContext context) {
-        ManagedCoopAssignmentQuery.SlotLookup lookup = managed.bySlot(context);
-        if (lookup.managedAuthority() || managed.configured() && !managed.trusted()) {
-            return lookup.snapshot() == null ? null : managed.stateSnapshot(lookup.resident());
-        }
-        return legacy.stateSnapshot(context);
+    public void clearAll() {
+        snapshots.clear();
     }
 
-    @Nullable
-    public CoopLedgerSlotSnapshot getLedgerSlotSnapshot(@Nullable CoopSlotContext context) {
-        ManagedCoopAssignmentQuery.SlotLookup lookup = managed.bySlot(context);
-        if (lookup.managedAuthority() || managed.configured() && !managed.trusted()) {
-            return managedSlotSnapshot(lookup);
-        }
-        return legacy.slotSnapshot(context);
+    private boolean ownerCompatible(
+            @Nonnull CoopLinkedNpcSnapshot snapshot,
+            @Nullable UUID ownerUuid
+    ) {
+        return snapshot.ownerId() == null
+                || ownerUuid == null
+                || snapshot.ownerId().equals(ownerUuid);
     }
 
-    @Nonnull
-    public List<CoopSlotContext> listHousedSlotsForWorld(@Nullable String worldName) {
-        if (managed.configured() && !managed.trusted()) {
-            return List.of();
-        }
-        List<CoopSlotContext> managedSlots = managed.housedSlots(worldName);
-        LinkedHashMap<String, CoopSlotContext> combined = new LinkedHashMap<>();
-        for (CoopSlotContext slot : managedSlots) {
-            combined.put(LegacyCoopLedgerSupport.slotKey(slot), slot);
-        }
-        for (CoopSlotContext slot : legacy.housedSlots(worldName)) {
-            combined.putIfAbsent(LegacyCoopLedgerSupport.slotKey(slot), slot);
-        }
-        return combined.isEmpty() ? List.of() : List.copyOf(combined.values());
-    }
-
-    public void clearAllLedgerEntries() {
-        legacy.clearAll();
-    }
-
-    /** Legacy rollback mutation; exact schema-v5 assignments fail closed. */
-    public void captureResident(@Nullable UUID npcUuid,
-                                @Nullable String roleId,
-                                @Nullable CoopSlotContext context,
-                                @Nullable UUID fallbackOwnerId,
-                                @Nullable String[] fallbackToolIds,
-                                @Nullable String fallbackDisplayName,
-                                @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot) {
-        if (managed.permitsLegacyMutation(npcUuid, context)) {
-            legacy.capture(npcUuid, roleId, context, fallbackOwnerId, fallbackToolIds,
-                    fallbackDisplayName, stateSnapshot);
-        }
-    }
-
-    public boolean recaptureResidentFromReleasedUuid(
-            @Nullable UUID npcUuid,
+    /** Immutable same-process detail for a companion currently assigned to a coop. */
+    public record CoopLinkedNpcSnapshot(
+            @Nonnull UUID npcUuid,
+            @Nullable UUID ownerId,
+            @Nullable String[] toolIds,
             @Nullable String roleId,
-            @Nullable String worldName,
+            @Nullable String displayName,
             @Nullable String coopId,
-            int x,
-            int y,
-            int z,
-            @Nullable UUID fallbackOwnerId,
-            @Nullable String[] fallbackToolIds,
-            @Nullable String fallbackDisplayName,
-            @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot) {
-        CoopSlotContext context = CoopSlotContext.of(worldName, coopId, x, y, z, 0);
-        return managed.permitsLegacyMutation(npcUuid, context)
-                && legacy.recapture(npcUuid, roleId, worldName, coopId, x, y, z,
-                fallbackOwnerId, fallbackToolIds, fallbackDisplayName, stateSnapshot);
-    }
-
-    @Nonnull
-    public ReleaseResolution resolveRelease(@Nullable UUID currentNpcUuid,
-                                            @Nullable String roleId,
-                                            @Nullable CoopSlotContext context,
-                                            boolean requireSnapshotOnRelease) {
-        if (!managed.permitsLegacyMutation(currentNpcUuid, context)) {
-            return ReleaseResolution.failure("managed_assignment_owned_by_schema_v5");
-        }
-        return legacy.release(currentNpcUuid, roleId, context, requireSnapshotOnRelease);
-    }
-
-    @Nullable
-    public CoopLinkedNpcSnapshot consumeSnapshotForReplacement(@Nullable UUID previousNpcUuid,
-                                                               @Nullable String coopId,
-                                                               int residentSlot,
-                                                               @Nullable String roleId) {
-        return managed.permitsLegacyMutation(previousNpcUuid, null)
-                ? legacy.consumeReplacement(previousNpcUuid, coopId, residentSlot, roleId)
-                : null;
-    }
-
-    @Nullable
-    public CoopLinkedNpcSnapshot consumeRespawnSnapshotForCoopResident(@Nullable UUID currentNpcUuid,
-                                                                       @Nullable String coopId,
-                                                                       int residentSlot,
-                                                                       @Nullable String roleId) {
-        return managed.permitsLegacyMutation(currentNpcUuid, null)
-                ? legacy.consumeCoopResident(currentNpcUuid, coopId, residentSlot, roleId)
-                : null;
-    }
-
-    @Nullable
-    public CoopLinkedNpcSnapshot consumeRespawnSnapshotForLinks(@Nullable UUID currentNpcUuid,
-                                                                @Nullable UUID ownerId,
-                                                                @Nullable String[] toolIds,
-                                                                @Nullable String roleId) {
-        return managed.permitsLegacyMutation(currentNpcUuid, null)
-                ? legacy.consumeLinks(currentNpcUuid, ownerId, toolIds, roleId)
-                : null;
-    }
-
-    @Nullable
-    private CoopLedgerSlotSnapshot managedSlotSnapshot(ManagedCoopAssignmentQuery.SlotLookup lookup) {
-        CoopLinkedNpcSnapshot snapshot = lookup.snapshot();
-        ResidentRecord resident = lookup.resident();
-        if (snapshot == null || resident == null) {
-            return null;
-        }
-        return new CoopLedgerSlotSnapshot(
-                snapshot.npcUuid(), null, snapshot.ownerId(), snapshot.toolIds(), snapshot.roleId(),
-                snapshot.displayName(), snapshot.housedAtMs(), 0L, managed.stateSnapshot(resident));
-    }
-
-    private boolean ownerCompatible(@Nonnull CoopLinkedNpcSnapshot snapshot, @Nullable UUID ownerUuid) {
-        return snapshot.ownerId() == null || ownerUuid == null || snapshot.ownerId().equals(ownerUuid);
-    }
-
-    /** World + exact block + resident slot identity used by compatibility callers. */
-    public record CoopSlotContext(@Nullable String worldName,
-                                  @Nullable String coopId,
-                                  int x,
-                                  int y,
-                                  int z,
-                                  int residentSlot) {
-        public static CoopSlotContext of(@Nullable String worldName,
-                                         @Nullable String coopId,
-                                         int x,
-                                         int y,
-                                         int z,
-                                         int residentSlot) {
-            return new CoopSlotContext(worldName, coopId, x, y, z, residentSlot);
-        }
-
-        public static CoopSlotContext legacy(@Nullable String coopId, int residentSlot) {
-            return new CoopSlotContext(null, coopId, LegacyCoopLedgerSupport.UNKNOWN_COORDINATE,
-                    LegacyCoopLedgerSupport.UNKNOWN_COORDINATE,
-                    LegacyCoopLedgerSupport.UNKNOWN_COORDINATE, residentSlot);
-        }
-
-        public static CoopSlotContext legacy(@Nullable String coopId,
-                                             int residentSlot,
-                                             @Nullable UUID npcUuid) {
-            if (npcUuid == null) {
-                return legacy(coopId, residentSlot);
-            }
-            return new CoopSlotContext(null, coopId, LegacyCoopLedgerSupport.UNKNOWN_COORDINATE,
-                    npcUuid.hashCode(), LegacyCoopLedgerSupport.UNKNOWN_COORDINATE, residentSlot);
-        }
-    }
-
-    public record ReleaseResolution(@Nullable UUID previousNpcUuid,
-                                    @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot,
-                                    @Nullable CoopLinkedNpcSnapshot linkedSnapshot,
-                                    boolean alreadyReconciled,
-                                    @Nullable String failureReason) {
-        public static ReleaseResolution failure(@Nonnull String reason) {
-            return new ReleaseResolution(null, null, null, false, reason);
-        }
-
-        public static ReleaseResolution reconciled() {
-            return new ReleaseResolution(null, null, null, true, null);
-        }
-
-        public boolean isFailure() {
-            return failureReason != null && !failureReason.isBlank();
-        }
-    }
-
-    public record CoopLedgerSlotSnapshot(@Nullable UUID housedNpcUuid,
-                                         @Nullable UUID lastReleasedNpcUuid,
-                                         @Nullable UUID ownerId,
-                                         @Nullable String[] toolIds,
-                                         @Nullable String roleId,
-                                         @Nullable String displayName,
-                                         long housedAtMs,
-                                         long releasedAtMs,
-                                         @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot) {
-        public CoopLedgerSlotSnapshot {
-            toolIds = toolIds == null ? new String[0] : toolIds.clone();
-        }
-    }
-
-    /** Snapshot of a command-linked companion currently assigned to a coop. */
-    public record CoopLinkedNpcSnapshot(@Nonnull UUID npcUuid,
-                                        @Nullable UUID ownerId,
-                                        @Nullable String[] toolIds,
-                                        @Nullable String roleId,
-                                        @Nullable String displayName,
-                                        @Nullable String coopId,
-                                        int residentSlot,
-                                        long housedAtMs) {
+            int residentSlot,
+            long housedAtMs
+    ) {
         public CoopLinkedNpcSnapshot {
+            if (npcUuid == null) {
+                throw new IllegalArgumentException("NPC UUID is required");
+            }
             toolIds = toolIds == null ? new String[0] : toolIds.clone();
+        }
+
+        @Override
+        public String[] toolIds() {
+            return toolIds.clone();
         }
 
         public boolean containsToolId(@Nullable String toolId) {

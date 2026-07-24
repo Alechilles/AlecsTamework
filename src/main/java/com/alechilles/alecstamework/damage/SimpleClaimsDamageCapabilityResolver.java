@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -20,31 +18,31 @@ interface SimpleClaimsDamageCapabilityResolver extends AutoCloseable {
     default void close() {
     }
 
-    record Resolution(@Nonnull ClaimProviderState state,
-                      @Nonnull ClaimProviderGeneration generation,
+    record Resolution(@Nonnull SimpleClaimsPluginState state,
+                      @Nonnull SimpleClaimsPluginGeneration generation,
                       @Nullable String pluginVersion,
                       @Nullable String reason,
                       @Nullable SimpleClaimsDamageGeneration capability) {
         public Resolution {
-            generation = generation == null ? ClaimProviderGeneration.NONE : generation;
-            if (state == ClaimProviderState.READY && capability == null) {
+            generation = generation == null ? SimpleClaimsPluginGeneration.NONE : generation;
+            if (state == SimpleClaimsPluginState.READY && capability == null) {
                 throw new IllegalArgumentException("A ready damage generation requires a capability.");
             }
-            if (state != ClaimProviderState.READY && capability != null) {
+            if (state != SimpleClaimsPluginState.READY && capability != null) {
                 throw new IllegalArgumentException("An unavailable damage generation cannot retain a capability.");
             }
         }
 
         @Nonnull
-        static Resolution ready(@Nonnull ClaimProviderGeneration generation,
+        static Resolution ready(@Nonnull SimpleClaimsPluginGeneration generation,
                                 @Nullable String pluginVersion,
                                 @Nonnull SimpleClaimsDamageGeneration capability) {
-            return new Resolution(ClaimProviderState.READY, generation, pluginVersion, null, capability);
+            return new Resolution(SimpleClaimsPluginState.READY, generation, pluginVersion, null, capability);
         }
 
         @Nonnull
-        static Resolution unavailable(@Nonnull ClaimProviderState state,
-                                      @Nonnull ClaimProviderGeneration generation,
+        static Resolution unavailable(@Nonnull SimpleClaimsPluginState state,
+                                      @Nonnull SimpleClaimsPluginGeneration generation,
                                       @Nullable String pluginVersion,
                                       @Nullable String reason) {
             return new Resolution(state, generation, pluginVersion, reason, null);

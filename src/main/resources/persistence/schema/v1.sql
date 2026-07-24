@@ -212,6 +212,7 @@ CREATE INDEX idx_operation_participant_scope
 CREATE TABLE refund_claim (
     operation_id TEXT PRIMARY KEY,
     recipient_uuid TEXT NOT NULL,
+    recipient_world_key TEXT NOT NULL,
     reason_code TEXT NOT NULL,
     receipt_key TEXT NOT NULL UNIQUE,
     claimed_at_ms INTEGER NOT NULL,

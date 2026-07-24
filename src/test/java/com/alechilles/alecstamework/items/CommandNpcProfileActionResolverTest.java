@@ -1,440 +1,160 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
-import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
-import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository.ManagedAssignment;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.items.persistence.TameworkSnapshotCodecs;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Regression coverage for profile-aware relocation and terminal lost-transition routing. */
 class CommandNpcProfileActionResolverTest {
-    private static final LoadedNpcIdentityIndex.Location LOCATION_A =
-            new LoadedNpcIdentityIndex.Location("world-a", "store-a");
-    private static final LoadedNpcIdentityIndex.Location LOCATION_B =
-            new LoadedNpcIdentityIndex.Location("world-b", "store-b");
-
     @Test
-    void staleHistoricalUuidRedirectsToSoleLiveCurrentUuidAndKeepsProfile() {
+    void relocationRedirectsToCanonicalCurrentAlias() {
+        UUID profileUuid = UUID.randomUUID();
         UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", currentUuid, List.of(currentUuid, staleUuid)),
-                probe -> probe.equals(currentUuid)
-                        ? oneLocation(probe, LOCATION_B)
-                        : absent(probe)
-        );
+        CommandNpcProfileActionResolver resolver =
+                resolver(profileUuid, currentUuid, Set.of());
 
         CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(staleUuid, null));
+                resolver.resolveRelocation(
+                        record(staleUuid, profileUuid.toString())
+                );
 
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertEquals("profile-a", target.profileId());
+        assertEquals(
+                CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED,
+                target.status()
+        );
         assertEquals(currentUuid, target.targetNpcUuid());
         assertTrue(target.redirected());
-        assertEquals(currentUuid, target.resolvedRecord().npcUuid);
-        assertEquals("profile-a", target.resolvedRecord().profileId);
-
-        CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                resolver.canonicalizeRecords(List.of(record(staleUuid, null)));
-        assertTrue(canonical.safeToPersist());
-        assertTrue(canonical.identityChanged());
-        assertEquals(currentUuid, canonical.records().get(0).npcUuid);
-        assertEquals("profile-a", canonical.records().get(0).profileId);
+        assertEquals(profileUuid.toString(), target.resolvedRecord().profileId);
     }
 
     @Test
-    void twoLiveAliasesFailClosedWithoutSelectingOrRewritingEitherUuid() {
-        UUID staleUuid = UUID.randomUUID();
+    void dormantCanonicalStatusBlocksRelocation() {
+        UUID profileUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", currentUuid, List.of(currentUuid, staleUuid)),
-                probe -> probe.equals(currentUuid)
-                        ? oneLocation(probe, LOCATION_A)
-                        : oneLocation(probe, LOCATION_B)
+                profileUuid,
+                currentUuid,
+                Set.of(TameworkSnapshotCodecs.DEATH)
         );
 
         CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(staleUuid, "profile-a"));
+                resolver.resolveRelocation(
+                        record(currentUuid, profileUuid.toString())
+                );
 
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.CONFLICT, target.status());
-        assertEquals("multiple_live_profile_aliases", target.reason());
-        assertFalse(target.isActionable());
-        assertNull(target.targetNpcUuid());
-        assertNull(target.resolvedRecord());
-        assertFalse(resolver.canonicalizeRecords(
-                List.of(record(staleUuid, "profile-a"))).safeToPersist());
-    }
-
-    @Test
-    void incompleteLoadedIndexFailsClosedWithoutSelectingOrRewritingAUuid() {
-        UUID staleUuid = UUID.randomUUID();
-        UUID currentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", currentUuid, List.of(currentUuid, staleUuid)),
-                probe -> probe.equals(currentUuid)
-                        ? oneLocation(probe, LOCATION_A)
-                        : unknown(probe)
+        assertEquals(
+                CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED,
+                target.status()
         );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(staleUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.FAILED, target.status());
-        assertEquals("loaded_identity_index_incomplete", target.reason());
-        assertFalse(target.isActionable());
-        assertNull(target.targetNpcUuid());
-        assertNull(target.resolvedRecord());
-        assertFalse(resolver.canonicalizeRecords(
-                List.of(record(staleUuid, "profile-a"))).safeToPersist());
-    }
-
-    @Test
-    void currentUuidRemainsTheActionTargetWithoutAFalseRedirect() {
-        UUID currentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", currentUuid, List.of(currentUuid)),
-                probe -> oneLocation(probe, LOCATION_A)
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(currentUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertEquals(currentUuid, target.targetNpcUuid());
-        assertFalse(target.redirected());
-        assertEquals("profile-a", target.resolvedRecord().profileId);
-        assertFalse(resolver.canonicalizeRecords(
-                List.of(record(currentUuid, "profile-a"))).identityChanged());
-    }
-
-    @Test
-    void currentUuidRecordWithoutProfileIsPersistentlyUpgradedToStableProfileIdentity() {
-        UUID currentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", currentUuid, List.of(currentUuid)),
-                probe -> oneLocation(probe, LOCATION_A)
-        );
-
-        CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                resolver.canonicalizeRecords(List.of(record(currentUuid, null)));
-
-        assertTrue(canonical.safeToPersist());
-        assertTrue(canonical.identityChanged());
-        assertEquals(currentUuid, canonical.records().get(0).npcUuid);
-        assertEquals("profile-a", canonical.records().get(0).profileId);
-    }
-
-    @Test
-    void crossedCachedUuidsAreRestoredFromTheirStableProfiles() {
-        UUID currentA = UUID.randomUUID();
-        UUID currentB = UUID.randomUUID();
-        NpcIdentityRepository.ProfileIdentity profileA =
-                identity("profile-a", currentA, List.of(currentA));
-        NpcIdentityRepository.ProfileIdentity profileB =
-                identity("profile-b", currentB, List.of(currentB));
-        CommandNpcIdentityService identityService = new CommandNpcIdentityService(
-                (profileId, historicalUuid) -> {
-                    if (historicalUuid != null) {
-                        return new NpcIdentityRepository.IdentityLoadResult(
-                                NpcIdentityRepository.LoadStatus.CONFLICT,
-                                null,
-                                profileId,
-                                "profile-a".equals(profileId) ? "profile-b" : "profile-a",
-                                "profile_and_uuid_resolve_differently",
-                                null
-                        );
-                    }
-                    return new NpcIdentityRepository.IdentityLoadResult(
-                            NpcIdentityRepository.LoadStatus.FOUND,
-                            "profile-a".equals(profileId) ? profileA : profileB,
-                            null,
-                            null,
-                            null,
-                            null
-                    );
-                },
-                this::absent
-        );
-        CommandNpcProfileActionResolver resolver =
-                new CommandNpcProfileActionResolver(identityService);
-
-        CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                resolver.canonicalizeRecords(List.of(
-                        record(currentB, "profile-a"),
-                        record(currentA, "profile-b")
-                ));
-
-        assertTrue(canonical.safeToPersist());
-        assertTrue(canonical.identityChanged());
-        assertEquals(currentA, canonical.records().get(0).npcUuid);
-        assertEquals("profile-a", canonical.records().get(0).profileId);
-        assertEquals(currentB, canonical.records().get(1).npcUuid);
-        assertEquals("profile-b", canonical.records().get(1).profileId);
-    }
-
-    @Test
-    void terminalLostTransitionIsBlockedWhenAnyProfileAliasIsLive() {
-        UUID droppedUuid = UUID.randomUUID();
-        UUID liveUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity("profile-a", droppedUuid, List.of(droppedUuid, liveUuid)),
-                probe -> probe.equals(liveUuid)
-                        ? oneLocation(probe, LOCATION_B)
-                        : absent(probe)
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveLostTransition(droppedUuid);
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
-        assertEquals("profile_alias_is_live", target.reason());
+        assertEquals("profile_is_dead", target.reason());
         assertFalse(target.isActionable());
     }
 
     @Test
-    void recoveredCurrentProjectionCanEnterANewLostCycle() {
-        UUID originalUuid = UUID.randomUUID();
+    void liveAliasCannotBecomeLost() {
+        UUID profileUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
         CommandNpcProfileActionResolver resolver = resolver(
-                recoveredIdentity("profile-a", currentUuid, originalUuid),
-                this::absent
+                profileUuid,
+                currentUuid,
+                Set.of(),
+                this::oneLocation
         );
 
         CommandNpcProfileActionResolver.ActionTarget target =
                 resolver.resolveLostTransition(currentUuid);
 
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertEquals(currentUuid, target.targetNpcUuid());
-        assertTrue(target.isActionable());
-    }
-
-    /** Regression for a second cleanup after recovery rotated the canonical projection UUID. */
-    @Test
-    void rotatedRecoveredCurrentProjectionCanEnterANewLostCycle() {
-        UUID originalUuid = UUID.randomUUID();
-        UUID recoveredUuid = UUID.randomUUID();
-        UUID rotatedCurrentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                recoveredIdentity(
-                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
-                this::absent
+        assertEquals(
+                CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED,
+                target.status()
         );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveLostTransition(rotatedCurrentUuid);
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertEquals(rotatedCurrentUuid, target.targetNpcUuid());
-        assertTrue(target.isActionable());
-    }
-
-    /** Regression for Recall unavailable after an already recovered projection unloaded. */
-    @Test
-    void rotatedRecoveredCurrentProjectionCanBeRecalledAfterUnload() {
-        UUID originalUuid = UUID.randomUUID();
-        UUID recoveredUuid = UUID.randomUUID();
-        UUID rotatedCurrentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                recoveredIdentity(
-                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
-                this::absent
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(rotatedCurrentUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertEquals(rotatedCurrentUuid, target.targetNpcUuid());
-        assertTrue(target.isActionable());
+        assertEquals("profile_alias_is_live", target.reason());
     }
 
     @Test
-    void rotatedHistoricalRecoveryProjectionRedirectsRecallButCannotStartLostCycle() {
-        UUID originalUuid = UUID.randomUUID();
-        UUID recoveredUuid = UUID.randomUUID();
-        UUID rotatedCurrentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                recoveredIdentity(
-                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
-                this::absent
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget relocation =
-                resolver.resolveRelocation(record(recoveredUuid, "profile-a"));
-        CommandNpcProfileActionResolver.ActionTarget lostTransition =
-                resolver.resolveLostTransition(recoveredUuid);
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, relocation.status());
-        assertEquals(rotatedCurrentUuid, relocation.targetNpcUuid());
-        assertTrue(relocation.redirected());
-        assertTrue(relocation.isActionable());
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, lostTransition.status());
-        assertEquals("profile_already_recovered", lostTransition.reason());
-        assertFalse(lostTransition.isActionable());
-    }
-
-    @Test
-    void recoveredHistoricalSourceCannotStartALostCycleForItsReplacement() {
-        UUID originalUuid = UUID.randomUUID();
+    void canonicalizationUpdatesOnlyIdentityFields() {
+        UUID profileUuid = UUID.randomUUID();
+        UUID staleUuid = UUID.randomUUID();
         UUID currentUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                recoveredIdentity("profile-a", currentUuid, originalUuid),
-                this::absent
+        CommandNpcProfileActionResolver resolver =
+                resolver(profileUuid, currentUuid, Set.of());
+
+        CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                resolver.canonicalizeRecords(List.of(record(staleUuid, null)));
+
+        assertTrue(canonical.safeToPersist());
+        assertTrue(canonical.identityChanged());
+        assertEquals(currentUuid, canonical.records().get(0).npcUuid);
+        assertEquals(
+                profileUuid.toString(),
+                canonical.records().get(0).profileId
         );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveLostTransition(originalUuid);
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
-        assertEquals("profile_already_recovered", target.reason());
-        assertFalse(target.isActionable());
-    }
-
-    /** Regression for Recall unavailable after a released coop NPC's chunk unloaded. */
-    @Test
-    void deployedManagedCoopProjectionCanBeRecalledAfterChunkUnload() {
-        UUID npcUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity(
-                        "profile-a",
-                        npcUuid,
-                        List.of(npcUuid),
-                        new ManagedAssignment(
-                                "resident-a", "authority-a", 0,
-                                npcUuid, npcUuid, npcUuid, ResidentState.DEPLOYED, 4L
-                        )
-                ),
-                this::absent
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(npcUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
-        assertTrue(target.isActionable());
-        assertEquals(npcUuid, target.targetNpcUuid());
-    }
-
-    @Test
-    void housedManagedCoopProjectionStillBlocksRelocation() {
-        UUID npcUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity(
-                        "profile-a",
-                        npcUuid,
-                        List.of(npcUuid),
-                        new ManagedAssignment(
-                                "resident-a", "authority-a", 0,
-                                npcUuid, npcUuid, null, ResidentState.HOUSED, 4L
-                        )
-                ),
-                this::absent
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(npcUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
-        assertEquals("profile_is_cooped", target.reason());
-        assertFalse(target.isActionable());
-    }
-
-    @Test
-    void deployedManagedCoopProjectionWithStaleCanonicalUuidStillBlocksRelocation() {
-        UUID staleCurrentUuid = UUID.randomUUID();
-        UUID deployedUuid = UUID.randomUUID();
-        CommandNpcProfileActionResolver resolver = resolver(
-                identity(
-                        "profile-a",
-                        staleCurrentUuid,
-                        List.of(staleCurrentUuid, deployedUuid),
-                        new ManagedAssignment(
-                                "resident-a", "authority-a", 0,
-                                deployedUuid, staleCurrentUuid, deployedUuid,
-                                ResidentState.DEPLOYED, 4L
-                        )
-                ),
-                this::absent
-        );
-
-        CommandNpcProfileActionResolver.ActionTarget target =
-                resolver.resolveRelocation(record(staleCurrentUuid, "profile-a"));
-
-        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
-        assertEquals("profile_is_cooped", target.reason());
-        assertFalse(target.isActionable());
     }
 
     private CommandNpcProfileActionResolver resolver(
-            NpcIdentityRepository.ProfileIdentity identity,
-            CommandNpcIdentityService.LiveNpcProbe liveProbe) {
-        CommandNpcIdentityService identityService = new CommandNpcIdentityService(
-                (profileId, historicalUuid) -> new NpcIdentityRepository.IdentityLoadResult(
-                        NpcIdentityRepository.LoadStatus.FOUND,
-                        identity,
+            UUID profileUuid,
+            UUID currentUuid,
+            Set<SnapshotKind> snapshots
+    ) {
+        return resolver(profileUuid, currentUuid, snapshots, this::absent);
+    }
+
+    private CommandNpcProfileActionResolver resolver(
+            UUID profileUuid,
+            UUID currentUuid,
+            Set<SnapshotKind> snapshots,
+            CommandNpcIdentityService.LiveNpcProbe probe
+    ) {
+        CompanionProfileProjectionState projection =
+                new CompanionProfileProjectionState(
+                        new ProfileId(profileUuid),
+                        new NpcAlias(currentUuid),
                         null,
                         null,
+                        "Tamed_Chicken",
+                        "Chicken",
                         null,
-                        null
-                ),
-                liveProbe
+                        true,
+                        null,
+                        null,
+                        Set.of(),
+                        snapshots,
+                        100L
+                );
+        CommandPersistenceView view = new CommandPersistenceView(
+                new CommandPersistenceView.ProjectionLookup() {
+                    @Override
+                    public Optional<CompanionProfileProjectionState> find(
+                            ProfileId profileId
+                    ) {
+                        return projection.profileId().equals(profileId)
+                                ? Optional.of(projection)
+                                : Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<CompanionProfileProjectionState> find(
+                            NpcAlias alias
+                    ) {
+                        return projection.currentAlias().equals(alias)
+                                ? Optional.of(projection)
+                                : Optional.empty();
+                    }
+                }
         );
-        return new CommandNpcProfileActionResolver(identityService);
-    }
-
-    private NpcIdentityRepository.ProfileIdentity identity(String profileId,
-                                                           UUID currentUuid,
-                                                           List<UUID> aliases) {
-        return identity(profileId, currentUuid, aliases, null);
-    }
-
-    private NpcIdentityRepository.ProfileIdentity identity(
-            String profileId,
-            UUID currentUuid,
-            List<UUID> aliases,
-            ManagedAssignment managedAssignment) {
-        return new NpcIdentityRepository.ProfileIdentity(
-                profileId,
-                currentUuid,
-                aliases,
-                true,
-                new NpcIdentityRepository.ProfileFlags(false, false, false, false, null, null),
-                managedAssignment,
-                null
-        );
-    }
-
-    private NpcIdentityRepository.ProfileIdentity recoveredIdentity(
-            String profileId,
-            UUID currentUuid,
-            UUID historicalUuid) {
-        return recoveredIdentity(profileId, currentUuid, historicalUuid, currentUuid);
-    }
-
-    private NpcIdentityRepository.ProfileIdentity recoveredIdentity(
-            String profileId,
-            UUID currentUuid,
-            UUID historicalUuid,
-            UUID recoveredUuid) {
-        List<UUID> aliases = currentUuid.equals(recoveredUuid)
-                ? List.of(currentUuid, historicalUuid)
-                : List.of(currentUuid, historicalUuid, recoveredUuid);
-        return new NpcIdentityRepository.ProfileIdentity(
-                profileId,
-                currentUuid,
-                aliases,
-                true,
-                new NpcIdentityRepository.ProfileFlags(
-                        false, false, true, false, null, recoveredUuid
-                ),
-                null,
-                null
+        return new CommandNpcProfileActionResolver(
+                new CommandNpcIdentityService(view, probe)
         );
     }
 
@@ -443,24 +163,15 @@ class CommandNpcProfileActionResolverTest {
                 npcUuid,
                 profileId,
                 null,
+                "default",
                 null,
+                "Chicken",
                 null,
-                null,
-                null,
-                "Mob_Test",
+                "Tamed_Chicken",
                 "Follow",
                 true,
                 false,
                 null
-        );
-    }
-
-    private LoadedNpcIdentityIndex.Probe oneLocation(UUID npcUuid,
-                                                     LoadedNpcIdentityIndex.Location location) {
-        return new LoadedNpcIdentityIndex.Probe(
-                npcUuid,
-                LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
-                List.of(location)
         );
     }
 
@@ -472,11 +183,13 @@ class CommandNpcProfileActionResolverTest {
         );
     }
 
-    private LoadedNpcIdentityIndex.Probe unknown(UUID npcUuid) {
+    private LoadedNpcIdentityIndex.Probe oneLocation(UUID npcUuid) {
         return new LoadedNpcIdentityIndex.Probe(
                 npcUuid,
-                LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN,
-                List.of()
+                LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
+                List.of(new LoadedNpcIdentityIndex.Location(
+                        "default", "store-a"
+                ))
         );
     }
 }

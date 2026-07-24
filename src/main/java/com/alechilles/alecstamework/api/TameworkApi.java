@@ -26,10 +26,5 @@ public interface TameworkApi {
     TameworkConfigReadApi configs();
 
     DiagnosticsApi diagnostics();
-
-    /** Read-only population-group counts used by roster capacity presentation. */
-    default PopulationGroupApi populationGroups() {
-        return PopulationGroupApi.unavailable();
-    }
 }
 

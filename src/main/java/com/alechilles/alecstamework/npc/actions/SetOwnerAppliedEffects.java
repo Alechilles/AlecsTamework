@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
-import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -57,11 +56,10 @@ final class SetOwnerAppliedEffects {
         return active == null || active.isEmpty() ? null : active.getItemId();
     }
 
-    void apply(@Nonnull OwnerMutationContext context,
+    void apply(@Nonnull Ref<EntityStore> npcRef,
+               @Nonnull Store<EntityStore> store,
                @Nonnull UUID playerId,
                @Nullable String expectedHeldItemId) {
-        Ref<EntityStore> npcRef = context.npcRef();
-        Store<EntityStore> store = context.store();
         Player player = resolvePlayer(store, playerId);
         Role role = resolveRole(npcRef, store);
         if (tame) {

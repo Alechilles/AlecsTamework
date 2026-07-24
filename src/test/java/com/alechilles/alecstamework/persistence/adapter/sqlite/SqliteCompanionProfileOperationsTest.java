@@ -312,6 +312,96 @@ class SqliteCompanionProfileOperationsTest {
     }
 
     @Test
+    void reconcilesImportedUnresolvedLifecycleAndModernAliasAtomically()
+            throws Exception {
+        CompanionProfileMutation.Create imported =
+                new CompanionProfileMutation.Create(
+                        identity(0, "Imported", -9_000),
+                        new CompanionLifecycle(
+                                PROFILE,
+                                OWNER_A,
+                                LifecycleState.UNRESOLVED,
+                                LifecycleLocation.unresolved(),
+                                LifecycleRevision.INITIAL,
+                                null,
+                                -9_000,
+                                ReconciliationGeneration.INITIAL,
+                                null,
+                                "owner-world"
+                        ),
+                        List.of(),
+                        -9_000
+                );
+        submit(1, "profile-imported", imported);
+        insertCurrentAlias(ALIAS_A);
+        CompanionProfileMutation.ReconcileLoaded reconciliation =
+                new CompanionProfileMutation.ReconcileLoaded(
+                        PROFILE,
+                        LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL,
+                        ALIAS_A,
+                        ALIAS_B,
+                        "loaded-world",
+                        -8_000
+                );
+
+        OperationWorkflowResult result = submitAsync(
+                2,
+                "profile-reconcile-loaded",
+                reconciliation
+        ).get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(3, result.events().size());
+        CompanionProfileMutationOutcome outcome =
+                CompanionProfileMutationEventCodec.decode(
+                        result.events().getFirst().payloadVersion(),
+                        result.events().getFirst().payloadJson()
+                );
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UPDATED,
+                outcome.status()
+        );
+        CompanionProfileProjectionChange change =
+                CompanionProfileProjectionChangeCodec.decode(
+                        result.events().get(1).payloadVersion(),
+                        result.events().get(1).payloadJson()
+                );
+        assertEquals(CompanionProfileProjectionChange.Source.ALIAS, change.source());
+        assertEquals(1, change.sourceRevision());
+
+        CompanionLifecycle lifecycle = storedLifecycle(PROFILE);
+        assertEquals(LifecycleState.ACTIVE, lifecycle.state());
+        assertEquals(
+                LifecycleLocation.liveEntity(ALIAS_B.toString(), "loaded-world"),
+                lifecycle.location()
+        );
+        assertEquals(new LifecycleRevision(1), lifecycle.revision());
+        assertEquals(
+                new ReconciliationGeneration(1),
+                lifecycle.lastReconciledGeneration()
+        );
+        assertEquals("owner-world", lifecycle.ownerWorldKey());
+        assertEquals(
+                com.alechilles.alecstamework.companion.identity.CompanionAlias.State.RETIRED,
+                storedAlias(ALIAS_A).state()
+        );
+        assertEquals(
+                com.alechilles.alecstamework.companion.identity.CompanionAlias.State.CURRENT,
+                storedAlias(ALIAS_B).state()
+        );
+        assertEquals(1, storedAlias(ALIAS_B).generation());
+
+        OperationWorkflowResult replay = submitAsync(
+                2,
+                "profile-reconcile-loaded",
+                reconciliation
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(result.events(), replay.events());
+        assertEquals(lifecycle, storedLifecycle(PROFILE));
+    }
+
+    @Test
     void concurrentAdoptionsOfOneAliasLeaveExactlyOneCompleteProfile()
             throws Exception {
         CompanionProfileMutation.AdoptLive first = adoption(
@@ -548,6 +638,21 @@ class SqliteCompanionProfileOperationsTest {
             return new SqliteCompanionIdentityStore(connection)
                     .resolveAlias(alias)
                     .isPresent();
+        }
+    }
+
+    private void insertCurrentAlias(NpcAlias alias) throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             java.sql.PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO companion_alias(
+                         npc_uuid, profile_id, alias_generation, alias_state,
+                         lease_operation_id, mapped_at_ms, retired_at_ms
+                     ) VALUES (?, ?, 0, 'CURRENT', NULL, ?, NULL)
+                     """)) {
+            statement.setString(1, alias.toString());
+            statement.setString(2, PROFILE.toString());
+            statement.setLong(3, -9_000);
+            statement.executeUpdate();
         }
     }
 

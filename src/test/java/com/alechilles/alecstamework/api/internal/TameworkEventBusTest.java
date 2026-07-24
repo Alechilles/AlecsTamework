@@ -8,15 +8,9 @@ import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.ProfileChangeType;
-import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
-import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import org.joml.Vector3d;
+import com.alechilles.alecstamework.api.Vector3View;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,30 +38,30 @@ class TameworkEventBusTest {
 
         bus.publishProfileChanged(
                 null,
-                publicProfile(profile(
+                profile(
                         "profile-alpha",
                         UUID.randomUUID(),
                         "Display A",
                         "Custom A"
-                )),
+                ),
                 System.currentTimeMillis()
         );
         assertEquals(1, deliveries.get());
 
         subscription.close();
         bus.publishProfileChanged(
-                publicProfile(profile(
+                profile(
                         "profile-alpha",
                         UUID.randomUUID(),
                         "Display A",
                         "Custom A"
-                )),
-                publicProfile(profile(
+                ),
+                profile(
                         "profile-alpha",
                         UUID.randomUUID(),
                         "Display B",
                         "Custom A"
-                )),
+                ),
                 System.currentTimeMillis()
         );
         assertEquals(1, deliveries.get());
@@ -91,25 +85,6 @@ class TameworkEventBusTest {
         assertEquals(1L, diagnostics.deliveredListeners());
         assertEquals(1L, diagnostics.listenerFailuresSinceBoot());
         assertEquals("ConfigReloadedEvent", diagnostics.lastFailedEventType());
-    }
-
-    @Test
-    void populationGroupListenersAreTypedAndIsolated() {
-        TameworkEventBus bus = new TameworkEventBus(null);
-        AtomicInteger successfulDeliveries = new AtomicInteger();
-        bus.subscribe(PopulationGroupMembershipChangedEvent.class, event -> {
-            throw new IllegalStateException("population-listener-failure");
-        });
-        bus.subscribe(PopulationGroupMembershipChangedEvent.class,
-                event -> successfulDeliveries.incrementAndGet());
-        UUID operationId = UUID.randomUUID();
-
-        bus.emitPopulationGroupEvent(new PopulationGroupMembershipChangedEvent(
-                operationId, "profile-mini", UUID.randomUUID(), "Tamed_Wyvern_Mini",
-                Set.of(), Set.of("hydragon:soulbound_mini"),
-                0L, 1L, false, 100L, 101L));
-
-        assertEquals(1, successfulDeliveries.get());
     }
 
     @Test
@@ -171,75 +146,47 @@ class TameworkEventBusTest {
 
         UUID npcUuid = UUID.randomUUID();
         UUID ownerUuid = UUID.randomUUID();
-        NpcProfileRepository.ProfileRecord profile = profile("profile-beta", npcUuid, "Display B", "Custom B");
-        bus.publishCaptureRecorded(new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+        var profile = profile(
+                "profile-beta", npcUuid, "Display B", "Custom B"
+        );
+        bus.publishCaptureRecorded(new NpcCapturedEvent(
+                profile,
                 npcUuid,
                 ownerUuid,
-                new String[] {"tool-a", "tool-b"},
+                Set.of("tool-a", "tool-b"),
                 "Mob_Test",
                 "Display B",
-                new Vector3d(1.0, 2.0, 3.0),
-                new Vector3d(4.0, 5.0, 6.0),
-                123L
-        ), publicProfile(profile));
-        bus.publishDeathRecorded(new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+                new Vector3View(1.0, 2.0, 3.0),
+                new Vector3View(4.0, 5.0, 6.0),
+                123L,
+                124L
+        ));
+        bus.publishDeathRecorded(new NpcDeathRecordedEvent(
+                profile,
                 npcUuid,
                 ownerUuid,
                 "Owner B",
-                new String[] {"tool-a", "tool-b"},
+                Set.of("tool-a", "tool-b"),
                 "Mob_Test",
-                true,
-                "Custom B",
                 "Display B",
-                new Vector3d(1.0, 2.0, 3.0),
-                new Vector3d(4.0, 5.0, 6.0),
+                "Custom B",
+                true,
+                new Vector3View(1.0, 2.0, 3.0),
+                new Vector3View(4.0, 5.0, 6.0),
                 234L,
                 345L,
-                null,
-                null,
-                0L,
-                null,
-                null,
-                0L,
-                null,
-                null,
-                null,
-                0L,
-                null,
-                0L,
-                0L,
-                0L,
-                0L,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                false,
-                null,
-                null,
-                false,
-                null,
-                1,
-                0.0,
-                null,
-                0,
-                null,
-                CommandLinkedNpcDeathService.DeathCauseKind.PLAYER,
-                "Owner B",
-                null
-        ), publicProfile(profile));
-        bus.publishLostRecorded(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
+                346L
+        ));
+        bus.publishLostRecorded(new NpcLostRecordedEvent(
+                profile,
                 npcUuid,
-                new Vector3d(7.0, 8.0, 9.0),
-                new Vector3d(4.0, 5.0, 6.0),
+                new Vector3View(7.0, 8.0, 9.0),
+                new Vector3View(4.0, 5.0, 6.0),
                 456L,
                 567L,
                 2,
-                null,
-                0L
-        ), publicProfile(profile));
+                568L
+        ));
         bus.emitConfigReload(TameworkConfigFamily.INTERACTION, Set.of("interaction/farm"));
 
         assertEquals(4, events.size());
@@ -259,11 +206,13 @@ class TameworkEventBusTest {
         assertFalse(configEvent.changedIds().isEmpty());
     }
 
-    private NpcProfileRepository.ProfileRecord profile(String profileId,
-                                                       UUID npcUuid,
-                                                       String displayName,
-                                                       String customName) {
-        return new NpcProfileRepository.ProfileRecord(
+    private com.alechilles.alecstamework.api.NpcProfileView profile(
+            String profileId,
+            UUID npcUuid,
+            String displayName,
+            String customName
+    ) {
+        return new com.alechilles.alecstamework.api.NpcProfileView(
                 profileId,
                 npcUuid,
                 UUID.randomUUID(),
@@ -274,16 +223,10 @@ class TameworkEventBusTest {
                 true,
                 "coop-a",
                 1,
-                new String[] {"tool-a"},
-                new String[] {"capture"},
+                Set.of("tool-a"),
+                Set.of("capture"),
                 System.currentTimeMillis()
         );
-    }
-
-    private com.alechilles.alecstamework.api.NpcProfileView publicProfile(
-            NpcProfileRepository.ProfileRecord profile
-    ) {
-        return LegacyNpcProfilesApi.mapProfile(profile);
     }
 }
 

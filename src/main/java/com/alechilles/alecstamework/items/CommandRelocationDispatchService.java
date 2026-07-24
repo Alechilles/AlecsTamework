@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
-import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityStatus;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -21,7 +19,6 @@ final class CommandRelocationDispatchService {
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
-    private final CommandRelocationPersistenceGate persistenceGate;
 
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
@@ -30,18 +27,6 @@ final class CommandRelocationDispatchService {
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
                                      CommandCompanionPlacementService companionPlacementService) {
-        this(relocationService, deathService, captureService, coopService, resolutionService,
-                stepExecutionService, companionPlacementService, null);
-    }
-
-    CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcCoopService coopService,
-                                     CommandResolutionService resolutionService,
-                                     CommandStepExecutionService stepExecutionService,
-                                     CommandCompanionPlacementService companionPlacementService,
-                                     CommandRelocationPersistenceGate persistenceGate) {
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -49,7 +34,6 @@ final class CommandRelocationDispatchService {
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
-        this.persistenceGate = persistenceGate;
     }
 
     QueueResult queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
@@ -71,7 +55,6 @@ final class CommandRelocationDispatchService {
             return QueueResult.none();
         }
         int queued = 0;
-        PersistenceMutationAvailabilityDecision firstRejection = null;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
                 continue;
@@ -99,25 +82,7 @@ final class CommandRelocationDispatchService {
                     && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
                 continue;
             }
-            String operationKind = returnHome ? "return_home" : "recall";
-            PersistenceMutationAvailabilityDecision decision = canRelocate(
-                    record.npcUuid, record.profileId, ownerUuid, world.getName(),
-                    record.lastKnownWorldName, operationKind, false);
-            if (!decision.allowed()) {
-                if (firstRejection == null) {
-                    firstRejection = decision;
-                }
-                CommandRelocationPreflightDiagnostics.recordRejected(
-                        operationKind,
-                        decision,
-                        record.npcUuid,
-                        record.profileId,
-                        record.lastKnownWorldName,
-                        world.getName(),
-                        false
-                );
-                continue;
-            }
+            relocationService.rememberSourceWorld(record.npcUuid, record.lastKnownWorldName);
             if (returnHome) {
                 if (record.homePosition == null) {
                     continue;
@@ -174,7 +139,7 @@ final class CommandRelocationDispatchService {
             );
             queued++;
         }
-        return new QueueResult(queued, firstRejection);
+        return new QueueResult(queued);
     }
 
     void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
@@ -227,21 +192,6 @@ final class CommandRelocationDispatchService {
         World world = context.player == null ? null : context.player.getWorld();
         UUID ownerUuid = context.player == null ? null : context.player.getUuid();
         if (world != null && ownerUuid != null && candidate.npc.getUuid() != null) {
-            PersistenceMutationAvailabilityDecision decision = canRelocate(
-                    candidate.npc.getUuid(), candidate.profileId, ownerUuid,
-                    world.getName(), world.getName(), "loaded_recall", true);
-            if (!decision.allowed()) {
-                CommandRelocationPreflightDiagnostics.recordRejected(
-                        "loaded_recall",
-                        decision,
-                        candidate.npc.getUuid(),
-                        candidate.profileId,
-                        world.getName(),
-                        world.getName(),
-                        true
-                );
-                return;
-            }
             relocationService.queueRelocation(
                     world, candidate.npc.getUuid(), safePosition, ownerUuid,
                     true, true, null, null, 0L, new Vector3d(npcPos), null
@@ -253,27 +203,9 @@ final class CommandRelocationDispatchService {
         return configured > 0.0 ? configured : fallback;
     }
 
-    private PersistenceMutationAvailabilityDecision canRelocate(
-            UUID npcUuid,
-            String profileId,
-            UUID ownerUuid,
-            String destinationWorld,
-            String sourceWorld,
-            String operationKind,
-            boolean liveProjectionExists
-    ) {
-        if (persistenceGate == null) {
-            return new PersistenceMutationAvailabilityDecision(
-                    PersistenceMutationAvailabilityStatus.ALLOW, "allowed", null);
-        }
-        return persistenceGate.decide(
-                npcUuid, profileId, ownerUuid, destinationWorld, sourceWorld,
-                operationKind, liveProjectionExists);
-    }
-
-    record QueueResult(int queued, PersistenceMutationAvailabilityDecision firstRejection) {
+    record QueueResult(int queued) {
         private static QueueResult none() {
-            return new QueueResult(0, null);
+            return new QueueResult(0);
         }
     }
 }

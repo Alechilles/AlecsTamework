@@ -4,25 +4,25 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CommandCompanionSpawnPhysicsResetService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
-import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Applies optional offspring state while guaranteeing live population finalization. */
+/**
+ * Applies best-effort offspring initialization after a live spawn succeeds.
+ *
+ * <p>A spawned NPC is the authoritative birth outcome. Optional initialization
+ * failures are isolated so they cannot create a duplicate retry litter.
+ */
 final class BreedingOffspringPostSpawnService {
     private final BreedingOffspringProgressionService progressionService;
     private final BreedingCooldownService cooldownService;
     private final BreedingPairingEffectsService effectsService;
-    private final BreedingLiveChildCompletion completion;
 
     BreedingOffspringPostSpawnService(
             @Nonnull BreedingOffspringProgressionService progressionService,
@@ -32,103 +32,78 @@ final class BreedingOffspringPostSpawnService {
         this.progressionService = progressionService;
         this.cooldownService = cooldownService;
         this.effectsService = effectsService;
-        this.completion = new BreedingLiveChildCompletion();
     }
 
-    void finish(
-            @Nonnull Request request,
-            @Nonnull Supplier<CompletableFuture<CompanionPopulationCommitResult>> commitAction,
-            @Nonnull Consumer<String> durabilityCallback,
-            @Nonnull Runnable reservationRelease
-    ) {
-        String[] physicsReset = new String[] { "not-run" };
-        BreedingCooldownService.Resolution[] childCooldown =
-                new BreedingCooldownService.Resolution[1];
-        completion.finish(
-                sideEffects(request, physicsReset, childCooldown),
-                commitAction,
-                durabilityCallback,
-                reservationRelease
+    void finish(@Nonnull Request request) {
+        String physics = runWithFallback(
+                () -> CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
+                        request.childRef(), request.childNpc(), request.store()
+                ),
+                "not-run"
         );
-    }
-
-    @Nonnull
-    private List<BreedingLiveChildCompletion.SideEffect> sideEffects(
-            Request request,
-            String[] physicsReset,
-            BreedingCooldownService.Resolution[] childCooldown
-    ) {
-        return List.of(
-                effect("breeding-spawn-physics-reset-failed",
-                        () -> physicsReset[0] = resetPhysics(request)),
-                effect("breeding-spawn-protection-failed", () -> protectSpawn(request)),
-                effect("breeding-progression-failed",
-                        () -> applyProgression(request, childCooldown)),
-                effect("breeding-effects-failed",
-                        () -> effectsService.spawnHearts(request.childRef(), request.store())),
-                effect("breeding-cooldown-log-failed",
-                        () -> logCooldown(request, childCooldown[0])),
-                effect("breeding-success-log-failed",
-                        () -> request.successLogger().accept(physicsReset[0]))
-        );
-    }
-
-    private static BreedingLiveChildCompletion.SideEffect effect(
-            String reason,
-            Runnable action
-    ) {
-        return new BreedingLiveChildCompletion.SideEffect(reason, action);
-    }
-
-    private static String resetPhysics(Request request) {
-        return CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
-                request.childRef(), request.childNpc(), request.store()
-        );
-    }
-
-    private static void protectSpawn(Request request) {
-        RecentSpawnProtectionService.getInstance().record(
+        runQuietly(() -> RecentSpawnProtectionService.getInstance().record(
                 request.childUuid(),
                 "breeding_offspring",
                 request.roleId(),
                 System.currentTimeMillis()
-        );
+        ));
+        BreedingCooldownService.Resolution cooldown = applyProgression(request);
+        runQuietly(() -> effectsService.spawnHearts(request.childRef(), request.store()));
+        if (cooldown != null) {
+            runQuietly(() -> request.cooldownLogger().accept(cooldown));
+        }
+        String finalPhysics = physics;
+        runQuietly(() -> request.successLogger().accept(finalPhysics));
     }
 
-    private void applyProgression(
-            Request request,
-            BreedingCooldownService.Resolution[] childCooldown
-    ) {
-        BreedingCooldownService.Resolution resolved = cooldownService.resolve(
-                request.config(), request.roleId(), request.childRef(), request.store()
-        );
-        childCooldown[0] = resolved;
-        progressionService.applyOffspringState(
-                request.childRef(),
-                request.childNpc(),
-                request.parentARef(),
-                request.parentBRef(),
-                request.roleId(),
-                request.parentAOwner(),
-                request.parentBOwner(),
-                request.parentATamed(),
-                request.parentBTamed(),
-                request.configId(),
-                resolved.durationMs(),
-                request.adultRoleId(),
-                request.gender(),
-                request.lifecycleFamily(),
-                request.lifecycleResolution(),
-                request.store()
-        );
+    @Nullable
+    private BreedingCooldownService.Resolution applyProgression(@Nonnull Request request) {
+        try {
+            BreedingCooldownService.Resolution cooldown = cooldownService.resolve(
+                    request.config(), request.roleId(), request.childRef(), request.store()
+            );
+            progressionService.applyOffspringState(
+                    request.childRef(),
+                    request.childNpc(),
+                    request.parentARef(),
+                    request.parentBRef(),
+                    request.roleId(),
+                    request.parentAOwner(),
+                    request.parentBOwner(),
+                    request.parentATamed(),
+                    request.parentBTamed(),
+                    request.configId(),
+                    cooldown.durationMs(),
+                    request.adultRoleId(),
+                    request.gender(),
+                    request.lifecycleFamily(),
+                    request.lifecycleResolution(),
+                    request.store()
+            );
+            return cooldown;
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
-    private static void logCooldown(
-            Request request,
-            @Nullable BreedingCooldownService.Resolution resolution
+    private static void runQuietly(@Nonnull Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException | LinkageError ignored) {
+            // The child is already live; optional follow-up cannot revoke the birth.
+        }
+    }
+
+    @Nonnull
+    private static String runWithFallback(
+            @Nonnull StringAction action,
+            @Nonnull String fallback
     ) {
-        if (resolution != null) {
-            request.cooldownLogger().accept(resolution);
+        try {
+            String result = action.run();
+            return result == null ? fallback : result;
+        } catch (RuntimeException | LinkageError ignored) {
+            return fallback;
         }
     }
 
@@ -153,5 +128,11 @@ final class BreedingOffspringPostSpawnService {
             @Nonnull Consumer<BreedingCooldownService.Resolution> cooldownLogger,
             @Nonnull Consumer<String> successLogger
     ) {
+    }
+
+    @FunctionalInterface
+    private interface StringAction {
+        @Nullable
+        String run();
     }
 }

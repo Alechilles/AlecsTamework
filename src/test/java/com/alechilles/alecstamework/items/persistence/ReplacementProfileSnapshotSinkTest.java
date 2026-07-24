@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -19,7 +21,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReplacementProfileSnapshotSinkTest {
@@ -27,7 +28,7 @@ class ReplacementProfileSnapshotSinkTest {
     Path tempDir;
 
     @Test
-    void publishesMetadataAndAliasWithoutClaimingOwnership()
+    void adoptsMissingObservedProfileAsExactLiveIdentity()
             throws Exception {
         AtomicLong clock = new AtomicLong(-100L);
         try (PersistenceBootstrap persistence =
@@ -48,7 +49,10 @@ class ReplacementProfileSnapshotSinkTest {
             UUID toolId = UUID.fromString(
                     "20000000-0000-0000-0000-000000000101"
             );
-            sink.publish(snapshot(npcUuid, toolId, "First"));
+            UUID ownerId = UUID.fromString(
+                    "30000000-0000-0000-0000-000000000101"
+            );
+            sink.publish(snapshot(npcUuid, toolId, "First"), "world");
 
             assertTrue(await(() -> facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
@@ -57,7 +61,7 @@ class ReplacementProfileSnapshotSinkTest {
             var created = facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
             ).orElseThrow();
-            assertNull(created.ownerId());
+            assertEquals(new OwnerId(ownerId), created.ownerId());
             var read = facades.queries().findProfile(
                     new NpcAlias(npcUuid)
             ).toCompletableFuture().join();
@@ -67,19 +71,23 @@ class ReplacementProfileSnapshotSinkTest {
             var model = (com.alechilles.alecstamework.companion.profile
                     .CompanionProfileReadModel) found.value();
             assertEquals(
-                    LifecycleState.UNLOADED,
+                    LifecycleState.ACTIVE,
                     model.lifecycle().state()
+            );
+            assertEquals(
+                    LifecycleLocation.liveEntity(npcUuid.toString(), "world"),
+                    model.lifecycle().location()
             );
             assertTrue(created.tamed());
             assertEquals(java.util.Set.of(toolId), created.toolIds());
 
             clock.set(-50L);
-            sink.publish(snapshot(npcUuid, toolId, "Second"));
+            sink.publish(snapshot(npcUuid, toolId, "Second"), "world");
             assertTrue(await(() -> facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
             ).map(state -> "Second".equals(state.customName()))
                     .orElse(false)));
-            assertNull(facades.queries().projectedProfile(
+            assertEquals(new OwnerId(ownerId), facades.queries().projectedProfile(
                     new NpcAlias(npcUuid)
             ).orElseThrow().ownerId());
         }

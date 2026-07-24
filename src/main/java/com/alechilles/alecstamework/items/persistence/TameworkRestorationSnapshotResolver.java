@@ -1,9 +1,6 @@
 package com.alechilles.alecstamework.items.persistence;
 
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
-import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
-import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -14,11 +11,6 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -33,6 +25,7 @@ public final class TameworkRestorationSnapshotResolver {
     private static final int COMPLETE_STATE_VERSION = 2;
 
     private final SnapshotCodecRegistry codecs;
+    private final TameworkRestorationEvidenceResolver evidence;
 
     public TameworkRestorationSnapshotResolver() {
         this(TameworkSnapshotCodecs.create());
@@ -45,6 +38,7 @@ public final class TameworkRestorationSnapshotResolver {
             throw new IllegalArgumentException("Snapshot codecs are required");
         }
         this.codecs = codecs;
+        this.evidence = new TameworkRestorationEvidenceResolver();
     }
 
     /** Resolves exactly one current death or lost source into a crash-safe projection. */
@@ -62,21 +56,20 @@ public final class TameworkRestorationSnapshotResolver {
         if (contextFailure != null) {
             return contextFailure;
         }
-        NpcAlias sourceAlias = profile.currentAlias().alias();
         try {
-            return resolveKnown(profile, source, sourceAlias);
-        } catch (MissingRole missing) {
+            return resolveKnown(profile, source);
+        } catch (TameworkRestorationEvidenceResolver.MissingRole missing) {
             return failed(
                     Failure.ROLE_MISSING,
                     "restoration_role_missing",
                     "roleId",
                     null
             );
-        } catch (EvidenceConflict conflict) {
+        } catch (TameworkRestorationEvidenceResolver.EvidenceConflict conflict) {
             return failed(
                     Failure.EVIDENCE_CONFLICT,
                     "restoration_evidence_conflict",
-                    conflict.field,
+                    conflict.field(),
                     conflict.getCause()
             );
         } catch (LegacyRestorationEvidence.EvidenceException invalid) {
@@ -126,26 +119,15 @@ public final class TameworkRestorationSnapshotResolver {
                     null
             );
         }
-        if (profile.currentAlias() == null
-                || profile.currentAlias().state()
-                != CompanionAlias.State.CURRENT) {
-            return failed(
-                    Failure.SOURCE_ALIAS_MISSING,
-                    "restoration_source_alias_missing",
-                    "currentAlias",
-                    null
-            );
-        }
         return null;
     }
 
     private Resolution resolveKnown(
             CompanionProfileReadModel profile,
-            CompanionSnapshot source,
-            NpcAlias sourceAlias
+            CompanionSnapshot source
     ) {
         if (source.payloadVersion() == COMPLETE_STATE_VERSION) {
-            return resolveComplete(profile, source, sourceAlias);
+            return resolveComplete(profile, source);
         }
         if (source.payloadVersion() != 1) {
             return failed(
@@ -156,10 +138,14 @@ public final class TameworkRestorationSnapshotResolver {
             );
         }
         if (source.kind().equals(TameworkSnapshotCodecs.DEATH)) {
-            return resolveLegacyDeath(profile, source, sourceAlias);
+            return resolveLegacyDeath(
+                    profile, source, evidence.legacySourceAlias(profile)
+            );
         }
         if (source.kind().equals(TameworkSnapshotCodecs.LOST)) {
-            return resolveLegacyLost(profile, source, sourceAlias);
+            return resolveLegacyLost(
+                    profile, source, evidence.legacySourceAlias(profile)
+            );
         }
         return failed(
                 Failure.UNSUPPORTED_CODEC,
@@ -171,11 +157,10 @@ public final class TameworkRestorationSnapshotResolver {
 
     private Resolution resolveComplete(
             CompanionProfileReadModel profile,
-            CompanionSnapshot source,
-            NpcAlias sourceAlias
+            CompanionSnapshot source
     ) {
         if (source.kind().equals(TameworkSnapshotCodecs.DEATH)) {
-            return resolveCompleteDeath(profile, source, sourceAlias);
+            return resolveCompleteDeath(profile, source);
         }
         SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 codecs.decode(source, CoopResidentStateSnapshot.class);
@@ -185,14 +170,14 @@ public final class TameworkRestorationSnapshotResolver {
         }
         CoopResidentStateSnapshot state = ((SnapshotDecodeResult.Decoded<
                 CoopResidentStateSnapshot>) decoded).value();
-        validateComplete(profile, sourceAlias, state);
+        NpcAlias sourceAlias = evidence.modernSourceAlias(profile, state);
+        evidence.validateComplete(profile, sourceAlias, state);
         return encodeProjection(sourceAlias, state);
     }
 
     private Resolution resolveCompleteDeath(
             CompanionProfileReadModel profile,
-            CompanionSnapshot source,
-            NpcAlias sourceAlias
+            CompanionSnapshot source
     ) {
         SnapshotDecodeResult<DeathSnapshotV2Payload> decoded =
                 codecs.decode(source, DeathSnapshotV2Payload.class);
@@ -204,7 +189,8 @@ public final class TameworkRestorationSnapshotResolver {
                 ((SnapshotDecodeResult.Decoded<DeathSnapshotV2Payload>) decoded)
                         .value();
         CoopResidentStateSnapshot state = death.fullState();
-        validateComplete(profile, sourceAlias, state);
+        NpcAlias sourceAlias = evidence.modernSourceAlias(profile, state);
+        evidence.validateComplete(profile, sourceAlias, state);
         return encodeProjection(sourceAlias, state);
     }
 
@@ -221,40 +207,12 @@ public final class TameworkRestorationSnapshotResolver {
         }
         LegacyDeathV1Payload legacy = ((SnapshotDecodeResult.Decoded<
                 LegacyDeathV1Payload>) decoded).value();
-        LegacyRestorationEvidence.Metadata metadata = metadata(profile);
-        String roleId = reconcileRole(
-                profile.identity().roleId(),
-                legacy.roleId()
+        CoopResidentStateSnapshot state = evidence.resolveLegacyDeath(
+                profile,
+                sourceAlias,
+                legacy,
+                source.createdAtMs()
         );
-        UUID ownerId = reconcileOwner(profile, legacy.ownerId());
-        String ownerName = reconcile(
-                "ownerName",
-                metadata.ownerName(),
-                legacy.ownerName()
-        );
-        if (ownerId == null && ownerName != null) {
-            throw new EvidenceConflict("ownerName");
-        }
-        String customName = reconcile(
-                "customName",
-                metadata.customName(),
-                legacy.customName()
-        );
-        if (metadata.tamed() != null
-                && metadata.tamed() != legacy.tamed()) {
-            throw new EvidenceConflict("tamed");
-        }
-        CoopResidentStateSnapshot state =
-                LegacyRestorationFullStateMapper.death(
-                        sourceAlias.value(),
-                        roleId,
-                        ownerId,
-                        ownerName,
-                        customName,
-                        toolIds(profile),
-                        legacy,
-                        source.createdAtMs()
-                );
         return encodeProjection(sourceAlias, state);
     }
 
@@ -271,28 +229,12 @@ public final class TameworkRestorationSnapshotResolver {
         }
         LegacyLostV1Payload legacy = ((SnapshotDecodeResult.Decoded<
                 LegacyLostV1Payload>) decoded).value();
-        if (legacy.replacementNpcUuid() != null
-                || legacy.recoveredAtMs() != 0L) {
-            throw new EvidenceConflict("legacyRecoveryEvidence");
-        }
-        LegacyRestorationEvidence.Metadata metadata = metadata(profile);
-        String roleId = requireRole(profile.identity().roleId());
-        UUID ownerId = owner(profile);
-        if (ownerId == null && metadata.ownerName() != null) {
-            throw new EvidenceConflict("ownerName");
-        }
-        CoopResidentStateSnapshot state =
-                LegacyRestorationFullStateMapper.lost(
-                        sourceAlias.value(),
-                        roleId,
-                        ownerId,
-                        metadata.ownerName(),
-                        metadata.customName(),
-                        metadata.tamed(),
-                        toolIds(profile),
-                        legacy,
-                        source.createdAtMs()
-                );
+        CoopResidentStateSnapshot state = evidence.resolveLegacyLost(
+                profile,
+                sourceAlias,
+                legacy,
+                source.createdAtMs()
+        );
         return encodeProjection(sourceAlias, state);
     }
 
@@ -311,104 +253,6 @@ public final class TameworkRestorationSnapshotResolver {
         );
     }
 
-    private void validateComplete(
-            CompanionProfileReadModel profile,
-            NpcAlias sourceAlias,
-            CoopResidentStateSnapshot state
-    ) {
-        if (!sourceAlias.value().equals(state.npcUuid())) {
-            throw new EvidenceConflict("sourceAlias");
-        }
-        String role = requireRole(state.roleId());
-        String profileRole = normalize(profile.identity().roleId());
-        if (profileRole != null && !profileRole.equalsIgnoreCase(role)) {
-            throw new EvidenceConflict("roleId");
-        }
-        UUID canonicalOwner = owner(profile);
-        TameworkOwnerComponent owner = state.owner();
-        TameworkCommandLinksComponent links = state.commandLinks();
-        validateOwner(canonicalOwner, owner == null ? null : owner.getOwnerId());
-        validateOwner(canonicalOwner, links == null ? null : links.getOwnerId());
-    }
-
-    private void validateOwner(
-            @Nullable UUID canonical,
-            @Nullable UUID snapshot
-    ) {
-        if (snapshot != null && !Objects.equals(canonical, snapshot)) {
-            throw new EvidenceConflict("ownerId");
-        }
-    }
-
-    private UUID reconcileOwner(
-            CompanionProfileReadModel profile,
-            @Nullable UUID payloadOwner
-    ) {
-        UUID canonical = owner(profile);
-        if (payloadOwner != null && !payloadOwner.equals(canonical)) {
-            throw new EvidenceConflict("ownerId");
-        }
-        return canonical;
-    }
-
-    @Nullable
-    private UUID owner(CompanionProfileReadModel profile) {
-        OwnerId owner = profile.lifecycle().ownerId();
-        return owner == null ? null : owner.value();
-    }
-
-    private String reconcileRole(
-            @Nullable String profileRole,
-            @Nullable String payloadRole
-    ) {
-        String canonical = normalize(profileRole);
-        String payload = normalize(payloadRole);
-        if (canonical != null && payload != null
-                && !canonical.equalsIgnoreCase(payload)) {
-            throw new EvidenceConflict("roleId");
-        }
-        return requireRole(canonical != null ? canonical : payload);
-    }
-
-    private String requireRole(@Nullable String role) {
-        String normalized = normalize(role);
-        if (normalized == null) {
-            throw new MissingRole();
-        }
-        return normalized.toLowerCase(Locale.ROOT);
-    }
-
-    @Nullable
-    private String reconcile(
-            String field,
-            @Nullable String first,
-            @Nullable String second
-    ) {
-        String left = normalize(first);
-        String right = normalize(second);
-        if (left != null && right != null && !left.equals(right)) {
-            throw new EvidenceConflict(field);
-        }
-        return left != null ? left : right;
-    }
-
-    private LegacyRestorationEvidence.Metadata metadata(
-            CompanionProfileReadModel profile
-    ) {
-        return LegacyRestorationEvidence.metadata(
-                profile.identity().metadataJson()
-        );
-    }
-
-    private String[] toolIds(CompanionProfileReadModel profile) {
-        return profile.toolLinks().stream()
-                .map(CompanionToolLink::toolId)
-                .distinct()
-                .sorted()
-                .map(UUID::toString)
-                .toArray(String[]::new);
-    }
-
     @Nullable
     private LifecycleState expectedState(SnapshotKind kind) {
         if (TameworkSnapshotCodecs.DEATH.equals(kind)) {
@@ -418,11 +262,6 @@ public final class TameworkRestorationSnapshotResolver {
             return LifecycleState.LOST;
         }
         return null;
-    }
-
-    @Nullable
-    private String normalize(@Nullable String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private Resolution decodeFailure(SnapshotDecodeResult.Failed<?> failure) {
@@ -483,22 +322,9 @@ public final class TameworkRestorationSnapshotResolver {
         UNSUPPORTED_CODEC,
         TYPE_MISMATCH,
         DECODE_FAILED,
-        SOURCE_ALIAS_MISSING,
         ROLE_MISSING,
         EVIDENCE_CONFLICT,
         CANONICAL_ENCODE_FAILED
     }
 
-    private static final class EvidenceConflict
-            extends IllegalArgumentException {
-        private final String field;
-
-        private EvidenceConflict(String field) {
-            super(field);
-            this.field = field;
-        }
-    }
-
-    private static final class MissingRole extends IllegalArgumentException {
-    }
 }

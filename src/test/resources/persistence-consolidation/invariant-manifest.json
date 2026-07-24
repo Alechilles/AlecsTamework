@@ -9,8 +9,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionIdentityStoreTest",
       "currentTests": [
-        "com.alechilles.alecstamework.ownership.CompanionIdentityResolverTest",
-        "com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepositoryTest"
+        "com.alechilles.alecstamework.companion.identity.CompanionIdentityContractTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileOperationsTest"
       ]
     },
     {
@@ -18,10 +18,10 @@
       "contract": "A planned runtime UUID is leased to the stable profile before ECS insertion and has exactly one terminal owner.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 4,
-      "replacementTestClass": "com.alechilles.alecstamework.companion.identity.CompanionAliasLeaseCrashTest",
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionRestorationOperationsTest",
       "currentTests": [
-        "com.alechilles.alecstamework.architecture.LostRecoveryPreparedAliasArchitectureTest",
-        "com.alechilles.alecstamework.architecture.PreparedSpawnCrashBoundaryArchitectureTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.RestorationProcessCrashTest",
+        "com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinitionTest"
       ]
     },
     {
@@ -31,8 +31,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionLifecycleStoreTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepositoryTest",
-        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopPopulationAtomicityTest"
+        "com.alechilles.alecstamework.companion.lifecycle.LifecycleVocabularyTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCoopOperationsTest"
       ]
     },
     {
@@ -42,7 +42,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionLifecycleStoreTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepositoryTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileOperationsTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCoopOperationsTest"
       ]
     },
     {
@@ -52,8 +53,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.PersistenceProcessCrashMatrixTest",
       "currentTests": [
-        "com.alechilles.alecstamework.architecture.PreparedSpawnCrashBoundaryArchitectureTest",
-        "com.alechilles.alecstamework.architecture.CaptureSourceSpendRecoveryArchitectureTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCaptureOperationsTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionRestorationOperationsTest"
       ]
     },
     {
@@ -63,8 +64,8 @@
       "replacementGatePhase": 4,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.ExactSourceFinalizationTest",
       "currentTests": [
-        "com.alechilles.alecstamework.architecture.CaptureSourceSpendRecoveryArchitectureTest",
-        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest"
+        "com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureWorldExecutorTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCaptureReleaseOperationsTest"
       ]
     },
     {
@@ -74,7 +75,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceTransactionContextTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopPopulationAtomicityTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCoopOperationsTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionDormantOperationsTest"
       ]
     },
     {
@@ -84,7 +86,7 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.operation.UnknownCommitReadbackTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteCheckpointFaultTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriterTest"
       ]
     },
     {
@@ -94,8 +96,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.projection.ProjectionCoordinatorTest",
       "currentTests": [
-        "com.alechilles.alecstamework.ownership.CompanionPopulationCommitFailureTest",
-        "com.alechilles.alecstamework.persistence.recovery.PostCommitPublicationRecoveryVerifierTest"
+        "com.alechilles.alecstamework.persistence.recovery.PostCommitPublicationRecoveryVerifierTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinatorTest"
       ]
     },
     {
@@ -103,10 +105,10 @@
       "contract": "Absence is authoritative only after complete boot and generation scoped disk/live evidence is sealed.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 5,
-      "replacementTestClass": "com.alechilles.alecstamework.ownership.reconciliation.SealedAbsenceEvidenceTest",
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.runtime.HytalePublicPersistenceWorldReconciliationTest",
       "currentTests": [
-        "com.alechilles.alecstamework.ownership.reconciliation.HytaleSavedWorldEvidenceSourceTest",
-        "com.alechilles.alecstamework.ownership.reconciliation.HytaleStoredPlayerInventoryEvidenceSourceTest"
+        "com.alechilles.alecstamework.persistence.control.PersistenceStartupCoordinatorTest",
+        "com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinitionTest"
       ]
     },
     {
@@ -114,10 +116,10 @@
       "contract": "Cross-authority sidecars are repaired from positive contradiction, never mere absence.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 5,
-      "replacementTestClass": "com.alechilles.alecstamework.persistence.recovery.PositiveContradictionRepairTest",
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.runtime.HytalePublicPersistenceWorldReconciliationTest",
       "currentTests": [
-        "com.alechilles.alecstamework.items.ManagedCoopDeployedProjectionImportServiceTest",
-        "com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryServiceTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileOperationsTest",
+        "com.alechilles.alecstamework.companion.dormant.CompanionDormantTransitionDefinitionTest"
       ]
     },
     {
@@ -127,8 +129,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.companion.lifecycle.ReconciliationGenerationContractTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadRepositoryTest",
-        "com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryAtomicFinalizationTest"
+        "com.alechilles.alecstamework.companion.lifecycle.LifecycleVocabularyTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionDormantOperationsTest"
       ]
     },
     {
@@ -149,7 +151,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionCaptureOperationsTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepositoryTest"
+        "com.alechilles.alecstamework.persistence.compensation.runtime.ReceiptFirstRefundDeliveryTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteRefundClaimStoreTest"
       ]
     },
     {
@@ -160,7 +163,7 @@
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationRecoveryCoordinatorTest",
       "currentTests": [
         "com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistryTest",
-        "com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinatorTest"
+        "com.alechilles.alecstamework.persistence.runtime.PublicPersistenceControlPlaneTest"
       ]
     },
     {
@@ -168,9 +171,8 @@
       "contract": "Unreadable canonical state, unknown scope, or failed fencing blocks all persistence mutations.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 3,
-      "replacementTestClass": "com.alechilles.alecstamework.persistence.control.GlobalReadOnlyContainmentTest",
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.runtime.PublicPersistenceControlPlaneTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityServiceTest",
         "com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClassifierTest"
       ]
     },
@@ -179,7 +181,7 @@
       "contract": "Delayed work carries stable identifiers and resolves live components on the owning world thread.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 4,
-      "replacementTestClass": "com.alechilles.alecstamework.runtime.dispatch.PersistenceWorldDispatchSafetyTest",
+      "replacementTestClass": "com.alechilles.alecstamework.architecture.RestorationWorldThreadArchitectureTest",
       "currentTests": [
         "com.alechilles.alecstamework.architecture.AsyncThreadSafetyGuardTest",
         "com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcherTest"
@@ -190,10 +192,10 @@
       "contract": "Shutdown rejects new work, drains accepted work, and leaves timed-out work explicitly recoverable.",
       "status": "CHARACTERIZED",
       "replacementGatePhase": 6,
-      "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistenceShutdownCoordinatorTest",
+      "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriterTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueueTest",
-        "com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntimeCloseTest"
+        "com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeTest",
+        "com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorkflowTrackerTest"
       ]
     },
     {
@@ -203,8 +205,8 @@
       "replacementGatePhase": 1,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.kernel.PersistenceReadResultTest",
       "currentTests": [
-        "com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadRepositoryTest",
-        "com.alechilles.alecstamework.architecture.PersistenceDegradationArchitectureTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteReadExecutorTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteCompanionProfileReaderTest"
       ]
     },
     {
@@ -224,7 +226,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.adapter.sqlite.PersistenceProcessCrashMatrixTest",
       "currentTests": [
-        "com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationProcessCrashRecoveryTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.CaptureProcessCrashTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.CoopProcessCrashTest"
       ]
     },
     {
@@ -244,7 +247,8 @@
       "replacementGatePhase": 3,
       "replacementTestClass": "com.alechilles.alecstamework.persistence.architecture.ReplacementPersistenceArchitectureGuardTest",
       "currentTests": [
-        "com.alechilles.alecstamework.architecture.PersistenceDegradationArchitectureTest"
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePersistenceTransactionContextTest",
+        "com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteOperationEngineTest"
       ]
     }
   ]

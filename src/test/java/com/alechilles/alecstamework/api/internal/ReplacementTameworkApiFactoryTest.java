@@ -67,14 +67,13 @@ class ReplacementTameworkApiFactoryTest {
                                  null,
                                  new InteractionExtensionRegistry(null),
                                  new TraitEffectRegistry(null, null),
-                                 new SimpleClaimsTamedDamagePolicy(),
-                                 UnavailablePopulationPolicyAuthority.INSTANCE
+                                 new SimpleClaimsTamedDamagePolicy()
                          )) {
                 assertTrue(api.getByProfileId(profileId().toString()).isPresent());
                 assertEquals(
                         "HEALTHY",
-                        api.diagnostics().getPersistenceResilience()
-                                .storageState()
+                        api.diagnostics().getPersistenceDiagnostics()
+                                .health().status()
                 );
                 ProfileDataCompareAndSetResult extension =
                         api.profileData().compareAndSet(

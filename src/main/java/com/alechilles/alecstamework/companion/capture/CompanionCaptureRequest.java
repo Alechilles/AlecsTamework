@@ -25,6 +25,7 @@ public record CompanionCaptureRequest(
         long requestedAtMs
 ) {
     public static final SnapshotKind SNAPSHOT_KIND = new SnapshotKind("capture");
+    public static final int SNAPSHOT_VERSION = 1;
 
     public CompanionCaptureRequest {
         if (profileId == null || expectedLifecycleRevision == null
@@ -35,6 +36,7 @@ public record CompanionCaptureRequest(
         targetWorldKey = requireText(targetWorldKey, "Capture target world");
         if (!profileId.equals(snapshot.profileId())
                 || !SNAPSHOT_KIND.equals(snapshot.kind())
+                || snapshot.payloadVersion() != SNAPSHOT_VERSION
                 || !snapshot.current()
                 || !snapshot.sourceLifecycleRevision().equals(
                         expectedLifecycleRevision.next()

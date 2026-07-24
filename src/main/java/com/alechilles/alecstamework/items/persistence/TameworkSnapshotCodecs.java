@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items.persistence;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -15,13 +17,20 @@ public final class TameworkSnapshotCodecs {
     private TameworkSnapshotCodecs() {
     }
 
-    /** Creates exactly the released and modern payload codecs for the three snapshot kinds. */
+    /** Creates exactly the released and modern payload codecs used by public gameplay. */
     @Nonnull
     public static SnapshotCodecRegistry create() {
         return new SnapshotCodecRegistry(List.of(
                 new LegacyDeathV1SnapshotCodec(),
                 new LegacyLostV1SnapshotCodec(),
-                new FullStateSnapshotCodecAdapter(COOP, 1),
+                new FullStateSnapshotCodecAdapter(
+                        COOP,
+                        CompanionCoopCaptureRequest.SNAPSHOT_VERSION
+                ),
+                new FullStateSnapshotCodecAdapter(
+                        CompanionCaptureRequest.SNAPSHOT_KIND,
+                        CompanionCaptureRequest.SNAPSHOT_VERSION
+                ),
                 new DeathSnapshotV2Codec(),
                 new FullStateSnapshotCodecAdapter(
                         CompanionFullStateProjection.KIND,

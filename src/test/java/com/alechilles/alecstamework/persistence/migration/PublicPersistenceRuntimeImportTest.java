@@ -7,7 +7,6 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBou
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntime;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -21,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Full runtime rehearsal for copied public-v4 import and rollback. */
+/** Full runtime rehearsal for copied public-v4 import and source preservation. */
 class PublicPersistenceRuntimeImportTest {
     @TempDir
     Path tempDir;
@@ -50,7 +49,7 @@ class PublicPersistenceRuntimeImportTest {
     }
 
     @Test
-    void failedReplacementCutoverLeavesSourceAndLegacyRuntimeUsable()
+    void failedReplacementCutoverLeavesSourceReadableAndClassifiable()
             throws Exception {
         Path source = materializePublicSource();
         byte[] before = Files.readAllBytes(source);
@@ -84,10 +83,12 @@ class PublicPersistenceRuntimeImportTest {
         assertArrayEquals(before, Files.readAllBytes(source));
         assertTrue(replacement.shutdown(Duration.ofSeconds(5)).terminal());
 
-        try (TameworkPersistenceRuntime legacy =
-                     TameworkPersistenceRuntime.initialize(tempDir, null)) {
-            assertTrue(Files.isRegularFile(source));
-        }
+        LegacySourceClassification classification = new LegacySourceClassifier()
+                .classify(source, tempDir.resolve("post-failure-classification"));
+        assertEquals(LegacySourceKind.PUBLIC_V4, classification.kind());
+        assertEquals(4, classification.schemaVersion());
+        assertTrue(classification.importablePublicSource());
+        assertTrue(classification.fingerprint().isPresent());
     }
 
     private Path materializePublicSource() throws Exception {

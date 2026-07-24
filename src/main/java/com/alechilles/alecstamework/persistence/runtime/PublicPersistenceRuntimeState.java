@@ -47,6 +47,7 @@ final class PublicPersistenceRuntimeState {
     private SqlitePublicPersistenceAdapter adapter;
     private PublicPersistenceOperations operations;
     private PublicPersistenceQueries queries;
+    private PublicPersistenceWorldReconciliation worldReconciliation;
     private SqlitePublicCanonicalSnapshot canonical;
     private boolean worldQuiesced;
     private boolean shutdownStarted;
@@ -177,65 +178,22 @@ final class PublicPersistenceRuntimeState {
             return terminalShutdown;
         }
         shutdownStarted = true;
-        long deadline = System.nanoTime() + timeout.toNanos();
-        startup.close();
-        try {
-            if (!worldQuiesced) {
-                configuration.worldReconciliation().quiesce();
-                worldQuiesced = true;
-            }
-        } catch (Throwable failure) {
-            return report(
-                    PublicPersistenceShutdownReport.Status.QUIESCE_FAILED,
-                    null,
-                    failure
-            );
+        PublicPersistenceShutdownExecutor.Outcome outcome =
+                PublicPersistenceShutdownExecutor.execute(
+                        startup,
+                        worldReconciliation,
+                        worldQuiesced,
+                        workflows,
+                        kernel,
+                        lease,
+                        timeout
+                );
+        worldQuiesced = outcome.worldQuiesced();
+        lastKernelShutdown = outcome.kernel();
+        if (outcome.terminal()) {
+            terminalShutdown = outcome.report();
         }
-        PublicPersistenceWorkflowTracker.DrainResult drained =
-                workflows.drain(remaining(deadline));
-        if (!drained.drained()) {
-            return new PublicPersistenceShutdownReport(
-                    PublicPersistenceShutdownReport.Status
-                            .FEATURE_DRAIN_TIMED_OUT,
-                    drained.outstanding(),
-                    null,
-                    null
-            );
-        }
-        SqliteKernelShutdownReport kernelReport =
-                kernel == null ? null : kernel.shutdown(remaining(deadline));
-        lastKernelShutdown = kernelReport;
-        if (kernelReport != null
-                && kernel.state() != SqlitePersistenceKernel.State.CLOSED) {
-            return report(
-                    PublicPersistenceShutdownReport.Status
-                            .KERNEL_DRAIN_TIMED_OUT,
-                    kernelReport,
-                    null
-            );
-        }
-        try {
-            if (lease != null) {
-                if (kernelReport == null || kernelReport.clean()) {
-                    lease.close();
-                } else {
-                    lease.closeUnclean();
-                }
-            }
-        } catch (Throwable failure) {
-            return report(
-                    PublicPersistenceShutdownReport.Status
-                            .CONTROL_CLOSE_FAILED,
-                    kernelReport,
-                    failure
-            );
-        }
-        PublicPersistenceShutdownReport.Status status =
-                kernelReport == null || kernelReport.clean()
-                        ? PublicPersistenceShutdownReport.Status.COMPLETE
-                        : PublicPersistenceShutdownReport.Status.COMPLETE_UNCLEAN;
-        terminalShutdown = report(status, kernelReport, null);
-        return terminalShutdown;
+        return outcome.report();
     }
 
     private OptionalInt schemaVersion(
@@ -269,7 +227,10 @@ final class PublicPersistenceRuntimeState {
         lease = PersistenceEngineLease.acquireReplacement(
                 configuration.dataDirectory()
         );
-        target = targets.open(configuration.dataDirectory());
+        target = targets.open(
+                configuration.dataDirectory(),
+                configuration.persistenceSourceDirectories()
+        );
         SqliteConnectionFactory connections =
                 new SqliteConnectionFactory(target.databasePath());
         schemas = new SqliteSchemaV1Manager(
@@ -291,6 +252,13 @@ final class PublicPersistenceRuntimeState {
                 workflows
         );
         queries = new PublicPersistenceQueries(adapter);
+        worldReconciliation = configuration.worldReconciliationFactory()
+                .create(new PersistenceDomainFacades(operations, queries));
+        if (worldReconciliation == null) {
+            throw new IllegalStateException(
+                    "public_persistence_world_reconciliation_factory_returned_null"
+            );
+        }
         return complete();
     }
 
@@ -393,11 +361,11 @@ final class PublicPersistenceRuntimeState {
 
     private CompletionStage<PersistenceStartupAction.Result>
     awaitWorldEvidence() {
-        return mapWorld(configuration.worldReconciliation().awaitEvidence());
+        return mapWorld(requireWorldReconciliation().awaitEvidence());
     }
 
     private CompletionStage<PersistenceStartupAction.Result> reconcileWorld() {
-        return mapWorld(configuration.worldReconciliation().reconcile());
+        return mapWorld(requireWorldReconciliation().reconcile());
     }
 
     private CompletionStage<PersistenceStartupAction.Result>
@@ -431,6 +399,15 @@ final class PublicPersistenceRuntimeState {
         );
     }
 
+    private PublicPersistenceWorldReconciliation requireWorldReconciliation() {
+        if (worldReconciliation == null) {
+            throw new IllegalStateException(
+                    "public_persistence_world_reconciliation_not_created"
+            );
+        }
+        return worldReconciliation;
+    }
+
     private IllegalStateException controlFailure(
             PersistenceTransactionResult<?> result
     ) {
@@ -450,22 +427,4 @@ final class PublicPersistenceRuntimeState {
         );
     }
 
-    private Duration remaining(long deadlineNs) {
-        return Duration.ofNanos(
-                Math.max(0, deadlineNs - System.nanoTime())
-        );
-    }
-
-    private PublicPersistenceShutdownReport report(
-            PublicPersistenceShutdownReport.Status status,
-            SqliteKernelShutdownReport kernelReport,
-            Throwable failure
-    ) {
-        return new PublicPersistenceShutdownReport(
-                status,
-                workflows.outstanding(),
-                kernelReport,
-                failure
-        );
-    }
 }

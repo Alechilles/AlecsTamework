@@ -168,6 +168,7 @@ final class CaptureReleaseProcessCrashChild {
                         receiptArtifact()
                 ),
                 TARGET_ALIAS,
+                null,
                 new CompanionSpawnPlacement(
                         "world-two", -12.5, -63.05, -4.5,
                         -0.25f, -1.5f, -0.5f

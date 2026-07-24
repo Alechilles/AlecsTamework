@@ -21,8 +21,8 @@ import javax.annotation.Nonnull;
 /** Connection-bound SQLite adapter for deterministic one-time refund recipes. */
 public final class SqliteRefundClaimStore implements RefundClaimPort {
     private static final String SELECT_COLUMNS = """
-            operation_id, recipient_uuid, reason_code, receipt_key, claimed_at_ms,
-            delivery_evidence, delivered_at_ms
+            operation_id, recipient_uuid, recipient_world_key, reason_code,
+            receipt_key, claimed_at_ms, delivery_evidence, delivered_at_ms
             """;
 
     private final Connection connection;
@@ -74,17 +74,19 @@ public final class SqliteRefundClaimStore implements RefundClaimPort {
         }
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO refund_claim(
-                    operation_id, recipient_uuid, reason_code, receipt_key,
-                    claimed_at_ms, delivery_evidence, delivered_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    operation_id, recipient_uuid, recipient_world_key,
+                    reason_code, receipt_key, claimed_at_ms,
+                    delivery_evidence, delivered_at_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, claim.operationId().toString());
             statement.setString(2, claim.recipientUuid().toString());
-            statement.setString(3, claim.reasonCode());
-            statement.setString(4, claim.receiptKey());
-            statement.setLong(5, claim.claimedAtMs());
-            setNullableText(statement, 6, claim.deliveryEvidence());
-            setNullableLong(statement, 7, claim.deliveredAtMs());
+            statement.setString(3, claim.recipientWorldKey());
+            statement.setString(4, claim.reasonCode());
+            statement.setString(5, claim.receiptKey());
+            statement.setLong(6, claim.claimedAtMs());
+            setNullableText(statement, 7, claim.deliveryEvidence());
+            setNullableLong(statement, 8, claim.deliveredAtMs());
             statement.executeUpdate();
             insertItems(claim);
             return PersistenceMutationResult.applied(claim);
@@ -173,6 +175,7 @@ public final class SqliteRefundClaimStore implements RefundClaimPort {
         return new RefundClaim(
                 operationId,
                 UUID.fromString(row.getString("recipient_uuid")),
+                row.getString("recipient_world_key"),
                 readItems(operationId),
                 row.getString("reason_code"),
                 row.getString("receipt_key"),

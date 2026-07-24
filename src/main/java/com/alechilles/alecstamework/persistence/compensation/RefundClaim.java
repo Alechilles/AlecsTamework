@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
  */
 public record RefundClaim(@Nonnull OperationId operationId,
                           @Nonnull UUID recipientUuid,
+                          @Nonnull String recipientWorldKey,
                           @Nonnull List<RefundItem> items,
                           @Nonnull String reasonCode,
                           @Nonnull String receiptKey,
@@ -25,6 +26,10 @@ public record RefundClaim(@Nonnull OperationId operationId,
         if (operationId == null || recipientUuid == null) {
             throw new IllegalArgumentException("Refund operation and recipient are required");
         }
+        recipientWorldKey = requireText(
+                recipientWorldKey,
+                "Refund recipient world"
+        );
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException(
                     "Refund recipe requires at least one item"
@@ -72,6 +77,7 @@ public record RefundClaim(@Nonnull OperationId operationId,
         return new RefundClaim(
                 operationId,
                 recipientUuid,
+                recipientWorldKey,
                 items,
                 reasonCode,
                 receiptKey,

@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -46,9 +45,6 @@ class ApiV08BinaryCompatibilityTest {
         assertTrue(ProfileDataApi.class.getMethod(
                 "findOperation", String.class, String.class).isDefault());
 
-        // Added to PolicyApi in 0.9.
-        assertTrue(legacyApi.policies().populationGroups() instanceof PopulationGroupApi);
-
         // Added to InteractionExtensionApi in 0.9.
         InteractionExtensionApi extensions = legacyApi.interactionExtensions();
         assertEquals(Set.of(), extensions.listCaptureRequirementIds());
@@ -58,20 +54,11 @@ class ApiV08BinaryCompatibilityTest {
         );
         assertEquals("capture-policy-unavailable", unsupported.getMessage());
 
-        // Added to PopulationAdmissionApi in 0.9. Null validates that the inherited default body,
-        // rather than an InvocationHandler or a recompiled fixture, is actually executing.
-        assertThrows(
-                NullPointerException.class,
-                () -> legacyApi.policies().populationAdmissions().tryAdmitV2(null)
-        );
-
         // Added to TameworkConfigReadApi in 0.9.
         TameworkConfigReadApi configs = legacyApi.configs();
         assertEquals(Optional.empty(), configs.getSpawnerCaptureMechanicsById("fixture"));
         assertEquals(Optional.empty(), configs.resolveSpawnerCaptureMechanicsForItemId("fixture"));
         assertEquals(Optional.empty(), configs.getCapturePolicyById("fixture"));
         assertEquals(Optional.empty(), configs.resolveCapturePolicyForRole("fixture"));
-        assertEquals(Optional.empty(), configs.getPopulationGroupById("fixture"));
-        assertEquals(List.of(), configs.resolvePopulationGroupsForRole("fixture"));
     }
 }

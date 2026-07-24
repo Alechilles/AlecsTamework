@@ -53,6 +53,22 @@ public final class PublicPersistenceOperations {
         return submission(submitted.acceptance(), submitted.completion());
     }
 
+    /**
+     * Narrow internal path for the startup graph's evidence-backed resolution.
+     */
+    PublicOperationSubmission reconcileLoadedDuringStartup(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CompanionProfileMutation.ReconcileLoaded reconciliation
+    ) {
+        var submitted = adapter.reconcileLoadedAtStartup(
+                operationId,
+                idempotencyKey,
+                reconciliation
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
     @Nonnull
     public PublicOperationSubmission rotateAlias(
             @Nonnull OperationId operationId,

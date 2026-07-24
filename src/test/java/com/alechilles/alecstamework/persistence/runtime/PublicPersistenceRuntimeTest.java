@@ -38,6 +38,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -159,6 +160,57 @@ class PublicPersistenceRuntimeTest {
             assertTrue(manifest.startupComplete());
             assertTrue(manifest.cleanShutdown());
         }
+    }
+
+    @Test
+    void createsWorldReconciliationOnlyAfterDomainFacadesExist() {
+        AtomicReference<PersistenceDomainFacades> received =
+                new AtomicReference<>();
+        AtomicInteger quiesced = new AtomicInteger();
+        PublicPersistenceWorldReconciliationFactory factory = facades -> {
+            received.set(facades);
+            return new PublicPersistenceWorldReconciliation() {
+                @Override
+                public CompletionStage<Result> awaitEvidence() {
+                    return CompletableFuture.completedFuture(Result.COMPLETE);
+                }
+
+                @Override
+                public CompletionStage<Result> reconcile() {
+                    return CompletableFuture.completedFuture(Result.COMPLETE);
+                }
+
+                @Override
+                public void quiesce() {
+                    quiesced.incrementAndGet();
+                }
+            };
+        };
+        PublicPersistenceRuntime runtime = new PublicPersistenceRuntime(
+                new PublicPersistenceRuntimeConfiguration(
+                        tempDir,
+                        "factory-test",
+                        () -> -100,
+                        (claim, operation) -> LiveOperationResult
+                                .confirmed("refund_confirmed")
+                                .completed(),
+                        ignored -> {
+                        },
+                        boundaries(),
+                        factory,
+                        Duration.ofSeconds(5)
+                )
+        );
+
+        assertTrue(runtime.start().toCompletableFuture().join().complete());
+        assertTrue(received.get() != null);
+        assertTrue(received.get().operations() != null);
+        assertTrue(received.get().queries() != null);
+        assertEquals(
+                PublicPersistenceShutdownReport.Status.COMPLETE,
+                runtime.shutdown(Duration.ofSeconds(5)).status()
+        );
+        assertEquals(1, quiesced.get());
     }
 
     @Test
@@ -417,7 +469,7 @@ class PublicPersistenceRuntimeTest {
 
         assertEquals(
                 PublicPersistenceShutdownReport.Status
-                        .FEATURE_DRAIN_TIMED_OUT,
+                        .KERNEL_DRAIN_TIMED_OUT,
                 timedOut.status()
         );
         assertEquals(1, timedOut.outstandingWorkflows());

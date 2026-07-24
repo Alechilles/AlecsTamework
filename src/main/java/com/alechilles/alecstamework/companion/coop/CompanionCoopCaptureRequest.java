@@ -16,6 +16,7 @@ public record CompanionCoopCaptureRequest(
         long requestedAtMs
 ) {
     public static final SnapshotKind SNAPSHOT_KIND = new SnapshotKind("coop");
+    public static final int SNAPSHOT_VERSION = 1;
 
     public CompanionCoopCaptureRequest {
         if (profileId == null || expectedLifecycleRevision == null
@@ -24,6 +25,7 @@ public record CompanionCoopCaptureRequest(
         }
         if (!profileId.equals(snapshot.profileId())
                 || !SNAPSHOT_KIND.equals(snapshot.kind())
+                || snapshot.payloadVersion() != SNAPSHOT_VERSION
                 || !snapshot.current()
                 || !snapshot.sourceLifecycleRevision().equals(
                 expectedLifecycleRevision.next()

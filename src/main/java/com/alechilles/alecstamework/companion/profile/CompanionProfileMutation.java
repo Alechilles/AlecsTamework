@@ -19,6 +19,7 @@ import javax.annotation.Nullable;
 public sealed interface CompanionProfileMutation
         permits CompanionProfileMutation.Create,
                 CompanionProfileMutation.AdoptLive,
+                CompanionProfileMutation.ReconcileLoaded,
                 CompanionProfileMutation.Update {
     @Nonnull
     ProfileId profileId();
@@ -103,6 +104,67 @@ public sealed interface CompanionProfileMutation
                     ReconciliationGeneration.INITIAL,
                     null,
                     ownerId == null ? null : worldKey
+            );
+        }
+    }
+
+    /**
+     * Resolves one imported, canonical {@code UNRESOLVED} lifecycle from a sealed
+     * positive loaded-entity observation.
+     *
+     * <p>The expected current alias is part of the evidence fence. The observed
+     * alias may be newer when modern ECS identity differs from the imported
+     * legacy NPC UUID; any required rotation and the lifecycle transition commit
+     * in this same shared operation.</p>
+     */
+    record ReconcileLoaded(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            @Nonnull ReconciliationGeneration expectedReconciliationGeneration,
+            @Nonnull NpcAlias expectedCurrentAlias,
+            @Nonnull NpcAlias observedAlias,
+            @Nonnull String worldKey,
+            long requestedAtMs
+    ) implements CompanionProfileMutation {
+        public ReconcileLoaded {
+            if (profileId == null || expectedLifecycleRevision == null
+                    || expectedReconciliationGeneration == null
+                    || expectedCurrentAlias == null || observedAlias == null) {
+                throw new IllegalArgumentException(
+                        "Complete loaded-profile reconciliation evidence is required"
+                );
+            }
+            worldKey = normalizeWorldKey(worldKey);
+        }
+
+        /** Builds the only valid resolved lifecycle while retaining owner authority. */
+        @Nonnull
+        public CompanionLifecycle resolvedLifecycle(
+                @Nonnull CompanionLifecycle current
+        ) {
+            if (current == null || !profileId.equals(current.profileId())
+                    || !expectedLifecycleRevision.equals(current.revision())
+                    || !expectedReconciliationGeneration.equals(
+                    current.lastReconciledGeneration()
+            )) {
+                throw new IllegalArgumentException(
+                        "Loaded-profile reconciliation lifecycle fence mismatch"
+                );
+            }
+            return new CompanionLifecycle(
+                    profileId,
+                    current.ownerId(),
+                    LifecycleState.ACTIVE,
+                    LifecycleLocation.liveEntity(
+                            observedAlias.toString(),
+                            worldKey
+                    ),
+                    current.revision().next(),
+                    null,
+                    requestedAtMs,
+                    current.lastReconciledGeneration().next(),
+                    null,
+                    current.ownerWorldKey()
             );
         }
     }

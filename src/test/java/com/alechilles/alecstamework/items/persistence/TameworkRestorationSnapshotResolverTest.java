@@ -117,7 +117,7 @@ class TameworkRestorationSnapshotResolverTest {
         );
         CoopResidentStateSnapshot state = fullState(projection);
 
-        assertEquals(SOURCE, state.npcUuid());
+        assertEquals(PROFILE.value(), state.npcUuid());
         assertEquals("tamework_dead", state.roleId());
         assertEquals(-9_001L, state.capturedAtMs());
         assertArrayEquals(
@@ -184,7 +184,7 @@ class TameworkRestorationSnapshotResolverTest {
                 resolved(resolver.resolve(profile, source))
         );
 
-        assertEquals(SOURCE, state.npcUuid());
+        assertEquals(PROFILE.value(), state.npcUuid());
         assertEquals("tamework_lost", state.roleId());
         assertEquals(-9_002L, state.capturedAtMs());
         assertEquals(3.0, state.commandLinks().getHomeZ());
@@ -335,7 +335,7 @@ class TameworkRestorationSnapshotResolverTest {
     }
 
     @Test
-    void missingRoleAndAliasOrConflictingOwnerAreExplicitFailures() {
+    void missingRoleAndConflictingOwnerAreExplicitFailures() {
         CompanionSnapshot lost = snapshot(
                 TameworkSnapshotCodecs.LOST,
                 1,
@@ -376,18 +376,77 @@ class TameworkRestorationSnapshotResolverTest {
         );
         assertEquals("ownerId", ownerFailure.field());
 
-        CompanionProfileReadModel noAlias = new CompanionProfileReadModel(
-                missingRole.identity(),
+    }
+
+    @Test
+    void dormantProfilesResolveWithoutCurrentAliasAndRejectConflictingOne() {
+        SnapshotCodecRegistry.EncodedSnapshot encoded = codecs.encode(
+                TameworkSnapshotCodecs.LOST,
+                2,
+                CoopResidentStateSnapshot.class,
+                new CoopResidentStateSnapshot(
+                        SOURCE,
+                        null,
+                        -1,
+                        "tamework_lost",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        -3L
+                )
+        );
+        CompanionSnapshot source = snapshot(
+                encoded.kind(), encoded.payloadVersion(),
+                encoded.payloadJson(), -3L
+        );
+        CompanionProfileReadModel dormant = profile(
+                source,
+                LifecycleState.LOST,
+                "tamework_lost",
                 null,
-                missingRole.lifecycle(),
-                missingRole.toolLinks(),
-                missingRole.currentSnapshots(),
+                List.of()
+        );
+
+        assertEquals(
+                SOURCE,
+                resolved(resolver.resolve(dormant, source))
+                        .sourceAlias().value()
+        );
+
+        CompanionAlias conflictingAlias = new CompanionAlias(
+                new NpcAlias(PROFILE.value()),
+                PROFILE,
+                1L,
+                CompanionAlias.State.CURRENT,
+                null,
+                -2L,
                 null
         );
-        assertEquals(
-                TameworkRestorationSnapshotResolver.Failure.SOURCE_ALIAS_MISSING,
-                failed(resolver.resolve(noAlias, lost)).failure()
+        CompanionProfileReadModel conflict = new CompanionProfileReadModel(
+                dormant.identity(),
+                conflictingAlias,
+                dormant.lifecycle(),
+                dormant.toolLinks(),
+                dormant.currentSnapshots(),
+                null
         );
+        TameworkRestorationSnapshotResolver.Resolution.Failed failure =
+                failed(resolver.resolve(conflict, source));
+        assertEquals(
+                TameworkRestorationSnapshotResolver.Failure.EVIDENCE_CONFLICT,
+                failure.failure()
+        );
+        assertEquals("sourceAlias", failure.field());
     }
 
     private CompanionProfileReadModel profile(
@@ -409,15 +468,6 @@ class TameworkRestorationSnapshotResolverTest {
                 -8L,
                 0L
         );
-        CompanionAlias alias = new CompanionAlias(
-                new NpcAlias(SOURCE),
-                PROFILE,
-                0L,
-                CompanionAlias.State.CURRENT,
-                null,
-                -7L,
-                null
-        );
         CompanionLifecycle lifecycle = new CompanionLifecycle(
                 PROFILE,
                 new OwnerId(OWNER),
@@ -431,7 +481,7 @@ class TameworkRestorationSnapshotResolverTest {
         );
         return new CompanionProfileReadModel(
                 identity,
-                alias,
+                null,
                 lifecycle,
                 toolLinks,
                 List.of(source),

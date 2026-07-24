@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
@@ -11,10 +12,13 @@ import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Durable codec and invariant tests for captured-artifact release evidence. */
@@ -25,6 +29,8 @@ class CompanionCaptureReleaseDefinitionTest {
             NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     private static final NpcAlias TARGET =
             NpcAlias.parse("20000000-0000-0000-0000-000000000002");
+    private static final OwnerId OWNER =
+            OwnerId.parse("30000000-0000-0000-0000-000000000001");
     private static final SnapshotId SNAPSHOT =
             SnapshotId.parse("50000000-0000-0000-0000-000000000001");
 
@@ -52,6 +58,29 @@ class CompanionCaptureReleaseDefinitionTest {
                 decoded.inventoryReceiptKey()
         );
         assertEquals("spawn-receipt", decoded.spawnReceiptKey());
+        assertEquals(OWNER, decoded.ownerAssignment());
+    }
+
+    @Test
+    void versionOnePayloadWithoutOwnerAssignmentRemainsReadable() {
+        JsonObject legacy = JsonParser.parseString(
+                CompanionCaptureReleaseDefinition.INSTANCE.encode(request(
+                        projection(
+                                CompanionFullStateProjection.KIND,
+                                CompanionFullStateProjection.VERSION
+                        ),
+                        "inventory-receipt",
+                        "spawn-receipt"
+                ))
+        ).getAsJsonObject();
+        legacy.remove("ownerAssignment");
+
+        CompanionCaptureReleaseRequest decoded =
+                CompanionCaptureReleaseDefinition.INSTANCE.decode(
+                        legacy.toString()
+                );
+
+        assertNull(decoded.ownerAssignment());
     }
 
     @Test
@@ -133,6 +162,7 @@ class CompanionCaptureReleaseDefinitionTest {
                 ),
                 source("inventory-receipt"),
                 TARGET,
+                null,
                 new CompanionSpawnPlacement(
                         "world", 1, 2, 3, 0, 0, 0
                 ),
@@ -151,6 +181,7 @@ class CompanionCaptureReleaseDefinitionTest {
                 ),
                 source("inventory-receipt"),
                 TARGET,
+                null,
                 new CompanionSpawnPlacement(
                         "world", 1, 2, 3, 0, 0, 0
                 ),
@@ -175,6 +206,7 @@ class CompanionCaptureReleaseDefinitionTest {
                         ),
                         source("inventory-receipt"),
                         TARGET,
+                        null,
                         new CompanionSpawnPlacement(
                                 "world", 1, 2, 3, 0, 0, 0
                         ),
@@ -198,6 +230,7 @@ class CompanionCaptureReleaseDefinitionTest {
                 projection,
                 source(inventoryReceipt),
                 TARGET,
+                OWNER,
                 new CompanionSpawnPlacement(
                         "world", 1, 2, 3, 0, 0, 0
                 ),
@@ -221,6 +254,7 @@ class CompanionCaptureReleaseDefinitionTest {
                 ),
                 source,
                 TARGET,
+                OWNER,
                 new CompanionSpawnPlacement(
                         "world", 1, 2, 3, 0, 0, 0
                 ),

@@ -1,75 +1,116 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** Regression coverage for released coop projections whose command record keeps an old UUID. */
 class CommandLinkedPanelLiveTargetResolverTest {
     @Test
-    void redirectsHistoricalRecordToSoleCanonicalLiveProjection() {
+    void redirectsHistoricalRecordToCanonicalProjection() {
+        UUID profileUuid = UUID.randomUUID();
         UUID historicalUuid = UUID.randomUUID();
         UUID liveUuid = UUID.randomUUID();
-        CommandLinkedPanelLiveTargetResolver resolver = resolver(
-                historicalUuid,
-                liveUuid,
-                candidate -> candidate.equals(liveUuid)
-                        ? oneLocation(candidate)
-                        : absent(candidate)
+        CommandLinkedPanelLiveTargetResolver resolver =
+                resolver(
+                        profileUuid,
+                        liveUuid,
+                        candidate -> candidate.equals(liveUuid)
+                                ? oneLocation(candidate)
+                                : absent(candidate)
+                );
+
+        LinkedNpcRecord redirected = resolver.resolveRedirect(
+                record(historicalUuid, profileUuid.toString())
         );
 
-        LinkedNpcRecord redirected = resolver.resolveRedirect(record(historicalUuid));
-
         assertEquals(liveUuid, redirected.npcUuid);
-        assertEquals("profile-a", redirected.profileId);
+        assertEquals(profileUuid.toString(), redirected.profileId);
     }
 
     @Test
     void doesNotRedirectWhenBothAliasesAreLive() {
+        UUID profileUuid = UUID.randomUUID();
         UUID historicalUuid = UUID.randomUUID();
         UUID liveUuid = UUID.randomUUID();
-        CommandLinkedPanelLiveTargetResolver resolver = resolver(
-                historicalUuid, liveUuid, this::oneLocation);
+        CommandLinkedPanelLiveTargetResolver resolver =
+                resolver(profileUuid, liveUuid, this::oneLocation);
 
-        assertNull(resolver.resolveRedirect(record(historicalUuid)));
+        assertNull(resolver.resolveRedirect(
+                record(historicalUuid, profileUuid.toString())
+        ));
     }
 
     private CommandLinkedPanelLiveTargetResolver resolver(
-            UUID historicalUuid,
+            UUID profileUuid,
             UUID liveUuid,
-            CommandNpcIdentityService.LiveNpcProbe probe) {
-        NpcIdentityRepository.ProfileIdentity identity = new NpcIdentityRepository.ProfileIdentity(
-                "profile-a",
-                liveUuid,
-                List.of(liveUuid, historicalUuid),
-                true,
-                new NpcIdentityRepository.ProfileFlags(false, false, false, false, null, null),
-                null,
-                null
-        );
-        CommandNpcIdentityService identityService = new CommandNpcIdentityService(
-                (profileId, uuid) -> new NpcIdentityRepository.IdentityLoadResult(
-                        NpcIdentityRepository.LoadStatus.FOUND,
-                        identity,
+            CommandNpcIdentityService.LiveNpcProbe probe
+    ) {
+        CompanionProfileProjectionState projection =
+                new CompanionProfileProjectionState(
+                        new ProfileId(profileUuid),
+                        new NpcAlias(liveUuid),
                         null,
                         null,
+                        "Tamed_Chicken",
+                        "Chicken",
                         null,
-                        null
-                ),
-                probe
+                        true,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        100L
+                );
+        CommandPersistenceView view = new CommandPersistenceView(
+                new CommandPersistenceView.ProjectionLookup() {
+                    @Override
+                    public Optional<CompanionProfileProjectionState> find(
+                            ProfileId profileId
+                    ) {
+                        return projection.profileId().equals(profileId)
+                                ? Optional.of(projection)
+                                : Optional.empty();
+                    }
+
+                    @Override
+                    public Optional<CompanionProfileProjectionState> find(
+                            NpcAlias alias
+                    ) {
+                        return projection.currentAlias().equals(alias)
+                                ? Optional.of(projection)
+                                : Optional.empty();
+                    }
+                }
         );
         return new CommandLinkedPanelLiveTargetResolver(
-                new CommandNpcProfileActionResolver(identityService));
+                new CommandNpcProfileActionResolver(
+                        new CommandNpcIdentityService(view, probe)
+                )
+        );
     }
 
-    private LinkedNpcRecord record(UUID npcUuid) {
+    private LinkedNpcRecord record(UUID npcUuid, String profileId) {
         return new LinkedNpcRecord(
-                npcUuid, null, null, null, null, null, null,
-                "Tamed_Chicken", "Follow", true, false, null
+                npcUuid,
+                profileId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Tamed_Chicken",
+                "Follow",
+                true,
+                false,
+                null
         );
     }
 
@@ -77,7 +118,9 @@ class CommandLinkedPanelLiveTargetResolverTest {
         return new LoadedNpcIdentityIndex.Probe(
                 npcUuid,
                 LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
-                List.of(new LoadedNpcIdentityIndex.Location("default", "store-a"))
+                List.of(new LoadedNpcIdentityIndex.Location(
+                        "default", "store-a"
+                ))
         );
     }
 

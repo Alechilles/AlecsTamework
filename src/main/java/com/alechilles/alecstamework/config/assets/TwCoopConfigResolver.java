@@ -100,7 +100,7 @@ final class TwCoopConfigResolver {
     }
 
     private static boolean isAuthorityCandidate(@Nullable TwCoopConfig candidate) {
-        return candidate != null && candidate.isManagedAuthorityEnabled();
+        return candidate != null && candidate.isEnabled();
     }
 
     private static void registerBlockTypeCandidates(@Nonnull Map<String, TwCoopConfig> cache,

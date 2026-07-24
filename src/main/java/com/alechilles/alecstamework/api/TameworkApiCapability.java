@@ -13,11 +13,7 @@ public enum TameworkApiCapability {
     COMPANION_XP_EVENTS,
     CONFIG_READ,
     DIAGNOSTICS,
-    PERSISTENCE_RESILIENCE,
     CAPTURE_POLICY,
-    POPULATION_GROUPS,
-    /** Exact source decrement after either terminal capture roll. */
-    CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
     /** Durable revision-fenced profile-data mutations and restart-visible operation queries. */
     PROFILE_DATA_TRANSACTIONS
 }

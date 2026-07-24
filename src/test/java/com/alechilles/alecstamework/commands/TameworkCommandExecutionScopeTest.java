@@ -12,12 +12,9 @@ class TameworkCommandExecutionScopeTest {
     @Test
     void serverGlobalDiagnosticsAndTogglesDoNotRequirePlayerContext() {
         Class<?>[] serverCommands = {
-                TameworkDiagnoseCommand.class,
-                TameworkPersistenceCircuitCommand.class,
                 TameworkPatchesStatusCommand.class,
                 TameworkApiTestRunCommand.class,
                 TameworkApiTestStatusCommand.class,
-                TameworkCoopCommand.class,
                 TameworkDebugCrashTelemetryCommand.class,
                 TameworkDebugDbCommand.class,
                 TameworkDebugCoopCommand.class,

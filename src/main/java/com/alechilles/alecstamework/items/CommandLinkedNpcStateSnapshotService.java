@@ -260,7 +260,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             fullSnapshotsByNpc.remove(npcUuid);
         }
         if (!hasProjectionIdentity(reference, store)) {
-            upsertProfile(snapshot);
+            upsertProfile(snapshot, worldKey(store));
         }
     }
 
@@ -326,11 +326,22 @@ public final class CommandLinkedNpcStateSnapshotService {
                      @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot);
     }
 
-    private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
-        if (snapshot.npcUuid() == null) {
+    private void upsertProfile(
+            @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+            @Nullable String worldKey
+    ) {
+        if (snapshot.npcUuid() == null || worldKey == null) {
             return;
         }
-        profileSnapshots.publish(snapshot);
+        profileSnapshots.publish(snapshot, worldKey);
+    }
+
+    @Nullable
+    private String worldKey(Store<EntityStore> store) {
+        EntityStore entityStore = store.getExternalData();
+        World world = entityStore == null ? null : entityStore.getWorld();
+        String name = world == null ? null : world.getName();
+        return name == null || name.isBlank() ? null : name.trim();
     }
 
     @Nullable
@@ -435,7 +446,9 @@ public final class CommandLinkedNpcStateSnapshotService {
                 && !attachmentsComponent.getAttachmentIds().isEmpty()
                 ? attachmentsComponent.getAttachmentIds()
                 : CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
-        String attachmentsValues = CommandLinkedNpcDeathService.encodeAttachmentSelections(attachmentSelections);
+        String attachmentsValues = CommandAttachmentSelectionCodec.encode(
+                attachmentSelections
+        );
 
         TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;

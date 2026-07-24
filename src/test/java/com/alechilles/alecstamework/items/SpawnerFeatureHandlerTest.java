@@ -61,85 +61,56 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void spawnPreparesPopulationBeforePhysicalSpawnAndFinalizesSourceAfterCommit() throws Exception {
-        String release = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerPreparedSpawnService.java"
-        ));
-        String continuation = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CompanionSpawnCommitContinuation.java"
-        ));
-
-        assertTrue(release.indexOf("admission.prepareAsync(request)")
-                < release.indexOf("executor.spawnAndCommit("));
-        assertTrue(release.contains("source.prepare(finalizedItem)"));
-        assertTrue(continuation.indexOf("boolean liveApplied = runLive")
-                < continuation.indexOf("runSource(sourceFinalization, live)"));
-        assertTrue(continuation.contains("finishSourceDurability("));
-    }
-
-    @Test
-    void spawnAndPreAddFailureCancelWithoutTouchingTheSourceItem() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CompanionPreparedSpawnService.java"
-        ));
-
-        int spawn = source.indexOf("SpawnAttempt attempt = spawn(");
-        int ambiguityGuard = source.indexOf("if (attempt.outcomeAmbiguous())", spawn);
-        int cancel = source.indexOf("admissionService.cancelAsync", spawn);
-        int commit = source.indexOf("admissionService.commitLiveAsync", spawn);
-
-        assertTrue(spawn >= 0 && ambiguityGuard > spawn && cancel > ambiguityGuard);
-        assertTrue(cancel < commit, "failed spawn/pre-add must cancel rather than commit live capacity");
-        assertFalse(source.contains("SpawnerSourceItemTransaction"));
-    }
-
-    @Test
     void captureRejectsStackedSpawnerItemsBeforeMetadataWrite() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+        String intents = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureIntentFactory.java"
+        ));
 
-        int quantityGuard = source.indexOf("itemStack.getQuantity() != 1");
-        int capturedMetadata = source.indexOf(".withMetadata(TameworkMetadataKeys.CAPTURED");
-        int canonicalProfileMetadata = source.indexOf("TameworkMetadataKeys.COMPANION_PROFILE_ID");
-        int ownerOutcomeMetadata = source.indexOf("TameworkMetadataKeys.CAPTURE_OWNER_CLEARED");
+        int quantityGuard = handler.indexOf("source.getQuantity() != 1");
+        int capturedMetadata = intents.indexOf(
+                ".withMetadata(\n"
+                        + "                        TameworkMetadataKeys.CAPTURED"
+        );
+        int ownerOutcomeMetadata = intents.indexOf(
+                "TameworkMetadataKeys.CAPTURE_OWNER_CLEARED"
+        );
 
         assertTrue(quantityGuard >= 0, "capture path must reject stacked spawner items");
         assertTrue(capturedMetadata >= 0, "capture path must write captured metadata");
-        assertTrue(canonicalProfileMetadata >= 0, "capture path must persist canonical profile identity");
         assertTrue(ownerOutcomeMetadata >= 0, "capture must persist its immutable owner outcome");
-        assertTrue(quantityGuard < capturedMetadata, "stack guard must run before captured metadata is stamped");
     }
 
     @Test
-    void captureFreezesLinkedPanelSnapshotBeforeOwnershipMutationAndPublishesAfterApply() throws Exception {
-        String source = Files.readString(Path.of(
+    void captureUsesCanonicalAuthorAsSoleDurableSuccessAuthority()
+            throws Exception {
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+        String author = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/persistence/SpawnerCaptureAuthor.java"
+        ));
+
+        assertTrue(handler.contains("captureAuthor.capture(intent)"));
+        assertTrue(author.contains("persistence.capture("));
+        assertFalse(handler.contains("CaptureRepository"));
+        assertFalse(handler.contains("captureAttemptRuntime"));
+        assertFalse(handler.contains("captureFinalizerService"));
+    }
+
+    @Test
+    void releaseUsesCanonicalAuthorWithoutPreparedSpawnSubsystem()
+            throws Exception {
+        String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
         ));
 
-        int prepare = source.indexOf("prepareCapturedLinkedNpcSnapshot(");
-        int applied = source.indexOf("public void onApplied(", prepare);
-        int publish = source.indexOf("publishPreparedCapturedLinkedNpcSnapshot(", applied);
-        int finalizeCapture = source.indexOf("captureFinalizerService.finalizeCapture(", publish);
-
-        assertTrue(prepare >= 0, "capture must freeze command links while the live component still exists");
-        assertTrue(applied > prepare, "capture publication must remain an applied-mutation continuation");
-        assertTrue(publish > applied, "prepared links must publish only after capture applies");
-        assertTrue(finalizeCapture > publish,
-                "the applied callback must be installed before owner mutation scheduling");
-    }
-
-    @Test
-    void captureAlwaysCreatesTheDurableCapturedItem() throws Exception {
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
-        String finalizer = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureFinalizerService.java"));
-
-        assertTrue(handler.contains("itemStackMetadataService.swapItemId("));
-        assertTrue(handler.contains("captureAttemptRuntime.commit(finalizedAttemptId)"));
-        assertFalse(handler.contains("tameAndCommandLink"));
-        assertFalse(handler.contains("commandFamilyRoster"));
-        assertFalse(finalizer.contains("keepsLiveNpc"));
-        assertTrue(finalizer.contains("despawnNpc(player, context.npcRef(), liveNpc)"));
+        assertTrue(handler.contains("releaseAuthor.release("));
+        assertFalse(handler.contains("CommandPreparedRestoreSpawnService"));
+        assertFalse(handler.contains("CompanionPreparedSpawnService"));
+        assertFalse(handler.contains("CommandNpcRelocationService"));
     }
 
     @Test
@@ -190,7 +161,9 @@ class SpawnerFeatureHandlerTest {
     private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
                                                                       Boolean spawnAssignsOwnerOverride)
             throws Exception {
-        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(null, null, null, null, null, null, null);
+        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(
+                null, null, null
+        );
         Method method = SpawnerFeatureHandler.class.getDeclaredMethod(
                 "buildSpawnerConfigForInteraction",
                 ItemFeatureConfig.class,

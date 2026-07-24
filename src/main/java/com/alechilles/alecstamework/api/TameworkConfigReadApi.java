@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.api;
 
 import java.util.Optional;
-import java.util.List;
 
 public interface TameworkConfigReadApi {
     GlobalConfigView getGlobalConfig();
@@ -65,14 +64,6 @@ public interface TameworkConfigReadApi {
 
     default Optional<CapturePolicyConfigView> resolveCapturePolicyForRole(String roleId) {
         return Optional.empty();
-    }
-
-    default Optional<PopulationGroupDefinitionView> getPopulationGroupById(String groupId) {
-        return Optional.empty();
-    }
-
-    default List<PopulationGroupDefinitionView> resolvePopulationGroupsForRole(String roleId) {
-        return List.of();
     }
 }
 

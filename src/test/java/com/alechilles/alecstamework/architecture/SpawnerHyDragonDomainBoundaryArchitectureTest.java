@@ -14,27 +14,6 @@ class SpawnerHyDragonDomainBoundaryArchitectureTest {
             "src/main/java/com/alechilles/alecstamework/config/assets");
 
     @Test
-    void legacyHandlerRemainsAnOrchestratorForCaptureDomain() throws Exception {
-        String handler = read(ITEMS.resolve("SpawnerFeatureHandler.java"));
-        String attempts = read(ITEMS.resolve("SpawnerCaptureAttemptRuntimeCoordinator.java"));
-
-        // Coarse tripwires only: the behavioral assertions below enforce the actual boundary.
-        // The committed handler was already larger than the old 1,050-line threshold before
-        // timed command-roster convergence was added.
-        assertTrue(handler.lines().count() <= 1400,
-                "legacy spawner handler must not absorb new domain implementations");
-        assertTrue(attempts.lines().count() <= 525,
-                "capture attempt lifecycle must remain a focused coordinator");
-        assertTrue(handler.contains("captureAttemptRuntime.prepareAndResolve("));
-        assertFalse(handler.contains("ConcurrentHashMap<"));
-        assertFalse(handler.contains("attempts.resolve(request)"));
-
-        assertTrue(attempts.contains("attempts.resolve(request)"));
-        assertTrue(attempts.contains("attempts.beginApply(effective.attemptId())"));
-        assertTrue(attempts.contains("attempts.revalidateBeforeApply("));
-    }
-
-    @Test
     void spawnerAssetClassDelegatesNewCodecAndRuntimeProjectionLogic() throws Exception {
         String config = read(ASSETS.resolve("TwSpawnerConfig.java"));
         String codec = read(ASSETS.resolve("TwSpawnerCaptureSettingsCodec.java"));

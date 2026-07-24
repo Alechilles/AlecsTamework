@@ -63,7 +63,7 @@ public final class SqliteCompanionProfileOperations {
                         idempotencyKey,
                         mutation,
                         FEATURE_SCOPE,
-                        null,
+                        expectedLifecycleRevision(mutation),
                         List.of(OperationScope.profile(mutation.profileId())),
                         mutation.requestedAtMs()
                 ),
@@ -86,7 +86,50 @@ public final class SqliteCompanionProfileOperations {
         if (mutation instanceof CompanionProfileMutation.AdoptLive adoption) {
             return adoptLive(transaction, operationId, adoption);
         }
+        if (mutation instanceof
+                CompanionProfileMutation.ReconcileLoaded reconciliation) {
+            return reconcileLoaded(
+                    transaction,
+                    operationId,
+                    reconciliation
+            );
+        }
         return update(transaction, (CompanionProfileMutation.Update) mutation);
+    }
+
+    private com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision
+    expectedLifecycleRevision(CompanionProfileMutation mutation) {
+        return mutation instanceof
+                CompanionProfileMutation.ReconcileLoaded reconciliation
+                ? reconciliation.expectedLifecycleRevision()
+                : null;
+    }
+
+    private AppliedMutation reconcileLoaded(
+            SqlitePersistenceTransactionContext transaction,
+            OperationId operationId,
+            CompanionProfileMutation.ReconcileLoaded reconciliation
+    ) {
+        SqliteLoadedProfileReconciliation.Result applied =
+                SqliteLoadedProfileReconciliation.apply(
+                        transaction,
+                        operationId,
+                        reconciliation
+                );
+        if (applied.before() == null) {
+            return unchanged(applied.outcome());
+        }
+        return changed(
+                applied.outcome(),
+                applied.before(),
+                applied.after(),
+                applied.source(),
+                applied.sourceRevision(),
+                new CompanionLifecycleProjectionChange(
+                        applied.beforeLifecycle(),
+                        applied.afterLifecycle()
+                )
+        );
     }
 
     private AppliedMutation create(
@@ -400,12 +443,30 @@ public final class SqliteCompanionProfileOperations {
             CompanionProfileProjectionChange.Source source,
             CompanionLifecycleProjectionChange lifecycleChange
     ) {
+        return changed(
+                outcome,
+                before,
+                after,
+                source,
+                outcome.metadataRevision(),
+                lifecycleChange
+        );
+    }
+
+    private AppliedMutation changed(
+            CompanionProfileMutationOutcome outcome,
+            CompanionProfileProjectionState before,
+            CompanionProfileProjectionState after,
+            CompanionProfileProjectionChange.Source source,
+            long sourceRevision,
+            CompanionLifecycleProjectionChange lifecycleChange
+    ) {
         return new AppliedMutation(
                 outcome,
                 new CompanionProfileProjectionChange(
                         source,
                         outcome.profileId(),
-                        outcome.metadataRevision(),
+                        sourceRevision,
                         before,
                         after,
                         outcome.updatedAtMs()

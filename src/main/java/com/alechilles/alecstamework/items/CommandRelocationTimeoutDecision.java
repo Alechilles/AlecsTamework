@@ -6,7 +6,6 @@ final class CommandRelocationTimeoutDecision {
     }
 
     static Outcome decide(boolean exhausted,
-                          boolean admissionApplying,
                           boolean physicalMutationAttempted,
                           boolean liveNpcObservedOutsideDestination,
                           boolean crossWorldTransferAttempted,
@@ -14,7 +13,7 @@ final class CommandRelocationTimeoutDecision {
         if (!exhausted) {
             return Outcome.RETRY;
         }
-        if (!admissionApplying || !physicalMutationAttempted) {
+        if (!physicalMutationAttempted) {
             return Outcome.DROP_AS_LOST;
         }
         if (liveNpcObservedOutsideDestination && !crossWorldDestinationInstalled) {

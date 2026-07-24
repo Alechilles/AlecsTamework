@@ -171,7 +171,6 @@ public final class PersistenceFailureReasonCatalog {
     }
 
     private static PersistenceDomain domain(String reason) {
-        if (reason.startsWith("reconciliation_")) return PersistenceDomain.RECONCILIATION;
         if (reason.startsWith("breeding_")) return PersistenceDomain.BREEDING;
         if (reason.startsWith("managed_coop_") || reason.startsWith("coop_")) {
             return PersistenceDomain.MANAGED_COOP_RELEASE;

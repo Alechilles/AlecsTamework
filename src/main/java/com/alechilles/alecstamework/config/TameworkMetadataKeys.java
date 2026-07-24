@@ -75,6 +75,9 @@ public final class TameworkMetadataKeys {
     /** Temporary owner refund receipt; cleared only after the claim commits DELIVERED. */
     public static final String CAPTURE_SOURCE_REFUND_ATTEMPT_ID =
             "Tamework.Capture.SourceRefundAttemptId";
+    /** Durable line receipt proving one exact replacement-persistence refund delivery. */
+    public static final String PERSISTENCE_REFUND_RECEIPT =
+            "Tamework.Persistence.RefundReceipt";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
     public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";

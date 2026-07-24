@@ -1,20 +1,17 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.hypixel.hytale.logger.HytaleLogger;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
+import java.util.Optional;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Resolves and migrates Tamework runtime data storage to a universe-scoped directory.
+ * Resolves the canonical universe-scoped directory without relocating historical
+ * persistence evidence.
  */
 public final class TameworkDataPathService {
     private static final String UNIVERSE_DIR_NAME = "universe";
@@ -24,22 +21,6 @@ public final class TameworkDataPathService {
     private static final String HYTALE_DIR_NAME = "hytale";
     private static final String TAMEWORK_DIR_NAME = "Tamework";
     private static final String DATA_DIR_NAME = "Data";
-
-    private static final String COOP_LEDGER_FILE = "CommandLinkedNpcCoops.dat";
-    private static final String COOP_MIGRATION_MARKER_FILE = "CommandLinkedNpcCoops.dat.runtime-v2.marker";
-    private static final String SQLITE_DB_FILE = "tamework.sqlite";
-    private static final String SQLITE_WAL_FILE = "tamework.sqlite-wal";
-    private static final String SQLITE_SHM_FILE = "tamework.sqlite-shm";
-    private static final String SQLITE_IMPORT_MARKER_FILE = "tamework.sqlite.legacy-dat-import-v2.marker";
-
-    private static final String[] KNOWN_DATA_FILES = new String[] {
-            "CommandLinkedNpcCaptures.dat",
-            COOP_LEDGER_FILE,
-            "CommandLinkedNpcDeaths.dat",
-            "CommandLinkedNpcLost.dat",
-            "CoopResidentSnapshots.dat",
-            COOP_MIGRATION_MARKER_FILE
-    };
 
     @Nullable
     private final HytaleLogger logger;
@@ -53,34 +34,70 @@ public final class TameworkDataPathService {
     }
 
     /**
-     * Resolves the preferred runtime data directory and migrates legacy data files when needed.
+     * Resolves and initializes the preferred runtime data directory.
      *
-     * <p>Falls back to the legacy directory if the universe path cannot be resolved or created.
+     * <p>The historical method name is retained for callers compiled against the
+     * earlier contract. No file is migrated, moved, renamed, or deleted. Persistence
+     * importers must inspect {@link #resolveDataPathLayout(Path)} before creating a
+     * replacement database.</p>
      */
     @Nonnull
     public Path resolveAndMigrateDataDirectory(@Nonnull Path legacyDataDirectory) {
-        Path legacyDir = legacyDataDirectory.toAbsolutePath().normalize();
-        Path preferredDir = resolvePreferredDataDirectory(legacyDir);
-        if (preferredDir.equals(legacyDir)) {
-            ensureDirectoryExists(legacyDir);
-            return legacyDir;
-        }
+        return resolveAndInitializeDataPathLayout(
+                legacyDataDirectory
+        ).targetDirectory();
+    }
+
+    /**
+     * Resolves the immutable source layout and initializes only its canonical
+     * write directory. A creation failure returns a layout whose target is the
+     * legacy directory while preserving any distinct historical candidate.
+     */
+    @Nonnull
+    public TameworkDataPathLayout resolveAndInitializeDataPathLayout(
+            @Nonnull Path legacyDataDirectory
+    ) {
+        TameworkDataPathLayout layout = resolveDataPathLayout(
+                legacyDataDirectory
+        );
+        Path preferredDir = layout.targetDirectory();
         if (!ensureDirectoryExists(preferredDir)) {
             log(Level.WARNING,
                     "Failed to initialize universe data directory '" + preferredDir
-                            + "'. Falling back to legacy data directory '" + legacyDir + "'.");
-            ensureDirectoryExists(legacyDir);
-            return legacyDir;
+                            + "'. Falling back to legacy data directory '"
+                            + layout.legacyDirectory() + "'.");
+            ensureDirectoryExists(layout.legacyDirectory());
+            return new TameworkDataPathLayout(
+                    layout.legacyDirectory(),
+                    layout.legacyDirectory(),
+                    layout.historicalDirectory()
+            );
         }
-        migrateLegacyDataFiles(legacyDir, preferredDir);
-        Path historicalDataDir = resolveHistoricalServerAnchoredDataDirectory(legacyDir);
-        if (historicalDataDir != null
-                && !historicalDataDir.equals(preferredDir)
-                && !historicalDataDir.equals(legacyDir)) {
-            migrateLegacyDataFiles(historicalDataDir, preferredDir);
+        return layout;
+    }
+
+    /**
+     * Resolves the canonical target and all known read-only source candidates
+     * without creating directories or changing any file.
+     */
+    @Nonnull
+    public TameworkDataPathLayout resolveDataPathLayout(
+            @Nonnull Path legacyDataDirectory
+    ) {
+        if (legacyDataDirectory == null) {
+            throw new IllegalArgumentException(
+                    "Legacy Tamework data directory is required"
+            );
         }
-        ensureCoopMigrationMarker(preferredDir);
-        return preferredDir;
+        Path legacyDir = legacyDataDirectory.toAbsolutePath().normalize();
+        Path preferredDir = resolvePreferredDataDirectory(legacyDir);
+        Path historicalDir =
+                resolveHistoricalServerAnchoredDataDirectory(legacyDir);
+        return new TameworkDataPathLayout(
+                preferredDir,
+                legacyDir,
+                Optional.ofNullable(historicalDir)
+        );
     }
 
     @Nonnull
@@ -182,109 +199,6 @@ public final class TameworkDataPathService {
             return null;
         }
         return serverAncestor.resolve(UNIVERSE_DIR_NAME).resolve(TAMEWORK_DIR_NAME).resolve(DATA_DIR_NAME).normalize();
-    }
-
-    private boolean shouldMigrateRuntimeFile(@Nonnull String fileName) {
-        String normalized = fileName.toLowerCase(Locale.ROOT);
-        if (normalized.endsWith(".dat")) {
-            return true;
-        }
-        if (normalized.startsWith("tamework.sqlite")) {
-            return true;
-        }
-        return normalized.startsWith("tamework_pre_v2_") && normalized.endsWith(".sqlite.bak");
-    }
-
-    private void migrateLegacyDataFiles(@Nonnull Path legacyDirectory, @Nonnull Path targetDirectory) {
-        if (legacyDirectory.equals(targetDirectory) || !Files.exists(legacyDirectory)) {
-            return;
-        }
-
-        Set<String> movedFileNames = new HashSet<>();
-        int movedCount = 0;
-
-        for (String fileName : KNOWN_DATA_FILES) {
-            Path source = legacyDirectory.resolve(fileName);
-            Path target = targetDirectory.resolve(fileName);
-            if (moveIfNeeded(source, target)) {
-                movedCount++;
-                movedFileNames.add(fileName);
-            }
-        }
-        for (String fileName : new String[] {SQLITE_DB_FILE, SQLITE_WAL_FILE, SQLITE_SHM_FILE, SQLITE_IMPORT_MARKER_FILE}) {
-            Path source = legacyDirectory.resolve(fileName);
-            Path target = targetDirectory.resolve(fileName);
-            if (moveIfNeeded(source, target)) {
-                movedCount++;
-                movedFileNames.add(fileName);
-            }
-        }
-
-        // Move additional runtime artifacts that may have been introduced by future persistence updates.
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(legacyDirectory)) {
-            for (Path source : stream) {
-                Path fileNamePath = source.getFileName();
-                if (fileNamePath == null || Files.isDirectory(source)) {
-                    continue;
-                }
-                String fileName = fileNamePath.toString();
-                if (movedFileNames.contains(fileName)) {
-                    continue;
-                }
-                if (!shouldMigrateRuntimeFile(fileName)) {
-                    continue;
-                }
-                if (moveIfNeeded(source, targetDirectory.resolve(fileName))) {
-                    movedCount++;
-                }
-            }
-        } catch (Exception ignored) {
-            // Ignore migration scan failures; known files are handled explicitly.
-        }
-
-        if (movedCount > 0) {
-            log(Level.INFO,
-                    "Migrated " + movedCount + " Tamework data file(s) from '"
-                            + legacyDirectory + "' to '" + targetDirectory + "'.");
-        }
-    }
-
-    private boolean moveIfNeeded(@Nonnull Path source, @Nonnull Path target) {
-        try {
-            if (!Files.exists(source) || Files.isDirectory(source)) {
-                return false;
-            }
-            if (Files.exists(target)) {
-                return false;
-            }
-            Path parent = target.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            try {
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (Exception ignored) {
-                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return true;
-        } catch (Exception ex) {
-            log(Level.WARNING, "Failed to migrate data file '" + source + "' to '" + target + "': " + ex.getMessage());
-            return false;
-        }
-    }
-
-    private void ensureCoopMigrationMarker(@Nonnull Path targetDirectory) {
-        Path coopLedgerPath = targetDirectory.resolve(COOP_LEDGER_FILE);
-        Path coopMarkerPath = targetDirectory.resolve(COOP_MIGRATION_MARKER_FILE);
-        if (!Files.exists(coopLedgerPath) || Files.exists(coopMarkerPath)) {
-            return;
-        }
-        try {
-            Files.writeString(coopMarkerPath, "runtime-v2", StandardCharsets.UTF_8);
-        } catch (Exception ex) {
-            log(Level.WARNING,
-                    "Failed to write coop migration marker '" + coopMarkerPath + "': " + ex.getMessage());
-        }
     }
 
     private boolean ensureDirectoryExists(@Nonnull Path directory) {

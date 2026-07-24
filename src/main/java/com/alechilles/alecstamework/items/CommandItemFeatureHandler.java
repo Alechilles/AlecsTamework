@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearTargetStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
@@ -20,8 +19,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSourc
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.localization.LocalizedText;
-import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
-import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -31,13 +28,9 @@ import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
+import com.alechilles.alecstamework.items.persistence.FreeCompanionRestorationAuthor;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
-import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.codec.Codec;
@@ -61,7 +54,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -71,12 +63,9 @@ import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -93,12 +82,8 @@ public final class CommandItemFeatureHandler {
     private static final long HYBRID_TELEPORT_DELAY_MS = 2500L;
     private static final double RECALL_SAFE_SPAWN_DISTANCE = 20.0;
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
-    private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
-    private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
-    private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
 
     private final CommandItemRegistry registry;
-    @Nullable private final TameworkPersistenceRuntime persistenceRuntime;
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
@@ -124,9 +109,8 @@ public final class CommandItemFeatureHandler {
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final CommandRelocationDispatchService relocationDispatchService;
-    private final CommandRespawnService respawnService;
     @Nullable
-    private final CommandLostRecoveryCoordinator lostRecoveryCoordinator;
+    private final CommandCompanionRestorationService restorationService;
     private final CommandOwnerReleaseService ownerReleaseService;
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
@@ -137,6 +121,8 @@ public final class CommandItemFeatureHandler {
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandGroupActivationService groupActivationService;
     private final CommandTalentPageService talentPageService;
+    private final CommandSelectionPageService selectionPageService;
+    private final CommandItemUseOrchestrator itemUseOrchestrator;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -156,22 +142,9 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcCoopService coopService,
                                      CommandLinkedNpcLostService lostService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable TameworkPersistenceRuntime persistenceRuntime) {
-        this(registry, relocationService, deathService, captureService, coopService, lostService,
-                stateSnapshotService, persistenceRuntime, null);
-    }
-
-    public CommandItemFeatureHandler(CommandItemRegistry registry,
-                                     CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcCoopService coopService,
-                                     CommandLinkedNpcLostService lostService,
-                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                     @Nullable TameworkPersistenceRuntime persistenceRuntime,
-                                     @Nullable CompanionIdentityResolver populationIdentityResolver) {
+                                     @Nullable PersistenceDomainFacades persistence,
+                                     @Nullable FreeCompanionRestorationAuthor restorationAuthor) {
         this.registry = registry;
-        this.persistenceRuntime = persistenceRuntime;
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -186,9 +159,12 @@ public final class CommandItemFeatureHandler {
         this.npcExistenceService = stateSnapshotService != null
                 ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
                 : new CommandNpcExistenceService();
-        CommandNpcIdentityService npcIdentityService = persistenceRuntime != null
+        CommandPersistenceView persistenceView = persistence != null
+                ? new CommandPersistenceView(persistence)
+                : null;
+        CommandNpcIdentityService npcIdentityService = persistenceView != null
                 ? new CommandNpcIdentityService(
-                        persistenceRuntime.getNpcIdentityRepository(), npcExistenceService)
+                        persistenceView, npcExistenceService)
                 : null;
         this.profileActionResolver = npcIdentityService != null
                 ? new CommandNpcProfileActionResolver(npcIdentityService)
@@ -202,11 +178,10 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 npcNameResolver,
                 stateSnapshotService,
-                persistenceRuntime != null ? persistenceRuntime.getNpcProfileRepository() : null,
+                persistenceView,
                 linkPolicyService,
                 this.groupService,
-                profileActionResolver,
-                persistenceRuntime != null ? persistenceRuntime.getQuarantineRegistry() : null
+                profileActionResolver
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.panelPreferenceService = new CommandPanelPreferenceService();
@@ -256,34 +231,15 @@ public final class CommandItemFeatureHandler {
                 coopService,
                 resolutionService,
                 stepExecutionService,
-                companionPlacementService,
-                persistenceRuntime != null
-                        ? new CommandRelocationPersistenceGate(
-                        persistenceRuntime.getMutationAvailabilityService(),
-                        persistenceRuntime.getPersistenceScopeFactory(),
-                        persistenceRuntime.getNpcProfileRepository())
-                        : null
+                companionPlacementService
         );
-        this.respawnService = new CommandRespawnService(
-                companionPlacementService,
-                linkPolicyService,
-                linkMutationService,
-                npcNameResolver,
-                deathService,
-                stepExecutionService
-        );
-        this.lostRecoveryCoordinator = persistenceRuntime != null && populationIdentityResolver != null
-                ? new CommandLostRecoveryCoordinator(
-                    npcIdentityService,
-                    persistenceRuntime.getLostRepository(),
-                    persistenceRuntime.getNpcRecoveryOperationRepository(),
-                    persistenceRuntime.getNpcLiveAliasRepairRepository(),
-                    inventoryRepairService,
-                    companionPlacementService,
-                    new PlannedNpcProjectionSpawner(),
-                    new PlannedNpcProjectionPostAddService(),
-                    stepExecutionService,
-                    populationIdentityResolver)
+        this.restorationService =
+                persistenceView != null && restorationAuthor != null
+                ? new CommandCompanionRestorationService(
+                        companionPlacementService,
+                        persistenceView,
+                        restorationAuthor
+                )
                 : null;
         this.ownerReleaseService = new CommandOwnerReleaseService(
                 linkPolicyService,
@@ -340,6 +296,34 @@ public final class CommandItemFeatureHandler {
                 panelActionService,
                 toolInventoryService,
                 groupActivationService
+        );
+        this.selectionPageService = new CommandSelectionPageService(
+                toolInventoryService,
+                groupAssignPageService,
+                resolutionService,
+                panelActionService,
+                talentPageService
+        );
+        this.itemUseOrchestrator = new CommandItemUseOrchestrator(
+                resolutionService,
+                toolInventoryService,
+                linkMutationService,
+                feedbackService,
+                recipientService,
+                canonicalRecordCommitGate,
+                relocationDispatchService,
+                stepExecutionService,
+                this::reconcileStaleLinkedNpcRecords,
+                this::openSelectionMenu,
+                this::handleDeferredLink,
+                this::resolveCommandLabel,
+                new CommandItemUseOrchestrator.CommandTuning(
+                        HYBRID_TELEPORT_DISTANCE_THRESHOLD,
+                        HYBRID_PATH_DISTANCE_BEFORE_TELEPORT,
+                        HYBRID_TELEPORT_DELAY_MS,
+                        RECALL_SAFE_SPAWN_DISTANCE,
+                        RECALL_FORCE_RELOCATE_DISTANCE
+                )
         );
     }
 
@@ -580,295 +564,9 @@ public final class CommandItemFeatureHandler {
                              Ref<EntityStore> targetRef,
                              String configIdOverride,
                              String commandIdOverride) {
-        if (player == null || itemStack == null || itemStack.isEmpty()) {
-            return false;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return false;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            return false;
-        }
-
-        TwCommandItemConfig config = resolutionService.resolveConfig(itemStack.getItemId(), configIdOverride);
-        if (config == null || !config.isEnabled()) {
-            return false;
-        }
-
-        CommandToolInventoryService.ToolResolution tool = toolInventoryService.ensureToolId(itemStack);
-        ItemStack working = tool.stack;
-        boolean updateHeldItem = tool.changed;
-        if (tool.toolId == null || tool.toolId.isBlank()) {
-            return false;
-        }
-        ItemStack reconciled =
-                reconcileStaleLinkedNpcRecords(
-                        player, store, config, working, tool.toolId
-                );
-        if (reconciled != working) {
-            working = reconciled;
-            updateHeldItem = true;
-        }
-
-        if (isOpenSelectionMenuCommand(commandIdOverride)) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            boolean opened = openSelectionMenu(player, store, config, working, tool.toolId);
-            if (!opened) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.noChoices");
-            }
-            return opened;
-        }
-
-        if (isCycleSelectionCommand(commandIdOverride)) {
-            CommandSelectionResult selection = cycleSelectedCommand(config, working);
-            if (selection.changed) {
-                working = selection.stack;
-                updateHeldItem = true;
-            }
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            if (selection.command == null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.noConfiguredCommand");
-                return false;
-            }
-            String label = resolveCommandLabel(player, selection.command);
-            feedbackService.showDefaultKey(player, "tamework.ui.notifications.command.selection.selected", label);
-            return true;
-        }
-
-        if (targetRef != null && config.isLinkEnabled()
-                && config.isLinkUseTogglesMembership()) {
-            LinkToggleResult link = linkMutationService.tryToggleLink(
-                    player,
-                    store,
-                    targetRef,
-                    tool.toolId,
-                    config,
-                    working,
-                    (livePlayer, liveStore, liveTarget) -> handleDeferredLink(
-                            livePlayer,
-                            liveStore,
-                            liveTarget,
-                            tool.toolId,
-                            config
-                    )
-            );
-            if (link.pending) {
-                if (updateHeldItem) {
-                    updateHeldItem(player, working);
-                }
-                return true;
-            }
-            if (link.toggled) {
-                if (link.updatedItem != null) {
-                    working = link.updatedItem;
-                    updateHeldItem = true;
-                }
-                if (updateHeldItem) {
-                    updateHeldItem(player, working);
-                }
-                if (link.linked && !link.active) {
-                    feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.successInactive", link.npcName);
-                } else {
-                    feedbackService.showSuccessKey(
-                            player,
-                            link.linked
-                                    ? "tamework.ui.notifications.command.link.success"
-                                    : "tamework.ui.notifications.command.link.unlinked",
-                            link.npcName
-                    );
-                }
-                return true;
-            }
-        }
-
-        int cooldownMs = Math.max(0, config.getCooldownSeconds()) * 1000;
-        if (isCooldownActive(working, cooldownMs)) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.cooldown");
-            return false;
-        }
-
-        CommandEntry command = resolutionService.resolveCommand(config, commandIdOverride, working);
-        if (command == null) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.noConfiguredCommand");
-            return false;
-        }
-
-        Ref<EntityStore> commandTarget = resolutionService.resolveCommandTarget(playerRef, store, config, command, targetRef);
-        Vector3d raycastPosition = resolutionService.resolveRaycastPosition(playerRef, store, config, command);
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        TwCompanionConfig.EffectiveSettings defaultCompanionSettings =
-                TwCompanionConfig.EffectiveSettings.fromGlobal(globalConfig);
-        double returnHomeTeleportDistance = resolvePositiveDouble(
-                defaultCompanionSettings.getReturnHomeTeleportDistance(),
-                HYBRID_TELEPORT_DISTANCE_THRESHOLD
+        return itemUseOrchestrator.handleUse(
+                player, itemStack, targetRef, configIdOverride, commandIdOverride
         );
-        double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
-                defaultCompanionSettings.getReturnHomePathDistanceBeforeTeleport(),
-                HYBRID_PATH_DISTANCE_BEFORE_TELEPORT
-        );
-        long returnHomeTeleportDelayMs = resolvePositiveLong(
-                defaultCompanionSettings.getReturnHomeTeleportDelayMs(),
-                HYBRID_TELEPORT_DELAY_MS
-        );
-        double recallSafeSpawnDistance = resolvePositiveDouble(
-                defaultCompanionSettings.getRecallSafeSpawnDistance(),
-                RECALL_SAFE_SPAWN_DISTANCE
-        );
-        double recallForceRelocateDistance = resolvePositiveDouble(
-                defaultCompanionSettings.getRecallForceRelocateDistance(),
-                RECALL_FORCE_RELOCATE_DISTANCE
-        );
-        Context context = new Context(
-                player,
-                playerRef,
-                store,
-                config,
-                command,
-                working.getItemId(),
-                tool.toolId,
-                commandTarget,
-                raycastPosition,
-                working,
-                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(
-                        defaultCompanionSettings.isBlockAllPlayerDamageIfOwned()
-                ),
-                TameworkRuntimeSettings.invulnerableIfOwned(defaultCompanionSettings.isInvulnerableIfOwned()),
-                returnHomeTeleportDistance,
-                returnHomePathDistanceBeforeTeleport,
-                returnHomeTeleportDelayMs,
-                recallSafeSpawnDistance,
-                recallForceRelocateDistance
-        );
-
-        List<Candidate> recipients = recipientService.queryRecipients(context);
-        List<LinkedNpcRecord> unloadedLinked = recipientService.queryUnloadedLinkedRecords(context, recipients);
-        if (context.itemChanged && context.workingItem != working) {
-            ItemStack canonicalStack = context.workingItem;
-            if (!canonicalRecordCommitGate.commitBeforeAction(
-                    true, () -> updateHeldItem(player, canonicalStack))) {
-                feedbackService.showWarningKey(
-                        player, "tamework.ui.notifications.command.shared.itemNotFound");
-                return false;
-            }
-            working = canonicalStack;
-            updateHeldItem = false;
-            context.itemChanged = false;
-        }
-        if (recipients.isEmpty() && unloadedLinked.isEmpty()) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.noRecipients");
-            return false;
-        }
-
-        int affected = 0;
-        Map<UUID, String> appliedCommandStates = new HashMap<>();
-        if (!recipients.isEmpty()) {
-            for (Candidate candidate : recipients) {
-                StepResult stepResult = executeCommand(context, candidate);
-                if (stepResult.applied) {
-                    affected++;
-                }
-                if (stepResult.appliedState != null
-                        && candidate != null
-                        && candidate.npc != null
-                        && candidate.npc.getUuid() != null) {
-                    String cachedState = stepResult.appliedState.cachedValue();
-                    if (cachedState != null) {
-                        appliedCommandStates.put(candidate.npc.getUuid(), cachedState);
-                    }
-                }
-                if (stepResult.abortAll) {
-                    break;
-                }
-            }
-        }
-        ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(
-                context.workingItem, recipients, store, appliedCommandStates
-        );
-        if (refreshedLinks != context.workingItem) {
-            context.workingItem = refreshedLinks;
-            context.itemChanged = true;
-            working = refreshedLinks;
-            updateHeldItem = true;
-        }
-        CommandRelocationDispatchService.QueueResult relocationResult =
-                relocationDispatchService.queueRelocationsForUnloaded(context, unloadedLinked);
-        int queued = relocationResult.queued();
-        if (context.workingItem != working) {
-            working = context.workingItem;
-            updateHeldItem = true;
-        }
-        if (affected <= 0 && queued <= 0) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            if (relocationResult.firstRejection() != null) {
-                feedbackService.showWarning(
-                        player,
-                        PersistencePlayerFeedback.resolve(
-                                player,
-                                PersistenceDomain.RECALL_RELOCATION,
-                                relocationResult.firstRejection()
-                        )
-                );
-            } else {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.none");
-            }
-            return false;
-        }
-
-        if (cooldownMs > 0) {
-            working = working.withMetadata(
-                    TameworkMetadataKeys.COMMAND_COOLDOWN_UNTIL,
-                    Codec.LONG,
-                    System.currentTimeMillis() + cooldownMs
-            );
-            updateHeldItem = true;
-            context.workingItem = working;
-            context.itemChanged = true;
-        }
-        if (updateHeldItem) {
-            updateHeldItem(player, working);
-        }
-        feedbackService.emitCommandExecutionFeedback(
-                context.player,
-                context.playerRef,
-                context.store,
-                context.command,
-                affected,
-                queued,
-                cmdEntry -> resolveCommandLabel(context.player, cmdEntry)
-        );
-        return true;
-    }
-
-    private boolean isCycleSelectionCommand(String commandIdOverride) {
-        if (commandIdOverride == null || commandIdOverride.isBlank()) {
-            return false;
-        }
-        return CYCLE_SELECTION_COMMAND_ID.equalsIgnoreCase(commandIdOverride.trim());
-    }
-
-    private boolean isOpenSelectionMenuCommand(String commandIdOverride) {
-        if (commandIdOverride == null || commandIdOverride.isBlank()) {
-            return false;
-        }
-        return OPEN_SELECTION_MENU_COMMAND_ID.equalsIgnoreCase(commandIdOverride.trim());
     }
 
     private boolean openSelectionMenu(Player player,
@@ -876,52 +574,8 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       ItemStack working,
                                       String toolId) {
-        if (player == null || store == null || config == null || toolId == null || toolId.isBlank()) {
-            return false;
-        }
-        CommandEntry[] commands = config.getCommandList();
-        if (commands == null || commands.length == 0) {
-            return false;
-        }
-        if (player.getPageManager() == null) {
-            return false;
-        }
-        String selectedId = working != null
-                ? working.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING)
-                : null;
-        Ref<EntityStore> playerRef = player.getReference();
-        if (playerRef == null || !playerRef.isValid()) {
-            return false;
-        }
-        PlayerRef uiPlayerRef = player.getPlayerRef();
-        if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            return false;
-        }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        boolean requireUnlinkConfirm = globalConfig == null || globalConfig.isCommandLinkedPanelRequireUnlinkConfirm();
-        boolean recallTeleportingEnabled = CommandTravelSettings.isRecallTeleportingEnabled();
-        TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
-                uiPlayerRef,
-                config,
-                selectedId,
-                requireUnlinkConfirm,
-                () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
-                () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId),
-                () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
-                () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
-                () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
-                () -> groupAssignPageService.resolveGroupActivationDropdownEntries(player, toolId),
-                () -> groupAssignPageService.resolveGroupActivationValue(player, toolId),
-                () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
-                entry -> recallTeleportingEnabled || !resolutionService.isRecallCommand(entry),
-                recallTeleportingEnabled,
-                npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
+        CommandSelectionPageService.Actions actions = new CommandSelectionPageService.Actions(
                 npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
-                npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
-                npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
                 npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, config, npcUuid),
@@ -929,47 +583,11 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRecall(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, config, npcUuid),
-                npcUuid -> talentPageService.openTalentPage(
-                        player,
-                        toolId,
-                        npcUuid,
-                        () -> reopenSelectionMenu(player, config, toolId)
-                ),
-                value -> panelActionService.applySetPanelMode(player, toolId, value),
-                enabled -> panelActionService.applySetAutoLinkEnabled(player, toolId, enabled),
-                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
-                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 () -> openGroupManagerFromSelection(player, config, toolId),
-                value -> panelActionService.applySetSort(player, toolId, value),
-                value -> panelActionService.applySetFilterMode(player, toolId, value),
-                value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
-                () -> panelActionService.applyClearFilters(player, toolId),
-                value -> groupAssignPageService.applyGroupActivation(player, toolId, value),
-                (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
-                        player,
-                        toolId,
-                        config,
-                        npcUuid,
-                        groupId
-                ),
+                () -> reopenSelectionMenu(player, config, toolId),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
-        try {
-            player.getPageManager().openCustomPage(playerRef, store, page);
-            return true;
-        } catch (Throwable throwable) {
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "ui_page_open_failed",
-                    throwable,
-                    TameworkTelemetryContext.uiPage(
-                            "TameworkCommandSelectionPage",
-                            "command_item",
-                            "open",
-                            "Failed to open command selection page."
-                    ).build()
-            );
-            return false;
-        }
+        return selectionPageService.open(player, store, config, working, toolId, actions);
     }
 
     private void openGroupManagerFromSelection(Player player,
@@ -1093,7 +711,7 @@ public final class CommandItemFeatureHandler {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
-        if (deathService == null && lostService == null) {
+        if (restorationService == null) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.trackingUnavailable");
             return;
         }
@@ -1129,81 +747,38 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
-                    deathService == null
-                            ? null
-                            : deathService.getDeadSnapshotForTool(
-                                    npcUuid, toolId, player.getUuid()
-                            );
-            if (deadSnapshot != null) {
-                String roleId = deadSnapshot.roleId();
-                if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-                    roleId = record.cachedRoleId;
-                }
-                TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-                if (!TameworkRuntimeSettings.reviveSystemEnabled(companionSettings.isDeadRespawnEnabled())) {
-                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.disabled");
-                    return;
-                }
-                long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-                if (remainingMs > 0L) {
-                    feedbackService.showWarningKey(
-                            player,
-                            "tamework.ui.notifications.command.respawn.cooldownRemaining",
-                            formatDuration(player, remainingMs)
+            TwCompanionConfig.EffectiveSettings companionSettings =
+                    TwCompanionConfig.resolveEffectiveForRole(
+                            record.cachedRoleId
                     );
-                    return;
-                }
-                double safeSpawnDistance = resolvePositiveDouble(
-                        companionSettings.getRecallSafeSpawnDistance(),
-                        RECALL_SAFE_SPAWN_DISTANCE
-                );
-                long followRetryDelayMs = resolvePositiveLong(
-                        companionSettings.getDeadRespawnFollowRetryDelayMs(),
-                        RESPAWN_FOLLOW_RETRY_DELAY_MS
-                );
-                String name = deadSnapshot.displayName();
-                if (name == null || name.isBlank()) {
-                    name = LocalizedText.resolve(
-                            player,
-                            "tamework.ui.notifications.command.shared.defaultCompanionName"
-                    );
-                }
-                boolean started = respawnService.respawnDeadLinkedNpc(
-                        player,
-                        playerRef,
-                        store,
-                        toolId,
-                        stack,
-                        record,
-                        deadSnapshot,
-                        safeSpawnDistance,
-                        followRetryDelayMs,
-                        deadRespawnCompletion(world, player.getUuid(), slot, stack, name)
-                );
-                if (!started) {
-                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
-                }
-                return;
-            }
-            if (lostRecoveryCoordinator == null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.notDeadOrLost");
-                return;
-            }
-            String roleId = record.cachedRoleId;
-            TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
             double safeSpawnDistance = resolvePositiveDouble(
                     companionSettings.getRecallSafeSpawnDistance(),
                     RECALL_SAFE_SPAWN_DISTANCE
             );
-            lostRecoveryCoordinator.request(
-                    world,
-                    player.getUuid(),
-                    toolId,
-                    record,
-                    safeSpawnDistance,
-                    this::onLostRecoveryComplete
-            );
+            CommandCompanionRestorationService.RequestStatus status =
+                    restorationService.request(
+                            player,
+                            playerRef,
+                            store,
+                            toolId,
+                            record,
+                            safeSpawnDistance
+                    );
+            if (status
+                    == CommandCompanionRestorationService.RequestStatus
+                    .NOT_DORMANT) {
+                feedbackService.showWarningKey(
+                        player,
+                        "tamework.ui.notifications.command.respawn.notDeadOrLost"
+                );
+            } else if (status
+                    != CommandCompanionRestorationService.RequestStatus
+                    .STARTED) {
+                feedbackService.showWarningKey(
+                        player,
+                        "tamework.ui.notifications.command.respawn.unavailable"
+                );
+            }
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
@@ -1213,94 +788,6 @@ public final class CommandItemFeatureHandler {
         if (holder != null) {
             inventoryRepairService.canonicalize(holder);
         }
-    }
-
-    @Nonnull
-    private CommandRespawnService.Completion deadRespawnCompletion(
-            @Nonnull World world,
-            @Nonnull UUID playerUuid,
-            short slot,
-            @Nonnull ItemStack expectedStack,
-            @Nonnull String displayName) {
-        return new CommandRespawnService.Completion() {
-            @Override
-            public boolean onApplied(@Nonnull CommandRespawnService.AppliedRespawn result) {
-                WorldPlayerResolver.ResolvedPlayer resolved =
-                        WorldPlayerResolver.resolve(world, playerUuid);
-                Inventory inventory = resolved == null ? null : resolved.player().getInventory();
-                ItemContainer hotbar = inventory == null ? null : inventory.getHotbar();
-                if (resolved == null || hotbar == null) {
-                    return false;
-                }
-                ItemStack current = hotbar.getItemStack(slot);
-                if (!Objects.equals(current, result.updatedStack())) {
-                    if (!Objects.equals(current, expectedStack)) {
-                        feedbackService.showWarningKey(
-                                resolved.player(),
-                                "tamework.ui.notifications.command.respawn.failed"
-                        );
-                        return false;
-                    }
-                    hotbar.setItemStackForSlot(slot, result.updatedStack());
-                }
-                feedbackService.showSuccessKey(
-                        resolved.player(),
-                        "tamework.ui.notifications.command.respawn.success",
-                        displayName
-                );
-                return true;
-            }
-
-            @Override
-            public void onDenied(@Nonnull String reason) {
-                showDeadRespawnFailure(world, playerUuid);
-            }
-
-            @Override
-            public void onDurabilityDegraded(@Nonnull String reason) {
-                showDeadRespawnFailure(world, playerUuid);
-            }
-        };
-    }
-
-    private void showDeadRespawnFailure(@Nonnull World world, @Nonnull UUID playerUuid) {
-        WorldPlayerResolver.ResolvedPlayer resolved = WorldPlayerResolver.resolve(world, playerUuid);
-        if (resolved != null) {
-            feedbackService.showWarningKey(
-                    resolved.player(),
-                    "tamework.ui.notifications.command.respawn.failed"
-            );
-        }
-    }
-
-    private void onLostRecoveryComplete(
-            @Nonnull Player player,
-            @Nonnull CommandLostRecoveryCoordinator.Outcome outcome) {
-        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.RECOVERED) {
-            String name = outcome.companionName();
-            if (name == null || name.isBlank()) {
-                name = LocalizedText.resolve(
-                        player, "tamework.ui.notifications.command.shared.defaultCompanionName");
-            }
-            feedbackService.showSuccessKey(
-                    player, "tamework.ui.notifications.command.respawn.recovered", name);
-            return;
-        }
-        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.ALREADY_LIVE_REPAIRED) {
-            feedbackService.showSuccess(
-                    player, "That companion is already live; command records were repaired.");
-            return;
-        }
-        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.IN_PROGRESS) {
-            feedbackService.showDefault(player, outcome.message());
-            return;
-        }
-        String message = outcome.message();
-        if (message == null || message.isBlank()) {
-            message = LocalizedText.resolve(
-                    player, "tamework.ui.notifications.command.respawn.recoverFailed");
-        }
-        feedbackService.showWarning(player, message);
     }
 
     private void applyMenuSetHome(Player player,
@@ -1701,47 +1188,8 @@ public final class CommandItemFeatureHandler {
         return null;
     }
 
-    private String formatDuration(Player player, long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return LocalizedText.format(player, "tamework.ui.shared.duration.seconds", seconds);
-        }
-        return LocalizedText.format(
-                player,
-                "tamework.ui.shared.duration.minutesSeconds",
-                minutes,
-                seconds
-        );
-    }
-
     private ItemStack findCommandToolStack(Player player, String toolId) {
         return toolInventoryService.findToolStack(player, toolId);
-    }
-
-    private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
-        if (config == null || stack == null) {
-            return CommandSelectionResult.none(stack);
-        }
-        String selectedId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
-        CommandEntry next = config.findNextCommand(selectedId);
-        if (next == null || next.getId() == null || next.getId().isBlank()) {
-            return CommandSelectionResult.none(stack);
-        }
-        boolean changed = !commandIdEquals(next.getId(), selectedId);
-        if (!changed) {
-            return new CommandSelectionResult(stack, next, false);
-        }
-        ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, next.getId());
-        return new CommandSelectionResult(updated, next, true);
-    }
-
-    private boolean commandIdEquals(String left, String right) {
-        if (left == null || right == null || left.isBlank() || right.isBlank()) {
-            return false;
-        }
-        return left.trim().equalsIgnoreCase(right.trim());
     }
 
     private String resolveCommandLabel(Player player, CommandEntry command) {
@@ -1757,11 +1205,6 @@ public final class CommandItemFeatureHandler {
         return LocalizedText.resolveConfigValue(language, command.getDisplayName(), fallback);
     }
 
-    private StepResult executeCommand(Context context, Candidate candidate) {
-        relocationDispatchService.maybeRelocateLoadedRecallCandidate(context, candidate);
-        return stepExecutionService.executeCommand(context, candidate);
-    }
-
     private Vector3d readStoredHomePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
@@ -1772,28 +1215,12 @@ public final class CommandItemFeatureHandler {
         }
         return links.getHomePosition();
     }
-    private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
-        if (cooldownMs <= 0) {
-            return false;
-        }
-        Long until = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_COOLDOWN_UNTIL, Codec.LONG);
-        return until != null && until > System.currentTimeMillis();
-    }
-
     private double resolvePositiveDouble(double configured, double fallback) {
         return configured > 0.0 ? configured : fallback;
     }
 
     private double resolveFiniteDouble(double configured, double fallback) {
         return Double.isFinite(configured) ? configured : fallback;
-    }
-
-    private long resolvePositiveLong(long configured, long fallback) {
-        return configured > 0L ? configured : fallback;
-    }
-
-    private boolean updateHeldItem(Player player, ItemStack updated) {
-        return toolInventoryService.updateHeldItem(player, updated);
     }
 
     private void handleDeferredLink(Player player,

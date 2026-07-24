@@ -2,10 +2,13 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -94,6 +97,24 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public SqliteCompanionProfileOperations profileOperations() {
         return publicOperations.profiles();
+    }
+
+    /**
+     * Submits the sole startup reconciliation mutation through the shared
+     * operation protocol without opening general public mutation admission.
+     */
+    @Nonnull
+    public SqliteDatabaseOperationCoordinator.Submission
+    reconcileLoadedAtStartup(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull CompanionProfileMutation.ReconcileLoaded reconciliation
+    ) {
+        return recoveryOperations.profiles().submit(
+                operationId,
+                idempotencyKey,
+                reconciliation
+        );
     }
 
     @Nonnull

@@ -3,10 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRecord;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -49,7 +45,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedPanelCooldownSnapshotService cooldownSnapshotService;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandLinkedPanelLiveTargetResolver liveTargetResolver;
-    private final PersistenceQuarantineRegistry quarantineRegistry;
+    private final CommandPersistenceView persistenceView;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -59,11 +55,10 @@ final class CommandLinkedPanelEntryService {
                                    CommandNpcRelocationService relocationService,
                                    CommandNpcNameResolver npcNameResolver,
                                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                   @Nullable NpcProfileRepository profileRepository,
+                                   @Nullable CommandPersistenceView persistenceView,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService,
-                                   @Nullable CommandNpcProfileActionResolver profileActionResolver,
-                                   @Nullable PersistenceQuarantineRegistry quarantineRegistry) {
+                                   @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -72,8 +67,9 @@ final class CommandLinkedPanelEntryService {
         this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
         this.unloadedNameService = new CommandLinkedPanelUnloadedNameService(
-                this.npcNameResolver, stateSnapshotService, profileRepository
+                this.npcNameResolver, stateSnapshotService, persistenceView
         );
+        this.persistenceView = persistenceView;
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
         this.progressionPresentationService = new CommandLinkedPanelProgressionPresentationService();
@@ -87,7 +83,6 @@ final class CommandLinkedPanelEntryService {
         this.liveTargetResolver = profileActionResolver == null
                 ? null
                 : new CommandLinkedPanelLiveTargetResolver(profileActionResolver);
-        this.quarantineRegistry = quarantineRegistry;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -141,6 +136,21 @@ final class CommandLinkedPanelEntryService {
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             }
+            CommandPersistenceView.ProfileSnapshot canonicalProfile =
+                    persistenceView == null
+                            ? null
+                            : persistenceView.find(record).orElse(null);
+            if (canonicalProfile != null) {
+                dead = canonicalProfile.dead();
+                captured = canonicalProfile.captured();
+                inCoop = canonicalProfile.inCoop();
+                lost = canonicalProfile.lost();
+                displayName = firstNonBlank(
+                        canonicalProfile.customName(),
+                        canonicalProfile.displayName(),
+                        displayName
+                );
+            }
             String gender = null;
             String speciesId = resolveCachedSpeciesId(record);
             String speciesLabel = speciesId;
@@ -170,7 +180,7 @@ final class CommandLinkedPanelEntryService {
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             boolean talentsActionVisible = false;
             boolean talentsActionEnabled = false;
-            if (!loaded && deathService != null) {
+            if (!loaded && dead && deathService != null) {
                 CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
                         record.profileId != null && !record.profileId.isBlank()
                                 ? deathService.getDeadSnapshotForOwner(
@@ -219,7 +229,8 @@ final class CommandLinkedPanelEntryService {
                     deadRespawnRemainingMs = -1L;
                 }
             }
-            if (!loaded && !dead && captureService != null) {
+            if (canonicalProfile == null
+                    && !loaded && !dead && captureService != null) {
                 CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
                         captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (capturedSnapshot != null) {
@@ -234,7 +245,8 @@ final class CommandLinkedPanelEntryService {
                     }
                 }
             }
-            if (!loaded && !dead && !captured && coopService != null) {
+            if (canonicalProfile == null
+                    && !loaded && !dead && !captured && coopService != null) {
                 CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot coopSnapshot =
                         coopService.getCoopSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (coopSnapshot != null) {
@@ -262,11 +274,13 @@ final class CommandLinkedPanelEntryService {
                     );
                 }
                 if (loadedEntry != null) {
-                    entries.add(applyRecoveryHold(loadedEntry, record.profileId));
+                    entries.add(loadedEntry);
                     continue;
                 }
             }
-            if (!loaded && !dead && !captured && !inCoop && lostService != null) {
+            if (canonicalProfile == null
+                    && !loaded && !dead && !captured && !inCoop
+                    && lostService != null) {
                 CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot =
                         lostService.getLostSnapshot(record.npcUuid);
                 if (lostSnapshot != null) {
@@ -330,18 +344,9 @@ final class CommandLinkedPanelEntryService {
                     recallPending,
                     recallLostRemainingMs
             );
-            entries.add(applyRecoveryHold(entry, record.profileId));
+            entries.add(entry);
         }
         return entries;
-    }
-
-    private LinkedNpcEntry applyRecoveryHold(LinkedNpcEntry entry, @Nullable String profileId) {
-        if (quarantineRegistry == null || profileId == null || profileId.isBlank()) return entry;
-        PersistenceQuarantineRecord hold = quarantineRegistry
-                .find(PersistenceScopeType.PROFILE, profileId)
-                .or(() -> quarantineRegistry.find(PersistenceScopeType.BREEDING_PARENT, profileId))
-                .orElse(null);
-        return hold == null ? entry : entry.withRecoveryHold(hold.incidentId());
     }
 
     @Nullable

@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import java.util.Objects;
@@ -36,7 +34,7 @@ final class SimpleClaimsRawAccessEvaluator {
 
         SimpleClaimsDamageCapabilityResolver.Resolution resolution = resolveCapability();
         SimpleClaimsDamageGeneration capability = resolution.capability();
-        if (resolution.state() != ClaimProviderState.READY || capability == null) {
+        if (resolution.state() != SimpleClaimsPluginState.READY || capability == null) {
             return unavailable(firstNonBlank(resolution.reason(), "simpleclaims-unavailable"));
         }
         if (!capability.claimIdentityAvailable()) {
@@ -135,8 +133,8 @@ final class SimpleClaimsRawAccessEvaluator {
     @Nonnull
     private static SimpleClaimsDamageCapabilityResolver.Resolution resolutionError(@Nonnull String reason) {
         return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                ClaimProviderState.ERROR,
-                ClaimProviderGeneration.NONE,
+                SimpleClaimsPluginState.ERROR,
+                SimpleClaimsPluginGeneration.NONE,
                 null,
                 reason
         );

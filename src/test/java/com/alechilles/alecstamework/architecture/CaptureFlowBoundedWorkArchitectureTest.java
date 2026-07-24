@@ -13,7 +13,6 @@ class CaptureFlowBoundedWorkArchitectureTest {
     void captureTickWorkUsesIndexedPlayersAndABoundedOrphanSweep() throws Exception {
         String channel = source("items/CaptureChannelVfxSystem.java");
         String handler = source("items/SpawnerFeatureHandler.java");
-        String attempts = source("items/SpawnerCaptureAttemptRuntimeCoordinator.java");
 
         assertTrue(channel.contains("Session session = playerUuid == null ? null : ACTIVE.get(playerUuid)"));
         assertTrue(channel.contains("this.query = Query.and(playerType, uuidType)"));
@@ -26,52 +25,9 @@ class CaptureFlowBoundedWorkArchitectureTest {
         assertFalse(channel.contains("loadAll"));
         assertFalse(channel.contains("Universe.get().getPlayers"));
 
-        assertTrue(attempts.contains(
-                "ConcurrentHashMap<UUID, CaptureAttemptHandle> channelAttempts"));
-        assertTrue(attempts.contains("channelAttempts.put(playerUuid, attempt)"));
-        assertTrue(attempts.contains("channelAttempts.remove(playerUuid)"));
         assertFalse(handler.contains("implements TickingSystem"));
-        assertFalse(attempts.contains("implements TickingSystem"));
         assertFalse(handler.contains("loadAllProfiles"));
-        assertFalse(attempts.contains("loadAllProfiles"));
         assertFalse(handler.contains("Universe.get().getPlayers"));
-        assertFalse(attempts.contains("Universe.get().getPlayers"));
-    }
-
-    @Test
-    void everyCaptureEntryPointCarriesOnePreparedHandleIntoTerminalResolution() throws Exception {
-        String handler = source("items/SpawnerFeatureHandler.java");
-        String attempts = source("items/SpawnerCaptureAttemptRuntimeCoordinator.java");
-        String owner = source("npc/actions/ActionTameworkCaptureOwner.java");
-        String wild = source("npc/actions/ActionTameworkCaptureWild.java");
-
-        assertTrue(handler.contains("CaptureAttemptHandle attempt = prepareCaptureAttempt("));
-        assertTrue(handler.contains("captureAttemptRuntime.rememberChannel(playerUuid.getUuid(), attempt)"));
-        assertTrue(handler.contains(
-                "UUID playerUuid = resolvePlayerUuid(player);\n"
-                        + "        CaptureAttemptHandle attempt = captureAttemptRuntime.takeChannel(playerUuid)"));
-        assertTrue(handler.contains("getStore().getComponent(\n"
-                + "                player.getReference(), UUIDComponent.getComponentType())"));
-        assertFalse(handler.contains("takeChannel(player.getUuid())"));
-        assertTrue(handler.contains("missing-channel-attempt-identity"));
-        assertTrue(attempts.contains("attempts.resolve(request)"));
-        assertFalse(handler.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
-        assertFalse(attempts.contains("attemptId == null ? UUID.randomUUID() : attemptId"));
-
-        assertPreparedHandleFlowsOnce(owner);
-        assertPreparedHandleFlowsOnce(wild);
-    }
-
-    private static void assertPreparedHandleFlowsOnce(String action) {
-        int prepare = action.indexOf(
-                "CaptureAttemptHandle attempt = handler.prepareCaptureAttempt(player, itemStack, null)");
-        int require = action.indexOf("attempt != null", prepare);
-        int dispatch = action.indexOf(
-                "handler.captureFromNpcAction(player, npcRef, itemStack, config, attempt)", require);
-        assertTrue(prepare >= 0);
-        assertTrue(require > prepare);
-        assertTrue(dispatch > require);
-        assertFalse(action.contains("UUID.randomUUID()"));
     }
 
     private static String source(String relative) throws Exception {

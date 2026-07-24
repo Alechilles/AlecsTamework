@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProject
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 
@@ -21,6 +23,7 @@ public record CompanionCaptureReleaseRequest(
         @Nonnull SnapshotCodecRegistry.EncodedSnapshot projection,
         @Nonnull CaptureReleaseSourceEvidence source,
         @Nonnull NpcAlias targetAlias,
+        @Nullable OwnerId ownerAssignment,
         @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String inventoryReceiptKey,
         @Nonnull String spawnReceiptKey,

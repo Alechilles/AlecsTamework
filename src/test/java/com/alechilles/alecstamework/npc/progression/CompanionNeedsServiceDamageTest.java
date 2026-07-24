@@ -453,7 +453,6 @@ class CompanionNeedsServiceDamageTest {
         return new ResolvedTameworkSettings(
                 defaults.populationLimitPerPlayerOwnedTotal(),
                 defaults.populationPerPlayerLimitScope(),
-                defaults.simpleClaimsProvider(),
                 defaults.simpleClaimsEnabled(),
                 defaults.simpleClaimsLimitPerClaimChunk(),
                 defaults.simpleClaimsLimitPerClaimTotal(),
