@@ -92,6 +92,21 @@ class TwCompanionConfigInheritanceTest {
     }
 
     @Test
+    void effectiveSettingsKeepRoleScopedRespawnCooldown() throws Exception {
+        TwCompanionConfig scoped = new TwCompanionConfig();
+        setNestedIntField(
+                scoped, "command", "deadRespawnCooldownMs", 600_000
+        );
+        TwGlobalConfig global = TwGlobalConfig.defaultConfig();
+        setField(global, "commandDeadRespawnCooldownMs", 60_000);
+
+        TwCompanionConfig.EffectiveSettings settings =
+                TwCompanionConfig.EffectiveSettings.from(scoped, global);
+
+        assertEquals(600_000, settings.getDeadRespawnCooldownMs());
+    }
+
+    @Test
     void deadRespawnFieldsInheritDirectly() throws Exception {
         TwCompanionConfig parent = new TwCompanionConfig();
         TwCompanionConfig child = new TwCompanionConfig();

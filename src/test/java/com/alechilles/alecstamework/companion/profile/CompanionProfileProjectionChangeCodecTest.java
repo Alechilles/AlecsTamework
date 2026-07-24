@@ -17,6 +17,8 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -181,5 +183,122 @@ class CompanionProfileProjectionChangeCodecTest {
         assertNull(state.customName());
         assertFalse(state.tamed());
         assertNull(state.coopSlot());
+    }
+
+    @Test
+    void deathDeadlineSurvivesCompositionAndCodecRoundTrip() {
+        CompanionIdentity identity = new CompanionIdentity(
+                PROFILE,
+                "Display",
+                "role",
+                "{}",
+                Sha256Hash.ofUtf8("{}"),
+                "world",
+                -100,
+                -90,
+                -90,
+                0
+        );
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.DEAD_REVIVABLE,
+                LifecycleLocation.none(),
+                new LifecycleRevision(2),
+                null,
+                -80,
+                ReconciliationGeneration.INITIAL,
+                null
+        );
+        String payload = """
+                {"diedAtMs":-260,"respawnAvailableAtMs":-1000}
+                """.trim();
+        CompanionSnapshot death = new CompanionSnapshot(
+                SnapshotId.parse(
+                        "50000000-0000-0000-0000-000000000002"
+                ),
+                PROFILE,
+                new SnapshotKind("death"),
+                2,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                new LifecycleRevision(2),
+                true,
+                -70
+        );
+        CompanionProfileProjectionState state =
+                CompanionProfileProjectionState.compose(
+                        identity,
+                        null,
+                        lifecycle,
+                        List.of(),
+                        List.of(death),
+                        null
+                );
+        CompanionProfileProjectionChange change =
+                new CompanionProfileProjectionChange(
+                        CompanionProfileProjectionChange.Source.SNAPSHOT,
+                        PROFILE,
+                        2,
+                        null,
+                        state,
+                        -60
+                );
+
+        CompanionProfileProjectionChange decoded =
+                CompanionProfileProjectionChangeCodec.decode(
+                        CompanionProfileProjectionChangeCodec.VERSION,
+                        CompanionProfileProjectionChangeCodec.encode(change)
+                );
+
+        assertEquals(-1000L, state.restorationAvailableAtMs());
+        assertEquals(
+                -1000L,
+                decoded.after().restorationAvailableAtMs()
+        );
+    }
+
+    @Test
+    void existingVersionOnePayloadWithoutDeadlineDecodesAsUnset() {
+        CompanionProfileProjectionState state =
+                new CompanionProfileProjectionState(
+                        PROFILE,
+                        null,
+                        LifecycleState.DEAD_REVIVABLE,
+                        OWNER,
+                        null,
+                        "role",
+                        "Display",
+                        null,
+                        true,
+                        null,
+                        null,
+                        java.util.Set.of(),
+                        java.util.Set.of(new SnapshotKind("death")),
+                        -70
+                );
+        CompanionProfileProjectionChange change =
+                new CompanionProfileProjectionChange(
+                        CompanionProfileProjectionChange.Source.SNAPSHOT,
+                        PROFILE,
+                        2,
+                        null,
+                        state,
+                        -60
+                );
+        JsonObject payload = JsonParser.parseString(
+                CompanionProfileProjectionChangeCodec.encode(change)
+        ).getAsJsonObject();
+        payload.getAsJsonObject("after").remove(
+                "restorationAvailableAtMs"
+        );
+
+        CompanionProfileProjectionChange decoded =
+                CompanionProfileProjectionChangeCodec.decode(
+                        CompanionProfileProjectionChangeCodec.VERSION,
+                        payload.toString()
+                );
+
+        assertEquals(0L, decoded.after().restorationAvailableAtMs());
     }
 }

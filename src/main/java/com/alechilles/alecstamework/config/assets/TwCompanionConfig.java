@@ -1021,9 +1021,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         global != null
                                 ? global.isCommandDeadRespawnEnabled()
                                 : command.isDeadRespawnEnabled(),
-                        global != null
-                                ? global.getCommandDeadRespawnCooldownMs()
-                                : command.getDeadRespawnCooldownMs(),
+                        command.getDeadRespawnCooldownMs(),
                         command.getDeadRespawnFollowRetryDelayMs(),
                         command.getDeadRespawnDistanceClose(),
                         command.getDeadRespawnDistanceNear(),

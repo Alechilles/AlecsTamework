@@ -42,6 +42,7 @@ public record CompanionProfileProjectionState(
         @Nullable Integer coopSlot,
         @Nonnull Set<UUID> toolIds,
         @Nonnull Set<SnapshotKind> activeSnapshotKinds,
+        long restorationAvailableAtMs,
         long lastUpdatedAtMs
 ) {
     public CompanionProfileProjectionState {
@@ -56,6 +57,44 @@ public record CompanionProfileProjectionState(
         coopId = normalize(coopId);
         toolIds = Set.copyOf(toolIds);
         activeSnapshotKinds = Set.copyOf(activeSnapshotKinds);
+    }
+
+    /**
+     * Backward-compatible constructor for consumers that do not project restoration timing.
+     */
+    public CompanionProfileProjectionState(
+            @Nonnull ProfileId profileId,
+            @Nullable NpcAlias currentAlias,
+            @Nonnull LifecycleState lifecycleState,
+            @Nullable OwnerId ownerId,
+            @Nullable String ownerName,
+            @Nullable String roleId,
+            @Nullable String displayName,
+            @Nullable String customName,
+            boolean tamed,
+            @Nullable String coopId,
+            @Nullable Integer coopSlot,
+            @Nonnull Set<UUID> toolIds,
+            @Nonnull Set<SnapshotKind> activeSnapshotKinds,
+            long lastUpdatedAtMs
+    ) {
+        this(
+                profileId,
+                currentAlias,
+                lifecycleState,
+                ownerId,
+                ownerName,
+                roleId,
+                displayName,
+                customName,
+                tamed,
+                coopId,
+                coopSlot,
+                toolIds,
+                activeSnapshotKinds,
+                0L,
+                lastUpdatedAtMs
+        );
     }
 
     /** Composes one projection state from the focused canonical authorities. */
@@ -119,8 +158,35 @@ public record CompanionProfileProjectionState(
                         : currentCoopSlot.key().residentSlot(),
                 tools,
                 snapshots,
+                restorationAvailableAtMs(lifecycle.state(), currentSnapshots),
                 latestUpdate(identity, currentAlias, lifecycle, toolLinks, currentSnapshots)
         );
+    }
+
+    private static long restorationAvailableAtMs(
+            LifecycleState lifecycleState,
+            List<CompanionSnapshot> snapshots
+    ) {
+        if (lifecycleState != LifecycleState.DEAD_REVIVABLE) {
+            return 0L;
+        }
+        for (CompanionSnapshot snapshot : snapshots) {
+            if (!"death".equals(snapshot.kind().value())) {
+                continue;
+            }
+            JsonObject payload = ProfileMetadata.parseObject(
+                    snapshot.payloadJson()
+            );
+            JsonElement value = ProfileMetadata.value(
+                    payload, "respawnAvailableAtMs"
+            );
+            try {
+                return value == null ? 0L : value.getAsLong();
+            } catch (RuntimeException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
     private static long latestUpdate(

@@ -103,6 +103,10 @@ public final class CompanionProfileProjectionChangeCodec {
                 .sorted()
                 .forEach(snapshots::add);
         json.add("activeSnapshotKinds", snapshots);
+        json.addProperty(
+                "restorationAvailableAtMs",
+                state.restorationAvailableAtMs()
+        );
         json.addProperty("lastUpdatedAtMs", state.lastUpdatedAtMs());
         return json;
     }
@@ -139,6 +143,7 @@ public final class CompanionProfileProjectionChangeCodec {
                 coopSlot == null || coopSlot.isJsonNull() ? null : coopSlot.getAsInt(),
                 tools,
                 snapshots,
+                optionalLong(json, "restorationAvailableAtMs", 0L),
                 json.get("lastUpdatedAtMs").getAsLong()
         );
     }
@@ -154,6 +159,17 @@ public final class CompanionProfileProjectionChangeCodec {
     private static String nullableText(JsonObject json, String name) {
         JsonElement value = json.get(name);
         return value == null || value.isJsonNull() ? null : value.getAsString();
+    }
+
+    private static long optionalLong(
+            JsonObject json,
+            String name,
+            long fallback
+    ) {
+        JsonElement value = json.get(name);
+        return value == null || value.isJsonNull()
+                ? fallback
+                : value.getAsLong();
     }
 
     private static String text(Object value) {

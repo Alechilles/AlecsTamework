@@ -137,7 +137,8 @@ final class CommandPersistenceView {
             @Nullable String displayName,
             @Nullable String customName,
             @Nonnull Set<UUID> toolIds,
-            @Nonnull LifecycleState lifecycleState
+            @Nonnull LifecycleState lifecycleState,
+            long restorationAvailableAtMs
     ) {
         ProfileSnapshot {
             Objects.requireNonNull(profileId, "Profile ID is required");
@@ -192,7 +193,8 @@ final class CommandPersistenceView {
                     projection.displayName(),
                     projection.customName(),
                     projection.toolIds(),
-                    projection.lifecycleState()
+                    projection.lifecycleState(),
+                    projection.restorationAvailableAtMs()
             );
         }
     }

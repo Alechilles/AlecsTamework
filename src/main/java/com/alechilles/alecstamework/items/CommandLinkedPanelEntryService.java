@@ -173,6 +173,11 @@ final class CommandLinkedPanelEntryService {
                 );
                 if (!deadRespawnEnabled) {
                     deadRespawnRemainingMs = -1L;
+                } else if (canonicalProfile != null) {
+                    deadRespawnRemainingMs = remainingUntil(
+                            canonicalProfile.restorationAvailableAtMs(),
+                            System.currentTimeMillis()
+                    );
                 }
             }
             if (!dead && !captured && !inCoop && world != null) {
@@ -253,6 +258,14 @@ final class CommandLinkedPanelEntryService {
             entries.add(entry);
         }
         return entries;
+    }
+
+    static long remainingUntil(long availableAtMs, long nowMs) {
+        if (availableAtMs == 0L || availableAtMs <= nowMs) {
+            return 0L;
+        }
+        long remaining = availableAtMs - nowMs;
+        return remaining < 0L ? Long.MAX_VALUE : remaining;
     }
 
     @Nullable

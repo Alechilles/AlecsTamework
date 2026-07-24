@@ -42,6 +42,7 @@ class CommandPersistenceViewTest {
                                 CompanionCaptureRequest.SNAPSHOT_KIND,
                                 TameworkSnapshotCodecs.LOST
                         ),
+                        600L,
                         100L
                 );
         CommandPersistenceView view = new CommandPersistenceView(
@@ -62,6 +63,7 @@ class CommandPersistenceViewTest {
         assertFalse(result.inCoop());
         assertTrue(result.dormant());
         assertTrue(result.restorable());
+        assertEquals(600L, result.restorationAvailableAtMs());
     }
 
     @Test
