@@ -21,19 +21,26 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `9246d8ddee2f5f80d5f31f79c61c088256c029c9` |
+| Tamework commit | `f71291e0fb10dfab3d839e3a991adf8fb1848e66` |
 | Tamework version | `3.0.0` |
-| Hytale version | Record the exact runtime version during the manual rehearsal |
+| Hytale version | `0.5.7` |
 | Candidate artifact path | `artifacts/Alec's Tamework! v3.0.0.jar` |
-| Candidate SHA-256 | `246b580a0df3f6f148a9fbac8d5fa82148845010af82889f50e6d26cfe17ef92` |
-| Maven test result | Clean candidate run on 2026-07-24: 2,530 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Normal builder passed in 2:47; artifact size 22,706,809 bytes |
+| Candidate SHA-256 | `94460d4a470a3a4e3d88a79f0d00f0bec63d453f96329f5856f0902d7abf8293` |
+| Maven test result | Clean candidate run on 2026-07-24: 2,531 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Normal builder passed in 2:54; artifact size 22,709,116 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
 
 This records the latest automated candidate only. The unchecked manual
 fresh-world, copied-save, and rollback gates remain required before publishing.
+
+The superseded candidate
+`246b580a0df3f6f148a9fbac8d5fa82148845010af82889f50e6d26cfe17ef92`
+failed owner-assigned spawner release in the disposable `TW Persistence
+Refresh` world on Hytale `0.5.7`. Commit `f71291e0` corrected the capture-release
+scope policy and added production control-plane regression coverage. Do not use
+the superseded candidate for further release evidence.
 
 ## Automated gates
 
