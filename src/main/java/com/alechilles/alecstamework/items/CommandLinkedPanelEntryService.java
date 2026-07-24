@@ -130,15 +130,34 @@ final class CommandLinkedPanelEntryService {
                 captured = canonicalProfile.captured();
                 inCoop = canonicalProfile.inCoop();
                 lost = canonicalProfile.lost();
+                String canonicalDisplayName =
+                        npcNameResolver.resolveSnapshotDisplayName(
+                                canonicalProfile.displayName(),
+                                record.cachedNameKey,
+                                canonicalProfile.roleId()
+                        );
                 displayName = firstNonBlank(
                         canonicalProfile.customName(),
-                        canonicalProfile.displayName(),
+                        canonicalDisplayName,
                         displayName
                 );
             }
             String gender = null;
-            String speciesId = resolveCachedSpeciesId(record);
-            String speciesLabel = speciesId;
+            String speciesRoleId = firstNonBlank(
+                    canonicalProfile == null
+                            ? null : canonicalProfile.roleId(),
+                    record.cachedRoleId,
+                    RoleNameResolver.extractRoleIdFromNameKey(
+                            record.cachedNameKey
+                    )
+            );
+            String speciesId = normalize(speciesRoleId);
+            String speciesLabel = npcNameResolver.resolveRoleDisplayName(
+                    speciesRoleId, record.cachedNameKey
+            );
+            if (speciesLabel == null || speciesLabel.isBlank()) {
+                speciesLabel = speciesId;
+            }
             int health = 0;
             int maxHealth = 0;
             int happiness = 0;
@@ -314,18 +333,6 @@ final class CommandLinkedPanelEntryService {
         }
         String raw = uuid.toString();
         return raw.length() >= 8 ? raw.substring(0, 8) : raw;
-    }
-
-    private String resolveCachedSpeciesId(LinkedNpcRecord record) {
-        if (record == null) {
-            return null;
-        }
-        String roleId = firstNonBlank(
-                record.cachedRoleId,
-                RoleNameResolver.extractRoleIdFromNameKey(record.cachedNameKey),
-                null
-        );
-        return normalize(roleId);
     }
 
     private String normalize(String value) {

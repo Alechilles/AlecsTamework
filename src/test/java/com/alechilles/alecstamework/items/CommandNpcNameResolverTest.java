@@ -137,4 +137,29 @@ class CommandNpcNameResolverTest {
                 resolver.resolveSnapshotDisplayName(null, null, "tamed_chicken")
         );
     }
+
+    @Test
+    void resolvesDormantSpeciesLabelFromLowercaseTamedRoleId() {
+        TranslationRegistry registry = new TranslationRegistry();
+        registry.put("npcRoles.Chicken.name", "Chicken");
+
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(registry);
+
+        assertEquals(
+                "Chicken",
+                resolver.resolveRoleDisplayName("tamed_chicken", null)
+        );
+    }
+
+    @Test
+    void humanizesDormantSpeciesWhenTranslationIsUnavailable() {
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(
+                new TranslationRegistry()
+        );
+
+        assertEquals(
+                "Chicken",
+                resolver.resolveRoleDisplayName("tamed_chicken", null)
+        );
+    }
 }

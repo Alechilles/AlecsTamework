@@ -209,11 +209,12 @@ public final class PositiveEvidenceDormantAuthor {
         }
         CompanionProfileReadModel profile = ((PersistenceReadResult.Found<
                 CompanionProfileReadModel>) read).value();
-        if (!exactLiveProfile(frozen, profile)) {
+        String conflict = liveProfileConflict(frozen, profile);
+        if (conflict != null) {
             return completed(result(
                     CompanionLifecycleAuthorResult.Status.PROFILE_CONFLICT,
                     frozen.operationId(), null,
-                    "dormant_profile_conflict", null
+                    conflict, null
             ));
         }
         return submit(
@@ -221,28 +222,42 @@ public final class PositiveEvidenceDormantAuthor {
         );
     }
 
-    private boolean exactLiveProfile(
+    @Nullable
+    private String liveProfileConflict(
             FrozenDormant frozen,
             CompanionProfileReadModel profile
     ) {
         DormantCompanionObservation observation = frozen.observation();
         CompanionLifecycle lifecycle = profile.lifecycle();
         CompanionAlias alias = profile.currentAlias();
-        return profile.identity().profileId().equals(observation.profileId())
-                && alias != null
-                && alias.alias().equals(observation.sourceAlias())
-                && alias.state() == CompanionAlias.State.CURRENT
-                && lifecycle.state() == LifecycleState.ACTIVE
-                && lifecycle.location().equals(LifecycleLocation.liveEntity(
-                        observation.sourceAlias().toString(),
-                        observation.sourceWorldKey()
-                ))
-                && lifecycle.activeOperationId() == null
-                && !lifecycle.quarantined()
-                && roleMatches(
-                        profile.identity().roleId(),
-                        frozen.eventFacts().snapshotRoleId()
-                );
+        if (!profile.identity().profileId().equals(observation.profileId())) {
+            return "dormant_profile_id_conflict";
+        }
+        if (alias == null || !alias.alias().equals(observation.sourceAlias())
+                || alias.state() != CompanionAlias.State.CURRENT) {
+            return "dormant_source_alias_conflict";
+        }
+        if (lifecycle.state() != LifecycleState.ACTIVE) {
+            return "dormant_lifecycle_not_active";
+        }
+        if (!lifecycle.location().equals(LifecycleLocation.liveEntity(
+                observation.sourceAlias().toString(),
+                observation.sourceWorldKey()
+        ))) {
+            return "dormant_live_location_conflict";
+        }
+        if (lifecycle.activeOperationId() != null) {
+            return "dormant_operation_in_progress";
+        }
+        if (lifecycle.quarantined()) {
+            return "dormant_profile_quarantined";
+        }
+        /*
+         * The exact profile, current alias, and live location already identify the source entity.
+         * A role is mutable gameplay state (for example life-stage/variant changes), so a stale
+         * profile role must not discard authoritative saved DeathComponent evidence.
+         */
+        return null;
     }
 
     private CompletionStage<CompanionLifecycleAuthorResult> submit(
@@ -402,14 +417,6 @@ public final class PositiveEvidenceDormantAuthor {
                 observation.evidence().name(),
                 observation.receiptKey()
         };
-    }
-
-    private boolean roleMatches(String profileRole, String snapshotRole) {
-        if (snapshotRole == null || snapshotRole.isBlank()) {
-            return false;
-        }
-        return profileRole == null
-                || profileRole.equalsIgnoreCase(snapshotRole.trim());
     }
 
     private String evidenceDetail(Throwable failure) {

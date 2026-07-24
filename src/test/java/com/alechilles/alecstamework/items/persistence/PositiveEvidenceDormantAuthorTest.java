@@ -98,6 +98,36 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     @Test
+    void exactAliasDeathSurvivesAStaleProfileRoleVariant() {
+        FakePersistence persistence = new FakePersistence(
+                profile("Tamed_Deer")
+        );
+        PositiveEvidenceDormantAuthor author = author(
+                persistence,
+                new TameworkFullStateSnapshotReader(
+                        (reference, store, uuid, context) ->
+                                fullState("Tamed_Deer_Stag")
+                ),
+                -450L
+        );
+
+        CompanionLifecycleAuthorResult result = author.makeDormant(intent(
+                DormantCompanionObservation.Evidence.SAVED_DEATH_COMPONENT
+        )).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(
+                "tamed_deer_stag",
+                ((DeathSnapshotV2Payload) ((com.alechilles.alecstamework
+                        .companion.snapshot.SnapshotDecodeResult.Decoded<?>)
+                        TameworkSnapshotCodecs.create().decode(
+                                persistence.request.snapshot(),
+                                DeathSnapshotV2Payload.class
+                        )).value()).fullState().roleId()
+        );
+    }
+
+    @Test
     void destructiveAndWorldDeletionEvidenceAuthorLostV2() {
         for (DormantCompanionObservation.Evidence evidence : List.of(
                 DormantCompanionObservation.Evidence.DESTRUCTIVE_REMOVAL,
@@ -324,10 +354,14 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     private CompanionProfileReadModel profile() {
+        return profile("tamework_test");
+    }
+
+    private CompanionProfileReadModel profile(String roleId) {
         CompanionIdentity identity = new CompanionIdentity(
                 PROFILE,
                 "Test",
-                "tamework_test",
+                roleId,
                 null,
                 null,
                 "world",
@@ -358,11 +392,15 @@ class PositiveEvidenceDormantAuthorTest {
     }
 
     private CoopResidentStateSnapshot fullState() {
+        return fullState("tamework_test");
+    }
+
+    private CoopResidentStateSnapshot fullState(String roleId) {
         return new CoopResidentStateSnapshot(
                 SOURCE.value(),
                 null,
                 -1,
-                "tamework_test",
+                roleId,
                 null,
                 null,
                 null,

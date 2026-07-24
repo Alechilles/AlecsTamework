@@ -37,19 +37,34 @@ final class TameworkDormantPersistenceRegistration {
                 observations,
                 dormantAuthor,
                 completion -> {
+                    var result = completion.result();
                     if (completion.failure() == null
-                            && completion.result() != null
-                            && completion.result().published()) {
+                            && result != null
+                            && result.published()) {
                         return;
                     }
                     var entry = plugin.getLogger().at(Level.WARNING);
-                    if (completion.failure() != null) {
-                        entry = entry.withCause(completion.failure());
+                    Throwable failure = completion.failure() != null
+                            ? completion.failure()
+                            : result == null ? null : result.failure();
+                    if (failure != null) {
+                        entry = entry.withCause(failure);
                     }
                     entry.log(
                             "Dormant companion evidence did not publish "
                                     + "(observation="
-                                    + completion.observationKey() + ")."
+                                    + completion.observationKey()
+                                    + ", status="
+                                    + (result == null ? "<none>" : result.status())
+                                    + ", workflowStatus="
+                                    + (result == null
+                                    ? "<none>" : result.workflowStatus())
+                                    + ", detail="
+                                    + (result == null ? "<none>" : result.detail())
+                                    + ", operation="
+                                    + (result == null
+                                    ? "<none>" : result.operationId())
+                                    + ")."
                     );
                 }
         );

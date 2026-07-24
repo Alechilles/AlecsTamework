@@ -89,6 +89,19 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
         assertFalse(relocation.contains("setRelocationDropListener"));
     }
 
+    @Test
+    void rejectedDormantEvidenceLogsItsActionableResult() throws Exception {
+        String registration = read(ROOT.resolve(
+                "TameworkDormantPersistenceRegistration.java"
+        ));
+
+        assertTrue(registration.contains("result.status()"));
+        assertTrue(registration.contains("result.workflowStatus()"));
+        assertTrue(registration.contains("result.detail()"));
+        assertTrue(registration.contains("result.operationId()"));
+        assertTrue(registration.contains("result.failure()"));
+    }
+
     private String read(Path path) throws Exception {
         return Files.readString(path, StandardCharsets.UTF_8);
     }

@@ -124,6 +124,29 @@ final class CommandNpcNameResolver {
         return null;
     }
 
+    String resolveRoleDisplayName(String roleId, String nameKey) {
+        String translated = translateNpcNameKey(roleId);
+        if (translated == null || translated.isBlank()) {
+            translated = translateNpcNameKey(nameKey);
+        }
+        if (translated != null && !translated.isBlank()) {
+            return translated;
+        }
+        String fallbackRole = firstNonBlank(
+                roleId,
+                extractRoleIdFromNameKey(nameKey)
+        );
+        if (fallbackRole == null) {
+            return null;
+        }
+        if (fallbackRole.regionMatches(
+                true, 0, "Tamed_", 0, "Tamed_".length()
+        )) {
+            fallbackRole = fallbackRole.substring("Tamed_".length());
+        }
+        return humanizeRoleId(fallbackRole);
+    }
+
     String resolveNpcDisplayNameFromComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         String customName = resolveNpcNameComponent(npcRef, store);
         if (customName != null && !customName.isBlank()) {
