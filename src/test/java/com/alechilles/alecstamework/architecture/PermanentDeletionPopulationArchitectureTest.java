@@ -136,7 +136,7 @@ class PermanentDeletionPopulationArchitectureTest {
         assertTrue(revivable.contains("extends DeathSystems.OnDeathSystem"));
         assertTrue(revivable.contains("Order.AFTER, NPCSystems.OnDeathSystem.class"));
         assertTrue(revivable.contains(
-                "CompanionRevivePolicy.supportsRevive(roleId, links, observation.npcUuid())"));
+                "CompanionRevivePolicy.supportsRevive(roleId, links)"));
         assertTrue(revivable.contains("projector.observeRevivableDeath("));
 
         String projector = read(

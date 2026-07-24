@@ -181,7 +181,6 @@ class ReplacementPersistenceArchitectureGuardTest {
 
         assertEquals(
                 List.of(
-                        "activateProvisionedCompanion",
                         "assignPopulationGroups",
                         "capture",
                         "captureToCoop",
@@ -190,7 +189,6 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "mutateExtension",
                         "mutateProfile",
                         "mutateTimedSummonLease",
-                        "provisionCompanion",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseCapturedCompanion",
@@ -222,8 +220,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "restorations",
                         "coopCaptures",
                         "coopReleases",
-                        "timedSummons",
-                        "provisioningActivations"
+                        "timedSummons"
                 ),
                 boundaries
         );
@@ -281,7 +278,6 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findAllCommandRosters",
                         "findAllLifecycles",
                         "findAllPopulationGroupAssignments",
-                        "findAllProvisioningRecords",
                         "findCommandRoster",
                         "findCommandRosterMembership",
                         "findCoopResidency",
@@ -290,7 +286,6 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findExtensions",
                         "findOperation",
                         "findProfile",
-                        "findProvisioning",
                         "findStalePopulationGroupProfiles",
                         "findTimedSummonLease",
                         "projectedCommandRosterActions",
@@ -307,8 +302,6 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "projectedPopulationGroupCounts",
                         "projectedProfile",
                         "projectedProfileSnapshot",
-                        "projectedProvisioning",
-                        "projectedProvisioningSnapshot",
                         "projectedTimedSummons"
                 ),
                 queries
@@ -346,13 +339,7 @@ class ReplacementPersistenceArchitectureGuardTest {
         String api = Files.readString(
                 MAIN.resolve("api/internal/TameworkApiImpl.java")
         );
-        assertTrue(api.contains(
-                "@Nonnull CompanionProvisioningApi runtime"
-        ));
         assertTrue(api.contains("@Nonnull PopulationGroupApi runtime"));
-        assertFalse(api.contains(
-                "@Nonnull CompanionProvisioningApiDelegate runtime"
-        ));
         assertFalse(api.contains(
                 "@Nonnull PopulationGroupApiDelegate runtime"
         ));

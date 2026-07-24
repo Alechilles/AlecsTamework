@@ -90,34 +90,6 @@ public final class CommandTimedSummoningService {
                 });
     }
 
-    /**
-     * Post-provisioning seam for companions that should appear immediately after profile and roster
-     * membership commit. The dormant row is committed before the ordinary summon transaction starts,
-     * so placement/admission/spawn failures leave the companion safely roster-stored with no lease.
-     */
-    @Nonnull
-    public CompletionStage<ActionResult> registerAndSummonInitial(@Nonnull InitialSummonRequest request) {
-        Objects.requireNonNull(request, "request");
-        StoredRegistration stored = new StoredRegistration(
-                request.ownerUuid(), request.commandFamilyId(), request.profileId(),
-                request.configId(), request.configRevision(), request.policy(), request.nowMs());
-        return registerRosterStored(stored).thenCompose(registered -> {
-            CommandTimedSummonSessionRecord session = registered.session();
-            if (registered.status() != Status.SUCCESS
-                    && (session == null
-                    || session.state() != CommandTimedSummonSessionRecord.State.ROSTER_STORED)) {
-                if (session != null && session.state().occupiesActiveCapacity()) {
-                    return completed(ActionResult.noop(session, "initial-projection-already-started"));
-                }
-                return completed(registered);
-            }
-            return summon(new SummonRequest(
-                    request.ownerUuid(), request.commandFamilyId(), request.profileId(),
-                    request.expectedProfileRevision(), request.roleId(), request.configId(),
-                    request.configRevision(), request.policy(), request.idempotencyKey(), request.nowMs()));
-        });
-    }
-
     /** Summons in front of the owner after roster, cooldown, placement, and active-cap preflight. */
     @Nonnull
     public CompletionStage<ActionResult> summon(@Nonnull SummonRequest request) {
@@ -703,19 +675,6 @@ public final class CommandTimedSummoningService {
                                      @Nullable Long configRevision,
                                      @Nonnull CommandTimedSummonPolicySnapshot policy, long nowMs) {
         public StoredRegistration { validateBase(ownerUuid, commandFamilyId, profileId, policy, "stored", nowMs); }
-    }
-
-    public record InitialSummonRequest(@Nonnull UUID ownerUuid, @Nonnull String commandFamilyId,
-                                       @Nonnull String profileId, long expectedProfileRevision,
-                                       @Nonnull String roleId, @Nullable String configId,
-                                       @Nullable Long configRevision,
-                                       @Nonnull CommandTimedSummonPolicySnapshot policy,
-                                       @Nonnull String idempotencyKey, long nowMs) {
-        public InitialSummonRequest {
-            validateBase(ownerUuid, commandFamilyId, profileId, policy, idempotencyKey, nowMs);
-            roleId = requireText(roleId, "roleId");
-            if (expectedProfileRevision < 0L) throw new IllegalArgumentException("profile revision required.");
-        }
     }
 
     public record SummonRequest(@Nonnull UUID ownerUuid, @Nonnull String commandFamilyId,

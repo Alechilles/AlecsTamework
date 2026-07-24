@@ -124,29 +124,6 @@ final class CommandLifecycleDiagnosticsService {
                 "No timed summon operation or session found for '" + bounded(key) + "'.");
     }
 
-    @Nonnull
-    List<String> provision(@Nonnull String operationId) {
-        String key = operationId.trim();
-        return queryRows("""
-                SELECT operation_id, caller_namespace, idempotency_key, owner_uuid, target_role_id,
-                       state, canonical_profile_id, recovery_status, result_code, projection_reason,
-                       updated_at_ms
-                FROM companion_provisioning_operations WHERE operation_id = ? LIMIT 1
-                """, statement -> statement.setString(1, key), result ->
-                "Provisioning operation: id=" + bounded(result.getString("operation_id"))
-                        + ", origin=" + bounded(result.getString("caller_namespace")) + "/"
-                        + bounded(result.getString("idempotency_key"))
-                        + ", owner=" + bounded(result.getString("owner_uuid"))
-                        + ", role=" + bounded(result.getString("target_role_id"))
-                        + ", profile=" + boundedOrNone(result.getString("canonical_profile_id"))
-                        + ", state=" + bounded(result.getString("state"))
-                        + ", recovery=" + bounded(result.getString("recovery_status"))
-                        + ", result=" + boundedOrNone(result.getString("result_code"))
-                        + ", projection=" + boundedOrNone(result.getString("projection_reason"))
-                        + ", updatedAtMs=" + result.getLong("updated_at_ms"),
-                "Provisioning operation not found for id '" + bounded(key) + "'.");
-    }
-
     private String summary(String label, String table, String booleanColumn) {
         try (Connection connection = connections.openConnection()) {
             if (!tableExists(connection, table)) return label + ": schema=unavailable";

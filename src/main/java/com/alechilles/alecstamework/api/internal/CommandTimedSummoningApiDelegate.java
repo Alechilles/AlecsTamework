@@ -6,14 +6,11 @@ import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
 import com.alechilles.alecstamework.api.CommandTimedSummoningResult;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import com.alechilles.alecstamework.api.CommandTimedSummoningView;
-import com.alechilles.alecstamework.api.CompanionProvisioningLinkRequest;
-import com.alechilles.alecstamework.api.CompanionProvisioningResult;
 import com.alechilles.alecstamework.items.CommandTimedSummoningService;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonSessionRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceReadExecutor;
-import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,37 +88,6 @@ public final class CommandTimedSummoningApiDelegate implements CommandTimedSummo
         Consumer<CommandTimedSummoningChangedEvent> required = Objects.requireNonNull(listener, "listener");
         listeners.add(required);
         return () -> listeners.remove(required);
-    }
-
-    /**
-     * Tamework-owned post-commit hook for provision-and-link. It creates the dormant timed row first
-     * and then uses the same admission/placement/lease path as a later Horn summon.
-     */
-    @Nonnull
-    public CompanionProvisioningCoordinator.InitialProjectionHook initialProjectionHook() {
-        return this::projectInitially;
-    }
-
-    private CompletionStage<CommandTimedSummoningResult> projectInitially(
-            CompanionProvisioningLinkRequest link,
-            CompanionProvisioningResult provisioning) {
-        if (provisioning.ownerUuid() == null || provisioning.profileId() == null
-                || provisioning.roleId() == null || provisioning.idempotencyKey() == null
-                || provisioning.profileRevision() < 0L) {
-            return denied("initial-timed-projection-identity-unavailable");
-        }
-        CommandTimedSummoningRequest identity = new CommandTimedSummoningRequest(
-                provisioning.ownerUuid(), link.commandFamilyId(), provisioning.profileId(),
-                provisioning.idempotencyKey());
-        long nowMs = clock.getAsLong();
-        return reads.submit(() -> resolver.resolve(identity, Operation.SUMMON)).thenCompose(resolved -> {
-            if (resolved == null) return denied("initial-timed-projection-unresolvable");
-            return service.registerAndSummonInitial(new CommandTimedSummoningService.InitialSummonRequest(
-                        provisioning.ownerUuid(), link.commandFamilyId(), provisioning.profileId(),
-                        provisioning.profileRevision(), provisioning.roleId(), resolved.configId(),
-                        resolved.configRevision(), resolved.policy(), provisioning.idempotencyKey(), nowMs))
-                    .thenApply(result -> publish(identity, result, "initial-projection", nowMs));
-        });
     }
 
     private CommandTimedSummoningResult publish(CommandTimedSummoningRequest request,

@@ -35,7 +35,7 @@ public record CompanionSpawnAdmissionRequest(
         Objects.requireNonNull(operation, "operation");
         boolean canonicalNullNpcRestore = previousNpcUuid == null
                 && canonicalProfileId != null
-                && isCanonicalNullDormantSource(requiredSourceLifecycle)
+                && requiredSourceLifecycle == CompanionLifecycleState.ROSTER_STORED
                 && !allowLegacyAdoption
                 && operation == OwnerPopulationOperation.RESTORE;
         if (previousNpcUuid == null && !canonicalNullNpcRestore) {
@@ -107,16 +107,11 @@ public record CompanionSpawnAdmissionRequest(
         return previousNpcUuid != null || canonicalProfileId != null;
     }
 
-    /** True only for an intentionally provisioned profile that has never had a live NPC UUID. */
+    /** True only for a stored canonical profile that currently has no live NPC UUID. */
     public boolean canonicalNullNpcRestore() {
         return previousNpcUuid == null
                 && canonicalProfileId != null
-                && isCanonicalNullDormantSource(requiredSourceLifecycle);
-    }
-
-    private static boolean isCanonicalNullDormantSource(@Nullable CompanionLifecycleState lifecycle) {
-        return lifecycle == CompanionLifecycleState.PROVISIONED_DORMANT
-                || lifecycle == CompanionLifecycleState.ROSTER_STORED;
+                && requiredSourceLifecycle == CompanionLifecycleState.ROSTER_STORED;
     }
 
     @Nullable

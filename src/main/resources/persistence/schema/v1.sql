@@ -98,11 +98,11 @@ CREATE TABLE companion_lifecycle (
     owner_uuid TEXT,
     lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN (
         'ACTIVE', 'UNLOADED', 'CAPTURED', 'COOP', 'DEAD_REVIVABLE',
-        'LOST', 'ROSTER_STORED', 'PROVISIONED_DORMANT', 'RELEASED', 'UNRESOLVED'
+        'LOST', 'ROSTER_STORED', 'RELEASED', 'UNRESOLVED'
     )),
     location_kind TEXT NOT NULL CHECK (location_kind IN (
         'LIVE_ENTITY', 'CAPTURE_ITEM', 'COOP_SLOT', 'COMMAND_ROSTER',
-        'PROVISIONING', 'NONE', 'UNRESOLVED'
+        'NONE', 'UNRESOLVED'
     )),
     location_key TEXT,
     world_key TEXT,
@@ -135,10 +135,6 @@ CREATE TABLE companion_lifecycle (
             AND world_key IS NULL)
         OR (lifecycle_state = 'ROSTER_STORED'
             AND location_kind = 'COMMAND_ROSTER'
-            AND location_key IS NOT NULL
-            AND world_key IS NULL)
-        OR (lifecycle_state = 'PROVISIONED_DORMANT'
-            AND location_kind = 'PROVISIONING'
             AND location_key IS NOT NULL
             AND world_key IS NULL)
         OR (lifecycle_state = 'UNRESOLVED'
@@ -458,21 +454,6 @@ CREATE TABLE timed_summon_lease (
                     AND remaining_ms <= active_duration_ms)
             ))
     )
-);
-
-CREATE TABLE provisioning_record (
-    profile_id TEXT PRIMARY KEY,
-    caller_namespace TEXT NOT NULL,
-    caller_key TEXT NOT NULL,
-    correlation_id TEXT,
-    policy_revision INTEGER NOT NULL CHECK (policy_revision >= 0),
-    creation_operation_id TEXT NOT NULL UNIQUE,
-    created_at_ms INTEGER NOT NULL,
-    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (creation_operation_id)
-        REFERENCES operation_envelope(operation_id),
-    UNIQUE (caller_namespace, caller_key)
 );
 
 CREATE TABLE refund_claim (

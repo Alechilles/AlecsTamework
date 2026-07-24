@@ -17,7 +17,6 @@ final class HyDragonBehavioralSelfTestFixtures {
         ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
         assertions.addAll(HyDragonCaptureSelfTestFixture.run());
         assertions.addAll(HyDragonPopulationGroupSelfTestFixture.run());
-        assertions.addAll(HyDragonProvisioningSelfTestFixture.run());
         return List.copyOf(assertions);
     }
 }

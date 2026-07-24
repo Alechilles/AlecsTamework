@@ -96,7 +96,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
             readRecoveryOperations(connection, rows);
             readCaptureAttemptOperations(connection, rows);
             readPopulationGroupOperations(connection, rows);
-            readProvisioningOperations(connection, rows);
             rows.sort(java.util.Comparator.comparingLong(OperationRow::updatedAtMs).reversed());
             int omitted = Math.max(0, rows.size() - ROW_LIMIT);
             if (rows.size() > ROW_LIMIT) rows.subList(ROW_LIMIT, rows.size()).clear();
@@ -168,23 +167,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
         readOperations(connection, sql, "population_group", out);
     }
 
-    private void readProvisioningOperations(Connection connection, List<OperationRow> out) throws Exception {
-        String sql = """
-                SELECT operation_id,
-                       COALESCE(canonical_profile_id, provisional_profile_id) AS profile_id,
-                       requested_disposition AS operation_type, state,
-                       created_at_ms, updated_at_ms, completed_at_ms,
-                       destination_context_json IS NOT NULL AS has_source
-                FROM companion_provisioning_operations
-                ORDER BY CASE state WHEN 'PREPARING_DORMANT' THEN 0 WHEN 'DORMANT_PREPARED' THEN 0
-                         WHEN 'DORMANT_APPLYING' THEN 0 WHEN 'DORMANT_COMMITTED' THEN 0
-                         WHEN 'ACTIVE_PREPARED' THEN 0 WHEN 'ACTIVE_APPLYING' THEN 0
-                         WHEN 'PARTIAL_DORMANT' THEN 0 WHEN 'QUARANTINED' THEN 0 ELSE 1 END,
-                         updated_at_ms DESC LIMIT 100
-                """;
-        readOperations(connection, sql, "companion_provisioning", out);
-    }
-
     private void readOperations(Connection connection, String sql, String domain,
                                 List<OperationRow> out) throws Exception {
         try (Statement statement = connection.createStatement();
@@ -235,11 +217,6 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
             duplicateCheck(connection, issues, "duplicate_capture_origin", """
                     SELECT COUNT(*) FROM (SELECT caller_namespace, idempotency_key FROM capture_attempts
                     WHERE caller_namespace IS NOT NULL
-                    GROUP BY caller_namespace, idempotency_key HAVING COUNT(*) > 1)
-                    """);
-            duplicateCheck(connection, issues, "duplicate_provisioning_origin", """
-                    SELECT COUNT(*) FROM (SELECT caller_namespace, idempotency_key
-                    FROM companion_provisioning_operations
                     GROUP BY caller_namespace, idempotency_key HAVING COUNT(*) > 1)
                     """);
             return Section.complete(issues, 0);

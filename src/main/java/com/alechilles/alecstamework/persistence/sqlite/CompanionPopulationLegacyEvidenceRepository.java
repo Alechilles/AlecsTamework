@@ -160,11 +160,9 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                                  SELECT 1 FROM managed_coop_residents m
                                  WHERE m.profile_id = p.profile_id AND m.active = 1
                                    AND m.state IN ('HOUSED', 'RELEASING')
-                             ) THEN 1 ELSE 0 END AS coop_active,
-                         cps.lifecycle_state AS population_lifecycle
+                         ) THEN 1 ELSE 0 END AS coop_active
                      FROM npc_profiles p
                      LEFT JOIN profile_states ps ON ps.profile_id = p.profile_id
-                     LEFT JOIN companion_population_state cps ON cps.profile_id = p.profile_id
                      ORDER BY p.profile_id
                      LIMIT ? OFFSET ?
                      """)) {
@@ -182,14 +180,6 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                     boolean lostActive = resultSet.getInt("lost_active") != 0;
                     boolean coopActive = resultSet.getInt("coop_active") != 0;
                     if (npcUuid == null) {
-                        if ("PROVISIONED_DORMANT".equals(resultSet.getString("population_lifecycle"))
-                                && !captureActive && !deathActive && !lostActive && !coopActive) {
-                            // Provisioning intentionally creates an authoritative profile before
-                            // any physical NPC exists. It is a scanned unit, but has no UUID-based
-                            // legacy evidence to contribute.
-                            profiles.add(List.of());
-                            continue;
-                        }
                         throw new IllegalStateException(
                                 "Profile has no resolvable current, alias, or coop UUID: " + profileId
                         );

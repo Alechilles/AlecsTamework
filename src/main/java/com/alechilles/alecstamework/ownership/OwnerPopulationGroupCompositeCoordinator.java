@@ -2,14 +2,12 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
-import com.alechilles.alecstamework.persistence.sqlite.UnifiedPopulationCompositeStore;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -63,7 +61,7 @@ public final class OwnerPopulationGroupCompositeCoordinator {
     }
 
     @Nonnull
-    public CompletableFuture<OwnerPopulationPreparationResult> prepareProvisionedDormantAsync(
+    public CompletableFuture<OwnerPopulationPreparationResult> preparePopulationGroupsAsync(
             @Nonnull OwnerPopulationAdmissionPlan plan,
             @Nonnull PopulationGroupRepository groupRepository,
             @Nonnull PopulationGroupOperationRecord groupOperation,
@@ -91,8 +89,8 @@ public final class OwnerPopulationGroupCompositeCoordinator {
                         plan.baselineState());
         try {
             PersistenceWriteQueue.WriteSubmission<
-                    UnifiedPopulationCompositeStore.ProvisionedDormantPreparationResult> submission =
-                    compositeStore.prepareProvisionedDormantAsync(
+                    UnifiedPopulationCompositeStore.PopulationGroupCompositePreparationResult>
+                    submission = compositeStore.preparePopulationGroupsAsync(
                             ownerPrepare, groupRepository, groupOperation, groupEvidence);
             if (submission == null || submission.completion() == null) {
                 index.cancel(decision.reservation());
@@ -113,7 +111,8 @@ public final class OwnerPopulationGroupCompositeCoordinator {
             OwnerPopulationDecision decision,
             UUID ownerOperationId,
             PersistenceWriteQueue.WriteOutcome<
-                    UnifiedPopulationCompositeStore.ProvisionedDormantPreparationResult> outcome,
+                    UnifiedPopulationCompositeStore.PopulationGroupCompositePreparationResult>
+                    outcome,
             Throwable failure) {
         if (failure != null || outcome == null || !outcome.isCommitted()
                 || outcome.value() == null || !outcome.value().prepared()) {
@@ -127,65 +126,6 @@ public final class OwnerPopulationGroupCompositeCoordinator {
                 new PreparedOwnerPopulationAdmission(ownerOperationId, plan, decision);
         return new OwnerPopulationPreparationResult(
                 true, "population-group-composite-prepared", decision, prepared);
-    }
-
-    @Nonnull
-    public CompletableFuture<OwnerPopulationCommitResult> commitProvisionedDormantAsync(
-            @Nonnull PreparedOwnerPopulationAdmission prepared,
-            @Nonnull NpcProfileRepository profileRepository,
-            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
-            @Nonnull PopulationGroupRepository groupRepository,
-            @Nonnull String groupOperationId,
-            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs) {
-        return commitProvisionedDormantAsync(prepared, profileRepository, profileMutation,
-                groupRepository, groupOperationId, classification, nowMs,
-                UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension.NO_OP);
-    }
-
-    @Nonnull
-    public CompletableFuture<OwnerPopulationCommitResult> commitProvisionedDormantAsync(
-            @Nonnull PreparedOwnerPopulationAdmission prepared,
-            @Nonnull NpcProfileRepository profileRepository,
-            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
-            @Nonnull PopulationGroupRepository groupRepository,
-            @Nonnull String groupOperationId,
-            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs,
-            @Nonnull UnifiedPopulationCompositeStore.ProvisionedDormantCommitExtension extension) {
-        OwnerPopulationCommitResult invalid = beginCommit(
-                prepared, "provisioned_dormant_owner_index_commit_failed",
-                "provisioned-dormant-owner-index-commit-failed");
-        if (invalid != null) return CompletableFuture.completedFuture(invalid);
-        PopulationPersistenceTransition.Commit ownerCommit =
-                OwnerPopulationPersistenceRecords.commit(prepared.operationId(), prepared.plan());
-        try {
-            PersistenceWriteQueue.WriteSubmission<
-                    UnifiedPopulationCompositeStore.ProvisionedDormantCommitResult> submission =
-                    compositeStore.commitProvisionedDormantAsync(
-                            ownerCommit, profileRepository, profileMutation, groupRepository,
-                            groupOperationId, classification, nowMs, extension);
-            if (submission == null || submission.completion() == null) {
-                return terminality.commitStartFailed(
-                        prepared, "provisioned-dormant-commit-stage-missing");
-            }
-            return submission.completion().handle((outcome, failure) -> {
-                if (failure == null && outcome != null && outcome.isCommitted()
-                        && outcome.value() != null && outcome.value().committed()) {
-                    prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
-                    return new OwnerPopulationCommitResult(
-                            OwnerPopulationCommitResult.Status.COMMITTED,
-                            "provisioned-dormant-committed", outcome.value().ownerResult());
-                }
-                return degraded(prepared, "provisioned_dormant_composite_commit_failed",
-                        "provisioned-dormant-composite-commit-failed",
-                        outcome == null || outcome.value() == null
-                                ? null : outcome.value().ownerResult());
-            });
-        } catch (RuntimeException | LinkageError failure) {
-            return terminality.commitStartFailed(
-                    prepared, "provisioned-dormant-commit-start-failed");
-        }
     }
 
     @Nonnull

@@ -129,11 +129,6 @@ class PublicPersistenceRuntimeImportTest {
                                         .completed(),
                                 (request, operation) -> LiveOperationResult
                                         .confirmed("timed_confirmed")
-                                        .completed(),
-                                (request, operation) -> LiveOperationResult
-                                        .confirmed(
-                                                "provisioning_activation_confirmed"
-                                        )
                                         .completed()
                         ),
                         world,

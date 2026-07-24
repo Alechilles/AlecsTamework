@@ -190,7 +190,6 @@ final class CompanionSpawnAdmissionPlanner {
                     : "spawn-source-population-state-mismatch";
         }
         if (owner == null || (claim == null
-                && requiredLifecycle != CompanionLifecycleState.PROVISIONED_DORMANT
                 && requiredLifecycle != CompanionLifecycleState.ROSTER_STORED)) {
             return "spawn-source-population-profile-unavailable";
         }

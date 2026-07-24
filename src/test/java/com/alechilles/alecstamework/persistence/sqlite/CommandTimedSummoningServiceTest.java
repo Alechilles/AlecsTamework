@@ -167,34 +167,6 @@ class CommandTimedSummoningServiceTest {
         }
     }
 
-    @Test
-    void initialProjectionFailureLeavesProvisionedCompanionDormantWithoutLease() throws Exception {
-        try (Fixture fixture = new Fixture(tempDir.resolve("service-initial-projection.sqlite"), 1)) {
-            String profile = fixture.harness.insertProfile(
-                    fixture.owner, "TestDragon", CompanionLifecycleState.ROSTER_STORED.name(), "world", 1L);
-            fixture.roster.add(profile);
-            insertMembership(fixture.harness, fixture.owner, fixture.family, profile);
-            fixture.projections.spawnOutcome = CommandTimedSummoningService.ProjectionOutcome.NOT_APPLIED;
-            CommandTimedSummonPolicySnapshot policy =
-                    new CommandTimedSummonPolicySnapshot(1_000L, 50L, true, new long[0]);
-
-            CommandTimedSummoningService.ActionResult result = await(
-                    fixture.service.registerAndSummonInitial(
-                            new CommandTimedSummoningService.InitialSummonRequest(
-                                    fixture.owner, fixture.family, profile, 1L, "TestDragon",
-                                    "Dragon", 1L, policy, "egg-provision-operation", 1_000L)));
-
-            assertEquals(CommandTimedSummoningService.Status.DENIED, result.status());
-            CommandTimedSummonSessionRecord session = fixture.repository.findSession(
-                    fixture.owner, fixture.family, profile);
-            assertEquals(CommandTimedSummonSessionRecord.State.ROSTER_STORED, session.state());
-            assertNull(session.summonSessionId());
-            assertNull(session.summonRemainingMs());
-            assertEquals(0, fixture.population.active);
-            assertEquals(0, fixture.population.pending);
-        }
-    }
-
     private static <T> T await(CompletionStage<T> stage) throws Exception {
         return stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
     }

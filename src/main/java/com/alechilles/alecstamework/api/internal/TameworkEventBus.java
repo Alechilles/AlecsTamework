@@ -4,9 +4,6 @@ import com.alechilles.alecstamework.api.ConfigReloadedEvent;
 import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
 import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
 import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
-import com.alechilles.alecstamework.api.CompanionProvisionedEvent;
-import com.alechilles.alecstamework.api.ProvisionedCompanionDeathRecordedEvent;
-import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -158,21 +155,6 @@ public final class TameworkEventBus
     }
 
     public void emitCaptureAttemptResolved(@Nonnull CaptureAttemptResolvedEvent event) {
-        dispatch(event);
-    }
-
-    public void emitCompanionProvisioned(@Nonnull CompanionProvisionedEvent event) {
-        dispatch(Objects.requireNonNull(event, "event"));
-    }
-
-    /** Isolated delivery seam for command-link-independent canonical lifecycle events. */
-    public void emitCanonicalCompanionLifecycleEvent(@Nonnull TameworkEvent event) {
-        Objects.requireNonNull(event, "event");
-        if (!(event instanceof ProvisionedCompanionDeathRecordedEvent)
-                && !(event instanceof ProvisionedCompanionRevivedEvent)) {
-            throw new IllegalArgumentException(
-                    "Only canonical provisioned companion lifecycle events are accepted.");
-        }
         dispatch(event);
     }
 

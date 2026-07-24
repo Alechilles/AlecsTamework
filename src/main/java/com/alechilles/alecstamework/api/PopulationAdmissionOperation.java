@@ -10,6 +10,5 @@ public enum PopulationAdmissionOperation {
     LIFECYCLE_CHANGE,
     LEGACY_ADOPTION,
     BREEDING,
-    PROVISION_DORMANT,
     ADMIN_FORCE
 }

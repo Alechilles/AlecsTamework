@@ -36,10 +36,10 @@ class PopulationGroupRepositoryTest {
                             PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL, null));
 
             PopulationGroupOperationRecord operation = new PopulationGroupOperationRecord(
-                    "groups-op", "population-op", "provisional-profile", "PROVISION_DORMANT",
+                    "groups-op", "population-op", "provisional-profile", "NEW_OWNERSHIP",
                     PopulationGroupOperationRecord.State.PREPARED, 0L, 9L,
                     null, owner, null, "miniwyvern", List.of(), List.of("soul_bond"),
-                    null, "PROVISIONED_DORMANT", null, "default", null, "NONE",
+                    null, "ACTIVE", null, "default", null, "NONE",
                     2L, 2L, 0L);
             PopulationGroupCountEvidenceRecord evidence = new PopulationGroupCountEvidenceRecord(
                     "groups-op", owner, "soul_bond",
@@ -52,10 +52,10 @@ class PopulationGroupRepositoryTest {
             assertEquals(PopulationGroupRepository.Status.IDEMPOTENT,
                     await(repository.prepareOperationAsync(operation, List.of(evidence))).status());
             PopulationGroupOperationRecord changedOwner = new PopulationGroupOperationRecord(
-                    "groups-op", "population-op", "provisional-profile", "PROVISION_DORMANT",
+                    "groups-op", "population-op", "provisional-profile", "NEW_OWNERSHIP",
                     PopulationGroupOperationRecord.State.PREPARED, 0L, 9L,
                     null, UUID.randomUUID(), null, "miniwyvern", List.of(), List.of("soul_bond"),
-                    null, "PROVISIONED_DORMANT", null, "default", null, "NONE",
+                    null, "ACTIVE", null, "default", null, "NONE",
                     2L, 2L, 0L);
             assertEquals(PopulationGroupRepository.Status.CONFLICT,
                     await(repository.prepareOperationAsync(changedOwner, List.of(evidence))).status());

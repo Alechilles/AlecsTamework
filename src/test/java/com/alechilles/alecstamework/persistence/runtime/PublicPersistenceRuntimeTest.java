@@ -95,7 +95,7 @@ class PublicPersistenceRuntimeTest {
         assertTrue(performance.reads().execution().count() > 0);
         assertTrue(performance.reads().maximumDepth() > 0);
         assertEquals(metrics.features().size(), diagnostics.features().size());
-        assertEquals(8, diagnostics.projectionCheckpoints().size());
+        assertEquals(7, diagnostics.projectionCheckpoints().size());
         assertEquals(0, diagnostics.outboxHead());
         assertTrue(diagnostics.openIncidentsByCode().isEmpty());
         assertTrue(diagnostics.activeQuarantinesByScope().isEmpty());
@@ -486,10 +486,7 @@ class PublicPersistenceRuntimeTest {
                 (request, operation) -> LiveOperationResult
                         .confirmed("coop_release_confirmed").completed(),
                 (request, operation) -> LiveOperationResult
-                        .confirmed("timed_confirmed").completed(),
-                (request, operation) -> LiveOperationResult
-                        .confirmed("provisioning_activation_confirmed")
-                        .completed()
+                        .confirmed("timed_confirmed").completed()
         );
     }
 

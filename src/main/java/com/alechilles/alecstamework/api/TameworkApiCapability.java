@@ -16,7 +16,6 @@ public enum TameworkApiCapability {
     PERSISTENCE_RESILIENCE,
     CAPTURE_POLICY,
     POPULATION_GROUPS,
-    COMPANION_PROVISIONING,
     /** Durable command-roster leases, active-cap storage, expiry, and resummon cooldowns. */
     COMMAND_TIMED_SUMMONING,
     /** Durable owner/command-family/profile roster authority. */

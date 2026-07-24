@@ -37,14 +37,6 @@ public interface TameworkApi {
         return CommandFamilyRosterApi.unavailable();
     }
 
-    /**
-     * Returns the idempotent companion-provisioning authority when advertised by
-     * {@link TameworkApiCapability#COMPANION_PROVISIONING}.
-     */
-    default CompanionProvisioningApi companionProvisioning() {
-        return CompanionProvisioningApi.unavailable();
-    }
-
     /** Read-only population-group counts used by roster capacity presentation. */
     default PopulationGroupApi populationGroups() {
         return PopulationGroupApi.unavailable();

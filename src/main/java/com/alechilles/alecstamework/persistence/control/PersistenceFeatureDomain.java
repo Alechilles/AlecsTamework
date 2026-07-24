@@ -9,7 +9,6 @@ public enum PersistenceFeatureDomain {
     DORMANT,
     COOP,
     COMMAND,
-    PROVISIONING,
     COMPENSATION,
     EXTENSION
 }

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
-import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
@@ -99,7 +98,7 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
                 .orElse(CompanionLifecycleState.ACTIVE);
         CompanionLifecycleState classified = removalClassifier.classify(
                 observation.npcUuid(), reason, current,
-                isPermanentDeath(ref, store, observation.npcUuid())
+                isPermanentDeath(ref, store)
         );
         if (classified == CompanionLifecycleState.UNLOADED) {
             reconciler.observePhysical(
@@ -118,8 +117,7 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
     }
 
     private static boolean isPermanentDeath(@Nonnull Ref<EntityStore> ref,
-                                            @Nonnull Store<EntityStore> store,
-                                            @Nonnull java.util.UUID npcUuid) {
+                                            @Nonnull Store<EntityStore> store) {
         try {
             if (!store.getArchetype(ref).contains(DeathComponent.getComponentType())) {
                 return false;
@@ -131,9 +129,7 @@ public final class CompanionPopulationLifecycleSystem extends RefSystem<EntitySt
                     : store.getComponent(ref, linksType);
             boolean commandLinked = links != null && links.getToolIds() != null
                     && links.getToolIds().length > 0;
-            return !commandLinked
-                    && !CompanionReviveEligibilityService.current()
-                    .protectsFromPermanentDeath(npcUuid);
+            return !commandLinked;
         } catch (RuntimeException | LinkageError failure) {
             return false;
         }

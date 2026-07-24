@@ -75,7 +75,6 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(diagnostics.contains("Integration readiness:"));
         assertTrue(diagnostics.contains("capturePolicy="));
         assertTrue(diagnostics.contains("populationGroups="));
-        assertTrue(diagnostics.contains("provisioning="));
         assertTrue(diagnostics.contains("Capture attempts:"));
         assertTrue(diagnostics.contains("entropy=<redacted>"));
 
@@ -85,39 +84,4 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(selfTest.contains("profile data transactions capability ready"));
     }
 
-    @Test
-    void companionProvisioningIsJournalBackedAndRecoveryGated() throws Exception {
-        String plugin = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/Tamework.java"));
-        String api = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/api/internal/TameworkApiImpl.java"));
-
-        assertTrue(plugin.contains("new SqliteProvisioningOperationJournal("));
-        assertTrue(plugin.contains("backend.recover().toCompletableFuture().join()"));
-        assertTrue(plugin.contains("coordinator.recover().toCompletableFuture().join()"));
-        assertTrue(plugin.contains("companionProvisioningBackend.recoveryReady()"));
-        assertTrue(plugin.contains("new HytaleProvisionedCompanionProjectionPort("));
-        assertTrue(plugin.contains("companionProvisioningBackend.readiness()"));
-        assertFalse(plugin.contains("|| !companionProvisioningBackend.dormantReady()"));
-        assertFalse(plugin.contains("|| !companionProvisioningBackend.activeProjectionReady()"));
-        assertTrue(plugin.contains("apiEventBus::emitCompanionProvisioned"));
-        assertTrue(plugin.contains("ownerPopulationRuntime.installPopulationGroups("));
-        assertTrue(plugin.contains("apiEventBus::emitPopulationGroupEvent"));
-        assertTrue(plugin.contains("ownerPopulationRuntime.reconcilePopulationGroups().join()"));
-        assertTrue(plugin.contains("ownerPopulationRuntime.publishPopulationGroupLimitChanges("));
-        assertTrue(plugin.contains("activatePopulationGroupsIfReady()"));
-        assertTrue(plugin.contains(".whenComplete(this::onPopulationRecoveryFinished)"));
-        assertTrue(plugin.contains(
-                "companionProvisioningRecoveryReady = populationRecovery.ready()"));
-        int reviveBootstrap = plugin.indexOf("reviveEligibility.bootstrap(");
-        int reviveEvents = plugin.indexOf(
-                "reviveEligibility.setEventSink(apiEventBus::emitCanonicalCompanionLifecycleEvent)");
-        int deathSystems = plugin.indexOf("TameworkPopulationRuntimeLifecycle.registerSystems(");
-        assertTrue(reviveBootstrap >= 0 && deathSystems > reviveBootstrap);
-        assertTrue(reviveEvents > reviveBootstrap && deathSystems > reviveEvents);
-        assertTrue(api.contains("activateCompanionProvisioningRuntime("));
-        assertTrue(api.contains("capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING)"));
-        assertTrue(api.contains("boolean recoveryReady"));
-        assertTrue(api.contains("boolean allPositivePathsInstalled"));
-    }
 }

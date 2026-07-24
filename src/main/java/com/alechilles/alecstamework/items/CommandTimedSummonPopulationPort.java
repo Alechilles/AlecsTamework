@@ -52,8 +52,8 @@ public final class CommandTimedSummonPopulationPort
     public CompletionStage<CommandTimedSummoningService.PopulationReservation> reserveActive(
             CommandTimedSummoningService.PopulationContext context) {
         OwnerPopulationEntry owner = owner(context);
-        if (owner == null || (owner.lifecycleState() != CompanionLifecycleState.ROSTER_STORED
-                && owner.lifecycleState() != CompanionLifecycleState.PROVISIONED_DORMANT)) {
+        if (owner == null
+                || owner.lifecycleState() != CompanionLifecycleState.ROSTER_STORED) {
             return completedReservation(false, null, "roster-stored-population-source-required");
         }
         PopulationAdmissionLocation destination = destination(context);

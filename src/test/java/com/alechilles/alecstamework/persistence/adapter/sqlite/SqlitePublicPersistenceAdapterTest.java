@@ -148,7 +148,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(8, result.catchUps().size());
+        assertEquals(7, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
         assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
         assertEquals(0, adapter.populationGroupIndex()
@@ -157,7 +157,6 @@ class SqlitePublicPersistenceAdapterTest {
                 .actionSnapshot().size());
         assertEquals(0, adapter.timedSummonIndex()
                 .readySnapshot().size());
-        assertEquals(0, adapter.provisioningIndex().snapshot().size());
     }
 
     @Test
@@ -321,11 +320,7 @@ class SqlitePublicPersistenceAdapterTest {
                 (request, operation) ->
                         LiveOperationResult.confirmed("coop_release").completed(),
                 (request, operation) ->
-                        LiveOperationResult.confirmed("timed").completed(),
-                (request, operation) ->
-                        LiveOperationResult.confirmed(
-                                "provisioning_activation"
-                        ).completed()
+                        LiveOperationResult.confirmed("timed").completed()
         );
     }
 

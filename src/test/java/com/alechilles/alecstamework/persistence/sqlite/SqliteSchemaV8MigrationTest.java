@@ -24,7 +24,7 @@ class SqliteSchemaV8MigrationTest {
     Path tempDir;
 
     @Test
-    void repeatedMigrationCreatesEveryHydragonPersistenceAuthority() throws Exception {
+    void repeatedMigrationCreatesCaptureAndPopulationGroupAuthorities() throws Exception {
         SqliteConnectionManager connections = connections("fresh.sqlite");
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
         try (Connection connection = connections.openConnection()) {
@@ -42,8 +42,7 @@ class SqliteSchemaV8MigrationTest {
                     "companion_population_group_assignments",
                     "companion_population_group_operations",
                     "companion_population_group_count_evidence",
-                    "companion_population_group_event_receipts",
-                    "companion_provisioning_operations"
+                    "companion_population_group_event_receipts"
             ), featureTables(connection));
         }
     }
@@ -64,12 +63,10 @@ class SqliteSchemaV8MigrationTest {
     }
 
     @Test
-    void malformedScopeAndDuplicateProvisioningKeyFailClosed() throws Exception {
+    void malformedScopeFailsClosed() throws Exception {
         SqliteConnectionManager connections = connections("constraints.sqlite");
         try (Connection connection = connections.openConnection()) {
             new SqliteSchemaMigrator().migrate(connection);
-            insertProvisioning(connection, "operation-a");
-            assertThrows(SQLException.class, () -> insertProvisioning(connection, "operation-b"));
             assertThrows(SQLException.class, () -> insertInvalidCountEvidence(connection));
         }
     }
@@ -112,19 +109,6 @@ class SqliteSchemaV8MigrationTest {
         return profileId;
     }
 
-    private void insertProvisioning(Connection connection, String operationId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO companion_provisioning_operations (
-                    operation_id, caller_namespace, idempotency_key, owner_uuid, target_role_id,
-                    requested_disposition, provisional_profile_id, state, created_at_ms, updated_at_ms
-                ) VALUES (?, 'hydragon', 'soul-bond-1', 'owner-a', 'miniwyvern',
-                    'PROVISIONED_DORMANT', 'profile-provisional', 'PREPARING_DORMANT', 1, 1)
-                """)) {
-            statement.setString(1, operationId);
-            statement.executeUpdate();
-        }
-    }
-
     private void insertInvalidCountEvidence(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
@@ -132,7 +116,7 @@ class SqliteSchemaV8MigrationTest {
                         operation_id, profile_id, operation_type, state, expected_population_revision,
                         classification_revision, old_group_ids_json, new_group_ids_json,
                         created_at_ms, updated_at_ms
-                    ) VALUES ('groups-a', 'profile-a', 'PROVISION_DORMANT', 'PREPARED', 0,
+                    ) VALUES ('groups-a', 'profile-a', 'NEW_OWNERSHIP', 'PREPARED', 0,
                         1, '[]', '["soul_bond"]', 1, 1)
                     """);
             statement.executeUpdate("""
@@ -152,8 +136,7 @@ class SqliteSchemaV8MigrationTest {
                 SELECT name FROM sqlite_master
                 WHERE type = 'table'
                   AND (name LIKE 'capture_%'
-                    OR name LIKE 'companion_population_group_%'
-                    OR name = 'companion_provisioning_operations')
+                    OR name LIKE 'companion_population_group_%')
                 """);
              ResultSet result = statement.executeQuery()) {
             Stream.Builder<String> names = Stream.builder();

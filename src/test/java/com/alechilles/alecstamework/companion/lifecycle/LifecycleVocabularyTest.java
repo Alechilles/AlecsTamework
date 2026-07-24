@@ -23,8 +23,6 @@ class LifecycleVocabularyTest {
                 Map.entry(LifecycleState.LOST, LifecycleLocation.none()),
                 Map.entry(LifecycleState.ROSTER_STORED,
                         LifecycleLocation.keyed(LifecycleLocationKind.COMMAND_ROSTER, "family-a:0")),
-                Map.entry(LifecycleState.PROVISIONED_DORMANT,
-                        LifecycleLocation.keyed(LifecycleLocationKind.PROVISIONING, "provision-a")),
                 Map.entry(LifecycleState.RELEASED, LifecycleLocation.none()),
                 Map.entry(LifecycleState.UNRESOLVED, LifecycleLocation.unresolved())
         );

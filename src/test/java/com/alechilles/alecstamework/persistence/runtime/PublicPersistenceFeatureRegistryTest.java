@@ -5,8 +5,6 @@ import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDef
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
-import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
@@ -26,7 +24,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(12, registry.descriptors().size());
+        assertEquals(11, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -53,7 +51,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(19, operationKinds.size());
+        assertEquals(17, operationKinds.size());
 
         PersistenceFeatureDescriptor economics = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
@@ -166,37 +164,5 @@ class PublicPersistenceFeatureRegistryTest {
                 timed.projectionConsumers()
         );
 
-        PersistenceFeatureDescriptor provisioning =
-                registry.requireFeature(
-                        PublicPersistenceFeatureRegistry.PROVISIONING
-                );
-        assertEquals(
-                Set.of("provisioning_record"),
-                provisioning.ownedAuthorities()
-        );
-        assertEquals(
-                Set.of(
-                        OperationScopeType.PROFILE,
-                        OperationScopeType.OWNER,
-                        OperationScopeType.COMMAND_FAMILY
-                ),
-                provisioning.operationScopes().get(
-                        CompanionProvisioningDefinition.INSTANCE.kind()
-                )
-        );
-        assertEquals(
-                provisioning.operationScopes().get(
-                        CompanionProvisioningDefinition.INSTANCE.kind()
-                ),
-                provisioning.operationScopes().get(
-                        ProvisioningActivationDefinition.INSTANCE.kind()
-                )
-        );
-        assertTrue(provisioning.startupDependencies().contains(
-                PublicPersistenceFeatureRegistry.TIMED_SUMMON
-        ));
-        assertTrue(provisioning.projectionConsumers().contains(
-                PublicPersistenceFeatureRegistry.PROVISIONING_INDEX
-        ));
     }
 }

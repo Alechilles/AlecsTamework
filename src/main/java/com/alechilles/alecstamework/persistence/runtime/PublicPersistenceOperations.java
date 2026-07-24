@@ -16,8 +16,6 @@ import com.alechilles.alecstamework.companion.command.CommandRosterTransitionReq
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
-import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
@@ -272,30 +270,6 @@ public final class PublicPersistenceOperations {
     ) {
         var submitted = adapter.commandRosterTransitionOperations().submit(
                 operationId, idempotencyKey, transition
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
-    public PublicOperationSubmission provisionCompanion(
-            @Nonnull OperationId operationId,
-            @Nonnull CompanionProvisioningRequest request
-    ) {
-        var submitted = adapter.provisioningOperations().submit(
-                operationId, request
-        );
-        return submission(submitted.acceptance(), submitted.completion());
-    }
-
-    @Nonnull
-    public PublicOperationSubmission activateProvisionedCompanion(
-            @Nonnull OperationId operationId,
-            @Nonnull ProvisioningActivationRequest request
-    ) {
-        var submitted = adapter.provisioningActivationOperations().submit(
-                operationId,
-                request,
-                boundaries.provisioningActivations()
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

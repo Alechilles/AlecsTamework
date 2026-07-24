@@ -72,7 +72,6 @@ class TameworkPersistenceRuntimeMigrationTest {
     @Test
     void exposesAllSchemaV8IntegrationRepositoriesAfterStartup() {
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
-            assertNotNull(runtime.getCompanionProvisioningRepository());
             assertNotNull(runtime.getPopulationGroupRepository());
         }
     }

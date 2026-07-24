@@ -30,7 +30,6 @@ class SqliteSchemaV9MigrationTest {
             assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V9));
             assertTrue(tableExists(connection, "command_family_rosters"));
             assertTrue(tableExists(connection, "command_family_roster_memberships"));
-            assertTrue(tableExists(connection, "companion_provisioning_command_links"));
             assertTrue(tableExists(connection, "command_timed_summon_sessions"));
             assertFalse(tableExists(connection, "paid_command_revival_operations"));
             assertFalse(tableExists(connection, "paid_command_revival_costs"));

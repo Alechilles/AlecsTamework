@@ -115,7 +115,7 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         TameworkCommandLinksComponent links = linksType == null
                 ? null : store.getComponent(ref, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
-        if (CompanionRevivePolicy.supportsRevive(roleId, links, npcUuid)) {
+        if (CompanionRevivePolicy.supportsRevive(roleId, links)) {
             retryAfterByNpc.remove(npcUuid);
             return;
         }

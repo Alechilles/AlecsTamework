@@ -9,8 +9,6 @@ import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.PopulationGroupMembershipChangedEvent;
-import com.alechilles.alecstamework.api.PopulationCompanionLifecycle;
-import com.alechilles.alecstamework.api.ProvisionedCompanionRevivedEvent;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
@@ -112,24 +110,6 @@ class TameworkEventBusTest {
                 0L, 1L, false, 100L, 101L));
 
         assertEquals(1, successfulDeliveries.get());
-    }
-
-    @Test
-    void canonicalProvisionedLifecycleEventsAreTypedAndListenerIsolated() {
-        TameworkEventBus bus = new TameworkEventBus(null);
-        List<ProvisionedCompanionRevivedEvent> delivered = new ArrayList<>();
-        bus.subscribe(ProvisionedCompanionRevivedEvent.class, event -> {
-            throw new IllegalStateException("listener-failure");
-        });
-        bus.subscribe(ProvisionedCompanionRevivedEvent.class, delivered::add);
-        ProvisionedCompanionRevivedEvent event = new ProvisionedCompanionRevivedEvent(
-                UUID.randomUUID(), "hydragon", "soul-bond", "profile-mini",
-                UUID.randomUUID(), "Tamed_Wyvern_Mini", UUID.randomUUID(),
-                PopulationCompanionLifecycle.ACTIVE, 3L, 4L, false, 100L, 101L);
-
-        bus.emitCanonicalCompanionLifecycleEvent(event);
-
-        assertEquals(List.of(event), delivered);
     }
 
     @Test

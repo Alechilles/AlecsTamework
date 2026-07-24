@@ -23,7 +23,7 @@ class CommandFamilyRosterRepositoryTest {
         try (HydragonPersistenceTestHarness harness =
                      new HydragonPersistenceTestHarness(tempDir.resolve("roster.sqlite"))) {
             UUID owner = UUID.randomUUID();
-            String profileId = harness.insertProfile(owner, "dragon-role", "PROVISIONED_DORMANT", "default", 3L);
+            String profileId = harness.insertProfile(owner, "dragon-role", "ROSTER_STORED", "default", 3L);
             CommandFamilyRosterRepository repository =
                     new CommandFamilyRosterRepository(harness.connections, harness.queue);
             CommandFamilyRosterMutationRequest request = request(
@@ -55,7 +55,7 @@ class CommandFamilyRosterRepositoryTest {
         try (HydragonPersistenceTestHarness harness =
                      new HydragonPersistenceTestHarness(tempDir.resolve("remove.sqlite"))) {
             UUID owner = UUID.randomUUID();
-            String profileId = harness.insertProfile(owner, "dragon-role", "PROVISIONED_DORMANT", "default", 2L);
+            String profileId = harness.insertProfile(owner, "dragon-role", "ROSTER_STORED", "default", 2L);
             CommandFamilyRosterRepository repository =
                     new CommandFamilyRosterRepository(harness.connections, harness.queue);
             HydragonPersistenceTestHarness.await(repository.mutateAsync(

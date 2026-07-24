@@ -45,7 +45,6 @@ public final class SqliteSchemaV1Manager implements PersistenceSchemaManager {
             "command_family",
             "command_roster_membership",
             "timed_summon_lease",
-            "provisioning_record",
             "projection_outbox",
             "projection_checkpoint",
             "feature_circuit",

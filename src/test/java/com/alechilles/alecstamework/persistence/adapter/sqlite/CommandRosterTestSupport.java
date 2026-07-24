@@ -414,12 +414,6 @@ abstract class CommandRosterTestSupport {
                 (request, operation) ->
                         com.alechilles.alecstamework.persistence.operation
                                 .LiveOperationResult.confirmed("timed")
-                                .completed(),
-                (request, operation) ->
-                        com.alechilles.alecstamework.persistence.operation
-                                .LiveOperationResult.confirmed(
-                                        "provisioning-activation"
-                                )
                                 .completed()
         );
     }

@@ -29,7 +29,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
         assertTrue(contains(lines, "classified=21"));
         assertTrue(contains(lines, "oldestCorrelation=population-op-4"));
         assertTrue(contains(lines, "configs=[hydragon:miniwyvern->HyDragon_Miniwyvern]"));
-        assertTrue(contains(lines, "Provisioning: readiness=READY"));
         assertTrue(contains(lines, "API events: dispatched=12"));
         assertTrue(contains(lines, "listenerFailuresSinceBoot=2"));
         assertTrue(contains(lines, "lastFailedEventType=CommandTimedSummoningChangedEvent"));
@@ -70,38 +69,12 @@ class TameworkIntegrationDiagnosticsServiceTest {
     }
 
     @Test
-    void provisioningLookupShowsDurablePhasesAndSanitizesFields() {
-        FakeSource source = new FakeSource();
-        source.provisioning = new TameworkIntegrationDiagnosticsService.ProvisioningDetail(
-                "provision-op", "hydragon\nforged", "soul-bond-7", "correlation-7",
-                "ACTIVE", "PARTIAL_DORMANT", "RECOVERED_PARTIAL", "provisional-7",
-                "profile-7", "HyDragon_Miniwyvern", 900L, 12L,
-                List.of("hydragon:miniwyvern", "hydragon:companion"),
-                "dormant-pop-7", "active-pop-7", "PARTIAL_DORMANT",
-                "projection-runtime-unavailable", 950L, 960L);
-
-        List<String> lines = new TameworkIntegrationDiagnosticsService(source)
-                .provisioning("hydragon", "soul-bond-7");
-
-        assertEquals(3, lines.size());
-        assertTrue(contains(lines, "origin=hydragon forged/soul-bond-7"));
-        assertTrue(contains(lines, "state=PARTIAL_DORMANT"));
-        assertTrue(contains(lines, "canonical=profile-7"));
-        assertTrue(contains(lines, "classificationRevision=12"));
-        assertTrue(contains(lines, "dormantPopulation=dormant-pop-7"));
-        assertFalse(lines.stream().anyMatch(line -> line.contains("\n")));
-    }
-
-    @Test
     void missingExactLookupsReturnOneBoundedLine() {
         FakeSource source = new FakeSource();
-        source.provisioning = null;
         source.captureAttempt = null;
         TameworkIntegrationDiagnosticsService service =
                 new TameworkIntegrationDiagnosticsService(source);
 
-        assertEquals(List.of("Provisioning operation not found for origin 'hydragon/missing'."),
-                service.provisioning("hydragon", "missing"));
         assertEquals(List.of("Capture attempt not found for id 'missing'."),
                 service.captureAttempt("missing"));
     }
@@ -114,15 +87,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         private final EnumSet<TameworkApiCapability> capabilities = EnumSet.of(
                 TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
                 TameworkApiCapability.COMMAND_TIMED_SUMMONING,
-                TameworkApiCapability.POPULATION_GROUPS,
-                TameworkApiCapability.COMPANION_PROVISIONING);
-        private TameworkIntegrationDiagnosticsService.ProvisioningDetail provisioning =
-                new TameworkIntegrationDiagnosticsService.ProvisioningDetail(
-                        "provision-op", "hydragon", "soul-bond-7", "correlation-7",
-                        "ACTIVE", "PARTIAL_DORMANT", "RECOVERED_PARTIAL", "provisional-7",
-                        "profile-7", "HyDragon_Miniwyvern", 900L, 12L,
-                        List.of("hydragon:miniwyvern"), "dormant-pop-7", "active-pop-7",
-                        "PARTIAL_DORMANT", "projection-runtime-unavailable", 950L, 960L);
+                TameworkApiCapability.POPULATION_GROUPS);
         private TameworkIntegrationDiagnosticsService.CaptureAttemptDetail captureAttempt =
                 new TameworkIntegrationDiagnosticsService.CaptureAttemptDetail(
                         "attempt-7", "QUARANTINED", "CAPTURED", "capture-apply-quarantined",
@@ -138,7 +103,7 @@ class TameworkIntegrationDiagnosticsServiceTest {
         @Override public String apiVersion() { return "0.9.0"; }
         @Override public String capabilities() {
             return "[COMMAND_FAMILY_ROSTERS, COMMAND_TIMED_SUMMONING, "
-                    + "COMPANION_PROVISIONING, POPULATION_GROUPS]";
+                    + "POPULATION_GROUPS]";
         }
         @Override public boolean captureReady() { return true; }
         @Override public boolean hasCapability(TameworkApiCapability capability) {
@@ -157,9 +122,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
                     new PopulationDiagnosticsView.ReservationMetricsView(9L, 7L, 1L, 1L, 0L),
                     new PopulationDiagnosticsView.ReservationMetricsView(8L, 6L, 1L, 1L, 0L),
                     unavailable.claimLookups(), PopulationDiagnosticsView.ReconciliationView.unknown());
-        }
-        @Override public TameworkIntegrationDiagnosticsService.ProvisioningSummary provisioningSummary() {
-            return new TameworkIntegrationDiagnosticsService.ProvisioningSummary(true, 4L, 1L, 120L);
         }
         @Override public TameworkIntegrationDiagnosticsService.GroupOperationSummary groupOperationSummary() {
             return new TameworkIntegrationDiagnosticsService.GroupOperationSummary(
@@ -183,10 +145,6 @@ class TameworkIntegrationDiagnosticsServiceTest {
         @Override public TameworkIntegrationDiagnosticsService.CaptureAttemptDetail findCaptureAttempt(
                 String ignoredAttemptId) {
             return captureAttempt;
-        }
-        @Override public TameworkIntegrationDiagnosticsService.ProvisioningDetail findProvisioning(
-                String ignoredNamespace, String ignoredKey) {
-            return provisioning;
         }
     }
 }

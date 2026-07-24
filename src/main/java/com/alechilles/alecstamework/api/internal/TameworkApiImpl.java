@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
-import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.GlobalConfigView;
@@ -289,8 +288,6 @@ public final class TameworkApiImpl
     private volatile ItemFeatureRegistry captureItemConfigs;
     @Nullable
     private volatile CapturePolicyRegistry capturePolicies;
-    private volatile CompanionProvisioningApi companionProvisioningApi =
-            CompanionProvisioningApi.unavailable();
     private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
     private volatile CommandTimedSummoningApi commandTimedSummoningApi =
             CommandTimedSummoningApi.unavailable();
@@ -343,21 +340,6 @@ public final class TameworkApiImpl
         synchronized (capabilities) {
             capabilities.add(TameworkApiCapability.CAPTURE_POLICY);
         }
-    }
-
-    /** Publishes provisioning only after its canonical feature readiness succeeds. */
-    public boolean activateCompanionProvisioningRuntime(
-            @Nonnull CompanionProvisioningApi runtime,
-            boolean recoveryReady) {
-        Objects.requireNonNull(runtime, "runtime");
-        if (!recoveryReady) {
-            return false;
-        }
-        companionProvisioningApi = runtime;
-        synchronized (capabilities) {
-            capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING);
-        }
-        return true;
     }
 
     /** Publishes command-family rosters only after the durable repository is available. */
@@ -458,11 +440,6 @@ public final class TameworkApiImpl
     @Override
     public TraitEffectApi traitEffects() {
         return traitEffectApi;
-    }
-
-    @Override
-    public CompanionProvisioningApi companionProvisioning() {
-        return companionProvisioningApi;
     }
 
     @Override

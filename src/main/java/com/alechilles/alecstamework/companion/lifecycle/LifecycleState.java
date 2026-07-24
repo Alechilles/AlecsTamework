@@ -11,7 +11,6 @@ public enum LifecycleState {
     DEAD_REVIVABLE(LifecycleLocationKind.NONE),
     LOST(LifecycleLocationKind.NONE),
     ROSTER_STORED(LifecycleLocationKind.COMMAND_ROSTER),
-    PROVISIONED_DORMANT(LifecycleLocationKind.PROVISIONING),
     RELEASED(LifecycleLocationKind.NONE),
     UNRESOLVED(LifecycleLocationKind.UNRESOLVED);
 

@@ -14,7 +14,6 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -45,8 +44,6 @@ final class SqlitePublicProjectionSet {
     private final CommandRosterProjectionIndex commandRosterIndex;
     private final TimedSummonProjectionIndex timedSummonIndex;
     private final SqliteTimedSummonLeaseReader timedSummonReader;
-    private final ProvisioningProjectionIndex provisioningIndex;
-    private final SqliteProvisioningReader provisioningReader;
     private final ProfileExtensionProjectionIndex extensionIndex;
     private final SqliteProfileExtensionReader extensionReader;
     private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
@@ -80,9 +77,6 @@ final class SqlitePublicProjectionSet {
         this.timedSummonIndex = new TimedSummonProjectionIndex();
         this.timedSummonReader =
                 new SqliteTimedSummonLeaseReader(kernel.reads());
-        this.provisioningIndex = new ProvisioningProjectionIndex();
-        this.provisioningReader =
-                new SqliteProvisioningReader(kernel.reads());
         this.extensionIndex = new ProfileExtensionProjectionIndex();
         this.extensionReader =
                 new SqliteProfileExtensionReader(kernel.reads());
@@ -93,7 +87,6 @@ final class SqlitePublicProjectionSet {
                 populationGroupIndex,
                 commandRosterIndex,
                 timedSummonIndex,
-                provisioningIndex,
                 extensionIndex
         ).stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
                 ProjectionConsumer::consumerId,
@@ -124,10 +117,6 @@ final class SqlitePublicProjectionSet {
     @Nonnull
     TimedSummonProjectionIndex timedSummonIndex() {
         return timedSummonIndex;
-    }
-    @Nonnull
-    ProvisioningProjectionIndex provisioningIndex() {
-        return provisioningIndex;
     }
     @Nonnull
     CompanionProfileObserverProjection profileIndex() {
@@ -396,8 +385,6 @@ final class SqlitePublicProjectionSet {
     private CompletionStage<SqlitePublicProjectionStartupResult>
     rebuildDetails() {
         return SqliteDetailProjectionBootstrap.rebuild(
-                provisioningReader,
-                provisioningIndex,
                 extensionReader,
                 extensionIndex
         ).thenCompose(result -> {

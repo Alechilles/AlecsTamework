@@ -96,7 +96,7 @@ class OwnerPopulationAdmissionCoordinatorTest {
 
             OwnerPopulationPreparationResult preparation = harness.coordinator()
                     .groupCompositeCoordinator()
-                    .prepareProvisionedDormantAsync(
+                    .preparePopulationGroupsAsync(
                             plan, harness.groups(), groupOperation, List.of(evidence))
                     .get(2, TimeUnit.SECONDS);
             assertTrue(preparation.allowed());

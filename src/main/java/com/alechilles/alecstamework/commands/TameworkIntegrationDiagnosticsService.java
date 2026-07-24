@@ -10,9 +10,6 @@ import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncident;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRepository;
-import com.alechilles.alecstamework.persistence.sqlite.CompanionProvisioningOperationRecord;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupClassificationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import java.util.ArrayList;
@@ -20,7 +17,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.StringJoiner;
 import java.util.TreeMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -56,11 +52,9 @@ final class TameworkIntegrationDiagnosticsService {
                 + source.hasCapability(TameworkApiCapability.COMMAND_FAMILY_ROSTERS)
                 + ", timedSummoning="
                 + source.hasCapability(TameworkApiCapability.COMMAND_TIMED_SUMMONING)
-                + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS)
-                + ", provisioning=" + source.hasCapability(TameworkApiCapability.COMPANION_PROVISIONING));
+                + ", populationGroups=" + source.hasCapability(TameworkApiCapability.POPULATION_GROUPS));
         appendCaptureSummary(lines);
         appendPopulationSummary(lines);
-        appendProvisioningSummary(lines);
         appendEventDeliverySummary(lines);
         appendPersistenceSummary(lines);
         return List.copyOf(lines.subList(0, Math.min(lines.size(), MAX_LINES)));
@@ -161,43 +155,6 @@ final class TameworkIntegrationDiagnosticsService {
         return List.copyOf(lines.subList(0, Math.min(lines.size(), MAX_LINES)));
     }
 
-    @Nonnull
-    List<String> provisioning(@Nonnull String callerNamespace,
-                              @Nonnull String idempotencyKey) {
-        ProvisioningDetail detail;
-        try {
-            detail = source.findProvisioning(callerNamespace, idempotencyKey);
-        } catch (Exception failure) {
-            return List.of("Provisioning diagnostic unavailable: " + failureCode(failure));
-        }
-        if (detail == null) {
-            return List.of("Provisioning operation not found for origin '"
-                    + bounded(callerNamespace) + "/" + bounded(idempotencyKey) + "'.");
-        }
-        List<String> lines = new ArrayList<>(3);
-        lines.add("Provisioning operation: id=" + bounded(detail.operationId())
-                + ", origin=" + bounded(detail.callerNamespace()) + "/"
-                + bounded(detail.idempotencyKey())
-                + ", correlation=" + boundedOrNone(detail.correlationId())
-                + ", disposition=" + detail.disposition()
-                + ", state=" + detail.state()
-                + ", recovery=" + bounded(detail.recoveryStatus()));
-        lines.add("Provisioning profile: provisional=" + bounded(detail.provisionalProfileId())
-                + ", canonical=" + boundedOrNone(detail.canonicalProfileId())
-                + ", role=" + bounded(detail.roleId())
-                + ", profileUpdatedAtMs=" + detail.profileUpdatedAtMs()
-                + ", classificationRevision=" + detail.classificationRevision()
-                + ", groups=" + boundedGroups(detail.groupIds()));
-        lines.add("Provisioning phases: dormantPopulation="
-                + boundedOrNone(detail.dormantPopulationOperationId())
-                + ", activePopulation=" + boundedOrNone(detail.activePopulationOperationId())
-                + ", result=" + boundedOrNone(detail.resultCode())
-                + ", projectionReason=" + boundedOrNone(detail.projectionReason())
-                + ", updatedAtMs=" + detail.updatedAtMs()
-                + ", completedAtMs=" + detail.completedAtMs());
-        return List.copyOf(lines);
-    }
-
     private void appendCaptureSummary(List<String> lines) {
         CaptureSummary summary = safe(source::captureSummary, null);
         if (summary == null) {
@@ -233,18 +190,6 @@ final class TameworkIntegrationDiagnosticsService {
                 + ", mappingConflicts=" + configs.mappingConflicts()));
     }
 
-    private void appendProvisioningSummary(List<String> lines) {
-        ProvisioningSummary summary = safe(source::provisioningSummary, null);
-        if (summary == null) {
-            lines.add("Provisioning: readiness=UNAVAILABLE, reason=diagnostics-read-failed");
-            return;
-        }
-        lines.add("Provisioning: readiness=" + (summary.capabilityReady() ? "READY" : "UNAVAILABLE")
-                + ", openOperations=" + summary.openOperations()
-                + ", quarantined=" + summary.quarantined()
-                + ", oldestUpdatedAtMs=" + summary.oldestUpdatedAtMs());
-    }
-
     private void appendPersistenceSummary(List<String> lines) {
         PersistenceSummary summary = safe(source::persistenceSummary, null);
         if (summary == null) {
@@ -271,14 +216,6 @@ final class TameworkIntegrationDiagnosticsService {
         return "diagnostics-read-failed:" + failure.getClass().getSimpleName();
     }
 
-    private static String boundedGroups(List<String> groups) {
-        if (groups == null || groups.isEmpty()) return "[]";
-        StringJoiner joiner = new StringJoiner(",", "[", groups.size() > MAX_GROUP_IDS ? ",...]" : "]");
-        groups.stream().sorted().limit(MAX_GROUP_IDS).map(TameworkIntegrationDiagnosticsService::bounded)
-                .forEach(joiner::add);
-        return joiner.toString();
-    }
-
     private static String boundedOrNone(@Nullable String value) {
         return value == null || value.isBlank() ? "<none>" : bounded(value);
     }
@@ -297,7 +234,6 @@ final class TameworkIntegrationDiagnosticsService {
         boolean hasCapability(@Nonnull TameworkApiCapability capability);
         @Nonnull PopulationGroupReconciliationView groupReadiness() throws Exception;
         @Nonnull PopulationDiagnosticsView populationDiagnostics() throws Exception;
-        @Nonnull ProvisioningSummary provisioningSummary() throws Exception;
         @Nonnull GroupOperationSummary groupOperationSummary() throws Exception;
         @Nonnull GroupConfigSummary groupConfigSummary() throws Exception;
         @Nonnull PersistenceSummary persistenceSummary() throws Exception;
@@ -306,8 +242,6 @@ final class TameworkIntegrationDiagnosticsService {
             return new EventDeliverySummary(0L, 0L, 0L, 0L, null);
         }
         @Nullable CaptureAttemptDetail findCaptureAttempt(@Nonnull String attemptId) throws Exception;
-        @Nullable ProvisioningDetail findProvisioning(
-                @Nonnull String callerNamespace, @Nonnull String idempotencyKey) throws Exception;
     }
 
     private static final class LiveSource implements Source {
@@ -348,19 +282,6 @@ final class TameworkIntegrationDiagnosticsService {
         @Override public PopulationDiagnosticsView populationDiagnostics() {
             return api == null ? PopulationDiagnosticsView.unavailable()
                     : api.diagnostics().getPopulationDiagnostics();
-        }
-
-        @Override public ProvisioningSummary provisioningSummary() throws Exception {
-            List<CompanionProvisioningOperationRecord> operations =
-                    persistence.getCompanionProvisioningRepository().loadRecoverable();
-            long open = operations.stream().filter(operation -> !operation.state().isTerminal()).count();
-            long quarantined = operations.stream()
-                    .filter(operation -> operation.state() == CompanionProvisioningOperationRecord.State.QUARANTINED)
-                    .count();
-            long oldest = operations.stream().mapToLong(CompanionProvisioningOperationRecord::updatedAtMs)
-                    .min().orElse(0L);
-            return new ProvisioningSummary(
-                    hasCapability(TameworkApiCapability.COMPANION_PROVISIONING), open, quarantined, oldest);
         }
 
         @Override public GroupOperationSummary groupOperationSummary() throws Exception {
@@ -502,31 +423,6 @@ final class TameworkIntegrationDiagnosticsService {
                     .findFirst().orElse(null);
         }
 
-        @Override public ProvisioningDetail findProvisioning(
-                String callerNamespace, String idempotencyKey) throws Exception {
-            CompanionProvisioningOperationRecord operation = persistence
-                    .getCompanionProvisioningRepository()
-                    .findByCallerKey(callerNamespace, idempotencyKey);
-            if (operation == null) return null;
-            NpcProfileRepository.ProfileRecord profile = operation.canonicalProfileId() == null
-                    ? null : persistence.getNpcProfileRepository()
-                    .loadProfileById(operation.canonicalProfileId());
-            PopulationGroupClassificationRecord classification = operation.canonicalProfileId() == null
-                    ? null : persistence.getPopulationGroupRepository()
-                    .findClassification(operation.canonicalProfileId());
-            return new ProvisioningDetail(operation.operationId(), operation.callerNamespace(),
-                    operation.idempotencyKey(), operation.correlationId(),
-                    operation.requestedDisposition().name(), operation.state().name(),
-                    operation.recoveryStatus(), operation.provisionalProfileId(),
-                    operation.canonicalProfileId(), operation.targetRoleId(),
-                    profile == null ? 0L : profile.updatedAtMs(),
-                    classification == null ? 0L : classification.classificationRevision(),
-                    classification == null ? List.of() : classification.groupIds(),
-                    operation.dormantPopulationOperationId(), operation.activePopulationOperationId(),
-                    operation.resultCode(), operation.projectionReason(), operation.updatedAtMs(),
-                    operation.completedAtMs());
-        }
-
         private static boolean relevantCoverage(String dimension) {
             String normalized = dimension.toUpperCase(Locale.ROOT);
             return normalized.contains("POPULATION") || normalized.contains("PROFILE")
@@ -534,8 +430,6 @@ final class TameworkIntegrationDiagnosticsService {
         }
     }
 
-    record ProvisioningSummary(boolean capabilityReady, long openOperations,
-                               long quarantined, long oldestUpdatedAtMs) { }
     record GroupOperationSummary(long openOperations, long quarantined,
                                  @Nullable String oldestCorrelation) { }
     record GroupConfigSummary(@Nonnull String winners, long mappingConflicts) { }
@@ -572,18 +466,6 @@ final class TameworkIntegrationDiagnosticsService {
             boolean eventEmitted, boolean quarantined, boolean hasQuarantineEvidence,
             @Nullable String incidentId, @Nullable String incidentStatus,
             @Nullable String incidentReason) { }
-    record ProvisioningDetail(@Nonnull String operationId, @Nonnull String callerNamespace,
-                              @Nonnull String idempotencyKey, @Nullable String correlationId,
-                              @Nonnull String disposition, @Nonnull String state,
-                              @Nonnull String recoveryStatus, @Nonnull String provisionalProfileId,
-                              @Nullable String canonicalProfileId, @Nonnull String roleId,
-                              long profileUpdatedAtMs, long classificationRevision,
-                              @Nonnull List<String> groupIds,
-                              @Nullable String dormantPopulationOperationId,
-                              @Nullable String activePopulationOperationId,
-                              @Nullable String resultCode, @Nullable String projectionReason,
-                              long updatedAtMs, long completedAtMs) { }
-
     @FunctionalInterface
     private interface CheckedSupplier<T> { T get() throws Exception; }
 }

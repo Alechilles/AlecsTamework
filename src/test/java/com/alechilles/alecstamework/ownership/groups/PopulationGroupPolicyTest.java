@@ -39,7 +39,7 @@ class PopulationGroupPolicyTest {
                 owner, "Mini", null, CompanionLifecycleState.ACTIVE)).isEmpty());
         Map<PopulationGroupBucket, PopulationGroupCountDelta> provisioned = planner.plan(
                 new PopulationGroupTransition(null, null, null, null,
-                        owner, "Mini", null, CompanionLifecycleState.PROVISIONED_DORMANT));
+                        owner, "Mini", null, CompanionLifecycleState.ROSTER_STORED));
         assertEquals(new PopulationGroupCountDelta(1, 0), provisioned.values().iterator().next());
     }
 
@@ -70,7 +70,7 @@ class PopulationGroupPolicyTest {
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> planner.plan(
                 new PopulationGroupTransition(null, null, null, null,
-                        UUID.randomUUID(), "Mini", null, CompanionLifecycleState.PROVISIONED_DORMANT)));
+                        UUID.randomUUID(), "Mini", null, CompanionLifecycleState.ROSTER_STORED)));
     }
 
     private static TwPopulationGroupConfig group() throws Exception {

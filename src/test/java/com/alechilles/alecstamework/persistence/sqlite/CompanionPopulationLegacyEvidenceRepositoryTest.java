@@ -84,36 +84,6 @@ class CompanionPopulationLegacyEvidenceRepositoryTest {
     }
 
     @Test
-    void provisionedDormantProfileWithoutPhysicalUuidSealsAsEmptyEvidence() throws Exception {
-        SqliteConnectionManager connections = migrated("provisioned-dormant.sqlite");
-        try (Connection connection = connections.openConnection()) {
-            insertProfile(connection, "profile", null, UUID.randomUUID());
-            insertPopulationState(connection, "profile", "PROVISIONED_DORMANT");
-        }
-
-        CompanionPopulationLegacyEvidenceRepository.Batch batch =
-                new CompanionPopulationLegacyEvidenceRepository(connections)
-                        .loadBatch(0, 16, "test");
-
-        assertEquals(1, batch.scannedUnits());
-        assertTrue(batch.evidence().isEmpty());
-    }
-
-    @Test
-    void provisionedDormantProfileWithLegacyPhysicalStateStillFailsClosed() throws Exception {
-        SqliteConnectionManager connections = migrated("malformed-provisioned-dormant.sqlite");
-        try (Connection connection = connections.openConnection()) {
-            insertProfile(connection, "profile", null, UUID.randomUUID());
-            insertPopulationState(connection, "profile", "PROVISIONED_DORMANT");
-            insertProfileState(connection, "profile", true, false, false, false);
-        }
-
-        assertThrows(IllegalStateException.class, () ->
-                new CompanionPopulationLegacyEvidenceRepository(connections)
-                        .loadBatch(0, 16, "test"));
-    }
-
-    @Test
     void historicalAliasResolvesAProfileWithoutCurrentUuid() throws Exception {
         SqliteConnectionManager connections = migrated("alias.sqlite");
         UUID aliasUuid = UUID.randomUUID();
@@ -206,21 +176,6 @@ class CompanionPopulationLegacyEvidenceRepositoryTest {
             statement.setInt(3, dead ? 1 : 0);
             statement.setInt(4, lost ? 1 : 0);
             statement.setInt(5, coop ? 1 : 0);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void insertPopulationState(Connection connection,
-                                              String profileId,
-                                              String lifecycle) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO companion_population_state (
-                    profile_id, ownership_world_name, lifecycle_state,
-                    revision, source, created_at_ms, updated_at_ms
-                ) VALUES (?, 'default', ?, 0, 'test', 1, 1)
-                """)) {
-            statement.setString(1, profileId);
-            statement.setString(2, lifecycle);
             statement.executeUpdate();
         }
     }

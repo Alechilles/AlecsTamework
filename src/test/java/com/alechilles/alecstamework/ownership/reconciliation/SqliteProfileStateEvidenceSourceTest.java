@@ -33,34 +33,6 @@ class SqliteProfileStateEvidenceSourceTest {
         assertTrue(batch.evidence().isEmpty());
     }
 
-    @Test
-    void uuidlessProvisionedDormantProfileCompletesWithoutLegacyEvidence() throws Exception {
-        SqliteConnectionManager connections = migrated();
-        try (Connection connection = connections.openConnection()) {
-            insertProfile(connection, "dormant-profile", null, UUID.randomUUID(), 1L);
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO companion_population_state (
-                        profile_id, ownership_world_name, lifecycle_state,
-                        revision, source, created_at_ms, updated_at_ms
-                    ) VALUES ('dormant-profile', 'default', 'PROVISIONED_DORMANT',
-                              0, 'test', 1, 1)
-                    """)) {
-                statement.executeUpdate();
-            }
-        }
-        SqliteProfileStateEvidenceSource source = new SqliteProfileStateEvidenceSource(
-                new CompanionPopulationLegacyEvidenceRepository(connections)
-        );
-
-        CompanionPopulationEvidenceSource.Batch batch = source.scan(0L, 128)
-                .get(2, TimeUnit.SECONDS);
-
-        assertEquals(1L, source.descriptor().estimatedTotal());
-        assertEquals(1L, batch.scannedUnits());
-        assertTrue(batch.complete());
-        assertTrue(batch.evidence().isEmpty());
-    }
-
     /** Regression: ordinary profile writes during a 426-row startup scan must not degrade it. */
     @Test
     void profileMutationDuringPagingDoesNotInvalidateCapturedSnapshot() throws Exception {

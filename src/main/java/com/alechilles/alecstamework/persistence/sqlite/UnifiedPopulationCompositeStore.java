@@ -4,13 +4,11 @@ import java.sql.Connection;
 import java.sql.Savepoint;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Owns rollback-safe SQLite boundaries that span owner population, population groups, and
- * intentionally null-NPC profile metadata.
+ * Owns rollback-safe SQLite boundaries that span owner population and population groups.
  */
 public final class UnifiedPopulationCompositeStore {
     private final CompanionPopulationRepository populationRepository;
@@ -29,8 +27,8 @@ public final class UnifiedPopulationCompositeStore {
 
     /** Prepares owner and group reservations in one rollback-safe SQLite transaction. */
     @Nonnull
-    public PersistenceWriteQueue.WriteSubmission<ProvisionedDormantPreparationResult>
-    prepareProvisionedDormantAsync(
+    public PersistenceWriteQueue.WriteSubmission<PopulationGroupCompositePreparationResult>
+    preparePopulationGroupsAsync(
             @Nonnull PopulationPersistenceTransition.Prepare ownerPrepare,
             @Nonnull PopulationGroupRepository groupRepository,
             @Nonnull PopulationGroupOperationRecord groupOperation,
@@ -39,59 +37,10 @@ public final class UnifiedPopulationCompositeStore {
         List<PopulationGroupRepository.ReservationEvidence> frozenEvidence =
                 List.copyOf(groupEvidence);
         return writeQueue.submitTracked(
-                "provisioned_dormant_population_prepare",
-                connection -> prepareProvisionedDormantInTransaction(
+                "population_group_composite_prepare",
+                connection -> preparePopulationGroupsInTransaction(
                         connection, ownerPrepare, groupRepository, groupOperation, frozenEvidence),
                 null);
-    }
-
-    /** Commits owner state, null-NPC profile metadata, and group classification atomically. */
-    @Nonnull
-    public PersistenceWriteQueue.WriteSubmission<ProvisionedDormantCommitResult>
-    commitProvisionedDormantAsync(
-            @Nonnull PopulationPersistenceTransition.Commit ownerCommit,
-            @Nonnull NpcProfileRepository profileRepository,
-            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
-            @Nonnull PopulationGroupRepository groupRepository,
-            @Nonnull String groupOperationId,
-            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs) {
-        return commitProvisionedDormantAsync(ownerCommit, profileRepository, profileMutation,
-                groupRepository, groupOperationId, classification, nowMs,
-                ProvisionedDormantCommitExtension.NO_OP);
-    }
-
-    /** Adds an optional domain commit to the same rollback boundary as profile creation. */
-    @Nonnull
-    public PersistenceWriteQueue.WriteSubmission<ProvisionedDormantCommitResult>
-    commitProvisionedDormantAsync(
-            @Nonnull PopulationPersistenceTransition.Commit ownerCommit,
-            @Nonnull NpcProfileRepository profileRepository,
-            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
-            @Nonnull PopulationGroupRepository groupRepository,
-            @Nonnull String groupOperationId,
-            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs,
-            @Nonnull ProvisionedDormantCommitExtension extension) {
-        Objects.requireNonNull(profileRepository, "profileRepository");
-        Objects.requireNonNull(groupRepository, "groupRepository");
-        Objects.requireNonNull(extension, "extension");
-        AtomicReference<NpcProfileRepository.ProfileRecord> before = new AtomicReference<>();
-        return writeQueue.submitTracked(
-                "provisioned_dormant_population_commit",
-                connection -> {
-                    before.set(profileRepository.loadProfileByIdInTransaction(
-                            connection, profileMutation.profileId()));
-                    return commitProvisionedDormantInTransaction(
-                            connection, ownerCommit, profileRepository, profileMutation,
-                            groupRepository, groupOperationId, classification, nowMs, extension);
-                },
-                result -> {
-                    if (result != null && result.committed() && result.profileResult() != null) {
-                        profileRepository.notifyProfileChanged(
-                                before.get(), result.profileResult().profile());
-                    }
-                });
     }
 
     /** Commits a normal claim-bearing owner transition and group classification atomically. */
@@ -112,7 +61,7 @@ public final class UnifiedPopulationCompositeStore {
                 null);
     }
 
-    private ProvisionedDormantPreparationResult prepareProvisionedDormantInTransaction(
+    private PopulationGroupCompositePreparationResult preparePopulationGroupsInTransaction(
             Connection connection,
             PopulationPersistenceTransition.Prepare ownerPrepare,
             PopulationGroupRepository groupRepository,
@@ -125,7 +74,7 @@ public final class UnifiedPopulationCompositeStore {
             if (owner.status() != PopulationPersistenceTransition.ResultStatus.PREPARED
                     && owner.status() != PopulationPersistenceTransition.ResultStatus.IDEMPOTENT) {
                 rollback(connection, boundary);
-                return ProvisionedDormantPreparationResult.denied(owner, null,
+                return PopulationGroupCompositePreparationResult.denied(owner, null,
                         owner.reason() == null ? "owner_population_prepare_denied" : owner.reason());
             }
             PopulationGroupRepository.ReservationResult groups =
@@ -134,7 +83,7 @@ public final class UnifiedPopulationCompositeStore {
             if (groups.status() != PopulationGroupRepository.Status.PREPARED
                     && groups.status() != PopulationGroupRepository.Status.IDEMPOTENT) {
                 rollback(connection, boundary);
-                return ProvisionedDormantPreparationResult.denied(owner, groups,
+                return PopulationGroupCompositePreparationResult.denied(owner, groups,
                         groups.reason() == null
                                 ? "population_group_prepare_denied" : groups.reason());
             }
@@ -142,7 +91,7 @@ public final class UnifiedPopulationCompositeStore {
             advancePreparedGroups(connection, groupRepository, groupOperation, groups,
                     ownerPrepare.operation().updatedAtMs());
             connection.releaseSavepoint(boundary);
-            return new ProvisionedDormantPreparationResult(
+            return new PopulationGroupCompositePreparationResult(
                     CompositeStatus.PREPARED, owner, groups, null);
         } catch (Exception failure) {
             rollback(connection, boundary);
@@ -188,57 +137,6 @@ public final class UnifiedPopulationCompositeStore {
             }
         } else if (persisted.state() != PopulationGroupOperationRecord.State.APPLYING) {
             throw new IllegalStateException("Group operation is not applying.");
-        }
-    }
-
-    private ProvisionedDormantCommitResult commitProvisionedDormantInTransaction(
-            Connection connection,
-            PopulationPersistenceTransition.Commit ownerCommit,
-            NpcProfileRepository profileRepository,
-            NpcProfileRepository.DormantProfileMutation profileMutation,
-            PopulationGroupRepository groupRepository,
-            String groupOperationId,
-            PopulationGroupRepository.ClassificationMutation classification,
-            long nowMs,
-            ProvisionedDormantCommitExtension extension) throws Exception {
-        Savepoint boundary = connection.setSavepoint();
-        try {
-            PopulationPersistenceTransition.Result owner =
-                    populationRepository.commitInTransaction(connection, ownerCommit);
-            if (!ownerCommitted(owner)) {
-                rollback(connection, boundary);
-                return ProvisionedDormantCommitResult.denied(owner, null, null,
-                        reason(owner.reason(), "owner_population_commit_denied"));
-            }
-            NpcProfileRepository.DormantProfileResult profile =
-                    profileRepository.applyDormantProfileInTransaction(connection, profileMutation);
-            if (profile.status() != NpcProfileRepository.DormantProfileStatus.APPLIED
-                    && profile.status() != NpcProfileRepository.DormantProfileStatus.IDEMPOTENT) {
-                rollback(connection, boundary);
-                return ProvisionedDormantCommitResult.denied(owner, profile, null,
-                        reason(profile.reason(), "dormant_profile_commit_denied"));
-            }
-            PopulationGroupRepository.OperationResult groups = commitGroups(
-                    connection, groupRepository, groupOperationId, classification, nowMs);
-            if (!groupsCommitted(groups)) {
-                rollback(connection, boundary);
-                return ProvisionedDormantCommitResult.denied(owner, profile, groups,
-                        reason(groups.reason(), "population_group_commit_denied"));
-            }
-            ExtensionResult extensionResult = extension.commit(connection, profile.profile());
-            if (extensionResult == null || !extensionResult.committed()) {
-                rollback(connection, boundary);
-                return ProvisionedDormantCommitResult.denied(owner, profile, groups,
-                        extensionResult == null ? "provisioned-dormant-extension-missing"
-                                : reason(extensionResult.reason(),
-                                "provisioned-dormant-extension-denied"));
-            }
-            connection.releaseSavepoint(boundary);
-            return new ProvisionedDormantCommitResult(
-                    CompositeStatus.COMMITTED, owner, profile, groups, null);
-        } catch (Exception failure) {
-            rollback(connection, boundary);
-            throw failure;
         }
     }
 
@@ -317,62 +215,24 @@ public final class UnifiedPopulationCompositeStore {
 
     public enum CompositeStatus { PREPARED, SOURCE_FINALIZATION_PENDING, COMMITTED, DENIED }
 
-    public record ProvisionedDormantPreparationResult(
+    public record PopulationGroupCompositePreparationResult(
             @Nonnull CompositeStatus status,
             @Nullable PopulationPersistenceTransition.Result ownerResult,
             @Nullable PopulationGroupRepository.ReservationResult groupResult,
             @Nullable String reason) {
-        public ProvisionedDormantPreparationResult {
+        public PopulationGroupCompositePreparationResult {
             status = Objects.requireNonNull(status, "status");
         }
 
-        public static ProvisionedDormantPreparationResult denied(
+        public static PopulationGroupCompositePreparationResult denied(
                 PopulationPersistenceTransition.Result owner,
                 PopulationGroupRepository.ReservationResult groups,
                 String reason) {
-            return new ProvisionedDormantPreparationResult(
+            return new PopulationGroupCompositePreparationResult(
                     CompositeStatus.DENIED, owner, groups, reason);
         }
 
         public boolean prepared() { return status == CompositeStatus.PREPARED; }
-    }
-
-    public record ProvisionedDormantCommitResult(
-            @Nonnull CompositeStatus status,
-            @Nullable PopulationPersistenceTransition.Result ownerResult,
-            @Nullable NpcProfileRepository.DormantProfileResult profileResult,
-            @Nullable PopulationGroupRepository.OperationResult groupResult,
-            @Nullable String reason) {
-        public ProvisionedDormantCommitResult {
-            status = Objects.requireNonNull(status, "status");
-        }
-
-        public static ProvisionedDormantCommitResult denied(
-                PopulationPersistenceTransition.Result owner,
-                NpcProfileRepository.DormantProfileResult profile,
-                PopulationGroupRepository.OperationResult groups,
-                String reason) {
-            return new ProvisionedDormantCommitResult(
-                    CompositeStatus.DENIED, owner, profile, groups, reason);
-        }
-
-        public boolean committed() { return status == CompositeStatus.COMMITTED; }
-    }
-
-    @FunctionalInterface
-    public interface ProvisionedDormantCommitExtension {
-        ProvisionedDormantCommitExtension NO_OP = (connection, profile) -> ExtensionResult.success();
-
-        @Nonnull ExtensionResult commit(@Nonnull Connection connection,
-                                        @Nonnull NpcProfileRepository.ProfileRecord profile)
-                throws Exception;
-    }
-
-    public record ExtensionResult(boolean committed, @Nullable String reason) {
-        public static ExtensionResult success() { return new ExtensionResult(true, null); }
-        public static ExtensionResult denied(String reason) {
-            return new ExtensionResult(false, Objects.requireNonNull(reason, "reason"));
-        }
     }
 
     public record PopulationGroupCompositeCommitResult(

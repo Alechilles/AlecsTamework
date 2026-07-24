@@ -94,8 +94,6 @@ class TameworkApiImplTest {
             );
             assertEquals(PopulationGroupReconciliationView.Readiness.UNAVAILABLE,
                     api.policies().populationGroups().getReconciliationStatus().readiness());
-            assertTrue(api.companionProvisioning().getByProfileId("missing-profile").isEmpty());
-
             UUID npcUuid = UUID.randomUUID();
             UUID ownerUuid = UUID.randomUUID();
             assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(

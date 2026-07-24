@@ -40,24 +40,4 @@ class IntegrationConfigRuntimeWiringTest {
                 "Rejected assets must retain the prior compiled index and log its revision.");
     }
 
-    @Test
-    void initialPopulationGroupAssetLoadRetriesProvisioningRecoveryBeforeActivation() throws Exception {
-        String compact = Files.readString(ENTRYPOINT).replaceAll("\\s+", "");
-
-        assertTrue(compact.contains(
-                "activatePopulationGroupsIfReady();"
-                        + "retryCompanionProvisioningRecoveryIfPopulationGroupsReady();"
-                        + "activateCompanionProvisioningIfReady();"),
-                "Population-group readiness must retry provisioning recovery before capability activation.");
-        assertTrue(compact.contains(
-                "if(companionProvisioningRecoveryReady"
-                        + "||!populationGroupRecoveryReady"
-                        + "||ownerPopulationRuntime==null"
-                        + "||!ownerPopulationRuntime.populationGroupsReady()"),
-                "The retry must remain idempotent and gated by authoritative population readiness.");
-        assertTrue(compact.contains(
-                "retryCompanionProvisioningRecoveryIfPopulationGroupsReady();"
-                        + "activateCompanionProvisioningIfReady();"),
-                "The canonical owner-recovery callback must use the same guarded retry path.");
-    }
 }

@@ -16,7 +16,6 @@ final class SqliteSchemaV9Migration {
         try (Statement statement = connection.createStatement()) {
             dropObsoleteBondedVessels(statement);
             createCommandFamilyRosters(statement);
-            createProvisioningCommandLinks(statement);
             createTimedSummons(statement);
             createCaptureSourceRefunds(statement);
         }
@@ -39,41 +38,6 @@ final class SqliteSchemaV9Migration {
         statement.execute("""
                 CREATE INDEX IF NOT EXISTS idx_capture_source_refunds_owner_state
                 ON capture_source_refund_claims(owner_uuid, state, created_at_ms)
-                """);
-    }
-
-    private void createProvisioningCommandLinks(Statement statement) throws Exception {
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS companion_provisioning_command_links (
-                    operation_id TEXT PRIMARY KEY,
-                    caller_namespace TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    owner_uuid TEXT NOT NULL,
-                    command_family_id TEXT NOT NULL,
-                    required_command_config_id TEXT NOT NULL,
-                    access_item_id TEXT,
-                    group_id TEXT,
-                    active_for_bulk_commands INTEGER NOT NULL CHECK (
-                        active_for_bulk_commands IN (0, 1)),
-                    home_x REAL,
-                    home_y REAL,
-                    home_z REAL,
-                    expected_roster_revision INTEGER NOT NULL CHECK (expected_roster_revision >= 0),
-                    profile_id TEXT,
-                    resulting_roster_revision INTEGER CHECK (
-                        resulting_roster_revision IS NULL OR resulting_roster_revision >= 1),
-                    state TEXT NOT NULL CHECK (state IN ('PREPARED','COMMITTED','QUARANTINED')),
-                    reason TEXT,
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    UNIQUE (caller_namespace, idempotency_key),
-                    CHECK ((home_x IS NULL AND home_y IS NULL AND home_z IS NULL)
-                        OR (home_x IS NOT NULL AND home_y IS NOT NULL AND home_z IS NOT NULL))
-                )
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_companion_provisioning_command_links_state
-                ON companion_provisioning_command_links(state, updated_at_ms, operation_id)
                 """);
     }
 

@@ -145,10 +145,6 @@ public final class ApiSelfTestRunner {
                         == PopulationGroupReconciliationView.Readiness.READY,
                 "readiness=" + groupReadiness.readiness() + " reason=" + groupReadiness.reason()));
         assertions.add(check(
-                "companion provisioning capability ready",
-                capabilities.contains(TameworkApiCapability.COMPANION_PROVISIONING),
-                "capabilities=" + capabilities));
-        assertions.add(check(
                 "profile data transactions capability ready",
                 capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS),
                 "capabilities=" + capabilities));

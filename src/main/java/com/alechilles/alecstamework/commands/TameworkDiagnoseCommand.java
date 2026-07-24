@@ -55,10 +55,6 @@ public final class TameworkDiagnoseCommand extends AbstractTameworkServerCommand
                 case "timed" -> arguments.size() <= 2
                         ? lifecycle.timed(arguments.size() == 2 ? arguments.get(1) : null)
                         : usage();
-                case "provision" -> arguments.size() == 2
-                        ? lifecycle.provision(arguments.get(1)) : usage();
-                case "provisioning" -> arguments.size() == 3
-                        ? diagnostics.provisioning(arguments.get(1), arguments.get(2)) : usage();
                 default -> usage();
             };
         }
@@ -69,9 +65,7 @@ public final class TameworkDiagnoseCommand extends AbstractTameworkServerCommand
 
     private static List<String> usage() {
         return List.of("Usage: /tw diagnose [population|capture-attempt <id>"
-                + "|command-family [owner-uuid] [family]|timed [operation-or-profile]"
-                + "|provision <operation-id>"
-                + "|provisioning <caller-namespace> <idempotency-key>]");
+                + "|command-family [owner-uuid] [family]|timed [operation-or-profile]]");
     }
 
     private static List<String> arguments(CommandContext context) {

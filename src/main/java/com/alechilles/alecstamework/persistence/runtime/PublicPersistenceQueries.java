@@ -23,8 +23,6 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupBu
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -245,44 +243,6 @@ public final class PublicPersistenceQueries {
     public Map<CommandFamilyKey, Long>
     projectedCommandRosterRevisions() {
         return adapter.commandRosterIndex().familyRevisionSnapshot();
-    }
-
-    @Nonnull
-    public CompletionStage<PersistenceReadResult<ProvisioningRecord>>
-    findProvisioning(@Nonnull ProfileId profileId) {
-        return adapter.provisioningReader().findByProfile(profileId);
-    }
-
-    @Nonnull
-    public CompletionStage<PersistenceReadResult<ProvisioningRecord>>
-    findProvisioning(@Nonnull ProvisioningOrigin origin) {
-        return adapter.provisioningReader().findByOrigin(origin);
-    }
-
-    @Nonnull
-    public CompletionStage<PersistenceReadResult<List<ProvisioningRecord>>>
-    findAllProvisioningRecords() {
-        return adapter.provisioningReader().findAll();
-    }
-
-    @Nonnull
-    public Optional<ProvisioningRecord> projectedProvisioning(
-            @Nonnull ProfileId profileId
-    ) {
-        return adapter.provisioningIndex().findByProfile(profileId);
-    }
-
-    @Nonnull
-    public Optional<ProvisioningRecord> projectedProvisioning(
-            @Nonnull ProvisioningOrigin origin
-    ) {
-        return adapter.provisioningIndex().findByOrigin(origin);
-    }
-
-    @Nonnull
-    public Map<ProfileId, ProvisioningRecord>
-    projectedProvisioningSnapshot() {
-        return adapter.provisioningIndex().snapshot();
     }
 
     @Nonnull

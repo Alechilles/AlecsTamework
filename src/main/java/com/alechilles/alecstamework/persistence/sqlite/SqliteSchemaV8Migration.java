@@ -5,7 +5,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import javax.annotation.Nonnull;
 
-/** Adds capture, population-group, and provisioning durability authorities. */
+/** Adds capture and population-group durability authorities. */
 final class SqliteSchemaV8Migration {
 
     void apply(@Nonnull Connection connection) throws Exception {
@@ -13,7 +13,6 @@ final class SqliteSchemaV8Migration {
         try (Statement statement = connection.createStatement()) {
             createCaptureAttempts(statement);
             createPopulationGroups(statement);
-            createProvisioningOperations(statement);
         }
     }
 
@@ -296,49 +295,4 @@ final class SqliteSchemaV8Migration {
                 """);
     }
 
-    private void createProvisioningOperations(@Nonnull Statement statement) throws Exception {
-        statement.execute("""
-                CREATE TABLE IF NOT EXISTS companion_provisioning_operations (
-                    operation_id TEXT PRIMARY KEY,
-                    caller_namespace TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    correlation_id TEXT,
-                    owner_uuid TEXT NOT NULL,
-                    target_role_id TEXT NOT NULL,
-                    requested_disposition TEXT NOT NULL CHECK (requested_disposition IN ('PROVISIONED_DORMANT', 'ACTIVE')),
-                    ownership_world_name TEXT,
-                    destination_context_json TEXT,
-                    initial_profile_json TEXT,
-                    expected_policy_revision INTEGER CHECK (expected_policy_revision IS NULL OR expected_policy_revision >= 0),
-                    provisional_profile_id TEXT NOT NULL,
-                    canonical_profile_id TEXT,
-                    state TEXT NOT NULL CHECK (state IN (
-                        'PREPARING_DORMANT', 'DORMANT_PREPARED', 'DORMANT_APPLYING',
-                        'DORMANT_COMMITTED', 'ACTIVE_PREPARED', 'ACTIVE_APPLYING',
-                        'COMMITTED', 'PARTIAL_DORMANT', 'DENIED', 'CANCELED', 'QUARANTINED')),
-                    dormant_population_operation_id TEXT,
-                    active_population_operation_id TEXT,
-                    result_code TEXT,
-                    projection_reason TEXT,
-                    recovery_status TEXT NOT NULL DEFAULT 'NONE',
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    completed_at_ms INTEGER NOT NULL DEFAULT 0,
-                    UNIQUE (caller_namespace, idempotency_key)
-                )
-                """);
-        statement.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_companion_provisioning_profile
-                ON companion_provisioning_operations(canonical_profile_id)
-                WHERE canonical_profile_id IS NOT NULL
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_companion_provisioning_recovery
-                ON companion_provisioning_operations(state, updated_at_ms, operation_id)
-                """);
-        statement.execute("""
-                CREATE INDEX IF NOT EXISTS idx_companion_provisioning_owner
-                ON companion_provisioning_operations(owner_uuid, state)
-                """);
-    }
 }

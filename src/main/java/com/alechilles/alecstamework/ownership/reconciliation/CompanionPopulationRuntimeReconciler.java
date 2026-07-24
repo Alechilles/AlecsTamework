@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
-import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
@@ -402,7 +401,6 @@ public final class CompanionPopulationRuntimeReconciler
     public void onCompleted(@Nonnull CompanionPopulationObservation observation,
                             @Nonnull CompanionPopulationObservationPersistResult result) {
         if (result.persisted()) {
-            CompanionReviveEligibilityService.current().onPopulationCommitted(observation, result);
             try {
                 identityResolver.markDurable(
                         observation.profileId(), observation.currentNpcUuid()

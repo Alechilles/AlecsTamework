@@ -19,6 +19,5 @@ public enum CompanionLifecycleState {
     /** An owned command-roster profile with no live or item-backed projection. */
     ROSTER_STORED,
     UNKNOWN_DORMANT,
-    PROVISIONED_DORMANT,
     RELEASED
 }

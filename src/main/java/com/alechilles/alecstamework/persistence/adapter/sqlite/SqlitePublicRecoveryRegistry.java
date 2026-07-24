@@ -26,10 +26,6 @@ import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
-import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
-import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
-import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
@@ -77,27 +73,6 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().operationId(),
                                 claim.operation().idempotencyKey(),
                                 payload(claim, CompanionAliasRotation.class)
-                        ).completion()
-                ),
-                Map.entry(
-                        CompanionProvisioningDefinition.INSTANCE.kind(),
-                        claim -> operations.provisioning().submit(
-                                claim.operation().operationId(),
-                                payload(
-                                        claim,
-                                        CompanionProvisioningRequest.class
-                                )
-                        ).completion()
-                ),
-                Map.entry(
-                        ProvisioningActivationDefinition.INSTANCE.kind(),
-                        claim -> operations.provisioningActivations().submit(
-                                claim.operation().operationId(),
-                                payload(
-                                        claim,
-                                        ProvisioningActivationRequest.class
-                                ),
-                                boundaries.provisioningActivations()
                         ).completion()
                 ),
                 Map.entry(

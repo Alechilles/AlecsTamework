@@ -108,8 +108,7 @@ class ReplacementProfileSnapshotSinkTest {
                 (request, operation) -> confirmed("restoration"),
                 (request, operation) -> confirmed("coop_capture"),
                 (request, operation) -> confirmed("coop_release"),
-                (request, operation) -> confirmed("timed"),
-                (request, operation) -> confirmed("provisioning")
+                (request, operation) -> confirmed("timed")
         );
     }
 

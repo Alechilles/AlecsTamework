@@ -19,7 +19,6 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.api.internal.CompanionProvisioningApiDelegate;
 import com.alechilles.alecstamework.api.internal.CommandTimedSummoningApiDelegate;
 import com.alechilles.alecstamework.api.internal.PopulationGroupApiDelegate;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
@@ -121,7 +120,6 @@ import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CompanionReviveEligibilityService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.ManagedCoopRuntimeComposition;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
@@ -138,7 +136,6 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
-import com.alechilles.alecstamework.items.HytaleProvisionedCompanionProjectionPort;
 import com.alechilles.alecstamework.items.HytaleCommandTimedSummonProjectionPort;
 import com.alechilles.alecstamework.items.CommandFamilyRosterMembershipPort;
 import com.alechilles.alecstamework.items.CommandTimedSummonPopulationPort;
@@ -191,9 +188,6 @@ import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntim
 import com.alechilles.alecstamework.persistence.legacy.LegacyNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.legacy.LegacyPersistenceEventBridge;
 import com.alechilles.alecstamework.persistence.sqlite.CommandTimedSummonPolicySnapshot;
-import com.alechilles.alecstamework.provisioning.CompanionProvisioningCoordinator;
-import com.alechilles.alecstamework.provisioning.SqliteProvisioningOperationJournal;
-import com.alechilles.alecstamework.provisioning.UnifiedProvisioningPopulationBackend;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
@@ -336,10 +330,7 @@ public class Tamework extends JavaPlugin {
     private PopulationGroupRegistry populationGroupRegistry;
     private PopulationGroupApiDelegate populationGroupApi;
     private boolean populationGroupRecoveryReady;
-    private UnifiedProvisioningPopulationBackend companionProvisioningBackend;
-    private CompanionProvisioningApiDelegate companionProvisioningApi;
     private CommandFamilyRosterService commandFamilyRosterService;
-    private boolean companionProvisioningRecoveryReady;
     private CommandTimedSummoningApiDelegate commandTimedSummoningApi;
     private CommandTimedSummoningService commandTimedSummoningService;
     private CommandTimedSummoningTickSystem commandTimedSummoningTickSystem;
@@ -892,25 +883,10 @@ public class Tamework extends JavaPlugin {
         ownerPopulationRuntime = TameworkPopulationRuntimeLifecycle.initialize(
                 persistenceRuntime, getLogger()
         );
-        CompanionReviveEligibilityService reviveEligibility =
-                new CompanionReviveEligibilityService();
-        var reviveReport = reviveEligibility.bootstrap(
-                persistenceRuntime.getCompanionProvisioningRepository(),
-                persistenceRuntime.getNpcProfileRepository(),
-                ownerPopulationRuntime.index());
-        if (reviveReport.ready()) {
-            CompanionReviveEligibilityService.install(reviveEligibility);
-        } else {
-            getLogger().at(Level.WARNING).log(
-                    "Provisioned-companion revive eligibility bootstrap failed; "
-                            + "command-link-independent revive remains unavailable.");
-        }
         TameworkScopedRecoveryWiring.installAndStart(persistenceRuntime, ownerPopulationRuntime);
         commandNpcRelocationService.setRelocationAdmissionService(ownerPopulationRuntime.relocationAdmissionService());
         apiEventBus = new TameworkEventBus(getLogger());
-        reviveEligibility.setEventSink(apiEventBus::emitCanonicalCompanionLifecycleEvent);
         initializePopulationGroupRuntime();
-        initializeCompanionProvisioningRuntime();
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
                 new HeldItemAttachmentInteractionService(getLogger());
@@ -1012,12 +988,10 @@ public class Tamework extends JavaPlugin {
         if (api instanceof TameworkApiImpl implementation) {
             implementation.activateCommandFamilyRosterRuntime(commandFamilyRosterService);
         }
-        retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
         if (captureAttemptRuntimeReady && api instanceof TameworkApiImpl implementation) {
             implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
         }
         activatePopulationGroupsIfReady();
-        activateCompanionProvisioningIfReady();
         ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
                 new ClaimProviderLifecycleInvalidator(provider -> {
                     OwnerPopulationRuntime runtime = ownerPopulationRuntime;
@@ -1510,9 +1484,6 @@ public class Tamework extends JavaPlugin {
         api = null;
         populationGroupApi = null;
         populationGroupRecoveryReady = false;
-        companionProvisioningApi = null;
-        companionProvisioningBackend = null;
-        companionProvisioningRecoveryReady = false;
         commandTimedSummoningApi = null;
         commandTimedSummoningService = null;
         commandTimedSummoningRecoveryReady = false;
@@ -2712,94 +2683,9 @@ public class Tamework extends JavaPlugin {
                 }
             }
             activatePopulationGroupsIfReady();
-            retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
-            activateCompanionProvisioningIfReady();
             retryCommandTimedSummoningIfReady();
         }
         return result.applied();
-    }
-
-    private void retryCompanionProvisioningRecoveryIfPopulationGroupsReady() {
-        if (companionProvisioningRecoveryReady
-                || !populationGroupRecoveryReady
-                || ownerPopulationRuntime == null
-                || !ownerPopulationRuntime.populationGroupsReady()
-                || populationGroupRegistry == null
-                || persistenceRuntime == null
-                || apiEventBus == null
-                || commandFamilyRosterService == null) {
-            return;
-        }
-        initializeCompanionProvisioningRuntime();
-    }
-
-    private void initializeCompanionProvisioningRuntime() {
-        companionProvisioningApi = null;
-        companionProvisioningBackend = null;
-        companionProvisioningRecoveryReady = false;
-        try {
-            UnifiedProvisioningPopulationBackend backend =
-                    new UnifiedProvisioningPopulationBackend(
-                            ownerPopulationRuntime,
-                            populationGroupRegistry,
-                            persistenceRuntime.getPopulationGroupRepository(),
-                            persistenceRuntime.getNpcProfileRepository(),
-                            new HytaleProvisionedCompanionProjectionPort(
-                                    ownerPopulationRuntime,
-                                    persistenceRuntime.getNpcProfileRepository(),
-                                    commandNpcRelocationService),
-                            persistenceRuntime.getCompanionProvisioningCommandLinkRepository(),
-                            persistenceRuntime.getCommandFamilyRosterRepository(),
-                            (profileRoleId, request) -> {
-                                String denial = commandItemRegistry.validateOwnerFamilyAccess(
-                                        request.commandFamilyId(), request.requiredCommandConfigId(),
-                                        request.accessItemId(), profileRoleId);
-                                return denial;
-                            });
-            var populationRecovery = backend.recover().toCompletableFuture().join();
-            CompanionProvisioningCoordinator coordinator = new CompanionProvisioningCoordinator(
-                    new SqliteProvisioningOperationJournal(
-                            persistenceRuntime.getCompanionProvisioningRepository()),
-                    backend, apiEventBus::emitCompanionProvisioned, System::currentTimeMillis,
-                    persistenceRuntime.getCompanionProvisioningCommandLinkRepository(),
-                    commandFamilyRosterService);
-            var provisioningRecovery = coordinator.recover().toCompletableFuture().join();
-            companionProvisioningBackend = backend;
-            companionProvisioningApi = new CompanionProvisioningApiDelegate(coordinator);
-            companionProvisioningRecoveryReady = populationRecovery.ready()
-                    && provisioningRecovery.failures() == 0;
-            if (!companionProvisioningRecoveryReady) {
-                getLogger().at(Level.WARNING).log(
-                        "Companion-provisioning recovery did not become ready; "
-                                + "COMPANION_PROVISIONING remains unavailable.");
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            getLogger().at(Level.WARNING).withCause(failure).log(
-                    "Companion-provisioning bootstrap failed; capability remains unavailable.");
-        }
-    }
-
-    private void activateCompanionProvisioningIfReady() {
-        if (!(api instanceof TameworkApiImpl implementation)
-                || companionProvisioningApi == null
-                || companionProvisioningBackend == null
-                || !companionProvisioningRecoveryReady
-                || !companionProvisioningBackend.recoveryReady()) {
-            return;
-        }
-        boolean alreadyActive = implementation.getCapabilities()
-                .contains(TameworkApiCapability.COMPANION_PROVISIONING);
-        boolean activated = implementation.activateCompanionProvisioningRuntime(
-                companionProvisioningApi, true);
-        if (activated && !alreadyActive) {
-            var readiness = companionProvisioningBackend.readiness();
-            getLogger().at(Level.INFO).log(
-                    "Companion-provisioning runtime recovered and activated "
-                            + "(dormantReady=" + readiness.dormantReady()
-                            + ", activeProjectionReady=" + readiness.activeProjectionReady()
-                            + ", recoveryReady=" + readiness.recoveryReady()
-                            + ", reason=" + readiness.reason() + ").");
-        }
     }
 
     private void initializeCommandTimedSummoningRuntime() {
@@ -2893,9 +2779,6 @@ public class Tamework extends JavaPlugin {
             commandLinkedNpcStateSnapshotService.installProjectionLoadSink(
                     projection::projectionLoaded);
             commandTimedSummoningTickSystem.install(service);
-            if (companionProvisioningApi != null) {
-                companionProvisioningApi.installInitialProjectionHook(runtime.initialProjectionHook());
-            }
             if (implementation.activateCommandTimedSummoningRuntime(
                     runtime, true, ownerPopulationRuntime.populationGroupsReady(), true)) {
                 getLogger().at(Level.INFO).log(
@@ -2938,7 +2821,7 @@ public class Tamework extends JavaPlugin {
             if (!populationGroupRecoveryReady) {
                 getLogger().at(Level.WARNING).log(
                         "Population-group recovery did not become ready; "
-                                + "POPULATION_GROUPS and COMPANION_PROVISIONING remain unavailable.");
+                                + "POPULATION_GROUPS remains unavailable.");
             }
         } catch (RuntimeException | LinkageError failure) {
             getLogger().at(Level.WARNING).withCause(failure).log(
@@ -2977,8 +2860,6 @@ public class Tamework extends JavaPlugin {
                     && ownerPopulationRuntime.populationGroupsReady();
             if (populationGroupRecoveryReady) {
                 activatePopulationGroupsIfReady();
-                retryCompanionProvisioningRecoveryIfPopulationGroupsReady();
-                activateCompanionProvisioningIfReady();
                 retryCommandTimedSummoningIfReady();
             } else {
                 getLogger().at(Level.WARNING).log(
