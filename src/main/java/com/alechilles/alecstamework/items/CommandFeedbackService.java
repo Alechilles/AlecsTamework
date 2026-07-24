@@ -84,6 +84,36 @@ final class CommandFeedbackService {
         show(player, LocalizedText.format(player, key, args), NotificationStyle.Warning);
     }
 
+    void emitRestorationRequestFeedback(
+            Player player,
+            CommandCompanionRestorationService.RequestStatus status
+    ) {
+        if (player == null) {
+            return;
+        }
+        String key = restorationRequestFeedbackKey(status);
+        if (key != null) {
+            showWarningKey(player, key);
+        }
+    }
+
+    static String restorationRequestFeedbackKey(
+            CommandCompanionRestorationService.RequestStatus status
+    ) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case NOT_DORMANT ->
+                    "tamework.ui.notifications.command.respawn.notDeadOrLost";
+            case DESTINATION_NPCS_FROZEN ->
+                    "tamework.ui.notifications.command.destination.npcsFrozen";
+            case UNAVAILABLE, INVALID_CONTEXT ->
+                    "tamework.ui.notifications.command.respawn.unavailable";
+            case STARTED -> null;
+        };
+    }
+
     private String resolveCommandLabel(CommandEntry command, Function<CommandEntry, String> commandLabelResolver) {
         if (commandLabelResolver == null) {
             return command != null && command.getId() != null

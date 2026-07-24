@@ -337,6 +337,14 @@ final class CommandMenuMoveService {
             if (context.itemChanged) {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
             }
+            if (relocationResult.destinationDecision()
+                    == CompanionDestinationAdmissionPolicy.Decision.NPCS_FROZEN) {
+                feedbackService.showWarningKey(
+                        player,
+                        "tamework.ui.notifications.command.destination.npcsFrozen"
+                );
+                return;
+            }
             if (affected <= 0 && queued <= 0) {
                 feedbackService.showWarningKey(
                         player,

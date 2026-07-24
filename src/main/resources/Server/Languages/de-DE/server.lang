@@ -547,6 +547,7 @@ tamework.ui.notifications.command.move.returnHome.noHome=Für diesen NPC wurde k
 tamework.ui.notifications.command.move.returnHome.noneMoved=Keine NPCs wurden nach Hause geschickt.
 tamework.ui.notifications.command.move.returnHome.notConfigured=„Nach Hause schicken“-Befehl ist nicht konfiguriert.
 tamework.ui.notifications.command.move.unavailable={0} nicht verfügbar.
+tamework.ui.notifications.command.destination.npcsFrozen=Begleiter können diese Welt nicht betreten, weil NPCs hier deaktiviert sind.
 tamework.ui.notifications.command.locate.location={0}: {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=Kein gespeicherter Standort für {0}.
 tamework.ui.notifications.command.locate.unknownWorld=unbekannte Welt

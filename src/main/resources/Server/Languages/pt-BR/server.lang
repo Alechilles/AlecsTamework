@@ -547,6 +547,7 @@ tamework.ui.notifications.command.move.returnHome.noHome=Nenhuma casa está defi
 tamework.ui.notifications.command.move.returnHome.noneMoved=Nenhum NPC foi movido para casa.
 tamework.ui.notifications.command.move.returnHome.notConfigured=O comando Voltar para Casa não está configurado.
 tamework.ui.notifications.command.move.unavailable={0} indisponível.
+tamework.ui.notifications.command.destination.npcsFrozen=Companheiros não podem entrar neste mundo porque os NPCs estão desativados aqui.
 tamework.ui.notifications.command.locate.location={0}: {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=Nenhuma localização registrada para {0}.
 tamework.ui.notifications.command.locate.unknownWorld=mundo desconhecido

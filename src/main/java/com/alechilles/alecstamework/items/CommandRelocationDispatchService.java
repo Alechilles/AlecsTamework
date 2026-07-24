@@ -45,6 +45,12 @@ final class CommandRelocationDispatchService {
         if (world == null) {
             return QueueResult.none();
         }
+        CompanionDestinationAdmissionPolicy.Decision destinationDecision =
+                CompanionDestinationAdmissionPolicy.assess(world);
+        if (recall && destinationDecision
+                != CompanionDestinationAdmissionPolicy.Decision.ALLOWED) {
+            return QueueResult.rejected(destinationDecision);
+        }
         int queued = 0;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
@@ -107,7 +113,10 @@ final class CommandRelocationDispatchService {
             );
             queued++;
         }
-        return new QueueResult(queued);
+        return new QueueResult(
+                queued,
+                CompanionDestinationAdmissionPolicy.Decision.ALLOWED
+        );
     }
 
     void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
@@ -171,9 +180,21 @@ final class CommandRelocationDispatchService {
         return configured > 0.0 ? configured : fallback;
     }
 
-    record QueueResult(int queued) {
+    record QueueResult(
+            int queued,
+            CompanionDestinationAdmissionPolicy.Decision destinationDecision
+    ) {
         private static QueueResult none() {
-            return new QueueResult(0);
+            return new QueueResult(
+                    0,
+                    CompanionDestinationAdmissionPolicy.Decision.ALLOWED
+            );
+        }
+
+        private static QueueResult rejected(
+                CompanionDestinationAdmissionPolicy.Decision decision
+        ) {
+            return new QueueResult(0, decision);
         }
     }
 }

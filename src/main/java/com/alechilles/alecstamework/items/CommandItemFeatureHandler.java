@@ -708,21 +708,7 @@ public final class CommandItemFeatureHandler {
                             record,
                             safeSpawnDistance
                     );
-            if (status
-                    == CommandCompanionRestorationService.RequestStatus
-                    .NOT_DORMANT) {
-                feedbackService.showWarningKey(
-                        player,
-                        "tamework.ui.notifications.command.respawn.notDeadOrLost"
-                );
-            } else if (status
-                    != CommandCompanionRestorationService.RequestStatus
-                    .STARTED) {
-                feedbackService.showWarningKey(
-                        player,
-                        "tamework.ui.notifications.command.respawn.unavailable"
-                );
-            }
+            feedbackService.emitRestorationRequestFeedback(player, status);
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");

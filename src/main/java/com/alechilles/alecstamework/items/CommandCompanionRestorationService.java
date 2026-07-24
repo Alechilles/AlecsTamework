@@ -25,7 +25,8 @@ final class CommandCompanionRestorationService {
         STARTED,
         UNAVAILABLE,
         INVALID_CONTEXT,
-        NOT_DORMANT
+        NOT_DORMANT,
+        DESTINATION_NPCS_FROZEN
     }
 
     private final CommandCompanionPlacementService placements;
@@ -64,6 +65,10 @@ final class CommandCompanionRestorationService {
                 || toolId == null || toolId.isBlank()
                 || record == null || record.npcUuid == null) {
             return RequestStatus.INVALID_CONTEXT;
+        }
+        if (CompanionDestinationAdmissionPolicy.assess(world)
+                == CompanionDestinationAdmissionPolicy.Decision.NPCS_FROZEN) {
+            return RequestStatus.DESTINATION_NPCS_FROZEN;
         }
         CommandPersistenceView.ProfileSnapshot profile =
                 persistence.find(record).orElse(null);

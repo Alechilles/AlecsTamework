@@ -547,6 +547,7 @@ tamework.ui.notifications.command.move.returnHome.noHome=No home is set for this
 tamework.ui.notifications.command.move.returnHome.noneMoved=No NPCs were moved home.
 tamework.ui.notifications.command.move.returnHome.notConfigured=Return Home command is not configured.
 tamework.ui.notifications.command.move.unavailable={0} unavailable.
+tamework.ui.notifications.command.destination.npcsFrozen=Companions cannot enter this world because NPCs are disabled here.
 tamework.ui.notifications.command.locate.location={0}: {1} ({2})
 tamework.ui.notifications.command.locate.noLocation=No recorded location for {0}.
 tamework.ui.notifications.command.locate.unknownWorld=unknown world
