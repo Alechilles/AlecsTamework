@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationProjectionIndex;
-import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
@@ -32,7 +30,6 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteCompanionLifecycleReader lifecycles;
     private final SqliteCompanionCoopReader coops;
     private final SqliteProfileExtensionReader extensions;
-    private final SqlitePopulationGroupReader populationGroups;
     private final SqliteOperationReader operationReader;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
@@ -91,7 +88,6 @@ public final class SqlitePublicPersistenceAdapter {
         lifecycles = new SqliteCompanionLifecycleReader(kernel.reads());
         coops = new SqliteCompanionCoopReader(kernel.reads());
         extensions = new SqliteProfileExtensionReader(kernel.reads());
-        populationGroups = new SqlitePopulationGroupReader(kernel.reads());
         operationReader = new SqliteOperationReader(kernel.reads());
     }
 
@@ -103,24 +99,6 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public SqliteCompanionAliasRotationOperations aliasOperations() {
         return publicOperations.aliases();
-    }
-
-    @Nonnull
-    public SqliteOwnerPopulationTransitionOperations
-    ownerPopulationOperations() {
-        return publicOperations.ownerPopulation();
-    }
-
-    @Nonnull
-    public SqliteOwnerPopulationReconciliationOperations
-    ownerPopulationReconciliationOperations() {
-        return publicOperations.ownerPopulationReconciliation();
-    }
-
-    @Nonnull
-    public SqlitePopulationGroupAssignmentOperations
-    populationGroupOperations() {
-        return publicOperations.populationGroups();
     }
 
     @Nonnull
@@ -185,11 +163,6 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
-    public SqlitePopulationGroupReader populationGroupReader() {
-        return populationGroups;
-    }
-
-    @Nonnull
     public SqliteOperationReader operationReader() {
         return operationReader;
     }
@@ -197,16 +170,6 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public CoopResidencyProjectionIndex coopIndex() {
         return projections.coopIndex();
-    }
-
-    @Nonnull
-    public OwnerPopulationProjectionIndex ownerPopulationIndex() {
-        return projections.ownerPopulationIndex();
-    }
-
-    @Nonnull
-    public PopulationGroupProjectionIndex populationGroupIndex() {
-        return projections.populationGroupIndex();
     }
 
     @Nonnull
@@ -250,9 +213,7 @@ public final class SqlitePublicPersistenceAdapter {
     buildProjections() {
         return projections.rebuildAndCatchUp(
                 profiles,
-                coops,
-                lifecycles,
-                populationGroups
+                coops
         );
     }
 

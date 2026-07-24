@@ -9,9 +9,6 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
-import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -25,10 +22,6 @@ final class SqlitePublicOperationSet {
     private final SqliteOperationEngine engine;
     private final SqliteCompanionProfileOperations profiles;
     private final SqliteCompanionAliasRotationOperations aliases;
-    private final SqliteOwnerPopulationTransitionOperations ownerPopulation;
-    private final SqliteOwnerPopulationReconciliationOperations
-            ownerPopulationReconciliation;
-    private final SqlitePopulationGroupAssignmentOperations populationGroups;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionCaptureReleaseOperations captureReleases;
     private final SqliteCompanionDormantOperations dormant;
@@ -85,26 +78,6 @@ final class SqlitePublicOperationSet {
                 database,
                 projections.requiredFor(
                         CompanionAliasRotationDefinition.INSTANCE.kind()
-                )
-        );
-        ownerPopulation = new SqliteOwnerPopulationTransitionOperations(
-                database,
-                projections.requiredFor(
-                        OwnerPopulationTransitionDefinition.INSTANCE.kind()
-                )
-        );
-        ownerPopulationReconciliation =
-                new SqliteOwnerPopulationReconciliationOperations(
-                        database,
-                        projections.requiredFor(
-                                OwnerPopulationReconciliationDefinition
-                                        .INSTANCE.kind()
-                        )
-                );
-        populationGroups = new SqlitePopulationGroupAssignmentOperations(
-                database,
-                projections.requiredFor(
-                        PopulationGroupAssignmentDefinition.INSTANCE.kind()
                 )
         );
         captures = new SqliteCompanionCaptureOperations(
@@ -181,19 +154,6 @@ final class SqlitePublicOperationSet {
 
     SqliteCompanionAliasRotationOperations aliases() {
         return aliases;
-    }
-
-    SqliteOwnerPopulationTransitionOperations ownerPopulation() {
-        return ownerPopulation;
-    }
-
-    SqliteOwnerPopulationReconciliationOperations
-    ownerPopulationReconciliation() {
-        return ownerPopulationReconciliation;
-    }
-
-    SqlitePopulationGroupAssignmentOperations populationGroups() {
-        return populationGroups;
     }
 
     SqliteCompanionCaptureOperations captures() {

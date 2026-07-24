@@ -23,7 +23,6 @@ class ReplacementPersistenceArchitectureGuardTest {
             MAIN.resolve("companion/extension"),
             MAIN.resolve("companion/identity"),
             MAIN.resolve("companion/lifecycle"),
-            MAIN.resolve("companion/population"),
             MAIN.resolve("companion/profile"),
             MAIN.resolve("companion/snapshot"),
             MAIN.resolve("persistence/adapter/sqlite"),
@@ -181,19 +180,16 @@ class ReplacementPersistenceArchitectureGuardTest {
 
         assertEquals(
                 List.of(
-                        "assignPopulationGroups",
                         "capture",
                         "captureToCoop",
                         "makeDormant",
                         "mutateExtension",
                         "mutateProfile",
-                        "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseCapturedCompanion",
                         "releaseFromCoop",
                         "restore",
-                        "rotateAlias",
-                        "transitionOwnerPopulation"
+                        "rotateAlias"
                 ),
                 operations
         );
@@ -271,23 +267,16 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "diagnoseCoopCapture",
                         "diagnoseCoopRelease",
                         "findAllLifecycles",
-                        "findAllPopulationGroupAssignments",
                         "findCoopResidency",
                         "findCoopSlot",
                         "findExtension",
                         "findExtensions",
                         "findOperation",
                         "findProfile",
-                        "findStalePopulationGroupProfiles",
                         "projectedCoopResidency",
                         "projectedCoopSnapshot",
                         "projectedExtension",
                         "projectedExtensions",
-                        "projectedLaggingPopulationGroupProfiles",
-                        "projectedOwnerPopulationCount",
-                        "projectedOwnerPopulationSnapshot",
-                        "projectedPopulationGroupAssignments",
-                        "projectedPopulationGroupCounts",
                         "projectedProfile",
                         "projectedProfileSnapshot"
                 ),

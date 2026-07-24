@@ -84,9 +84,6 @@ class SqlitePublicPersistenceAdapterTest {
 
         assertNotNull(adapter.profileOperations());
         assertNotNull(adapter.aliasOperations());
-        assertNotNull(adapter.ownerPopulationOperations());
-        assertNotNull(adapter.ownerPopulationReconciliationOperations());
-        assertNotNull(adapter.populationGroupOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -98,23 +95,20 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.lifecycleReader());
         assertNotNull(adapter.coopReader());
         assertNotNull(adapter.extensionReader());
-        assertNotNull(adapter.populationGroupReader());
         assertNotNull(adapter.coopIndex());
-        assertNotNull(adapter.ownerPopulationIndex());
-        assertNotNull(adapter.populationGroupIndex());
         assertNotNull(adapter.extensionIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
         );
         assertEquals(
-                3,
+                1,
                 adapter.projections().requiredFor(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                4,
+                2,
                 adapter.projections().requiredFor(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 ).size()
@@ -140,11 +134,8 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(5, result.catchUps().size());
+        assertEquals(3, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
-        assertEquals(0, adapter.ownerPopulationIndex().snapshot().size());
-        assertEquals(0, adapter.populationGroupIndex()
-                .assignmentSnapshot().size());
     }
 
     @Test

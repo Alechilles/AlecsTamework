@@ -10,9 +10,6 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionIndex;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotationDefinition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionDefinition;
-import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationDefinition;
-import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDomain;
@@ -31,10 +28,6 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("core_identity");
     public static final PersistenceFeatureId LIFECYCLE =
             new PersistenceFeatureId("core_lifecycle");
-    public static final PersistenceFeatureId OWNER_POPULATION =
-            new PersistenceFeatureId("owner_population");
-    public static final PersistenceFeatureId POPULATION_GROUPS =
-            new PersistenceFeatureId("population_groups");
     public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
             new PersistenceFeatureId("economic_compensation");
     public static final PersistenceFeatureId CAPTURE =
@@ -49,10 +42,6 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("public_profile_observer");
     public static final ProjectionConsumerId COOP_INDEX =
             new ProjectionConsumerId("coop_residency_index");
-    public static final ProjectionConsumerId OWNER_POPULATION_INDEX =
-            new ProjectionConsumerId("owner_population_index");
-    public static final ProjectionConsumerId POPULATION_GROUP_INDEX =
-            new ProjectionConsumerId("population_group_index");
     public static final ProjectionConsumerId EXTENSION_INDEX =
             ProfileExtensionProjectionIndex.CONSUMER_ID;
 
@@ -63,8 +52,6 @@ public final class PublicPersistenceFeatureRegistry {
         return new PersistenceFeatureRegistry(List.of(
                 identity(),
                 lifecycle(),
-                ownerPopulation(),
-                populationGroups(),
                 economicCompensation(),
                 capture(),
                 dormant(),
@@ -93,11 +80,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
-                ),
+                Set.of(PROFILE_OBSERVER),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
                         PersistenceStartupNode.RECOVER_OPERATIONS,
@@ -118,11 +101,7 @@ public final class PublicPersistenceFeatureRegistry {
                 List.of(),
                 Map.of(),
                 Set.of(IDENTITY),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
-                ),
+                Set.of(PROFILE_OBSERVER),
                 Set.of(
                         PersistenceStartupNode.LOAD_CANONICAL,
                         PersistenceStartupNode.RECONCILE_WORLD
@@ -130,83 +109,6 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE
-                )
-        );
-    }
-
-    private static PersistenceFeatureDescriptor ownerPopulation() {
-        return PublicPersistenceFeatureDescriptorFactory.create(
-                OWNER_POPULATION,
-                PersistenceFeatureDomain.POPULATION,
-                Set.of(
-                        "owner_population_reservation",
-                        "population_evidence_batch",
-                        "population_evidence_observation"
-                ),
-                List.of(
-                        OwnerPopulationTransitionDefinition.INSTANCE,
-                        OwnerPopulationReconciliationDefinition.INSTANCE
-                ),
-                PublicPersistenceFeatureDescriptorFactory.scopes(
-                        OwnerPopulationTransitionDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        ),
-                        OwnerPopulationReconciliationDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        )
-                ),
-                Set.of(IDENTITY, LIFECYCLE),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
-                ),
-                Set.of(
-                        PersistenceStartupNode.LOAD_CANONICAL,
-                        PersistenceStartupNode.RECOVER_OPERATIONS,
-                        PersistenceStartupNode.BUILD_PROJECTIONS,
-                        PersistenceStartupNode.RECONCILE_WORLD
-                ),
-                Set.of(
-                        OperationScopeType.OPERATION,
-                        OperationScopeType.PROFILE,
-                        OperationScopeType.OWNER
-                )
-        );
-    }
-
-    private static PersistenceFeatureDescriptor populationGroups() {
-        return PublicPersistenceFeatureDescriptorFactory.create(
-                POPULATION_GROUPS,
-                PersistenceFeatureDomain.POPULATION,
-                Set.of(
-                        "population_group_classification",
-                        "population_group_membership",
-                        "population_group_reservation"
-                ),
-                List.of(PopulationGroupAssignmentDefinition.INSTANCE),
-                PublicPersistenceFeatureDescriptorFactory.scopes(
-                        PopulationGroupAssignmentDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
-                        )
-                ),
-                Set.of(IDENTITY, LIFECYCLE, OWNER_POPULATION),
-                Set.of(POPULATION_GROUP_INDEX),
-                Set.of(
-                        PersistenceStartupNode.LOAD_FEATURE_DETAIL,
-                        PersistenceStartupNode.RECOVER_OPERATIONS,
-                        PersistenceStartupNode.BUILD_PROJECTIONS
-                ),
-                Set.of(
-                        OperationScopeType.OPERATION,
-                        OperationScopeType.PROFILE,
-                        OperationScopeType.OWNER
                 )
         );
     }
@@ -230,11 +132,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE, ECONOMIC_COMPENSATION),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
-                ),
+                Set.of(PROFILE_OBSERVER),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
@@ -280,11 +178,7 @@ public final class PublicPersistenceFeatureRegistry {
                         Set.of(OperationScopeType.PROFILE)
                 ),
                 Set.of(IDENTITY, LIFECYCLE),
-                Set.of(
-                        PROFILE_OBSERVER,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
-                ),
+                Set.of(PROFILE_OBSERVER),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
                         OperationScopeType.OPERATION,
@@ -320,9 +214,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(IDENTITY, LIFECYCLE),
                 Set.of(
                         PROFILE_OBSERVER,
-                        COOP_INDEX,
-                        OWNER_POPULATION_INDEX,
-                        POPULATION_GROUP_INDEX
+                        COOP_INDEX
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
