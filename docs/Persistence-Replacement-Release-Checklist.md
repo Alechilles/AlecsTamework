@@ -21,13 +21,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `e08e61dc055dff46c70f2fd0ba129977efa85a2b` |
+| Tamework commit | `2cf3f015ba79250cf92c9870e451da6811694b4a` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
-| Candidate artifact path | `artifacts/Alec's Tamework! v3.0.0.jar` |
-| Candidate SHA-256 | `cf5178548547eb89458506230d6986e2f0d47ecd388f6beecd544962f8d729ac` |
-| Maven test result | Clean candidate run on 2026-07-24: 2,534 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Normal builder passed in 2:37; artifact size 22,719,784 bytes |
+| Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
+| Candidate SHA-256 | `00ced182a53894a39bb9a497d968325062dec8b528c0249bbe3a8719d4b626a0` |
+| Maven test result | Clean isolated run on 2026-07-24: 2,566 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed in 41.5 seconds, artifact size 22,732,690 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -37,6 +37,12 @@ fresh-world, copied-save, and rollback gates remain required before publishing.
 
 Two earlier candidates are superseded:
 
+- `6faf1eedaf303f17337c6e1abdf637c1755fd61ee8dffaeb8f2b2767a1b5a653`
+  passed the focused Hub rehearsal but falsely quarantined public coop
+  residents during the first copied-save test. The source remained unchanged.
+  Commit `2cf3f015` now treats only housed v2.16.1 rows as current occupancy,
+  retains released rows as inactive history, and matches the exact released
+  profile-state key.
 - `246b580a0df3f6f148a9fbac8d5fa82148845010af82889f50e6d26cfe17ef92`
   failed owner-assigned spawner release in the disposable `TW Persistence
   Refresh` world on Hytale `0.5.7`. Commit `f71291e0` corrected the
