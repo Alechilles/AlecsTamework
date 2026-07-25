@@ -8,6 +8,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -17,6 +19,8 @@ public record ProvisioningActivationRequest(
         @Nonnull ProvisioningOrigin origin,
         @Nonnull PopulationGroupTransitionAdmissionRequest groupAdmission,
         @Nonnull NpcAlias targetAlias,
+        @Nonnull String expectedRoleId,
+        @Nonnull SnapshotCodecRegistry.EncodedSnapshot fullState,
         @Nonnull CompanionSpawnPlacement placement,
         @Nonnull String spawnReceiptKey,
         @Nullable TimedSummonActivation timedActivation,
@@ -24,14 +28,25 @@ public record ProvisioningActivationRequest(
 ) {
     public ProvisioningActivationRequest {
         if (origin == null || groupAdmission == null
-                || targetAlias == null || placement == null) {
+                || targetAlias == null || fullState == null
+                || placement == null) {
             throw new IllegalArgumentException(
                     "Complete provisioning activation is required"
             );
         }
+        expectedRoleId = text(
+                expectedRoleId, "Provisioning activation role"
+        );
         spawnReceiptKey = text(
                 spawnReceiptKey, "Provisioning activation receipt"
         );
+        if (!CompanionFullStateProjection.KIND.equals(fullState.kind())
+                || fullState.payloadVersion()
+                != CompanionFullStateProjection.VERSION) {
+            throw new IllegalArgumentException(
+                    "Provisioning activation requires modern full state"
+            );
+        }
         CompanionLifecycle before = groupAdmission.before();
         CompanionLifecycle after = groupAdmission.after();
         if (!before.profileId().equals(origin.profileId())
@@ -131,4 +146,3 @@ public record ProvisioningActivationRequest(
         return value.trim();
     }
 }
-

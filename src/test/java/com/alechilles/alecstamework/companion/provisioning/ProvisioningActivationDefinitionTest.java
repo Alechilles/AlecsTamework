@@ -18,6 +18,12 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupPolicy;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionRequest;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +48,8 @@ class ProvisioningActivationDefinitionTest {
 
         assertEquals(-12.5, request.placement().x());
         assertEquals(NOW, request.requestedAtMs());
+        assertEquals(3,
+                ProvisioningActivationDefinition.INSTANCE.payloadVersion());
         assertEquals(
                 request,
                 ProvisioningActivationDefinition.INSTANCE.decode(
@@ -54,6 +62,52 @@ class ProvisioningActivationDefinitionTest {
                 request.finalLifecycle().revision());
         assertEquals(LifecycleState.ACTIVE,
                 request.finalLifecycle().state());
+    }
+
+    @Test
+    void activationRejectsAProjectionWithTheWrongSnapshotKind() {
+        ProvisioningActivationRequest valid = request(false);
+        String payload = valid.fullState().payloadJson();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ProvisioningActivationRequest(
+                        valid.origin(),
+                        valid.groupAdmission(),
+                        valid.targetAlias(),
+                        valid.expectedRoleId(),
+                        new SnapshotCodecRegistry.EncodedSnapshot(
+                                new SnapshotKind("not_full_state"),
+                                CompanionFullStateProjection.VERSION,
+                                payload,
+                                Sha256Hash.ofUtf8(payload)
+                        ),
+                        valid.placement(),
+                        valid.spawnReceiptKey(),
+                        null,
+                        valid.requestedAtMs()
+                )
+        );
+    }
+
+    @Test
+    void activationCodecRejectsAFullStateHashMismatch() {
+        JsonObject encoded = JsonParser.parseString(
+                ProvisioningActivationDefinition.INSTANCE.encode(
+                        request(false)
+                )
+        ).getAsJsonObject();
+        encoded.getAsJsonObject("fullState").addProperty(
+                "payloadHash",
+                "0000000000000000000000000000000000000000000000000000000000000000"
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ProvisioningActivationDefinition.INSTANCE.decode(
+                        encoded.toString()
+                )
+        );
     }
 
     @Test
@@ -80,6 +134,8 @@ class ProvisioningActivationDefinitionTest {
                                 NOW
                         ),
                         ALIAS,
+                        "Mini",
+                        projection(ALIAS),
                         placement("world-b"),
                         "receipt",
                         valid.timedActivation(),
@@ -104,6 +160,8 @@ class ProvisioningActivationDefinitionTest {
                         ORIGIN,
                         valid.groupAdmission(),
                         ALIAS,
+                        "Mini",
+                        projection(ALIAS),
                         placement("world-a"),
                         "receipt",
                         new TimedSummonActivation(
@@ -152,6 +210,8 @@ class ProvisioningActivationDefinitionTest {
                         NOW
                 ),
                 ALIAS,
+                "Mini",
+                projection(ALIAS),
                 placement("world-a"),
                 "receipt",
                 timed ? timed() : null,
@@ -163,6 +223,18 @@ class ProvisioningActivationDefinitionTest {
         return new CompanionSpawnPlacement(
                 world, -12.5, -63.05, -4.5,
                 -0.25f, -1.5f, -0.5f
+        );
+    }
+
+    private SnapshotCodecRegistry.EncodedSnapshot projection(
+            NpcAlias alias
+    ) {
+        String payload = "{\"npcUuid\":\"" + alias + "\"}";
+        return new SnapshotCodecRegistry.EncodedSnapshot(
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload)
         );
     }
 
@@ -219,4 +291,3 @@ class ProvisioningActivationDefinitionTest {
         );
     }
 }
-

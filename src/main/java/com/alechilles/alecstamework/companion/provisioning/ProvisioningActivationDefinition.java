@@ -4,13 +4,14 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivatio
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJsonCodec;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
+import com.alechilles.alecstamework.companion.snapshot.EncodedSnapshotJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/** Version-one shared live operation definition for initial activation. */
+/** Version-three shared live operation definition for initial activation. */
 public final class ProvisioningActivationDefinition
         implements OperationDefinition<ProvisioningActivationRequest> {
     public static final ProvisioningActivationDefinition INSTANCE =
@@ -28,7 +29,7 @@ public final class ProvisioningActivationDefinition
 
     @Override
     public int payloadVersion() {
-        return 2;
+        return 3;
     }
 
     @Override
@@ -52,6 +53,11 @@ public final class ProvisioningActivationDefinition
         );
         json.addProperty(
                 "targetAlias", payload.targetAlias().toString()
+        );
+        json.addProperty("expectedRoleId", payload.expectedRoleId());
+        json.add(
+                "fullState",
+                EncodedSnapshotJsonCodec.encode(payload.fullState())
         );
         json.add(
                 "placement",
@@ -86,6 +92,10 @@ public final class ProvisioningActivationDefinition
                 NpcAlias.parse(
                         json.get("targetAlias").getAsString()
                 ),
+                json.get("expectedRoleId").getAsString(),
+                EncodedSnapshotJsonCodec.decode(
+                        json.getAsJsonObject("fullState")
+                ),
                 CompanionSpawnPlacementJsonCodec.decode(
                         json.getAsJsonObject("placement")
                 ),
@@ -100,4 +110,3 @@ public final class ProvisioningActivationDefinition
     }
 
 }
-

@@ -116,7 +116,15 @@ final class SqliteProvisioningActivationPreparation
     private boolean recordMatches(
             SqlitePersistenceTransactionContext transaction
     ) {
-        return transaction.provisioning()
+        var identity = transaction.identities()
+                .findProfile(request.origin().profileId())
+                .orElse(null);
+        return identity != null
+                && request.expectedRoleId().equals(identity.roleId())
+                && request.fullState().payloadHash().matchesUtf8(
+                request.fullState().payloadJson()
+        )
+                && transaction.provisioning()
                 .findByOrigin(request.origin())
                 .filter(record -> record.profileId().equals(
                         request.origin().profileId()
@@ -249,4 +257,3 @@ final class SqliteProvisioningActivationPreparation
         return result.value();
     }
 }
-

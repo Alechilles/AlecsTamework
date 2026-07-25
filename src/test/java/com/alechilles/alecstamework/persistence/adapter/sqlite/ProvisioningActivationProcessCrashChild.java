@@ -19,8 +19,11 @@ import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivatio
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceKernelMetrics;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -167,6 +170,8 @@ final class ProvisioningActivationProcessCrashChild {
                         ACTIVATED_AT
                 ),
                 ALIAS,
+                "Mini",
+                fullState(),
                 new CompanionSpawnPlacement(
                         "world-a", -12.5, -63.05, -4.5,
                         -0.25f, -1.5f, -0.5f
@@ -174,6 +179,16 @@ final class ProvisioningActivationProcessCrashChild {
                 "spawn:process-crash",
                 null,
                 ACTIVATED_AT
+        );
+    }
+
+    private static SnapshotCodecRegistry.EncodedSnapshot fullState() {
+        String payload = "{\"npcUuid\":\"" + ALIAS + "\"}";
+        return new SnapshotCodecRegistry.EncodedSnapshot(
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload)
         );
     }
 
@@ -303,4 +318,3 @@ final class ProvisioningActivationProcessCrashChild {
         DURABLE_COMMITTED
     }
 }
-

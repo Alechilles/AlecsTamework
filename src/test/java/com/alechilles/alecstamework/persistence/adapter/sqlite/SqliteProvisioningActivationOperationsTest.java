@@ -28,7 +28,10 @@ import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioning
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -212,6 +216,53 @@ class SqliteProvisioningActivationOperationsTest {
         assertEquals(0, reservationCount(operationId(21)));
     }
 
+    @Test
+    void canonicalRoleMismatchFailsBeforeLiveProjection()
+            throws Exception {
+        ProvisioningOrigin origin =
+                new ProvisioningOrigin("test:activation", "wrong-role");
+        grant(30, origin, false, 2, 2);
+        ProvisioningActivationRequest exact =
+                activation(origin, alias(30), null);
+        ProvisioningActivationRequest mismatched =
+                new ProvisioningActivationRequest(
+                        exact.origin(),
+                        exact.groupAdmission(),
+                        exact.targetAlias(),
+                        "Other",
+                        exact.fullState(),
+                        exact.placement(),
+                        exact.spawnReceiptKey(),
+                        exact.timedActivation(),
+                        exact.requestedAtMs()
+                );
+        AtomicBoolean invoked = new AtomicBoolean();
+
+        OperationWorkflowResult result =
+                adapter.provisioningActivationOperations().submit(
+                        operationId(31),
+                        mismatched,
+                        (request, operation) -> {
+                            invoked.set(true);
+                            return LiveOperationResult.confirmed(
+                                    "must-not-run"
+                            ).completed();
+                        }
+                ).completion().toCompletableFuture().get(
+                        10, TimeUnit.SECONDS
+                );
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertEquals(false, invoked.get());
+        assertEquals(
+                LifecycleState.PROVISIONED_DORMANT,
+                lifecycle(origin).state()
+        );
+    }
+
     private void grant(
             int number,
             ProvisioningOrigin origin,
@@ -320,6 +371,8 @@ class SqliteProvisioningActivationOperationsTest {
                         ACTIVATED_AT
                 ),
                 alias,
+                "Mini",
+                fullState(alias),
                 new CompanionSpawnPlacement(
                         "world-a", -12.5, -63.05, -4.5,
                         -0.25f, -1.5f, -0.5f
@@ -327,6 +380,18 @@ class SqliteProvisioningActivationOperationsTest {
                 "spawn:" + origin.callerKey(),
                 timed,
                 ACTIVATED_AT
+        );
+    }
+
+    private SnapshotCodecRegistry.EncodedSnapshot fullState(
+            NpcAlias alias
+    ) {
+        String payload = "{\"npcUuid\":\"" + alias + "\"}";
+        return new SnapshotCodecRegistry.EncodedSnapshot(
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload)
         );
     }
 
@@ -493,4 +558,3 @@ class SqliteProvisioningActivationOperationsTest {
         ));
     }
 }
-

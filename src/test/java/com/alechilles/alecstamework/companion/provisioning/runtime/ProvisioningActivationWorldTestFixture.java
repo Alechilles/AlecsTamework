@@ -13,6 +13,9 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupTr
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -78,6 +81,8 @@ final class ProvisioningActivationWorldTestFixture {
                         before, after, 1, 0, List.of(), NOW
                 ),
                 ALIAS,
+                "Mini",
+                fullState(),
                 new CompanionSpawnPlacement(
                         "world-target",
                         -12.5,
@@ -90,6 +95,16 @@ final class ProvisioningActivationWorldTestFixture {
                 receiptKey,
                 null,
                 NOW
+        );
+    }
+
+    private static SnapshotCodecRegistry.EncodedSnapshot fullState() {
+        String payload = "{\"npcUuid\":\"" + ALIAS + "\"}";
+        return new SnapshotCodecRegistry.EncodedSnapshot(
+                CompanionFullStateProjection.KIND,
+                CompanionFullStateProjection.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload)
         );
     }
 
