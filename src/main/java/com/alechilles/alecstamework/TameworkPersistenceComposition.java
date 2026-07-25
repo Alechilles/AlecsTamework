@@ -46,6 +46,8 @@ import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceRuntimeConfiguration;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .TameworkInventoryOperationReceiptsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
@@ -137,7 +139,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 identityIndex,
                 components.captureSourceReceipts(),
                 components.coopCaptureReceipts(),
-                components.persistenceRetirement()
+                components.persistenceRetirement(),
+                components.inventoryOperationReceipts()
         );
         AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
         TameworkEventRegistrationSupport.registerGlobal(
@@ -189,7 +192,11 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull ComponentType<
                     EntityStore,
                     TameworkPersistenceRetirementComponent
-                    > retirement
+                    > retirement,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkInventoryOperationReceiptsComponent
+                    > inventoryReceipts
     ) {
         Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
         Objects.requireNonNull(logger, "logger");
@@ -206,7 +213,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         identityIndex,
                         captureSourceReceipts,
                         coopReceipts,
-                        retirement
+                        retirement,
+                        inventoryReceipts
                 )
         );
         PersistenceStartupReport initial = bootstrap.start()
@@ -252,7 +260,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent>
                     coopReceipts,
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
-                    retirement
+                    retirement,
+            ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+                    inventoryReceipts
     ) {
         return new PublicPersistenceRuntimeConfiguration(
                 paths.targetDirectory(),
@@ -264,7 +274,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 HytalePersistenceLiveBoundariesFactory.create(
                         captureSourceReceipts,
                         coopReceipts,
-                        retirement
+                        retirement,
+                        inventoryReceipts
                 ),
                 HytalePublicPersistenceWorldReconciliation.factory(
                         identityBootstrap,
