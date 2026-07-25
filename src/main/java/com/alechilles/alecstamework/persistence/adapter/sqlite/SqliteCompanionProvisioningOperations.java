@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeCodec;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMutationOutcome;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
@@ -129,7 +130,9 @@ public final class SqliteCompanionProvisioningOperations {
                 SqliteCompanionProfileProjectionComposer.compose(
                         transaction, request.origin().profileId()
                 );
-        return events(operation, request, record, roster, after);
+        return events(
+                transaction, operation, request, record, roster, after
+        );
     }
 
     private CommandRosterMutationOutcome commandMembership(
@@ -150,6 +153,7 @@ public final class SqliteCompanionProvisioningOperations {
     }
 
     private List<ProjectionEventDraft> events(
+            SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation,
             CompanionProvisioningRequest request,
             ProvisioningRecord record,
@@ -188,7 +192,13 @@ public final class SqliteCompanionProvisioningOperations {
         if (roster != null) {
             events.add(CommandRosterMembershipChangeCodec.draft(
                     operation.operationId(),
-                    roster,
+                    SqliteCommandSemanticEventEvidence.roster(
+                            transaction,
+                            roster,
+                            request.lifecycle(),
+                            CommandRosterMembershipChangeEvidence.Reason
+                                    .PROVISIONED
+                    ),
                     request.requestedAtMs()
             ));
         }
@@ -254,4 +264,3 @@ public final class SqliteCompanionProvisioningOperations {
         return result.value();
     }
 }
-

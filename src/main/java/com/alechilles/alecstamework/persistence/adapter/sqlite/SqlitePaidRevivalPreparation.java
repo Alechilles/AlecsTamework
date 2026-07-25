@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalEventCodec;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalOutcome;
@@ -17,7 +16,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEvent;
 
-/** Exact death, profile, roster, timed, alias, and lifecycle paid-revival fence. */
+/** Exact dormant, profile, roster, timed, alias, and lifecycle paid-revival fence. */
 final class SqlitePaidRevivalPreparation
         implements PreparedOperationDetail {
     private final PaidRevivalRequest request;
@@ -236,7 +235,7 @@ final class SqlitePaidRevivalPreparation
         return lifecycle != null
                 && lifecycle.profileId().equals(source.profileId())
                 && lifecycle.ownerId().equals(source.ownerId())
-                && lifecycle.state() == LifecycleState.DEAD_REVIVABLE
+                && lifecycle.state() == source.state()
                 && lifecycle.location().equals(LifecycleLocation.none())
                 && lifecycle.revision().equals(
                 source.revision().next().next()

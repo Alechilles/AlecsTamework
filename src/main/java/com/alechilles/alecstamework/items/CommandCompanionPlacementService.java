@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 /**
  * Computes companion placement positions for recall and respawn flows.
  */
-final class CommandCompanionPlacementService {
+public final class CommandCompanionPlacementService {
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
     private static final double RESPAWN_DISTANCE_MID = 12.0;
@@ -74,7 +74,7 @@ final class CommandCompanionPlacementService {
      * Freezes one exact canonical restoration placement from current world-thread state.
      */
     @Nullable
-    CompanionSpawnPlacement computeRestorationPlacement(
+    public CompanionSpawnPlacement computeRestorationPlacement(
             Ref<EntityStore> playerRef,
             Store<EntityStore> store,
             double safeSpawnDistance,

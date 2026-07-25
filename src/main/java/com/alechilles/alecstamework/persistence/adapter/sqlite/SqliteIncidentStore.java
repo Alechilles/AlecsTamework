@@ -53,6 +53,56 @@ public final class SqliteIncidentStore implements IncidentStore {
     }
 
     @Override
+    public Optional<IncidentRecord> findIncidentByIdOrUniquePrefix(
+            String incidentIdOrUniquePrefix
+    ) {
+        String prefix = canonicalPrefix(incidentIdOrUniquePrefix);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT incident_id, failure_kind, failure_code, state, summary,
+                       evidence_json, created_at_ms, resolved_at_ms
+                FROM persistence_incident
+                WHERE substr(incident_id, 1, ?) = ?
+                ORDER BY incident_id
+                LIMIT 2
+                """)) {
+            statement.setInt(1, prefix.length());
+            statement.setString(2, prefix);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (!rows.next()) {
+                    return Optional.empty();
+                }
+                IncidentRecord incident = readIncident(rows);
+                return rows.next() ? Optional.empty() : Optional.of(incident);
+            }
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("incident_find_prefix", failure);
+        }
+    }
+
+    @Override
+    public List<ScopeQuarantine> findQuarantines(IncidentId incidentId) {
+        require(incidentId, "Incident ID");
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT scope_type, scope_key, incident_id, state, reason_code,
+                       created_at_ms, released_at_ms
+                FROM persistence_quarantine
+                WHERE incident_id = ?
+                ORDER BY scope_type, scope_key
+                """)) {
+            statement.setString(1, incidentId.toString());
+            try (ResultSet rows = statement.executeQuery()) {
+                ArrayList<ScopeQuarantine> quarantines = new ArrayList<>();
+                while (rows.next()) {
+                    quarantines.add(readQuarantine(rows));
+                }
+                return List.copyOf(quarantines);
+            }
+        } catch (SQLException | RuntimeException failure) {
+            throw storeFailure("quarantine_find_by_incident", failure);
+        }
+    }
+
+    @Override
     public PersistenceMutationResult<IncidentRecord> createIncident(IncidentRecord incident) {
         require(incident, "Incident");
         Optional<IncidentRecord> existing = findIncident(incident.incidentId());
@@ -291,6 +341,22 @@ public final class SqliteIncidentStore implements IncidentStore {
             return storeException;
         }
         return new PersistenceStoreException(operation, failure);
+    }
+
+    private String canonicalPrefix(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Incident ID or prefix is required"
+            );
+        }
+        String prefix = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (prefix.length() > 36
+                || !prefix.matches("[0-9a-f-]+")) {
+            throw new IllegalArgumentException(
+                    "Incident ID prefix must use canonical UUID characters"
+            );
+        }
+        return prefix;
     }
 
     private static <T> T require(T value, String label) {

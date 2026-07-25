@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -24,17 +26,41 @@ final class CommandSelectionPageService {
     private final CommandResolutionService resolutionService;
     private final CommandPanelActionService panelActionService;
     private final CommandTalentPageService talentPageService;
+    private final CommandPanelFeaturePresentationSource featurePresentations;
+    private final CommandPanelFeatureActionService featureActions;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
                                 CommandResolutionService resolutionService,
                                 CommandPanelActionService panelActionService,
                                 CommandTalentPageService talentPageService) {
+        this(
+                toolInventoryService,
+                groupAssignPageService,
+                resolutionService,
+                panelActionService,
+                talentPageService,
+                null,
+                null
+        );
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
         this.panelActionService = panelActionService;
         this.talentPageService = talentPageService;
+        this.featurePresentations = featurePresentations;
+        this.featureActions = featureActions;
     }
 
     boolean open(Player player,
@@ -89,6 +115,7 @@ final class CommandSelectionPageService {
                 requireUnlinkConfirm,
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
+                () -> buildFeaturePresentations(player, config),
                 () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
@@ -107,6 +134,15 @@ final class CommandSelectionPageService {
                 actions.release(),
                 actions.cull(),
                 actions.respawn(),
+                npcUuid -> applyFeatureAction(
+                        player, config, npcUuid, FeatureAction.SUMMON
+                ),
+                npcUuid -> applyFeatureAction(
+                        player, config, npcUuid, FeatureAction.DISMISS
+                ),
+                npcUuid -> applyFeatureAction(
+                        player, config, npcUuid, FeatureAction.REVIVE
+                ),
                 actions.locate(),
                 actions.recall(),
                 actions.setHome(),
@@ -127,6 +163,44 @@ final class CommandSelectionPageService {
                         player, toolId, config, npcUuid, groupId),
                 actions.selectCommand()
         );
+    }
+
+    private Map<UUID, CommandPanelFeaturePresentation>
+    buildFeaturePresentations(
+            Player player,
+            TwCommandItemConfig config
+    ) {
+        if (featurePresentations == null || player == null) {
+            return Map.of();
+        }
+        String worldName = player.getWorld() == null
+                ? null
+                : player.getWorld().getName();
+        return featurePresentations.snapshot(
+                player.getUuid(), worldName, config
+        );
+    }
+
+    private void applyFeatureAction(
+            Player player,
+            TwCommandItemConfig config,
+            UUID presentationUuid,
+            FeatureAction action
+    ) {
+        if (featureActions == null) {
+            return;
+        }
+        switch (action) {
+            case SUMMON -> featureActions.summon(
+                    player, config, presentationUuid
+            );
+            case DISMISS -> featureActions.dismiss(
+                    player, config, presentationUuid
+            );
+            case REVIVE -> featureActions.revive(
+                    player, config, presentationUuid
+            );
+        }
     }
 
     private boolean resolveRequireUnlinkConfirm() {
@@ -168,5 +242,11 @@ final class CommandSelectionPageService {
                    Runnable manageGroups,
                    Runnable reopenMenu,
                    Consumer<String> selectCommand) {
+    }
+
+    private enum FeatureAction {
+        SUMMON,
+        DISMISS,
+        REVIVE
     }
 }

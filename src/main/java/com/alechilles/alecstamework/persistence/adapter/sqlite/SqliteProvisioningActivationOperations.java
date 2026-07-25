@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeEvidence;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
@@ -171,12 +172,13 @@ public final class SqliteProvisioningActivationOperations {
                         transaction, request.origin().profileId()
                 );
         return events(
-                operation, request, fenced, after, before,
+                transaction, operation, request, fenced, after, before,
                 afterProfile, lease, committedAtMs
         );
     }
 
     private List<ProjectionEventDraft> events(
+            SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation,
             ProvisioningActivationRequest request,
             CompanionLifecycle beforeLifecycle,
@@ -222,7 +224,18 @@ public final class SqliteProvisioningActivationOperations {
         ));
         if (lease != null) {
             result.add(TimedSummonLeaseChangeCodec.draft(
-                    operation.operationId(), lease, committedAtMs
+                    operation.operationId(),
+                    SqliteCommandSemanticEventEvidence.timed(
+                            transaction,
+                            lease,
+                            lease.before() == null
+                                    ? null
+                                    : beforeLifecycle,
+                            afterLifecycle,
+                            TimedSummonLeaseChangeEvidence.Reason
+                                    .PROVISIONING_ACTIVATED
+                    ),
+                    committedAtMs
             ));
         }
         return List.copyOf(result);

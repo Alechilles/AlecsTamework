@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonActivation;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeEvidence;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -69,6 +70,7 @@ final class SqlitePaidRevivalCommit {
                         transaction, fenced.profileId()
                 );
         return events(
+                transaction,
                 operation,
                 request,
                 fenced,
@@ -167,6 +169,7 @@ final class SqlitePaidRevivalCommit {
     }
 
     private List<ProjectionEventDraft> events(
+            SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation,
             PaidRevivalRequest request,
             CompanionLifecycle fenced,
@@ -202,6 +205,14 @@ final class SqlitePaidRevivalCommit {
                         committedAtMs
                 )
         ));
+        SqliteProvisionedCompanionLifecycleEvents.revival(
+                transaction,
+                operation.operationId(),
+                active,
+                request.groupAdmission().before().revision(),
+                request.targetAlias(),
+                committedAtMs
+        ).ifPresent(result::add);
         result.add(SqliteCompanionProfileProjectionComposer.event(
                 operation.operationId(),
                 new CompanionProfileProjectionChange(
@@ -221,7 +232,16 @@ final class SqlitePaidRevivalCommit {
         ));
         if (timed != null) {
             result.add(TimedSummonLeaseChangeCodec.draft(
-                    operation.operationId(), timed, committedAtMs
+                    operation.operationId(),
+                    SqliteCommandSemanticEventEvidence.timed(
+                            transaction,
+                            timed,
+                            timed.before() == null ? null : fenced,
+                            active,
+                            TimedSummonLeaseChangeEvidence.Reason
+                                    .PAID_REVIVED
+                    ),
+                    committedAtMs
             ));
         }
         return List.copyOf(result);

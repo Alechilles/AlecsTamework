@@ -24,6 +24,12 @@ import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBound
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
 import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmissionGate;
+import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
+import com.alechilles.alecstamework.persistence.projection
+        .ProjectionPublicationContext;
+import java.util.List;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -59,10 +65,12 @@ final class SqlitePublicOperationSet {
             @Nonnull SqlitePublicProjectionSet projections,
             @Nonnull PersistenceOperationAdmissionGate admission,
             @Nonnull LongSupplier clock,
-            @Nonnull RefundDeliveryBoundary refunds
+            @Nonnull RefundDeliveryBoundary refunds,
+            @Nonnull ProjectionPublicationContext publicationContext
     ) {
         if (registry == null || kernel == null || projections == null
-                || admission == null || clock == null || refunds == null) {
+                || admission == null || clock == null || refunds == null
+                || publicationContext == null) {
             throw new IllegalArgumentException(
                     "Public operation dependencies are required"
             );
@@ -90,53 +98,57 @@ final class SqlitePublicOperationSet {
                         projections.coordinator(),
                         clock
                 );
+        Function<OperationKind, List<ProjectionConsumer>> consumers =
+                operationKind -> projections.requiredFor(
+                        operationKind, publicationContext
+                );
         profiles = new SqliteCompanionProfileOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 )
         );
         aliases = new SqliteCompanionAliasRotationOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionAliasRotationDefinition.INSTANCE.kind()
                 )
         );
         ownerPopulation = new SqliteOwnerPopulationTransitionOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         OwnerPopulationTransitionDefinition.INSTANCE.kind()
                 )
         );
         ownerPopulationReconciliation =
                 new SqliteOwnerPopulationReconciliationOperations(
                         database,
-                        projections.requiredFor(
+                        consumers.apply(
                                 OwnerPopulationReconciliationDefinition
                                         .INSTANCE.kind()
                         )
                 );
         populationGroups = new SqlitePopulationGroupAssignmentOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         PopulationGroupAssignmentDefinition.INSTANCE.kind()
                 )
         );
         commandRosters = new SqliteCommandRosterMembershipOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CommandRosterMembershipDefinition.INSTANCE.kind()
                 )
         );
         commandTransitions = new SqliteCommandRosterTransitionOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CommandRosterTransitionDefinition.INSTANCE.kind()
                 )
         );
         timedSummons = new SqliteTimedSummonLeaseOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         TimedSummonLeaseMutationDefinition.INSTANCE.kind()
                 )
         );
@@ -144,13 +156,13 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         TimedSummonTransitionDefinition.INSTANCE.kind()
                 )
         );
         provisioning = new SqliteCompanionProvisioningOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionProvisioningDefinition.INSTANCE.kind()
                 )
         );
@@ -159,7 +171,7 @@ final class SqlitePublicOperationSet {
                         engine,
                         publisher,
                         clock,
-                        projections.requiredFor(
+                        consumers.apply(
                                 ProvisioningActivationDefinition
                                         .INSTANCE.kind()
                         )
@@ -169,7 +181,7 @@ final class SqlitePublicOperationSet {
                 publisher,
                 clock,
                 refunds,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionCaptureDefinition.INSTANCE.kind()
                 )
         );
@@ -177,7 +189,7 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionCaptureReleaseDefinition.INSTANCE.kind()
                 )
         );
@@ -186,7 +198,7 @@ final class SqlitePublicOperationSet {
                 evidence,
                 projections.coordinator(),
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionDormantTransitionDefinition.INSTANCE.kind()
                 )
         );
@@ -194,13 +206,13 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionRestorationDefinition.INSTANCE.kind()
                 )
         );
         coopSlots = new SqliteCoopSlotOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         CoopSlotRegistrationDefinition.INSTANCE.kind()
                 )
         );
@@ -208,7 +220,7 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 )
         );
@@ -216,7 +228,7 @@ final class SqlitePublicOperationSet {
                 engine,
                 publisher,
                 clock,
-                projections.requiredFor(
+                consumers.apply(
                         CompanionCoopReleaseDefinition.INSTANCE.kind()
                 )
         );
@@ -226,13 +238,13 @@ final class SqlitePublicOperationSet {
                 kernel.reads(),
                 clock,
                 refunds,
-                projections.requiredFor(
+                consumers.apply(
                         PaidRevivalDefinition.INSTANCE.kind()
                 )
         );
         extensions = new SqliteProfileExtensionOperations(
                 database,
-                projections.requiredFor(
+                consumers.apply(
                         ProfileExtensionMutationDefinition.INSTANCE.kind()
                 )
         );

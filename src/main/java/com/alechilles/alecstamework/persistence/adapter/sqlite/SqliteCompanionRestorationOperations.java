@@ -3,10 +3,12 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationEventCodec;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
@@ -14,6 +16,7 @@ import com.alechilles.alecstamework.companion.restoration.CompanionRestorationOu
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
@@ -22,6 +25,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResul
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CompletableFuture;
@@ -92,7 +96,12 @@ public final class SqliteCompanionRestorationOperations {
                         CompanionRestorationDefinition.INSTANCE,
                         request,
                         new SqliteCompanionRestorationPreparation(restoration),
-                        liveBoundary,
+                        restoration.restoresLive()
+                                ? liveBoundary
+                                : (payload, operation) ->
+                                LiveOperationResult.confirmed(
+                                        "provisioned_dormant_revived"
+                                ).completed(),
                         this::commitRestoration,
                         requiredConsumers,
                         "companion_restoration"
@@ -147,6 +156,21 @@ public final class SqliteCompanionRestorationOperations {
             CompanionRestorationRequest restoration,
             long restoredAtMs
     ) {
+        return restoration.restoresLive()
+                ? commitActiveRestoration(
+                transaction, operation, restoration, restoredAtMs
+        )
+                : commitDormantRestoration(
+                transaction, operation, restoration, restoredAtMs
+        );
+    }
+
+    private List<ProjectionEventDraft> commitActiveRestoration(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionRestorationRequest restoration,
+            long restoredAtMs
+    ) {
         CompanionLifecycle fenced = requireFencedLifecycle(
                 transaction, operation, restoration
         );
@@ -191,6 +215,26 @@ public final class SqliteCompanionRestorationOperations {
                 )),
                 "restoration_lifecycle"
         );
+        return activeEvents(
+                transaction,
+                operation,
+                restoration,
+                fenced,
+                active,
+                before,
+                restoredAtMs
+        );
+    }
+
+    private List<ProjectionEventDraft> activeEvents(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionRestorationRequest restoration,
+            CompanionLifecycle fenced,
+            CompanionLifecycle active,
+            CompanionProfileProjectionState before,
+            long restoredAtMs
+    ) {
         CompanionProfileProjectionState after =
                 SqliteCompanionProfileProjectionComposer.compose(
                         transaction, restoration.profileId()
@@ -213,25 +257,162 @@ public final class SqliteCompanionRestorationOperations {
                         after,
                         restoredAtMs
                 );
-        return List.of(
-                new ProjectionEventDraft(
-                        operation.operationId(),
-                        EVENT_TYPE,
-                        "restoration-result:" + restoration.profileId(),
-                        active.revision().value(),
-                        CompanionRestorationEventCodec.VERSION,
-                        CompanionRestorationEventCodec.encode(outcome),
-                        restoredAtMs
+        ArrayList<ProjectionEventDraft> events = new ArrayList<>(4);
+        events.add(new ProjectionEventDraft(
+                operation.operationId(),
+                EVENT_TYPE,
+                "restoration-result:" + restoration.profileId(),
+                active.revision().value(),
+                CompanionRestorationEventCodec.VERSION,
+                CompanionRestorationEventCodec.encode(outcome),
+                restoredAtMs
+        ));
+        SqliteProvisionedCompanionLifecycleEvents.revival(
+                transaction,
+                operation.operationId(),
+                active,
+                restoration.expectedLifecycleRevision(),
+                restoration.targetAlias(),
+                restoredAtMs
+        ).ifPresent(events::add);
+        events.add(SqliteCompanionProfileProjectionComposer.event(
+                operation.operationId(), change
+        ));
+        events.add(CompanionLifecycleProjectionChangeCodec.draft(
+                operation.operationId(),
+                fenced,
+                active,
+                restoredAtMs
+        ));
+        return List.copyOf(events);
+    }
+
+    private List<ProjectionEventDraft> commitDormantRestoration(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionRestorationRequest restoration,
+            long restoredAtMs
+    ) {
+        CompanionLifecycle dead =
+                SqliteCompanionRestorationPreparation
+                        .requireRestorableSource(
+                                transaction, restoration
+                        );
+        ProvisioningRecord provisioning =
+                SqliteCompanionRestorationPreparation
+                        .requireProvisioning(
+                                transaction, restoration
+                        );
+        CompanionProfileProjectionState before =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction, restoration.profileId()
+                );
+        CompanionLifecycle dormant = new CompanionLifecycle(
+                restoration.profileId(),
+                dead.ownerId(),
+                LifecycleState.PROVISIONED_DORMANT,
+                LifecycleLocation.keyed(
+                        LifecycleLocationKind.PROVISIONING,
+                        provisioning.origin().stableKey()
                 ),
-                SqliteCompanionProfileProjectionComposer.event(
-                        operation.operationId(), change
+                dead.revision().next(),
+                null,
+                restoredAtMs,
+                dead.lastReconciledGeneration(),
+                dead.quarantineIncidentId(),
+                dead.ownerWorldKey()
+        );
+        requireApplied(
+                transaction.lifecycles().transition(
+                        new LifecycleTransition(
+                                dead.revision(), null, dormant
+                        )
                 ),
-                CompanionLifecycleProjectionChangeCodec.draft(
-                        operation.operationId(),
-                        fenced,
-                        active,
+                "restoration_dormant_lifecycle"
+        );
+        return dormantEvents(
+                transaction,
+                operation,
+                restoration,
+                dead,
+                dormant,
+                before,
+                restoredAtMs
+        );
+    }
+
+    private List<ProjectionEventDraft> dormantEvents(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionRestorationRequest restoration,
+            CompanionLifecycle dead,
+            CompanionLifecycle dormant,
+            CompanionProfileProjectionState before,
+            long restoredAtMs
+    ) {
+        CompanionProfileProjectionState after =
+                SqliteCompanionProfileProjectionComposer.compose(
+                        transaction, restoration.profileId()
+                );
+        CompanionRestorationOutcome outcome =
+                new CompanionRestorationOutcome(
+                        restoration.profileId(),
+                        restoration.sourceSnapshot().snapshotId(),
+                        LifecycleState.PROVISIONED_DORMANT,
+                        null,
+                        null,
+                        dormant.revision(),
+                        null,
                         restoredAtMs
-                )
+                );
+        CompanionProfileProjectionChange change =
+                new CompanionProfileProjectionChange(
+                        CompanionProfileProjectionChange.Source.LIFECYCLE,
+                        restoration.profileId(),
+                        dormant.revision().value(),
+                        before,
+                        after,
+                        restoredAtMs
+                );
+        ArrayList<ProjectionEventDraft> events = new ArrayList<>(4);
+        events.add(restorationEvent(
+                operation, outcome, dormant.revision(), restoredAtMs
+        ));
+        SqliteProvisionedCompanionLifecycleEvents.revival(
+                transaction,
+                operation.operationId(),
+                dormant,
+                restoration.expectedLifecycleRevision(),
+                null,
+                restoredAtMs
+        ).ifPresent(events::add);
+        events.add(SqliteCompanionProfileProjectionComposer.event(
+                operation.operationId(), change
+        ));
+        events.add(CompanionLifecycleProjectionChangeCodec.draft(
+                operation.operationId(),
+                dead,
+                dormant,
+                restoredAtMs
+        ));
+        return List.copyOf(events);
+    }
+
+    private ProjectionEventDraft restorationEvent(
+            OperationEnvelope operation,
+            CompanionRestorationOutcome outcome,
+            com.alechilles.alecstamework.companion.lifecycle
+                    .LifecycleRevision revision,
+            long restoredAtMs
+    ) {
+        return new ProjectionEventDraft(
+                operation.operationId(),
+                EVENT_TYPE,
+                "restoration-result:" + outcome.profileId(),
+                revision.value(),
+                CompanionRestorationEventCodec.VERSION,
+                CompanionRestorationEventCodec.encode(outcome),
+                restoredAtMs
         );
     }
 

@@ -16,6 +16,8 @@ import com.alechilles.alecstamework.items.persistence.SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseAuthor;
+import com.alechilles.alecstamework.items.persistence
+        .SpawnerTameAndLinkEvidenceSource;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -72,11 +74,37 @@ public final class SpawnerFeatureHandler {
                 logger,
                 registry,
                 translations,
+                captureAuthor,
+                releaseAuthor,
+                capturePolicies,
+                captureRequirements,
+                SpawnerTameAndLinkEvidenceSource.unavailable()
+        );
+    }
+
+    /** Creates the canonical spawner composition with tame/link evidence. */
+    public SpawnerFeatureHandler(
+            @Nonnull HytaleLogger logger,
+            @Nonnull ItemFeatureRegistry registry,
+            @Nullable TranslationRegistry translations,
+            @Nonnull SpawnerCaptureAuthor captureAuthor,
+            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
+            @Nonnull CapturePolicyRegistry capturePolicies,
+            @Nonnull CaptureRequirementRuntime captureRequirements,
+            @Nonnull SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence
+    ) {
+        this(
+                logger,
+                registry,
+                translations,
                 Objects.requireNonNull(captureAuthor, "captureAuthor"),
                 Objects.requireNonNull(releaseAuthor, "releaseAuthor"),
                 Objects.requireNonNull(capturePolicies, "capturePolicies"),
                 Objects.requireNonNull(
                         captureRequirements, "captureRequirements"
+                ),
+                Objects.requireNonNull(
+                        tameAndLinkEvidence, "tameAndLinkEvidence"
                 ),
                 true
         );
@@ -90,6 +118,7 @@ public final class SpawnerFeatureHandler {
             SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
             CapturePolicyRegistry capturePolicies,
             CaptureRequirementRuntime captureRequirements,
+            SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
             boolean canonicalComposition
     ) {
         this.logger = logger;
@@ -143,7 +172,8 @@ public final class SpawnerFeatureHandler {
                 itemMetadata,
                 new SpawnerItemDisplayMetadataService(translations),
                 npcState,
-                npcIdentity
+                npcIdentity,
+                tameAndLinkEvidence
         );
         SpawnerSpawnPositionService positions =
                 new SpawnerSpawnPositionService(logger);
@@ -168,6 +198,7 @@ public final class SpawnerFeatureHandler {
                 null,
                 new CapturePolicyRegistry(),
                 NoCaptureRequirements.INSTANCE,
+                SpawnerTameAndLinkEvidenceSource.unavailable(),
                 false
         );
     }

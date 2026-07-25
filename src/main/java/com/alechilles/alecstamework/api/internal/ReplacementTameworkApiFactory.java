@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.api.internal;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
+import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
 import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
@@ -119,15 +120,18 @@ public final class ReplacementTameworkApiFactory {
                         facades.operations(),
                         dependencies.commandRosters()
                 );
-        CommandTimedSummoningApi timed =
+        ReplacementCommandTimedSummoningApi timedFacade =
                 dependencies.timedSummoning() == null
-                        ? CommandTimedSummoningApi.unavailable()
+                        ? null
                         : new ReplacementCommandTimedSummoningApi(
-                        facades.queries(),
-                        facades.operations(),
-                        dependencies.timedSummoning(),
-                        clock
-                );
+                                facades.queries(),
+                                facades.operations(),
+                                dependencies.timedSummoning(),
+                                clock
+                        );
+        CommandTimedSummoningApi timed = timedFacade == null
+                ? CommandTimedSummoningApi.unavailable()
+                : timedFacade;
         CompanionProvisioningApi provisioning =
                 dependencies.provisioning() == null
                         || dependencies.commandRosters() == null
@@ -160,7 +164,13 @@ public final class ReplacementTameworkApiFactory {
                 provisioning,
                 paidRevival
         );
-        return new Composition(base, api);
+        AutoCloseable timedEventBridge = timedFacade == null
+                ? () -> { }
+                : eventBus.subscribe(
+                        CommandTimedSummoningChangedEvent.class,
+                        timedFacade::publishFromOutbox
+                );
+        return new Composition(base, api, timedEventBridge);
     }
 
     private static TameworkApiImpl base(
@@ -204,14 +214,19 @@ public final class ReplacementTameworkApiFactory {
     public static final class Composition implements AutoCloseable {
         private final TameworkApiImpl base;
         private final ReplacementTameworkApi api;
+        private final AutoCloseable timedEventBridge;
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private Composition(
                 TameworkApiImpl base,
-                ReplacementTameworkApi api
+                ReplacementTameworkApi api,
+                AutoCloseable timedEventBridge
         ) {
             this.base = Objects.requireNonNull(base, "base");
             this.api = Objects.requireNonNull(api, "api");
+            this.timedEventBridge = Objects.requireNonNull(
+                    timedEventBridge, "timedEventBridge"
+            );
         }
 
         @Nonnull
@@ -235,6 +250,11 @@ public final class ReplacementTameworkApiFactory {
         @Override
         public void close() {
             if (closed.compareAndSet(false, true)) {
+                try {
+                    timedEventBridge.close();
+                } catch (Exception ignored) {
+                    // The event bus owns only an in-memory listener handle.
+                }
                 api.close();
             }
         }

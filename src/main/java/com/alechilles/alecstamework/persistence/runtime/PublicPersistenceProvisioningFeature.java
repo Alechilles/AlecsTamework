@@ -55,7 +55,9 @@ final class PublicPersistenceProvisioningFeature {
                                 .COMMAND_ROSTER_INDEX,
                         PublicPersistenceFeatureRegistry
                                 .TIMED_SUMMON_INDEX,
-                        PublicPersistenceFeatureRegistry.PROVISIONING_INDEX
+                        PublicPersistenceFeatureRegistry.PROVISIONING_INDEX,
+                        PublicPersistenceFeatureRegistry
+                                .PUBLIC_FEATURE_EVENT_OBSERVER
                 ),
                 Set.of(
                         PersistenceStartupNode.LOAD_FEATURE_DETAIL,

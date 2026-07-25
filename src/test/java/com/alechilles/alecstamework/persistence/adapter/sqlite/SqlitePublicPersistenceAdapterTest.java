@@ -143,13 +143,13 @@ class SqlitePublicPersistenceAdapterTest {
                 ).size()
         );
         assertEquals(
-                5,
+                6,
                 adapter.projections().requiredFor(
                         CommandRosterMembershipDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                5,
+                6,
                 adapter.projections().requiredFor(
                         TimedSummonLeaseMutationDefinition.INSTANCE.kind()
                 ).size()
@@ -169,7 +169,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(9, result.catchUps().size());
+        assertEquals(10, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
     }
 

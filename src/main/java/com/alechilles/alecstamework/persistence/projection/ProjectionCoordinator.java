@@ -44,7 +44,12 @@ public final class ProjectionCoordinator {
     ) {
         requireConsumerAndBatch(consumer, batchSize);
         return gateway.load(consumer.consumerId(), batchSize)
-                .thenCompose(read -> startFromRead(consumer, batchSize, read));
+                .thenCompose(read -> startFromRead(
+                        consumer,
+                        ProjectionPublicationContext.RECOVERY_CONVERGENCE,
+                        batchSize,
+                        read
+                ));
     }
 
     /** Projects through a sequence returned by an already committed canonical transaction. */
@@ -54,11 +59,34 @@ public final class ProjectionCoordinator {
             @Nonnull ProjectionSequence committedSequence,
             int batchSize
     ) {
+        return afterCommit(
+                consumer,
+                committedSequence,
+                batchSize,
+                ProjectionPublicationContext.LIVE_COMMIT
+        );
+    }
+
+    /**
+     * Projects one committed sequence with an origin supplied by the
+     * publication/recovery caller.
+     */
+    @Nonnull
+    public CompletionStage<ProjectionCatchUpResult> afterCommit(
+            @Nonnull ProjectionConsumer consumer,
+            @Nonnull ProjectionSequence committedSequence,
+            int batchSize,
+            @Nonnull ProjectionPublicationContext context
+    ) {
         requireConsumerAndBatch(consumer, batchSize);
-        if (committedSequence == null) {
-            throw new IllegalArgumentException("Committed projection sequence is required");
+        if (committedSequence == null || context == null) {
+            throw new IllegalArgumentException(
+                    "Committed projection sequence and context are required"
+            );
         }
-        return catchUpThrough(consumer, committedSequence, batchSize, 0);
+        return catchUpThrough(
+                consumer, context, committedSequence, batchSize, 0
+        );
     }
 
     /** Compares a canonical rebuild with the currently published projection outside transactions. */
@@ -86,6 +114,7 @@ public final class ProjectionCoordinator {
 
     private CompletionStage<ProjectionCatchUpResult> startFromRead(
             ProjectionConsumer consumer,
+            ProjectionPublicationContext context,
             int batchSize,
             PersistenceReadResult<ProjectionBatch> read
     ) {
@@ -98,7 +127,9 @@ public final class ProjectionCoordinator {
                         0
                 );
             }
-            return processBatch(consumer, batch, batch.head(), batchSize, 0);
+            return processBatch(
+                    consumer, context, batch, batch.head(), batchSize, 0
+            );
         }
         Throwable failure = readFailure(read, "projection_startup_read_absent");
         return completedFailure(
@@ -112,6 +143,7 @@ public final class ProjectionCoordinator {
 
     private CompletionStage<ProjectionCatchUpResult> catchUpThrough(
             ProjectionConsumer consumer,
+            ProjectionPublicationContext context,
             ProjectionSequence target,
             int batchSize,
             int delivered
@@ -131,12 +163,15 @@ public final class ProjectionCoordinator {
             if (acknowledged.compareTo(target) >= 0) {
                 return completedSuccess(consumer.consumerId(), acknowledged, delivered);
             }
-            return processBatch(consumer, batch, target, batchSize, delivered);
+            return processBatch(
+                    consumer, context, batch, target, batchSize, delivered
+            );
         });
     }
 
     private CompletionStage<ProjectionCatchUpResult> processBatch(
             ProjectionConsumer consumer,
+            ProjectionPublicationContext context,
             ProjectionBatch batch,
             ProjectionSequence target,
             int batchSize,
@@ -156,6 +191,7 @@ public final class ProjectionCoordinator {
         }
         return applySequentially(
                 consumer,
+                context,
                 eligible,
                 0,
                 batch.checkpoint().acknowledgedSequence(),
@@ -170,13 +206,18 @@ public final class ProjectionCoordinator {
                 );
             }
             return catchUpThrough(
-                    consumer, target, batchSize, result.deliveredCount()
+                    consumer,
+                    context,
+                    target,
+                    batchSize,
+                    result.deliveredCount()
             );
         });
     }
 
     private CompletionStage<ProjectionCatchUpResult> applySequentially(
             ProjectionConsumer consumer,
+            ProjectionPublicationContext context,
             List<ProjectionEvent> events,
             int index,
             ProjectionSequence acknowledged,
@@ -187,7 +228,7 @@ public final class ProjectionCoordinator {
         }
         ProjectionEvent event = events.get(index);
         try {
-            ProjectionApplyOutcome outcome = consumer.apply(event);
+            ProjectionApplyOutcome outcome = consumer.apply(event, context);
             if (outcome == null) {
                 throw new IllegalStateException("projection_consumer_returned_null");
             }
@@ -218,6 +259,7 @@ public final class ProjectionCoordinator {
             }
             return applySequentially(
                     consumer,
+                    context,
                     events,
                     index + 1,
                     checkpoint.acknowledgedSequence(),

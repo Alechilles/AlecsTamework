@@ -59,6 +59,36 @@ public record OperationScope(@Nonnull OperationScopeType type, @Nonnull String k
         );
     }
 
+    /** Parses one canonical persisted owner-scoped command-family key. */
+    public static OperationScope commandFamily(
+            @Nonnull String persistedKey
+    ) {
+        if (persistedKey == null || persistedKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Command family scope key is required"
+            );
+        }
+        String key = persistedKey.trim();
+        int separator = key.indexOf(':');
+        if (separator <= 0 || separator == key.length() - 1) {
+            throw new IllegalArgumentException(
+                    "Canonical command family scope key is required"
+            );
+        }
+        return commandFamily(new CommandFamilyKey(
+                OwnerId.parse(key.substring(0, separator)),
+                key.substring(separator + 1)
+        ));
+    }
+
+    /** Creates one exact persisted tool scope. */
+    public static OperationScope tool(@Nonnull String toolKey) {
+        if (toolKey == null || toolKey.isBlank()) {
+            throw new IllegalArgumentException("Tool scope key is required");
+        }
+        return new OperationScope(OperationScopeType.TOOL, toolKey);
+    }
+
     /** Creates one normalized coop slot scope. */
     public static OperationScope coop(@Nonnull String coopSlotKey) {
         if (coopSlotKey == null || coopSlotKey.isBlank()) {

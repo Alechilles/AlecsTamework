@@ -11,6 +11,18 @@ public interface IncidentStore {
     @Nonnull
     Optional<IncidentRecord> findIncident(@Nonnull IncidentId incidentId);
 
+    /** Resolves an exact incident ID or one unambiguous canonical UUID prefix. */
+    @Nonnull
+    Optional<IncidentRecord> findIncidentByIdOrUniquePrefix(
+            @Nonnull String incidentIdOrUniquePrefix
+    );
+
+    /** Returns every quarantine row attached to one incident in scope order. */
+    @Nonnull
+    List<ScopeQuarantine> findQuarantines(
+            @Nonnull IncidentId incidentId
+    );
+
     @Nonnull
     PersistenceMutationResult<IncidentRecord> createIncident(@Nonnull IncidentRecord incident);
 

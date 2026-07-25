@@ -43,7 +43,9 @@ final class PublicPersistencePaidRevivalFeature {
                                 .POPULATION_GROUP_INDEX,
                         PublicPersistenceFeatureRegistry
                                 .COMMAND_ROSTER_INDEX,
-                        PublicPersistenceFeatureRegistry.TIMED_SUMMON_INDEX
+                        PublicPersistenceFeatureRegistry.TIMED_SUMMON_INDEX,
+                        PublicPersistenceFeatureRegistry
+                                .PUBLIC_FEATURE_EVENT_OBSERVER
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(

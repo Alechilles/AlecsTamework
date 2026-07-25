@@ -27,6 +27,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
@@ -161,26 +162,34 @@ public final class SqliteCompanionDormantOperations {
                         after,
                         dormant.source().observedAtMs()
                 );
-        return List.of(
-                new ProjectionEventDraft(
-                        operation.operationId(),
-                        EVENT_TYPE,
-                        "dormant-result:" + dormant.profileId(),
-                        transitioned.revision().value(),
-                        CompanionDormantTransitionEventCodec.VERSION,
-                        CompanionDormantTransitionEventCodec.encode(outcome),
-                        dormant.source().observedAtMs()
-                ),
-                SqliteCompanionProfileProjectionComposer.event(
-                        operation.operationId(), change
-                ),
-                CompanionLifecycleProjectionChangeCodec.draft(
-                        operation.operationId(),
-                        current,
-                        transitioned,
-                        dormant.source().observedAtMs()
-                )
-        );
+        ArrayList<ProjectionEventDraft> events = new ArrayList<>(4);
+        events.add(new ProjectionEventDraft(
+                operation.operationId(),
+                EVENT_TYPE,
+                "dormant-result:" + dormant.profileId(),
+                transitioned.revision().value(),
+                CompanionDormantTransitionEventCodec.VERSION,
+                CompanionDormantTransitionEventCodec.encode(outcome),
+                dormant.source().observedAtMs()
+        ));
+        SqliteProvisionedCompanionLifecycleEvents.death(
+                transaction,
+                operation.operationId(),
+                current,
+                transitioned,
+                dormant.source().sourceAlias(),
+                dormant.source().observedAtMs()
+        ).ifPresent(events::add);
+        events.add(SqliteCompanionProfileProjectionComposer.event(
+                operation.operationId(), change
+        ));
+        events.add(CompanionLifecycleProjectionChangeCodec.draft(
+                operation.operationId(),
+                current,
+                transitioned,
+                dormant.source().observedAtMs()
+        ));
+        return List.copyOf(events);
     }
 
     private static CompanionLifecycle requireExactLive(

@@ -21,6 +21,8 @@ class TameworkPersistenceCompositionArchitectureTest {
     private static final Path TAMEWORK = MAIN.resolve("Tamework.java");
     private static final Path COMPOSITION =
             MAIN.resolve("TameworkPersistenceComposition.java");
+    private static final Path RESTORED_FEATURES =
+            MAIN.resolve("TameworkRestoredFeatureComposition.java");
     private static final Path COMMAND_ROOT =
             MAIN.resolve("commands/TameworkCommandRoot.java");
     private static final Path DEBUG_DB_COMMAND =
@@ -180,17 +182,58 @@ class TameworkPersistenceCompositionArchitectureTest {
 
     @Test
     void persistenceCompositionStaysWithinComplexityTarget() throws Exception {
+        assertWithinComplexityTarget(COMPOSITION);
+        assertWithinComplexityTarget(RESTORED_FEATURES);
+    }
+
+    @Test
+    void restoredFeaturesUseOneComposedLifecycleBoundary()
+            throws Exception {
+        String tamework = read(TAMEWORK);
+        String persistence = read(COMPOSITION);
+        String restored = read(RESTORED_FEATURES);
+
+        assertTrue(
+                tamework.contains("ReplacementTameworkApiFactory.compose("),
+                "Production must use readiness-gated feature composition"
+        );
+        assertFalse(
+                tamework.contains("instanceof TameworkApiImpl"),
+                "Plugin lifecycle must not inspect the API implementation"
+        );
+        assertTrue(
+                persistence.contains(
+                        "restoredFeatures.activateMutationReady();"
+                ),
+                "Codec-created runtimes must activate only after readiness"
+        );
+        assertTrue(
+                restored.contains("CapturedItemCoopRuntime.install(")
+                        && restored.contains(
+                        "CapturedItemCoopRuntime.uninstall("
+                ),
+                "Captured-item runtime install/uninstall must share one owner"
+        );
+        assertTrue(
+                restored.contains(
+                        "new ReplacementFeatureEvidenceAuthors("
+                ),
+                "Restored mutations must share one evidence-author bundle"
+        );
+    }
+
+    private static void assertWithinComplexityTarget(Path file)
+            throws Exception {
         long lines;
         try (Stream<String> source = Files.lines(
-                COMPOSITION,
+                file,
                 StandardCharsets.UTF_8
         )) {
             lines = source.count();
         }
-
         assertTrue(
                 lines <= 500,
-                () -> relative(COMPOSITION) + " has " + lines
+                () -> relative(file) + " has " + lines
                         + " lines; target is 500"
         );
     }

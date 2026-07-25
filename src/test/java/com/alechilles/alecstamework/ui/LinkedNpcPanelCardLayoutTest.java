@@ -28,6 +28,12 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path CARD_BINDER = Paths.get(
             "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelCardBinder.java"
     );
+    private static final Path PANEL_UI = Paths.get(
+            "src", "main", "resources", "Common", "UI", "Custom", "TameworkLinkedNpcPanel.ui"
+    );
+    private static final Path REVIVE_COST_LINE_UI = Paths.get(
+            "src", "main", "resources", "Common", "UI", "Custom", "TameworkReviveCostLine.ui"
+    );
     private static final Path PROGRESSION_BINDER = Paths.get(
             "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelProgressionBinder.java"
     );
@@ -95,11 +101,11 @@ class LinkedNpcPanelCardLayoutTest {
         );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
         assertTrue(
-                binder.contains("COMPACT_CARD_HEIGHT = 88"),
-                "Linked cards should retain the released compact height."
+                binder.contains("COMPACT_CARD_HEIGHT = 126"),
+                "Linked cards should reserve the timed-roster status lane."
         );
         assertFalse(binder.contains("showRosterDetails"),
-                "The unreleased roster detail row must not affect card layout.");
+                "Roster presentation should use the dedicated feature binder, not legacy flags.");
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
         int xpRingLeft = Integer.parseInt(xpRing.group(2));
@@ -169,8 +175,8 @@ class LinkedNpcPanelCardLayoutTest {
                         || binder.contains("bindReviveCosts"),
                 "The card binder must not project paid revival quote state.");
         assertTrue(
-                binder.contains("!showReviveAction") && binder.contains("!entry.dead() && !entry.lost()"),
-                "The heartbeat action should replace the inactive badge and locate action instead of overlapping them."
+                binder.contains("!showRespawn") && binder.contains("!entry.dead() && !entry.lost()"),
+                "The visible heartbeat action should replace the inactive badge and locate action instead of overlapping them."
         );
         assertFalse(
                 binder.contains("respawnSelector + \".Enabled\""),
@@ -180,6 +186,66 @@ class LinkedNpcPanelCardLayoutTest {
                 binder.contains("respawnSelector + \".Visible\", showRespawn"),
                 "A ready free-respawn action should be shown without an unsupported Enabled binding."
         );
+    }
+
+    @Test
+    void rosterRowsExposeStatusCapacityAndTimedActions() throws IOException {
+        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
+        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+        String featureBinder = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles",
+                "alecstamework", "ui", "LinkedNpcPanelFeatureBinder.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(cardUi.contains("Label #RosterState"));
+        assertTrue(cardUi.contains("Label #RosterTimer"));
+        assertTrue(cardUi.contains("Label #RosterCapacity"));
+        assertTrue(cardUi.contains("TextButton #RosterSummonButton"));
+        assertTrue(cardUi.contains("TextButton #RosterDismissButton"));
+        assertTrue(binder.contains("LinkedNpcPanelFeatureBinder.bind("));
+        assertTrue(featureBinder.contains("roster.summonEnabled()"));
+        assertTrue(featureBinder.contains("roster.dismissEnabled()"));
+        assertFalse(
+                featureBinder.contains("+ \".Enabled\""),
+                "TextButton state should be enforced by event binding because runtime Enabled writes disconnect CustomUI."
+        );
+    }
+
+    @Test
+    void paidRevivalOverlayRendersEveryQuotedCostBeforeConfirmation()
+            throws IOException {
+        String panelUi = Files.readString(
+                PANEL_UI, StandardCharsets.UTF_8
+        );
+        String costLineUi = Files.readString(
+                REVIVE_COST_LINE_UI, StandardCharsets.UTF_8
+        );
+        String overlay = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles",
+                "alecstamework", "ui",
+                "LinkedNpcPanelReviveOverlayState.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(panelUi.contains(
+                "Group #TameworkLinkedPanelReviveOverlay"
+        ));
+        assertTrue(panelUi.contains(
+                "Group #TameworkLinkedPanelReviveCostList"
+        ));
+        assertTrue(panelUi.contains(
+                "#TameworkLinkedPanelReviveConfirmButton"
+        ));
+        assertTrue(panelUi.contains(
+                "#TameworkLinkedPanelReviveBlockedButton"
+        ));
+        assertTrue(costLineUi.contains("ItemGrid #CostItem"));
+        assertTrue(costLineUi.contains("Label #CostSatisfied"));
+        assertTrue(costLineUi.contains("Label #CostInsufficient"));
+        assertTrue(overlay.contains(
+                "for (int index = 0; index < costs.size(); index++)"
+        ));
+        assertTrue(overlay.contains("COST_LINE_UI_PATH"));
+        assertTrue(overlay.contains("presentation.confirmEnabled()"));
     }
 
     @Test

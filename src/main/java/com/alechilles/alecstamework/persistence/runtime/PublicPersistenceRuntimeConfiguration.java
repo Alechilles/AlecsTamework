@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicApiEventSink;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashSet;
@@ -18,6 +20,7 @@ public record PublicPersistenceRuntimeConfiguration(
         @Nonnull LongSupplier clock,
         @Nonnull RefundDeliveryBoundary refunds,
         @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
+        @Nonnull ReplacementPublicApiEventSink publicEventSink,
         @Nonnull PublicPersistenceLiveBoundaries liveBoundaries,
         @Nonnull PublicPersistenceWorldReconciliationFactory worldReconciliationFactory,
         @Nonnull Duration shutdownTimeout
@@ -28,6 +31,7 @@ public record PublicPersistenceRuntimeConfiguration(
                 .anyMatch(path -> path == null)
                 || workerId == null || workerId.isBlank()
                 || clock == null || refunds == null || profileListener == null
+                || publicEventSink == null
                 || liveBoundaries == null || worldReconciliationFactory == null
                 || shutdownTimeout == null || shutdownTimeout.isNegative()
                 || shutdownTimeout.isZero()) {
@@ -42,6 +46,35 @@ public record PublicPersistenceRuntimeConfiguration(
                 normalizedSources.add(path.toAbsolutePath().normalize()));
         persistenceSourceDirectories = List.copyOf(normalizedSources);
         workerId = workerId.trim();
+    }
+
+    /**
+     * Compatibility constructor with no checkpointed public event destination.
+     */
+    public PublicPersistenceRuntimeConfiguration(
+            Path dataDirectory,
+            List<Path> persistenceSourceDirectories,
+            String workerId,
+            LongSupplier clock,
+            RefundDeliveryBoundary refunds,
+            Consumer<NpcProfileChangedEvent> profileListener,
+            PublicPersistenceLiveBoundaries liveBoundaries,
+            PublicPersistenceWorldReconciliationFactory
+                    worldReconciliationFactory,
+            Duration shutdownTimeout
+    ) {
+        this(
+                dataDirectory,
+                persistenceSourceDirectories,
+                workerId,
+                clock,
+                refunds,
+                profileListener,
+                ReplacementPublicApiEventSink.NO_OP,
+                liveBoundaries,
+                worldReconciliationFactory,
+                shutdownTimeout
+        );
     }
 
     /**
@@ -66,6 +99,7 @@ public record PublicPersistenceRuntimeConfiguration(
                 clock,
                 refunds,
                 profileListener,
+                ReplacementPublicApiEventSink.NO_OP,
                 liveBoundaries,
                 worldReconciliationFactory,
                 shutdownTimeout
@@ -93,6 +127,7 @@ public record PublicPersistenceRuntimeConfiguration(
                 clock,
                 refunds,
                 profileListener,
+                ReplacementPublicApiEventSink.NO_OP,
                 liveBoundaries,
                 PublicPersistenceWorldReconciliationFactory.fixed(
                         worldReconciliation
@@ -123,6 +158,7 @@ public record PublicPersistenceRuntimeConfiguration(
                 clock,
                 refunds,
                 profileListener,
+                ReplacementPublicApiEventSink.NO_OP,
                 liveBoundaries,
                 PublicPersistenceWorldReconciliationFactory.fixed(
                         worldReconciliation

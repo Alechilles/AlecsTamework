@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeEvidence;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
@@ -219,7 +220,17 @@ public final class SqliteTimedSummonTransitionOperations {
                 ),
                 TimedSummonLeaseChangeCodec.draft(
                         operation.operationId(),
-                        leaseChange,
+                        SqliteCommandSemanticEventEvidence.timed(
+                                transaction,
+                                leaseChange,
+                                fenced,
+                                after,
+                                request.starting()
+                                        ? TimedSummonLeaseChangeEvidence
+                                        .Reason.SUMMON_STARTED
+                                        : TimedSummonLeaseChangeEvidence
+                                        .Reason.STORED
+                        ),
                         request.requestedAtMs()
                 )
         );

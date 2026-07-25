@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeCodec;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDraft;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipRequest;
@@ -78,15 +79,17 @@ public final class SqliteCommandRosterMembershipOperations {
                 ),
                 new ExactMembershipDetail(request),
                 (transaction, operation) -> List.of(event(
+                        transaction,
                         operation.operationId(),
                         apply(transaction, request),
+                        request.action(),
                         request.requestedAtMs()
                 )),
                 requiredConsumers
         );
     }
 
-    private CommandRosterMutationOutcome apply(
+    private AppliedMembership apply(
             SqlitePersistenceTransactionContext transaction,
             CommandRosterMembershipRequest request
     ) {
@@ -121,7 +124,9 @@ public final class SqliteCommandRosterMembershipOperations {
                             + result.status().name().toLowerCase()
             );
         }
-        return result.value();
+        return new AppliedMembership(
+                result.value(), source.lifecycle()
+        );
     }
 
     private static MembershipSource requireSource(
@@ -163,7 +168,7 @@ public final class SqliteCommandRosterMembershipOperations {
                     "command_roster_source_mismatch"
             );
         }
-        return new MembershipSource(membership);
+        return new MembershipSource(membership, lifecycle);
     }
 
     private static boolean membershipMatches(
@@ -195,17 +200,37 @@ public final class SqliteCommandRosterMembershipOperations {
     }
 
     private ProjectionEventDraft event(
+            SqlitePersistenceTransactionContext transaction,
             OperationId operationId,
-            CommandRosterMutationOutcome outcome,
+            AppliedMembership applied,
+            CommandRosterMembershipRequest.Action action,
             long changedAtMs
     ) {
         return CommandRosterMembershipChangeCodec.draft(
-                operationId, outcome, changedAtMs
+                operationId,
+                SqliteCommandSemanticEventEvidence.roster(
+                        transaction,
+                        applied.mutation(),
+                        applied.lifecycle(),
+                        action == CommandRosterMembershipRequest.Action.REMOVE
+                                ? CommandRosterMembershipChangeEvidence
+                                .Reason.REMOVED
+                                : CommandRosterMembershipChangeEvidence
+                                .Reason.UPSERTED
+                ),
+                changedAtMs
         );
     }
 
     private record MembershipSource(
-            CommandRosterMembership membership
+            CommandRosterMembership membership,
+            CompanionLifecycle lifecycle
+    ) {
+    }
+
+    private record AppliedMembership(
+            CommandRosterMutationOutcome mutation,
+            CompanionLifecycle lifecycle
     ) {
     }
 
@@ -247,4 +272,3 @@ public final class SqliteCommandRosterMembershipOperations {
         }
     }
 }
-

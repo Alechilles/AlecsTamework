@@ -11,9 +11,12 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProject
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Restoration payload codec and exact-source validation contracts. */
@@ -44,6 +47,9 @@ class CompanionRestorationDefinitionTest {
                                     .encode(request)
                     )
             );
+            assertFalse(JsonParser.parseString(
+                    CompanionRestorationDefinition.INSTANCE.encode(request)
+            ).getAsJsonObject().has("targetState"));
             CompanionRestorationOutcome outcome =
                     new CompanionRestorationOutcome(
                             PROFILE,
@@ -62,6 +68,56 @@ class CompanionRestorationDefinitionTest {
                     )
             );
         }
+    }
+
+    @Test
+    void provisionedDormantRevivalRoundTripsWithoutLiveTargetFacts() {
+        CompanionRestorationRequest request =
+                CompanionRestorationRequest.reviveProvisionedDormant(
+                        PROFILE,
+                        REVISION,
+                        snapshot(
+                                LifecycleState.DEAD_REVIVABLE,
+                                REVISION
+                        ),
+                        -500
+                );
+
+        String encoded =
+                CompanionRestorationDefinition.INSTANCE.encode(request);
+        assertEquals(
+                request,
+                CompanionRestorationDefinition.INSTANCE.decode(encoded)
+        );
+        assertFalse(request.restoresLive());
+        assertEquals(
+                LifecycleState.PROVISIONED_DORMANT,
+                request.targetState()
+        );
+        assertNull(request.projection());
+        assertNull(request.targetAlias());
+        assertNull(request.placement());
+        assertNull(request.spawnReceiptKey());
+        assertNull(request.targetWorldKey());
+
+        CompanionRestorationOutcome outcome =
+                new CompanionRestorationOutcome(
+                        PROFILE,
+                        request.sourceSnapshot().snapshotId(),
+                        LifecycleState.PROVISIONED_DORMANT,
+                        null,
+                        null,
+                        REVISION.next(),
+                        null,
+                        -400
+                );
+        assertEquals(
+                outcome,
+                CompanionRestorationEventCodec.decode(
+                        CompanionRestorationEventCodec.VERSION,
+                        CompanionRestorationEventCodec.encode(outcome)
+                )
+        );
     }
 
     @Test
@@ -162,6 +218,43 @@ class CompanionRestorationDefinitionTest {
                         TARGET,
                         valid.fullState()
                 ))
+        );
+    }
+
+    @Test
+    void provisionedDormantRevivalRejectsLostOrLiveTargetEvidence() {
+        CompanionSnapshot death = snapshot(
+                LifecycleState.DEAD_REVIVABLE, REVISION
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        REVISION,
+                        LifecycleState.LOST,
+                        snapshot(LifecycleState.LOST, REVISION),
+                        LifecycleState.PROVISIONED_DORMANT,
+                        null,
+                        null,
+                        null,
+                        null,
+                        -500
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CompanionRestorationRequest(
+                        PROFILE,
+                        REVISION,
+                        LifecycleState.DEAD_REVIVABLE,
+                        death,
+                        LifecycleState.PROVISIONED_DORMANT,
+                        projection(death),
+                        TARGET,
+                        placement(),
+                        "spawn-receipt",
+                        -500
+                )
         );
     }
 

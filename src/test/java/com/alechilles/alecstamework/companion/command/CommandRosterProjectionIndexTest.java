@@ -57,12 +57,18 @@ class CommandRosterProjectionIndexTest {
                 1,
                 CommandRosterMembershipChangeCodec.draft(
                         OPERATION,
-                        new CommandRosterMutationOutcome(
-                                FAMILY,
-                                4,
-                                5,
-                                membership(2, false),
-                                updated
+                        CommandRosterMembershipChangeEvidence.from(
+                                new CommandRosterMutationOutcome(
+                                        FAMILY,
+                                        4,
+                                        5,
+                                        membership(2, false),
+                                        updated
+                                ),
+                                identity(),
+                                active(3),
+                                CommandRosterMembershipChangeEvidence
+                                        .Reason.UPSERTED
                         ),
                         -90
                 )

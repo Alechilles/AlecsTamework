@@ -12,6 +12,9 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
@@ -26,6 +29,8 @@ import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.nio.file.Files;
@@ -39,8 +44,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Forked JVM that halts at restoration's durable commit boundaries. */
 final class RestorationProcessCrashChild {
     static final int HALT_EXIT_CODE = 90;
+    static final ProvisioningOrigin PROVISIONING =
+            new ProvisioningOrigin("hydragon", "crash-companion");
     static final ProfileId PROFILE =
-            ProfileId.parse("10000000-0000-0000-0000-000000000001");
+            PROVISIONING.profileId();
     static final NpcAlias SOURCE_ALIAS =
             NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     static final NpcAlias TARGET_ALIAS =
@@ -60,12 +67,14 @@ final class RestorationProcessCrashChild {
         Path database = Path.of(args[1]).toAbsolutePath().normalize();
         Path haltMarker = Path.of(args[2]).toAbsolutePath().normalize();
         Path spawnReceipt = Path.of(args[3]).toAbsolutePath().normalize();
+        boolean dormant = args.length > 4
+                && "DORMANT".equals(args[4]);
         Files.createDirectories(database.getParent());
 
         SqliteConnectionFactory connections =
                 new SqliteConnectionFactory(database);
         new SqliteSchemaV1Manager(connections, () -> -10_000).initialize();
-        seed(connections);
+        seed(connections, dormant);
         AtomicInteger commits = new AtomicInteger();
         SqliteSingleWriter writer = new SqliteSingleWriter(
                 connections,
@@ -93,7 +102,7 @@ final class RestorationProcessCrashChild {
         operations(writer, reads).submit(
                 OPERATION,
                 new IdempotencyKey("restoration-process-crash"),
-                request(),
+                dormant ? dormantRequest() : request(),
                 (restoration, operation) -> {
                     Files.writeString(spawnReceipt, "spawn");
                     return LiveOperationResult.confirmed(
@@ -151,6 +160,15 @@ final class RestorationProcessCrashChild {
         );
     }
 
+    static CompanionRestorationRequest dormantRequest() {
+        return CompanionRestorationRequest.reviveProvisionedDormant(
+                PROFILE,
+                new LifecycleRevision(1),
+                snapshot(true),
+                -600
+        );
+    }
+
     private static RestorationProjection projection() {
         String payload = "{\"state\":\"frozen\"}";
         return new RestorationProjection(
@@ -164,7 +182,10 @@ final class RestorationProcessCrashChild {
         );
     }
 
-    private static void seed(SqliteConnectionFactory connections)
+    private static void seed(
+            SqliteConnectionFactory connections,
+            boolean provisioned
+    )
             throws Exception {
         try (Connection connection = connections.openWriterConnection()) {
             connection.setAutoCommit(false);
@@ -223,6 +244,32 @@ final class RestorationProcessCrashChild {
                             null
                     )
             ));
+            if (provisioned) {
+                OperationId creation = OperationId.parse(
+                        "60000000-0000-0000-0000-000000000090"
+                );
+                transaction.operations().prepare(new PreparedOperation(
+                        creation,
+                        PROVISIONING.operationKey(),
+                        CompanionProvisioningDefinition.KIND,
+                        1,
+                        "{}",
+                        SqliteCompanionProvisioningOperations.FEATURE_SCOPE,
+                        null,
+                        List.of(OperationScope.profile(PROFILE)),
+                        -9_000
+                ));
+                transaction.provisioning().create(
+                        new ProvisioningRecord(
+                                PROFILE,
+                                PROVISIONING,
+                                null,
+                                1,
+                                creation,
+                                -9_000
+                        )
+                );
+            }
             connection.commit();
         }
     }

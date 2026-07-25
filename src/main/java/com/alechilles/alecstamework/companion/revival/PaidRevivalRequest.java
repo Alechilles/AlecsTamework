@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupTr
 import com.alechilles.alecstamework.companion.restoration.RestorationProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -205,7 +206,8 @@ public record PaidRevivalRequest(
     ) {
         CompanionLifecycle before = admission.before();
         CompanionLifecycle after = admission.after();
-        if (before.state() != LifecycleState.DEAD_REVIVABLE
+        SnapshotKind sourceKind = sourceKind(before.state());
+        if (sourceKind == null
                 || !before.location().equals(LifecycleLocation.none())
                 || before.ownerId() == null
                 || !familyKey.ownerId().equals(before.ownerId())
@@ -219,9 +221,7 @@ public record PaidRevivalRequest(
                 || requestedAtMs != after.stateChangedAtMs()
                 || !snapshot.profileId().equals(before.profileId())
                 || !snapshot.current()
-                || !snapshot.kind().equals(
-                DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind()
-        )
+                || !snapshot.kind().equals(sourceKind)
                 || snapshot.sourceLifecycleRevision()
                 .compareTo(before.revision()) > 0
                 || !CompanionFullStateProjection.KIND.equals(
@@ -234,6 +234,16 @@ public record PaidRevivalRequest(
                     "Paid revival source and target are inconsistent"
             );
         }
+    }
+
+    @Nullable
+    private static SnapshotKind sourceKind(LifecycleState state) {
+        if (state == LifecycleState.DEAD_REVIVABLE) {
+            return DormantSourceEvidence.Kind.DEATH_COMPONENT.snapshotKind();
+        }
+        return state == LifecycleState.LOST
+                ? DormantSourceEvidence.Kind.DESTRUCTIVE_REMOVAL.snapshotKind()
+                : null;
     }
 
     private static void requireTimed(

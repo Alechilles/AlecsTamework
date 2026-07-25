@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int COMPACT_CARD_HEIGHT = 88;
+    private static final int COMPACT_CARD_HEIGHT = 126;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -35,6 +35,28 @@ final class LinkedNpcPanelCardBinder {
                      boolean pendingUnlink,
                      CardBindingConfig config,
                      String language) {
+        bind(
+                commandBuilder,
+                eventBuilder,
+                index,
+                entry,
+                appendCard,
+                pendingUnlink,
+                config,
+                language,
+                null
+        );
+    }
+
+    static void bind(UICommandBuilder commandBuilder,
+                     UIEventBuilder eventBuilder,
+                     int index,
+                     LinkedNpcEntry entry,
+                     boolean appendCard,
+                     boolean pendingUnlink,
+                     CardBindingConfig config,
+                     String language,
+                     CommandPanelFeaturePresentation feature) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
         String nameSelector = entrySelector + " #Name";
         String maleIconSelector = entrySelector + " #GenderMaleIcon";
@@ -73,7 +95,9 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
-        boolean showReviveAction = isLinked
+        boolean paidRevivalManaged = feature != null
+                && feature.managesPaidRevival();
+        boolean showReviveAction = !paidRevivalManaged && isLinked
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
@@ -112,8 +136,11 @@ final class LinkedNpcPanelCardBinder {
                 isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
                 isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
-        boolean showInactiveBadge = isLinked && !entry.active() && !showReviveAction
-                && !pendingUnlink;
+        boolean showRespawn = paidRevivalManaged
+                ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
+                : showReviveAction;
+        boolean showInactiveBadge = isLinked && !entry.active()
+                && !showRespawn && !pendingUnlink;
         boolean showRecallCountdown = isLinked
                 && entry.recallPending()
                 && !entry.loaded()
@@ -122,9 +149,10 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
-        boolean showRespawn = showReviveAction;
-
-        commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showReviveAction);
+        commandBuilder.set(
+                statusUnloadedSelector + ".Visible",
+                !entry.loaded() && !pendingUnlink && !showRespawn
+        );
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
         commandBuilder.set(
@@ -183,6 +211,15 @@ final class LinkedNpcPanelCardBinder {
                 showTalentPointAction
         );
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        LinkedNpcPanelFeatureBinder.bind(
+                commandBuilder,
+                eventBuilder,
+                entrySelector,
+                entry.npcUuid(),
+                feature,
+                config,
+                language
+        );
         commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
@@ -341,6 +378,8 @@ final class LinkedNpcPanelCardBinder {
                              String releaseCommandPrefix,
                              String cullCommandPrefix,
                              String respawnCommandPrefix,
+                             String summonCommandPrefix,
+                             String dismissCommandPrefix,
                              String locateCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,

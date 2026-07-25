@@ -1,5 +1,13 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
+import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
+import com.alechilles.alecstamework.api.CommandTimedSummoningRequest;
+import com.alechilles.alecstamework.api.CommandTimedSummoningResult;
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
+import com.alechilles.alecstamework.api.CommandTimedSummoningView;
+import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
+import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
 import com.alechilles.alecstamework.companion.command.CommandRosterActionView;
 import com.alechilles.alecstamework.companion.command.CommandRosterHome;
@@ -14,11 +22,18 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -132,6 +147,59 @@ class CommandRosterPanelRecordSourceTest {
         assertTrue(source.recordsFor(OWNER_UUID, FAMILY_ID).isEmpty());
     }
 
+    @Test
+    void featurePresentationObservesUnavailableToReadyApiTransition()
+            throws Exception {
+        ProfileId profileId = profile(6);
+        CommandRosterPanelRecordSource roster =
+                new CommandRosterPanelRecordSource(() -> Map.of(
+                        profileId,
+                        action(
+                                profileId,
+                                OWNER_UUID,
+                                FAMILY_ID,
+                                null,
+                                true,
+                                null,
+                                LifecycleState.ROSTER_STORED
+                        )
+                ));
+        AtomicReference<CommandTimedSummoningApi> timed =
+                new AtomicReference<>(
+                        CommandTimedSummoningApi.unavailable()
+                );
+        CommandPanelFeaturePresentationSource presentations =
+                new CommandPanelFeaturePresentationSource(
+                        roster,
+                        timed::get,
+                        PaidCommandRevivalApi::unavailable,
+                        PopulationGroupApi::unavailable,
+                        () -> 1_000L
+                );
+        TwCommandItemConfig config = ownerFamilyConfig(FAMILY_ID);
+
+        CommandPanelFeaturePresentation unavailable =
+                presentations.snapshot(OWNER_UUID, "world-a", config)
+                        .values().iterator().next();
+        assertEquals(
+                CommandTimedSummoningState.ROSTER_STORED,
+                unavailable.roster().state()
+        );
+
+        timed.set(readyTimedApi(profileId));
+        CommandPanelFeaturePresentation ready =
+                presentations.snapshot(OWNER_UUID, "world-a", config)
+                        .values().iterator().next();
+        assertEquals(
+                CommandTimedSummoningState.ACTIVE,
+                ready.roster().state()
+        );
+        assertEquals(2L, ready.roster().revision());
+        assertEquals(
+                Long.valueOf(5_000L), ready.roster().remainingMs()
+        );
+    }
+
     private static CommandRosterActionView action(
             ProfileId profileId,
             UUID ownerUuid,
@@ -218,5 +286,79 @@ class CommandRosterPanelRecordSourceTest {
                 "20000000-0000-0000-0000-"
                         + String.format("%012d", suffix)
         ));
+    }
+
+    private static CommandTimedSummoningApi readyTimedApi(
+            ProfileId profileId
+    ) {
+        return new CommandTimedSummoningApi() {
+            @Override
+            public Optional<CommandTimedSummoningView> get(
+                    CommandTimedSummoningRequest identity
+            ) {
+                return Optional.of(new CommandTimedSummoningView(
+                        OWNER_UUID,
+                        FAMILY_ID,
+                        profileId.toString(),
+                        2L,
+                        CommandTimedSummoningState.ACTIVE,
+                        "session-1",
+                        5_000L,
+                        false,
+                        0L,
+                        1_000L
+                ));
+            }
+
+            @Override
+            public CompletionStage<CommandTimedSummoningResult> summon(
+                    CommandTimedSummoningRequest request
+            ) {
+                return CommandTimedSummoningApi.unavailable()
+                        .summon(request);
+            }
+
+            @Override
+            public CompletionStage<CommandTimedSummoningResult> dismiss(
+                    CommandTimedSummoningRequest request
+            ) {
+                return CommandTimedSummoningApi.unavailable()
+                        .dismiss(request);
+            }
+
+            @Override
+            public AutoCloseable subscribe(
+                    Consumer<CommandTimedSummoningChangedEvent> listener
+            ) {
+                return () -> {
+                };
+            }
+        };
+    }
+
+    private static TwCommandItemConfig ownerFamilyConfig(
+            String familyId
+    ) throws Exception {
+        var constructor =
+                TwCommandItemConfig.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        TwCommandItemConfig config = constructor.newInstance();
+        setField(config, "commandFamilyId", familyId);
+        setField(
+                config,
+                "rosterStorage",
+                TwCommandItemConfig.RosterStorage.OwnerCommandFamily
+        );
+        return config;
+    }
+
+    private static void setField(
+            TwCommandItemConfig config,
+            String name,
+            Object value
+    ) throws Exception {
+        Field field = TwCommandItemConfig.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(config, value);
     }
 }

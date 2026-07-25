@@ -18,10 +18,18 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupPr
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicApiEventSink;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicSemanticEventProjection;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCatchUpResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
+import com.alechilles.alecstamework.persistence.projection
+        .ContextualProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
+import com.alechilles.alecstamework.persistence.projection
+        .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +43,8 @@ import javax.annotation.Nonnull;
 final class SqlitePublicProjectionSet {
     private final ProjectionCoordinator coordinator;
     private final CompanionProfileObserverProjection profileObserver;
+    private final ReplacementPublicSemanticEventProjection
+            publicEventObserver;
     private final CoopResidencyProjectionIndex coopIndex;
     private final OwnerPopulationProjectionIndex ownerPopulationIndex;
     private final PopulationGroupProjectionIndex populationGroupIndex;
@@ -51,10 +61,11 @@ final class SqlitePublicProjectionSet {
             @Nonnull PersistenceFeatureRegistry registry,
             @Nonnull SqlitePersistenceKernel kernel,
             @Nonnull LongSupplier clock,
-            @Nonnull Consumer<NpcProfileChangedEvent> profileListener
+            @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
+            @Nonnull ReplacementPublicApiEventSink publicEventSink
     ) {
         if (registry == null || kernel == null || clock == null
-                || profileListener == null) {
+                || profileListener == null || publicEventSink == null) {
             throw new IllegalArgumentException(
                     "Public projection dependencies are required"
             );
@@ -69,6 +80,10 @@ final class SqlitePublicProjectionSet {
         );
         this.profileObserver =
                 new CompanionProfileObserverProjection(profileListener);
+        this.publicEventObserver =
+                new ReplacementPublicSemanticEventProjection(
+                        publicEventSink, clock
+                );
         this.coopIndex = new CoopResidencyProjectionIndex();
         this.ownerPopulationIndex = new OwnerPopulationProjectionIndex();
         this.populationGroupIndex = new PopulationGroupProjectionIndex();
@@ -94,7 +109,8 @@ final class SqlitePublicProjectionSet {
                 timedSummonIndex,
                 provisioningIndex,
                 extensionIndex,
-                captureCooldownIndex
+                captureCooldownIndex,
+                publicEventObserver
         ));
     }
     @Nonnull
@@ -141,10 +157,25 @@ final class SqlitePublicProjectionSet {
     /** Resolves the exact required set from the operation owner's descriptor. */
     @Nonnull
     List<ProjectionConsumer> requiredFor(@Nonnull OperationKind operationKind) {
+        return requiredFor(
+                operationKind, ProjectionPublicationContext.LIVE_COMMIT
+        );
+    }
+
+    /** Resolves a stable consumer set bound to its publication origin. */
+    @Nonnull
+    List<ProjectionConsumer> requiredFor(
+            @Nonnull OperationKind operationKind,
+            @Nonnull ProjectionPublicationContext context
+    ) {
         if (operationKind == null) {
             throw new IllegalArgumentException("Operation kind is required");
         }
-        return consumers.requiredFor(operationKind);
+        List<ProjectionConsumer> required =
+                consumers.requiredFor(operationKind);
+        return context == ProjectionPublicationContext.LIVE_COMMIT
+                ? required
+                : ContextualProjectionConsumer.bind(required, context);
     }
 
     @Nonnull

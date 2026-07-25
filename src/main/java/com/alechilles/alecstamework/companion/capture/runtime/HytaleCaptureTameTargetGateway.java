@@ -27,7 +27,6 @@ import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
-import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -269,41 +268,10 @@ final class HytaleCaptureTameTargetGateway {
     private CaptureTameLiveStateHasher.State readState(
             ResolvedTarget target
     ) {
-        if (!target.completeTypes()) {
-            return null;
-        }
-        TameworkOwnerComponent owner = store.getComponent(
-                target.reference(), target.ownerType()
-        );
-        TameworkTamedComponent tamed = store.getComponent(
-                target.reference(), target.tamedType()
-        );
-        TameworkCommandLinksComponent links = store.getComponent(
-                target.reference(), target.linksType()
-        );
-        return new CaptureTameLiveStateHasher.State(
-                roleId(target.npc()),
-                owner != null,
-                ownerId(owner == null ? null : owner.getOwnerId()),
-                owner == null ? null : owner.getOwnerName(),
-                tamed != null,
-                tamed != null && tamed.isTamed(),
-                links != null,
-                ownerId(links == null ? null : links.getOwnerId()),
-                links == null || links.getToolIds() == null
-                        ? java.util.List.of()
-                        : Arrays.asList(links.getToolIds()),
-                links != null && links.hasHome(),
-                links != null && links.hasHome()
-                        ? links.getHomeX() : 0.0D,
-                links != null && links.hasHome()
-                        ? links.getHomeY() : 0.0D,
-                links != null && links.hasHome()
-                        ? links.getHomeZ() : 0.0D,
-                target.npc().getSpawnConfiguration(),
-                target.npc().getEnvironment(),
-                present(target.reference(), target.markerType()),
-                present(target.reference(), target.beaconType())
+        return HytaleCaptureTameLiveStateFreezer.freeze(
+                target.reference(),
+                store,
+                request.targetAlias()
         );
     }
 
@@ -423,11 +391,6 @@ final class HytaleCaptureTameTargetGateway {
             );
         }
         return roleId.trim();
-    }
-
-    @Nullable
-    private OwnerId ownerId(@Nullable java.util.UUID value) {
-        return value == null ? null : OwnerId.parse(value.toString());
     }
 
     private <T extends Component<EntityStore>> boolean present(

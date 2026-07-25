@@ -1,10 +1,16 @@
 package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.api.internal
+        .ReplacementFeatureApiDependencies;
 import com.alechilles.alecstamework.companion.capture.runtime
         .TameworkCaptureSourceReceiptsComponent;
 import com.alechilles.alecstamework.companion.coop.runtime
         .TameworkCoopCaptureReceiptsComponent;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.population
+        .PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
@@ -16,6 +22,8 @@ import com.alechilles.alecstamework.items.persistence
         .SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence
         .SpawnerCapturedArtifactReleaseAuthor;
+import com.alechilles.alecstamework.items.persistence
+        .SpawnerTameAndLinkEvidenceSource;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopAuthor;
 import com.alechilles.alecstamework.items.coop.DirectLiveCoopProjectionView;
 import com.alechilles.alecstamework.npc.components
@@ -84,6 +92,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final PositiveEvidenceDormantAuthor dormantAuthor;
     private final DirectLiveCoopAuthor directLiveCoopAuthor;
     private final DirectLiveCoopProjectionView directLiveCoopProjections;
+    private final TameworkRestoredFeatureComposition restoredFeatures;
 
     private TameworkPersistenceComposition(
             HytaleLogger logger,
@@ -97,7 +106,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             FreeCompanionRestorationAuthor restorationAuthor,
             PositiveEvidenceDormantAuthor dormantAuthor,
             DirectLiveCoopAuthor directLiveCoopAuthor,
-            DirectLiveCoopProjectionView directLiveCoopProjections
+            DirectLiveCoopProjectionView directLiveCoopProjections,
+            TameworkRestoredFeatureComposition restoredFeatures
     ) {
         this.logger = logger;
         this.identityBootstrap = identityBootstrap;
@@ -111,6 +121,9 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.dormantAuthor = dormantAuthor;
         this.directLiveCoopAuthor = directLiveCoopAuthor;
         this.directLiveCoopProjections = directLiveCoopProjections;
+        this.restoredFeatures = Objects.requireNonNull(
+                restoredFeatures, "restoredFeatures"
+        );
     }
 
     /**
@@ -121,7 +134,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     static TameworkPersistenceComposition create(
             @Nonnull Tamework plugin,
             @Nonnull TameworkComponentRegistrar.RegisteredComponents components,
-            @Nonnull TameworkEventBus events
+            @Nonnull TameworkEventBus events,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull PopulationGroupConfigRegistry populationGroups
     ) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(components, "components");
@@ -132,6 +148,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         plugin.getLogger()
                 );
         TameworkPersistenceComposition composition = open(
+                plugin,
                 plugin.getDataDirectory(),
                 plugin.getLogger(),
                 events,
@@ -140,7 +157,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 components.captureSourceReceipts(),
                 components.coopCaptureReceipts(),
                 components.persistenceRetirement(),
-                components.inventoryOperationReceipts()
+                components.inventoryOperationReceipts(),
+                itemFeatures,
+                commandItems,
+                populationGroups
         );
         AtomicBoolean startupWorldsLoaded = new AtomicBoolean();
         TameworkEventRegistrationSupport.registerGlobal(
@@ -176,6 +196,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
      */
     @Nonnull
     static TameworkPersistenceComposition open(
+            @Nonnull Tamework plugin,
             @Nonnull Path pluginDataDirectory,
             @Nonnull HytaleLogger logger,
             @Nonnull TameworkEventBus events,
@@ -196,8 +217,12 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull ComponentType<
                     EntityStore,
                     TameworkInventoryOperationReceiptsComponent
-                    > inventoryReceipts
+                    > inventoryReceipts,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CommandItemRegistry commandItems,
+            @Nonnull PopulationGroupConfigRegistry populationGroups
     ) {
+        Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
         Objects.requireNonNull(logger, "logger");
         Objects.requireNonNull(events, "events");
@@ -234,7 +259,23 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         identityIndex,
                         facades
                 );
-        return new TameworkPersistenceComposition(
+        TameworkRestoredFeatureComposition restoredFeatures;
+        try {
+            restoredFeatures = TameworkRestoredFeatureComposition.create(
+                        plugin,
+                        paths.targetDirectory(),
+                        bootstrap,
+                        facades,
+                        populationGroups,
+                        itemFeatures,
+                        commandItems
+                );
+        } catch (RuntimeException | Error failure) {
+            bootstrap.close();
+            throw failure;
+        }
+        TameworkPersistenceComposition composition =
+                new TameworkPersistenceComposition(
                 logger,
                 identityBootstrap,
                 bootstrap,
@@ -246,8 +287,13 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 authors.restorationAuthor(),
                 authors.dormantAuthor(),
                 authors.directLiveCoopAuthor(),
-                authors.directLiveCoopProjections()
+                authors.directLiveCoopProjections(),
+                restoredFeatures
         );
+        if (initial.complete()) {
+            restoredFeatures.activateMutationReady();
+        }
+        return composition;
     }
 
     private static PublicPersistenceRuntimeConfiguration configuration(
@@ -271,6 +317,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 System::currentTimeMillis,
                 new HytaleRefundDeliveryBoundary(),
                 events::publishProfileChanged,
+                events::publishPersistenceEvent,
                 HytalePersistenceLiveBoundariesFactory.create(
                         captureSourceReceipts,
                         coopReceipts,
@@ -338,6 +385,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             );
             return;
         }
+        restoredFeatures.activateMutationReady();
         logger.at(Level.INFO).log(
                 "Replacement persistence is mutation-ready."
         );
@@ -403,9 +451,20 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         return directLiveCoopProjections;
     }
 
+    @Nonnull
+    ReplacementFeatureApiDependencies featureApiDependencies() {
+        return restoredFeatures.apiDependencies();
+    }
+
+    @Nonnull
+    SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence() {
+        return restoredFeatures.tameAndLinkEvidence();
+    }
+
     /** Runs the bounded teardown protocol and returns its exact outcome. */
     @Nonnull
     PublicPersistenceShutdownReport shutdown() {
+        restoredFeatures.close();
         return bootstrap.shutdown(SHUTDOWN_TIMEOUT);
     }
 

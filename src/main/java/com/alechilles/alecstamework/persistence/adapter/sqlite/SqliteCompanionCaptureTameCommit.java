@@ -2,9 +2,11 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeCodec;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipChangeEvidence;
 import com.alechilles.alecstamework.companion.command.CommandRosterMutationOutcome;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeEvidence;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
@@ -87,6 +89,7 @@ final class SqliteCompanionCaptureTameCommit {
                         evidence.targetIdentity().profileId()
                 );
         return events(
+                transaction,
                 operation,
                 evidence,
                 fenced,
@@ -191,6 +194,7 @@ final class SqliteCompanionCaptureTameCommit {
     }
 
     private List<ProjectionEventDraft> events(
+            SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation,
             CaptureTameAndLinkEvidence evidence,
             CompanionLifecycle fenced,
@@ -229,10 +233,27 @@ final class SqliteCompanionCaptureTameCommit {
                 )
         ));
         events.add(CommandRosterMembershipChangeCodec.draft(
-                operation.operationId(), roster, committedAtMs
+                operation.operationId(),
+                SqliteCommandSemanticEventEvidence.roster(
+                        transaction,
+                        roster,
+                        evidence.finalLifecycle(),
+                        CommandRosterMembershipChangeEvidence.Reason
+                                .TAME_AND_LINKED
+                ),
+                committedAtMs
         ));
         events.add(TimedSummonLeaseChangeCodec.draft(
-                operation.operationId(), lease, committedAtMs
+                operation.operationId(),
+                SqliteCommandSemanticEventEvidence.timed(
+                        transaction,
+                        lease,
+                        null,
+                        evidence.finalLifecycle(),
+                        TimedSummonLeaseChangeEvidence.Reason
+                                .TAME_AND_LINKED
+                ),
+                committedAtMs
         ));
         return List.copyOf(events);
     }

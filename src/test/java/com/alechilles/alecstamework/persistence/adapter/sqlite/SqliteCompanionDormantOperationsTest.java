@@ -15,13 +15,20 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecycleEventCodec;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecyclePublishedEventMapper;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.nio.file.Path;
@@ -42,8 +49,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end shared death/lost snapshot and lifecycle transition tests. */
 class SqliteCompanionDormantOperationsTest {
+    private static final ProvisioningOrigin PROVISIONING =
+            new ProvisioningOrigin("hydragon", "soul-bond:owner");
     private static final ProfileId PROFILE =
-            ProfileId.parse("10000000-0000-0000-0000-000000000001");
+            PROVISIONING.profileId();
     private static final NpcAlias ALIAS =
             NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     private static final OwnerId OWNER =
@@ -168,6 +177,36 @@ class SqliteCompanionDormantOperationsTest {
         }
     }
 
+    @Test
+    void provisionedDeathPublishesSelfContainedSemanticEvent()
+            throws Exception {
+        seedProvisioning();
+        CompanionDormantTransitionRequest request =
+                request(DormantSourceEvidence.Kind.DEATH_COMPONENT, 3);
+
+        OperationWorkflowResult result = submit(5, request);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(4, result.events().size());
+        var semantic = result.events().stream()
+                .filter(event -> ProvisionedCompanionLifecycleEventCodec
+                        .DEATH_EVENT_TYPE.equals(event.eventType()))
+                .findFirst()
+                .orElseThrow();
+        var mapped =
+                ProvisionedCompanionLifecyclePublishedEventMapper.mapDeath(
+                        semantic, false, -390
+                );
+        assertEquals(PROVISIONING.callerNamespace(), mapped.callerNamespace());
+        assertEquals(PROVISIONING.callerKey(), mapped.provisioningKey());
+        assertEquals(PROFILE.toString(), mapped.profileId());
+        assertEquals(OWNER.value(), mapped.ownerUuid());
+        assertEquals(ALIAS.value(), mapped.lastNpcUuid());
+        assertEquals(0, mapped.oldProfileRevision());
+        assertEquals(1, mapped.newProfileRevision());
+        assertEquals(-500, mapped.diedAtMs());
+    }
+
     private OperationWorkflowResult submit(
             int number,
             CompanionDormantTransitionRequest request
@@ -280,6 +319,35 @@ class SqliteCompanionDormantOperationsTest {
                 statement.setLong(3, -10_000);
                 statement.executeUpdate();
             }
+            connection.commit();
+        }
+    }
+
+    private void seedProvisioning() throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            OperationId creation = operationId(90);
+            transaction.operations().prepare(new PreparedOperation(
+                    creation,
+                    PROVISIONING.operationKey(),
+                    CompanionProvisioningDefinition.KIND,
+                    1,
+                    "{}",
+                    SqliteCompanionProvisioningOperations.FEATURE_SCOPE,
+                    null,
+                    List.of(OperationScope.profile(PROFILE)),
+                    -9_000
+            ));
+            transaction.provisioning().create(new ProvisioningRecord(
+                    PROFILE,
+                    PROVISIONING,
+                    null,
+                    1,
+                    creation,
+                    -9_000
+            ));
             connection.commit();
         }
     }

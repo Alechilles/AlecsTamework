@@ -198,6 +198,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "releaseCapturedCompanion",
                         "releaseFromCoop",
                         "restore",
+                        "reviveCompanion",
                         "rotateAlias",
                         "transitionCommandRoster",
                         "transitionOwnerPopulation",
@@ -225,7 +226,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "coopCaptures",
                         "coopReleases",
                         "timedSummons",
-                        "provisioningActivations"
+                        "provisioningActivations",
+                        "paidRevivals"
                 ),
                 boundaries
         );
@@ -264,7 +266,7 @@ class ReplacementPersistenceArchitectureGuardTest {
     }
 
     @Test
-    void publicDiagnosticsRetainsOnlyTheReleasedSnapshotContract()
+    void publicDiagnosticsDeclaresOnlySupportedReplacementContracts()
             throws Exception {
         List<String> methods = Stream.of(
                         com.alechilles.alecstamework.api.DiagnosticsApi.class
@@ -274,7 +276,16 @@ class ReplacementPersistenceArchitectureGuardTest {
                 .map(Method::getName)
                 .sorted()
                 .toList();
-        assertEquals(List.of("getPersistenceDiagnostics"), methods);
+        assertEquals(
+                List.of(
+                        "findPersistenceIncident",
+                        "getPersistenceDiagnostics",
+                        "getPersistenceResilience",
+                        "getPopulationDiagnostics",
+                        "queryPersistenceAvailability"
+                ),
+                methods
+        );
         assertTrue(
                 javaFiles(MAIN.resolve("persistence/health")).isEmpty(),
                 "The retired health package must contain no production code"
@@ -283,12 +294,15 @@ class ReplacementPersistenceArchitectureGuardTest {
         String adapter = Files.readString(MAIN.resolve(
                 "persistence/facade/ReplacementPersistenceDiagnosticsApi.java"
         ));
-        for (String removedAuthority : List.of(
+        for (String replacementAuthority : List.of(
                 "queryPersistenceAvailability",
                 "getPersistenceResilience",
                 "findPersistenceIncident"
         )) {
-            assertFalse(adapter.contains(removedAuthority), removedAuthority);
+            assertTrue(
+                    adapter.contains(replacementAuthority),
+                    replacementAuthority
+            );
         }
     }
 
@@ -320,6 +334,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findCoopSlot",
                         "findExtension",
                         "findExtensions",
+                        "findFirstActiveQuarantine",
+                        "findIncidentEvidence",
                         "findOperation",
                         "findProfile",
                         "findProvisioning",
@@ -333,6 +349,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "projectedExtensions",
                         "projectedLaggingCommandRosterProfiles",
                         "projectedLaggingPopulationGroupProfiles",
+                        "projectedLaggingTimedSummonProfiles",
                         "projectedOwnerPopulationCount",
                         "projectedOwnerPopulationSnapshot",
                         "projectedPopulationGroupAssignments",

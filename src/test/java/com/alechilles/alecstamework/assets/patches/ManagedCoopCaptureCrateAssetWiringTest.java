@@ -111,9 +111,18 @@ final class ManagedCoopCaptureCrateAssetWiringTest {
                 "src/main/java/com/alechilles/alecstamework/"
                         + "interactions/TameworkSpawnInteraction.java"
         ));
+        String plugin = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/Tamework.java"
+        ));
 
         assertTrue(captureInteraction.contains(
                 "extends UseCaptureCrateInteraction"
+        ));
+        assertTrue(plugin.contains(
+                "TameworkManagedCoopCaptureCrateInteraction.TYPE_ID"
+        ));
+        assertTrue(plugin.contains(
+                "TameworkManagedCoopCaptureCrateInteraction.CODEC"
         ));
         assertTrue(captureInteraction.contains("intake.attempt("));
         assertTrue(service.contains(

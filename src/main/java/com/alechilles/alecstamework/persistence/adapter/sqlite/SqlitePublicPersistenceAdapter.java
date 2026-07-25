@@ -15,6 +15,10 @@ import com.alechilles.alecstamework.persistence.control.PersistenceOperationAdmi
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicApiEventSink;
+import com.alechilles.alecstamework.persistence.projection
+        .ProjectionPublicationContext;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -44,6 +48,7 @@ public final class SqlitePublicPersistenceAdapter {
     private final SqliteTimedSummonLeaseReader timedSummons;
     private final SqliteProvisioningReader provisioning;
     private final SqliteOperationReader operationReader;
+    private final SqliteContainmentReader containmentReader;
     private final LongSupplier clock;
     private final PersistenceFeatureRegistry registry;
 
@@ -55,8 +60,32 @@ public final class SqlitePublicPersistenceAdapter {
             @Nonnull RefundDeliveryBoundary refunds,
             @Nonnull Consumer<NpcProfileChangedEvent> profileListener
     ) {
+        this(
+                registry,
+                kernel,
+                admission,
+                clock,
+                refunds,
+                profileListener,
+                ReplacementPublicApiEventSink.NO_OP
+        );
+    }
+
+    /**
+     * Builds the adapter with the checkpointed semantic-event destination.
+     */
+    public SqlitePublicPersistenceAdapter(
+            @Nonnull PersistenceFeatureRegistry registry,
+            @Nonnull SqlitePersistenceKernel kernel,
+            @Nonnull PersistenceOperationAdmissionGate admission,
+            @Nonnull LongSupplier clock,
+            @Nonnull RefundDeliveryBoundary refunds,
+            @Nonnull Consumer<NpcProfileChangedEvent> profileListener,
+            @Nonnull ReplacementPublicApiEventSink publicEventSink
+    ) {
         if (registry == null || kernel == null || admission == null
-                || clock == null || refunds == null || profileListener == null) {
+                || clock == null || refunds == null || profileListener == null
+                || publicEventSink == null) {
             throw new IllegalArgumentException(
                     "Public persistence adapter dependencies are required"
             );
@@ -67,7 +96,8 @@ public final class SqlitePublicPersistenceAdapter {
                 registry,
                 kernel,
                 clock,
-                profileListener
+                profileListener,
+                publicEventSink
         );
         publicOperations = new SqlitePublicOperationSet(
                 registry,
@@ -75,7 +105,8 @@ public final class SqlitePublicPersistenceAdapter {
                 projections,
                 admission,
                 clock,
-                refunds
+                refunds,
+                ProjectionPublicationContext.LIVE_COMMIT
         );
         recoveryOperations = new SqlitePublicOperationSet(
                 registry,
@@ -83,7 +114,8 @@ public final class SqlitePublicPersistenceAdapter {
                 projections,
                 PersistenceOperationAdmissionGate.allowAll(),
                 clock,
-                refunds
+                refunds,
+                ProjectionPublicationContext.RECOVERY_CONVERGENCE
         );
         recovery = new SqliteOperationRecoveryCoordinator(
                 registry.operationDefinitions(),
@@ -106,6 +138,7 @@ public final class SqlitePublicPersistenceAdapter {
         timedSummons = new SqliteTimedSummonLeaseReader(kernel.reads());
         provisioning = new SqliteProvisioningReader(kernel.reads());
         operationReader = new SqliteOperationReader(kernel.reads());
+        containmentReader = new SqliteContainmentReader(kernel.reads());
     }
 
     @Nonnull
@@ -277,6 +310,12 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public SqliteOperationReader operationReader() {
         return operationReader;
+    }
+
+    /** Returns bounded incident and exact-scope quarantine diagnostics. */
+    @Nonnull
+    public SqliteContainmentReader containmentReader() {
+        return containmentReader;
     }
 
     @Nonnull

@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
+import com.alechilles.alecstamework.api.CommandTimedSummoningView;
 import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityView;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
@@ -30,6 +33,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -147,11 +151,42 @@ class ReplacementTameworkApiFactoryTest {
                                 .CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
                         TameworkApiCapability.CAPTURE_TAME_AND_LINK
                 )));
+                AtomicInteger timedEvents = new AtomicInteger();
+                api.commandTimedSummoning().subscribe(
+                        ignored -> timedEvents.incrementAndGet()
+                );
+                events.publishPersistenceEvent(
+                        new CommandTimedSummoningChangedEvent(
+                                null,
+                                timedView(),
+                                "stored",
+                                -55L,
+                                -50L
+                        )
+                );
+                assertEquals(1, timedEvents.get());
                 composition.onRuntimeSettingsChanged();
             }
         } finally {
             events.close();
         }
+    }
+
+    private CommandTimedSummoningView timedView() {
+        return new CommandTimedSummoningView(
+                UUID.fromString(
+                        "10000000-0000-0000-0000-000000000007"
+                ),
+                "test-family",
+                profileId().toString(),
+                1L,
+                CommandTimedSummoningState.ROSTER_STORED,
+                null,
+                null,
+                false,
+                0L,
+                -55L
+        );
     }
 
     private PublicPersistenceRuntimeConfiguration configuration(

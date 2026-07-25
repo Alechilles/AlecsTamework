@@ -50,16 +50,28 @@ public final class CompanionRestorationDefinition
                 "sourceSnapshot",
                 CompanionSnapshotJsonCodec.encode(payload.sourceSnapshot())
         );
-        json.add(
-                "projection",
-                RestorationProjectionJsonCodec.encode(payload.projection())
-        );
-        json.addProperty("targetAlias", payload.targetAlias().toString());
-        json.add(
-                "placement",
-                CompanionSpawnPlacementJsonCodec.encode(payload.placement())
-        );
-        json.addProperty("spawnReceiptKey", payload.spawnReceiptKey());
+        if (payload.restoresLive()) {
+            json.add(
+                    "projection",
+                    RestorationProjectionJsonCodec.encode(payload.projection())
+            );
+            json.addProperty(
+                    "targetAlias", payload.targetAlias().toString()
+            );
+            json.add(
+                    "placement",
+                    CompanionSpawnPlacementJsonCodec.encode(
+                            payload.placement()
+                    )
+            );
+            json.addProperty(
+                    "spawnReceiptKey", payload.spawnReceiptKey()
+            );
+        } else {
+            json.addProperty(
+                    "targetState", payload.targetState().name()
+            );
+        }
         json.addProperty("requestedAtMs", payload.requestedAtMs());
         return json.toString();
     }
@@ -67,6 +79,23 @@ public final class CompanionRestorationDefinition
     @Override
     public CompanionRestorationRequest decode(String payloadJson) {
         JsonObject json = JsonParser.parseString(payloadJson).getAsJsonObject();
+        LifecycleState targetState = json.has("targetState")
+                ? LifecycleState.valueOf(
+                json.get("targetState").getAsString()
+        )
+                : LifecycleState.ACTIVE;
+        if (targetState == LifecycleState.PROVISIONED_DORMANT) {
+            return CompanionRestorationRequest.reviveProvisionedDormant(
+                    ProfileId.parse(json.get("profileId").getAsString()),
+                    new LifecycleRevision(
+                            json.get("expectedLifecycleRevision").getAsLong()
+                    ),
+                    CompanionSnapshotJsonCodec.decode(
+                            json.getAsJsonObject("sourceSnapshot")
+                    ),
+                    json.get("requestedAtMs").getAsLong()
+            );
+        }
         return new CompanionRestorationRequest(
                 ProfileId.parse(json.get("profileId").getAsString()),
                 new LifecycleRevision(

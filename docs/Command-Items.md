@@ -140,6 +140,14 @@ Linked panel supports:
   companions; ordinary unloaded rows keep the latest custom display name from
   the live snapshot or durable profile, including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
+- Owner/command-family roster rows additionally show their authoritative
+  timed-summon state, remaining duration or cooldown, active population count
+  and limit, with `Summon` and `Dismiss` actions where valid.
+- Dead and Lost owner/command-family roster rows use the server-authoritative
+  paid revival quote. The confirmation lists every exact cost component and
+  owned/required quantity; the replacement paid-revival API performs the
+  mutation. Legacy item-metadata links retain their existing free restoration
+  behavior.
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying
 
@@ -197,9 +205,11 @@ Lost flow:
 - A delete-on-remove world can also provide terminal Lost evidence while the
   companion's complete live state is still available.
 - `Recall`/`Return Home` are blocked while `LOST`.
-- `Revive`/`Respawn` uses the canonical free restoration path and the exact
-  saved snapshot. A successful restoration rotates the live alias without
-  creating a second profile.
+- `Revive`/`Respawn` uses the canonical paid-revival path for an
+  owner/command-family roster row and the canonical free restoration path for
+  a legacy item-metadata link. Both use the exact saved snapshot, and a
+  successful restoration rotates the live alias without creating a second
+  profile.
 
 Configured-coop flow:
 
@@ -214,9 +224,9 @@ Dead companions:
 
 - Saved death is positive dormant evidence and its snapshot persists across
   relog/restart.
-- `Revive` uses the same canonical free restoration path as Lost restoration.
-  Enablement is controlled by `/tw settings`; placement tuning remains in
-  `TwCompanionConfig.Command`.
+- `Revive` uses the same roster-scoped paid or legacy free distinction as Lost
+  restoration. Enablement is controlled by `/tw settings`; placement and
+  exact revival-cost tuning remain in `TwCompanionConfig.Command`.
 
 ## Global tuning
 `TwGlobalConfig.Command` remains the shared relocation infrastructure location:

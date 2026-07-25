@@ -27,10 +27,12 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileProjection
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
+import com.alechilles.alecstamework.persistence.incidents.ScopeQuarantine;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -141,6 +143,12 @@ public final class PublicPersistenceQueries {
     public Map<ProfileId, TimedSummonProjectionView>
     projectedTimedSummons() {
         return adapter.timedSummonIndex().readySnapshot();
+    }
+
+    /** Profiles whose lease/roster/lifecycle join cannot prove absence or presence. */
+    @Nonnull
+    public Set<ProfileId> projectedLaggingTimedSummonProfiles() {
+        return adapter.timedSummonIndex().laggingProfiles();
     }
 
     @Nonnull
@@ -316,6 +324,29 @@ public final class PublicPersistenceQueries {
         return adapter.operationReader()
                 .findByIdempotency(kind, idempotencyKey)
                 .thenApply(this::operationEvidence);
+    }
+
+    /**
+     * Returns the first exact active quarantine in canonical scope order.
+     * Raw scope keys stay inside Tamework's internal API composition.
+     */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<ScopeQuarantine>>
+    findFirstActiveQuarantine(
+            @Nonnull List<OperationScope> candidateScopes
+    ) {
+        return adapter.containmentReader().findFirstActive(candidateScopes);
+    }
+
+    /** Returns bounded evidence for one exact or unambiguous incident ID. */
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<
+            PublicPersistenceIncidentEvidence>> findIncidentEvidence(
+            @Nonnull String incidentIdOrUniquePrefix
+    ) {
+        return adapter.containmentReader().findIncident(
+                incidentIdOrUniquePrefix
+        );
     }
 
     private PersistenceReadResult<PublicOperationEvidence>

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChange;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeCodec;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseChangeEvidence;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationRequest;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
@@ -90,9 +91,31 @@ public final class SqliteTimedSummonLeaseOperations {
         }
         return List.of(TimedSummonLeaseChangeCodec.draft(
                 operation.operationId(),
-                result.value(),
+                SqliteCommandSemanticEventEvidence.timed(
+                        transaction,
+                        result.value(),
+                        mutation.before() == null
+                                ? null
+                                : mutation.lifecycle(),
+                        mutation.lifecycle(),
+                        reason(mutation)
+                ),
                 mutation.requestedAtMs()
         ));
+    }
+
+    private static TimedSummonLeaseChangeEvidence.Reason reason(
+            TimedSummonLeaseMutationRequest mutation
+    ) {
+        if (mutation.before() == null) {
+            return TimedSummonLeaseChangeEvidence.Reason.REGISTERED;
+        }
+        if (!mutation.before().policy().equals(
+                mutation.after().policy()
+        )) {
+            return TimedSummonLeaseChangeEvidence.Reason.POLICY_REFRESHED;
+        }
+        return TimedSummonLeaseChangeEvidence.Reason.CHECKPOINTED;
     }
 
     private static void requireExact(
@@ -155,4 +178,3 @@ public final class SqliteTimedSummonLeaseOperations {
         }
     }
 }
-

@@ -27,7 +27,10 @@ class TameworkCommandSelectionPageNavigationTest {
     void talentsNavigationUsesDeferredPageSwapInsteadOfClosingFirst() throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
         int branchStart = content.indexOf("commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)");
-        int branchEnd = content.indexOf("if (!containsOption(commandId))", branchStart);
+        int branchEnd = content.indexOf(
+                "if (!CommandSelectionOptionSource.contains(options, commandId))",
+                branchStart
+        );
 
         assertTrue(branchStart >= 0, "Talent navigation branch should exist.");
         assertTrue(branchEnd > branchStart, "Talent navigation branch should be bounded by the fallback branch.");

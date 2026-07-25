@@ -11,4 +11,24 @@ public interface ProjectionConsumer {
 
     @Nonnull
     ProjectionApplyOutcome apply(@Nonnull ProjectionEvent event) throws Exception;
+
+    /**
+     * Applies an event with its explicit publication origin.
+     *
+     * <p>Existing state projections are context-independent and continue
+     * through the one-argument method. Semantic event bridges override this
+     * method when recovery is part of their public contract.</p>
+     */
+    @Nonnull
+    default ProjectionApplyOutcome apply(
+            @Nonnull ProjectionEvent event,
+            @Nonnull ProjectionPublicationContext context
+    ) throws Exception {
+        if (context == null) {
+            throw new IllegalArgumentException(
+                    "Projection publication context is required"
+            );
+        }
+        return apply(event);
+    }
 }

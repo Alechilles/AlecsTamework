@@ -398,6 +398,7 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
         assertEquals(
                 evidence.timedActivation().lease(),
                 TimedSummonLeaseChangeCodec.decode(
+                        lease.payloadVersion(),
                         lease.payloadJson()
                 ).after()
         );

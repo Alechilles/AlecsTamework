@@ -10,5 +10,8 @@ import javax.annotation.Nonnull;
  */
 @FunctionalInterface
 public interface ReplacementPublicApiEventSink {
+    ReplacementPublicApiEventSink NO_OP = ignored -> {
+    };
+
     void publish(@Nonnull TameworkEvent event);
 }

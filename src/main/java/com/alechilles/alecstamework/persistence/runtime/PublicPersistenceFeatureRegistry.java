@@ -24,6 +24,8 @@ import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegist
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicSemanticEventProjection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +60,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("extension_data");
     public static final ProjectionConsumerId PROFILE_OBSERVER =
             new ProjectionConsumerId("public_profile_observer");
+    public static final ProjectionConsumerId PUBLIC_FEATURE_EVENT_OBSERVER =
+            ReplacementPublicSemanticEventProjection.CONSUMER_ID;
     public static final ProjectionConsumerId COOP_INDEX =
             new ProjectionConsumerId("coop_residency_index");
     public static final ProjectionConsumerId OWNER_POPULATION_INDEX =
@@ -277,7 +281,8 @@ public final class PublicPersistenceFeatureRegistry {
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
                         COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        TIMED_SUMMON_INDEX,
+                        PUBLIC_FEATURE_EVENT_OBSERVER
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
@@ -322,7 +327,8 @@ public final class PublicPersistenceFeatureRegistry {
                         POPULATION_GROUP_INDEX,
                         COMMAND_ROSTER_INDEX,
                         TIMED_SUMMON_INDEX,
-                        CAPTURE_COOLDOWN_INDEX
+                        CAPTURE_COOLDOWN_INDEX,
+                        PUBLIC_FEATURE_EVENT_OBSERVER
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(
@@ -375,7 +381,8 @@ public final class PublicPersistenceFeatureRegistry {
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
                         COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        TIMED_SUMMON_INDEX,
+                        PUBLIC_FEATURE_EVENT_OBSERVER
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(

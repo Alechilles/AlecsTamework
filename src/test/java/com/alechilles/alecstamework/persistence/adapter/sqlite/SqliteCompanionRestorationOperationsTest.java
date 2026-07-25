@@ -1,6 +1,12 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.dormant.DormantSourceEvidence;
+import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
+import com.alechilles.alecstamework.companion.command.CommandRoster;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDraft;
+import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLease;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonPolicy;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -8,11 +14,20 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecycleEventCodec;
+import com.alechilles.alecstamework.companion.provisioning.ProvisionedCompanionLifecyclePublishedEventMapper;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningOrigin;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupMembership;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupScope;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationEventCodec;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
@@ -32,6 +47,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperation;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.nio.file.Path;
@@ -39,6 +55,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -56,8 +73,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** End-to-end alias lease, live receipt, durable restoration, and replay tests. */
 class SqliteCompanionRestorationOperationsTest {
+    private static final ProvisioningOrigin PROVISIONING =
+            new ProvisioningOrigin("hydragon", "soul-bond:owner");
     private static final ProfileId PROFILE =
-            ProfileId.parse("10000000-0000-0000-0000-000000000001");
+            PROVISIONING.profileId();
     private static final NpcAlias SOURCE_ALIAS =
             NpcAlias.parse("20000000-0000-0000-0000-000000000001");
     private static final NpcAlias TARGET_ALIAS =
@@ -334,6 +353,157 @@ class SqliteCompanionRestorationOperationsTest {
         assertEquals(LifecycleState.ACTIVE, lifecycle().state());
     }
 
+    @Test
+    void provisionedRevivalPublishesSelfContainedSemanticEvent()
+            throws Exception {
+        seedProvisioning();
+
+        OperationWorkflowResult result = submit(
+                6,
+                (restoration, operation) -> LiveOperationResult.confirmed(
+                        "spawn_receipt_confirmed"
+                ).completed()
+        );
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(4, result.events().size());
+        var semantic = result.events().stream()
+                .filter(event -> ProvisionedCompanionLifecycleEventCodec
+                        .REVIVED_EVENT_TYPE.equals(event.eventType()))
+                .findFirst()
+                .orElseThrow();
+        var mapped =
+                ProvisionedCompanionLifecyclePublishedEventMapper.mapRevival(
+                        semantic, true, -390
+                );
+        assertEquals(PROVISIONING.callerNamespace(), mapped.callerNamespace());
+        assertEquals(PROVISIONING.callerKey(), mapped.provisioningKey());
+        assertEquals(PROFILE.toString(), mapped.profileId());
+        assertEquals(OWNER.value(), mapped.ownerUuid());
+        assertEquals(TARGET_ALIAS.value(), mapped.newNpcUuid());
+        assertEquals(1, mapped.oldProfileRevision());
+        assertEquals(3, mapped.newProfileRevision());
+        assertTrue(mapped.recovered());
+        assertEquals(-400, mapped.revivedAtMs());
+    }
+
+    @Test
+    void provisionedDormantRevivalIsDatabaseOnlyAndPreservesAuthorities()
+            throws Exception {
+        seedProvisioning();
+        AuthorityState authorities = seedFeatureAuthorities();
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult first = restorations.submit(
+                operationId(7),
+                new IdempotencyKey("restoration-7"),
+                dormantRestorationRequest(),
+                (restoration, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "must_not_run"
+                    ).completed();
+                }
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        OperationWorkflowResult replay = restorations.submit(
+                operationId(7),
+                new IdempotencyKey("restoration-7"),
+                dormantRestorationRequest(),
+                (restoration, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "must_not_run"
+                    ).completed();
+                }
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED,
+                first.status(),
+                () -> String.valueOf(first.failure())
+        );
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(0, liveCalls.get());
+        CompanionLifecycle dormant = lifecycle();
+        assertEquals(LifecycleState.PROVISIONED_DORMANT, dormant.state());
+        assertEquals(new LifecycleRevision(2), dormant.revision());
+        assertEquals(
+                LifecycleLocation.keyed(
+                        LifecycleLocationKind.PROVISIONING,
+                        PROVISIONING.stableKey()
+                ),
+                dormant.location()
+        );
+        assertEquals(OWNER, dormant.ownerId());
+        assertNull(dormant.activeOperationId());
+        assertTrue(snapshot().current());
+        assertEquals(
+                CompanionAlias.State.RETIRED,
+                alias(SOURCE_ALIAS).state()
+        );
+        assertEquals(authorities, authorityState());
+
+        CompanionRestorationOutcome outcome =
+                CompanionRestorationEventCodec.decode(
+                        first.events().getFirst().payloadVersion(),
+                        first.events().getFirst().payloadJson()
+                );
+        assertEquals(
+                LifecycleState.PROVISIONED_DORMANT,
+                outcome.targetState()
+        );
+        assertNull(outcome.targetAlias());
+        var semantic = first.events().stream()
+                .filter(event -> ProvisionedCompanionLifecycleEventCodec
+                        .REVIVED_EVENT_TYPE.equals(event.eventType()))
+                .findFirst()
+                .orElseThrow();
+        var mapped =
+                ProvisionedCompanionLifecyclePublishedEventMapper.mapRevival(
+                        semantic, false, -390
+                );
+        assertNull(mapped.newNpcUuid());
+        assertEquals(
+                com.alechilles.alecstamework.api
+                        .PopulationCompanionLifecycle.PROVISIONED_DORMANT,
+                mapped.lifecycle()
+        );
+        assertEquals(
+                com.alechilles.alecstamework.api
+                        .CompanionProvisioningProjectionStatus.NOT_REQUESTED,
+                mapped.projectionStatus()
+        );
+        assertEquals(1, mapped.oldProfileRevision());
+        assertEquals(2, mapped.newProfileRevision());
+    }
+
+    @Test
+    void provisionedDormantRevivalRequiresExistingEntitlement()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+
+        OperationWorkflowResult result = restorations.submit(
+                operationId(8),
+                new IdempotencyKey("restoration-8"),
+                dormantRestorationRequest(),
+                (restoration, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "must_not_run"
+                    ).completed();
+                }
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PREPARE_FAILED,
+                result.status()
+        );
+        assertEquals(0, liveCalls.get());
+        assertEquals(LifecycleState.DEAD_REVIVABLE, lifecycle().state());
+        assertEquals(new LifecycleRevision(1), lifecycle().revision());
+        assertTrue(snapshot().current());
+    }
+
     private OperationWorkflowResult submit(
             int number,
             CompanionRestorationLiveBoundary boundary
@@ -363,6 +533,15 @@ class SqliteCompanionRestorationOperationsTest {
                         -0.25f, -1.5f, -0.5f
                 ),
                 "spawn-receipt",
+                -600
+        );
+    }
+
+    private CompanionRestorationRequest dormantRestorationRequest() {
+        return CompanionRestorationRequest.reviveProvisionedDormant(
+                PROFILE,
+                new LifecycleRevision(1),
+                sourceSnapshot(true),
                 -600
         );
     }
@@ -443,6 +622,126 @@ class SqliteCompanionRestorationOperationsTest {
         }
     }
 
+    private void seedProvisioning() throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            OperationId creation = operationId(90);
+            transaction.operations().prepare(new PreparedOperation(
+                    creation,
+                    PROVISIONING.operationKey(),
+                    CompanionProvisioningDefinition.KIND,
+                    1,
+                    "{}",
+                    SqliteCompanionProvisioningOperations.FEATURE_SCOPE,
+                    null,
+                    List.of(OperationScope.profile(PROFILE)),
+                    -9_000
+            ));
+            transaction.provisioning().create(new ProvisioningRecord(
+                    PROFILE,
+                    PROVISIONING,
+                    null,
+                    1,
+                    creation,
+                    -9_000
+            ));
+            connection.commit();
+        }
+    }
+
+    private AuthorityState seedFeatureAuthorities() throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            connection.setAutoCommit(false);
+            CommandFamilyKey family =
+                    new CommandFamilyKey(OWNER, "hydragon");
+            new SqliteCommandRosterStore(connection).upsert(
+                    0,
+                    null,
+                    new CommandRosterMembershipDraft(
+                            CommandRosterSlotId.parse(
+                                    "70000000-0000-0000-0000-000000000001"
+                            ),
+                            family,
+                            PROFILE,
+                            "bonded",
+                            true,
+                            null,
+                            -8_000
+                    )
+            );
+            new SqlitePopulationGroupAssignmentStore(connection).replace(
+                    null,
+                    new PopulationGroupAssignment(
+                            PROFILE,
+                            "role",
+                            List.of(new PopulationGroupMembership(
+                                    "bonded",
+                                    PopulationGroupScope.GLOBAL
+                            )),
+                            1,
+                            0,
+                            new LifecycleRevision(1),
+                            1,
+                            -8_000
+                    )
+            );
+            new SqliteTimedSummonLeaseStore(connection).replace(
+                    null,
+                    new TimedSummonLease(
+                            PROFILE,
+                            1,
+                            null,
+                            null,
+                            -7_000L,
+                            new TimedSummonPolicy(
+                                    "hydragon",
+                                    1L,
+                                    60_000,
+                                    10_000,
+                                    true,
+                                    List.of(30_000L)
+                            ),
+                            Set.of(),
+                            null,
+                            -8_000,
+                            -8_000
+                    )
+            );
+            connection.commit();
+        }
+        return authorityState();
+    }
+
+    private AuthorityState authorityState() throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            CommandRoster roster =
+                    new SqliteCommandRosterStore(connection)
+                            .findRoster(
+                                    new CommandFamilyKey(OWNER, "hydragon")
+                            )
+                            .orElseThrow();
+            PopulationGroupAssignment groups =
+                    transaction.populationGroups()
+                            .findAssignment(PROFILE)
+                            .orElseThrow();
+            TimedSummonLease timed =
+                    transaction.timedSummons()
+                            .find(PROFILE)
+                            .orElseThrow();
+            ProvisioningRecord provisioning =
+                    transaction.provisioning()
+                            .findByProfile(PROFILE)
+                            .orElseThrow();
+            return new AuthorityState(
+                    roster, groups, timed, provisioning
+            );
+        }
+    }
+
     private CompanionSnapshot sourceSnapshot(boolean current) {
         return new CompanionSnapshot(
                 SNAPSHOT_ID,
@@ -486,5 +785,13 @@ class SqliteCompanionRestorationOperationsTest {
                 "60000000-0000-0000-0000-%012d",
                 number
         ));
+    }
+
+    private record AuthorityState(
+            CommandRoster roster,
+            PopulationGroupAssignment groups,
+            TimedSummonLease timed,
+            ProvisioningRecord provisioning
+    ) {
     }
 }

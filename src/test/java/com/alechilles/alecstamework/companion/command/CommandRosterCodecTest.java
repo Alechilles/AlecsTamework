@@ -67,11 +67,20 @@ class CommandRosterCodecTest {
                         membership(2, false),
                         membership(3, true)
                 );
+        CommandRosterMembershipChangeEvidence evidence =
+                new CommandRosterMembershipChangeEvidence(
+                        outcome,
+                        "Mini",
+                        7,
+                        LifecycleState.ACTIVE,
+                        4,
+                        CommandRosterMembershipChangeEvidence.Reason.UPSERTED
+                );
         assertEquals(
-                outcome,
-                CommandRosterMembershipChangeCodec.decode(
+                evidence,
+                CommandRosterMembershipChangeCodec.decodeEvidence(
                         CommandRosterMembershipChangeCodec.VERSION,
-                        CommandRosterMembershipChangeCodec.encode(outcome)
+                        CommandRosterMembershipChangeCodec.encode(evidence)
                 )
         );
     }
@@ -205,4 +214,3 @@ class CommandRosterCodecTest {
         );
     }
 }
-

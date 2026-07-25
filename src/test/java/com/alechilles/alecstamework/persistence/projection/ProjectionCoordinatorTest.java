@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,42 @@ class ProjectionCoordinatorTest {
                         .get(10, TimeUnit.SECONDS);
         assertEquals(events.getLast().sequence(), startup.acknowledged());
         assertEquals(2L, consumer.revisions.get("profile-a"));
+    }
+
+    @Test
+    void publicationOriginIsExplicitForLiveCommitAndStartupRecovery()
+            throws Exception {
+        List<ProjectionEvent> events = appendOneEvent();
+        ContextConsumer consumer = new ContextConsumer();
+
+        coordinator.afterCommit(
+                consumer, events.getFirst().sequence(), 10
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(
+                List.of(ProjectionPublicationContext.LIVE_COMMIT),
+                consumer.contexts
+        );
+
+        rewindCheckpoint(consumer.consumerId());
+        coordinator.startupCatchUp(consumer, 10)
+                .toCompletableFuture().get(10, TimeUnit.SECONDS);
+        rewindCheckpoint(consumer.consumerId());
+        coordinator.afterCommit(
+                new ContextualProjectionConsumer(
+                        consumer,
+                        ProjectionPublicationContext.RECOVERY_CONVERGENCE
+                ),
+                events.getFirst().sequence(),
+                10
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertEquals(
+                List.of(
+                        ProjectionPublicationContext.LIVE_COMMIT,
+                        ProjectionPublicationContext.RECOVERY_CONVERGENCE,
+                        ProjectionPublicationContext.RECOVERY_CONVERGENCE
+                ),
+                consumer.contexts
+        );
     }
 
     @Test
@@ -299,6 +336,33 @@ class ProjectionCoordinatorTest {
                 return ProjectionApplyOutcome.ALREADY_APPLIED;
             }
             revisions.put(event.aggregateId(), event.aggregateRevision());
+            return ProjectionApplyOutcome.APPLIED;
+        }
+    }
+
+    private static final class ContextConsumer
+            implements ProjectionConsumer {
+        private final List<ProjectionPublicationContext> contexts =
+                new ArrayList<>();
+
+        @Override
+        public ProjectionConsumerId consumerId() {
+            return new ProjectionConsumerId("context_observer");
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(ProjectionEvent event) {
+            throw new AssertionError(
+                    "Context-aware delivery must use the explicit overload"
+            );
+        }
+
+        @Override
+        public ProjectionApplyOutcome apply(
+                ProjectionEvent event,
+                ProjectionPublicationContext context
+        ) {
+            contexts.add(context);
             return ProjectionApplyOutcome.APPLIED;
         }
     }

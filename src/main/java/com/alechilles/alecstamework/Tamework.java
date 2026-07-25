@@ -15,7 +15,6 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
@@ -92,6 +91,7 @@ import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchHomingVisualProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
+import com.alechilles.alecstamework.interactions.TameworkManagedCoopCaptureCrateInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
@@ -273,6 +273,7 @@ public class Tamework extends JavaPlugin {
     private TameworkPersistenceComposition persistenceComposition;
     private PersistenceBootstrap persistenceBootstrap;
     private TameworkApi api;
+    private ReplacementTameworkApiFactory.Composition apiComposition;
     private TameworkEventBus apiEventBus;
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
@@ -481,6 +482,11 @@ public class Tamework extends JavaPlugin {
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
+        Interaction.CODEC.register(
+                TameworkManagedCoopCaptureCrateInteraction.TYPE_ID,
+                TameworkManagedCoopCaptureCrateInteraction.class,
+                TameworkManagedCoopCaptureCrateInteraction.CODEC
+        );
         Interaction.CODEC.register(
                 "TameworkCaptureChannel",
                 TameworkCaptureChannelInteraction.class,
@@ -836,7 +842,12 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         apiEventBus = new TameworkEventBus(getLogger());
         persistenceComposition = TameworkPersistenceComposition.create(
-                this, components, apiEventBus
+                this,
+                components,
+                apiEventBus,
+                itemFeatureRegistry,
+                commandItemRegistry,
+                populationGroupConfigRegistry
         );
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
@@ -892,7 +903,7 @@ public class Tamework extends JavaPlugin {
                 )
         );
         SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
-        api = ReplacementTameworkApiFactory.create(
+        apiComposition = ReplacementTameworkApiFactory.compose(
                 persistenceBootstrap,
                 Duration.ofSeconds(5),
                 System::currentTimeMillis,
@@ -900,11 +911,13 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcStateSnapshotService,
                 interactionExtensionRegistry,
                 traitEffectRegistry,
-                damagePolicy
+                damagePolicy,
+                persistenceComposition.featureApiDependencies()
         );
-        if (api instanceof TameworkApiImpl implementation) {
-            implementation.activateCapturePolicyRuntime(itemFeatureRegistry, capturePolicyRegistry);
-        }
+        api = apiComposition.api();
+        apiComposition.activateCapturePolicyRuntime(
+                itemFeatureRegistry, capturePolicyRegistry
+        );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> api,
                 message -> getLogger().at(Level.INFO).log(message)
@@ -984,7 +997,8 @@ public class Tamework extends JavaPlugin {
                 persistenceComposition.captureAuthor(),
                 persistenceComposition.releaseAuthor(),
                 capturePolicyRegistry,
-                interactionExtensionRegistry
+                interactionExtensionRegistry,
+                persistenceComposition.tameAndLinkEvidence()
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -994,7 +1008,10 @@ public class Tamework extends JavaPlugin {
                 commandNpcRelocationService,
                 commandLinkedNpcStateSnapshotService,
                 persistenceComposition.facades(),
-                persistenceComposition.restorationAuthor()
+                persistenceComposition.restorationAuthor(),
+                api::commandTimedSummoning,
+                api::paidCommandRevival,
+                api::populationGroups
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
@@ -1256,12 +1273,11 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
-        if (api instanceof TameworkApiImpl implementation) {
-            implementation.close();
+        if (apiComposition != null) {
+            apiComposition.close();
+            apiComposition = null;
         }
         api = null;
-        if (commandLinkedNpcStateSnapshotService != null) {
-        }
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
@@ -1448,6 +1464,13 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    /** Refreshes runtime-backed API settings without exposing its implementation. */
+    public void onRuntimeSettingsChanged() {
+        if (apiComposition != null) {
+            apiComposition.onRuntimeSettingsChanged();
+        }
     }
 
     @Nullable

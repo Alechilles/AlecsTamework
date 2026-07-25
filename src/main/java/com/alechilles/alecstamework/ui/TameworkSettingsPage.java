@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -355,9 +354,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
-        if (plugin.getApi() instanceof TameworkApiImpl implementation) {
-            implementation.onRuntimeSettingsChanged();
-        }
+        plugin.onRuntimeSettingsChanged();
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
     }

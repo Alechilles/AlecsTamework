@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -13,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,15 @@ class RestorationProcessCrashTest {
         }
     }
 
+    @Test
+    void dormantProvisionedRestorationCrashesResumeWithoutLiveEffect()
+            throws Exception {
+        for (RestorationProcessCrashChild.Boundary boundary
+                : RestorationProcessCrashChild.Boundary.values()) {
+            verifyDormant(boundary);
+        }
+    }
+
     private void verify(RestorationProcessCrashChild.Boundary boundary)
             throws Exception {
         Path lane = tempDir.resolve(boundary.name().toLowerCase());
@@ -54,6 +66,33 @@ class RestorationProcessCrashTest {
                 new SqliteConnectionFactory(database);
         assertCrashEvidence(boundary, connections, output);
         resume(boundary, connections, spawnReceipt);
+    }
+
+    private void verifyDormant(
+            RestorationProcessCrashChild.Boundary boundary
+    ) throws Exception {
+        Path lane = tempDir.resolve(
+                "dormant-" + boundary.name().toLowerCase()
+        );
+        Path database = lane.resolve("tamework-state.sqlite");
+        Path haltMarker = lane.resolve("halt.txt");
+        Path spawnReceipt = lane.resolve("spawn-receipt.txt");
+        Files.createDirectories(lane);
+
+        String output = haltChildAt(
+                boundary,
+                database,
+                haltMarker,
+                spawnReceipt,
+                true
+        );
+
+        assertEquals(boundary.name(), Files.readString(haltMarker));
+        assertTrue(!Files.exists(spawnReceipt));
+        SqliteConnectionFactory connections =
+                new SqliteConnectionFactory(database);
+        assertDormantCrashEvidence(boundary, connections, output);
+        resumeDormant(connections, spawnReceipt);
     }
 
     private void assertCrashEvidence(
@@ -118,6 +157,80 @@ class RestorationProcessCrashTest {
         }
     }
 
+    private void assertDormantCrashEvidence(
+            RestorationProcessCrashChild.Boundary boundary,
+            SqliteConnectionFactory connections,
+            String output
+    ) throws Exception {
+        try (java.sql.Connection connection =
+                     connections.openReadConnection()) {
+            SqlitePersistenceTransactionContext transaction =
+                    new SqlitePersistenceTransactionContext(connection);
+            OperationEnvelope operation = transaction.operations()
+                    .find(RestorationProcessCrashChild.OPERATION)
+                    .orElseThrow();
+            CompanionLifecycle lifecycle = transaction.lifecycles()
+                    .findByProfile(RestorationProcessCrashChild.PROFILE)
+                    .orElseThrow();
+            boolean snapshotCurrent = transaction.snapshots()
+                    .findById(RestorationProcessCrashChild.SNAPSHOT)
+                    .orElseThrow()
+                    .current();
+
+            if (boundary == RestorationProcessCrashChild.Boundary
+                    .DURABLE_UNCOMMITTED) {
+                assertEquals(
+                        OperationPhase.LIVE_APPLYING,
+                        operation.phase(),
+                        output
+                );
+                assertEquals(
+                        LifecycleState.DEAD_REVIVABLE,
+                        lifecycle.state()
+                );
+                assertEquals(
+                        new LifecycleRevision(1),
+                        lifecycle.revision()
+                );
+                assertEquals(
+                        LifecycleLocation.none(),
+                        lifecycle.location()
+                );
+            } else {
+                assertEquals(
+                        OperationPhase.DURABLE,
+                        operation.phase(),
+                        output
+                );
+                assertEquals(
+                        LifecycleState.PROVISIONED_DORMANT,
+                        lifecycle.state()
+                );
+                assertEquals(
+                        new LifecycleRevision(2),
+                        lifecycle.revision()
+                );
+                assertEquals(
+                        LifecycleLocation.keyed(
+                                LifecycleLocationKind.PROVISIONING,
+                                RestorationProcessCrashChild.PROVISIONING
+                                        .stableKey()
+                        ),
+                        lifecycle.location()
+                );
+            }
+            assertNull(lifecycle.activeOperationId());
+            assertTrue(snapshotCurrent);
+            assertTrue(
+                    transaction.identities()
+                            .resolveAlias(
+                                    RestorationProcessCrashChild.TARGET_ALIAS
+                            )
+                            .isEmpty()
+            );
+        }
+    }
+
     private void resume(
             RestorationProcessCrashChild.Boundary boundary,
             SqliteConnectionFactory connections,
@@ -168,11 +281,68 @@ class RestorationProcessCrashTest {
         }
     }
 
+    private void resumeDormant(
+            SqliteConnectionFactory connections,
+            Path spawnReceipt
+    ) throws Exception {
+        SqliteSingleWriter writer = new SqliteSingleWriter(connections);
+        SqliteReadExecutor reads = new SqliteReadExecutor(connections);
+        AtomicInteger liveCalls = new AtomicInteger();
+        try {
+            OperationWorkflowResult result =
+                    RestorationProcessCrashChild.operations(writer, reads)
+                            .submit(
+                                    RestorationProcessCrashChild.OPERATION,
+                                    new IdempotencyKey(
+                                            "restoration-process-crash"
+                                    ),
+                                    RestorationProcessCrashChild
+                                            .dormantRequest(),
+                                    (restoration, operation) -> {
+                                        liveCalls.incrementAndGet();
+                                        Files.writeString(
+                                                spawnReceipt, "spawn"
+                                        );
+                                        return LiveOperationResult.confirmed(
+                                                "must_not_run"
+                                        ).completed();
+                                    }
+                            ).completion().toCompletableFuture()
+                            .get(20, TimeUnit.SECONDS);
+
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    result.status()
+            );
+            assertEquals(0, liveCalls.get());
+            assertTrue(!Files.exists(spawnReceipt));
+        } finally {
+            writer.shutdown(Duration.ofSeconds(5));
+            reads.shutdown(Duration.ofSeconds(5));
+        }
+    }
+
     private String haltChildAt(
             RestorationProcessCrashChild.Boundary boundary,
             Path database,
             Path haltMarker,
             Path spawnReceipt
+    ) throws Exception {
+        return haltChildAt(
+                boundary,
+                database,
+                haltMarker,
+                spawnReceipt,
+                false
+        );
+    }
+
+    private String haltChildAt(
+            RestorationProcessCrashChild.Boundary boundary,
+            Path database,
+            Path haltMarker,
+            Path spawnReceipt,
+            boolean dormant
     ) throws Exception {
         String classpath = System.getProperty("surefire.test.class.path");
         if (classpath == null || classpath.isBlank()) {
@@ -183,16 +353,23 @@ class RestorationProcessCrashTest {
         if (!Files.isRegularFile(java)) {
             java = javaHome.resolve("java");
         }
-        Process process = new ProcessBuilder(
-                java.toString(),
-                "-cp",
-                classpath,
-                RestorationProcessCrashChild.class.getName(),
-                boundary.name(),
-                database.toString(),
-                haltMarker.toString(),
-                spawnReceipt.toString()
-        ).redirectErrorStream(true).start();
+        java.util.ArrayList<String> command =
+                new java.util.ArrayList<>(List.of(
+                        java.toString(),
+                        "-cp",
+                        classpath,
+                        RestorationProcessCrashChild.class.getName(),
+                        boundary.name(),
+                        database.toString(),
+                        haltMarker.toString(),
+                        spawnReceipt.toString()
+                ));
+        if (dormant) {
+            command.add("DORMANT");
+        }
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
         if (!process.waitFor(30, TimeUnit.SECONDS)) {
             process.destroyForcibly();
             process.waitFor(5, TimeUnit.SECONDS);

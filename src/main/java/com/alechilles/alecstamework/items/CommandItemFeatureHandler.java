@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
+import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
+import com.alechilles.alecstamework.api.PopulationGroupApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -100,8 +103,7 @@ public final class CommandItemFeatureHandler {
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final CommandRelocationDispatchService relocationDispatchService;
-    @Nullable
-    private final CommandCompanionRestorationService restorationService;
+    private final CommandFreeRestorationActionService freeRestorationActions;
     private final CommandOwnerReleaseService ownerReleaseService;
     private final CommandOwnerCullService ownerCullService;
     private final CommandMenuMoveService menuMoveService;
@@ -126,6 +128,50 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                      @Nullable PersistenceDomainFacades persistence,
                                      @Nullable FreeCompanionRestorationAuthor restorationAuthor) {
+        this(
+                registry,
+                relocationService,
+                stateSnapshotService,
+                persistence,
+                restorationAuthor,
+                (CommandTimedSummoningApi) null,
+                (PaidCommandRevivalApi) null,
+                (PopulationGroupApi) null
+        );
+    }
+
+    public CommandItemFeatureHandler(
+            CommandItemRegistry registry,
+            CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService,
+            @Nullable PersistenceDomainFacades persistence,
+            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable CommandTimedSummoningApi timedSummoning,
+            @Nullable PaidCommandRevivalApi paidRevival,
+            @Nullable PopulationGroupApi populationGroups
+    ) {
+        this(
+                registry,
+                relocationService,
+                stateSnapshotService,
+                persistence,
+                restorationAuthor,
+                constant(timedSummoning),
+                constant(paidRevival),
+                constant(populationGroups)
+        );
+    }
+
+    public CommandItemFeatureHandler(
+            CommandItemRegistry registry,
+            CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService,
+            @Nullable PersistenceDomainFacades persistence,
+            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
+            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
+            @Nullable Supplier<PopulationGroupApi> populationGroups
+    ) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.stateSnapshotService = stateSnapshotService;
@@ -211,7 +257,7 @@ public final class CommandItemFeatureHandler {
                 stepExecutionService,
                 companionPlacementService
         );
-        this.restorationService =
+        CommandCompanionRestorationService restorationService =
                 persistenceView != null && restorationAuthor != null
                 ? new CommandCompanionRestorationService(
                         companionPlacementService,
@@ -219,6 +265,13 @@ public final class CommandItemFeatureHandler {
                         restorationAuthor
                 )
                 : null;
+        this.freeRestorationActions =
+                new CommandFreeRestorationActionService(
+                        restorationService,
+                        linkMutationService,
+                        feedbackService,
+                        RECALL_SAFE_SPAWN_DISTANCE
+                );
         this.ownerReleaseService = new CommandOwnerReleaseService(
                 linkPolicyService,
                 stepExecutionService,
@@ -271,12 +324,42 @@ public final class CommandItemFeatureHandler {
                 toolInventoryService,
                 groupActivationService
         );
+        CommandDeferredLinkService deferredLinks =
+                new CommandDeferredLinkService(
+                        toolInventoryService,
+                        linkMutationService,
+                        feedbackService
+                );
+        CommandPanelFeaturePresentationSource featurePresentations =
+                rosterPanelRecordSource != null
+                        && timedSummoning != null
+                        && paidRevival != null
+                        && populationGroups != null
+                        ? new CommandPanelFeaturePresentationSource(
+                                rosterPanelRecordSource,
+                                timedSummoning,
+                                paidRevival,
+                                populationGroups,
+                                System::currentTimeMillis
+                        )
+                        : null;
+        CommandPanelFeatureActionService featureActions =
+                featurePresentations == null
+                        ? null
+                        : new CommandPanelFeatureActionService(
+                                featurePresentations,
+                                timedSummoning,
+                                paidRevival,
+                                feedbackService
+                        );
         this.selectionPageService = new CommandSelectionPageService(
                 toolInventoryService,
                 groupAssignPageService,
                 resolutionService,
                 panelActionService,
-                talentPageService
+                talentPageService,
+                featurePresentations,
+                featureActions
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,
@@ -289,7 +372,7 @@ public final class CommandItemFeatureHandler {
                 stepExecutionService,
                 this::canonicalizeLinkedNpcRecords,
                 this::openSelectionMenu,
-                this::handleDeferredLink,
+                deferredLinks::handle,
                 this::resolveCommandLabel,
                 new CommandItemUseOrchestrator.CommandTuning(
                         HYBRID_TELEPORT_DISTANCE_THRESHOLD,
@@ -529,7 +612,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRespawn(player, toolId, config, npcUuid),
+                npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuLocate(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, config, npcUuid),
@@ -657,68 +740,8 @@ public final class CommandItemFeatureHandler {
 
     private void applyMenuRespawn(Player player,
                                   String toolId,
-                                  TwCommandItemConfig commandConfig,
                                   UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        if (restorationService == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.trackingUnavailable");
-            return;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || !stackToolId.equals(toolId)) {
-                continue;
-            }
-            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
-            if (record == null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
-                return;
-            }
-            TwCompanionConfig.EffectiveSettings companionSettings =
-                    TwCompanionConfig.resolveEffectiveForRole(
-                            record.cachedRoleId
-                    );
-            double safeSpawnDistance = resolvePositiveDouble(
-                    companionSettings.getRecallSafeSpawnDistance(),
-                    RECALL_SAFE_SPAWN_DISTANCE
-            );
-            CommandCompanionRestorationService.RequestStatus status =
-                    restorationService.request(
-                            player,
-                            playerRef,
-                            store,
-                            toolId,
-                            record,
-                            safeSpawnDistance
-                    );
-            feedbackService.emitRestorationRequestFeedback(player, status);
-            return;
-        }
-        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
+        freeRestorationActions.request(player, toolId, npcUuid);
     }
 
     void canonicalizePlayerCommandInventory(@Nullable Holder<EntityStore> holder) {
@@ -914,45 +937,9 @@ public final class CommandItemFeatureHandler {
         return Double.isFinite(configured) ? configured : fallback;
     }
 
-    private void handleDeferredLink(Player player,
-                                    Store<EntityStore> store,
-                                    Ref<EntityStore> targetRef,
-                                    String toolId,
-                                    TwCommandItemConfig config) {
-        LinkToggleResult[] resultHolder = new LinkToggleResult[1];
-        boolean mutated = toolInventoryService.mutateToolStack(player, toolId, stack -> {
-            LinkToggleResult result = linkMutationService.tryToggleLink(
-                    player,
-                    store,
-                    targetRef,
-                    toolId,
-                    config,
-                    stack,
-                    null
-            );
-            resultHolder[0] = result;
-            return result != null && result.updatedItem != null ? result.updatedItem : stack;
-        });
-        LinkToggleResult result = resultHolder[0];
-        if (!mutated || result == null || !result.toggled || result.updatedItem == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
-            return;
-        }
-        if (result.linked && !result.active) {
-            feedbackService.showSuccessKey(
-                    player,
-                    "tamework.ui.notifications.command.link.successInactive",
-                    result.npcName
-            );
-            return;
-        }
-        feedbackService.showSuccessKey(
-                player,
-                result.linked
-                        ? "tamework.ui.notifications.command.link.success"
-                        : "tamework.ui.notifications.command.link.unlinked",
-                result.npcName
-        );
+    @Nullable
+    private static <T> Supplier<T> constant(@Nullable T value) {
+        return value == null ? null : () -> value;
     }
 
     private record LoadedCompanionTalentContext(@Nonnull Ref<EntityStore> npcRef,

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.companion.command.CommandRosterHome;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceQueries;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -53,6 +54,30 @@ final class CommandRosterPanelRecordSource {
             @Nullable UUID ownerUuid,
             @Nullable String commandFamilyId
     ) {
+        List<PanelMember> members = membersFor(ownerUuid, commandFamilyId);
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<LinkedNpcRecord> records =
+                new ArrayList<>(members.size());
+        for (PanelMember member : members) {
+            records.add(toRecord(member.view()));
+        }
+        return List.copyOf(records);
+    }
+
+    /**
+     * Returns the durable roster identity behind each panel UUID.
+     *
+     * <p>This is also the bridge used by command feature presentation and
+     * actions. The UUID remains presentation-only; every mutation is authored
+     * from the stable profile identity retained here.</p>
+     */
+    @Nonnull
+    List<PanelMember> membersFor(
+            @Nullable UUID ownerUuid,
+            @Nullable String commandFamilyId
+    ) {
         CommandFamilyKey familyKey = familyKey(ownerUuid, commandFamilyId);
         if (familyKey == null) {
             return List.of();
@@ -67,7 +92,7 @@ final class CommandRosterPanelRecordSource {
             return List.of();
         }
 
-        ArrayList<CommandRosterActionView> matches = new ArrayList<>();
+        ArrayList<PanelMember> matches = new ArrayList<>();
         for (Map.Entry<ProfileId, CommandRosterActionView> entry
                 : snapshot.entrySet()) {
             CommandRosterActionView view = entry.getValue();
@@ -75,18 +100,18 @@ final class CommandRosterPanelRecordSource {
                     || !familyKey.equals(view.membership().familyKey())) {
                 continue;
             }
-            matches.add(view);
+            matches.add(new PanelMember(
+                    presentationUuid(view),
+                    view.membership().profileId().toString(),
+                    view.roleId(),
+                    view.lifecycle().state(),
+                    view
+            ));
         }
         matches.sort(Comparator.comparing(
-                view -> view.membership().profileId().value()
+                PanelMember::profileId
         ));
-
-        ArrayList<LinkedNpcRecord> records =
-                new ArrayList<>(matches.size());
-        for (CommandRosterActionView view : matches) {
-            records.add(toRecord(view));
-        }
-        return List.copyOf(records);
+        return List.copyOf(matches);
     }
 
     @Nullable
@@ -117,11 +142,8 @@ final class CommandRosterPanelRecordSource {
     ) {
         CommandRosterMembership membership = view.membership();
         CommandRosterHome home = membership.home();
-        UUID presentationUuid = view.currentAlias() != null
-                ? view.currentAlias().value()
-                : presentationUuid(membership.profileId());
         return new LinkedNpcRecord(
-                presentationUuid,
+                presentationUuid(view),
                 membership.profileId().toString(),
                 null,
                 null,
@@ -139,6 +161,15 @@ final class CommandRosterPanelRecordSource {
     }
 
     @Nonnull
+    private static UUID presentationUuid(
+            @Nonnull CommandRosterActionView view
+    ) {
+        return view.currentAlias() != null
+                ? view.currentAlias().value()
+                : presentationUuid(view.membership().profileId());
+    }
+
+    @Nonnull
     static UUID presentationUuid(@Nonnull ProfileId profileId) {
         Objects.requireNonNull(profileId, "Profile ID is required");
         return UUID.nameUUIDFromBytes(
@@ -152,5 +183,22 @@ final class CommandRosterPanelRecordSource {
     interface ProjectionLookup {
         @Nonnull
         Map<ProfileId, CommandRosterActionView> actionSnapshot();
+    }
+
+    /** Stable identity and lifecycle context for one rendered roster row. */
+    record PanelMember(
+            @Nonnull UUID presentationUuid,
+            @Nonnull String profileId,
+            @Nonnull String roleId,
+            @Nonnull LifecycleState lifecycleState,
+            @Nonnull CommandRosterActionView view
+    ) {
+        PanelMember {
+            Objects.requireNonNull(presentationUuid, "Presentation UUID is required");
+            profileId = Objects.requireNonNull(profileId, "Profile ID is required");
+            roleId = Objects.requireNonNull(roleId, "Role ID is required");
+            Objects.requireNonNull(lifecycleState, "Lifecycle state is required");
+            Objects.requireNonNull(view, "Roster action view is required");
+        }
     }
 }

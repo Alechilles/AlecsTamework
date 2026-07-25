@@ -27,7 +27,7 @@ class SqliteIncidentStoreTest {
     private static final IncidentId INCIDENT =
             new IncidentId(UUID.fromString("50000000-0000-0000-0000-000000000001"));
     private static final IncidentId OTHER_INCIDENT =
-            new IncidentId(UUID.fromString("50000000-0000-0000-0000-000000000002"));
+            new IncidentId(UUID.fromString("51000000-0000-0000-0000-000000000002"));
     private static final OperationScope PROFILE_SCOPE = OperationScope.profile(
             ProfileId.parse("20000000-0000-0000-0000-000000000001")
     );
@@ -122,6 +122,48 @@ class SqliteIncidentStoreTest {
         }
         try (Connection connection = connections.openReadConnection()) {
             assertFalse(new SqliteIncidentStore(connection).findIncident(INCIDENT).isPresent());
+        }
+    }
+
+    @Test
+    void resolvesOnlyExactOrUnambiguousIncidentPrefixesAndListsScopes()
+            throws Exception {
+        try (Connection connection = transaction()) {
+            SqliteIncidentStore store = new SqliteIncidentStore(connection);
+            store.createIncident(incident(INCIDENT, "{}"));
+            store.createIncident(incident(OTHER_INCIDENT, "{}"));
+            ScopeQuarantine quarantine = new ScopeQuarantine(
+                    PROFILE_SCOPE,
+                    INCIDENT,
+                    QuarantineState.ACTIVE,
+                    "unknown_commit",
+                    -9_000,
+                    null
+            );
+            store.quarantine(quarantine);
+
+            assertEquals(
+                    INCIDENT,
+                    store.findIncidentByIdOrUniquePrefix(
+                            "50000000-0000-0000-0000-000000000001"
+                    ).orElseThrow().incidentId()
+            );
+            assertEquals(
+                    INCIDENT,
+                    store.findIncidentByIdOrUniquePrefix(
+                            "50000000-0000"
+                    ).orElseThrow().incidentId()
+            );
+            assertTrue(
+                    store.findIncidentByIdOrUniquePrefix(
+                            "5"
+                    ).isEmpty()
+            );
+            assertEquals(
+                    List.of(quarantine),
+                    store.findQuarantines(INCIDENT)
+            );
+            connection.rollback();
         }
     }
 

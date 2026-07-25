@@ -121,6 +121,30 @@ class PublicPersistenceFeatureRegistryTest {
                                 .ECONOMIC_COMPENSATION
                 )
         ));
+        assertTrue(registry.requireFeature(
+                PublicPersistenceFeatureRegistry.COMMAND_ROSTER
+        ).projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry
+                        .PUBLIC_FEATURE_EVENT_OBSERVER
+        ));
+        assertTrue(registry.requireFeature(
+                PublicPersistenceFeatureRegistry.TIMED_SUMMON
+        ).projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry
+                        .PUBLIC_FEATURE_EVENT_OBSERVER
+        ));
+        assertTrue(registry.requireFeature(
+                PublicPersistenceFeatureRegistry.DORMANT
+        ).projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry
+                        .PUBLIC_FEATURE_EVENT_OBSERVER
+        ));
+        assertTrue(registry.requireFeature(
+                PublicPersistenceFeatureRegistry.PROVISIONING
+        ).projectionConsumers().contains(
+                PublicPersistenceFeatureRegistry
+                        .PUBLIC_FEATURE_EVENT_OBSERVER
+        ));
 
         PersistenceFeatureDescriptor coop = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.COOP

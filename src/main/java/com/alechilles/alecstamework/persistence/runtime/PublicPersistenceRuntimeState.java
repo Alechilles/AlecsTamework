@@ -244,7 +244,8 @@ final class PublicPersistenceRuntimeState {
                 control,
                 configuration.clock(),
                 configuration.refunds(),
-                configuration.profileListener()
+                configuration.profileListener(),
+                configuration.publicEventSink()
         );
         operations = new PublicPersistenceOperations(
                 adapter,

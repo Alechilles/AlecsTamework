@@ -3,7 +3,10 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
+import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleTransition;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceMutationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
@@ -34,6 +37,10 @@ final class SqliteCompanionRestorationPreparation
         CompanionLifecycle current = requireRestorableSource(
                 transaction, restoration
         );
+        if (!restoration.restoresLive()) {
+            requireProvisioning(transaction, restoration);
+            return;
+        }
         requireApplied(
                 transaction.identities().leaseAlias(
                         restoration.profileId(),
@@ -71,6 +78,22 @@ final class SqliteCompanionRestorationPreparation
         CompanionLifecycle lifecycle = transaction.lifecycles()
                 .findByProfile(restoration.profileId())
                 .orElse(null);
+        if (!restoration.restoresLive()) {
+            if (matchesCompletedDormant(
+                    transaction, operation, lifecycle
+            )) {
+                return true;
+            }
+            try {
+                requireRestorableSource(transaction, restoration);
+                requireProvisioning(transaction, restoration);
+                return operation.phase() == OperationPhase.PREPARED
+                        || operation.phase()
+                        == OperationPhase.LIVE_APPLYING;
+            } catch (IllegalStateException invalid) {
+                return false;
+            }
+        }
         CompanionAlias alias = transaction.identities()
                 .resolveAlias(restoration.targetAlias())
                 .orElse(null);
@@ -91,6 +114,30 @@ final class SqliteCompanionRestorationPreparation
             return true;
         }
         return matchesCompleted(transaction, operation, lifecycle, alias);
+    }
+
+    private boolean matchesCompletedDormant(
+            SqlitePersistenceTransactionContext transaction,
+            OperationEnvelope operation,
+            CompanionLifecycle lifecycle
+    ) {
+        ProvisioningRecord provisioning = transaction.provisioning()
+                .findByProfile(restoration.profileId())
+                .orElse(null);
+        return (operation.phase() == OperationPhase.DURABLE
+                || operation.phase() == OperationPhase.PUBLISHED)
+                && lifecycle != null
+                && provisioning != null
+                && lifecycle.revision().equals(
+                restoration.expectedLifecycleRevision().next()
+        )
+                && lifecycle.state() == LifecycleState.PROVISIONED_DORMANT
+                && lifecycle.location().equals(LifecycleLocation.keyed(
+                LifecycleLocationKind.PROVISIONING,
+                provisioning.origin().stableKey()
+        ))
+                && lifecycle.activeOperationId() == null
+                && exactCurrentSnapshot(transaction);
     }
 
     private boolean matchesCompleted(
@@ -139,6 +186,17 @@ final class SqliteCompanionRestorationPreparation
             );
         }
         return current;
+    }
+
+    static ProvisioningRecord requireProvisioning(
+            SqlitePersistenceTransactionContext transaction,
+            CompanionRestorationRequest restoration
+    ) {
+        return transaction.provisioning()
+                .findByProfile(restoration.profileId())
+                .orElseThrow(() -> new IllegalStateException(
+                    "restoration_provisioning_entitlement_missing"
+                ));
     }
 
     private boolean exactCurrentSnapshot(
