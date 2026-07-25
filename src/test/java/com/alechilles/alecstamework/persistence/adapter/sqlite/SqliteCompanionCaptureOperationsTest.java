@@ -350,6 +350,30 @@ class SqliteCompanionCaptureOperationsTest {
         assertTrue(snapshot().isEmpty());
     }
 
+    @Test
+    void stackedResolvedAttemptCompensationRefundsOnlySpentUnit()
+            throws Exception {
+        CompanionCaptureRequest request = failedRequest(8);
+
+        OperationWorkflowResult result = submit(
+                7,
+                request,
+                (capture, operation) -> LiveOperationResult.compensate(
+                        "stacked_source_spent_target_proven_live",
+                        null
+                ).completed()
+        );
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED,
+                result.status()
+        );
+        RefundClaim claim = refundClaim(operationId(7));
+        assertEquals(1, claim.items().size());
+        assertEquals("capture-device", claim.items().getFirst().itemId());
+        assertEquals(1, claim.items().getFirst().quantity());
+    }
+
     private OperationWorkflowResult submit(
             int number,
             com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary boundary
@@ -416,6 +440,10 @@ class SqliteCompanionCaptureOperationsTest {
     }
 
     private CompanionCaptureRequest failedRequest() {
+        return failedRequest(1);
+    }
+
+    private CompanionCaptureRequest failedRequest(int quantity) {
         UUID attemptId = UUID.fromString(
                 "70000000-0000-0000-0000-000000000001"
         );
@@ -466,8 +494,12 @@ class SqliteCompanionCaptureOperationsTest {
                         "world",
                         2,
                         "capture-device",
-                        1,
+                        quantity,
                         Sha256Hash.ofUtf8("before"),
+                        quantity - 1,
+                        quantity == 1
+                                ? null
+                                : Sha256Hash.ofUtf8("after"),
                         attemptId.toString()
                 ),
                 -600

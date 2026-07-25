@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptCooldown;
 import com.alechilles.alecstamework.companion.command.CommandRoster;
 import com.alechilles.alecstamework.companion.command.CommandRosterActionView;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembership;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -277,6 +279,19 @@ public final class PublicPersistenceQueries {
             @Nonnull ProvisioningOrigin origin
     ) {
         return adapter.provisioningIndex().findByOrigin(origin);
+    }
+
+    /** Returns the active actor/config failure cooldown, excluding an idempotent replay. */
+    @Nonnull
+    public Optional<CaptureAttemptCooldown> activeCaptureFailureCooldown(
+            @Nonnull UUID actorUuid,
+            @Nonnull String itemConfigId,
+            @Nonnull UUID currentAttemptId,
+            long nowMs
+    ) {
+        return adapter.captureCooldownIndex().active(
+                actorUuid, itemConfigId, currentAttemptId, nowMs
+        );
     }
 
     @Nonnull

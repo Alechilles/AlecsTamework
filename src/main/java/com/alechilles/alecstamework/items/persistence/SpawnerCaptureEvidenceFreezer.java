@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -11,6 +13,7 @@ import com.alechilles.alecstamework.persistence.operation.StablePersistenceIds;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
 
@@ -22,8 +25,6 @@ import org.bson.BsonString;
  */
 final class SpawnerCaptureEvidenceFreezer {
     private static final String CAPTURE = "spawner-live-capture:v1";
-    private static final String SNAPSHOT =
-            "spawner-live-capture-snapshot:v1";
 
     private final TameworkFullStateSnapshotReader snapshots;
     private final HytaleCapturedArtifactAdapter artifacts;
@@ -63,18 +64,46 @@ final class SpawnerCaptureEvidenceFreezer {
         }
         SpawnerCaptureLiveFacts liveFacts =
                 SpawnerCaptureLiveFacts.freeze(fullState);
+        long requestedAt = clock.getAsLong();
+        CapturedArtifact source = artifacts.toArtifact(intent.sourceStack());
+        CapturedArtifact remainder = source.quantity() == 1
+                ? null
+                : artifacts.toArtifact(
+                        intent.sourceStack().withQuantity(
+                                source.quantity() - 1
+                        )
+                );
+        String[] parts = intentParts(intent, source);
+        OperationId operationId =
+                StablePersistenceIds.operationId(CAPTURE, parts);
+        if (!intent.resolution().successful()) {
+            return new FrozenCapture(
+                    context,
+                    requestedAt,
+                    operationId,
+                    StablePersistenceIds.idempotencyKey(CAPTURE, parts),
+                    null,
+                    null,
+                    liveFacts,
+                    source,
+                    remainder,
+                    null,
+                    intent.resolution()
+            );
+        }
+        if (intent.resolution().successDisposition()
+                != CaptureSuccessDisposition.CAPTURED_ITEM) {
+            throw new EvidenceFailure(
+                    "capture_success_disposition_not_supported"
+            );
+        }
         CoopResidentStateSnapshot capturedState = ownership.normalize(
                 fullState,
                 intent.resultingOwnerId(),
                 intent.resultingOwnerName()
         );
-        long requestedAt = clock.getAsLong();
-        CapturedArtifact source = artifacts.toArtifact(intent.sourceStack());
-        String[] parts = intentParts(intent, source);
-        OperationId operationId =
-                StablePersistenceIds.operationId(CAPTURE, parts);
         SnapshotId snapshotId = new SnapshotId(
-                StablePersistenceIds.operationId(SNAPSHOT, parts).value()
+                intent.resolution().attemptId()
         );
         BsonDocument metadata = new BsonDocument()
                 .append(
@@ -102,7 +131,9 @@ final class SpawnerCaptureEvidenceFreezer {
                 snapshotMapper.encodeCapture(capturedState),
                 liveFacts,
                 source,
-                artifacts.toArtifact(tagged)
+                remainder,
+                artifacts.toArtifact(tagged),
+                intent.resolution()
         );
     }
 
@@ -133,11 +164,13 @@ final class SpawnerCaptureEvidenceFreezer {
             long requestedAt,
             OperationId operationId,
             IdempotencyKey idempotencyKey,
-            SnapshotId snapshotId,
-            SnapshotCodecRegistry.EncodedSnapshot encoded,
+            @Nullable SnapshotId snapshotId,
+            @Nullable SnapshotCodecRegistry.EncodedSnapshot encoded,
             SpawnerCaptureLiveFacts liveFacts,
             CapturedArtifact source,
-            CapturedArtifact artifact
+            @Nullable CapturedArtifact remainder,
+            @Nullable CapturedArtifact artifact,
+            CaptureAttemptResolution resolution
     ) {
     }
 }

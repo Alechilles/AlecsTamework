@@ -123,7 +123,7 @@ final class SqliteCaptureCompensation {
                 capture.source().worldKey(),
                 List.of(new RefundItem(
                         capture.source().sourceItemId(),
-                        capture.source().quantity()
+                        capture.source().spentQuantity()
                 )),
                 REASON,
                 "capture-refund:" + operationId,

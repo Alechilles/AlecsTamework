@@ -159,6 +159,15 @@ public final class CompanionCaptureDefinition
                 "beforeFingerprint",
                 source.beforeFingerprint().toString()
         );
+        json.addProperty(
+                "remainingQuantity", source.remainingQuantity()
+        );
+        if (source.remainingFingerprint() != null) {
+            json.addProperty(
+                    "remainingFingerprint",
+                    source.remainingFingerprint().toString()
+            );
+        }
         json.addProperty("receiptKey", source.receiptKey());
         return json;
     }
@@ -173,6 +182,16 @@ public final class CompanionCaptureDefinition
                 com.alechilles.alecstamework.persistence.kernel.Sha256Hash.parse(
                         json.get("beforeFingerprint").getAsString()
                 ),
+                json.has("remainingQuantity")
+                        ? json.get("remainingQuantity").getAsInt()
+                        : 0,
+                json.has("remainingFingerprint")
+                        ? com.alechilles.alecstamework.persistence.kernel
+                        .Sha256Hash.parse(
+                                json.get("remainingFingerprint")
+                                        .getAsString()
+                        )
+                        : null,
                 json.get("receiptKey").getAsString()
         );
     }

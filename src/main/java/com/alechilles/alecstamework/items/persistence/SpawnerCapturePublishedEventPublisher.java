@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureEvidenceFreezer.FrozenCapture;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -30,7 +31,10 @@ final class SpawnerCapturePublishedEventPublisher {
             SpawnerCaptureContext context,
             FrozenCapture frozen
     ) {
-        if (!outcome.published()) {
+        if (!outcome.published()
+                || !frozen.resolution().successful()
+                || frozen.resolution().successDisposition()
+                != CaptureSuccessDisposition.CAPTURED_ITEM) {
             return java.util.concurrent.CompletableFuture.completedFuture(
                     outcome
             );

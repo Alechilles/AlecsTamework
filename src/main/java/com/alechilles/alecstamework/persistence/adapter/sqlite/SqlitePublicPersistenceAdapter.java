@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptCooldownIndex;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionIndex;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonProjectionIndex;
@@ -301,6 +302,11 @@ public final class SqlitePublicPersistenceAdapter {
     @Nonnull
     public ProvisioningProjectionIndex provisioningIndex() {
         return projections.provisioningIndex();
+    }
+
+    @Nonnull
+    public CaptureAttemptCooldownIndex captureCooldownIndex() {
+        return projections.captureCooldownIndex();
     }
 
     @Nonnull

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -61,25 +62,54 @@ final class SpawnerCaptureIntentFactory {
                 : world.getEntityStore().getStore();
         if (player == null || targetRef == null || source == null
                 || config == null || attempt == null || roll == null
+                || roll.terminal() == null
                 || world == null || store == null) {
             return null;
         }
+        UUID existingOwner = npcState.resolveOwnerFromComponent(
+                targetRef, world
+        );
+        if (!roll.terminal().successful()) {
+            return intent(
+                    player, targetRef, store, source, attempt, roll,
+                    existingOwner, null, null, null,
+                    publishedEffect(
+                            targetRef,
+                            store,
+                            config.getCaptureMechanics()
+                                    .failureParticleSystem(),
+                            config.getCaptureMechanics()
+                                    .failureSoundEvent()
+                    )
+            );
+        }
+        if (roll.terminal().successDisposition()
+                != CaptureSuccessDisposition.CAPTURED_ITEM) {
+            return null;
+        }
+        return capturedItemIntent(
+                player, targetRef, store, source, config, attempt, roll,
+                existingOwner, particleSystemOverride
+        );
+    }
 
+    private SpawnerCaptureIntent capturedItemIntent(
+            Player player,
+            Ref<EntityStore> targetRef,
+            Store<EntityStore> store,
+            ItemStack source,
+            ItemFeatureConfig config,
+            CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            @Nullable UUID existingOwner,
+            @Nullable String particleSystemOverride
+    ) {
         SpawnerCaptureMetadataService.CaptureInfo info =
                 captureMetadata.buildCaptureInfo(
                         player,
                         targetRef,
                         npcIdentity::resolveDisplayName
                 );
-        String fullItemIcon = captureMetadata.resolveFullItemIcon(
-                config,
-                info.attachmentsJson(),
-                source.getItemId(),
-                info.npcNameKey()
-        );
-        UUID existingOwner = npcState.resolveOwnerFromComponent(
-                targetRef, world
-        );
         UUID resultingOwner = resolveCapturedOwnerMetadata(
                 existingOwner, config.isCaptureClearsOwner()
         );
@@ -90,11 +120,58 @@ final class SpawnerCaptureIntentFactory {
         String resultingOwnerName = resultingOwner == null
                 ? null
                 : resultingOwner.equals(existingOwner)
-                ? npcState.resolveOwnerNameFromComponent(targetRef, world)
+                ? npcState.resolveOwnerNameFromComponent(
+                        targetRef, player.getWorld()
+                )
                 : resultingOwner.equals(player.getUuid())
                 ? OwnerNameUtil.resolve(player)
                 : null;
+        ItemStack artifact = capturedArtifact(
+                targetRef,
+                store,
+                source,
+                config,
+                roll,
+                info,
+                existingOwner,
+                resultingOwner,
+                player.getWorld()
+        );
+        String particleSystem =
+                particleSystemOverride == null
+                        || particleSystemOverride.isBlank()
+                        ? config.getCaptureParticleSystem()
+                        : particleSystemOverride;
+        return intent(
+                player, targetRef, store, source, attempt, roll,
+                existingOwner, resultingOwner, resultingOwnerName,
+                artifact,
+                publishedEffect(
+                        targetRef,
+                        store,
+                        particleSystem,
+                        config.getCaptureSoundEvent()
+                )
+        );
+    }
 
+    private ItemStack capturedArtifact(
+            Ref<EntityStore> targetRef,
+            Store<EntityStore> store,
+            ItemStack source,
+            ItemFeatureConfig config,
+            SpawnerCaptureRollService.Resolution roll,
+            SpawnerCaptureMetadataService.CaptureInfo info,
+            @Nullable UUID existingOwner,
+            @Nullable UUID resultingOwner,
+            World world
+    ) {
+        String fullItemIcon = captureMetadata.resolveFullItemIcon(
+                config,
+                info.attachmentsJson(),
+                source.getItemId(),
+                info.npcNameKey()
+        );
         ItemStack artifact = itemMetadata.swapItemId(
                         source, config.getSpawnerFilledItemId()
                 )
@@ -167,26 +244,38 @@ final class SpawnerCaptureIntentFactory {
         artifact = displayMetadata.applyCapturedDisplayMetadata(
                 artifact, config
         );
+        return artifact;
+    }
 
-        ProfileId profileId = new ProfileId(roll.targetUuid());
-        SpawnerPublishedEffect publishedEffect = publishedEffect(
-                targetRef, store, config, particleSystemOverride
-        );
+    private SpawnerCaptureIntent intent(
+            Player player,
+            Ref<EntityStore> targetRef,
+            Store<EntityStore> store,
+            ItemStack source,
+            CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            @Nullable UUID existingOwner,
+            @Nullable UUID resultingOwner,
+            @Nullable String resultingOwnerName,
+            @Nullable ItemStack artifact,
+            @Nullable SpawnerPublishedEffect publishedEffect
+    ) {
         return new SpawnerCaptureIntent(
                 attempt.attemptId().toString(),
                 player.getUuid(),
-                world.getName(),
+                player.getWorld().getName(),
                 attempt.hotbarSlot(),
                 source,
                 artifact,
                 targetRef,
                 store,
-                profileId,
+                new ProfileId(roll.targetUuid()),
                 new NpcAlias(roll.targetUuid()),
                 existingOwner == null ? null : new OwnerId(existingOwner),
                 resultingOwner == null ? null : new OwnerId(resultingOwner),
                 resultingOwnerName,
                 roll.roleId(),
+                roll.terminal(),
                 publishedEffect
         );
     }
@@ -195,8 +284,8 @@ final class SpawnerCaptureIntentFactory {
     private SpawnerPublishedEffect publishedEffect(
             Ref<EntityStore> targetRef,
             Store<EntityStore> store,
-            ItemFeatureConfig config,
-            @Nullable String particleSystemOverride
+            @Nullable String particleSystem,
+            @Nullable String soundEvent
     ) {
         TransformComponent transform = store.getComponent(
                 targetRef, TransformComponent.getComponentType()
@@ -205,17 +294,12 @@ final class SpawnerCaptureIntentFactory {
             return null;
         }
         org.joml.Vector3d position = transform.getPosition();
-        String particleSystem =
-                particleSystemOverride == null
-                        || particleSystemOverride.isBlank()
-                        ? config.getCaptureParticleSystem()
-                        : particleSystemOverride;
         return new SpawnerPublishedEffect(
                 position.x,
                 position.y,
                 position.z,
                 particleSystem,
-                config.getCaptureSoundEvent()
+                soundEvent
         );
     }
 

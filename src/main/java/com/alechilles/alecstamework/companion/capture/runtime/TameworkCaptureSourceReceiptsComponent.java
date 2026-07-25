@@ -60,6 +60,19 @@ public final class TameworkCaptureSourceReceiptsComponent
                             (entry, value) -> entry.sourceFingerprint = value,
                             entry -> entry.sourceFingerprint
                     ).add()
+                    .<Integer>append(
+                            new KeyedCodec<>("RemainingQuantity", Codec.INTEGER),
+                            (entry, value) -> entry.remainingQuantity = value,
+                            entry -> entry.remainingQuantity
+                    ).add()
+                    .<String>append(
+                            new KeyedCodec<>(
+                                    "RemainingFingerprint", Codec.STRING
+                            ),
+                            (entry, value) ->
+                                    entry.remainingFingerprint = value,
+                            entry -> entry.remainingFingerprint
+                    ).add()
                     .build();
     private static final ArrayCodec<ReceiptEntry> RECEIPT_ARRAY_CODEC =
             new ArrayCodec<>(RECEIPT_CODEC, ReceiptEntry[]::new);
@@ -163,7 +176,14 @@ public final class TameworkCaptureSourceReceiptsComponent
                     entry.slot,
                     entry.sourceItemId,
                     entry.quantity,
-                    Sha256Hash.parse(entry.sourceFingerprint)
+                    Sha256Hash.parse(entry.sourceFingerprint),
+                    entry.remainingQuantity,
+                    entry.remainingFingerprint == null
+                            || entry.remainingFingerprint.isBlank()
+                            ? null
+                            : Sha256Hash.parse(
+                                    entry.remainingFingerprint
+                            )
             );
         } catch (RuntimeException failure) {
             throw new IllegalStateException(
@@ -187,6 +207,8 @@ public final class TameworkCaptureSourceReceiptsComponent
         private String sourceItemId;
         private int quantity;
         private String sourceFingerprint;
+        private int remainingQuantity;
+        private String remainingFingerprint;
 
         private ReceiptEntry() {
         }
@@ -199,6 +221,10 @@ public final class TameworkCaptureSourceReceiptsComponent
             sourceItemId = receipt.sourceItemId();
             quantity = receipt.quantity();
             sourceFingerprint = receipt.sourceFingerprint().toString();
+            remainingQuantity = receipt.remainingQuantity();
+            remainingFingerprint = receipt.remainingFingerprint() == null
+                    ? null
+                    : receipt.remainingFingerprint().toString();
         }
     }
 }

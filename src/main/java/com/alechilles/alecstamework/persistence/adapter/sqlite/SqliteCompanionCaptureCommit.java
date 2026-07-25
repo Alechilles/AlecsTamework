@@ -24,7 +24,7 @@ final class SqliteCompanionCaptureCommit {
     static final ProjectionEventType CAPTURED_EVENT_TYPE =
             new ProjectionEventType("companion_captured");
     static final ProjectionEventType ATTEMPT_EVENT_TYPE =
-            new ProjectionEventType("capture_attempt_resolved");
+            CaptureAttemptResolutionEventCodec.EVENT_TYPE;
 
     List<ProjectionEventDraft> commit(
             SqlitePersistenceTransactionContext transaction,
@@ -141,6 +141,7 @@ final class SqliteCompanionCaptureCommit {
                 1,
                 CaptureAttemptResolutionEventCodec.VERSION,
                 CaptureAttemptResolutionEventCodec.encode(
+                        capture.source().actorUuid(),
                         capture.resolution()
                 ),
                 committedAtMs

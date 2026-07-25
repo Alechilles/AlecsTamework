@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.internal.CompanionProfileObserverProjection;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptCooldownIndex;
 import com.alechilles.alecstamework.companion.command.CommandRoster;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionIndex;
 import com.alechilles.alecstamework.companion.command.CommandRosterProjectionSeed;
@@ -15,19 +16,15 @@ import com.alechilles.alecstamework.companion.population.OwnerPopulationProjecti
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupProjectionIndex;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
-import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCatchUpResult;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
-import com.alechilles.alecstamework.persistence.projection.ProjectionConsumerId;
 import com.alechilles.alecstamework.persistence.projection.ProjectionCoordinator;
 import com.alechilles.alecstamework.persistence.projection.ProjectionRetryPolicy;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
@@ -36,7 +33,6 @@ import javax.annotation.Nonnull;
 
 /** Registry-checked projection composition shared by public work and recovery. */
 final class SqlitePublicProjectionSet {
-    private final PersistenceFeatureRegistry registry;
     private final ProjectionCoordinator coordinator;
     private final CompanionProfileObserverProjection profileObserver;
     private final CoopResidencyProjectionIndex coopIndex;
@@ -49,7 +45,8 @@ final class SqlitePublicProjectionSet {
     private final SqliteProvisioningReader provisioningReader;
     private final ProfileExtensionProjectionIndex extensionIndex;
     private final SqliteProfileExtensionReader extensionReader;
-    private final Map<ProjectionConsumerId, ProjectionConsumer> consumers;
+    private final CaptureAttemptCooldownIndex captureCooldownIndex;
+    private final SqliteProjectionConsumerSet consumers;
     SqlitePublicProjectionSet(
             @Nonnull PersistenceFeatureRegistry registry,
             @Nonnull SqlitePersistenceKernel kernel,
@@ -62,7 +59,6 @@ final class SqlitePublicProjectionSet {
                     "Public projection dependencies are required"
             );
         }
-        this.registry = registry;
         this.coordinator = new ProjectionCoordinator(
                 new SqliteProjectionGateway(
                         kernel.reads(),
@@ -86,7 +82,10 @@ final class SqlitePublicProjectionSet {
         this.extensionIndex = new ProfileExtensionProjectionIndex();
         this.extensionReader =
                 new SqliteProfileExtensionReader(kernel.reads());
-        this.consumers = List.<ProjectionConsumer>of(
+        this.captureCooldownIndex = new CaptureAttemptCooldownIndex();
+        this.consumers = new SqliteProjectionConsumerSet(
+                registry,
+                List.<ProjectionConsumer>of(
                 profileObserver,
                 coopIndex,
                 ownerPopulationIndex,
@@ -94,12 +93,9 @@ final class SqlitePublicProjectionSet {
                 commandRosterIndex,
                 timedSummonIndex,
                 provisioningIndex,
-                extensionIndex
-        ).stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-                ProjectionConsumer::consumerId,
-                java.util.function.Function.identity()
+                extensionIndex,
+                captureCooldownIndex
         ));
-        requireExactRegistryConsumers();
     }
     @Nonnull
     ProjectionCoordinator coordinator() {
@@ -137,6 +133,10 @@ final class SqlitePublicProjectionSet {
     ProfileExtensionProjectionIndex extensionIndex() {
         return extensionIndex;
     }
+    @Nonnull
+    CaptureAttemptCooldownIndex captureCooldownIndex() {
+        return captureCooldownIndex;
+    }
 
     /** Resolves the exact required set from the operation owner's descriptor. */
     @Nonnull
@@ -144,24 +144,12 @@ final class SqlitePublicProjectionSet {
         if (operationKind == null) {
             throw new IllegalArgumentException("Operation kind is required");
         }
-        PersistenceFeatureDescriptor feature =
-                registry.requireOperation(operationKind);
-        return feature.projectionConsumers().stream()
-                .sorted(java.util.Comparator.comparing(
-                        ProjectionConsumerId::value
-                ))
-                .map(this::requireConsumer)
-                .toList();
+        return consumers.requiredFor(operationKind);
     }
 
     @Nonnull
     List<ProjectionConsumer> all() {
-        return consumers.entrySet().stream()
-                .sorted(java.util.Comparator.comparing(
-                        entry -> entry.getKey().value()
-                ))
-                .map(Map.Entry::getValue)
-                .toList();
+        return consumers.all();
     }
 
     /** Rebuilds canonical indexes before catching every declared consumer up. */
@@ -476,24 +464,4 @@ final class SqlitePublicProjectionSet {
         );
     }
 
-    private ProjectionConsumer requireConsumer(ProjectionConsumerId consumerId) {
-        ProjectionConsumer consumer = consumers.get(consumerId);
-        if (consumer == null) {
-            throw new IllegalArgumentException(
-                    "Missing public projection consumer: " + consumerId
-            );
-        }
-        return consumer;
-    }
-
-    private void requireExactRegistryConsumers() {
-        Set<ProjectionConsumerId> declared = registry.descriptors().stream()
-                .flatMap(feature -> feature.projectionConsumers().stream())
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        if (!declared.equals(consumers.keySet())) {
-            throw new IllegalArgumentException(
-                    "Public projection composition does not match registry"
-            );
-        }
-    }
 }

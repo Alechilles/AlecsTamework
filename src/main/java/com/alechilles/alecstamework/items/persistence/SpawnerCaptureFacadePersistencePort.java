@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.persistence.operation.PublicOperationSubmiss
 import com.alechilles.alecstamework.persistence.runtime.PersistenceDomainFacades;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -73,5 +74,17 @@ final class SpawnerCaptureFacadePersistencePort
         return persistence.operations().mutateProfile(
                 operationId, idempotencyKey, reconciliation
         );
+    }
+
+    @Override
+    public boolean failureCooldownActive(
+            UUID actorUuid,
+            String itemConfigId,
+            UUID currentAttemptId,
+            long nowMs
+    ) {
+        return persistence.queries().activeCaptureFailureCooldown(
+                actorUuid, itemConfigId, currentAttemptId, nowMs
+        ).isPresent();
     }
 }

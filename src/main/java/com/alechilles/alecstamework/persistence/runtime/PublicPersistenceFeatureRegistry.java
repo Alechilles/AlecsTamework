@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptCooldownIndex;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
 import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
@@ -67,6 +68,8 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("timed_summon_index");
     public static final ProjectionConsumerId PROVISIONING_INDEX =
             new ProjectionConsumerId("provisioning_index");
+    public static final ProjectionConsumerId CAPTURE_COOLDOWN_INDEX =
+            CaptureAttemptCooldownIndex.CONSUMER_ID;
     public static final ProjectionConsumerId EXTENSION_INDEX =
             ProfileExtensionProjectionIndex.CONSUMER_ID;
 
@@ -310,7 +313,8 @@ public final class PublicPersistenceFeatureRegistry {
                         OWNER_POPULATION_INDEX,
                         POPULATION_GROUP_INDEX,
                         COMMAND_ROSTER_INDEX,
-                        TIMED_SUMMON_INDEX
+                        TIMED_SUMMON_INDEX,
+                        CAPTURE_COOLDOWN_INDEX
                 ),
                 PublicPersistenceFeatureDescriptorFactory.worldReadiness(),
                 Set.of(

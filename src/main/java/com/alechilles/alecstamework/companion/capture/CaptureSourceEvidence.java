@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.capture;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Exact external inventory evidence frozen before one capture attempt.
@@ -17,9 +18,14 @@ public record CaptureSourceEvidence(@Nonnull UUID actorUuid,
                                     @Nonnull String sourceItemId,
                                     int quantity,
                                     @Nonnull Sha256Hash beforeFingerprint,
+                                    int remainingQuantity,
+                                    @Nullable Sha256Hash remainingFingerprint,
                                     @Nonnull String receiptKey) {
     public CaptureSourceEvidence {
-        if (actorUuid == null || slot < 0 || quantity <= 0) {
+        if (actorUuid == null || slot < 0 || quantity <= 0
+                || remainingQuantity != quantity - 1
+                || (remainingQuantity == 0)
+                != (remainingFingerprint == null)) {
             throw new IllegalArgumentException("Valid capture source identity is required");
         }
         worldKey = requireText(worldKey, "Capture source world");
@@ -30,6 +36,38 @@ public record CaptureSourceEvidence(@Nonnull UUID actorUuid,
             );
         }
         receiptKey = requireText(receiptKey, "Capture source receipt");
+    }
+
+    /** Source-compatible constructor for prior singleton source evidence. */
+    public CaptureSourceEvidence(
+            UUID actorUuid,
+            String worldKey,
+            int slot,
+            String sourceItemId,
+            int quantity,
+            Sha256Hash beforeFingerprint,
+            String receiptKey
+    ) {
+        this(
+                actorUuid,
+                worldKey,
+                slot,
+                sourceItemId,
+                quantity,
+                beforeFingerprint,
+                0,
+                null,
+                receiptKey
+        );
+        if (quantity != 1) {
+            throw new IllegalArgumentException(
+                    "Legacy capture source evidence must be a singleton"
+            );
+        }
+    }
+
+    public int spentQuantity() {
+        return quantity - remainingQuantity;
     }
 
     private static String requireText(String value, String label) {

@@ -46,6 +46,27 @@ class TameworkCaptureSourceReceiptsComponentTest {
         assertEquals(receipt, clone.receiptFor(2));
     }
 
+    @Test
+    void stackedReceiptPreservesExactPostSpendRemainder() {
+        CaptureSourceReceipt receipt = new CaptureSourceReceipt(
+                "stacked",
+                PROFILE,
+                TARGET,
+                3,
+                "Tamework_Draconic_Stone",
+                8,
+                hash('e'),
+                7,
+                hash('f')
+        );
+
+        TameworkCaptureSourceReceiptsComponent component =
+                new TameworkCaptureSourceReceiptsComponent()
+                        .withReceipt(receipt);
+
+        assertEquals(receipt, component.receiptFor(3));
+    }
+
     private CaptureSourceReceipt receipt(
             String key,
             int slot,
@@ -58,9 +79,13 @@ class TameworkCaptureSourceReceiptsComponentTest {
                 slot,
                 "Tamework_Capture_Source",
                 1,
-                new Sha256Hash(
-                        String.valueOf(fingerprintDigit).repeat(64)
-                )
+                hash(fingerprintDigit)
+        );
+    }
+
+    private Sha256Hash hash(char fingerprintDigit) {
+        return new Sha256Hash(
+                String.valueOf(fingerprintDigit).repeat(64)
         );
     }
 }

@@ -88,7 +88,7 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
         if (matchesSource(current)) {
             return SpendProbe.receiptedSource();
         }
-        return current == null || current.isEmpty()
+        return matchesRemainder(current)
                 ? SpendProbe.spent()
                 : SpendProbe.conflict(null);
     }
@@ -153,10 +153,15 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
         ItemStack current = inventory.container().getItemStack(
                 inventory.slot()
         );
+        ItemStack remaining = request.source().remainingQuantity() == 0
+                ? ItemStack.EMPTY
+                : current.withQuantity(
+                        request.source().remainingQuantity()
+                );
         try {
             boolean succeeded = inventory.container()
                     .replaceItemStackInSlot(
-                            inventory.slot(), current, ItemStack.EMPTY
+                            inventory.slot(), current, remaining
                     ).succeeded();
             SpendProbe after = probe();
             if (after.status()
@@ -396,6 +401,26 @@ final class HytaleCompanionCaptureAttemptGateway implements AttemptGateway {
             return source.sourceItemId().equals(live.itemId())
                     && source.quantity() == live.quantity()
                     && source.beforeFingerprint().equals(
+                    live.artifactHash()
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean matchesRemainder(@Nullable ItemStack stack) {
+        CaptureSourceEvidence source = request.source();
+        if (source.remainingQuantity() == 0) {
+            return stack == null || stack.isEmpty();
+        }
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        try {
+            CapturedArtifact live = artifacts.toArtifact(stack);
+            return source.sourceItemId().equals(live.itemId())
+                    && source.remainingQuantity() == live.quantity()
+                    && source.remainingFingerprint().equals(
                     live.artifactHash()
             );
         } catch (RuntimeException | LinkageError failure) {

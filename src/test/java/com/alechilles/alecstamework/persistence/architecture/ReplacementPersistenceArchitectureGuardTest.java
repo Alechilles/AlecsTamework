@@ -307,6 +307,7 @@ class ReplacementPersistenceArchitectureGuardTest {
 
         assertEquals(
                 List.of(
+                        "activeCaptureFailureCooldown",
                         "diagnoseCoopCapture",
                         "diagnoseCoopRelease",
                         "findAllCommandRosters",

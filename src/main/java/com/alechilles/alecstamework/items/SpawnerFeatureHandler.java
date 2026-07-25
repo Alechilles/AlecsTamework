@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.CaptureRequirementContext;
 import com.alechilles.alecstamework.api.CaptureRequirementDecision;
 import com.alechilles.alecstamework.api.CaptureRequirementSpec;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -119,7 +121,21 @@ public final class SpawnerFeatureHandler {
                 capturePolicies,
                 captureRequirements,
                 capturePolicy,
-                roles
+                roles,
+                new SpawnerCaptureResolutionFactory(
+                        registry == null
+                                ? new ItemFeatureRegistry()
+                                : registry,
+                        System::currentTimeMillis
+                ),
+                (actorUuid, itemConfigId, attemptId, nowMs) ->
+                        captureAuthor != null
+                                && captureAuthor.failureCooldownActive(
+                                        actorUuid,
+                                        itemConfigId,
+                                        attemptId,
+                                        nowMs
+                                )
         );
         this.captureIntents = new SpawnerCaptureIntentFactory(
                 captureMetadata,
@@ -444,7 +460,9 @@ public final class SpawnerFeatureHandler {
         );
         if (captureAuthor == null || player == null || targetRef == null
                 || source == null || source.isEmpty() || resolved == null
-                || source.getQuantity() != 1
+                || (source.getQuantity() != 1
+                && resolved.getCaptureMechanics().successDisposition()
+                == CaptureSuccessDisposition.CAPTURED_ITEM)
                 || itemMetadata.isAlreadyCaptured(source)
                 || !sourceMatches(player, attempt)
                 || !capturePolicy.canCapture(
@@ -456,15 +474,18 @@ public final class SpawnerFeatureHandler {
                 player, targetRef, source, resolved, attempt
         );
         if (roll == null || roll.evaluation().outcome()
-                != SpawnerCaptureChanceService.Outcome.SUCCESS) {
-            if (roll != null && roll.evaluation().outcome()
-                    == SpawnerCaptureChanceService.Outcome.FAILED_ROLL) {
-                effects.playCaptureFailureEffects(
-                        player.getWorld(),
-                        targetRef,
-                        resolved.getCaptureMechanics()
-                );
-            }
+                == SpawnerCaptureChanceService.Outcome.DENIED) {
+            return false;
+        }
+        if (roll.evaluation().outcome()
+                == SpawnerCaptureChanceService.Outcome.FAILED_ROLL
+                && resolved.getCaptureMechanics().sourceConsumption()
+                != CaptureSourceConsumption.RESOLVED_ATTEMPT) {
+            effects.playCaptureFailureEffects(
+                    player.getWorld(),
+                    targetRef,
+                    resolved.getCaptureMechanics()
+            );
             return false;
         }
         SpawnerCaptureIntent intent = captureIntents.create(

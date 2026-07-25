@@ -1,13 +1,10 @@
 package com.alechilles.alecstamework.items.persistence;
 
-import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
-import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
-import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureEvidenceFreezer.FrozenCapture;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailure;
@@ -23,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -39,6 +37,8 @@ public final class SpawnerCaptureAuthor {
     private final SpawnerCaptureAdoptionFactory adoptions;
     private final SpawnerCapturePublishedEventPublisher eventPublisher;
     private final SpawnerCaptureProfileCoordinator profiles;
+    private final SpawnerCaptureRequestFactory requests =
+            new SpawnerCaptureRequestFactory();
     private final ResultDispatcher dispatcher;
 
     /** Creates the production author over replacement facades and UUID-safe feedback. */
@@ -142,6 +142,18 @@ public final class SpawnerCaptureAuthor {
                                 "capture_author_failed", failure
                         ))
                 .thenApply(value -> dispatch(context, value));
+    }
+
+    /** Checks the rebuildable durable failure-cooldown projection before rolling. */
+    public boolean failureCooldownActive(
+            @Nonnull UUID actorUuid,
+            @Nonnull String itemConfigId,
+            @Nonnull UUID currentAttemptId,
+            long nowMs
+    ) {
+        return persistence.failureCooldownActive(
+                actorUuid, itemConfigId, currentAttemptId, nowMs
+        );
     }
 
     private SpawnerCaptureIntent canonicalize(
@@ -271,37 +283,16 @@ public final class SpawnerCaptureAuthor {
             FrozenCapture frozen,
             CompanionProfileReadModel profile
     ) {
-        CompanionLifecycle lifecycle = profile.lifecycle();
-        CompanionSnapshot snapshot = new CompanionSnapshot(
-                frozen.snapshotId(),
-                context.profileId(),
-                CompanionCaptureRequest.SNAPSHOT_KIND,
-                frozen.encoded().payloadVersion(),
-                frozen.encoded().payloadJson(),
-                frozen.encoded().payloadHash(),
-                lifecycle.revision().next(),
-                true,
-                frozen.requestedAt()
-        );
-        CompanionCaptureRequest request = new CompanionCaptureRequest(
-                context.profileId(),
-                lifecycle.revision(),
-                context.resultingOwnerId(),
-                context.sourceAlias(),
-                context.worldKey(),
-                snapshot,
-                frozen.artifact(),
-                new CaptureSourceEvidence(
-                        context.actorUuid(),
-                        context.worldKey(),
-                        context.sourceSlot(),
-                        frozen.source().itemId(),
-                        frozen.source().quantity(),
-                        frozen.source().artifactHash(),
-                        frozen.snapshotId().toString()
-                ),
-                frozen.requestedAt()
-        );
+        final CompanionCaptureRequest request;
+        try {
+            request = requests.create(context, frozen, profile);
+        } catch (RuntimeException failure) {
+            return completed(result(
+                    SpawnerPersistenceAuthorResult.Status.EVIDENCE_FAILED,
+                    frozen.operationId(), null,
+                    evidenceDetail(failure), failure
+            ));
+        }
         final PublicOperationSubmission submitted;
         try {
             submitted = persistence.capture(
@@ -479,6 +470,15 @@ public final class SpawnerCaptureAuthor {
                 IdempotencyKey idempotencyKey,
                 CompanionCaptureRequest capture
         );
+
+        default boolean failureCooldownActive(
+                UUID actorUuid,
+                String itemConfigId,
+                UUID currentAttemptId,
+                long nowMs
+        ) {
+            return false;
+        }
     }
 
     @FunctionalInterface

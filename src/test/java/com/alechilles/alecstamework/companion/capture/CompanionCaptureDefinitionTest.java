@@ -50,6 +50,39 @@ class CompanionCaptureDefinitionTest {
     }
 
     @Test
+    void versionTwoRoundTripsExactStackRemainder() throws Exception {
+        CompanionCaptureRequest singleton = request(PROFILE, EXPECTED);
+        CaptureSourceEvidence source = singleton.source();
+        CompanionCaptureRequest stacked = new CompanionCaptureRequest(
+                singleton.profileId(),
+                singleton.expectedLifecycleRevision(),
+                singleton.resultingOwnerId(),
+                singleton.targetAlias(),
+                singleton.targetWorldKey(),
+                singleton.terminal(),
+                new CaptureSourceEvidence(
+                        source.actorUuid(),
+                        source.worldKey(),
+                        source.slot(),
+                        source.sourceItemId(),
+                        8,
+                        Sha256Hash.ofUtf8("stack-before"),
+                        7,
+                        Sha256Hash.ofUtf8("stack-after"),
+                        source.receiptKey()
+                ),
+                singleton.requestedAtMs()
+        );
+
+        assertEquals(
+                stacked,
+                CompanionCaptureDefinition.INSTANCE.decode(
+                        CompanionCaptureDefinition.INSTANCE.encode(stacked)
+                )
+        );
+    }
+
+    @Test
     void snapshotMustBelongToProfileAndPostPrepareRevision() {
         ProfileId other =
                 ProfileId.parse("10000000-0000-0000-0000-000000000002");

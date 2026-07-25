@@ -1,6 +1,11 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptFormula;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
+import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
@@ -271,6 +276,50 @@ class SpawnerCaptureAuthorTest {
         );
     }
 
+    @Test
+    void resolvedFailureUsesCanonicalOperationWithoutCaptureEvent() {
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                profile(IMPORTED_PROFILE),
+                projection(IMPORTED_PROFILE)
+        );
+        AtomicInteger events = new AtomicInteger();
+        UUID attemptId = UUID.fromString(
+                "81000000-0000-0000-0000-000000000070"
+        );
+        SpawnerCaptureIntent failed = new SpawnerCaptureIntent(
+                attemptId.toString(),
+                ACTOR,
+                "world",
+                2,
+                stack("capture-device-empty"),
+                null,
+                null,
+                null,
+                IMPORTED_PROFILE,
+                ALIAS,
+                null,
+                null,
+                null,
+                "tamework_test",
+                failedResolution(attemptId),
+                null
+        );
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> events.incrementAndGet()
+        ).capture(failed).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertTrue(persistence.capture.failedAttempt());
+        assertEquals(
+                attemptId.toString(),
+                persistence.capture.source().receiptKey()
+        );
+        assertEquals(0, events.get());
+    }
+
     private SpawnerCaptureAuthor author(
             FakePersistence persistence,
             SpawnerCapturePublishedEventSink events
@@ -320,6 +369,42 @@ class SpawnerCaptureAuthorTest {
         return HytaleItemStackTestFixture.stack(
                 itemId,
                 new BsonDocument()
+        );
+    }
+
+    private CaptureAttemptResolution failedResolution(UUID attemptId) {
+        return new CaptureAttemptResolution(
+                attemptId,
+                "tamework_test",
+                new CaptureAttemptFormula(
+                        "test-stone",
+                        7L,
+                        CaptureChanceMode.PROBABILITY,
+                        1,
+                        0.25D,
+                        0.1D,
+                        0.0D,
+                        1.0D,
+                        "test-policy",
+                        3L,
+                        1,
+                        0.1D,
+                        1.0D,
+                        0.2D,
+                        null,
+                        com.alechilles.alecstamework.persistence.kernel
+                                .Sha256Hash.ofUtf8("[]"),
+                        4L
+                ),
+                CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                CaptureSuccessDisposition.CAPTURED_ITEM,
+                CaptureAttemptResolution.Outcome.FAILED_ROLL,
+                "capture-probability-failure",
+                0.25D,
+                false,
+                0.5D,
+                0.75D,
+                -250L
         );
     }
 
