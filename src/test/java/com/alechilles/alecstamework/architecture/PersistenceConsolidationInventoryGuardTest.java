@@ -51,6 +51,7 @@ class PersistenceConsolidationInventoryGuardTest {
             SOURCE_ROOT.resolve("persistence/facade"),
             SOURCE_ROOT.resolve("companion/identity"),
             SOURCE_ROOT.resolve("companion/lifecycle"),
+            SOURCE_ROOT.resolve("companion/population"),
             SOURCE_ROOT.resolve("companion/snapshot")
     );
 
@@ -141,7 +142,8 @@ class PersistenceConsolidationInventoryGuardTest {
                 SOURCE_ROOT.resolve("persistence/adapter"),
                 SOURCE_ROOT.resolve("persistence/projection"),
                 SOURCE_ROOT.resolve("companion/identity"),
-                SOURCE_ROOT.resolve("companion/lifecycle")
+                SOURCE_ROOT.resolve("companion/lifecycle"),
+                SOURCE_ROOT.resolve("companion/population")
         );
         for (Path root : focusedRoots) {
             for (Path file : javaFiles(root)) {

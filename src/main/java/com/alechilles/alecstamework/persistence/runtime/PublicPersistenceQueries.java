@@ -11,6 +11,10 @@ import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjecti
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignment;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
@@ -21,6 +25,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 
@@ -142,6 +147,49 @@ public final class PublicPersistenceQueries {
     public CompletionStage<PersistenceReadResult<List<CompanionLifecycle>>>
     findAllLifecycles() {
         return adapter.lifecycleReader().findAll();
+    }
+
+    public long projectedOwnerPopulationCount(
+            @Nonnull OwnerPopulationScope scope
+    ) {
+        return adapter.ownerPopulationIndex().count(scope);
+    }
+
+    @Nonnull
+    public Map<ProfileId, CompanionLifecycle>
+    projectedOwnerPopulationSnapshot() {
+        return adapter.ownerPopulationIndex().snapshot();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<
+            List<PopulationGroupAssignment>>>
+    findAllPopulationGroupAssignments() {
+        return adapter.populationGroupReader().findAllAssignments();
+    }
+
+    @Nonnull
+    public CompletionStage<PersistenceReadResult<List<ProfileId>>>
+    findStalePopulationGroupProfiles() {
+        return adapter.populationGroupReader().findStaleProfiles();
+    }
+
+    @Nonnull
+    public PopulationGroupCounts projectedPopulationGroupCounts(
+            @Nonnull PopulationGroupBucket bucket
+    ) {
+        return adapter.populationGroupIndex().counts(bucket);
+    }
+
+    @Nonnull
+    public Set<ProfileId> projectedLaggingPopulationGroupProfiles() {
+        return adapter.populationGroupIndex().laggingProfiles();
+    }
+
+    @Nonnull
+    public Map<ProfileId, PopulationGroupAssignment>
+    projectedPopulationGroupAssignments() {
+        return adapter.populationGroupIndex().assignmentSnapshot();
     }
 
     @Nonnull

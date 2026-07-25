@@ -4,6 +4,7 @@ package com.alechilles.alecstamework.persistence.control;
 public enum PersistenceFeatureDomain {
     IDENTITY,
     LIFECYCLE,
+    POPULATION,
     CAPTURE,
     DORMANT,
     COOP,

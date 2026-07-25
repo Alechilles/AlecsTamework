@@ -19,7 +19,7 @@ class PublicPersistenceFeatureRegistryTest {
     void registryOwnsEveryPublicOperationAndCrossCuttingHookExactlyOnce() {
         PersistenceFeatureRegistry registry =
                 PublicPersistenceFeatureRegistry.create();
-        assertEquals(7, registry.descriptors().size());
+        assertEquals(9, registry.descriptors().size());
         assertEquals(
                 PublicPersistenceFeatureRegistry.IDENTITY,
                 registry.descriptors().getFirst().featureId()
@@ -46,7 +46,7 @@ class PublicPersistenceFeatureRegistryTest {
                         .containsKey(definition.kind()));
             });
         }
-        assertEquals(10, operationKinds.size());
+        assertEquals(13, operationKinds.size());
 
         PersistenceFeatureDescriptor economics = registry.requireFeature(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION

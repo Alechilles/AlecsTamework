@@ -9,6 +9,9 @@ import com.alechilles.alecstamework.companion.dormant.CompanionDormantTransition
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionMutation;
 import com.alechilles.alecstamework.companion.identity.CompanionAliasRotation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationReconciliationRequest;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
@@ -192,6 +195,43 @@ public final class PublicPersistenceOperations {
                 adapter.extensionOperations().submit(
                         operationId, idempotencyKey, mutation
                 );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission transitionOwnerPopulation(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull OwnerPopulationTransitionRequest transition
+    ) {
+        var submitted = adapter.ownerPopulationOperations().submit(
+                operationId, idempotencyKey, transition
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission reconcileOwnerPopulation(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull OwnerPopulationReconciliationRequest reconciliation
+    ) {
+        var submitted =
+                adapter.ownerPopulationReconciliationOperations().submit(
+                        operationId, idempotencyKey, reconciliation
+                );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission assignPopulationGroups(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull PopulationGroupAssignmentRequest assignment
+    ) {
+        var submitted = adapter.populationGroupOperations().submit(
+                operationId, idempotencyKey, assignment
+        );
         return submission(submitted.acceptance(), submitted.completion());
     }
 
