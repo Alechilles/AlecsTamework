@@ -305,6 +305,99 @@ CREATE INDEX idx_population_group_reservation_scope
         owner_uuid, group_id, scope_kind, owner_world_key, operation_id
     );
 
+CREATE TABLE command_family (
+    owner_uuid TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    roster_revision INTEGER NOT NULL DEFAULT 0 CHECK (roster_revision >= 0),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (owner_uuid, family_id)
+);
+
+CREATE TABLE command_roster_membership (
+    slot_id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL UNIQUE,
+    owner_uuid TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    membership_revision INTEGER NOT NULL CHECK (membership_revision > 0),
+    group_id TEXT,
+    active_for_bulk_commands INTEGER NOT NULL CHECK (
+        active_for_bulk_commands IN (0, 1)
+    ),
+    home_world_key TEXT,
+    home_x REAL,
+    home_y REAL,
+    home_z REAL,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (owner_uuid, family_id)
+        REFERENCES command_family(owner_uuid, family_id)
+        ON DELETE CASCADE,
+    CHECK (
+        (home_world_key IS NULL AND home_x IS NULL
+            AND home_y IS NULL AND home_z IS NULL)
+        OR (length(trim(home_world_key)) > 0
+            AND home_x IS NOT NULL AND home_y IS NOT NULL
+            AND home_z IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_command_roster_family
+    ON command_roster_membership(owner_uuid, family_id, profile_id);
+
+CREATE TABLE timed_summon_lease (
+    profile_id TEXT PRIMARY KEY,
+    lease_revision INTEGER NOT NULL CHECK (lease_revision > 0),
+    session_id TEXT UNIQUE,
+    remaining_ms INTEGER CHECK (remaining_ms >= 0),
+    cooldown_until_ms INTEGER,
+    config_id TEXT,
+    config_revision INTEGER CHECK (config_revision >= 0),
+    active_duration_ms INTEGER NOT NULL CHECK (active_duration_ms >= 0),
+    resummon_cooldown_ms INTEGER NOT NULL CHECK (
+        resummon_cooldown_ms >= 0
+    ),
+    auto_store_on_owner_logout INTEGER NOT NULL CHECK (
+        auto_store_on_owner_logout IN (0, 1)
+    ),
+    warning_thresholds_json TEXT NOT NULL CHECK (
+        json_valid(warning_thresholds_json)
+        AND json_type(warning_thresholds_json) = 'array'
+    ),
+    emitted_warning_thresholds_json TEXT NOT NULL CHECK (
+        json_valid(emitted_warning_thresholds_json)
+        AND json_type(emitted_warning_thresholds_json) = 'array'
+    ),
+    checkpointed_at_ms INTEGER,
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    CHECK (
+        (config_id IS NULL AND config_revision IS NULL)
+        OR (length(trim(config_id)) > 0 AND config_revision IS NOT NULL)
+    ),
+    CHECK (
+        (session_id IS NULL
+            AND remaining_ms IS NULL
+            AND checkpointed_at_ms IS NULL
+            AND json_array_length(
+                emitted_warning_thresholds_json
+            ) = 0)
+        OR (session_id IS NOT NULL
+            AND checkpointed_at_ms IS NOT NULL
+            AND cooldown_until_ms IS NULL
+            AND (
+                (active_duration_ms = 0 AND remaining_ms IS NULL)
+                OR (active_duration_ms > 0
+                    AND remaining_ms IS NOT NULL
+                    AND remaining_ms <= active_duration_ms)
+            ))
+    )
+);
+
 CREATE TABLE companion_snapshot (
     snapshot_id TEXT PRIMARY KEY,
     profile_id TEXT NOT NULL,
@@ -358,7 +451,7 @@ CREATE TABLE operation_participant (
     operation_id TEXT NOT NULL,
     scope_type TEXT NOT NULL CHECK (scope_type IN (
         'OPERATION', 'PROFILE', 'OWNER', 'COOP', 'TOOL',
-        'FEATURE', 'GLOBAL'
+        'COMMAND_FAMILY', 'FEATURE', 'GLOBAL'
     )),
     scope_key TEXT NOT NULL,
     PRIMARY KEY (operation_id, scope_type, scope_key),

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -90,6 +92,10 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.ownerPopulationOperations());
         assertNotNull(adapter.ownerPopulationReconciliationOperations());
         assertNotNull(adapter.populationGroupOperations());
+        assertNotNull(adapter.commandRosterOperations());
+        assertNotNull(adapter.commandRosterTransitionOperations());
+        assertNotNull(adapter.timedSummonOperations());
+        assertNotNull(adapter.timedSummonTransitionOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -102,22 +108,26 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.coopReader());
         assertNotNull(adapter.extensionReader());
         assertNotNull(adapter.populationGroupReader());
+        assertNotNull(adapter.commandRosterReader());
+        assertNotNull(adapter.timedSummonReader());
         assertNotNull(adapter.coopIndex());
         assertNotNull(adapter.ownerPopulationIndex());
         assertNotNull(adapter.populationGroupIndex());
+        assertNotNull(adapter.commandRosterIndex());
+        assertNotNull(adapter.timedSummonIndex());
         assertNotNull(adapter.extensionIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
                 adapter.recoveryOperations().engine()
         );
         assertEquals(
-                3,
+                5,
                 adapter.projections().requiredFor(
                         CompanionProfileMutationDefinition.INSTANCE.kind()
                 ).size()
         );
         assertEquals(
-                4,
+                6,
                 adapter.projections().requiredFor(
                         CompanionCoopCaptureDefinition.INSTANCE.kind()
                 ).size()
@@ -126,6 +136,18 @@ class SqlitePublicPersistenceAdapterTest {
                 1,
                 adapter.projections().requiredFor(
                         ProfileExtensionMutationDefinition.INSTANCE.kind()
+                ).size()
+        );
+        assertEquals(
+                5,
+                adapter.projections().requiredFor(
+                        CommandRosterMembershipDefinition.INSTANCE.kind()
+                ).size()
+        );
+        assertEquals(
+                5,
+                adapter.projections().requiredFor(
+                        TimedSummonLeaseMutationDefinition.INSTANCE.kind()
                 ).size()
         );
     }
@@ -143,7 +165,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(5, result.catchUps().size());
+        assertEquals(7, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
     }
 

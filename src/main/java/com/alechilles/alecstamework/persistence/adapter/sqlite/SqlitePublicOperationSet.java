@@ -2,6 +2,10 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDefinition;
+import com.alechilles.alecstamework.companion.command.CommandRosterTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLeaseMutationDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureDefinition;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseDefinition;
 import com.alechilles.alecstamework.companion.coop.CoopSlotRegistrationDefinition;
@@ -29,6 +33,10 @@ final class SqlitePublicOperationSet {
     private final SqliteOwnerPopulationReconciliationOperations
             ownerPopulationReconciliation;
     private final SqlitePopulationGroupAssignmentOperations populationGroups;
+    private final SqliteCommandRosterMembershipOperations commandRosters;
+    private final SqliteCommandRosterTransitionOperations commandTransitions;
+    private final SqliteTimedSummonLeaseOperations timedSummons;
+    private final SqliteTimedSummonTransitionOperations timedTransitions;
     private final SqliteCompanionCaptureOperations captures;
     private final SqliteCompanionCaptureReleaseOperations captureReleases;
     private final SqliteCompanionDormantOperations dormant;
@@ -105,6 +113,32 @@ final class SqlitePublicOperationSet {
                 database,
                 projections.requiredFor(
                         PopulationGroupAssignmentDefinition.INSTANCE.kind()
+                )
+        );
+        commandRosters = new SqliteCommandRosterMembershipOperations(
+                database,
+                projections.requiredFor(
+                        CommandRosterMembershipDefinition.INSTANCE.kind()
+                )
+        );
+        commandTransitions = new SqliteCommandRosterTransitionOperations(
+                database,
+                projections.requiredFor(
+                        CommandRosterTransitionDefinition.INSTANCE.kind()
+                )
+        );
+        timedSummons = new SqliteTimedSummonLeaseOperations(
+                database,
+                projections.requiredFor(
+                        TimedSummonLeaseMutationDefinition.INSTANCE.kind()
+                )
+        );
+        timedTransitions = new SqliteTimedSummonTransitionOperations(
+                engine,
+                publisher,
+                clock,
+                projections.requiredFor(
+                        TimedSummonTransitionDefinition.INSTANCE.kind()
                 )
         );
         captures = new SqliteCompanionCaptureOperations(
@@ -194,6 +228,22 @@ final class SqlitePublicOperationSet {
 
     SqlitePopulationGroupAssignmentOperations populationGroups() {
         return populationGroups;
+    }
+
+    SqliteCommandRosterMembershipOperations commandRosters() {
+        return commandRosters;
+    }
+
+    SqliteCommandRosterTransitionOperations commandTransitions() {
+        return commandTransitions;
+    }
+
+    SqliteTimedSummonLeaseOperations timedSummons() {
+        return timedSummons;
+    }
+
+    SqliteTimedSummonTransitionOperations timedTransitions() {
+        return timedTransitions;
     }
 
     SqliteCompanionCaptureOperations captures() {

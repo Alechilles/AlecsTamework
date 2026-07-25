@@ -49,6 +49,7 @@ class PersistenceConsolidationInventoryGuardTest {
             SOURCE_ROOT.resolve("persistence/migration"),
             SOURCE_ROOT.resolve("persistence/adapter"),
             SOURCE_ROOT.resolve("persistence/facade"),
+            SOURCE_ROOT.resolve("companion/command"),
             SOURCE_ROOT.resolve("companion/identity"),
             SOURCE_ROOT.resolve("companion/lifecycle"),
             SOURCE_ROOT.resolve("companion/population"),
@@ -141,6 +142,7 @@ class PersistenceConsolidationInventoryGuardTest {
                 SOURCE_ROOT.resolve("persistence/kernel"),
                 SOURCE_ROOT.resolve("persistence/adapter"),
                 SOURCE_ROOT.resolve("persistence/projection"),
+                SOURCE_ROOT.resolve("companion/command"),
                 SOURCE_ROOT.resolve("companion/identity"),
                 SOURCE_ROOT.resolve("companion/lifecycle"),
                 SOURCE_ROOT.resolve("companion/population")

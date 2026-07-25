@@ -5,6 +5,7 @@ public enum PersistenceFeatureDomain {
     IDENTITY,
     LIFECYCLE,
     POPULATION,
+    COMMAND,
     CAPTURE,
     DORMANT,
     COOP,

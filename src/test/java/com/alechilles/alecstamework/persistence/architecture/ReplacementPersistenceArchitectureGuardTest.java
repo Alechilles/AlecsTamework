@@ -20,6 +20,7 @@ class ReplacementPersistenceArchitectureGuardTest {
     );
     private static final Path SQLITE = MAIN.resolve("persistence/adapter/sqlite");
     private static final List<Path> REPLACEMENT_ROOTS = List.of(
+            MAIN.resolve("companion/command"),
             MAIN.resolve("companion/extension"),
             MAIN.resolve("companion/identity"),
             MAIN.resolve("companion/lifecycle"),
@@ -185,15 +186,19 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "capture",
                         "captureToCoop",
                         "makeDormant",
+                        "mutateCommandRoster",
                         "mutateExtension",
                         "mutateProfile",
+                        "mutateTimedSummonLease",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseCapturedCompanion",
                         "releaseFromCoop",
                         "restore",
                         "rotateAlias",
-                        "transitionOwnerPopulation"
+                        "transitionCommandRoster",
+                        "transitionOwnerPopulation",
+                        "transitionTimedSummon"
                 ),
                 operations
         );
@@ -215,7 +220,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "capturedReleases",
                         "restorations",
                         "coopCaptures",
-                        "coopReleases"
+                        "coopReleases",
+                        "timedSummons"
                 ),
                 boundaries
         );
@@ -299,8 +305,11 @@ class ReplacementPersistenceArchitectureGuardTest {
                 List.of(
                         "diagnoseCoopCapture",
                         "diagnoseCoopRelease",
+                        "findAllCommandRosters",
                         "findAllLifecycles",
                         "findAllPopulationGroupAssignments",
+                        "findCommandRoster",
+                        "findCommandRosterMembership",
                         "findCoopResidency",
                         "findCoopSlot",
                         "findExtension",
@@ -308,17 +317,22 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findOperation",
                         "findProfile",
                         "findStalePopulationGroupProfiles",
+                        "findTimedSummonLease",
+                        "projectedCommandRosterActions",
+                        "projectedCommandRosterRevisions",
                         "projectedCoopResidency",
                         "projectedCoopSnapshot",
                         "projectedExtension",
                         "projectedExtensions",
+                        "projectedLaggingCommandRosterProfiles",
                         "projectedLaggingPopulationGroupProfiles",
                         "projectedOwnerPopulationCount",
                         "projectedOwnerPopulationSnapshot",
                         "projectedPopulationGroupAssignments",
                         "projectedPopulationGroupCounts",
                         "projectedProfile",
-                        "projectedProfileSnapshot"
+                        "projectedProfileSnapshot",
+                        "projectedTimedSummons"
                 ),
                 queries
         );
