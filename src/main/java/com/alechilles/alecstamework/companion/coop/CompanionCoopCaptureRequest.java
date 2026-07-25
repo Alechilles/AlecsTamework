@@ -12,7 +12,7 @@ public record CompanionCoopCaptureRequest(
         @Nonnull LifecycleRevision expectedLifecycleRevision,
         @Nonnull CoopSlotKey targetSlot,
         @Nonnull CompanionSnapshot snapshot,
-        @Nonnull CoopCaptureSourceEvidence source,
+        @Nonnull CoopCaptureSource source,
         long requestedAtMs
 ) {
     public static final SnapshotKind SNAPSHOT_KIND = new SnapshotKind("coop");
@@ -39,5 +39,39 @@ public record CompanionCoopCaptureRequest(
                     "Coop capture source and slot must share one world boundary"
             );
         }
+        if (source instanceof CoopCapturedItemSourceEvidence capturedItem) {
+            requireCapturedItemSource(
+                    profileId,
+                    expectedLifecycleRevision,
+                    targetSlot,
+                    snapshot,
+                    capturedItem
+            );
+        }
+    }
+
+    private static void requireCapturedItemSource(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            CoopSlotKey targetSlot,
+            CompanionSnapshot targetSnapshot,
+            CoopCapturedItemSourceEvidence source
+    ) {
+        CompanionSnapshot captureSnapshot = source.captureSnapshot();
+        if (!profileId.equals(source.sourceProfileId())
+                || !profileId.equals(captureSnapshot.profileId())
+                || !captureSnapshot.sourceLifecycleRevision().equals(
+                expectedLifecycleRevision
+        )) {
+            throw new IllegalArgumentException(
+                    "Captured-item coop source must match the exact current profile fence"
+            );
+        }
+        CoopCapturedItemSnapshotDerivation.requireExact(
+                captureSnapshot,
+                targetSnapshot,
+                source.sourceAlias(),
+                targetSlot
+        );
     }
 }

@@ -8,7 +8,7 @@ public record CoopCaptureSourceEvidence(
         @Nonnull NpcAlias sourceAlias,
         @Nonnull String sourceWorldKey,
         @Nonnull String retirementReceiptKey
-) {
+) implements CoopCaptureSource {
     public CoopCaptureSourceEvidence {
         if (sourceAlias == null) {
             throw new IllegalArgumentException("Coop capture source alias is required");
@@ -17,6 +17,12 @@ public record CoopCaptureSourceEvidence(
         retirementReceiptKey = requireText(
                 retirementReceiptKey, "Coop capture retirement receipt"
         );
+    }
+
+    @Override
+    @Nonnull
+    public Kind kind() {
+        return Kind.LIVE_ENTITY;
     }
 
     private static String requireText(String value, String label) {
