@@ -43,7 +43,7 @@ class CoopResidentStateSnapshotCodecTest {
         assertNotNull(decoded);
         assertEquals(source.npcUuid(), decoded.npcUuid());
         assertEquals("coop_chicken", decoded.coopId());
-        assertEquals("tamed_chicken", decoded.roleId());
+        assertEquals("Tamed_Chicken", decoded.roleId());
         assertEquals(-9_001L, decoded.capturedAtMs());
         assertEquals(-101L, decoded.happiness().getLastUpdateMs());
         assertEquals(-102L, decoded.needs().getLastUpdateMs());

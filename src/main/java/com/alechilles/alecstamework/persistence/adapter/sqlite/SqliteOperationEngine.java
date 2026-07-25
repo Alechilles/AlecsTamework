@@ -269,9 +269,10 @@ public final class SqliteOperationEngine {
         }
         if (expected.phase() != OperationPhase.PREPARED
                 && expected.phase() != OperationPhase.LIVE_APPLYING
-                && expected.phase() != OperationPhase.RETRYABLE) {
+                && expected.phase() != OperationPhase.RETRYABLE
+                && expected.phase() != OperationPhase.UNKNOWN) {
             throw new IllegalArgumentException(
-                    "Durable commit requires prepared, applying, or retryable phase"
+                    "Durable commit requires a live-verifiable source phase"
             );
         }
         SqliteTransactionCommand<DurableCommitEvidence> command = new SqliteTransactionCommand<>(

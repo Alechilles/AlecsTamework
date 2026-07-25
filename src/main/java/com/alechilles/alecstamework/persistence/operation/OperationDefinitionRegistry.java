@@ -124,6 +124,23 @@ public final class OperationDefinitionRegistry {
         }
     }
 
+    /** Returns whether the exact registered definition opts this UNKNOWN into live proof. */
+    public boolean allowsUnknownLiveReverification(
+            @Nonnull OperationEnvelope envelope
+    ) {
+        if (envelope == null) {
+            throw new IllegalArgumentException(
+                    "Operation envelope is required"
+            );
+        }
+        OperationDefinition<?> definition = definitions.get(
+                envelope.kind()
+        );
+        return definition != null
+                && definition.payloadVersion() == envelope.payloadVersion()
+                && definition.allowsUnknownLiveReverification(envelope);
+    }
+
     private void requireRegistered(OperationDefinition<?> definition) {
         validate(definition);
         if (definitions.get(definition.kind()) != definition) {

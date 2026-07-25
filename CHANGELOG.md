@@ -110,6 +110,11 @@
   lowercased by an earlier snapshot. New snapshots preserve exact Hytale role
   casing, while tester-only case-damaged profiles can complete one safe
   transition into the correctly cased tamed role.
+- Fixed linked timed companions becoming impossible to dismiss, summon, or
+  capture after an earlier snapshot lowercased a mixed-case role ID. Restart
+  recovery now rechecks the exact live companion, completes case-only matches,
+  and clears only that operation's persistence block; genuinely different
+  roles remain safely contained.
 - Capture items with a required status effect now show a clear warning when
   that effect is missing; tranquilizer-based captures specifically tell the
   player that the target must be tranquilized.

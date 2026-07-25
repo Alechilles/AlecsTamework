@@ -33,6 +33,12 @@ Failures around commit have three distinct meanings:
 - known commit: return committed;
 - unknown outcome: run the operation's exact readback contract before retry or compensation.
 
+`UNKNOWN` remains manual-review-only by default. A registered operation definition may opt one
+exact failure signature into automatic live reverification only when its live resolver is
+idempotent and requires positive frozen evidence. A confirmed result commits directly from
+`UNKNOWN` to `DURABLE` and resolves that operation's matching incident and quarantine scopes in
+the same transaction. An absent, conflicting, or unreadable result stays `UNKNOWN` and contained.
+
 No filesystem, network, ECS, inventory, or projection callback runs inside a database transaction.
 
 ## Consequences

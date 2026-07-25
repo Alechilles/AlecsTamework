@@ -241,9 +241,15 @@ final class HytaleTimedSummonStoreGateway {
         }
         return authority.liveAlias().value().equals(snapshot.npcUuid())
                 && snapshot.roleId() != null
-                && snapshot.roleId().equals(
+                && sameRole(snapshot.roleId(),
                         components.npc().getRoleName()
                 );
+    }
+
+    /** Accepts only the tester-era case damage, never a different role ID. */
+    static boolean sameRole(String frozenRoleId, String liveRoleId) {
+        return frozenRoleId != null && liveRoleId != null
+                && frozenRoleId.equalsIgnoreCase(liveRoleId);
     }
 
     @Nullable

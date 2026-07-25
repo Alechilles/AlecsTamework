@@ -117,7 +117,7 @@ class PositiveEvidenceDormantAuthorTest {
 
         assertTrue(result.published());
         assertEquals(
-                "tamed_deer_stag",
+                "Tamed_Deer_Stag",
                 ((DeathSnapshotV2Payload) ((com.alechilles.alecstamework
                         .companion.snapshot.SnapshotDecodeResult.Decoded<?>)
                         TameworkSnapshotCodecs.create().decode(

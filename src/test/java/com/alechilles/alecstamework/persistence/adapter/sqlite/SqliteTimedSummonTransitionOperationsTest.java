@@ -6,11 +6,17 @@ import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitio
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
+import com.alechilles.alecstamework.persistence.incidents.IncidentState;
+import com.alechilles.alecstamework.persistence.incidents.QuarantineState;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
+import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -214,6 +220,157 @@ class SqliteTimedSummonTransitionOperationsTest
                 .get(10, TimeUnit.SECONDS));
         assertEquals(2, lifecycleRead(PROFILE_A).revision().value());
         assertEquals(0, reservationCount(operationId));
+    }
+
+    @Test
+    void recoveryReverifiesKnownCaseDamagedStoreAndReleasesContainment()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(100);
+        TimedSummonTransitionRequest start = startRequest(
+                prepared, lifecycleRead(PROFILE_A), -3_000
+        );
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(104),
+                new IdempotencyKey("timed:case-recovery-start"),
+                start,
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "spawned"
+                ).completed()
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+
+        TimedSummonTransitionRequest store = storeRequest(
+                prepared, lifecycleRead(PROFILE_A), lease(), -2_000
+        );
+        var operationId = operationId(105);
+        OperationWorkflowResult unknown =
+                adapter.timedSummonTransitionOperations().submit(
+                        operationId,
+                        new IdempotencyKey("timed:case-recovery-store"),
+                        store,
+                        (request, operation) ->
+                                LiveOperationResult.unknown(
+                                        "timed_summon_store_evidence_conflict",
+                                        null
+                                ).completed()
+                ).completion().toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                OperationWorkflowResult.Status.LIVE_UNKNOWN,
+                unknown.status()
+        );
+        com.alechilles.alecstamework.persistence.incidents.IncidentId
+                incidentId;
+        try (var connection = connections.openReadConnection()) {
+            OperationEnvelope operation = new SqliteOperationStore(connection)
+                    .find(operationId).orElseThrow();
+            assertEquals(OperationPhase.UNKNOWN, operation.phase());
+            assertTrue(TimedSummonTransitionDefinition.INSTANCE
+                    .allowsUnknownLiveReverification(operation));
+            var quarantine = new SqliteIncidentStore(connection)
+                    .findQuarantine(OperationScope.operation(operationId))
+                    .orElseThrow();
+            assertEquals(QuarantineState.ACTIVE, quarantine.state());
+            incidentId = quarantine.incidentId();
+        }
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                boundaries(), "case-damaged-store-recovery"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(
+                SqlitePublicRecoveryResult.Status.COMPLETE,
+                recovered.status()
+        );
+        assertEquals(1, recovered.completedCount());
+        assertEquals(LifecycleState.ROSTER_STORED,
+                lifecycleRead(PROFILE_A).state());
+        try (var connection = connections.openReadConnection()) {
+            SqliteOperationStore operations =
+                    new SqliteOperationStore(connection);
+            SqliteIncidentStore incidents =
+                    new SqliteIncidentStore(connection);
+            assertEquals(
+                    OperationPhase.PUBLISHED,
+                    operations.find(operationId).orElseThrow().phase()
+            );
+            assertEquals(
+                    IncidentState.RESOLVED,
+                    incidents.findIncident(incidentId).orElseThrow().state()
+            );
+            for (OperationScope scope : List.of(
+                    OperationScope.operation(operationId),
+                    OperationScope.profile(PROFILE_A),
+                    OperationScope.owner(OWNER),
+                    OperationScope.commandFamily(FAMILY)
+            )) {
+                assertEquals(
+                        QuarantineState.RELEASED,
+                        incidents.findQuarantine(scope)
+                                .orElseThrow().state()
+                );
+            }
+        }
+    }
+
+    @Test
+    void unresolvedCaseDamagedStoreRemainsUnknownAndContained()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(110);
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(114),
+                new IdempotencyKey("timed:case-retry-start"),
+                startRequest(prepared, lifecycleRead(PROFILE_A), -3_000),
+                (request, operation) -> LiveOperationResult.confirmed(
+                        "spawned"
+                ).completed()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS));
+
+        OperationId operationId = operationId(115);
+        adapter.timedSummonTransitionOperations().submit(
+                operationId,
+                new IdempotencyKey("timed:case-retry-store"),
+                storeRequest(
+                        prepared, lifecycleRead(PROFILE_A), lease(), -2_000
+                ),
+                (request, operation) -> LiveOperationResult.unknown(
+                        "timed_summon_store_evidence_conflict", null
+                ).completed()
+        ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        PublicPersistenceLiveBoundaries defaults = boundaries();
+        PublicPersistenceLiveBoundaries unresolved =
+                new PublicPersistenceLiveBoundaries(
+                        defaults.captures(),
+                        defaults.capturedReleases(),
+                        defaults.restorations(),
+                        defaults.coopCaptures(),
+                        defaults.coopReleases(),
+                        (request, operation) -> LiveOperationResult.retryable(
+                                "live_evidence_not_ready", null
+                        ).completed(),
+                        defaults.provisioningActivations(),
+                        defaults.paidRevivals()
+                );
+
+        SqlitePublicRecoveryResult recovered = adapter.recover(
+                unresolved, "case-damaged-store-unresolved"
+        ).toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        assertEquals(SqlitePublicRecoveryResult.Status.COMPLETE,
+                recovered.status());
+        assertEquals(0, recovered.completedCount());
+        assertEquals(1, recovered.deferredCount());
+        try (var connection = connections.openReadConnection()) {
+            assertEquals(OperationPhase.UNKNOWN,
+                    new SqliteOperationStore(connection).find(operationId)
+                            .orElseThrow().phase());
+            assertEquals(QuarantineState.ACTIVE,
+                    new SqliteIncidentStore(connection).findQuarantine(
+                            OperationScope.operation(operationId)
+                    ).orElseThrow().state());
+        }
     }
 
     private TimedSummonTransitionRequest withPlacement(

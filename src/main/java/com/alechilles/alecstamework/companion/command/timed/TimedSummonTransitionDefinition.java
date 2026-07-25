@@ -8,7 +8,9 @@ import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacementJ
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupTransitionAdmissionJsonCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshotJsonCodec;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -36,6 +38,26 @@ public final class TimedSummonTransitionDefinition
     @Override
     public Class<TimedSummonTransitionRequest> payloadType() {
         return TimedSummonTransitionRequest.class;
+    }
+
+    @Override
+    public boolean allowsUnknownLiveReverification(
+            OperationEnvelope operation
+    ) {
+        if (operation == null
+                || operation.phase() != OperationPhase.UNKNOWN
+                || !"live".equals(operation.failureKind())
+                || !"timed_summon_store_evidence_conflict".equals(
+                operation.failureCode()
+        )) {
+            return false;
+        }
+        try {
+            return decode(operation.payloadJson()).action()
+                    == TimedSummonTransitionRequest.Action.STORE;
+        } catch (RuntimeException invalid) {
+            return false;
+        }
     }
 
     @Override
@@ -127,4 +149,3 @@ public final class TimedSummonTransitionDefinition
         );
     }
 }
-

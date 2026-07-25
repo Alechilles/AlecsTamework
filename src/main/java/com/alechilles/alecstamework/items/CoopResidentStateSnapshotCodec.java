@@ -103,7 +103,7 @@ public final class CoopResidentStateSnapshotCodec {
             UUID npcUuid = requiredSourceUuid(payload);
             String coopId = normalizeIdentifier(optionalString(payload, "coopId"));
             int residentSlot = optionalInt(payload, "residentSlot", -1);
-            String roleId = normalizeIdentifier(optionalString(payload, "roleId"));
+            String roleId = normalizeRoleId(optionalString(payload, "roleId"));
             long capturedAtMs = optionalLong(payload, "capturedAtMs", 0L);
             TameworkCommandLinksComponent commandLinks = component(
                     payload, "commandLinks", TameworkCommandLinksComponent.class);
@@ -293,6 +293,11 @@ public final class CoopResidentStateSnapshotCodec {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Nullable
+    private String normalizeRoleId(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Nonnull

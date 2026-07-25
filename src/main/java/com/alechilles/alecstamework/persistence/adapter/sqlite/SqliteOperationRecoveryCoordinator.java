@@ -19,13 +19,17 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationLeaseRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
+import com.alechilles.alecstamework.persistence.operation.OperationScopeType;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryAction;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryClaim;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryIssue;
 import com.alechilles.alecstamework.persistence.recovery.OperationRecoveryScanResult;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -102,26 +106,11 @@ public final class SqliteOperationRecoveryCoordinator {
                 connection -> {
                     SqlitePersistenceTransactionContext transaction =
                             new SqlitePersistenceTransactionContext(connection);
-                    List<OperationEnvelope> recoverable =
-                            transaction.operations().findRecoverable(
-                                    nowMs,
-                                    limit,
-                                    exclusions
-                            );
-                    ArrayList<OperationEnvelope> eligible = new ArrayList<>();
-                    int skipped = 0;
-                    for (OperationEnvelope operation : recoverable) {
-                        ScopeQuarantine quarantine = transaction.incidents()
-                                .findQuarantine(OperationScope.operation(operation.operationId()))
-                                .orElse(null);
-                        if (quarantine != null && quarantine.state() == QuarantineState.ACTIVE) {
-                            skipped++;
-                        } else {
-                            eligible.add(operation);
-                        }
-                    }
+                    List<OperationEnvelope> eligible = recoverableIncludingAllowedQuarantines(
+                            transaction, nowMs, limit, exclusions
+                    );
                     return PersistenceReadResult.found(
-                            new RecoveryCandidates(List.copyOf(eligible), skipped),
+                            new RecoveryCandidates(eligible, 0),
                             eligible.size()
                     );
                 }
@@ -140,6 +129,57 @@ public final class SqliteOperationRecoveryCoordinator {
                     0, new ArrayList<>(), new ArrayList<>()
             );
         });
+    }
+
+    private List<OperationEnvelope> recoverableIncludingAllowedQuarantines(
+            SqlitePersistenceTransactionContext transaction,
+            long nowMs,
+            int limit,
+            Set<OperationId> exclusions
+    ) {
+        Map<OperationId, OperationEnvelope> eligible = new LinkedHashMap<>();
+        for (OperationEnvelope operation : transaction.operations()
+                .findRecoverable(nowMs, limit, exclusions)) {
+            eligible.put(operation.operationId(), operation);
+        }
+        for (ScopeQuarantine quarantine : transaction.incidents().findAllActiveQuarantines()) {
+            addAllowedQuarantinedOperation(
+                    transaction, quarantine, nowMs, exclusions, eligible
+            );
+        }
+        return eligible.values().stream()
+                .sorted(Comparator.comparingLong(OperationEnvelope::createdAtMs)
+                        .thenComparing(operation -> operation.operationId().toString()))
+                .limit(limit)
+                .toList();
+    }
+
+    private void addAllowedQuarantinedOperation(
+            SqlitePersistenceTransactionContext transaction,
+            ScopeQuarantine quarantine,
+            long nowMs,
+            Set<OperationId> exclusions,
+            Map<OperationId, OperationEnvelope> eligible
+    ) {
+        if (quarantine.state() != QuarantineState.ACTIVE
+                || quarantine.scope().type() != OperationScopeType.OPERATION) {
+            return;
+        }
+        OperationId operationId;
+        try {
+            operationId = OperationId.parse(quarantine.scope().key());
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        if (exclusions.contains(operationId) || eligible.containsKey(operationId)) {
+            return;
+        }
+        OperationEnvelope operation = transaction.operations().find(operationId).orElse(null);
+        if (operation == null || operation.phase().isTerminal() || operation.leasedAt(nowMs)
+                || !definitions.allowsUnknownLiveReverification(operation)) {
+            return;
+        }
+        eligible.put(operationId, operation);
     }
 
     private CompletionStage<OperationRecoveryScanResult> process(
@@ -295,7 +335,10 @@ public final class SqliteOperationRecoveryCoordinator {
             case DURABLE -> OperationRecoveryAction.PUBLISH_DURABLE;
             case COMPENSATING -> OperationRecoveryAction.VERIFY_COMPENSATION;
             case RETRYABLE -> OperationRecoveryAction.RETRY_FROM_EVIDENCE;
-            case UNKNOWN -> OperationRecoveryAction.MANUAL_REVIEW;
+            case UNKNOWN -> definitions
+                    .allowsUnknownLiveReverification(operation)
+                    ? OperationRecoveryAction.VERIFY_LIVE_APPLY
+                    : OperationRecoveryAction.MANUAL_REVIEW;
             case PUBLISHED, COMPENSATED, FAILED ->
                     throw new IllegalArgumentException("Terminal operation cannot be recovered");
         };

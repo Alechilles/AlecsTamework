@@ -108,6 +108,7 @@ public final class SqliteLiveOperationCoordinator {
                         );
                     }
                     return continueFrom(
+                            definition,
                             operation,
                             request.payload(),
                             liveBoundary,
@@ -121,6 +122,7 @@ public final class SqliteLiveOperationCoordinator {
     }
 
     private <T> CompletionStage<OperationWorkflowResult> continueFrom(
+            OperationDefinition<T> definition,
             OperationEnvelope operation,
             T payload,
             LiveOperationBoundary<T> liveBoundary,
@@ -147,7 +149,23 @@ public final class SqliteLiveOperationCoordinator {
                     operation, payload, liveBoundary, durableCleanup,
                     durableWork, consumers, code
             );
-            case UNKNOWN -> SqliteOperationResults.completed(
+            case UNKNOWN -> definition
+                    .allowsUnknownLiveReverification(operation)
+                    ? SqliteUnknownLiveOperationRecovery.verify(
+                            operation,
+                            payload,
+                            liveBoundary,
+                            () -> commit(
+                                    operation,
+                                    payload,
+                                    durableCleanup,
+                                    durableWork,
+                                    consumers,
+                                    code
+                            ),
+                            code
+                    )
+                    : SqliteOperationResults.completed(
                     SqliteOperationResults.failed(
                             OperationWorkflowResult.Status.LIVE_UNKNOWN,
                             operation,
@@ -215,33 +233,17 @@ public final class SqliteLiveOperationCoordinator {
             List<ProjectionConsumer> consumers,
             String code
     ) {
-        CompletionStage<LiveOperationResult> resolution;
-        try {
-            resolution = liveBoundary.applyOrResolve(payload, operation);
-            if (resolution == null) {
-                throw new IllegalStateException(code + "_live_boundary_returned_null");
-            }
-        } catch (Throwable failure) {
-            resolution = LiveOperationResult.retryable(
-                    code + "_live_boundary_failed",
-                    failure
-            ).completed();
-        }
-        return resolution.handle((live, failure) -> failure == null
-                        ? live
-                        : LiveOperationResult.retryable(
-                                code + "_live_boundary_failed",
-                                failure
-                        ))
-                .thenCompose(live -> continueLiveResult(
-                        operation,
-                        payload,
-                        durableCleanup,
-                        durableWork,
-                        consumers,
-                        code,
-                        requireLiveResult(live, code)
-                ));
+        return SqliteLiveBoundaryResolver.resolve(
+                operation, payload, liveBoundary, code
+        ).thenCompose(live -> continueLiveResult(
+                operation,
+                payload,
+                durableCleanup,
+                durableWork,
+                consumers,
+                code,
+                live
+        ));
     }
 
     private <T> CompletionStage<OperationWorkflowResult> continueLiveResult(
@@ -283,20 +285,6 @@ public final class SqliteLiveOperationCoordinator {
                     code
             );
         };
-    }
-
-    private LiveOperationResult requireLiveResult(
-            LiveOperationResult live,
-            String code
-    ) {
-        return live == null
-                ? LiveOperationResult.retryable(
-                        code + "_live_boundary_returned_null",
-                        new IllegalStateException(
-                                code + "_live_boundary_returned_null"
-                        )
-                )
-                : live;
     }
 
     private CompletionStage<OperationWorkflowResult> transitionLiveFailure(
@@ -345,9 +333,13 @@ public final class SqliteLiveOperationCoordinator {
             String code
     ) {
         long committedAtMs = clock.getAsLong();
+        TimedDurableOperationWork<T> recoveryAwareWork =
+                SqliteUnknownLiveOperationRecovery.containmentAwareWork(
+                        operation, durableWork
+                );
         return operations.commitDurable(
                 operation,
-                (transaction, current) -> durableWork.execute(
+                (transaction, current) -> recoveryAwareWork.execute(
                         transaction,
                         current,
                         payload,
