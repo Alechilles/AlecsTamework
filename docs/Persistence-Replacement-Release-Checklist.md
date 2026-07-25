@@ -21,13 +21,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `2cf3f015ba79250cf92c9870e451da6811694b4a` |
+| Tamework commit | `12ba60e9229238e2b18125b7e61ab0d062d2f868` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
 | Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
-| Candidate SHA-256 | `00ced182a53894a39bb9a497d968325062dec8b528c0249bbe3a8719d4b626a0` |
-| Maven test result | Clean isolated run on 2026-07-24: 2,566 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed in 41.5 seconds, artifact size 22,732,690 bytes |
+| Candidate SHA-256 | `c81cd8b58b293d07b893d6cf8cae2cd45b1d83019ed773d18b9793f0c4ac1d64` |
+| Maven test result | Clean isolated run on 2026-07-24: 2,578 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,764,071 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -35,8 +35,13 @@ recorded SHA-256.
 This records the latest automated candidate only. The unchecked manual
 fresh-world, copied-save, and rollback gates remain required before publishing.
 
-Two earlier candidates are superseded:
+Earlier candidates are superseded:
 
+- `35e09a60812271802aa609640d8c81c5ca4096fd996a98024ad1073dd891a005`
+  imported the copied public save correctly but silently rejected filled
+  spawners created by public `v2.16.1`. Commit `12ba60e9` now joins the exact
+  public item evidence to its imported canonical capture profile through the
+  normal receipt-first release operation.
 - `6faf1eedaf303f17337c6e1abdf637c1755fd61ee8dffaeb8f2b2767a1b5a653`
   passed the focused Hub rehearsal but falsely quarantined public coop
   residents during the first copied-save test. The source remained unchanged.
