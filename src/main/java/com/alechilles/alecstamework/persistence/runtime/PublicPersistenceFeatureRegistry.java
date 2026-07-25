@@ -297,9 +297,14 @@ public final class PublicPersistenceFeatureRegistry {
                 ),
                 PublicPersistenceFeatureDescriptorFactory.scopes(
                         CompanionCaptureDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.OWNER
+                        PublicPersistenceFeatureDescriptorFactory.policy(
+                                Set.of(
+                                        OperationScopeType.PROFILE,
+                                        OperationScopeType.OWNER
+                                ),
+                                Set.of(
+                                        OperationScopeType.COMMAND_FAMILY
+                                )
                         ),
                         CompanionCaptureReleaseDefinition.INSTANCE,
                         PublicPersistenceFeatureDescriptorFactory.policy(
@@ -320,7 +325,8 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
-                        OperationScopeType.OWNER
+                        OperationScopeType.OWNER,
+                        OperationScopeType.COMMAND_FAMILY
                 )
         );
     }

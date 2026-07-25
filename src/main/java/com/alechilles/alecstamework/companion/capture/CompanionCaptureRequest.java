@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 
-/** Immutable command to replace one live companion with one exact captured artifact. */
+/** Immutable command for one exact terminal resolved capture attempt. */
 public record CompanionCaptureRequest(
         @Nonnull ProfileId profileId,
         @Nonnull LifecycleRevision expectedLifecycleRevision,
@@ -56,6 +56,16 @@ public record CompanionCaptureRequest(
                     expectedLifecycleRevision,
                     source,
                     captured.evidence()
+            );
+        } else if (terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink tame) {
+            requireTameAndLinkEvidence(
+                    profileId,
+                    expectedLifecycleRevision,
+                    resultingOwnerId,
+                    targetAlias,
+                    targetWorldKey,
+                    tame.evidence()
             );
         } else if (resultingOwnerId != null) {
             throw new IllegalArgumentException(
@@ -113,6 +123,21 @@ public record CompanionCaptureRequest(
         return terminal instanceof CaptureTerminalPlan.FailedAttempt;
     }
 
+    public boolean tameAndCommandLink() {
+        return terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink;
+    }
+
+    public CaptureTameAndLinkEvidence tameAndLinkEvidence() {
+        if (terminal
+                instanceof CaptureTerminalPlan.TameAndCommandLink tame) {
+            return tame.evidence();
+        }
+        throw new IllegalStateException(
+                "Capture terminal result does not contain tame/link evidence"
+        );
+    }
+
     private static void requireCapturedEvidence(
             ProfileId profileId,
             LifecycleRevision expectedLifecycleRevision,
@@ -138,6 +163,43 @@ public record CompanionCaptureRequest(
             );
         }
         requireArtifactReceipt(artifact, source.receiptKey());
+    }
+
+    private static void requireTameAndLinkEvidence(
+            ProfileId profileId,
+            LifecycleRevision expectedLifecycleRevision,
+            OwnerId resultingOwnerId,
+            NpcAlias targetAlias,
+            String targetWorldKey,
+            CaptureTameAndLinkEvidence evidence
+    ) {
+        if (resultingOwnerId == null
+                || !profileId.equals(
+                evidence.expectedIdentity().profileId()
+        )
+                || !expectedLifecycleRevision.equals(
+                evidence.expectedLifecycle().revision()
+        )
+                || !resultingOwnerId.equals(
+                evidence.finalLifecycle().ownerId()
+        )
+                || !resultingOwnerId.equals(
+                evidence.live().targetOwnerId()
+        )
+                || !targetAlias.toString().equals(
+                evidence.expectedLifecycle().location().key()
+        )
+                || !targetWorldKey.equals(
+                evidence.expectedLifecycle().location().worldKey()
+        )
+                || evidence.ownerPopulation().increases().stream()
+                .anyMatch(increase -> !resultingOwnerId.equals(
+                        increase.scope().ownerId()
+                ))) {
+            throw new IllegalArgumentException(
+                    "Tame/link capture request evidence is inconsistent"
+            );
+        }
     }
 
     private CompanionSnapshotEvidence capturedEvidence() {

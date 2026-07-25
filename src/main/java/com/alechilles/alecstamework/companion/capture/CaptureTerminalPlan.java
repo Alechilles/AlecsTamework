@@ -25,6 +25,27 @@ public sealed interface CaptureTerminalPlan {
         }
     }
 
+    /** Successful resolved attempt that converts the same live NPC into one roster companion. */
+    record TameAndCommandLink(
+            @Nonnull CaptureAttemptResolution resolution,
+            @Nonnull CaptureTameAndLinkEvidence evidence
+    ) implements CaptureTerminalPlan {
+        public TameAndCommandLink {
+            if (resolution == null || evidence == null
+                    || !resolution.successful()
+                    || resolution.successDisposition()
+                    != com.alechilles.alecstamework.api
+                    .CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                    || !resolution.targetRoleId().equals(
+                    evidence.live().expectedRoleId()
+            )) {
+                throw new IllegalArgumentException(
+                        "Tame/link terminal evidence is inconsistent"
+                );
+            }
+        }
+    }
+
     /** Terminal failed roll that spends only a resolved-attempt source. */
     record FailedAttempt(
             @Nonnull CaptureAttemptResolution resolution

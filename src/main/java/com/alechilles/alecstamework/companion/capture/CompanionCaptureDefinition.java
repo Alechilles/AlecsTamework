@@ -51,7 +51,11 @@ public final class CompanionCaptureDefinition
         json.addProperty("targetWorldKey", payload.targetWorldKey());
         json.addProperty(
                 "terminalKind",
-                payload.capturedItem() ? "CAPTURED_ITEM" : "FAILED_ATTEMPT"
+                payload.capturedItem()
+                        ? "CAPTURED_ITEM"
+                        : payload.tameAndCommandLink()
+                        ? "TAME_AND_COMMAND_LINK"
+                        : "FAILED_ATTEMPT"
         );
         json.add(
                 "resolution",
@@ -67,6 +71,13 @@ public final class CompanionCaptureDefinition
             json.add(
                     "artifact",
                     CapturedArtifactJsonCodec.encode(payload.artifact())
+            );
+        } else if (payload.tameAndCommandLink()) {
+            json.add(
+                    "tameAndLink",
+                    CaptureTameAndLinkEvidenceJsonCodec.encode(
+                            payload.tameAndLinkEvidence()
+                    )
             );
         }
         json.add("source", encodeSource(payload.source()));
@@ -142,6 +153,13 @@ public final class CompanionCaptureDefinition
             );
             case "FAILED_ATTEMPT" ->
                     new CaptureTerminalPlan.FailedAttempt(resolution);
+            case "TAME_AND_COMMAND_LINK" ->
+                    new CaptureTerminalPlan.TameAndCommandLink(
+                            resolution,
+                            CaptureTameAndLinkEvidenceJsonCodec.decode(
+                                    json.getAsJsonObject("tameAndLink")
+                            )
+                    );
             default -> throw new IllegalArgumentException(
                     "Unknown capture terminal kind: " + kind.getAsString()
             );

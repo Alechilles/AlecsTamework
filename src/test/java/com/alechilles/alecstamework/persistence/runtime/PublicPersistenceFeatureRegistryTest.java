@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.runtime;
 
+import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseDefinition;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureDescriptor;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
@@ -62,6 +63,21 @@ class PublicPersistenceFeatureRegistryTest {
         assertTrue(capture.startupDependencies().contains(
                 PublicPersistenceFeatureRegistry.ECONOMIC_COMPENSATION
         ));
+        assertEquals(
+                Set.of(
+                        OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER
+                ),
+                capture.operationScopes().get(
+                        CompanionCaptureDefinition.INSTANCE.kind()
+                ).required()
+        );
+        assertEquals(
+                Set.of(OperationScopeType.COMMAND_FAMILY),
+                capture.operationScopes().get(
+                        CompanionCaptureDefinition.INSTANCE.kind()
+                ).optional()
+        );
         assertEquals(
                 Set.of(OperationScopeType.PROFILE),
                 capture.operationScopes().get(
