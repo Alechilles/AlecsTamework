@@ -169,7 +169,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(8, result.catchUps().size());
+        assertEquals(9, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
     }
 

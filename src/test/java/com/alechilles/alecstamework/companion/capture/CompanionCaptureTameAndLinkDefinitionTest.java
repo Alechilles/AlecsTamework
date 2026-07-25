@@ -1,6 +1,13 @@
 package com.alechilles.alecstamework.companion.capture;
 
 import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationAdmissionPlan;
+import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentPlan;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
+import com.alechilles.alecstamework.companion.population.group.PopulationGroupReservation;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,6 +89,134 @@ class CompanionCaptureTameAndLinkDefinitionTest {
                         wrong,
                         CaptureTameAndLinkTestFixtures.evidence()
                 )
+        );
+    }
+
+    @Test
+    void evidenceRejectsOwnerCapacityReservedInAnotherWorld() {
+        CaptureTameAndLinkEvidence valid =
+                CaptureTameAndLinkTestFixtures.evidence();
+        OwnerPopulationAdmissionPlan wrong =
+                new OwnerPopulationAdmissionPlan(
+                        valid.ownerPopulation().profileId(),
+                        valid.ownerPopulation()
+                                .expectedLifecycleRevision(),
+                        List.of(
+                                valid.ownerPopulation().increases()
+                                        .getFirst(),
+                                new OwnerPopulationAdmissionPlan.LimitIncrease(
+                                        OwnerPopulationScope.perWorld(
+                                                valid.finalLifecycle().ownerId(),
+                                                "other-world"
+                                        ),
+                                        1,
+                                        0
+                                )
+                        )
+                );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> withPopulation(
+                        valid, wrong, valid.populationGroups()
+                )
+        );
+    }
+
+    @Test
+    void evidenceRejectsReservationForUnassignedGroup() {
+        CaptureTameAndLinkEvidence valid =
+                CaptureTameAndLinkTestFixtures.evidence();
+        PopulationGroupReservation reservation =
+                valid.populationGroups().targetPlan()
+                        .reservations().getFirst();
+        PopulationGroupReservation wrong =
+                new PopulationGroupReservation(
+                        reservation.operationId(),
+                        reservation.profileId(),
+                        reservation.expectedLifecycleRevision(),
+                        new PopulationGroupBucket(
+                                reservation.bucket().ownerId(),
+                                "unassigned_group",
+                                reservation.bucket().scope(),
+                                reservation.bucket().ownerWorldKey()
+                        ),
+                        reservation.ownedDelta(),
+                        reservation.activeDelta(),
+                        reservation.snapshottedMaxOwned(),
+                        reservation.snapshottedMaxActive(),
+                        reservation.policyRevision(),
+                        reservation.createdAtMs()
+                );
+        CapturePopulationGroupEvidence groups =
+                new CapturePopulationGroupEvidence(
+                        valid.populationGroups().expectedAssignment(),
+                        new PopulationGroupAssignmentPlan(
+                                valid.populationGroups()
+                                        .targetPlan().target(),
+                                List.of(wrong)
+                        )
+                );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> withPopulation(
+                        valid, valid.ownerPopulation(), groups
+                )
+        );
+    }
+
+    @Test
+    void evidenceRejectsChangedReconciliationGeneration() {
+        CaptureTameAndLinkEvidence valid =
+                CaptureTameAndLinkTestFixtures.evidence();
+        CompanionLifecycle target = valid.finalLifecycle();
+        CompanionLifecycle wrong = new CompanionLifecycle(
+                target.profileId(),
+                target.ownerId(),
+                target.state(),
+                target.location(),
+                target.revision(),
+                target.activeOperationId(),
+                target.stateChangedAtMs(),
+                target.lastReconciledGeneration().next(),
+                target.quarantineIncidentId(),
+                target.ownerWorldKey()
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new CaptureTameAndLinkEvidence(
+                        valid.expectedIdentity(),
+                        valid.targetIdentity(),
+                        valid.expectedLifecycle(),
+                        wrong,
+                        valid.ownerPopulation(),
+                        valid.populationGroups(),
+                        valid.expectedRosterRevision(),
+                        valid.rosterMembership(),
+                        valid.timedActivation(),
+                        valid.live()
+                )
+        );
+    }
+
+    private CaptureTameAndLinkEvidence withPopulation(
+            CaptureTameAndLinkEvidence valid,
+            OwnerPopulationAdmissionPlan owner,
+            CapturePopulationGroupEvidence groups
+    ) {
+        return new CaptureTameAndLinkEvidence(
+                valid.expectedIdentity(),
+                valid.targetIdentity(),
+                valid.expectedLifecycle(),
+                valid.finalLifecycle(),
+                owner,
+                groups,
+                valid.expectedRosterRevision(),
+                valid.rosterMembership(),
+                valid.timedActivation(),
+                valid.live()
         );
     }
 }

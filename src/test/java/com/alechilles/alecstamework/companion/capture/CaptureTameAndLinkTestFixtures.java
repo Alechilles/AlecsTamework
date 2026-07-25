@@ -34,29 +34,30 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Deterministic complete tame/link evidence shared by focused tests. */
-final class CaptureTameAndLinkTestFixtures {
-    static final ProfileId PROFILE = ProfileId.parse(
+public final class CaptureTameAndLinkTestFixtures {
+    public static final ProfileId PROFILE = ProfileId.parse(
             "10000000-0000-0000-0000-000000000101"
     );
-    static final NpcAlias ALIAS = NpcAlias.parse(
+    public static final NpcAlias ALIAS = NpcAlias.parse(
             "20000000-0000-0000-0000-000000000101"
     );
-    static final OwnerId OWNER = OwnerId.parse(
+    public static final OwnerId OWNER = OwnerId.parse(
             "30000000-0000-0000-0000-000000000101"
     );
-    static final UUID ATTEMPT = UUID.fromString(
+    public static final UUID ATTEMPT = UUID.fromString(
             "40000000-0000-0000-0000-000000000101"
     );
-    static final OperationId OPERATION = OperationId.parse(
+    public static final OperationId OPERATION = OperationId.parse(
             "50000000-0000-0000-0000-000000000101"
     );
-    static final LifecycleRevision EXPECTED = new LifecycleRevision(4);
-    static final long NOW = -500;
+    public static final LifecycleRevision EXPECTED =
+            LifecycleRevision.INITIAL;
+    public static final long NOW = -500;
 
     private CaptureTameAndLinkTestFixtures() {
     }
 
-    static CompanionCaptureRequest request() {
+    public static CompanionCaptureRequest request() {
         CaptureAttemptResolution resolution = resolution();
         return new CompanionCaptureRequest(
                 PROFILE,
@@ -80,14 +81,14 @@ final class CaptureTameAndLinkTestFixtures {
         );
     }
 
-    static CaptureTameAndLinkEvidence evidence() {
+    public static CaptureTameAndLinkEvidence evidence() {
         CompanionIdentity before = identity(
-                "Dragon_Fire", "{\"tamed\":false}", 3, -900
+                "Dragon_Fire", "{\"tamed\":false}", 0, -900
         );
         CompanionIdentity after = identity(
                 "Tamed_Dragon_Fire",
                 "{\"owner_name\":\"Alec\",\"tamed\":true}",
-                4,
+                1,
                 NOW
         );
         CompanionLifecycle beforeLifecycle = new CompanionLifecycle(
@@ -179,7 +180,7 @@ final class CaptureTameAndLinkTestFixtures {
         );
     }
 
-    static CaptureAttemptResolution resolution() {
+    public static CaptureAttemptResolution resolution() {
         return new CaptureAttemptResolution(
                 ATTEMPT,
                 "Dragon_Fire",

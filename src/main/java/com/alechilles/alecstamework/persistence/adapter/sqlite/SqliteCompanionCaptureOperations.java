@@ -12,9 +12,11 @@ import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -74,20 +76,59 @@ public final class SqliteCompanionCaptureOperations {
                 capture,
                 FEATURE_SCOPE,
                 capture.expectedLifecycleRevision(),
-                List.of(
-                        OperationScope.profile(capture.profileId()),
-                        OperationScope.owner(OwnerId.parse(
-                                capture.source().actorUuid().toString()
-                        ))
-                ),
+                participants(capture),
                 capture.requestedAtMs()
         );
+        SqliteCompanionCapturePreparation base =
+                new SqliteCompanionCapturePreparation(capture);
+        PreparedOperationDetail detail = base;
+        SqliteOwnerPopulationParticipant owner = null;
+        SqliteCapturePopulationGroupParticipant groups = null;
+        if (capture.tameAndCommandLink()) {
+            SqliteCaptureCommandActivationParticipant command =
+                    new SqliteCaptureCommandActivationParticipant(
+                            capture.tameAndLinkEvidence()
+                    );
+            owner = new SqliteOwnerPopulationParticipant(
+                    capture.tameAndLinkEvidence().ownerPopulation()
+            );
+            groups = new SqliteCapturePopulationGroupParticipant(
+                    capture.tameAndLinkEvidence()
+            );
+            detail = PreparedOperationDetail.compose(
+                    command, owner, groups, base
+            );
+        }
+        SqliteOwnerPopulationParticipant ownerParticipant = owner;
+        SqliteCapturePopulationGroupParticipant groupParticipant =
+                groups;
         SqliteLiveOperationCoordinator.Submission submission = workflow.execute(
                 CompanionCaptureDefinition.INSTANCE,
                 request,
-                new SqliteCompanionCapturePreparation(capture),
+                detail,
                 liveBoundary,
-                commit::commit,
+                (transaction, operation, payload, committedAtMs) -> {
+                    if (ownerParticipant == null
+                            || groupParticipant == null) {
+                        return commit.commit(
+                                transaction,
+                                operation,
+                                payload,
+                                committedAtMs
+                        );
+                    }
+                    return ownerParticipant.decorate(
+                            groupParticipant.decorate(
+                                    (current, envelope) ->
+                                            commit.commit(
+                                                    current,
+                                                    envelope,
+                                                    payload,
+                                                    committedAtMs
+                                            )
+                            )
+                    ).execute(transaction, operation);
+                },
                 requiredConsumers,
                 "companion_capture"
         );
@@ -106,6 +147,23 @@ public final class SqliteCompanionCaptureOperations {
                     );
                 });
         return new Submission(submission.acceptance(), completion);
+    }
+
+    private List<OperationScope> participants(
+            CompanionCaptureRequest capture
+    ) {
+        TreeSet<OperationScope> scopes = new TreeSet<>();
+        scopes.add(OperationScope.profile(capture.profileId()));
+        scopes.add(OperationScope.owner(OwnerId.parse(
+                capture.source().actorUuid().toString()
+        )));
+        if (capture.tameAndCommandLink()) {
+            scopes.add(OperationScope.commandFamily(
+                    capture.tameAndLinkEvidence()
+                            .rosterMembership().familyKey()
+            ));
+        }
+        return List.copyOf(scopes);
     }
 
     /** Writer admission for atomic preparation plus the eventual exact workflow result. */

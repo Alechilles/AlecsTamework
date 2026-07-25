@@ -59,13 +59,22 @@ public record CompanionCaptureRequest(
             );
         } else if (terminal
                 instanceof CaptureTerminalPlan.TameAndCommandLink tame) {
+            if (resultingOwnerId == null
+                    || !resultingOwnerId.value().equals(
+                    source.actorUuid()
+            )) {
+                throw new IllegalArgumentException(
+                        "Tame/link capture owner must be the source actor"
+                );
+            }
             requireTameAndLinkEvidence(
                     profileId,
                     expectedLifecycleRevision,
                     resultingOwnerId,
                     targetAlias,
                     targetWorldKey,
-                    tame.evidence()
+                    tame.evidence(),
+                    requestedAtMs
             );
         } else if (resultingOwnerId != null) {
             throw new IllegalArgumentException(
@@ -171,7 +180,8 @@ public record CompanionCaptureRequest(
             OwnerId resultingOwnerId,
             NpcAlias targetAlias,
             String targetWorldKey,
-            CaptureTameAndLinkEvidence evidence
+            CaptureTameAndLinkEvidence evidence,
+            long requestedAtMs
     ) {
         if (resultingOwnerId == null
                 || !profileId.equals(
@@ -192,6 +202,8 @@ public record CompanionCaptureRequest(
                 || !targetWorldKey.equals(
                 evidence.expectedLifecycle().location().worldKey()
         )
+                || evidence.finalLifecycle().stateChangedAtMs()
+                != requestedAtMs
                 || evidence.ownerPopulation().increases().stream()
                 .anyMatch(increase -> !resultingOwnerId.equals(
                         increase.scope().ownerId()

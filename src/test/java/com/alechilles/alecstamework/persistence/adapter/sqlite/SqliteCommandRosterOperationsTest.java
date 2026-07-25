@@ -195,9 +195,14 @@ class SqliteCommandRosterOperationsTest
                 first.join().status()
                         == OperationWorkflowResult.Status.PREPARE_FAILED
                         ? first.join() : second.join();
-        assertTrue(rootMessage(denied.failure()).contains(
-                "population_group_active_capacity_reached"
-        ));
+        String denial = rootMessage(denied.failure());
+        assertTrue(
+                denial.contains("operation_command_family_busy")
+                        || denial.contains(
+                        "population_group_active_capacity_reached"
+                ),
+                denial
+        );
         assertEquals(
                 new PopulationGroupCounts(2, 1, 0, 0),
                 adapter.populationGroupIndex().counts(bucket())
@@ -319,4 +324,3 @@ class SqliteCommandRosterOperationsTest
                 lifecycleRead(PROFILE_A).state());
     }
 }
-

@@ -96,6 +96,14 @@ final class SqliteCaptureCompensation {
                     )
             );
         }
+        if (capture.tameAndCommandLink()) {
+            return matchesTameCompleted(
+                    transaction,
+                    operation.operationId(),
+                    capture,
+                    lifecycle
+            );
+        }
         return actual != null
                 && actual.delivered()
                 && sameClaim(expected, actual)
@@ -111,6 +119,56 @@ final class SqliteCaptureCompensation {
                 && transaction.snapshots()
                 .findById(capture.snapshot().snapshotId())
                 .isEmpty();
+    }
+
+    private static boolean matchesTameCompleted(
+            SqlitePersistenceTransactionContext transaction,
+            OperationId operationId,
+            CompanionCaptureRequest capture,
+            CompanionLifecycle lifecycle
+    ) {
+        var evidence = capture.tameAndLinkEvidence();
+        CompanionLifecycle source = evidence.expectedLifecycle();
+        CompanionAlias alias = transaction.identities()
+                .resolveAlias(capture.targetAlias())
+                .orElse(null);
+        return lifecycle.profileId().equals(source.profileId())
+                && java.util.Objects.equals(
+                lifecycle.ownerId(), source.ownerId()
+        )
+                && lifecycle.state() == source.state()
+                && lifecycle.location().equals(source.location())
+                && lifecycle.revision().equals(
+                source.revision().next().next()
+        )
+                && lifecycle.activeOperationId() == null
+                && !lifecycle.quarantined()
+                && lifecycle.lastReconciledGeneration().equals(
+                source.lastReconciledGeneration()
+        )
+                && java.util.Objects.equals(
+                lifecycle.ownerWorldKey(), source.ownerWorldKey()
+        )
+                && transaction.identities()
+                .findProfile(source.profileId())
+                .filter(evidence.expectedIdentity()::equals)
+                .isPresent()
+                && alias != null
+                && alias.state() == CompanionAlias.State.CURRENT
+                && alias.profileId().equals(source.profileId())
+                && java.util.Objects.equals(
+                evidence.populationGroups().expectedAssignment(),
+                transaction.populationGroups()
+                        .findAssignment(source.profileId()).orElse(null)
+        )
+                && transaction.commandRosters()
+                .findByProfile(source.profileId()).isEmpty()
+                && transaction.timedSummons()
+                .find(source.profileId()).isEmpty()
+                && transaction.population()
+                .findByOperation(operationId).isEmpty()
+                && transaction.populationGroups()
+                .findReservations(operationId).isEmpty();
     }
 
     private static RefundClaim claim(
@@ -211,6 +269,9 @@ final class SqliteCaptureCompensation {
                 requireUnchanged(transaction);
                 return;
             }
+            if (capture.tameAndCommandLink()) {
+                requireTameUncommitted(transaction, operation);
+            }
             CompanionLifecycle fenced = requireFenced(
                     transaction,
                     operation
@@ -238,6 +299,9 @@ final class SqliteCaptureCompensation {
                 throw new IllegalStateException(
                         "capture_compensation_lifecycle_rejected"
                 );
+            }
+            if (capture.tameAndCommandLink()) {
+                retireTameReservations(transaction, operation);
             }
         }
 
@@ -298,29 +362,98 @@ final class SqliteCaptureCompensation {
             CompanionAlias alias = transaction.identities()
                     .resolveAlias(capture.targetAlias())
                     .orElse(null);
-            boolean exactLocation = lifecycle.location().kind()
+            boolean exactFence = capture.tameAndCommandLink()
+                    ? SqliteCompanionCapturePreparation.matchesFence(
+                    lifecycle,
+                    operation,
+                    capture.tameAndLinkEvidence().expectedLifecycle(),
+                    capture.requestedAtMs()
+            )
+                    : lifecycle.state() == LifecycleState.ACTIVE
+                    && lifecycle.revision().equals(
+                    capture.expectedLifecycleRevision().next()
+            )
+                    && operation.operationId().equals(
+                    lifecycle.activeOperationId()
+            )
+                    && !lifecycle.quarantined()
+                    && lifecycle.location().kind()
                     == LifecycleLocationKind.LIVE_ENTITY
-                    && lifecycle.location().equals(LifecycleLocation.liveEntity(
+                    && lifecycle.location().equals(
+                    LifecycleLocation.liveEntity(
                             capture.targetAlias().toString(),
                             capture.targetWorldKey()
-                    ));
-            if (lifecycle.state() != LifecycleState.ACTIVE
-                    || !lifecycle.revision().equals(
-                    capture.expectedLifecycleRevision().next()
-            ) || !operation.operationId().equals(
-                    lifecycle.activeOperationId()
-            ) || lifecycle.quarantined() || !exactLocation
+                    )
+            );
+            if (!exactFence
                     || alias == null
                     || alias.state() != CompanionAlias.State.CURRENT
                     || !alias.profileId().equals(capture.profileId())
-                    || transaction.snapshots()
-                    .findById(capture.snapshot().snapshotId())
-                    .isPresent()) {
+                    || (capture.capturedItem()
+                    && transaction.snapshots()
+                            .findById(capture.snapshot().snapshotId())
+                            .isPresent())) {
                 throw new IllegalStateException(
                         "capture_compensation_fence_mismatch"
                 );
             }
             return lifecycle;
+        }
+
+        private void requireTameUncommitted(
+                SqlitePersistenceTransactionContext transaction,
+                OperationEnvelope operation
+        ) {
+            var evidence = capture.tameAndLinkEvidence();
+            if (transaction.identities()
+                    .findProfile(evidence.expectedIdentity().profileId())
+                    .filter(evidence.expectedIdentity()::equals)
+                    .isEmpty()
+                    || !java.util.Objects.equals(
+                    evidence.populationGroups().expectedAssignment(),
+                    transaction.populationGroups().findAssignment(
+                            capture.profileId()
+                    ).orElse(null)
+            )
+                    || transaction.commandRosters()
+                    .findByProfile(capture.profileId()).isPresent()
+                    || transaction.timedSummons()
+                    .find(capture.profileId()).isPresent()
+                    || !transaction.population()
+                    .findByOperation(operation.operationId()).equals(
+                            new SqliteOwnerPopulationParticipant(
+                                    evidence.ownerPopulation()
+                            ).reservations(operation)
+            )
+                    || !transaction.populationGroups()
+                    .findReservations(operation.operationId()).equals(
+                            evidence.populationGroups()
+                                    .targetPlan().reservations()
+            )) {
+                throw new IllegalStateException(
+                        "capture_tame_compensation_source_mismatch"
+                );
+            }
+        }
+
+        private void retireTameReservations(
+                SqlitePersistenceTransactionContext transaction,
+                OperationEnvelope operation
+        ) {
+            var evidence = capture.tameAndLinkEvidence();
+            if (!transaction.population().retireExact(
+                    operation.operationId(),
+                    evidence.ownerPopulation().increases().size()
+            )
+                    || !transaction.populationGroups().retireExact(
+                    operation.operationId(),
+                    evidence.populationGroups()
+                            .targetPlan().reservations().size()
+            )) {
+                throw new IllegalStateException(
+                        "capture_tame_compensation_reservation_retirement_failed"
+                );
+            }
         }
     }
 }

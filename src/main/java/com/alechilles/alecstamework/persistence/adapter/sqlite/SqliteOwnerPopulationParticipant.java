@@ -56,7 +56,9 @@ public final class SqliteOwnerPopulationParticipant
                 transaction.population()
                         .findByOperation(operation.operationId());
         if (operation.phase() == OperationPhase.DURABLE
-                || operation.phase() == OperationPhase.PUBLISHED) {
+                || operation.phase() == OperationPhase.PUBLISHED
+                || operation.phase() == OperationPhase.COMPENSATED
+                || operation.phase() == OperationPhase.FAILED) {
             return actual.isEmpty();
         }
         return actual.equals(reservations(operation));
@@ -93,7 +95,7 @@ public final class SqliteOwnerPopulationParticipant
         };
     }
 
-    private List<OwnerPopulationReservation> reservations(
+    List<OwnerPopulationReservation> reservations(
             OperationEnvelope operation
     ) {
         return plan.increases().stream()
@@ -121,4 +123,3 @@ public final class SqliteOwnerPopulationParticipant
         }
     }
 }
-

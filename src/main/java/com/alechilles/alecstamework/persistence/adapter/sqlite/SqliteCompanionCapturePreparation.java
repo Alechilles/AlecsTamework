@@ -103,11 +103,19 @@ final class SqliteCompanionCapturePreparation
         if (lifecycle == null) {
             return false;
         }
-        if (lifecycle.revision().equals(
+        boolean exactFence = capture.tameAndCommandLink()
+                ? matchesFence(
+                lifecycle,
+                operation,
+                capture.tameAndLinkEvidence().expectedLifecycle(),
+                capture.requestedAtMs()
+        )
+                : lifecycle.revision().equals(
                 capture.expectedLifecycleRevision().next()
         ) && operation.operationId().equals(
                 lifecycle.activeOperationId()
-        )) {
+        );
+        if (exactFence) {
             return true;
         }
         if (operation.phase() == OperationPhase.COMPENSATED
@@ -115,6 +123,13 @@ final class SqliteCompanionCapturePreparation
                 transaction, operation, capture
         )) {
             return true;
+        }
+        if (capture.tameAndCommandLink()) {
+            return (operation.phase() == OperationPhase.DURABLE
+                    || operation.phase() == OperationPhase.PUBLISHED)
+                    && SqliteCompanionCaptureTameCommit.matchesDurable(
+                    transaction, capture.tameAndLinkEvidence()
+            );
         }
         return (operation.phase() == OperationPhase.DURABLE
                 || operation.phase() == OperationPhase.PUBLISHED)
@@ -169,5 +184,37 @@ final class SqliteCompanionCapturePreparation
             );
         }
         return current;
+    }
+
+    static boolean matchesFence(
+            CompanionLifecycle lifecycle,
+            OperationEnvelope operation,
+            CompanionLifecycle source,
+            long fencedAtMs
+    ) {
+        return lifecycle != null
+                && operation != null
+                && source != null
+                && lifecycle.profileId().equals(source.profileId())
+                && java.util.Objects.equals(
+                lifecycle.ownerId(), source.ownerId()
+        )
+                && lifecycle.state() == source.state()
+                && lifecycle.location().equals(source.location())
+                && lifecycle.revision().equals(source.revision().next())
+                && operation.operationId().equals(
+                lifecycle.activeOperationId()
+        )
+                && lifecycle.stateChangedAtMs() == fencedAtMs
+                && lifecycle.lastReconciledGeneration().equals(
+                source.lastReconciledGeneration()
+        )
+                && java.util.Objects.equals(
+                lifecycle.quarantineIncidentId(),
+                source.quarantineIncidentId()
+        )
+                && java.util.Objects.equals(
+                lifecycle.ownerWorldKey(), source.ownerWorldKey()
+        );
     }
 }

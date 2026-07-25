@@ -25,6 +25,8 @@ final class SqliteCompanionCaptureCommit {
             new ProjectionEventType("companion_captured");
     static final ProjectionEventType ATTEMPT_EVENT_TYPE =
             CaptureAttemptResolutionEventCodec.EVENT_TYPE;
+    private final SqliteCompanionCaptureTameCommit tame =
+            new SqliteCompanionCaptureTameCommit();
 
     List<ProjectionEventDraft> commit(
             SqlitePersistenceTransactionContext transaction,
@@ -37,9 +39,18 @@ final class SqliteCompanionCaptureCommit {
             events.add(attemptEvent(operation, capture, committedAtMs));
             return List.copyOf(events);
         }
-        events.addAll(commitCaptured(
-                transaction, operation, capture, committedAtMs
-        ));
+        if (capture.tameAndCommandLink()) {
+            events.addAll(tame.commit(
+                    transaction,
+                    operation,
+                    capture.tameAndLinkEvidence(),
+                    committedAtMs
+            ));
+        } else {
+            events.addAll(commitCaptured(
+                    transaction, operation, capture, committedAtMs
+            ));
+        }
         events.add(attemptEvent(operation, capture, committedAtMs));
         return List.copyOf(events);
     }

@@ -145,6 +145,9 @@ public final class SqliteOperationEngine {
                             transaction.operations().prepare(prepared),
                             "operation_prepare"
                     );
+                    SqliteCommandFamilyOperationFence.requireAvailable(
+                            connection, operation
+                    );
                     if (operation.phase() == OperationPhase.PREPARED
                             && !detail.matches(transaction, operation)) {
                         detail.prepare(transaction, operation);
@@ -168,6 +171,9 @@ public final class SqliteOperationEngine {
                     if (found.isPresent() && matchesPreparation(found.get(), prepared)) {
                         SqlitePersistenceTransactionContext transaction =
                                 new SqlitePersistenceTransactionContext(connection);
+                        SqliteCommandFamilyOperationFence.requireAvailable(
+                                connection, found.get()
+                        );
                         if (detail.matches(transaction, found.get())) {
                             return PersistenceReadResult.found(
                                     found.get(), found.get().attemptCount()
