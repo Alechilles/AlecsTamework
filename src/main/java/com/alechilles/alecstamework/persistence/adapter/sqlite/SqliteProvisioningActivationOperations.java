@@ -234,8 +234,7 @@ public final class SqliteProvisioningActivationOperations {
                             afterLifecycle,
                             TimedSummonLeaseChangeEvidence.Reason
                                     .PROVISIONING_ACTIVATED
-                    ),
-                    committedAtMs
+                    )
             ));
         }
         return List.copyOf(result);

@@ -100,6 +100,10 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed successful tame-and-link capture updating the companion and command
+  roster but still reporting failure when its timed-summon event was committed
+  after the original request timestamp. Composite capture, revival, and
+  provisioning events now publish from their own canonical lease timestamp.
 - Fixed tame-and-link capture failing when a mixed-case NPC role ID had been
   lowercased by an earlier snapshot. New snapshots preserve exact Hytale role
   casing, while tester-only case-damaged profiles can complete one safe

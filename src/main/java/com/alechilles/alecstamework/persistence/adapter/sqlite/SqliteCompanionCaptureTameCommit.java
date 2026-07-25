@@ -252,8 +252,7 @@ final class SqliteCompanionCaptureTameCommit {
                         evidence.finalLifecycle(),
                         TimedSummonLeaseChangeEvidence.Reason
                                 .TAME_AND_LINKED
-                ),
-                committedAtMs
+                )
         ));
         return List.copyOf(events);
     }

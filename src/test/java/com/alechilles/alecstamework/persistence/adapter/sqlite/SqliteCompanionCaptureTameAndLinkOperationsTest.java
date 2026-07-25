@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.api.CaptureAttemptResolvedEvent;
+import com.alechilles.alecstamework.api.CommandFamilyRosterMembershipChangedEvent;
+import com.alechilles.alecstamework.api.CommandTimedSummoningChangedEvent;
+import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkTestFixtures;
 import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolutionEventCodec;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
@@ -11,6 +15,8 @@ import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjec
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupAssignmentChangeCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
+import com.alechilles.alecstamework.persistence.facade
+        .ReplacementPublicSemanticEventProjection;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -24,6 +30,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,6 +56,7 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
     private SqliteReadExecutor reads;
     private SqliteCompanionCaptureOperations captures;
     private AtomicInteger refunds;
+    private List<TameworkEvent> publicEvents;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -70,6 +78,7 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
                 units
         );
         refunds = new AtomicInteger();
+        publicEvents = new ArrayList<>();
         captures = new SqliteCompanionCaptureOperations(
                 engine,
                 new SqliteOperationPublisher(
@@ -89,7 +98,10 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
                             "tame_link_refund_delivered"
                     ).completed();
                 },
-                List.of()
+                List.of(new ReplacementPublicSemanticEventProjection(
+                        publicEvents::add,
+                        () -> -300
+                ))
         );
     }
 
@@ -123,6 +135,22 @@ class SqliteCompanionCaptureTameAndLinkOperationsTest {
         assertEquals(
                 OperationWorkflowResult.Status.PUBLISHED,
                 result.status()
+        );
+        // Regression: the 2026-07-25 live capture used request time in the
+        // timed lease and later commit time in its outbox envelope. Canonical
+        // state committed, but semantic publication rejected the mismatch.
+        assertEquals(3, publicEvents.size());
+        assertEquals(
+                CommandFamilyRosterMembershipChangedEvent.class,
+                publicEvents.get(0).getClass()
+        );
+        assertEquals(
+                CommandTimedSummoningChangedEvent.class,
+                publicEvents.get(1).getClass()
+        );
+        assertEquals(
+                CaptureAttemptResolvedEvent.class,
+                publicEvents.get(2).getClass()
         );
         assertEquals(1, liveCalls.get());
         assertEquals(6, result.events().size());

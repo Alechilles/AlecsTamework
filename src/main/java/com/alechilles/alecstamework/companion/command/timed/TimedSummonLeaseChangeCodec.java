@@ -24,8 +24,7 @@ public final class TimedSummonLeaseChangeCodec {
     @Nonnull
     public static ProjectionEventDraft draft(
             @Nonnull OperationId operationId,
-            @Nonnull TimedSummonLeaseChangeEvidence evidence,
-            long changedAtMs
+            @Nonnull TimedSummonLeaseChangeEvidence evidence
     ) {
         if (operationId == null || evidence == null) {
             throw new IllegalArgumentException(
@@ -40,7 +39,7 @@ public final class TimedSummonLeaseChangeCodec {
                 change.after().leaseRevision(),
                 VERSION,
                 encode(evidence),
-                changedAtMs
+                change.after().updatedAtMs()
         );
     }
 

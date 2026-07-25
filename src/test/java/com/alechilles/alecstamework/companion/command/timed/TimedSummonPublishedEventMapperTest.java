@@ -56,7 +56,7 @@ class TimedSummonPublishedEventMapperTest {
         TimedSummonLeaseChangeEvidence expected = evidence();
         ProjectionEvent event = committed(
                 TimedSummonLeaseChangeCodec.draft(
-                        OPERATION, expected, -1_000
+                        OPERATION, expected
                 )
         );
 
@@ -88,7 +88,7 @@ class TimedSummonPublishedEventMapperTest {
     void mapperRejectsEnvelopeThatDisagreesWithPayload() {
         ProjectionEvent valid = committed(
                 TimedSummonLeaseChangeCodec.draft(
-                        OPERATION, evidence(), -1_000
+                        OPERATION, evidence()
                 )
         );
         ProjectionEvent mismatched = new ProjectionEvent(
@@ -129,7 +129,7 @@ class TimedSummonPublishedEventMapperTest {
                 );
         ProjectionEvent event = committed(
                 TimedSummonLeaseChangeCodec.draft(
-                        OPERATION, evidence(), -1_000
+                        OPERATION, evidence()
                 )
         );
 

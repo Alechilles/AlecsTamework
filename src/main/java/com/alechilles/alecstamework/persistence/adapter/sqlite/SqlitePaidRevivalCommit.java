@@ -240,8 +240,7 @@ final class SqlitePaidRevivalCommit {
                             active,
                             TimedSummonLeaseChangeEvidence.Reason
                                     .PAID_REVIVED
-                    ),
-                    committedAtMs
+                    )
             ));
         }
         return List.copyOf(result);

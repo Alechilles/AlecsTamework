@@ -230,8 +230,7 @@ public final class SqliteTimedSummonTransitionOperations {
                                         .Reason.SUMMON_STARTED
                                         : TimedSummonLeaseChangeEvidence
                                         .Reason.STORED
-                        ),
-                        request.requestedAtMs()
+                        )
                 )
         );
     }
