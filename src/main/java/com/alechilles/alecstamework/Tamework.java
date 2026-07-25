@@ -2595,7 +2595,7 @@ public class Tamework extends JavaPlugin {
                 if (itemId == null || itemId.isBlank()) {
                     continue;
                 }
-                commandItemRegistry.register(itemId, asset);
+                commandItemRegistry.register(asset.getId(), itemId, asset);
                 loaded++;
             }
         }
