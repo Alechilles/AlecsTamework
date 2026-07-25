@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.CaptureAttemptHandle;
+import com.alechilles.alecstamework.items.HytaleCapturedItemCoopInteractionService;
+import com.alechilles.alecstamework.items.HytaleCapturedItemCoopInteractionService.Result;
+import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -28,7 +30,6 @@ import javax.annotation.Nonnull;
 public class TameworkSpawnInteraction extends SimpleInteraction {
     private static final long SLOW_INTERACTION_THRESHOLD_NS = TimeUnit.MILLISECONDS.toNanos(20L);
 
-
     public static final BuilderCodec<TameworkSpawnInteraction> CODEC = BuilderCodec.builder(
             TameworkSpawnInteraction.class,
             TameworkSpawnInteraction::new,
@@ -53,6 +54,8 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
 
     private String emptyItemId;
     private Boolean spawnAssignsOwner;
+    private final HytaleCapturedItemCoopInteractionService coopIntake =
+            new HytaleCapturedItemCoopInteractionService();
 
     protected TameworkSpawnInteraction() {
         super();
@@ -130,6 +133,21 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
             if (debugLag) {
                 logSlowInteraction(plugin, startedNs, "capture", player, heldItem, targetEntity);
             }
+            context.setHeldItem(heldItem);
+            super.tick0(true, time, type, context, cooldownHandler);
+            return;
+        }
+
+        Result coopResult = coopIntake.attempt(
+                commandBuffer.getExternalData().getWorld(),
+                commandBuffer,
+                context
+        );
+        if (coopResult != Result.NOT_MANAGED) {
+            context.getState().state = coopResult
+                    == Result.STARTED
+                    ? InteractionState.Finished
+                    : InteractionState.Failed;
             context.setHeldItem(heldItem);
             super.tick0(true, time, type, context, cooldownHandler);
             return;
