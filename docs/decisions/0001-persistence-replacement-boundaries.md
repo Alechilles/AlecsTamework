@@ -1,7 +1,22 @@
 # ADR 0001: Persistence Replacement Boundaries
 
-- Status: Accepted and implemented
+- Status: Accepted core boundaries; feature-scope decision partially superseded
 - Date: 2026-07-23
+
+## 2026-07-24 correction
+
+ADR 0008 supersedes the product-scope portion of this decision. Tester-only
+schema compatibility may still be discarded, but intended unreleased
+capabilities must be rewritten on the replacement architecture rather than
+removed.
+
+Durable owner population/groups, command-family rosters, timed summoning,
+companion provisioning, resolved capture-attempt consumption, tame-and-link
+capture, paid revival, and captured-item-to-coop intake are required recovery
+scope. Only profile-scoped virtual companion inventories and earlier bonded
+vessel designs remain excluded.
+
+The current reduced artifact is not a feature-complete release candidate.
 
 ## Context
 
@@ -31,24 +46,27 @@ The replacement persistence system follows these non-negotiable boundaries:
 9. Treat zero as a valid revision and generation. For world timestamps, zero alone is unset and
    negative values are valid.
 10. Remove the superseded runtime after all feature slices pass their replacement gates.
-11. Delete unreleased feature authorities instead of preserving dormant schema, operation, API,
-    or configuration compatibility for them.
+11. Do not preserve unreleased schema/API implementation compatibility, but
+    recover still-required feature behavior through the shared replacement
+    authorities.
 
-## Discarded unreleased designs
+## Corrected unreleased feature boundary
 
-The July builds were tester-only. The following designs therefore do not form part of the
-replacement contract:
+The July builds were tester-only, so their implementations and save formats do
+not constrain the replacement. The following intended capabilities nevertheless
+remain required:
 
 - durable owner-population reservations/evidence and population-group assignment;
 - command-family rosters and timed summon leases;
-- companion provisioning and tame-and-command-link capture;
+- companion provisioning, resolved capture attempts, and tame-and-command-link capture;
 - paid revival and captured-item-to-coop intake;
-- profile-scoped companion inventory.
 
-Their detailed ADRs and HyDragon proposals were deleted because retaining implemented-looking
-specifications would imply support that the runtime intentionally does not provide. Git history
-remains the design record if any idea is reconsidered later; a future implementation must be
-designed against the then-current public API and replacement schema rather than reviving the July
+Profile-scoped companion inventory remains deferred. Earlier bonded-vessel
+designs remain removed.
+
+Git history is a behavior/design record, not a compatibility promise or a
+wholesale restoration target. Required features are recovered selectively
+against the current public API and replacement schema without reviving the July
 authority graph.
 
 This deletion does not remove released behavior. Tamework retains the process-local live owner

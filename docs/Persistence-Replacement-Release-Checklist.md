@@ -1,5 +1,12 @@
 # Persistence Replacement Release Checklist
 
+> **Release blocked (2026-07-24):** The artifact recorded below validates the
+> replacement migration core but is not feature-complete. Required unreleased
+> HyDragon-facing systems were removed in error and must be recovered under ADR
+> 0008 and the required persistence feature recovery plan. Do not continue
+> public release preparation or treat the recorded SHA as a release candidate.
+> A new exact artifact and a revised live matrix are required after recovery.
+
 Use this checklist for the first public release of the replacement persistence
 lineage. It deliberately reuses the normal Maven and release-preparation
 workflows. There is no separate persistence candidate builder or evidence

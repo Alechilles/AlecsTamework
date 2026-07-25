@@ -1,7 +1,15 @@
 # ADR 0007: Replacement Persistence Core Implementation
 
-- Status: Accepted and implemented
+- Status: Accepted and implemented core; production feature scope reopened
 - Date: 2026-07-23
+
+## 2026-07-24 feature-scope correction
+
+The shared core and its complexity constraints remain accepted. ADR 0008
+supersedes the conclusion that every unreleased capability should remain absent.
+Required HyDragon-facing and captured-item-to-coop behavior will be rebuilt as
+focused participants in this core. The current reduced artifact is not
+feature-complete.
 
 ## Context
 
@@ -105,11 +113,11 @@ lineage unchanged, and never dual-writes. The superseded persistence runtime
 and its alternate repositories, queues, recovery authorities, and adapters
 have been deleted from production.
 
-The unreleased durable owner-population/group, command-roster, timed-summon,
-provisioning, paid-revival, and companion-inventory designs are not dormant
-features of this core. They have no replacement table, operation kind, public
-capability, or compatibility promise. ADR 0001 records the retained released
-behavior and the reason their implementation-era documents were removed.
+Required owner-population/group, command-roster, timed-summon, provisioning,
+resolved capture/tame-link, paid-revival, and captured-item-to-coop behavior is
+reopened under ADR 0008. It gains no compatibility promise for July save
+formats and must use this core's shared authorities. Companion inventory remains
+deferred and bonded vessels remain removed.
 
 ## Consequences
 
