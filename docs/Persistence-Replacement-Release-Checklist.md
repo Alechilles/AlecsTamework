@@ -21,13 +21,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `12ba60e9229238e2b18125b7e61ab0d062d2f868` |
+| Tamework commit | `2d1b120ffa75ea5b603d05ff87b1949d2af24711` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
 | Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
-| Candidate SHA-256 | `c81cd8b58b293d07b893d6cf8cae2cd45b1d83019ed773d18b9793f0c4ac1d64` |
-| Maven test result | Clean isolated run on 2026-07-24: 2,578 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,764,071 bytes |
+| Candidate SHA-256 | `fe394a166bbc66a3e3bee0b25cdec7927663a799faebc2c14dedc5e20ab6df05` |
+| Maven test result | Clean isolated run on 2026-07-24: 2,580 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,764,451 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -37,6 +37,13 @@ fresh-world, copied-save, and rollback gates remain required before publishing.
 
 Earlier candidates are superseded:
 
+- `c81cd8b58b293d07b893d6cf8cae2cd45b1d83019ed773d18b9793f0c4ac1d64`
+  resolved public filled spawners to their exact imported capture profiles, but
+  rejected the released `CaptureClearsOwner` shape: the item intentionally
+  omitted `OwnerUuid`, the canonical profile retained the current owner, and
+  release produced a redundant same-owner assignment. Commit `2d1b120f`
+  normalizes only that equal assignment into preserve-owner evidence while a
+  genuinely different owner remains fail-closed.
 - `35e09a60812271802aa609640d8c81c5ca4096fd996a98024ad1073dd891a005`
   imported the copied public save correctly but silently rejected filled
   spawners created by public `v2.16.1`. Commit `12ba60e9` now joins the exact
@@ -61,7 +68,7 @@ Earlier candidates are superseded:
   releases remain exact `RETRYABLE` operations with captured canonical
   profiles.
 
-Do not use either superseded candidate for further release evidence.
+Do not use any superseded candidate for further release evidence.
 
 ## Automated gates
 
