@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.capture.runtime;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkTestFixtures;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
@@ -230,6 +231,27 @@ class CompanionCaptureWorldExecutorTest {
         LiveOperationResult result = executor.execute(
                 request(),
                 wrong,
+                attempts
+        );
+
+        assertResult(
+                LiveOperationResult.Status.UNKNOWN,
+                "capture_operation_invariant_mismatch",
+                result
+        );
+        assertEquals(0, attempts.inventoryProbes);
+    }
+
+    @Test
+    void tameAndLinkRequestsCannotEnterArtifactCaptureExecutor() {
+        FakeAttempts attempts = new FakeAttempts();
+
+        LiveOperationResult result = executor.execute(
+                CaptureTameAndLinkTestFixtures.request(),
+                operation(
+                        CompanionCaptureDefinition.KIND,
+                        CaptureTameAndLinkTestFixtures.EXPECTED
+                ),
                 attempts
         );
 

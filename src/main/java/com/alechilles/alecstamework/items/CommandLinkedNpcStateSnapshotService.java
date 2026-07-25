@@ -255,7 +255,8 @@ public final class CommandLinkedNpcStateSnapshotService {
                 || TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind);
+                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind);
     }
 
     private void upsertProfile(

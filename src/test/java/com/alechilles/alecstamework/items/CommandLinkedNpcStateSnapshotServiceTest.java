@@ -152,6 +152,9 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD
         )));
+        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
+                TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER
+        )));
     }
 
     @Test

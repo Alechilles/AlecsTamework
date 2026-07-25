@@ -15,7 +15,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.IChunkSaver;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -210,32 +209,13 @@ final class HytaleCaptureReleaseDurabilityBarrier {
         if (save == null || flusher == null || ioExecutor == null) {
             return completed(ReceiptPersistence.retryable(null));
         }
-        CompletableFuture<ReceiptPersistence> completion =
-                new CompletableFuture<>();
-        save.whenComplete((ignored, failure) -> {
-            if (failure != null) {
-                completion.complete(ReceiptPersistence.retryable(failure));
-                return;
-            }
-            CompletableFuture.runAsync(() -> {
-                try {
-                    flusher.flush();
-                } catch (Exception | LinkageError flushFailure) {
-                    throw new CompletionException(flushFailure);
-                }
-            }, ioExecutor).whenComplete((unused, flushFailure) ->
-                    completion.complete(
-                            flushFailure == null
-                                    ? ReceiptPersistence.savedTargetChunk(
-                                            targetChunkIndex
-                                    )
-                                    : ReceiptPersistence.retryable(
-                                            flushFailure
-                                    )
-                    )
-            );
-        });
-        return completion;
+        return HytaleChunkSaveSupport.saveAndFlush(
+                save,
+                flusher::flush,
+                ioExecutor
+        ).thenApply(outcome -> outcome.saved()
+                ? ReceiptPersistence.savedTargetChunk(targetChunkIndex)
+                : ReceiptPersistence.retryable(outcome.failure()));
     }
 
     private static <T> CompletionStage<T> completed(T value) {

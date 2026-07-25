@@ -90,6 +90,7 @@ final class CompanionCaptureWorldExecutor {
     ) {
         return request != null
                 && operation != null
+                && !request.tameAndCommandLink()
                 && CompanionCaptureDefinition.KIND.equals(operation.kind())
                 && request.expectedLifecycleRevision().equals(
                         operation.expectedLifecycleRevision()

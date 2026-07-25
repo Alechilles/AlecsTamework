@@ -19,6 +19,7 @@ public final class HytaleCompanionCaptureWorldGateway
         implements CompanionCaptureWorldGateway,
         HytaleAsyncWorldOperationGateway<CompanionCaptureRequest> {
     private final CompanionCaptureWorldExecutor executor;
+    private final CompanionCaptureTameWorldExecutor tameExecutor;
     private final HytaleCapturedArtifactAdapter artifacts;
     private final ComponentType<
             EntityStore,
@@ -31,6 +32,7 @@ public final class HytaleCompanionCaptureWorldGateway
     ) {
         this(
                 new CompanionCaptureWorldExecutor(),
+                new CompanionCaptureTameWorldExecutor(),
                 new HytaleCapturedArtifactAdapter(),
                 receiptType
         );
@@ -43,7 +45,26 @@ public final class HytaleCompanionCaptureWorldGateway
                     EntityStore,
                     TameworkCaptureSourceReceiptsComponent> receiptType
     ) {
+        this(
+                executor,
+                new CompanionCaptureTameWorldExecutor(),
+                artifacts,
+                receiptType
+        );
+    }
+
+    HytaleCompanionCaptureWorldGateway(
+            @Nonnull CompanionCaptureWorldExecutor executor,
+            @Nonnull CompanionCaptureTameWorldExecutor tameExecutor,
+            @Nonnull HytaleCapturedArtifactAdapter artifacts,
+            @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkCaptureSourceReceiptsComponent> receiptType
+    ) {
         this.executor = Objects.requireNonNull(executor, "executor");
+        this.tameExecutor = Objects.requireNonNull(
+                tameExecutor, "tameExecutor"
+        );
         this.artifacts = Objects.requireNonNull(artifacts, "artifacts");
         this.receiptType = Objects.requireNonNull(
                 receiptType, "receiptType"
@@ -75,7 +96,7 @@ public final class HytaleCompanionCaptureWorldGateway
         HytaleCompanionCaptureAttemptGateway attempts = attempts(
                 world, store, request
         );
-        return request.failedAttempt()
+        return request.failedAttempt() || request.tameAndCommandLink()
                 ? LiveOperationResult.retryable(
                 "capture_async_source_barrier_required", null
         )
@@ -93,6 +114,20 @@ public final class HytaleCompanionCaptureWorldGateway
         LiveOperationResult invalid = validate(world, store);
         if (invalid != null) {
             return invalid.completed();
+        }
+        if (request.tameAndCommandLink()) {
+            return tameExecutor.execute(
+                    request,
+                    operation,
+                    new HytaleCompanionCaptureTameAttemptGateway(
+                            world,
+                            store,
+                            request,
+                            operation,
+                            artifacts,
+                            receiptType
+                    )
+            );
         }
         HytaleCompanionCaptureAttemptGateway attempts = attempts(
                 world, store, request
