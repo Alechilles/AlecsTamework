@@ -6,7 +6,7 @@ import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Command, revival, and travel policy nested under {@code TwCompanionConfig.Command}. */
+/** Command, revival, summoning, and travel policy under {@code Command}. */
 public final class TwCompanionCommandSettings {
     static final int MILLIS_PER_MINUTE = 60_000;
     static final double DEFAULT_RETURN_HOME_TELEPORT_DISTANCE = 96.0;
@@ -44,6 +44,8 @@ public final class TwCompanionCommandSettings {
     double placementMaxRelativeY = DEFAULT_PLACEMENT_MAX_RELATIVE_Y;
     TwCompanionReviveSettings revive = new TwCompanionReviveSettings();
     boolean reviveExplicit;
+    TwCompanionSummonSettings summon =
+            new TwCompanionSummonSettings();
     TravelSettings travel = new TravelSettings();
 
     public double getReturnHomeTeleportDistance() {
@@ -110,6 +112,15 @@ public final class TwCompanionCommandSettings {
     }
 
     @Nonnull
+    public TwCompanionSummonSettings getSummon() {
+        TwCompanionSummonSettings resolved = summon != null
+                ? summon
+                : new TwCompanionSummonSettings();
+        resolved.validate();
+        return resolved;
+    }
+
+    @Nonnull
     public TravelSettings getTravel() {
         return travel != null ? travel : new TravelSettings();
     }
@@ -136,8 +147,15 @@ public final class TwCompanionCommandSettings {
         copy.placementMaxRelativeY = placementMaxRelativeY;
         copy.revive = getRevive().copy();
         copy.reviveExplicit = reviveExplicit;
+        copy.summon = getSummon().copy();
         copy.travel = getTravel().copy();
         return copy;
+    }
+
+    void setSummon(@Nullable TwCompanionSummonSettings summon) {
+        this.summon = summon == null
+                ? new TwCompanionSummonSettings()
+                : summon;
     }
 
     void applyLegacyReviveEnabled(boolean enabled) {

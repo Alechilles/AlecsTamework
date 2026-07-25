@@ -104,8 +104,8 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     asset -> asset.command
             )
             .documentation("Companion command runtime settings. Inheritance: omitted section inherits from parent; when "
-                    + "present, only explicitly defined nested fields override parent. Nested Revive settings are "
-                    + "authoritative over legacy DeadRespawn fields; explicit Costs replace the parent array.")
+                    + "present, only explicitly defined nested fields override parent. Nested Revive is authoritative "
+                    + "over legacy DeadRespawn fields; explicit Costs and Summon warning arrays replace parent arrays.")
             .add()
             .build();
 
@@ -506,6 +506,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final double placementMinRelativeY;
         private final double placementMaxRelativeY;
         private final TwCompanionReviveSettings revive;
+        private final TwCompanionSummonSettings summon;
         private final boolean crossWorldRecallEnabled;
         private final TransferFailurePolicy onTransferFailure;
         private final boolean followMasterOnWorldChange;
@@ -529,6 +530,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   double placementMinRelativeY,
                                   double placementMaxRelativeY,
                                   TwCompanionReviveSettings revive,
+                                  TwCompanionSummonSettings summon,
                                   boolean crossWorldRecallEnabled,
                                   TransferFailurePolicy onTransferFailure,
                                   boolean followMasterOnWorldChange,
@@ -553,6 +555,9 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             this.revive = revive != null
                     ? revive.copy()
                     : new TwCompanionReviveSettings();
+            this.summon = summon != null
+                    ? summon.copy()
+                    : new TwCompanionSummonSettings();
             this.crossWorldRecallEnabled = crossWorldRecallEnabled;
             this.onTransferFailure = onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
             this.followMasterOnWorldChange = followMasterOnWorldChange;
@@ -607,6 +612,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         command.getPlacementMinRelativeY(),
                         command.getPlacementMaxRelativeY(),
                         revive,
+                        command.getSummon(),
                         travel.isCrossWorldRecallEnabled(),
                         travel.getOnTransferFailure(),
                         travel.isFollowMasterOnWorldChange(),
@@ -674,6 +680,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                             ? global.getCommandPlacementMaxRelativeY()
                             : defaults.getPlacementMaxRelativeY(),
                     revive,
+                    defaults.getSummon(),
                     travel.isCrossWorldRecallEnabled(),
                     travel.getOnTransferFailure(),
                     travel.isFollowMasterOnWorldChange(),
@@ -754,6 +761,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return revive.copy();
         }
 
+        @Nonnull
+        public TwCompanionSummonSettings getSummon() {
+            return summon.copy();
+        }
+
         public boolean isCrossWorldRecallEnabled() {
             return crossWorldRecallEnabled;
         }
@@ -783,6 +795,3 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
     }
 }
-
-
-

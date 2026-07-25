@@ -3,9 +3,13 @@ package com.alechilles.alecstamework.config.assets;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 
 /** Owns the codec graph for the nested companion command policy. */
 final class TwCompanionCommandSettingsCodec {
+    private static final ArrayCodec<Long> LONG_ARRAY_CODEC =
+            new ArrayCodec<>(Codec.LONG, Long[]::new);
+
     private static final BuilderCodec<TwCompanionReviveSettings>
             REVIVE_CODEC = BuilderCodec.builder(
                     TwCompanionReviveSettings.class,
@@ -61,6 +65,84 @@ final class TwCompanionCommandSettingsCodec {
                     "Optional localization key used when any configured cost "
                             + "component is missing. Inheritance: an omitted "
                             + "value inherits."
+            )
+            .add()
+            .build();
+
+    private static final BuilderCodec<TwCompanionSummonSettings>
+            SUMMON_CODEC = BuilderCodec.builder(
+                    TwCompanionSummonSettings.class,
+                    TwCompanionSummonSettings::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) ->
+                            settings.setEnabled(value != null && value),
+                    TwCompanionSummonSettings::isEnabled
+            )
+            .documentation(
+                    "Enables roster summon, dismiss, and stored lifecycle. "
+                            + "Inheritance: an omitted value inherits."
+            )
+            .add()
+            .<Long>append(
+                    new KeyedCodec<>("ActiveDurationMs", Codec.LONG),
+                    (settings, value) -> {
+                        if (value != null) {
+                            settings.setActiveDurationMs(value);
+                        }
+                    },
+                    TwCompanionSummonSettings::getActiveDurationMs
+            )
+            .documentation(
+                    "Non-negative active-session duration; zero is unlimited. "
+                            + "This is not a world timestamp. Inheritance: an "
+                            + "omitted value inherits."
+            )
+            .add()
+            .<Long>append(
+                    new KeyedCodec<>("ResummonCooldownMs", Codec.LONG),
+                    (settings, value) -> {
+                        if (value != null) {
+                            settings.setResummonCooldownMs(value);
+                        }
+                    },
+                    TwCompanionSummonSettings::getResummonCooldownMs
+            )
+            .documentation(
+                    "Non-negative duration after dismissal or expiry; zero "
+                            + "disables the additional cooldown. This is not a "
+                            + "world timestamp. Inheritance: omitted inherits."
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("AutoStoreOnOwnerLogout", Codec.BOOLEAN),
+                    (settings, value) ->
+                            settings.setAutoStoreOnOwnerLogout(
+                                    value == null || value
+                            ),
+                    TwCompanionSummonSettings::isAutoStoreOnOwnerLogout
+            )
+            .documentation(
+                    "Stores an active companion when its owner logs out. "
+                            + "Inheritance: an omitted value inherits."
+            )
+            .add()
+            .<Long[]>append(
+                    new KeyedCodec<>(
+                            "ExpiryWarningThresholdsMs",
+                            LONG_ARRAY_CODEC
+                    ),
+                    TwCompanionSummonSettings
+                            ::setExpiryWarningThresholdsMs,
+                    TwCompanionSummonSettings
+                            ::getExpiryWarningThresholdsBoxed
+            )
+            .documentation(
+                    "Strictly descending unique positive remaining-time "
+                            + "warnings below positive ActiveDurationMs. "
+                            + "Inheritance: an explicit array replaces the "
+                            + "parent array (no append or merge)."
             )
             .add()
             .build();
@@ -293,6 +375,18 @@ final class TwCompanionCommandSettingsCodec {
                             + "section inherits; when present, explicit nested "
                             + "fields override and missing nested fields "
                             + "inherit. Costs replace as an array."
+            )
+            .add()
+            .<TwCompanionSummonSettings>append(
+                    new KeyedCodec<>("Summon", SUMMON_CODEC),
+                    TwCompanionCommandSettings::setSummon,
+                    TwCompanionCommandSettings::getSummon
+            )
+            .documentation(
+                    "Timed roster summoning settings. Inheritance: omitted "
+                            + "section inherits; when present, explicit nested "
+                            + "fields override and missing nested fields "
+                            + "inherit. Warning arrays replace."
             )
             .add()
             .<Double>append(

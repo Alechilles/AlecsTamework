@@ -15,6 +15,7 @@ final class TwCompanionCommandInheritance {
     ) {
         inheritCommandScalars(parent, current, explicit);
         inheritRevive(parent, current, explicit);
+        inheritSummon(parent, current, explicit);
         inheritTravel(parent, current, explicit);
     }
 
@@ -151,6 +152,47 @@ final class TwCompanionCommandInheritance {
             currentTravel.followMasterOnWorldChangeStateFilter =
                     parentTravel.getFollowMasterOnWorldChangeStateFilter();
         }
+    }
+
+    private static void inheritSummon(
+            TwCompanionCommandSettings parent,
+            TwCompanionCommandSettings current,
+            Set<String> explicit
+    ) {
+        if (!explicit.contains("Summon")) {
+            current.summon = parent.getSummon().copy();
+            return;
+        }
+        TwCompanionSummonSettings parentSummon = parent.getSummon();
+        TwCompanionSummonSettings currentSummon = current.summon;
+        if (currentSummon == null) {
+            currentSummon = new TwCompanionSummonSettings();
+            current.summon = currentSummon;
+        }
+        if (!explicit.contains("Summon.Enabled")) {
+            currentSummon.setEnabled(parentSummon.isEnabled());
+        }
+        if (!explicit.contains("Summon.ActiveDurationMs")) {
+            currentSummon.setActiveDurationMs(
+                    parentSummon.getActiveDurationMs()
+            );
+        }
+        if (!explicit.contains("Summon.ResummonCooldownMs")) {
+            currentSummon.setResummonCooldownMs(
+                    parentSummon.getResummonCooldownMs()
+            );
+        }
+        if (!explicit.contains("Summon.AutoStoreOnOwnerLogout")) {
+            currentSummon.setAutoStoreOnOwnerLogout(
+                    parentSummon.isAutoStoreOnOwnerLogout()
+            );
+        }
+        if (!explicit.contains("Summon.ExpiryWarningThresholdsMs")) {
+            currentSummon.setExpiryWarningThresholdsMs(
+                    parentSummon.getExpiryWarningThresholdsBoxed()
+            );
+        }
+        currentSummon.validate();
     }
 
     private static boolean hasLegacyCooldownOverride(
