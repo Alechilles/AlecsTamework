@@ -1,6 +1,6 @@
 # HyDragon Integration Specifications
 
-Status: required recovery contract; implementation in progress
+Status: automated implementation complete; exact live acceptance pending
 
 These specifications define Tamework's supported boundary for HyDragon 0.2.x
 and Tamework 3.x:
@@ -11,10 +11,10 @@ and Tamework 3.x:
 - [Cross-mod integration contract](integration-contract.md)
 - [Recovery donor manifest](recovery-donor-manifest.md)
 
-The current reduced Tamework runtime does not advertise the recovery
-capabilities yet. Each capability remains unavailable until its complete
-persistence, recovery, projection, configuration, API, UI, and integration
-slice passes its gate.
+The restored Tamework runtime independently advertises each recovery capability
+only after its complete persistence, recovery, projection, configuration, API,
+UI, and integration slice is composed. The automated Tamework and HyDragon
+gates are green; exact-artifact live acceptance remains required before release.
 
 ## Required capabilities
 

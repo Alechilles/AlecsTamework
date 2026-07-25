@@ -16,15 +16,18 @@ settings do not form a second companion-lifecycle authority.
 
 ## Population limit
 
-`LimitPerPlayerOwnedTotal` is a simple live owner cap:
+`LimitPerPlayerOwnedTotal` is a durable canonical owner cap:
 
-- it counts loaded NPCs with that player as owner;
+- it counts saved profiles with that player as owner, including unloaded,
+  captured, cooped, roster-stored, provisioned, dead, and Lost profiles;
 - `0` disables the cap;
 - `PerPlayerLimitScope` selects `PerWorld` or `Global`;
 - the shared check is used by positive owner-acquisition paths including
   taming, owner assignment, breeding, NPC spawn, and filled-spawner release;
+- positive acquisitions reserve capacity in their shared persistence operation;
   and
-- it does not count dormant canonical profiles or create durable reservations.
+- sealed world evidence reconciles startup observations without treating
+  temporary absence as ownership removal.
 
 ## SimpleClaims
 
@@ -46,13 +49,15 @@ capture-owner, spawn-owner, needs-resource, and announcement settings. Apply
 changes through the UI so validation and settings-file writes use one path.
 
 Revive enablement controls whether exact `DEAD_REVIVABLE` or `LOST` profiles
-may use free restoration. It does not create those lifecycle states and there
-is no payment setting.
+may restore. Role-scoped `TwCompanionConfig.Command.Revive` supplies the
+gameplay cooldown, exact AND item-cost recipe, and optional insufficient-cost
+message for roster-backed revival. Legacy item-linked restoration remains
+free.
 
 ## Troubleshooting
 
-- If the owner cap appears wrong, count loaded owned NPCs and inspect their live
-  owner components.
+- If the owner cap appears wrong, inspect canonical lifecycle ownership and
+  reconciliation readiness; nearby loaded NPCs are not the complete count.
 - If breeding is denied, verify the SimpleClaims claim and configured breeding
   limits.
 - SimpleClaims damage integration errors fail open; they do not make a target

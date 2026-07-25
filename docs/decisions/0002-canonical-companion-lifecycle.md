@@ -17,6 +17,8 @@ Canonical states and their only valid location kinds are:
 | `UNLOADED` | `NONE` |
 | `CAPTURED` | `CAPTURE_ITEM` |
 | `COOP` | `COOP_SLOT` |
+| `ROSTER_STORED` | `COMMAND_ROSTER` |
+| `PROVISIONED_DORMANT` | `PROVISIONING` |
 | `DEAD_REVIVABLE` | `NONE` |
 | `LOST` | `NONE` |
 | `RELEASED` | `NONE` |
@@ -33,12 +35,11 @@ Locations carry these fields:
 - `NONE` and `UNRESOLVED` carry no key.
 
 `ownerWorldKey` is independent of physical location. It preserves the
-normalized per-world bucket for an owned profile across capture, coop, death,
-lost, and unload transitions. An unowned profile cannot carry the field. It is
-lifecycle evidence used to keep released per-world live-cap decisions aligned;
-it is not a durable count, reservation, population-group membership, or
-claim-cap authority. The released owner cap counts currently loaded owned NPCs
-through its process-local live index.
+normalized per-world bucket for an owned profile across capture, coop, roster
+storage, provisioning, death, lost, and unload transitions. An unowned profile
+cannot carry the field. Durable owner-population and population-group
+authorities derive their global/per-world scopes from this canonical evidence;
+they do not introduce another lifecycle.
 
 Revisions are non-negative and begin at zero. Every transition compares an expected revision and
 advances it exactly once.
@@ -47,8 +48,9 @@ advances it exactly once.
 
 - A profile can answer “where is it?” from one row.
 - Feature detail explains a lifecycle state but cannot independently declare it.
-- Owner-world evidence remains attached to canonical lifecycle without creating
-  a separate owner-population subsystem.
+- Owner-world evidence remains attached to canonical lifecycle while focused
+  owner/group tables provide reservations, classification, and reconciliation
+  evidence without competing for lifecycle authority.
 - Invalid state/location combinations fail before reaching an adapter and are also constrained by
   schema checks.
 - Scoped quarantine preserves the last readable lifecycle rather than introducing a competing

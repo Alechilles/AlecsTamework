@@ -22,9 +22,8 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Linked companions panel + command radial UI (mode/sort/filter/group management + per-row actions)
 - Settings announcement UI (`TameworkSettingsAnnouncementService`) with first-run welcome copy and version-specific upgrade notices.
 - Coop capture/release integration (`TwCoopConfig`) for direct live NPC
-  handoff; filled spawner items use the canonical captured-spawner release
-  operation
-- A simple loaded-owner cap used by taming and ownership changes
+  handoff and eligible canonical captured-item intake
+- Durable global/per-world owner admission plus role-defined population groups
 - Direct SimpleClaims integration for breeding limits and native tamed-NPC
   damage policy
 - Canonical companion identity, saved death/Lost restoration, and namespaced
@@ -42,7 +41,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   affected mutations and feed diagnostics such as `openCircuits`; they do not
   recreate the old v5 failure catalogs or feature-specific health systems.
 - Public API integration surfaces for canonical profiles, profile extension
-  data, capture policy, progression, command links, and interaction extensions;
+  data, capture policy, progression, command links, population groups,
+  command-family rosters, timed summoning, provisioning, paid revival, and
+  interaction extensions;
   see the
   [HyDragon Integration Guide](../wiki/Modder-Documentation/System-Integration/HyDragon-Integration-Guide.md)
 - Optional asset patch generation (`Server/Tamework/Patches`) for JSON-like server assets that should stay valid when Tamework is absent
@@ -59,37 +60,41 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   entity UUID alias back to that stable profile before submitting a mutation;
   an alias rotation never creates a second identity or makes the companion
   ineligible by itself.
-- `ACTIVE`, `UNLOADED`, `CAPTURED`, `COOP`, `DEAD_REVIVABLE`, `LOST`,
-  `RELEASED`, and `UNRESOLVED` form the sole durable companion lifecycle.
+- `ACTIVE`, `UNLOADED`, `CAPTURED`, `COOP`, `ROSTER_STORED`,
+  `PROVISIONED_DORMANT`, `DEAD_REVIVABLE`, `LOST`, `RELEASED`, and
+  `UNRESOLVED` form the sole durable companion lifecycle.
   Command status, restoration, capture, and coop behavior read that lifecycle
   instead of inferring durable state from feature-local snapshots or caches.
 - Public imports keep ordinary no-flag profiles `UNRESOLVED` offline. Once
   Hytale reports all startup worlds loaded, sealed entity-store evidence
   resolves a matching NPC to `ACTIVE` and sealed absence to `UNLOADED`; an
   empty pre-world universe never proves absence.
-- Configured coops capture live NPCs and release live residents directly. Capture
-  items are not a second coop-intake protocol.
+- Configured coops capture live NPCs and release live residents directly.
+  Eligible canonical captured items enter through the same coop-capture
+  operation and retire the exact source item only after durable residency.
 - Manual and passive breeding use the released breeding flow and apply direct
   SimpleClaims limits when configured.
-- Command tools persist linked NPC metadata, active/inactive status, panel preferences, and group metadata directly on the item.
+- Legacy command tools retain item-projected links and presentation metadata.
+  Owner/command-family integrations use durable roster membership and stable
+  slots as authority; item metadata is only a projection.
 - Linked panel supports both linked and nearby modes, plus sort/filter/group assignment and group manager flows.
 - Ownership/damage behavior resolves effective policy through `TwCompanionConfig` with `TwGlobalConfig` fallback.
-- The owner cap counts currently loaded owned NPCs. It is not a durable dormant
-  ledger and does not reserve future capacity.
-- Linked companions restore from saved death or Lost state without payment.
-  The death snapshot's immutable respawn deadline is also projected into the
-  linked panel, so display and restoration admission use the same canonical
-  timing fact.
+- The owner cap counts canonical owned profiles in its configured global or
+  per-world scope. Positive acquisitions reserve capacity inside the same
+  operation, and sealed world evidence reconciles stale live observations.
+- Legacy item-linked companions retain free death/Lost restoration.
+  Owner/command-family roster rows use the role-effective exact paid-revival
+  quote. Both paths restore the same canonical profile, and the panel uses the
+  same saved cooldown fact as restoration admission.
 - Dormant transitions require positive evidence: a saved death, an explicit
   destructive `REMOVE`, or terminal removal of a delete-on-remove world.
   Unload, absence, and timeout are not evidence that a companion is dead or
   Lost.
-- The unreleased July paid-revival, durable population/group, provisioning,
-  command-roster, timed-summon, captured-item coop-intake, rehearsal, and
-  duplicate command/spawner persistence-state cache authorities are not part
-  of the replacement runtime. Free death/Lost restoration, the live owner cap,
-  direct-live coop capture/release, filled-spawner capture/release, and the
-  shared bounded feature-control plane remain.
+- Durable population/groups, command-family rosters, timed summon/storage,
+  provisioning, resolved capture/tame-link, paid revival, and captured-item
+  coop intake are composed over the same replacement runtime. The deleted July
+  writers, journals, recovery scanners, readiness graphs, and duplicate
+  command/spawner cache authorities remain absent.
 - Runtime combat and Public API damage evaluation share one live owner-policy resolver: owner component first, then command-link owner, then persisted NPC-name owner, with role-effective protection settings.
 - Settings announcements are selected per player: no announcement/version history shows the welcome message, older recorded Tamework versions show the current update notice, and current-version history suppresses automatic notices.
 

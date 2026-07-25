@@ -16,7 +16,9 @@ capture, paid revival, and captured-item-to-coop intake are required recovery
 scope. Only profile-scoped virtual companion inventories and earlier bonded
 vessel designs remain excluded.
 
-The current reduced artifact is not a feature-complete release candidate.
+At the 2026-07-24 scope correction, the then-reduced artifact was not a
+feature-complete release candidate. ADR 0008 records the subsequent recovery;
+the composed implementation now awaits exact-artifact live acceptance.
 
 ## Context
 
@@ -69,11 +71,12 @@ wholesale restoration target. Required features are recovered selectively
 against the current public API and replacement schema without reviving the July
 authority graph.
 
-This deletion does not remove released behavior. Tamework retains the process-local live owner
-cap, ordinary command links, filled-spawner capture/release, direct live-entity coop
-capture/release, free death/lost restoration, and namespaced profile-extension data. Those
-features use canonical lifecycle evidence and the shared operation protocol where persistence is
-required; none recreates one of the discarded authorities.
+The completed cutover retains released behavior and restores the required
+unreleased capabilities on shared authorities. Tamework now provides durable
+owner/group admission, legacy and command-family links, timed storage,
+provisioning, filled-spawner capture/release, direct live and captured-item
+coop intake, free legacy and exact paid roster restoration, and namespaced
+profile-extension data. None recreates one of the discarded authorities.
 
 ## Enforcement
 

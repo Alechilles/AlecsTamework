@@ -32,6 +32,15 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `NpcCapturedEvent`
 - `NpcDeathRecordedEvent`
 - `NpcLostRecordedEvent`
+- `CaptureAttemptResolvedEvent`
+- `PopulationGroupMembershipChangedEvent`
+- `PopulationGroupLimitChangedEvent`
+- `CommandFamilyRosterMembershipChangedEvent`
+- `CommandTimedSummoningChangedEvent`
+- `CompanionProvisionedEvent`
+- `ProvisionedCompanionDeathRecordedEvent`
+- `ProvisionedCompanionRevivedEvent`
+- `PaidCommandRevivedEvent`
 - `ConfigReloadedEvent`
 - `CompanionXpAwardedEvent`
 
@@ -40,6 +49,9 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - Listener exceptions are caught and logged so one consumer cannot break others.
 - Always close the returned `AutoCloseable` during unload/shutdown.
 - Payloads are immutable snapshots (`record` + defensive copies).
+- Persistence semantic events are published from one checkpointed outbox
+  observer. Replay after restart does not redeliver an already checkpointed
+  event to the same runtime consumer.
 - `CompanionXpAwardedEvent` is emitted only after Tamework accepts an XP award and applies or queues the component write.
 - Companion XP does not require a command-tool link; command links only add optional tool id context.
 
@@ -91,6 +103,7 @@ Payload fields:
 - `TALENT`
 - `DEBUG`
 - `CAPTURE_POLICY`
+- `POPULATION_GROUP`
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

@@ -25,16 +25,21 @@ This page is the working mental model for how Tamework finds config assets, choo
 - `TwDynamicAttachmentsConfig`: `<ModRoot>/Server/Tamework/DynamicAttachments/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
+- `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
+- `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 - `TwDebugConfig`: `<ModRoot>/Server/Tamework/Debug/*.json`
 
 ## Pick the Right Family First
 - Use `TwGlobalConfig` for shared server-wide defaults, infrastructure, asset-set gates, population limits, and SimpleClaims policy.
-- Use `TwCompanionConfig` for role-scoped ownership and command behavior policy.
+- Use `TwCompanionConfig` for role-scoped ownership, command behavior, paid
+  revival, and timed summon/storage policy.
 - Use `TwInteractionConfig` for optimized interaction authoring.
 - Use `TwSpawnerConfig`, `TwNameItemConfig`, and `TwCommandItemConfig` when the behavior is bound to an item.
 - Use `TwNamesConfig` when naming UI randomization should resolve from reusable name pools.
 - Use `TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwAttachmentMigrationConfig`, `TwDynamicAttachmentsConfig`, and `TwTraitConfig` for progression state and attachment appearance.
 - Use `TwCoopConfig` when runtime behavior is keyed to a coop id.
+- Use `TwPopulationGroupConfig` to classify roles into namespaced durable
+  population groups and set global/per-world owned/active limits.
 - Use `TwDebugConfig` for dev-only default debug toggles.
 
 ## Resolution Patterns
@@ -56,6 +61,8 @@ These families match by NPC role:
 - `TwAttachmentMigrationConfig`
 - `TwDynamicAttachmentsConfig`
 - `TwTraitConfig`
+- `TwCapturePolicyConfig`
+- `TwPopulationGroupConfig`
 
 Rule:
 - highest enabled `Priority` whose `RoleIds` contains the role wins
@@ -124,10 +131,12 @@ Everything else refreshes through normal asset loaded and removed events:
 - interactions
 - progression families
 - coop configs
+- capture policy and population-group configs
 - debug config
 
 ## Practical Workflow
-1. Decide whether the behavior is global, role-scoped, item-scoped, coop-scoped, or debug-only.
+1. Decide whether the behavior is global, role-scoped, item-scoped,
+   coop-scoped, population-group-scoped, or debug-only.
 2. Put the asset in the correct folder first.
 3. Keep priorities sparse and deliberate.
 4. Use parent fallback for shared defaults, but remember arrays and maps replace.
@@ -142,6 +151,7 @@ Everything else refreshes through normal asset loaded and removed events:
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwAttachmentMigrationConfig Reference](/mod/alecs-tamework/twattachmentmigrationconfig-reference)
 - [TwDynamicAttachmentsConfig Reference](/mod/alecs-tamework/twdynamicattachmentsconfig-reference)
+- [TwPopulationGroupConfig Reference](/mod/alecs-tamework/twpopulationgroupconfig-reference)
 
 
 

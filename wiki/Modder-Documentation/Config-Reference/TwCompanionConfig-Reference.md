@@ -9,13 +9,20 @@ draft: false
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
-`TwCompanionConfig` is the role-scoped companion policy family. Use it when a specific set of NPC roles should share command distances, revive cooldowns, placement behavior, and cross-world travel handling.
+`TwCompanionConfig` is the role-scoped companion policy family. Use it when a
+specific set of NPC roles should share command distances, paid revival,
+timed-summon/storage, placement behavior, and cross-world travel handling.
 
 Use this family for:
-- command recall, return-home, and revive placement/cooldown policy by role
+- command recall, return-home, exact revival cost/cooldown, and revive
+  placement policy by role
+- timed summon duration, dismissal/expiry cooldown, warning thresholds, and
+  logout storage policy
 - cross-world follow and transfer-failure policy
 
-Ownership damage protection and revive enablement are controlled by `/tw settings`. Legacy config fields still load for older packs, but new examples and `/tw config` hide them.
+Ownership damage protection and the server-wide revive master gate are
+controlled by `/tw settings`. `Command.Revive.Enabled` is the matching role's
+paid-revival policy. Legacy flat revive fields still load for older packs.
 
 Do not put global relocation infrastructure here. Retry windows and linked-panel unlink confirmation stay in [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 
@@ -40,6 +47,8 @@ Do not put global relocation infrastructure here. Retry windows and linked-panel
   "RoleIds": [],
   "Command": {
     "...": "...",
+    "Revive": { "...": "..." },
+    "Summon": { "...": "..." },
     "Travel": { "...": "..." }
   }
 }
@@ -62,8 +71,8 @@ These fields control effective companion behavior once the command system target
 - `ReturnHomeTeleportDelayMs`: delay before return-home teleport executes.
 - `RecallSafeSpawnDistance`: preferred spawn distance when recalling an unloaded companion.
 - `RecallForceRelocateDistance`: distance beyond which recall can force relocation.
-- `DeadRespawnCooldownMs`: cooldown in milliseconds before revive is available again.
-- `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are set, the minutes key wins.
+- `DeadRespawnCooldownMs`: legacy cooldown alias.
+- `DeadRespawnCooldownMins`: legacy minute-based cooldown alias.
 - `DeadRespawnFollowRetryDelayMs`: follow retry delay after respawn.
 - `DeadRespawnDistanceClose`
 - `DeadRespawnDistanceNear`
@@ -72,6 +81,31 @@ These fields control effective companion behavior once the command system target
 These define the ordered placement rings the revive runtime can try.
 - `PlacementMinRelativeY`: minimum allowed vertical placement offset.
 - `PlacementMaxRelativeY`: maximum allowed vertical placement offset.
+
+### `Command.Revive`
+
+- `Enabled`: enables paid command-panel revival for matching roster-backed
+  companions.
+- `GameplayCooldownMs`: non-negative delay after death; `0` adds no delay.
+- `Costs`: ordered AND recipe. Every unique `ItemId`/positive `Quantity`
+  component is required. An explicit array replaces the inherited recipe.
+- `InsufficientCostMessage`: optional localization key used when any component
+  is missing.
+
+The panel displays the exact quote before confirmation. Admission and the
+complete recipe are rechecked before charge. A proven terminal failure creates
+one exact refund claim; an unavailable or denied operation charges nothing.
+
+### `Command.Summon`
+
+- `Enabled`: enables owner/command-family roster summon and dismiss/storage.
+- `ActiveDurationMs`: non-negative active duration; `0` is unlimited.
+- `ResummonCooldownMs`: non-negative cooldown after dismissal or expiry.
+- `AutoStoreOnOwnerLogout`: stores an active companion when the owner logs
+  out.
+- `ExpiryWarningThresholdsMs`: strictly descending, unique, positive
+  remaining-time thresholds below a positive active duration. An explicit
+  array replaces the inherited list.
 
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
@@ -93,7 +127,8 @@ retry and logs the drop. Only positive destructive-removal evidence can create
 Use `TwCompanionConfig` for behavior policy:
 - how far recall or return-home can go
 - whether cross-world travel is allowed
-- revive cooldown and placement tuning
+- paid revival cost/cooldown and placement tuning
+- timed summon/storage balance and logout behavior
 
 Use `/tw settings` for:
 - who can damage owned NPCs
@@ -105,17 +140,18 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 - max retry attempts
 - linked-panel unlink confirmation
 
-When an enabled role-scoped config matches, its dead-respawn cooldown is
-authoritative even though a global config object also exists. The global
-cooldown is only the fallback for roles without an enabled matching
-`TwCompanionConfig`.
+When an enabled role-scoped config matches, `Command.Revive` and
+`Command.Summon` are authoritative. Legacy dead-respawn cooldown fields remain
+input aliases; `Revive.GameplayCooldownMs` wins when the nested section is
+present.
 
 ## Legacy Settings-Owned Fields Accepted
 Older packs may still contain ownership protection and revive enablement keys in `TwCompanionConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Companion/TwCompanionConfig_Default.json` is the shipped baseline.
-- `DeadRespawnCooldownMins` is the preferred human-friendly authoring key and overrides `DeadRespawnCooldownMs` when both are present.
+- New configs should use `Revive.GameplayCooldownMs`; the older
+  `DeadRespawnCooldownMins` and `DeadRespawnCooldownMs` fields remain readable.
 - Settings-owned legacy fields remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
 - `FollowMasterOnWorldChangeStateFilter` is an explicit array. If you author it in a child asset, it replaces the parent list.
 
@@ -147,7 +183,22 @@ Older packs may still contain ownership protection and revive enablement keys in
     "ReturnHomeTeleportDistance": 96.0,
     "RecallSafeSpawnDistance": 20.0,
     "RecallForceRelocateDistance": 80.0,
-    "DeadRespawnCooldownMins": 10,
+    "Revive": {
+      "Enabled": true,
+      "GameplayCooldownMs": 600000,
+      "Costs": [
+        { "ItemId": "Ingredient_Dragon_Heart", "Quantity": 1 },
+        { "ItemId": "Ingredient_Essence", "Quantity": 8 }
+      ],
+      "InsufficientCostMessage": "server.my_mod.revive.missing_cost"
+    },
+    "Summon": {
+      "Enabled": true,
+      "ActiveDurationMs": 600000,
+      "ResummonCooldownMs": 120000,
+      "AutoStoreOnOwnerLogout": true,
+      "ExpiryWarningThresholdsMs": [60000, 30000, 10000]
+    },
     "PlacementMinRelativeY": -2.0,
     "PlacementMaxRelativeY": 4.0,
     "Travel": {
@@ -170,6 +221,8 @@ Older packs may still contain ownership protection and revive enablement keys in
 - If a child asset explicitly authors `Travel`, only missing nested keys inherit. Authored arrays like `FollowMasterOnWorldChangeStateFilter` replace the parent list.
 - Global relocation retry settings still come from `TwGlobalConfig`.
 - A global cooldown value does not override a matching role-scoped cooldown.
+- `Costs` is an AND recipe, not weighted alternatives. Duplicate item IDs,
+  zero/negative quantities, and invalid warning thresholds reject the config.
 - Relocation timeout or retry exhaustion never creates canonical `LOST`
   state, regardless of `OnTransferFailure`.
 

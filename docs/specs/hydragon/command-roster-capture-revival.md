@@ -1,6 +1,7 @@
 # Command Rosters, Timed Summoning, Capture, and Revival
 
-Status: required recovery contract; implementation in progress
+Status: implemented and independently capability-gated; exact live acceptance
+pending
 
 ## Goal
 

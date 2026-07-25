@@ -32,6 +32,9 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "ItemIds": [],
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
+  "RosterStorage": "ItemMetadata",
+  "CommandFamilyId": null,
+  "ProjectRosterToItemMetadata": true,
   "LinkEnabled": true,
   "LinkUseTogglesMembership": true,
   "RequireTamed": true,
@@ -52,6 +55,12 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `ItemIds`: item ids that resolve this config.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.
+- `RosterStorage`: `ItemMetadata` for the legacy/default per-item authority or
+  `OwnerCommandFamily` for a durable owner/family roster.
+- `CommandFamilyId`: stable namespaced family shared by equivalent access
+  items; required for `OwnerCommandFamily`.
+- `ProjectRosterToItemMetadata`: optionally writes a disposable item cache for
+  presentation/compatibility. The cache never becomes roster authority.
 - `LinkEnabled`: allows persistent link and unlink actions for the tool.
 - `LinkUseTogglesMembership`: makes the link action toggle whether the NPC is in the active membership set.
 - `RequireTamed`: requires targets to be tamed.
@@ -70,10 +79,12 @@ Accepted `MembershipMode` values:
 - `MasterTarget`: target only the current resolved master target.
 - `LinkedOrMasterTarget`: linked companions plus the current master target.
 
-Linked membership is stored on the command item. When a record has a canonical
-profile ID, the runtime uses it to resolve entity-UUID aliases and reads
-lifecycle status from the replacement profile projection. The item does not
-maintain independent death, lost, captured, or coop status caches.
+With `RosterStorage: ItemMetadata`, linked membership remains on that command
+item. With `OwnerCommandFamily`, membership and stable slots are durable for
+the owner/family and equivalent access items see the same roster. Optional item
+metadata is only a disposable projection. Both modes resolve canonical profile
+IDs and read lifecycle status from replacement persistence; neither item cache
+may invent death, Lost, captured, coop, stored, or provisioned state.
 
 ## `AllowedRoles`
 Accepted `Mode` values:
@@ -179,6 +190,8 @@ Fields:
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 - `RequireOwner` can be left unset to inherit global linking-owner policy.
+- `OwnerCommandFamily` requires `RequireOwner: true` and a non-blank
+  `CommandFamilyId`.
 
 ## Bundled Example Is Not a Player Acquisition Flow
 

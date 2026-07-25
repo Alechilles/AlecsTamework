@@ -25,8 +25,10 @@ Parent: [Troubleshooting and Glossary](/mod/alecs-tamework/troubleshooting-and-g
   released through that item.
 - `In Coop`: the companion is housed in a configured coop and must be released
   through that coop.
-- `Revive`: free restoration for a saved dead or `LOST` companion when policy
-  and any death cooldown allow it.
+- `Revive`: restoration for a saved dead or `LOST` companion when policy and
+  any death cooldown allow it. Legacy item-linked companions may be free;
+  roster-backed companions can require the exact item costs shown in the
+  confirmation.
 - `LOST`: a restorable state saved from positive destructive-removal or
   world-deletion evidence, not from ordinary unload, absence, or recall
   timeout.

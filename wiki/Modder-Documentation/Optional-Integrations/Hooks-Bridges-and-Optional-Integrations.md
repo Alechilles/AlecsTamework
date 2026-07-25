@@ -67,7 +67,10 @@ What it enables:
 - SimpleClaims-native tamed-target damage policy.
 
 These checks do not create a general claim-population or placement-admission
-system. The ordinary owner cap remains a separate loaded-NPC count.
+system. The ordinary owner cap is a separate durable count of canonical owned
+profiles in its configured global or per-world scope. It includes active,
+unloaded, captured, cooped, roster-stored, provisioned-dormant, dead, and Lost
+companions and uses reservations plus reconciliation to prevent oversubscription.
 
 ### SimpleClaims damage policy
 

@@ -1,11 +1,10 @@
 # Persistence Replacement Release Checklist
 
-> **Release blocked (2026-07-24):** The artifact recorded below validates the
-> replacement migration core but is not feature-complete. Required unreleased
-> HyDragon-facing systems were removed in error and must be recovered under ADR
-> 0008 and the required persistence feature recovery plan. Do not continue
-> public release preparation or treat the recorded SHA as a release candidate.
-> A new exact artifact and a revised live matrix are required after recovery.
+> **Live acceptance pending:** The replacement core and required persistence
+> feature recovery under ADR 0008 are implemented and automated gates are
+> green. Public release preparation remains blocked until the exact artifact
+> recorded below passes the fresh-world, copied-save, cross-world, restart, and
+> rollback live matrices.
 
 Use this checklist for the first public release of the replacement persistence
 lineage. It deliberately reuses the normal Maven and release-preparation
@@ -28,13 +27,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `cabe6df27f5564a327a6caefcecc78f8929bfd1d` |
+| Tamework commit | `fa4191a88c45638ff54e1b9dc220c0ccf924fdfa` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
 | Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
-| Candidate SHA-256 | `eee6d47e6c8623d1132e3a5c59fe25d8ebcf9f0106311258c18995f046b0df19` |
-| Maven test result | Clean isolated run on 2026-07-24: 2,595 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,814,939 bytes |
+| Candidate SHA-256 | `ccc7b5f25f0ab0bdc06d5fb2dc915ea096a4103ae32f97fe9fcb5061b81e7a24` |
+| Maven test result | Clean run on 2026-07-25: 3,001 tests, 0 failures, 0 errors, 1 intentional environment-dependent skip |
+| Test-candidate package result | Ordinary Maven package passed; artifact size 24,376,018 bytes. Release packaging remains deferred until live acceptance completes. |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -141,6 +140,26 @@ Use a disposable fresh world with the exact candidate artifact.
 - [ ] Start cleanly, tame a companion, and verify its identity and name.
 - [ ] Capture the companion into a spawner and release it.
 - [ ] Capture a live companion into a loaded coop and release it.
+- [ ] Admit an eligible filled capture item directly into a supported managed
+      coop, then release the same canonical companion.
+- [ ] Configure global and per-world owner limits plus one population group.
+      Verify `MaxOwned` counts active, unloaded, captured, cooped,
+      roster-stored, provisioned-dormant, dead, and Lost profiles; verify
+      `MaxActive` reserves and releases active slots without oversubscription.
+- [ ] Open a Dragon Horn-style owner/command-family roster. Store and summon
+      one companion, dismiss it, allow one timed summon to expire, log out
+      during another summon, and verify the configured cooldown across restart.
+- [ ] Provision one Soul Bond Miniwyvern, activate it, and verify repeated
+      provisioning requests remain idempotent. Exercise its Dead/Lost paid
+      revival path and confirm a duplicate live identity is never created.
+- [ ] Exercise both capture source-consumption modes: a terminal denial and a
+      success under `ResolvedAttempt`, plus one ordinary `SuccessOnly` denial.
+      Verify exact source spending and no spending for retryable/unresolved
+      outcomes.
+- [ ] Complete one `TameAndCommandLink` capture and verify ownership plus
+      command-family roster membership publish together.
+- [ ] Quote, reject, and then confirm a paid Dead/Lost roster revival. Verify
+      the exact recipe quantities, no cost on denial, and one restored profile.
 - [ ] Exercise death restoration and lost-companion restoration.
 - [ ] Stop cleanly, boot the same world twice, and repeat one capture/release.
 - [ ] Verify no companion is duplicated, lost, unexpectedly teleported, or

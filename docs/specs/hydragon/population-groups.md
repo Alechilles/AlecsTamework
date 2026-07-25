@@ -1,6 +1,7 @@
 # Population Groups and Companion Provisioning
 
-Status: required recovery contract; implementation in progress
+Status: implemented and independently capability-gated; exact live acceptance
+pending
 
 ## Goal
 
@@ -132,8 +133,8 @@ provisioned companion.
 
 HyDragon's Wyvern Egg requests one `Tamed_Wyvern_Mini` profile in the Soul Bond
 group with `hydragon:dragon_horn` membership. A claimed, pending, dormant,
-active, unloaded, lost, dead, or recoverable profile denies another Egg claim
-without consuming the Egg.
+roster-stored, active, unloaded, lost, dead, or recoverable profile denies
+another Egg claim without consuming the Egg.
 
 This is not the removed bonded-vessel item system:
 

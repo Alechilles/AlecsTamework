@@ -1,6 +1,6 @@
 # ADR 0008: Required Persistence Feature Recovery
 
-- Status: Accepted for planning; implementation pending
+- Status: Accepted; automated implementation verified, live verification pending
 - Date: 2026-07-24
 
 ## Context
@@ -82,3 +82,34 @@ state remain prohibited.
 - Recovery proceeds in gated vertical slices described in
   `2026-07-24-required-persistence-feature-recovery-plan.md`.
 
+## Implementation record
+
+The recovered cutover was completed in `f7c3f046` on
+`refactor/persistence-consolidation`. It restores every required capability
+through the replacement runtime without reinstating the deleted persistence
+lineage or any feature-specific writer, phase graph, recovery scanner,
+readiness graph, or projection journal.
+
+The implementation remains at the agreed ceilings:
+
+- 13 feature descriptors;
+- 20 operation kinds;
+- 29 schema tables.
+
+The final automated gate ran 3,001 Tamework tests with zero failures, zero
+errors, and one intentional skip. HyDragon then passed its complete
+131-test `verify` run against the exact Tamework jar, including validation of
+366 JSON assets and five locales. Architecture, crash-recovery, schema,
+ECS/thread-safety, API-boundary, and stale-runtime guards all passed.
+
+The tested Tamework artifact was:
+
+- file: `target/Alec's Tamework! v3.0.0.jar`;
+- SHA-256:
+  `ccc7b5f25f0ab0bdc06d5fb2dc915ea096a4103ae32f97fe9fcb5061b81e7a24`;
+- schema-v1 SHA-256:
+  `8ad3e6a9783b3fb4f85cf91f14546fd401651249239554ec7f3be76e2b2bf0d5`.
+
+The complete authority, operation, schema, and complexity inventory is in
+`docs/Required-Persistence-Feature-Inventory.md`. Live Tamework and HyDragon
+acceptance rehearsals remain required before release preparation may begin.

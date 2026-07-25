@@ -28,3 +28,41 @@ version or from DTO classes being present.
 For durable integration state, resolve a canonical ID through `profiles()` and
 store namespaced data through `profileData()`. Never write Tamework persistence
 directly.
+
+Replacement persistence features are advertised independently. Check the exact
+set your action needs before taking an item, charging a cost, spawning an NPC,
+or changing live state:
+
+```java
+EnumSet<TameworkApiCapability> required = EnumSet.of(
+        TameworkApiCapability.POPULATION_GROUPS,
+        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
+        TameworkApiCapability.COMMAND_TIMED_SUMMONING
+);
+if (!capabilities.containsAll(required)) {
+    return; // Fail closed before player cost or live mutation.
+}
+
+CommandFamilyRosterApi rosters = api.commandFamilyRosters();
+CommandTimedSummoningApi timed = api.commandTimedSummoning();
+PopulationGroupApi groups = api.populationGroups();
+```
+
+The readiness-gated persistence capabilities are:
+
+| Capability | API or contract |
+| --- | --- |
+| `POPULATION_GROUPS` | `populationGroups()` |
+| `COMMAND_FAMILY_ROSTERS` | `commandFamilyRosters()` |
+| `COMMAND_TIMED_SUMMONING` | `commandTimedSummoning()` |
+| `COMPANION_PROVISIONING` | `companionProvisioning()` |
+| `PAID_COMMAND_REVIVAL` | `paidCommandRevival()` |
+| `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION` | resolved capture-attempt contract |
+| `CAPTURE_TAME_AND_LINK` | successful capture tame/link contract |
+| `PERSISTENCE_RESILIENCE` | replacement persistence health and resilience |
+
+Capabilities can become available after startup readiness completes or become
+unavailable when their own persistence scope is quarantined. Resolve the
+capability and API for each player action; do not cache startup availability as
+a permanent answer. The default API implementations remain fail-closed for
+older Tamework versions.

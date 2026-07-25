@@ -44,11 +44,12 @@ Use this page when an asset or integration loads but behaves incorrectly.
 - `/tw debugrespawntrace`
 - `/tw debugxpevents`
 
-Death and Lost restoration are free gameplay flows. There is no debug-ready
-revival mutation or persistence repair command.
+Death and Lost restoration is a gameplay flow. Roster-backed companions can
+use role-configured exact item costs, while legacy item-linked paths remain
+free. There is no debug-ready revival mutation or persistence repair command.
 
-For coops, test direct live capture and direct live release. Filled spawner
-items release through their ordinary interaction instead of entering a coop.
+For coops, test direct live capture, direct captured-item intake through the
+supported managed-coop interaction, and resident release independently.
 
 Command status comes from the canonical lifecycle projection. A relocation
 timeout only drops the pending retry; it cannot manufacture `LOST`, and none of

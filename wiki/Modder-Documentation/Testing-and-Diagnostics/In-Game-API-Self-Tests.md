@@ -34,10 +34,13 @@ console, `core`, `diagnostics`, `hydragon-integrations`, and their read-only
   fixture baseline
 - `interaction-extensions` and `trait-effects`: registration, lookup,
   unregister, and invalid-ID behavior
-- `policies`: ownership, damage/claim decisions, and the live owner-cap result
+- `policies`: ownership, damage/claim decisions, and the durable owner-cap
+  preflight
 - `diagnostics`: persistence path, health, and metrics readability
-- `hydragon-integrations`: capture-policy mechanics and transactional
-  profile-data capability advertisement
+- `hydragon-integrations`: capture mechanics plus independent readiness for
+  capture policy, transactional profile data, persistence resilience,
+  population groups, provisioning, command-family rosters, timed summoning,
+  paid revival, resolved-attempt consumption, and tame/link capture
 
 The runner logs a verbose report even when chat output is summarized. These
 checks validate the packaged public API; they do not replace the Maven suite or

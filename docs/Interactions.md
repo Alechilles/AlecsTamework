@@ -63,7 +63,8 @@ Common fields:
 
 Behavior:
 - Requires untamed NPC and matching held item.
-- Checks the destination player's live owner cap before changing ownership.
+- Checks durable owner-population and matching group admission before changing
+  ownership.
 - Sets tamed + owner, consumes the held item, and performs an optional role
   swap only after the live mutation succeeds.
 
@@ -155,10 +156,11 @@ Behavior:
 
 ## Ownership rules
 
-`SetOwner` and Tame check the simple live owner cap when adding a non-null
-owner. The cap is a current loaded-NPC count; it is not a durable reservation
-or claim-placement system, and it does not create a provisioning or population
-journal.
+`SetOwner` and Tame check durable owner-population admission when adding a
+non-null owner. The configured global/per-world cap counts canonical owned
+profiles, and positive acquisitions reserve capacity inside the same operation.
+This is independent from SimpleClaims placement and does not create a
+feature-local provisioning or population journal.
 
 `TameworkOwnerComponent` is the canonical live authorization source for
 ownership mutation and command access. A clear invalidates command-tool links

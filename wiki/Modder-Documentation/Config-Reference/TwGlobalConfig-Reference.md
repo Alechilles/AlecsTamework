@@ -112,10 +112,10 @@ For the current compatibility release only, the same configured key is also chec
 
 These legacy fields are still decoded but `/tw settings` is authoritative:
 
-- `Population.LimitPerPlayerOwnedTotal`: maximum loaded owned NPCs per player;
-  `0` disables the cap.
-- `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for that live
-  count.
+- `Population.LimitPerPlayerOwnedTotal`: maximum canonical owned profiles per
+  player; `0` disables the cap.
+- `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for that
+  durable count.
 - `SimpleClaims.SimpleClaimsEnabled`: backward-compatible master claim-integration gate.
 - `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: live
   SimpleClaims capacity limits used by taming and breeding.

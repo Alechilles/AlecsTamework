@@ -27,12 +27,15 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 
 ## Command items
 - Link specific companions to a tool
-- Store command selection, links, and display preferences on the item itself
+- Legacy tools store command selection, links, and display preferences on the
+  item itself. Owner/command-family tools read durable roster membership from
+  the world instead of treating the item as roster authority.
 - Open the radial menu and linked panel for deeper management
 - Can limit how many linked companions stay active at once
 - Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
-- Read captured, coop, dead, and `LOST` status from the companion's saved
-  lifecycle rather than deciding those states from stale item metadata
+- Read captured, coop, roster-stored, provisioned-dormant, dead, and `LOST`
+  status from the companion's saved lifecycle rather than deciding those states
+  from stale item metadata
 
 Tamework's bundled example command whistle is a development/reference item and
 has no recipe. Servers may give it directly for testing, while production mods
@@ -50,11 +53,12 @@ method.
 - If a command item looks empty, it may simply have no linked companions yet.
 - A companion shown as housed in a configured coop is not missing. Release it
   through that coop instead of trying to create a replacement.
-- A filled capture item cannot be placed directly into a configured coop.
-  Release the companion from the item first, then use the coop's live-creature
-  intake.
-- Restoring a command-linked dead or `LOST` companion is free; the configured
-  policy or death cooldown may still delay or disable the action.
+- A supported managed-coop interaction can place an eligible canonical filled
+  capture item directly into an available coop slot. Other filled items still
+  use their normal release interaction.
+- Restoring a command-linked dead or `LOST` companion may be free or may
+  require the exact item recipe shown by the confirmation. The configured
+  policy or cooldown can still delay or disable the action.
 
 ## Related Pages
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)

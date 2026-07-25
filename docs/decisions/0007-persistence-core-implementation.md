@@ -1,15 +1,16 @@
 # ADR 0007: Replacement Persistence Core Implementation
 
-- Status: Accepted and implemented core; production feature scope reopened
+- Status: Accepted; feature recovery implemented, exact live acceptance pending
 - Date: 2026-07-23
 
 ## 2026-07-24 feature-scope correction
 
 The shared core and its complexity constraints remain accepted. ADR 0008
 supersedes the conclusion that every unreleased capability should remain absent.
-Required HyDragon-facing and captured-item-to-coop behavior will be rebuilt as
-focused participants in this core. The current reduced artifact is not
-feature-complete.
+Required HyDragon-facing and captured-item-to-coop behavior was rebuilt as
+focused participants in this core under ADR 0008. The historical reduced
+artifact was not feature-complete; the composed replacement implementation now
+awaits exact-artifact live acceptance.
 
 ## Context
 
@@ -102,9 +103,11 @@ lease, startup graph, query facade, operation facade, diagnostics, and bounded
 shutdown. `TameworkPersistenceAuthors` composes the released gameplay authors
 over that one facade bundle.
 
-The final cutover includes canonical profile snapshots, filled-spawner capture
-and release, direct-live coop capture and release, saved death/destructive
-removal dormancy, free restoration, and transactional profile-extension data.
+The final cutover includes canonical profile snapshots, durable
+owner-population/groups, command-family rosters, timed summon/storage,
+provisioning, resolved capture/tame-link, filled-spawner capture/release,
+direct-live and captured-item coop intake, saved death/destructive-removal
+dormancy, free/paid restoration, and transactional profile-extension data.
 Dormant state requires positive death, destructive removal, or
 delete-on-remove-world evidence; unload, absence, and timeout cannot author it.
 
@@ -113,11 +116,11 @@ lineage unchanged, and never dual-writes. The superseded persistence runtime
 and its alternate repositories, queues, recovery authorities, and adapters
 have been deleted from production.
 
-Required owner-population/group, command-roster, timed-summon, provisioning,
-resolved capture/tame-link, paid-revival, and captured-item-to-coop behavior is
-reopened under ADR 0008. It gains no compatibility promise for July save
-formats and must use this core's shared authorities. Companion inventory remains
-deferred and bonded vessels remain removed.
+ADR 0008 records the completed recovery of owner-population/group,
+command-roster, timed-summon, provisioning, resolved capture/tame-link,
+paid-revival, and captured-item-to-coop behavior through this core's shared
+authorities. July save formats gain no compatibility promise. Companion
+inventory remains deferred and bonded vessels remain removed.
 
 ## Consequences
 

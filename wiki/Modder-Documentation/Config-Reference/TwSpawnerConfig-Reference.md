@@ -92,11 +92,25 @@ Fields:
 - `MinimumChance` / `MaximumChance`: inclusive probability clamps.
 - `FailureCooldownMs`: cooldown applied after a resolved failed roll.
 - `FailureParticleSystem` / `FailureSoundEvent`: optional failure feedback.
+- `SourceConsumption`: `SuccessOnly` preserves ordinary filled-item behavior;
+  `ResolvedAttempt` spends one exact source item after either terminal success
+  or terminal failure.
+- `SuccessDisposition`: `CapturedItem` creates the configured filled item;
+  `TameAndCommandLink` keeps the target live and atomically establishes its
+  canonical tame/owner/role/profile, population groups, roster membership, and
+  first timed lease.
+- `CommandFamilyId`: required stable owner-scoped family for
+  `TameAndCommandLink`.
+- `RequiredCommandConfigId`: optional exact command-config access fence.
+- `RequireCommandAccessItem`: requires a compatible owner/family access item
+  before the probability roll.
 
 `ChanceMode: Guaranteed` preserves deterministic capture and bypasses
 `TwCapturePolicyConfig`, including its custom requirements. `Probability`
 requires the `CAPTURE_POLICY` capability before an integration treats the flow
-as available.
+as available. `ResolvedAttempt` additionally requires
+`CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, and `TameAndCommandLink` requires
+`CAPTURE_TAME_AND_LINK` plus its population/roster/timed dependencies.
 
 ### `Spawn`
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.

@@ -53,8 +53,14 @@ the `tamework:` namespace is reserved.
 - Never roll chance in a downstream plugin and then call deterministic capture.
 - Treat a missing capability, missing handler, or invalid live evidence as
   denial.
-- Probabilistic capture uses the ordinary filled-item result. There is no
-  resolved-attempt source-consumption or tame-and-command-link mode.
+- `SuccessDisposition: CapturedItem` preserves the ordinary filled-item result.
+- `SuccessDisposition: TameAndCommandLink` commits taming and command-family
+  roster membership through one canonical operation and requires
+  `CAPTURE_TAME_AND_LINK`.
+- `SourceConsumption: ResolvedAttempt` consumes the configured source exactly
+  once after either terminal success or terminal denial and requires
+  `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`. Retryable or unresolved attempts do
+  not consume the source.
 
 ## Related pages
 

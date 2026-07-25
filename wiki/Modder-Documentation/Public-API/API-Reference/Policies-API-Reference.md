@@ -20,12 +20,19 @@ Entry point: `TameworkApi.policies()`.
 - `evaluateClaimAccess(profileId, playerUuid)`
 - `evaluateDamage(profileId, attackerPlayerUuid)`
 - `evaluatePopulationCap(ownerUuid)`
+- `evaluatePopulationCap(requestV2)`
+- `populationAdmissions()`
 
 ## Owner cap
 
-`evaluatePopulationCap` is a read-only preflight for the simple live owner cap.
-The count is based on loaded owned NPCs. It is not a durable reservation, so
-another live ownership change may alter the result before a later mutation.
+The legacy `evaluatePopulationCap(ownerUuid)` remains a compatibility view.
+`evaluatePopulationCap(requestV2)` reads the durable canonical owner count for
+an explicit global/per-world scope. Both are informational preflights.
+
+Use `populationAdmissions()` when a custom gameplay mutation must bind a
+positive acquisition to durable capacity. Its try/claim-for-apply/commit/cancel
+protocol prevents another concurrent mutation from consuming the same slot.
+Do not treat a read-only preflight as a reservation.
 
 ## SimpleClaims
 

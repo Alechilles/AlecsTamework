@@ -25,19 +25,28 @@ authorize optional behavior.
 - `profiles()` for canonical companion profile reads;
 - `commandLinks()` for command-tool links;
 - `progression()` for progression reads and supported mutations;
-- `policies()` for ownership, damage, claim access, and the live owner-cap
-  preflight;
+- `policies()` for ownership, damage, claim access, durable owner-cap
+  preflight, and mutation-bound owner admission;
 - `interactionExtensions()` and `traitEffects()` for registered extensions;
 - `profileData()` for namespaced canonical-profile data;
 - `events()` for immutable notifications;
 - `configs()` for detached config views; and
-- `diagnostics()` for the retained read-only diagnostic snapshot.
+- `diagnostics()` for the retained read-only diagnostic snapshot;
+- `populationGroups()` for role classification, counts, and reconciliation;
+- `commandFamilyRosters()` for durable owner/family/profile membership;
+- `commandTimedSummoning()` for timed summon, storage, and lease state;
+- `companionProvisioning()` for idempotent dormant grants and activation; and
+- `paidCommandRevival()` for exact quote, same-profile revival, and operation
+  recovery.
 
 The current capability enum contains `PROFILES`, `COMMAND_LINKS`,
 `PROGRESSION`, `PROGRESSION_MUTATIONS`, `POLICY`,
 `INTERACTION_EXTENSIONS`, `TRAIT_EFFECTS`, `PROFILE_DATA`, `EVENTS`,
-`COMPANION_XP_EVENTS`, `CONFIG_READ`, `DIAGNOSTICS`, `CAPTURE_POLICY`, and
-`PROFILE_DATA_TRANSACTIONS`.
+`COMPANION_XP_EVENTS`, `CONFIG_READ`, `DIAGNOSTICS`, `CAPTURE_POLICY`,
+`PROFILE_DATA_TRANSACTIONS`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`,
+`COMPANION_PROVISIONING`, `COMMAND_TIMED_SUMMONING`,
+`PAID_COMMAND_REVIVAL`, `COMMAND_FAMILY_ROSTERS`,
+`CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, and `CAPTURE_TAME_AND_LINK`.
 
 ## Canonical profile extension data
 
@@ -52,7 +61,7 @@ canonical profile ID.
 An unadvertised capability is unavailable. Integrations must not infer private
 operations from the API version.
 
-There is no public population-reservation, population-group, companion-
-provisioning, timed-roster, or paid-restoration authority. Use the supported
-gameplay paths and API families above instead of internal replacement-
-persistence classes.
+Use the public population, roster, timed-summon, provisioning, and paid-revival
+authorities above. Resolved capture consumption and tame/link behavior are
+advertised contracts on the capture path. None of these capabilities permits
+direct access to internal replacement-persistence classes or SQLite tables.

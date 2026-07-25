@@ -94,7 +94,7 @@ tamed-companion damage decision.
   administrator, full-world, permission, and outsider rules.
 - A SimpleClaims lookup failure does not make a companion invulnerable.
 
-The ordinary Tamework owner cap is separate. It counts loaded owned NPCs and
-does not use claims, dormant profile accounting, reservations, or provider
-selection. There is no provider-neutral claims bridge or persistent reflected
-provider cache in the released runtime.
+The ordinary Tamework owner cap is separate. It counts canonical owned
+profiles in its configured global/per-world scope and uses durable positive
+reservations; it does not use claims or provider selection. There is no
+provider-neutral claims bridge or persistent reflected provider cache.

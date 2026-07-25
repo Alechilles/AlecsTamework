@@ -33,9 +33,10 @@ That pattern is most visible in the spawner, naming, command, and persistence
 runtimes.
 
 Persistence has one production composition and one facade bundle. Gameplay
-authors submit canonical capture, release, coop, dormant, restoration, and
-profile-data operations through those facades; tick and ECS systems freeze live
-facts and do not own storage.
+authors submit canonical capture, release, coop, population, roster,
+timed-summon, provisioning, revival, dormant, restoration, and profile-data
+operations through those facades; tick and ECS systems freeze live facts and
+do not own storage.
 
 The persistence database is `tamework-state.sqlite`, beginning with a fresh
 schema-v1 lineage. Released v2-v4 SQLite sources and the released DAT bundle are
@@ -47,6 +48,8 @@ read-only import inputs. Unreleased v5-v9 databases are refused unchanged.
 - Persistence composition:
   `src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java`
 - Persistence decisions: `docs/decisions/0001-0007`
+- Restored feature inventory:
+  `docs/Required-Persistence-Feature-Inventory.md`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Config assets: `src/main/java/com/alechilles/alecstamework/config/assets`
 - Bundled examples: `src/main/resources/Server/Tamework`

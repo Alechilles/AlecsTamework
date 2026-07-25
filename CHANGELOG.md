@@ -3,6 +3,23 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
+- Added durable owner-population limits, role-based population groups, and
+  command-family rosters. Companion capacity and command membership now remain
+  consistent across capture, release, death, storage, world travel, and server
+  restarts.
+- Added data-driven timed companion summoning and storage, including per-role
+  durations, warnings, logout storage policy, expiry, and resummon cooldowns.
+- Added idempotent dormant companion provisioning and activation for
+  integrations such as HyDragon's bonded Miniwyvern, without reintroducing
+  physical bonded-vessel item states.
+- Added exact multi-item paid command revival for Dead and Lost companions,
+  with pre-charge admission checks and durable exact refunds when a terminal
+  failure is proven.
+- Added resolved probabilistic capture attempts that consume their configured
+  source exactly once after either terminal result, plus successful in-place
+  tame-and-command-link capture for command-roster integrations.
+- Added direct captured-item intake for configured coops. A captured companion
+  can now move into a coop without an intermediate live spawn or duplicate.
 - Restored `/tw debugdb export` for the replacement persistence system. It
   creates a bounded, redacted support ZIP containing operational status,
   counters, and durable diagnostic summaries without copying the database,
@@ -54,6 +71,9 @@
 - Persistence-backed gameplay now uses one shared idempotent operation protocol
   and one ordered projection outbox instead of feature-specific persistence
   journals, recovery queues, and duplicate in-memory lifecycle caches.
+- All restored population, roster, timed summon, provisioning, capture,
+  revival, and coop-item behavior now shares the replacement persistence
+  lifecycle, operation, recovery, readiness, and projection authorities.
 - Durable death or Lost state now requires positive saved-death, destructive
   removal, or delete-on-remove-world evidence. Ordinary unload, absence, and
   timeout do not reclassify a companion as dead or Lost.
@@ -68,8 +88,9 @@
 - SimpleClaims tamed-companion protection now follows its native full-world, admin, member-permission, player-ally, party-ally, and outsider policy. The configured `AllowDamagePermissionKey` is a Hytale server permission; the old raw SimpleClaims party-key grant remains for one compatibility release with a deprecation warning.
 - Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
 - SimpleClaims breeding limits continue to use direct claim lookup and claim
-  counts. Owner caps remain a live-NPC check rather than durable profile,
-  claim-placement, or reservation accounting.
+  counts. Owner and population-group companion caps now use durable positive
+  reservations and sealed world reconciliation, preventing unloaded or
+  in-flight companions from bypassing admission limits.
 - Added a dedicated model and texture for Flightmaster's Talisman.
 - Avatar flight keeps the transformed NordicDrake model enabled by default while the experimental fake rider visual remains disabled.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
@@ -159,18 +180,20 @@
   identity, and known captured, dead, cooped, or Lost states use their specific
   player warning instead of generic unavailability.
 - Fixed handheld capture items losing or delaying a linked companion's panel status when capture clears ownership. Command links are now frozen before the ownership transition, published only after capture succeeds, and shown as captured immediately even while the retired source projection finishes despawning.
-- Kept coop behavior on the direct live path: configured coops capture and
-  release live companions. Filled spawner items release their stored NPC through
-  the ordinary spawner flow.
+- Added durable captured-item intake for supported managed coops. Eligible
+  filled spawners now move the same companion profile into coop residency and
+  retire the item only after that transition publishes; ordinary filled-item
+  use still releases the companion normally.
 - Fixed daytime coop release repeatedly returning residents to the coop because
   randomized spawn placement was recalculated between the release checks.
 - Fixed breeding sweep and cooldown paths treating negative Hytale world timestamps as missing; `0` is the only unset sentinel.
 - Fixed packaged servers printing a false `SEVERE` SLF4J binder warning when Tamework opened its SQLite data store.
 - Fixed custom `SetOwner` effects so a missing or malformed UUID is rejected; an owner name alone can no longer clear or overwrite ownership.
 - Fixed runtime and Public API damage decisions to use the same live owner precedence (owner component, command-link owner, then persisted NPC-name owner) and role-resolved protection settings.
-- Fixed free linked-companion death restoration preserving the saved companion
-  state through chunk unload and restart. Revival does not consume payment
-  items, and Lost restoration likewise recreates only the recorded companion.
+- Fixed linked-companion restoration preserving the saved companion state
+  through chunk unload and restart. Legacy item-metadata links retain free
+  restoration, while owner/command-family roster entries in Dead or Lost state
+  use the server-authoritative paid revival recipe and exact item quantities.
 - Rebuilt the avatar-flight launch particle sequence with scene-lit, translucent custom wind sprites, rotating arcs, curved orbiting charge motes, helical launch streaks, upward mist, and radial ground dust, drawing from Hytale's battleaxe whirlwind and Wind Spirit effects.
 - Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
 - Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.

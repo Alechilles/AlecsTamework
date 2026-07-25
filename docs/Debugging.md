@@ -60,11 +60,14 @@ and `/tw showspawnmarkers` need a live player.
 
 - Confirm an enabled `TwCoopConfig` resolves for the exact coop under test.
 - Test live NPC intake and live resident release independently.
-- Captured items are not a coop-intake path.
-- Filled spawner items release their stored NPC through the normal spawner
-  interaction.
+- Test eligible captured-item intake independently. A successful operation
+  retires the exact item and creates one canonical coop resident; an ineligible
+  item or unavailable persistence feature remains untouched.
+- Filled spawner items still release through their normal interaction when the
+  targeted block is not a supported managed coop intake.
 - For death or Lost recovery, verify the linked panel shows the recorded state
-  and that restoration is free.
+  and exact cooldown. Roster-backed paid revival must show every configured
+  cost; legacy item-linked restoration remains free.
 - Released schema v2-v4 sources and released DAT records import into
   `tamework-state.sqlite` without modifying the source. A v5-v9 source is a
   deliberate refusal: restore a public backup or create a new world instead of
@@ -109,15 +112,18 @@ and `/tw showspawnmarkers` need a live player.
 
 ## Population and claim troubleshooting
 
-- The owner cap counts loaded NPCs currently owned by that player. If the result
-  looks wrong, inspect the live owner component and count other loaded owned
+- The owner cap counts canonical owned profiles, including unloaded, captured,
+  cooped, roster-stored, provisioned-dormant, dead, and Lost profiles in the
+  configured global/per-world scope. If the result looks wrong, inspect
+  lifecycle ownership and reconciliation readiness rather than only nearby live
   NPCs.
 - SimpleClaims affects breeding only through its direct claim-required,
   per-chunk, and total-claim settings.
 - SimpleClaims damage protection uses its native tamed-NPC policy. Integration
   errors fail open rather than making companions invulnerable.
-- There is no provider selector, QuestLines bridge, durable dormant count,
-  placement reservation, or batch-admission diagnostic to inspect.
+- There is no provider selector or QuestLines bridge. Durable owner/group
+  admission and sealed reconciliation belong to replacement persistence, not
+  SimpleClaims.
 
 ## Debug toggles
 - `/tw debughook [on|off]`

@@ -21,8 +21,8 @@ Use this page when a Tamework-powered feature seems inconsistent and the other m
 ### Recall or return-home is not working
 - The companion may be unloaded and still waiting on relocation.
 - The mod may require special travel rules for cross-world recovery.
-- Dead and `LOST` companions use the free `Revive` action rather than normal
-  recall.
+- Dead and `LOST` companions use `Revive` rather than normal recall. The
+  confirmation shows any configured item cost before you approve it.
 - A failed relocation keeps the last canonical state instead of deleting the
   companion or guessing that it is `LOST`.
 - A recall countdown ending stops that attempt. Off-screen absence and timeout
@@ -39,14 +39,17 @@ Use this page when a Tamework-powered feature seems inconsistent and the other m
 - The item may be on cooldown or out of range.
 - Filled items release through their normal spawner interaction. The filled
   item should remain available if release cannot safely complete.
-- Configured coops accept eligible live creatures, not filled capture items.
-  Release the item first, then use the coop intake.
+- A supported managed-coop interaction can accept an eligible canonical filled
+  capture item directly. If that intake is not configured or the item is
+  ineligible, release it normally and use live-creature intake.
 
 ### Taming or ownership says the owner limit was reached
 
-- The limit counts loaded NPCs currently owned by that player.
-- Move away from or release loaded owned companions, or ask the administrator
-  to review the configured limit.
+- The limit counts saved owned companions in the configured global or
+  per-world scope, including companions that are unloaded, captured, cooped,
+  roster-stored, provisioned-dormant, dead, or `LOST`.
+- Release ownership from an existing companion or ask the administrator to
+  review the configured limit. Merely moving away does not free a slot.
 
 ### Breeding says a claim limit was reached
 

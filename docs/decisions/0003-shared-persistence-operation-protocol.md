@@ -37,10 +37,12 @@ No filesystem, network, ECS, inventory, or projection callback runs inside a dat
 
 ## Consequences
 
-- Profile/alias mutation, capture, coop, positive-evidence dormancy, free
+- Profile/alias mutation, population/groups, roster/timed summoning,
+  provisioning, capture, coop, positive-evidence dormancy, free/paid
   restoration, and profile-extension mutation share recovery mechanics.
-- Command items read canonical projections and invoke the canonical restoration
-  path; they do not own a command-roster operation family.
+- Legacy command items read canonical projections. Owner/command-family items
+  use the shared roster operation family and canonical restoration machinery;
+  neither owns item-local recovery infrastructure.
 - Operation IDs and scope keys replace string labels and JSON context as transaction identity.
 - A feature registry can prove every operation kind has recovery, containment, readiness, and
   shutdown ownership.

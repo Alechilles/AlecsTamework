@@ -136,9 +136,10 @@ Linked panel supports:
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
-- Status lanes for loaded, unloaded, captured, cooped, dead, and Lost
-  companions; ordinary unloaded rows keep the latest custom display name from
-  the live snapshot or durable profile, including across restart
+- Status lanes for loaded, unloaded, captured, cooped, roster-stored,
+  provisioned-dormant, dead, and Lost companions; ordinary unloaded rows keep
+  the latest custom display name from the live snapshot or durable profile,
+  including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Owner/command-family roster rows additionally show their authoritative
   timed-summon state, remaining duration or cooldown, active population count
@@ -217,8 +218,9 @@ Configured-coop flow:
   canonical coop slot and releases it through the same persistence authority.
 - The released live NPC may have a different entity UUID but remains attached
   to the same stable profile and command links.
-- Filled spawner items never enter a coop; their release uses the canonical
-  captured-spawner release operation.
+- A supported managed-coop interaction can move an eligible canonical filled
+  spawner directly into a coop slot through the canonical coop-capture
+  operation. Other uses retain the captured-spawner release operation.
 
 Dead companions:
 

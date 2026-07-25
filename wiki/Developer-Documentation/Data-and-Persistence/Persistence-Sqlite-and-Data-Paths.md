@@ -25,17 +25,24 @@ The replacement persistence-backed flows are:
 - canonical profile identity and live UUID aliases;
 - command links and canonical profile snapshots;
 - filled-spawner capture and release;
-- configured-coop capture and release of live NPCs;
-- saved death and Lost restoration, without payment; and
+- configured-coop capture/release of live NPCs and eligible captured items;
+- durable owner population and role-defined population groups;
+- command-family rosters and timed summon/storage leases;
+- idempotent dormant provisioning and activation;
+- resolved capture-attempt consumption and tame-and-command-link capture;
+- free legacy restoration and exact paid roster revival;
 - namespaced profile extension data.
 
-There is one capture path, one filled-item release path, one direct-live coop
-path, and one restoration path. Captured items do not enter coops.
+There is one capture operation kind, one filled-item release operation, one
+coop-capture operation for live and item sources, and shared restoration
+machinery. Feature variants add typed participants and frozen evidence rather
+than their own transaction/recovery protocols.
 
 The canonical lifecycle vocabulary is `ACTIVE`, `UNLOADED`, `CAPTURED`,
-`COOP`, `DEAD_REVIVABLE`, `LOST`, `RELEASED`, and `UNRESOLVED`. Command
-presentation, restoration, capture, and coop code read that lifecycle; they do
-not maintain separate death, lost, captured, or coop status authorities.
+`COOP`, `ROSTER_STORED`, `PROVISIONED_DORMANT`, `DEAD_REVIVABLE`, `LOST`,
+`RELEASED`, and `UNRESOLVED`. Command presentation, restoration, capture,
+provisioning, roster, and coop code read that lifecycle; they do not maintain
+separate status authorities.
 
 ## Dormant transitions require positive evidence
 

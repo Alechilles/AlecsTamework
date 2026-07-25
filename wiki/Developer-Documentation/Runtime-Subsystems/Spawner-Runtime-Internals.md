@@ -31,8 +31,10 @@ Spawner behavior is not a single monolithic capture method. Each collaborator ow
 - Capture/release intents carry only an immutable effect position and optional
   asset IDs across the async boundary. The world-thread completion dispatcher
   emits them only for a published operation.
-- A filled item is the exact source artifact for release. Coop intake accepts a
-  live NPC instead and never consumes a filled spawner item.
+- A filled item is the exact source artifact for ordinary release. A supported
+  managed-coop interaction can instead submit an eligible filled capture item
+  directly; the item is retired only after durable coop residency publishes.
+  Other coops continue to accept live NPCs through their ordinary intake path.
 - Tooltip bridges may need invalidation on config reload
 
 ## Related Pages

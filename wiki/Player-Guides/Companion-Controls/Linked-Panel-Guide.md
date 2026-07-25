@@ -15,15 +15,16 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 ## What the panel shows
 - Linked companions for the current tool
 - Active and inactive status
-- Loaded, unloaded, captured, housed in a coop, dead, or `LOST` state
+- Loaded, unloaded, captured, housed in a coop, roster-stored,
+  provisioned-dormant, dead, or `LOST` state
 - Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
 - In some mods, happiness details including current and target trend, plus active impulse modifiers
 
-The panel derives captured, coop, dead, and `LOST` status from one saved
-companion lifecycle. Item metadata and an expired recall timer do not override
-that status.
+The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
+`LOST` status from one saved companion lifecycle. Item metadata and an expired
+recall timer do not override that status.
 
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
@@ -45,17 +46,19 @@ that status.
 - `Set Home`
 - `Return Home`
 - `Unlink`
-- `Revive`, a free restoration action for dead or `LOST` companions when the
-  companion policy and death cooldown allow it
+- `Revive`, a restoration action for dead or `LOST` companions when the
+  companion policy and death cooldown allow it. Roster-backed companions can
+  show a confirmation with exact item costs; legacy item-linked flows may be
+  free.
 - Nearby-only `Release` and `Cull` when the mod exposes those actions
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.
 - `Captured` means the companion is stored in its filled capture item. Release
-  that item normally; recall and return-home do not replace it.
+  that item normally or use a supported managed-coop item intake; recall and
+  return-home do not replace it.
 - `In Coop` means the companion is housed in a configured coop. Release it
-  through that coop; a filled capture item cannot be inserted as a coop
-  resident.
+  through that coop.
 - `Attempting recall` means the tool is retrying relocation for an unloaded
   companion. The timer shows only the remaining retry window. When it ends,
   the attempt stops without inventing a new `LOST` state from timeout or
@@ -74,8 +77,9 @@ that status.
   or owner limits.
 
 ## Practical tips
-- If a companion is dead or `LOST`, use the free `Revive` action when it
-  becomes available instead of repeatedly using recall.
+- If a companion is dead or `LOST`, use `Revive` when it becomes available
+  instead of repeatedly using recall. Review the exact cost confirmation when
+  one is configured.
 - If a row says `Attempting recall`, let the current attempt finish before
   trying again. An expired countdown is not proof that the companion is lost.
 - If a row says `Captured` or `In Coop`, use the matching filled-item or coop
@@ -88,6 +92,7 @@ that status.
 - [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
 
-> [Screenshot Placeholder: Linked panel showing active, inactive, captured, coop, dead, and lost rows]
+> [Screenshot Placeholder: Linked panel showing active, unloaded, captured,
+> coop, roster-stored, provisioned-dormant, dead, and Lost rows]
 
 

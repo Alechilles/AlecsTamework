@@ -1,7 +1,7 @@
 # Capture Policy and Durable Resolved Attempts
 
-Status: probability policy supported; durable resolved-attempt and tame/link
-recovery required before capability advertisement
+Status: implemented and independently capability-gated; exact live acceptance
+pending
 
 ## Goal
 

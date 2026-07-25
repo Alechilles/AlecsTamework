@@ -58,9 +58,11 @@ Use this page when you need the shared building blocks rather than one specific 
 - Role-specific ownership and command protection belong in `TwCompanionConfig`
 - Item systems should not re-implement their own ownership rules unless the item config explicitly needs a stricter or looser override
 
-`TameworkSetOwner` and Tame check the simple live owner cap before assigning a
-non-null owner. The cap counts loaded owned NPCs; it is not a durable
-reservation or claim-placement admission.
+`TameworkSetOwner` and Tame check durable owner-population admission before
+assigning a non-null owner. The cap counts canonical owned profiles in the
+configured global/per-world scope and reserves positive capacity within the
+same shared operation. It remains independent from SimpleClaims
+claim-placement policy.
 
 `TameworkOwnerComponent` is authoritative. Clearing or transferring canonical ownership invalidates
 the prior command-link authority, while retained name metadata follows the new canonical owner.

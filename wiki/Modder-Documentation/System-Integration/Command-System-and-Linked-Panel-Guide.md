@@ -92,7 +92,8 @@ Config-driven:
 - item cooldown and selection rules
 
 Runtime-driven:
-- linked row status such as loaded, unloaded, dead, or lost
+- linked row status such as active, unloaded, captured, cooped, roster-stored,
+  provisioned-dormant, dead, or Lost
 - per-row actions such as recall, set home, return home, unlink, revive, release, or cull
 - group assignment and sorting/filter state
 - current health, cooldown, breeding, and trait indicators

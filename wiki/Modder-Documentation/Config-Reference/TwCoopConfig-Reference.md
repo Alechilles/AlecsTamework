@@ -31,13 +31,13 @@ aliases. These fields do not select another persistence path.
 
 - Capture accepts a live NPC, records the state needed for release, and removes
   that live source.
+- Supported managed-coop interactions can move an eligible canonical captured
+  item directly into an available slot and retire the exact source item.
 - Release recreates the resident as a live NPC.
-- Captured items do not enter the coop; release the filled item through its
-  normal spawner interaction first.
 - Coops without an enabled matching config retain their ordinary behavior.
 
-This is the only coop lifecycle path: direct live capture and direct live
-release through the canonical persistence authority.
+Live and captured-item intake use the same canonical coop-capture operation;
+release uses the same resident authority.
 
 ## Inheritance
 

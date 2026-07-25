@@ -21,6 +21,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 - `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
+- `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 
 ## Resolution patterns
 ### Single active global config
@@ -39,6 +40,9 @@ Resolved by role id + `Priority`:
 - `TwDynamicAttachmentsConfig`
 - `TwTraitConfig`
 - `TwCapturePolicyConfig`
+- `TwPopulationGroupConfig` uses role matching to classify companions into one
+  or more namespaced groups, then applies its configured global/per-world
+  owned and active limits.
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
@@ -78,19 +82,23 @@ Behavior summary:
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.
-- `/tw settings` owns high-impact server runtime policy such as the live owner
+- `/tw settings` owns high-impact server runtime policy such as the durable owner
   cap, ownership requirements, ownership damage protection, SimpleClaims
   breeding/damage options, needs resource mode, needs tick/damage policy,
   passive breeding enablement, and spawner owner transfer defaults.
-- `TwCompanionConfig` is the role-scoped location for command distances, travel policy, cooldowns, placement rings, and other companion command behavior.
+- `TwCompanionConfig` is the role-scoped location for command distances, travel
+  policy, placement rings, paid `Command.Revive` cost/cooldown policy,
+  `Command.Summon` duration/storage/cooldown policy, and other companion
+  command behavior.
 - Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config` hide them so server owners use `/tw settings`.
 
-Persistence operations do not have feature-specific asset families. There are
-no config families for paid revival, durable population groups, companion
-provisioning, command rosters, timed summons, or persistence rehearsals; those
-unreleased systems are outside the replacement runtime. The retained
-`feature_circuit` control plane is internal and registry-derived, not an asset
-family or a return to the old per-feature failure catalogs.
+Persistence machinery does not have feature-specific asset families.
+Population groups are authored through `TwPopulationGroupConfig`; paid revival
+and timed summon balance are nested role policy in `TwCompanionConfig`.
+Command rosters and companion provisioning are public integration authorities,
+not asset families. The `feature_circuit` control plane is internal and
+registry-derived, not a configurable rehearsal runtime or a return to the old
+per-feature failure catalogs.
 
 ## Asset-set gates
 `TwGlobalConfig.AssetSets` gates optional bundled asset sets:

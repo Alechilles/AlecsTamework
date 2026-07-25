@@ -10,7 +10,7 @@
 - Validation: dependency on/off, each capability unavailable/degraded/available,
   and complete affected-consumer paths
 
-Status: required recovery contract; implementation in progress
+Status: automated implementation complete; exact live acceptance pending
 
 ## Goal
 
@@ -110,9 +110,9 @@ Rules:
 
 | Tamework | HyDragon | Integration state | Static | Live | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Current reduced 3.0 dev build | 0.2.x | recovery capabilities absent | must fail closed | not release-valid | No required capability may be inferred |
-| Feature-slice candidate | 0.2.x | individual capabilities independently enabled | per-slice tests | per-slice smoke | Unfinished dependencies remain unavailable |
-| Feature-complete 3.0 candidate | 0.2.x | all required capabilities available | full cross-repo suite | full live matrix | Only release-eligible combination |
+| Historical reduced 3.0 dev build | 0.2.x | recovery capabilities absent | superseded | not release-valid | Recorded only as the corrected 2026-07-24 baseline |
+| Feature-slice candidate | 0.2.x | individual capabilities independently enabled | per-slice tests | per-slice smoke | Superseded by the composed feature-complete candidate |
+| Feature-complete 3.0 candidate | 0.2.x | all required capabilities available | full cross-repo suite green | full live matrix pending | Only release-eligible combination after live acceptance |
 | Tamework absent/incompatible | 0.2.x | dependency failure | startup explains range | no gameplay mutation | No private HyDragon fallback DB |
 | Tamework feature degraded | 0.2.x | affected capability degraded | deterministic denial | no player cost | Unrelated safe capabilities remain usable |
 

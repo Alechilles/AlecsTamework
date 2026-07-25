@@ -44,13 +44,21 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Spawner, naming, and command items**: capture and respawn NPCs with metadata, name companions with custom items, and build command tools with radial and linked-panel support.
 - **Linked companion runtime**: manage loaded, unloaded, dead, and lost companions through a linked panel with recall, home, revive, and related flows.
 - **Progression systems**: add happiness, needs, breeding, life stage, and trait-driven variation through config-driven systems.
-- **Coop integration**: configured coops can capture live companions and release them again while preserving the companion state needed by Tamework; other coops retain their normal behavior.
-- **Practical population controls**: the simple live owner cap limits new taming and ownership changes, while direct SimpleClaims checks can limit breeding by claim and apply its native tamed-companion damage rules.
+- **Coop integration**: configured coops can accept eligible live companions or
+  canonical filled capture items and release the same saved companion again;
+  other coops retain their normal behavior.
+- **Durable population controls**: owner and role-defined group limits account
+  for canonical companions across unloads, storage, capture, death, travel, and
+  restarts, while direct SimpleClaims checks can still limit breeding by claim
+  and apply its native tamed-companion damage rules.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
 - **Stable integration data**: the Public API exposes canonical companion
   profiles and namespaced profile extension data, including revision-fenced
   compare-and-set operations for integrations that need restart-safe custom
   state.
+- **Durable integration workflows**: capability-gated APIs expose population
+  groups, command-family rosters, timed summon/storage, idempotent companion
+  provisioning, and exact paid revival without exposing SQLite internals.
 - **A clean persistence upgrade boundary**: released schema v2-v4 saves and
   released DAT companion records import into the replacement database without
   modifying the source files. Tester-only v5-v9 databases are refused; testers

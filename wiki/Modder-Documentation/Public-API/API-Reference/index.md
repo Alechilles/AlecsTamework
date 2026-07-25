@@ -26,6 +26,11 @@ This subsection contains the reference contract for each public API family.
 - [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
+- [Population Groups API Reference](/mod/alecs-tamework/population-groups-api-reference)
+- [Command Family Rosters API Reference](/mod/alecs-tamework/command-family-rosters-api-reference)
+- [Timed Summoning API Reference](/mod/alecs-tamework/timed-summoning-api-reference)
+- [Companion Provisioning API Reference](/mod/alecs-tamework/companion-provisioning-api-reference)
+- [Paid Command Revival API Reference](/mod/alecs-tamework/paid-command-revival-api-reference)
 
 
 

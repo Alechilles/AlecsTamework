@@ -81,8 +81,9 @@ Captured attachment IDs are stored on the spawner item and can be displayed with
 
 Releasing a filled spawner recreates the stored NPC through the canonical
 captured-spawner release operation and consumes the filled item only after the
-release succeeds. It uses the shared lifecycle/operation protocol and never
-enters the coop-intake path.
+release succeeds. Ordinary use follows that shared release path. A supported
+managed-coop interaction can instead admit an eligible canonical filled item
+directly; it retires the item only after durable coop residency publishes.
 
 Configured capture/spawn particles and sounds are success feedback. Tamework
 freezes their asset IDs and position with the operation intent, then emits them

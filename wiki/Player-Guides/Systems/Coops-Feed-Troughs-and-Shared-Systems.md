@@ -14,7 +14,7 @@ support.
 
 ## Configured coops
 
-- A mod can configure particular coop IDs for Tamework live-NPC behavior.
+- A mod can configure particular coop IDs for Tamework companion behavior.
 - An eligible live creature can be captured into a coop and later released as
   a live creature with its saved state restored.
 - A companion keeps one stable profile even if its temporary entity UUID
@@ -22,9 +22,9 @@ support.
   the same creature.
 - Only explicitly enabled coops use this path. Other coops keep their ordinary
   behavior.
-- Coop intake accepts an eligible currently live creature. Filled capture
-  items are not coop residents; use the filled item's normal release
-  interaction first.
+- Coop intake accepts an eligible currently live creature. Supported
+  interactions can also move an eligible canonical filled capture item
+  directly into an available slot while retiring the exact item.
 
 ## Feed trough support
 - Needs systems can consume trough resources rather than only hand-fed resources.
@@ -34,8 +34,9 @@ support.
 ## Shared utility systems
 - Optional tooltip integration for spawner items
 - Travel and relocation recovery for off-screen companions
-- Free restoration for positively recorded dead or `LOST` companions, with
-  stale-original suppression when a replacement is needed
+- Configurable free or item-cost restoration for positively recorded dead or
+  `LOST` companions, with stale-original suppression when a replacement is
+  needed
 - Per-role command travel rules for recalls and world transfer behavior
 
 ## Why this matters to players
