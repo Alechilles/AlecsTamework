@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
@@ -517,6 +519,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("FailureCooldownMs")) capture.failureCooldownMs = parent.capture.failureCooldownMs;
         if (!nestedExplicitKeys.contains("FailureParticleSystem")) capture.failureParticleSystem = parent.capture.failureParticleSystem;
         if (!nestedExplicitKeys.contains("FailureSoundEvent")) capture.failureSoundEvent = parent.capture.failureSoundEvent;
+        if (!nestedExplicitKeys.contains("SourceConsumption")) capture.sourceConsumption = parent.capture.sourceConsumption;
+        if (!nestedExplicitKeys.contains("SuccessDisposition")) capture.successDisposition = parent.capture.successDisposition;
+        if (!nestedExplicitKeys.contains("CommandFamilyId")) capture.commandFamilyId = parent.capture.commandFamilyId;
+        if (!nestedExplicitKeys.contains("RequiredCommandConfigId")) capture.requiredCommandConfigId = parent.capture.requiredCommandConfigId;
+        if (!nestedExplicitKeys.contains("RequireCommandAccessItem")) capture.requireCommandAccessItem = parent.capture.requireCommandAccessItem;
     }
 
     private void inheritSpawnSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -756,6 +763,14 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         int failureCooldownMs;
         String failureParticleSystem;
         String failureSoundEvent;
+        CaptureSourceConsumption sourceConsumption =
+                CaptureSourceConsumption.SUCCESS_ONLY;
+        CaptureSuccessDisposition successDisposition =
+                CaptureSuccessDisposition.CAPTURED_ITEM;
+        String commandFamilyId;
+        String requiredCommandConfigId;
+        boolean requireCommandAccessItem;
+
         public ItemFeatureConfig.CaptureItemMechanics toMechanics() {
             return TwSpawnerConfigRuntimeAdapter.captureMechanics(this);
         }

@@ -2,11 +2,15 @@ package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.bson.BsonDocument;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -91,6 +95,78 @@ class TwSpawnerWildCaptureConfigTest {
         assertEquals(2500, mechanics.failureCooldownMs());
         assertEquals(CaptureChanceMode.GUARANTEED,
                 new TwSpawnerConfig().toItemFeatureConfig().getCaptureMechanics().chanceMode());
+    }
+
+    @Test
+    void commandLinkFieldsDecodeAndNestedScalarsInheritWithExplicitFalseOverride()
+            throws Exception {
+        TwSpawnerConfig parent = TwSpawnerConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "Capture": {
+                            "SourceConsumption": "ResolvedAttempt",
+                            "SuccessDisposition": "TameAndCommandLink",
+                            "CommandFamilyId": "hydragon:dragon_horn",
+                            "RequiredCommandConfigId": "HyDragonDragonHorn",
+                            "RequireCommandAccessItem": true
+                          }
+                        }
+                        """),
+                new ExtraInfo()
+        );
+        TwSpawnerConfig child = TwSpawnerConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "Capture": {
+                            "RequireCommandAccessItem": false
+                          }
+                        }
+                        """),
+                new ExtraInfo()
+        );
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Capture"),
+                Map.of("Capture", Set.of("RequireCommandAccessItem"))
+        );
+        ItemFeatureConfig.CaptureItemMechanics mechanics =
+                child.toItemFeatureConfig().getCaptureMechanics();
+
+        assertEquals(
+                CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                mechanics.sourceConsumption()
+        );
+        assertEquals(
+                CaptureSuccessDisposition.TAME_AND_COMMAND_LINK,
+                mechanics.successDisposition()
+        );
+        assertEquals(
+                "hydragon:dragon_horn",
+                mechanics.commandFamilyId()
+        );
+        assertEquals(
+                "HyDragonDragonHorn",
+                mechanics.requiredCommandConfigId()
+        );
+        assertFalse(mechanics.requireCommandAccessItem());
+    }
+
+    @Test
+    void commandLinkFieldsDefaultToLegacyCapturedItemBehavior() {
+        ItemFeatureConfig.CaptureItemMechanics mechanics =
+                new TwSpawnerConfig().toItemFeatureConfig()
+                        .getCaptureMechanics();
+
+        assertEquals(
+                CaptureSourceConsumption.SUCCESS_ONLY,
+                mechanics.sourceConsumption()
+        );
+        assertEquals(
+                CaptureSuccessDisposition.CAPTURED_ITEM,
+                mechanics.successDisposition()
+        );
+        assertFalse(mechanics.requireCommandAccessItem());
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {

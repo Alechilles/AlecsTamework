@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -85,6 +87,39 @@ final class TwSpawnerCaptureSettingsCodec {
             (settings, value) -> settings.failureSoundEvent = value,
             settings -> settings.failureSoundEvent)
         .documentation("Optional failed-roll sound event.").add()
+        .<String>append(new KeyedCodec<>("SourceConsumption", Codec.STRING),
+            (settings, value) -> settings.sourceConsumption =
+                    parseSourceConsumption(value),
+            settings -> settings.sourceConsumption
+                    == CaptureSourceConsumption.RESOLVED_ATTEMPT
+                    ? "ResolvedAttempt" : "SuccessOnly")
+        .documentation("When the exact source item is spent. Omitted values inherit the parent; "
+                + "SuccessOnly preserves captured-item behavior, while ResolvedAttempt spends "
+                + "one item after either terminal roll result.").add()
+        .<String>append(new KeyedCodec<>("SuccessDisposition", Codec.STRING),
+            (settings, value) -> settings.successDisposition =
+                    parseSuccessDisposition(value),
+            settings -> settings.successDisposition
+                    == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                    ? "TameAndCommandLink" : "CapturedItem")
+        .documentation("Successful capture result. Omitted values inherit the parent; "
+                + "CapturedItem creates the configured filled item, while "
+                + "TameAndCommandLink keeps the NPC live and links its canonical profile.").add()
+        .<String>append(new KeyedCodec<>("CommandFamilyId", Codec.STRING),
+            (settings, value) -> settings.commandFamilyId = value,
+            settings -> settings.commandFamilyId)
+        .documentation("Command-family namespace used by TameAndCommandLink. "
+                + "An omitted value inherits the parent; an explicit scalar replaces it.").add()
+        .<String>append(new KeyedCodec<>("RequiredCommandConfigId", Codec.STRING),
+            (settings, value) -> settings.requiredCommandConfigId = value,
+            settings -> settings.requiredCommandConfigId)
+        .documentation("Optional exact command config fence for capture access. "
+                + "An omitted value inherits the parent; an explicit scalar replaces it.").add()
+        .<Boolean>append(new KeyedCodec<>("RequireCommandAccessItem", Codec.BOOLEAN),
+            (settings, value) -> settings.requireCommandAccessItem = value,
+            settings -> settings.requireCommandAccessItem)
+        .documentation("Require a compatible command access item before rolling. "
+                + "An omitted value inherits the parent; explicit false overrides inherited true.").add()
         .build();
 
     private TwSpawnerCaptureSettingsCodec() {
@@ -96,6 +131,36 @@ final class TwSpawnerCaptureSettingsCodec {
         }
         if (value.equalsIgnoreCase("Probability")) return CaptureChanceMode.PROBABILITY;
         throw new IllegalArgumentException("Unknown capture ChanceMode: " + value);
+    }
+
+    private static CaptureSourceConsumption parseSourceConsumption(
+            @Nullable String value
+    ) {
+        if (value == null || value.isBlank()
+                || value.equalsIgnoreCase("SuccessOnly")) {
+            return CaptureSourceConsumption.SUCCESS_ONLY;
+        }
+        if (value.equalsIgnoreCase("ResolvedAttempt")) {
+            return CaptureSourceConsumption.RESOLVED_ATTEMPT;
+        }
+        throw new IllegalArgumentException(
+                "Unknown capture SourceConsumption: " + value
+        );
+    }
+
+    private static CaptureSuccessDisposition parseSuccessDisposition(
+            @Nullable String value
+    ) {
+        if (value == null || value.isBlank()
+                || value.equalsIgnoreCase("CapturedItem")) {
+            return CaptureSuccessDisposition.CAPTURED_ITEM;
+        }
+        if (value.equalsIgnoreCase("TameAndCommandLink")) {
+            return CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
+        }
+        throw new IllegalArgumentException(
+                "Unknown capture SuccessDisposition: " + value
+        );
     }
 
 }
