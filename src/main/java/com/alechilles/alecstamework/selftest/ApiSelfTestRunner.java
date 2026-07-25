@@ -100,29 +100,12 @@ public final class ApiSelfTestRunner {
             suites.add(runDiagnostics(context));
         }
         if (suite == Suite.ALL || suite == Suite.HYDRAGON_INTEGRATIONS) {
-            suites.add(runHyDragonIntegrations(context));
+            suites.add(HyDragonApiSelfTestSuite.run(
+                    context,
+                    EXAMPLE_SPAWNER_ITEM_ID
+            ));
         }
         return new ApiSelfTestRunReport(suites);
-    }
-
-    @Nonnull
-    private ApiSelfTestSuiteResult runHyDragonIntegrations(@Nonnull ApiSelfTestContext context) {
-        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
-        TameworkApi api = context.api();
-        EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
-        assertions.add(check(
-                "capture policy capability ready",
-                capabilities.contains(TameworkApiCapability.CAPTURE_POLICY),
-                "capabilities=" + capabilities));
-        assertions.add(check(
-                "capture mechanics fixture resolves",
-                api.configs().resolveSpawnerCaptureMechanicsForItemId(EXAMPLE_SPAWNER_ITEM_ID).isPresent(),
-                "item=" + EXAMPLE_SPAWNER_ITEM_ID));
-        assertions.add(check(
-                "profile data transactions capability ready",
-                capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS),
-                "capabilities=" + capabilities));
-        return new ApiSelfTestSuiteResult("hydragon-integrations", assertions);
     }
 
     @Nonnull
