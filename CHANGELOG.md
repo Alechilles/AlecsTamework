@@ -103,7 +103,9 @@
 - Fixed successful tame-and-link capture updating the companion and command
   roster but still reporting failure when its timed-summon event was committed
   after the original request timestamp. Composite capture, revival, and
-  provisioning events now publish from their own canonical lease timestamp.
+  provisioning events now publish from their own canonical lease timestamp,
+  and worlds containing an event written before this fix recover normally on
+  startup.
 - Fixed tame-and-link capture failing when a mixed-case NPC role ID had been
   lowercased by an earlier snapshot. New snapshots preserve exact Hytale role
   casing, while tester-only case-damaged profiles can complete one safe

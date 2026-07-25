@@ -30,21 +30,24 @@ public final class TimedSummonPublishedEventMapper {
                         event.payloadVersion(), event.payloadJson()
                 );
         requireMatchingEnvelope(event, evidence);
+        // The payload owns domain time. Early replacement writers used the
+        // later transaction time in the envelope, which is storage metadata.
+        long occurredAtMs = evidence.leaseChange().after().updatedAtMs();
         return new CommandTimedSummoningChangedEvent(
                 view(
                         evidence.leaseChange().before(),
                         evidence,
                         evidence.previousLifecycleState(),
-                        event.createdAtMs()
+                        occurredAtMs
                 ),
                 view(
                         evidence.leaseChange().after(),
                         evidence,
                         evidence.currentLifecycleState(),
-                        event.createdAtMs()
+                        occurredAtMs
                 ),
                 evidence.reason().publicValue(),
-                event.createdAtMs(),
+                occurredAtMs,
                 emittedAtMs
         );
     }
@@ -63,8 +66,7 @@ public final class TimedSummonPublishedEventMapper {
     ) {
         TimedSummonLease after = evidence.leaseChange().after();
         if (!event.aggregateId().equals(after.profileId().toString())
-                || event.aggregateRevision() != after.leaseRevision()
-                || event.createdAtMs() != after.updatedAtMs()) {
+                || event.aggregateRevision() != after.leaseRevision()) {
             throw new IllegalArgumentException(
                     "Timed summon projection envelope does not match payload"
             );

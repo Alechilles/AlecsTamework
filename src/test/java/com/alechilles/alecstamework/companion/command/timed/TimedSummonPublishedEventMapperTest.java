@@ -120,29 +120,47 @@ class TimedSummonPublishedEventMapperTest {
     }
 
     @Test
-    void checkpointedPublicObserverRoutesTimedEvent() {
+    void checkpointedPublicObserverRecoversTimestampOnlyLegacyEvent() {
         AtomicReference<com.alechilles.alecstamework.api.TameworkEvent>
                 delivered = new AtomicReference<>();
         ReplacementPublicSemanticEventProjection observer =
                 new ReplacementPublicSemanticEventProjection(
                         delivered::set, () -> -900
                 );
-        ProjectionEvent event = committed(
+        ProjectionEvent currentEvent = committed(
                 TimedSummonLeaseChangeCodec.draft(
                         OPERATION, evidence()
                 )
+        );
+        // Regression: New World startup catch-up failed on a pre-fix capture
+        // whose transaction timestamp followed its canonical lease timestamp.
+        ProjectionEvent legacyTimestampEvent = new ProjectionEvent(
+                currentEvent.sequence(),
+                currentEvent.operationId(),
+                currentEvent.eventType(),
+                currentEvent.aggregateId(),
+                currentEvent.aggregateRevision(),
+                currentEvent.payloadVersion(),
+                currentEvent.payloadJson(),
+                -500
         );
 
         assertEquals(
                 ProjectionApplyOutcome.APPLIED,
                 observer.apply(
-                        event, ProjectionPublicationContext.LIVE_COMMIT
+                        legacyTimestampEvent,
+                        ProjectionPublicationContext.RECOVERY_CONVERGENCE
                 )
         );
         assertEquals(
                 CommandTimedSummoningChangedEvent.class,
                 delivered.get().getClass()
         );
+        CommandTimedSummoningChangedEvent mapped =
+                (CommandTimedSummoningChangedEvent) delivered.get();
+        assertEquals(-1_000, mapped.occurredAtMs());
+        assertEquals(-900, mapped.emittedAtMs());
+        assertEquals(4_000L, mapped.previous().remainingMs());
     }
 
     private TimedSummonLeaseChangeEvidence evidence() {
