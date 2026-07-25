@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkEvidence
 import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkTestFixtures;
 import com.alechilles.alecstamework.companion.command.CommandRosterMembershipDraft;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
+import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.population.OwnerPopulationScope;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupBucket;
 import com.alechilles.alecstamework.companion.population.group.PopulationGroupCounts;
@@ -33,28 +34,7 @@ class SpawnerTameAndLinkCapturePipelineTest {
                 CaptureTameAndLinkTestFixtures.evidence();
         SpawnerTameAndLinkIntentEvidence intentEvidence =
                 intentEvidence(donor);
-        SpawnerCaptureIntent intent = new SpawnerCaptureIntent(
-                CaptureTameAndLinkTestFixtures.ATTEMPT.toString(),
-                CaptureTameAndLinkTestFixtures.OWNER.value(),
-                "world",
-                2,
-                HytaleItemStackTestFixture.stack(
-                        "HyDragon_Draconic_Stone",
-                        new BsonDocument()
-                ),
-                null,
-                null,
-                null,
-                CaptureTameAndLinkTestFixtures.PROFILE,
-                CaptureTameAndLinkTestFixtures.ALIAS,
-                null,
-                CaptureTameAndLinkTestFixtures.OWNER,
-                "Alec",
-                donor.expectedIdentity().roleId(),
-                CaptureTameAndLinkTestFixtures.resolution(),
-                null,
-                intentEvidence
-        );
+        SpawnerCaptureIntent intent = intent(donor, intentEvidence);
         SpawnerCaptureEvidenceFreezer.FrozenCapture frozen =
                 freezer().freeze(intent);
 
@@ -86,6 +66,78 @@ class SpawnerTameAndLinkCapturePipelineTest {
                 frozen.operationId().value(),
                 request.tameAndLinkEvidence()
                         .timedActivation().lease().sessionId().value()
+        );
+    }
+
+    /**
+     * Protects the 2026-07-25 live failure where snapshot normalization had
+     * already adopted a mixed-case role ID in lowercase before tame/link.
+     */
+    @Test
+    void lowercaseAdoptedRoleUsesExactFrozenLiveRoleForOneSafeTransition() {
+        CaptureTameAndLinkEvidence donor =
+                CaptureTameAndLinkTestFixtures.evidence();
+        SpawnerCaptureIntent intent = intent(
+                donor, intentEvidence(donor)
+        );
+        SpawnerCaptureEvidenceFreezer.FrozenCapture frozen =
+                freezer().freeze(intent);
+        CompanionIdentity expected = donor.expectedIdentity();
+        CompanionIdentity lowercase = new CompanionIdentity(
+                expected.profileId(),
+                expected.displayName(),
+                expected.roleId().toLowerCase(java.util.Locale.ROOT),
+                expected.metadataJson(),
+                expected.metadataHash(),
+                expected.lastKnownWorldKey(),
+                expected.createdAtMs(),
+                expected.updatedAtMs(),
+                expected.lastActiveAtMs(),
+                expected.metadataRevision()
+        );
+
+        var request = new SpawnerCaptureRequestFactory().create(
+                intent.frozenContext(),
+                frozen,
+                profile(donor, lowercase)
+        );
+
+        assertEquals(
+                "dragon_fire",
+                request.tameAndLinkEvidence()
+                        .expectedIdentity().roleId()
+        );
+        assertEquals(
+                "Dragon_Fire",
+                request.tameAndLinkEvidence().live().expectedRoleId()
+        );
+    }
+
+    private SpawnerCaptureIntent intent(
+            CaptureTameAndLinkEvidence donor,
+            SpawnerTameAndLinkIntentEvidence intentEvidence
+    ) {
+        return new SpawnerCaptureIntent(
+                CaptureTameAndLinkTestFixtures.ATTEMPT.toString(),
+                CaptureTameAndLinkTestFixtures.OWNER.value(),
+                "world",
+                2,
+                HytaleItemStackTestFixture.stack(
+                        "HyDragon_Draconic_Stone",
+                        new BsonDocument()
+                ),
+                null,
+                null,
+                null,
+                CaptureTameAndLinkTestFixtures.PROFILE,
+                CaptureTameAndLinkTestFixtures.ALIAS,
+                null,
+                CaptureTameAndLinkTestFixtures.OWNER,
+                "Alec",
+                donor.expectedIdentity().roleId(),
+                CaptureTameAndLinkTestFixtures.resolution(),
+                null,
+                intentEvidence
         );
     }
 
@@ -128,8 +180,15 @@ class SpawnerTameAndLinkCapturePipelineTest {
     private CompanionProfileReadModel profile(
             CaptureTameAndLinkEvidence donor
     ) {
+        return profile(donor, donor.expectedIdentity());
+    }
+
+    private CompanionProfileReadModel profile(
+            CaptureTameAndLinkEvidence donor,
+            CompanionIdentity identity
+    ) {
         return new CompanionProfileReadModel(
-                donor.expectedIdentity(),
+                identity,
                 new CompanionAlias(
                         CaptureTameAndLinkTestFixtures.ALIAS,
                         CaptureTameAndLinkTestFixtures.PROFILE,

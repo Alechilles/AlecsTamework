@@ -4,10 +4,12 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -26,11 +28,20 @@ import java.util.logging.Level;
  * Evaluates whether a spawner item is currently allowed to capture a target NPC.
  */
 public final class SpawnerCapturePolicyService {
+    private static final String TRANQUILIZED_EFFECT_ID =
+            "Tw_Status_Tranquilized";
+    private static final String TRANQUILIZED_REQUIRED_MESSAGE =
+            "tamework.ui.notifications.capture.tranquilizedRequired";
+    private static final String EFFECT_REQUIRED_MESSAGE =
+            "tamework.ui.notifications.capture.effectRequired";
+
     private final HytaleLogger logger;
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerNpcStateService npcStateService;
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
     private final SpawnerNpcIdentityService npcIdentityService;
+    private final TameworkUiMessageService messages =
+            new TameworkUiMessageService();
 
     public SpawnerCapturePolicyService(HytaleLogger logger,
                                        SpawnerRolePolicyService rolePolicyService,
@@ -115,6 +126,13 @@ public final class SpawnerCapturePolicyService {
             return false;
         }
         if (enforceTerminalRequirements && !hasRequiredEffect(targetRef, config, store)) {
+            messages.showKey(
+                    player,
+                    NotificationStyle.Warning,
+                    missingRequiredEffectMessageKey(
+                            config.getCaptureRequiredEffectId()
+                    )
+            );
             logCaptureDebug("denied reason=required-effect player=" + player.getUuid()
                     + " effect=" + config.getCaptureRequiredEffectId());
             return false;
@@ -190,6 +208,12 @@ public final class SpawnerCapturePolicyService {
         }
         EffectControllerComponent effectController = store.getComponent(targetRef, effectType);
         return TameworkEntityEffectService.hasActiveEffect(effectController, requiredEffectId);
+    }
+
+    static String missingRequiredEffectMessageKey(String requiredEffectId) {
+        return TRANQUILIZED_EFFECT_ID.equals(requiredEffectId)
+                ? TRANQUILIZED_REQUIRED_MESSAGE
+                : EFFECT_REQUIRED_MESSAGE;
     }
 
     private void logCaptureDebug(String message) {

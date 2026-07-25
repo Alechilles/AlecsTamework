@@ -100,6 +100,13 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed tame-and-link capture failing when a mixed-case NPC role ID had been
+  lowercased by an earlier snapshot. New snapshots preserve exact Hytale role
+  casing, while tester-only case-damaged profiles can complete one safe
+  transition into the correctly cased tamed role.
+- Capture items with a required status effect now show a clear warning when
+  that effect is missing; tranquilizer-based captures specifically tell the
+  player that the target must be tranquilized.
 - Captured spawners now treat generic role IDs such as `Wolf_Black` and
   `Deer_Stag` as species identity rather than custom NPC names, so their item
   titles show only the localized species name while genuine custom names remain

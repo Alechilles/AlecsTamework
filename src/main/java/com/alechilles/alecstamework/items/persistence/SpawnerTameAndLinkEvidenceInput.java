@@ -11,11 +11,16 @@ public record SpawnerTameAndLinkEvidenceInput(
         long requestedAtMs,
         @Nonnull CompanionIdentity currentIdentity,
         @Nonnull CompanionLifecycle currentLifecycle,
+        @Nonnull String expectedLiveRoleId,
         @Nonnull SpawnerTameAndLinkIntentEvidence intentEvidence
 ) {
     public SpawnerTameAndLinkEvidenceInput {
+        expectedLiveRoleId = expectedLiveRoleId == null
+                || expectedLiveRoleId.isBlank()
+                ? null : expectedLiveRoleId.trim();
         if (operationId == null || currentIdentity == null
-                || currentLifecycle == null || intentEvidence == null) {
+                || currentLifecycle == null || expectedLiveRoleId == null
+                || intentEvidence == null) {
             throw new IllegalArgumentException(
                     "Complete tame/link authoring input is required"
             );

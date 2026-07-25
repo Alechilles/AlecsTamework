@@ -58,6 +58,7 @@ final class SpawnerCaptureRequestFactory {
                             frozen.requestedAt(),
                             profile.identity(),
                             lifecycle,
+                            frozen.resolution().targetRoleId(),
                             frozen.tameAndLinkEvidence()
                     )
             );

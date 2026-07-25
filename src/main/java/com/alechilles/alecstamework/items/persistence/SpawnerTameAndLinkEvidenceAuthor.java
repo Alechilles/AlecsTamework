@@ -90,7 +90,10 @@ public final class SpawnerTameAndLinkEvidenceAuthor {
                 || lifecycle.ownerWorldKey() != null
                 || lifecycle.activeOperationId() != null
                 || lifecycle.quarantined()
-                || identity.roleId() == null) {
+                || identity.roleId() == null
+                || !sameRole(
+                        identity.roleId(), input.expectedLiveRoleId()
+                )) {
             throw failure("capture_tame_profile_not_exact_wild_live");
         }
         PopulationGroupAssignment assignment =
@@ -324,7 +327,7 @@ public final class SpawnerTameAndLinkEvidenceAuthor {
     ) {
         TargetEvidence target = target(input);
         return new CaptureTameLiveEvidence(
-                input.currentIdentity().roleId(),
+                input.expectedLiveRoleId(),
                 null,
                 false,
                 target.expectedLiveStateHash(),
@@ -338,6 +341,11 @@ public final class SpawnerTameAndLinkEvidenceAuthor {
 
     private IllegalArgumentException failure(String detail) {
         return new IllegalArgumentException(detail);
+    }
+
+    private static boolean sameRole(String left, String right) {
+        return left != null && right != null
+                && left.equalsIgnoreCase(right);
     }
 
     private TargetEvidence target(

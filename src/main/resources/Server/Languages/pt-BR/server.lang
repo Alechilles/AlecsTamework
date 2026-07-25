@@ -539,6 +539,8 @@ tamework.ui.linkedLocation.worldLabel=Mundo:
 # (No static localization keys required; message HUD text is runtime-driven.)
 
 # ===== Tamework UI: Notifications =====
+tamework.ui.notifications.capture.effectRequired=O alvo não tem o efeito necessário para a captura.
+tamework.ui.notifications.capture.tranquilizedRequired=O alvo precisa estar tranquilizado antes da captura.
 tamework.ui.notifications.command.cull.mustBeLoaded=O NPC precisa estar carregado para abater.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Apenas NPCs próximos que pertencem a você podem ser abatidos.
 tamework.ui.notifications.command.cull.success=Abatido: {0}

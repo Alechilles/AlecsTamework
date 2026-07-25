@@ -105,8 +105,8 @@ public final class CoopResidentStateSnapshotService {
             );
             return null;
         }
-        String normalizedCoopId = normalizeIdentifier(coopId);
-        String normalizedRoleId = normalizeIdentifier(roleId);
+        String normalizedCoopId = normalizeCoopId(coopId);
+        String normalizedRoleId = normalizeRoleId(roleId);
         if (!isCoopIdMatch(candidate.coopId(), normalizedCoopId)
                 || !isResidentSlotMatch(candidate.residentSlot(), residentSlot)
                 || !isRoleIdMatch(candidate.roleId(), normalizedRoleId)) {
@@ -136,8 +136,8 @@ public final class CoopResidentStateSnapshotService {
         if (currentNpcUuid == null || sourceSnapshot == null) {
             return;
         }
-        String normalizedCoopId = normalizeIdentifier(coopId);
-        String normalizedRoleId = normalizeIdentifier(roleId);
+        String normalizedCoopId = normalizeCoopId(coopId);
+        String normalizedRoleId = normalizeRoleId(roleId);
         CoopResidentStateSnapshot remapped = snapshotCodec.copy(new CoopResidentStateSnapshot(
                 currentNpcUuid,
                 normalizedCoopId != null ? normalizedCoopId : sourceSnapshot.coopId(),
@@ -188,8 +188,8 @@ public final class CoopResidentStateSnapshotService {
             return direct;
         }
 
-        String normalizedCoopId = normalizeIdentifier(coopId);
-        String normalizedRoleId = normalizeIdentifier(roleId);
+        String normalizedCoopId = normalizeCoopId(coopId);
+        String normalizedRoleId = normalizeRoleId(roleId);
         CoopResidentStateSnapshot match = null;
         int matches = 0;
         for (CoopResidentStateSnapshot candidate : snapshotsByNpc.values()) {
@@ -302,11 +302,20 @@ public final class CoopResidentStateSnapshotService {
     }
 
     @Nullable
-    private String normalizeIdentifier(@Nullable String value) {
+    private String normalizeCoopId(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Preserves the exact Hytale role ID used for runtime and persistence
+     * identity while removing only surrounding whitespace.
+     */
+    @Nullable
+    static String normalizeRoleId(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void debugCoop(String message) {
@@ -336,9 +345,9 @@ public final class CoopResidentStateSnapshotService {
         Double healthPercent = CompanionHealthStateService.captureHealthPercent(reference, store);
         return snapshotCodec.copy(new CoopResidentStateSnapshot(
                 npcUuid,
-                normalizeIdentifier(coopId),
+                normalizeCoopId(coopId),
                 residentSlot,
-                normalizeIdentifier(roleId),
+                normalizeRoleId(roleId),
                 store.getComponent(reference, TameworkCommandLinksComponent.getComponentType()),
                 store.getComponent(reference, TameworkOwnerComponent.getComponentType()),
                 store.getComponent(reference, TameworkTamedComponent.getComponentType()),

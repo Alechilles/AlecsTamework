@@ -475,7 +475,7 @@ Common effect families:
 
 - `Phase: Begin` validates the empty spawner, target role/state, ownership, cooldown, and distance, then applies `Capture.ChannelAuraEffectId`. Health and required-effect gates are intentionally deferred until completion so channel feedback can begin before the target is capture-ready.
 - `Phase: Cancel` removes the channel aura without capturing.
-- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture. If configured, `CaptureBurstParticleSystem` plays only after that capture applies successfully.
+- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture. A missing required effect produces player-facing feedback; `Tw_Status_Tranquilized` uses a specific tranquilization warning. If configured, `CaptureBurstParticleSystem` plays only after that capture applies successfully.
 
 Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Configure `BeamParticleSystem` on `Begin` and `CaptureBurstParticleSystem` on `Complete`; Tamework emits bounded world-space segments between the player and the locked target only while that server-tracked channel is active.
 

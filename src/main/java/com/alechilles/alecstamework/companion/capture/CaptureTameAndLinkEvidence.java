@@ -70,7 +70,7 @@ public record CaptureTameAndLinkEvidence(
                 != Math.addExact(
                 expectedIdentity.metadataRevision(), 1
         )
-                || !java.util.Objects.equals(
+                || !sameRole(
                 expectedIdentity.roleId(), live.expectedRoleId()
         )
                 || !java.util.Objects.equals(
@@ -80,6 +80,11 @@ public record CaptureTameAndLinkEvidence(
                     "Tame/link profile identity evidence is inconsistent"
             );
         }
+    }
+
+    private static boolean sameRole(String left, String right) {
+        return left != null && right != null
+                && left.equalsIgnoreCase(right);
     }
 
     private static void requireLifecycle(

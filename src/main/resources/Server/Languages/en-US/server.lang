@@ -539,6 +539,8 @@ tamework.ui.linkedLocation.worldLabel=World:
 # (No static localization keys required; message HUD text is runtime-driven.)
 
 # ===== Tamework UI: Notifications =====
+tamework.ui.notifications.capture.effectRequired=The target is missing the required capture effect.
+tamework.ui.notifications.capture.tranquilizedRequired=The target must be tranquilized before capture.
 tamework.ui.notifications.command.cull.mustBeLoaded=NPC must be loaded to cull.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Only owned nearby NPCs can be culled.
 tamework.ui.notifications.command.cull.success=Culled: {0}

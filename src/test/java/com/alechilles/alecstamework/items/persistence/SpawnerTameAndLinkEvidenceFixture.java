@@ -94,6 +94,7 @@ final class SpawnerTameAndLinkEvidenceFixture {
                 REQUESTED_AT,
                 identity(),
                 lifecycle(),
+                identity().roleId(),
                 baseIntentEvidence()
         );
     }
@@ -291,6 +292,7 @@ final class SpawnerTameAndLinkEvidenceFixture {
                 REQUESTED_AT,
                 identity(),
                 changed,
+                identity().roleId(),
                 baseIntentEvidence()
         );
     }
@@ -326,7 +328,8 @@ final class SpawnerTameAndLinkEvidenceFixture {
             SpawnerTameAndLinkIntentEvidence intent
     ) {
         return new SpawnerTameAndLinkEvidenceInput(
-                OPERATION, REQUESTED_AT, identity(), lifecycle(), intent
+                OPERATION, REQUESTED_AT, identity(), lifecycle(),
+                identity().roleId(), intent
         );
     }
 }

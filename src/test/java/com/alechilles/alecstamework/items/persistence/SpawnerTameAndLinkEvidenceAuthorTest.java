@@ -104,6 +104,7 @@ class SpawnerTameAndLinkEvidenceAuthorTest {
                                 4L
                         ),
                         current,
+                        "wild_miniwyvern",
                         fixture.baseIntentEvidence()
                 ),
                 "capture_tame_profile_not_exact_wild_live"

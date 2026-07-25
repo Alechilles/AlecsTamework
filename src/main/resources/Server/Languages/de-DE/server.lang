@@ -539,6 +539,8 @@ tamework.ui.linkedLocation.worldLabel=Welt:
 # (Keine statischen Übersetzungsschlüssel erforderlich; HUD-Text wird dynamisch generiert.)
 
 # ===== Tamework UI: Benachrichtigungen =====
+tamework.ui.notifications.capture.effectRequired=Dem Ziel fehlt der erforderliche Einfangeffekt.
+tamework.ui.notifications.capture.tranquilizedRequired=Das Ziel muss vor dem Einfangen betäubt sein.
 tamework.ui.notifications.command.cull.mustBeLoaded=NPC muss geladen sein, um geschlachtet zu werden.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Nur eigene NPCs in der Nähe können geschlachtet werden.
 tamework.ui.notifications.command.cull.success=Geschlachtet: {0}
