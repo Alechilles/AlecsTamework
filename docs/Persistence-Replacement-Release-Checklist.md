@@ -21,13 +21,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `64a910a36a88cdd89cf30eb05a54f8866285fbd1` |
+| Tamework commit | `cabe6df27f5564a327a6caefcecc78f8929bfd1d` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
 | Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
-| Candidate SHA-256 | `5930cf187cca52a2e0ab00e79a2d4c402bf3f7cc4cb77d487d3a0c20f72abd81` |
-| Maven test result | Clean isolated run on 2026-07-24: 2,587 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,803,278 bytes |
+| Candidate SHA-256 | `eee6d47e6c8623d1132e3a5c59fe25d8ebcf9f0106311258c18995f046b0df19` |
+| Maven test result | Clean isolated run on 2026-07-24: 2,595 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,814,939 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -37,6 +37,16 @@ fresh-world, copied-save, and rollback gates remain required before publishing.
 
 Earlier candidates are superseded:
 
+- `5930cf187cca52a2e0ab00e79a2d4c402bf3f7cc4cb77d487d3a0c20f72abd81`
+  passed the imported capture/release, coop, death/Lost, ordinary cross-world,
+  Hub, and missing-imported-companion recovery lanes. Final migration-world
+  checks exposed two narrower defects: generic public role labels such as
+  `Wolf_Black` were treated as custom names, and a physically live current
+  alias could be refused capture while its canonical lifecycle still said
+  Unloaded or named another world. Commit `cabe6df2` centralizes role-identity
+  name suppression and allows only that already-current alias to reconcile its
+  stale location through the canonical profile operation before capture.
+  Historical aliases and all other identity conflicts remain fail-closed.
 - `fe394a166bbc66a3e3bee0b25cdec7927663a799faebc2c14dedc5e20ab6df05`
   passed imported capture release, coop, death, lost, and ordinary cross-world
   recall testing, but one genuinely absent imported companion remained
