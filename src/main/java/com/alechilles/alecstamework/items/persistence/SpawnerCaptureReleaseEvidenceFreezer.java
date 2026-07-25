@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.StablePersistenceIds;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
 
@@ -62,7 +63,9 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
 
     FrozenRelease freeze(
             PendingRelease pending,
-            ResolvedIdentity resolved
+            ResolvedIdentity resolved,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
     ) {
         SpawnerCapturedArtifactIdentity.Claim claim = pending.claim();
         if (claim == null || resolved == null
@@ -88,9 +91,9 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
                 profileId.toString(),
                 sourceAlias.toString(),
                 snapshotId.toString(),
-                pending.ownerAssignment() == null
+                ownerAssignment == null
                         ? "preserve"
-                        : pending.ownerAssignment().toString(),
+                        : ownerAssignment.toString(),
                 source.artifactHash().toString()
         };
         String inventoryReceipt = StablePersistenceIds.receipt(
@@ -128,8 +131,8 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
                 receiptArtifact,
                 inventoryReceipt,
                 spawnReceipt,
-                pending.ownerAssignment(),
-                pending.ownerAssignmentName()
+                ownerAssignment,
+                ownerAssignmentName
         );
     }
 

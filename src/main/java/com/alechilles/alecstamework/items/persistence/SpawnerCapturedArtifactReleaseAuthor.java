@@ -205,7 +205,9 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         try {
             frozen = evidence.freeze(
                     frozenSource,
-                    release.resolvedIdentity()
+                    release.resolvedIdentity(),
+                    release.ownerAssignment(),
+                    release.ownerAssignmentName()
             );
         } catch (RuntimeException | LinkageError failure) {
             return completed(result(

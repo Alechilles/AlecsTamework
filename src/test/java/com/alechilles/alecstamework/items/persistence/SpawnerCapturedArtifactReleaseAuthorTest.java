@@ -163,6 +163,37 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         assertNull(persistence.request);
     }
 
+    /**
+     * Protects the public-save case logged on 2026-07-24: capture-clears-owner
+     * items omit OwnerUuid even though their imported profile remains owned.
+     */
+    @Test
+    void redundantSameOwnerAssignmentPreservesImportedCanonicalOwner() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile()
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                releasedPublicIntent(
+                        CANONICAL_OWNER,
+                        "Current player",
+                        false
+                ),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertNull(persistence.request.ownerAssignment());
+        CoopResidentStateSnapshot projected = projection(
+                persistence.request
+        );
+        assertEquals(
+                CANONICAL_OWNER.value(),
+                projected.owner().getOwnerId()
+        );
+        assertEquals("Canonical owner", projected.owner().getOwnerName());
+    }
+
     @Test
     void releasedPublicItemResolvesByAliasAndMapsItsSplitState() {
         FakePersistence persistence = new FakePersistence(
@@ -337,14 +368,18 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     }
 
     private SpawnerCapturedArtifactReleaseIntent releasedPublicIntent() {
+        return releasedPublicIntent(null, null, true);
+    }
+
+    private SpawnerCapturedArtifactReleaseIntent releasedPublicIntent(
+            OwnerId ownerAssignment,
+            String ownerAssignmentName,
+            boolean includeItemOwner
+    ) {
         BsonDocument sourceMetadata = new BsonDocument()
                 .append(
                         TameworkMetadataKeys.TARGET_UUID,
                         new BsonString(SOURCE.toString())
-                )
-                .append(
-                        TameworkMetadataKeys.OWNER_UUID,
-                        new BsonString(CANONICAL_OWNER.toString())
                 )
                 .append(
                         TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
@@ -378,6 +413,12 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                         TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS,
                         new BsonInt64(-777L)
                 );
+        if (includeItemOwner) {
+            sourceMetadata.append(
+                    TameworkMetadataKeys.OWNER_UUID,
+                    new BsonString(CANONICAL_OWNER.toString())
+            );
+        }
         return new SpawnerCapturedArtifactReleaseIntent(
                 "release-click-public",
                 ACTOR,
@@ -385,8 +426,8 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 2,
                 stack("capture-device-filled", sourceMetadata),
                 stack("capture-device-empty", new BsonDocument()),
-                null,
-                null,
+                ownerAssignment,
+                ownerAssignmentName,
                 null
         );
     }

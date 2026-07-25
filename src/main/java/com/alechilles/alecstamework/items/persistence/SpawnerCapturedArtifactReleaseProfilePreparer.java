@@ -112,14 +112,21 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
             @Nullable String ownerAssignmentName
     ) {
         OwnerId canonicalOwner = profile.lifecycle().ownerId();
-        if (ownerAssignment != null && canonicalOwner != null) {
+        if (ownerAssignment != null && canonicalOwner != null
+                && !ownerAssignment.equals(canonicalOwner)) {
             return Rejected.profileConflict();
         }
-        OwnerId effectiveOwner = ownerAssignment == null
-                ? canonicalOwner
-                : ownerAssignment;
-        String effectiveOwnerName = ownerAssignment == null
-                ? projectedOwnerName(profile)
+        OwnerId effectiveOwner = canonicalOwner == null
+                ? ownerAssignment
+                : canonicalOwner;
+        String effectiveOwnerName = canonicalOwner == null
+                ? ownerAssignmentName
+                : projectedOwnerName(profile);
+        OwnerId durableAssignment = canonicalOwner == null
+                ? ownerAssignment
+                : null;
+        String durableAssignmentName = durableAssignment == null
+                ? null
                 : ownerAssignmentName;
         try {
             return new Prepared(
@@ -133,7 +140,9 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                             profile.identity().profileId(),
                             profile.currentAlias().alias(),
                             sourceSnapshot.snapshotId()
-                    )
+                    ),
+                    durableAssignment,
+                    durableAssignmentName
             );
         } catch (RuntimeException failure) {
             return Rejected.decodeFailed(
@@ -228,7 +237,9 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
     record Prepared(
             CompanionSnapshot sourceSnapshot,
             SnapshotCodecRegistry.EncodedSnapshot projection,
-            ResolvedIdentity resolvedIdentity
+            ResolvedIdentity resolvedIdentity,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
     ) implements Result {
     }
 
