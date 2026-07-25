@@ -21,13 +21,13 @@ Record these values before live testing:
 
 | Evidence | Value |
 | --- | --- |
-| Tamework commit | `2d1b120ffa75ea5b603d05ff87b1949d2af24711` |
+| Tamework commit | `64a910a36a88cdd89cf30eb05a54f8866285fbd1` |
 | Tamework version | `3.0.0` |
 | Hytale version | `0.5.7` |
 | Candidate artifact path | `target/Alec's Tamework! v3.0.0.jar` (test candidate; evidence copy retained with the migration baseline) |
-| Candidate SHA-256 | `fe394a166bbc66a3e3bee0b25cdec7927663a799faebc2c14dedc5e20ab6df05` |
-| Maven test result | Clean isolated run on 2026-07-24: 2,580 tests, 0 failures, 0 errors, 1 environment-dependent skip |
-| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,764,451 bytes |
+| Candidate SHA-256 | `5930cf187cca52a2e0ab00e79a2d4c402bf3f7cc4cb77d487d3a0c20f72abd81` |
+| Maven test result | Clean isolated run on 2026-07-24: 2,587 tests, 0 failures, 0 errors, 1 environment-dependent skip |
+| Release build result | Deferred until live testing completes; ordinary Maven test-candidate package passed, artifact size 22,803,278 bytes |
 
 The worktree must be clean, and every live boot must use the artifact with the
 recorded SHA-256.
@@ -37,6 +37,15 @@ fresh-world, copied-save, and rollback gates remain required before publishing.
 
 Earlier candidates are superseded:
 
+- `fe394a166bbc66a3e3bee0b25cdec7927663a799faebc2c14dedc5e20ab6df05`
+  passed imported capture release, coop, death, lost, and ordinary cross-world
+  recall testing, but one genuinely absent imported companion remained
+  Unloaded after Recall. Commit `64a910a3` now retains only one valid
+  released-coop history payload as single-use migration evidence. It converts
+  that evidence to ordinary Lost restoration data only after an explicit
+  Recall exhausts without physically moving an NPC; all current alias, owner,
+  role, metadata, lifecycle, source revision, and payload-hash fences are
+  rechecked atomically.
 - `c81cd8b58b293d07b893d6cf8cae2cd45b1d83019ed773d18b9793f0c4ac1d64`
   resolved public filled spawners to their exact imported capture profiles, but
   rejected the released `CaptureClearsOwner` shape: the item intentionally
