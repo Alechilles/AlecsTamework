@@ -3,11 +3,15 @@ package com.alechilles.alecstamework.companion.capture.runtime;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
 import com.alechilles.alecstamework.companion.capture.runtime.CaptureReleaseWorldAttempt.ReceiptPersistence;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.runtime.chunk
+        .HytaleChunkSaveSupport;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .HytalePlayerDurabilityBarrier;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .HytalePlayerDurabilityBarrier.SaveResult;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -30,6 +34,7 @@ final class HytaleCaptureReleaseDurabilityBarrier {
     private final World world;
     private final Store<EntityStore> store;
     private final CompanionCaptureReleaseRequest request;
+    private final HytalePlayerDurabilityBarrier playerDurability;
 
     HytaleCaptureReleaseDurabilityBarrier(
             World world,
@@ -39,31 +44,18 @@ final class HytaleCaptureReleaseDurabilityBarrier {
         this.world = world;
         this.store = store;
         this.request = request;
+        this.playerDurability = new HytalePlayerDurabilityBarrier(
+                world,
+                store,
+                request.targetWorldKey(),
+                request.source().actorUuid()
+        );
     }
 
     CompletionStage<ReceiptPersistence> saveActorReceipt() {
-        try {
-            store.assertThread();
-            Ref<EntityStore> actor =
-                    world.getEntityRef(request.source().actorUuid());
-            ComponentType<EntityStore, Player> playerType =
-                    Player.getComponentType();
-            if (actor == null || !actor.isValid() || playerType == null) {
-                return completed(ReceiptPersistence.retryable(null));
-            }
-            Player player = store.getComponent(actor, playerType);
-            if (player == null) {
-                return completed(ReceiptPersistence.retryable(null));
-            }
-            CompletableFuture<Void> save = player.saveConfig(
-                    world,
-                    HytalePlayerSaveHolderFactory.create(store, actor),
-                    true
-            );
-            return mapPlayerSave(save);
-        } catch (RuntimeException | LinkageError failure) {
-            return completed(ReceiptPersistence.retryable(failure));
-        }
+        return playerDurability.saveActor().thenApply(
+                HytaleCaptureReleaseDurabilityBarrier::mapPlayerSave
+        );
     }
 
     CompletionStage<ReceiptPersistence> saveTargetChunkReceipt(
@@ -122,69 +114,18 @@ final class HytaleCaptureReleaseDurabilityBarrier {
     CompletionStage<LiveOperationResult> resumeOnWorldThread(
             Supplier<CompletionStage<LiveOperationResult>> continuation
     ) {
-        CompletableFuture<LiveOperationResult> completion =
-                new CompletableFuture<>();
-        try {
-            world.execute(() -> resume(continuation, completion));
-        } catch (Throwable failure) {
-            completion.completeExceptionally(failure);
-        }
-        return completion;
+        return playerDurability.resumeOnWorldThread(
+                continuation,
+                () -> LiveOperationResult.retryable(
+                        "capture_release_world_instance_changed", null
+                )
+        );
     }
 
-    private void resume(
-            Supplier<CompletionStage<LiveOperationResult>> continuation,
-            CompletableFuture<LiveOperationResult> completion
-    ) {
-        try {
-            World current = Universe.get().getWorld(
-                    request.targetWorldKey()
-            );
-            if (current != world
-                    || world.getEntityStore().getStore() != store) {
-                completion.complete(LiveOperationResult.retryable(
-                        "capture_release_world_instance_changed",
-                        null
-                ));
-                return;
-            }
-            store.assertThread();
-            CompletionStage<LiveOperationResult> result =
-                    continuation.get();
-            if (result == null) {
-                completion.completeExceptionally(
-                        new IllegalStateException(
-                                "World continuation returned no result"
-                        )
-                );
-                return;
-            }
-            result.whenComplete((resolved, failure) -> {
-                if (failure != null) {
-                    completion.completeExceptionally(failure);
-                } else {
-                    completion.complete(resolved);
-                }
-            });
-        } catch (Throwable failure) {
-            completion.completeExceptionally(failure);
-        }
-    }
-
-    private static CompletionStage<ReceiptPersistence> mapPlayerSave(
-            CompletionStage<Void> save
-    ) {
-        if (save == null) {
-            return completed(ReceiptPersistence.retryable(null));
-        }
-        CompletableFuture<ReceiptPersistence> completion =
-                new CompletableFuture<>();
-        save.whenComplete((ignored, failure) -> completion.complete(
-                failure == null
-                        ? ReceiptPersistence.saved()
-                        : ReceiptPersistence.retryable(failure)
-        ));
-        return completion;
+    private static ReceiptPersistence mapPlayerSave(SaveResult saved) {
+        return saved.saved()
+                ? ReceiptPersistence.saved()
+                : ReceiptPersistence.retryable(saved.failure());
     }
 
     static CompletionStage<ReceiptPersistence> mapChunkSave(

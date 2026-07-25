@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .HytalePlayerDurabilityBarrier;
 import com.alechilles.alecstamework.persistence.runtime.HytaleAsyncWorldOperationGateway;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
@@ -171,6 +173,9 @@ public final class HytaleCompanionCaptureWorldGateway
             return durability.resumeOnWorldThread(
                     () -> finishResolvedSpend(
                             request, operation, attempts, durability
+                    ),
+                    () -> LiveOperationResult.retryable(
+                            "capture_world_instance_changed", null
                     )
             );
         });

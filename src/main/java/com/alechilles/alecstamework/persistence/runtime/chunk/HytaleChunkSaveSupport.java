@@ -1,19 +1,23 @@
-package com.alechilles.alecstamework.companion.capture.runtime;
+package com.alechilles.alecstamework.persistence.runtime.chunk;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Shared asynchronous save-then-flush mapping for exact Hytale chunk receipts. */
-final class HytaleChunkSaveSupport {
+public final class HytaleChunkSaveSupport {
     private HytaleChunkSaveSupport() {
     }
 
-    static CompletionStage<Outcome> saveAndFlush(
-            CompletionStage<Void> save,
-            ChunkFlusher flusher,
-            Executor ioExecutor
+    /** Maps both the save and durable flush into one typed result. */
+    @Nonnull
+    public static CompletionStage<Outcome> saveAndFlush(
+            @Nullable CompletionStage<Void> save,
+            @Nullable ChunkFlusher flusher,
+            @Nullable Executor ioExecutor
     ) {
         if (save == null || flusher == null || ioExecutor == null) {
             return CompletableFuture.completedFuture(
@@ -41,18 +45,23 @@ final class HytaleChunkSaveSupport {
         return completion;
     }
 
-    record Outcome(boolean saved, Throwable failure) {
-        static Outcome success() {
+    /** Exact chunk durability result. */
+    public record Outcome(
+            boolean saved,
+            @Nullable Throwable failure
+    ) {
+        public static Outcome success() {
             return new Outcome(true, null);
         }
 
-        static Outcome retryable(Throwable failure) {
+        public static Outcome retryable(@Nullable Throwable failure) {
             return new Outcome(false, failure);
         }
     }
 
+    /** Potentially blocking chunk-store flush invoked on the supplied executor. */
     @FunctionalInterface
-    interface ChunkFlusher {
+    public interface ChunkFlusher {
         void flush() throws Exception;
     }
 }

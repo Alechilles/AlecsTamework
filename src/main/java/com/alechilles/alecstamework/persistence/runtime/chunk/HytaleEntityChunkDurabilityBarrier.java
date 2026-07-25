@@ -1,6 +1,5 @@
-package com.alechilles.alecstamework.companion.capture.runtime;
+package com.alechilles.alecstamework.persistence.runtime.chunk;
 
-import com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureTameWorldAttempt.ReceiptPersistence;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -10,33 +9,39 @@ import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.IChunkSaver;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
+import javax.annotation.Nonnull;
 
-/** Saves and flushes the exact current chunk containing one stable live entity UUID. */
-final class HytaleEntityChunkDurabilityBarrier {
+/** Saves and flushes the exact current chunk containing one stable entity UUID. */
+public final class HytaleEntityChunkDurabilityBarrier {
     private final World world;
     private final Store<EntityStore> store;
     private final UUID targetUuid;
 
-    HytaleEntityChunkDurabilityBarrier(
-            World world,
-            Store<EntityStore> store,
-            UUID targetUuid
+    public HytaleEntityChunkDurabilityBarrier(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull UUID targetUuid
     ) {
-        this.world = world;
-        this.store = store;
-        this.targetUuid = targetUuid;
+        this.world = Objects.requireNonNull(world, "world");
+        this.store = Objects.requireNonNull(store, "store");
+        this.targetUuid = Objects.requireNonNull(targetUuid, "targetUuid");
     }
 
-    CompletionStage<ReceiptPersistence> saveTarget() {
+    /** Starts one exact target-chunk save on the owning world thread. */
+    @Nonnull
+    public CompletionStage<HytaleChunkSaveSupport.Outcome> saveTarget() {
         try {
             store.assertThread();
             SaveContext context = resolve();
             if (context == null) {
-                return completed(ReceiptPersistence.retryable(null));
+                return completed(
+                        HytaleChunkSaveSupport.Outcome.retryable(null)
+                );
             }
             CompletableFuture<Void> save = context.saver().saveHolder(
                     context.chunk().getX(),
@@ -47,11 +52,11 @@ final class HytaleEntityChunkDurabilityBarrier {
                     save,
                     context.saver()::flush,
                     ForkJoinPool.commonPool()
-            ).thenApply(outcome -> outcome.saved()
-                    ? ReceiptPersistence.saved()
-                    : ReceiptPersistence.retryable(outcome.failure()));
+            );
         } catch (RuntimeException | LinkageError failure) {
-            return completed(ReceiptPersistence.retryable(failure));
+            return completed(
+                    HytaleChunkSaveSupport.Outcome.retryable(failure)
+            );
         }
     }
 

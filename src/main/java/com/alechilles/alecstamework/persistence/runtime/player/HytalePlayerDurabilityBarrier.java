@@ -1,6 +1,5 @@
-package com.alechilles.alecstamework.companion.capture.runtime;
+package com.alechilles.alecstamework.persistence.runtime.player;
 
-import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -8,31 +7,44 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
-/** Saves exact player ECS evidence and re-enters its current world safely. */
-final class HytalePlayerDurabilityBarrier {
+/**
+ * Saves exact player ECS evidence and re-enters its originating world safely.
+ *
+ * <p>The barrier retains only stable actor/world identity across the async
+ * save. Live components are resolved again on the owning world thread.</p>
+ */
+public final class HytalePlayerDurabilityBarrier {
     private final World world;
     private final Store<EntityStore> store;
     private final String worldKey;
     private final UUID actorUuid;
 
-    HytalePlayerDurabilityBarrier(
-            World world,
-            Store<EntityStore> store,
-            String worldKey,
-            UUID actorUuid
+    public HytalePlayerDurabilityBarrier(
+            @Nonnull World world,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull String worldKey,
+            @Nonnull UUID actorUuid
     ) {
-        this.world = world;
-        this.store = store;
-        this.worldKey = worldKey;
-        this.actorUuid = actorUuid;
+        this.world = Objects.requireNonNull(world, "world");
+        this.store = Objects.requireNonNull(store, "store");
+        if (worldKey.isBlank()) {
+            throw new IllegalArgumentException("Player world key is required");
+        }
+        this.worldKey = worldKey.trim();
+        this.actorUuid = Objects.requireNonNull(actorUuid, "actorUuid");
     }
 
-    CompletionStage<SaveResult> saveActor() {
+    /** Starts one exact player save on the owning world thread. */
+    @Nonnull
+    public CompletionStage<SaveResult> saveActor() {
         try {
             store.assertThread();
             Ref<EntityStore> actor = world.getEntityRef(actorUuid);
@@ -66,35 +78,43 @@ final class HytalePlayerDurabilityBarrier {
         }
     }
 
-    CompletionStage<LiveOperationResult> resumeOnWorldThread(
-            Supplier<CompletionStage<LiveOperationResult>> continuation
+    /**
+     * Re-enters the exact originating world/store before resolving live state.
+     *
+     * @param unavailable value returned when that exact world instance changed
+     */
+    @Nonnull
+    public <T> CompletionStage<T> resumeOnWorldThread(
+            @Nonnull Supplier<CompletionStage<T>> continuation,
+            @Nonnull Supplier<T> unavailable
     ) {
-        CompletableFuture<LiveOperationResult> completion =
-                new CompletableFuture<>();
+        Objects.requireNonNull(continuation, "continuation");
+        Objects.requireNonNull(unavailable, "unavailable");
+        CompletableFuture<T> completion = new CompletableFuture<>();
         try {
-            world.execute(() -> resume(continuation, completion));
+            world.execute(() -> resume(
+                    continuation, unavailable, completion
+            ));
         } catch (Throwable failure) {
             completion.completeExceptionally(failure);
         }
         return completion;
     }
 
-    private void resume(
-            Supplier<CompletionStage<LiveOperationResult>> continuation,
-            CompletableFuture<LiveOperationResult> completion
+    private <T> void resume(
+            Supplier<CompletionStage<T>> continuation,
+            Supplier<T> unavailable,
+            CompletableFuture<T> completion
     ) {
         try {
             World current = Universe.get().getWorld(worldKey);
             if (current != world
                     || world.getEntityStore().getStore() != store) {
-                completion.complete(LiveOperationResult.retryable(
-                        "capture_world_instance_changed", null
-                ));
+                completion.complete(unavailable.get());
                 return;
             }
             store.assertThread();
-            CompletionStage<LiveOperationResult> result =
-                    continuation.get();
+            CompletionStage<T> result = continuation.get();
             if (result == null) {
                 completion.completeExceptionally(
                         new IllegalStateException(
@@ -119,12 +139,16 @@ final class HytalePlayerDurabilityBarrier {
         return CompletableFuture.completedFuture(value);
     }
 
-    record SaveResult(boolean saved, Throwable failure) {
-        static SaveResult success() {
+    /** Player-save proof resolved without accessing components off-thread. */
+    public record SaveResult(
+            boolean saved,
+            @Nullable Throwable failure
+    ) {
+        public static SaveResult success() {
             return new SaveResult(true, null);
         }
 
-        static SaveResult retryable(Throwable failure) {
+        public static SaveResult retryable(@Nullable Throwable failure) {
             return new SaveResult(false, failure);
         }
     }

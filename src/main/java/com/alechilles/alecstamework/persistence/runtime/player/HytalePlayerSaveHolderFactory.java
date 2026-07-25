@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.companion.capture.runtime;
+package com.alechilles.alecstamework.persistence.runtime.player;
 
 import com.hypixel.hytale.component.Archetype;
 import com.hypixel.hytale.component.Component;
@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
+import javax.annotation.Nonnull;
 
 /**
  * Builds the live-component holder expected by Hytale's player config saver.
@@ -16,13 +17,15 @@ import java.util.Objects;
  * thread. Cloning the complete serializable entity is both unnecessary and
  * unsafe because not every live player component has a direct clone codec.</p>
  */
-final class HytalePlayerSaveHolderFactory {
+public final class HytalePlayerSaveHolderFactory {
     private HytalePlayerSaveHolderFactory() {
     }
 
-    static Holder<EntityStore> create(
-            Store<EntityStore> store,
-            Ref<EntityStore> actor
+    /** Captures the current live component references without cloning them. */
+    @Nonnull
+    public static Holder<EntityStore> create(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> actor
     ) {
         Objects.requireNonNull(store, "store");
         Objects.requireNonNull(actor, "actor");

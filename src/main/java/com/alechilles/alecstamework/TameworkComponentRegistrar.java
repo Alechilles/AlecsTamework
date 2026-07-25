@@ -35,6 +35,8 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -176,6 +178,13 @@ final class TameworkComponentRegistrar {
                         "TameworkCaptureSourceReceipts",
                         TameworkCaptureSourceReceiptsComponent.CODEC
                 );
+        ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+                inventoryOperationReceipts =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkInventoryOperationReceiptsComponent.class,
+                        "TameworkInventoryOperationReceipts",
+                        TameworkInventoryOperationReceiptsComponent.CODEC
+                );
         ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile =
                 plugin.getEntityStoreRegistry().registerComponent(
                         HomingVisualProjectileComponent.class,
@@ -202,8 +211,8 @@ final class TameworkComponentRegistrar {
                 leveling, traits, talents, tranquilizerPeak, attachments, dynamicAttachments,
                 lifeStage, projectileImpactEffect, lingeringHazardProjectile, lingeringHazard,
                 apiSelfTestFixtureMarker, projectionIdentity, persistenceRetirement,
-                captureSourceReceipts, homingVisualProjectile, feedTroughWaterCharges,
-                coopCaptureReceipts
+                captureSourceReceipts, inventoryOperationReceipts,
+                homingVisualProjectile, feedTroughWaterCharges, coopCaptureReceipts
         );
     }
 
@@ -242,6 +251,8 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentity,
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent> persistenceRetirement,
             ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent> captureSourceReceipts,
+            ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+                    inventoryOperationReceipts,
             ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile,
             ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges,
             ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> coopCaptureReceipts) {

@@ -10,6 +10,10 @@ import com.alechilles.alecstamework.companion.capture.runtime.CompanionCaptureTa
 import com.alechilles.alecstamework.items.persistence.HytaleCapturedArtifactAdapter;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.runtime.chunk
+        .HytaleEntityChunkDurabilityBarrier;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .HytalePlayerDurabilityBarrier;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -158,7 +162,10 @@ final class HytaleCompanionCaptureTameAttemptGateway
 
     @Override
     public CompletionStage<ReceiptPersistence> persistTarget() {
-        return targetDurability.saveTarget();
+        return targetDurability.saveTarget().thenApply(saved ->
+                saved.saved()
+                        ? ReceiptPersistence.saved()
+                        : ReceiptPersistence.retryable(saved.failure()));
     }
 
     @Override
