@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.companion.population.group.PopulationGroupAs
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningRequest;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationRequest;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationRequest;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteDatabaseOperationCoordinator;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqlitePublicPersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSingleWriter;
@@ -214,6 +215,22 @@ public final class PublicPersistenceOperations {
                 idempotencyKey,
                 release,
                 boundaries.coopReleases()
+        );
+        return submission(submitted.acceptance(), submitted.completion());
+    }
+
+    @Nonnull
+    public PublicOperationSubmission reviveCompanion(
+            @Nonnull OperationId operationId,
+            @Nonnull IdempotencyKey idempotencyKey,
+            @Nonnull PaidRevivalRequest revival
+    ) {
+        var submitted = adapter.paidRevivalOperations().submit(
+                operationId,
+                idempotencyKey,
+                revival,
+                boundaries.paidRevivals().revivals(),
+                boundaries.paidRevivals().releases()
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

@@ -46,6 +46,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("provisioning");
     public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
             new PersistenceFeatureId("economic_compensation");
+    public static final PersistenceFeatureId PAID_REVIVAL =
+            new PersistenceFeatureId("paid_revival");
     public static final PersistenceFeatureId CAPTURE =
             new PersistenceFeatureId("capture");
     public static final PersistenceFeatureId DORMANT =
@@ -86,6 +88,7 @@ public final class PublicPersistenceFeatureRegistry {
                 PublicPersistenceTimedFeature.create(),
                 PublicPersistenceProvisioningFeature.create(),
                 economicCompensation(),
+                PublicPersistencePaidRevivalFeature.create(),
                 capture(),
                 dormant(),
                 coop(),
@@ -396,9 +399,12 @@ public final class PublicPersistenceFeatureRegistry {
                         CoopSlotRegistrationDefinition.INSTANCE,
                         Set.of(OperationScopeType.COOP),
                         CompanionCoopCaptureDefinition.INSTANCE,
-                        Set.of(
-                                OperationScopeType.PROFILE,
-                                OperationScopeType.COOP
+                        PublicPersistenceFeatureDescriptorFactory.policy(
+                                Set.of(
+                                        OperationScopeType.PROFILE,
+                                        OperationScopeType.COOP
+                                ),
+                                Set.of(OperationScopeType.OWNER)
                         ),
                         CompanionCoopReleaseDefinition.INSTANCE,
                         Set.of(
@@ -419,6 +425,7 @@ public final class PublicPersistenceFeatureRegistry {
                 Set.of(
                         OperationScopeType.OPERATION,
                         OperationScopeType.PROFILE,
+                        OperationScopeType.OWNER,
                         OperationScopeType.COOP
                 )
         );

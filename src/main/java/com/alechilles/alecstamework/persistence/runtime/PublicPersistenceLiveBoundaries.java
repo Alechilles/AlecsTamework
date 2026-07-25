@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureLiveBound
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBoundary;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalBoundaries;
 import javax.annotation.Nonnull;
 
 /** Complete external mutation/resolution boundaries used by normal work and recovery. */
@@ -17,18 +18,42 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull CompanionCoopCaptureLiveBoundary coopCaptures,
         @Nonnull CompanionCoopReleaseLiveBoundary coopReleases,
         @Nonnull TimedSummonLiveBoundary timedSummons,
-        @Nonnull ProvisioningActivationLiveBoundary provisioningActivations
+        @Nonnull ProvisioningActivationLiveBoundary provisioningActivations,
+        @Nonnull PaidRevivalBoundaries paidRevivals
 ) {
     public PublicPersistenceLiveBoundaries {
         if (captures == null || capturedReleases == null
                 || restorations == null
                 || coopCaptures == null || coopReleases == null
                 || timedSummons == null
-                || provisioningActivations == null) {
+                || provisioningActivations == null
+                || paidRevivals == null) {
             throw new IllegalArgumentException(
                     "Every public live persistence boundary is required"
             );
         }
+    }
+
+    /** Compatibility composition for callers without paid revival. */
+    public PublicPersistenceLiveBoundaries(
+            CompanionCaptureLiveBoundary captures,
+            CompanionCaptureReleaseLiveBoundary capturedReleases,
+            CompanionRestorationLiveBoundary restorations,
+            CompanionCoopCaptureLiveBoundary coopCaptures,
+            CompanionCoopReleaseLiveBoundary coopReleases,
+            TimedSummonLiveBoundary timedSummons,
+            ProvisioningActivationLiveBoundary provisioningActivations
+    ) {
+        this(
+                captures,
+                capturedReleases,
+                restorations,
+                coopCaptures,
+                coopReleases,
+                timedSummons,
+                provisioningActivations,
+                PaidRevivalBoundaries.unavailable()
+        );
     }
 
     /** Compatibility composition for callers without provisioning activation. */

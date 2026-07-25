@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDe
 import com.alechilles.alecstamework.companion.provisioning.CompanionProvisioningDefinition;
 import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationDefinition;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationDefinition;
+import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.control.PersistenceFeatureRegistry;
 import com.alechilles.alecstamework.persistence.control.PersistenceContainmentListener;
@@ -49,6 +50,7 @@ final class SqlitePublicOperationSet {
     private final SqliteCoopSlotOperations coopSlots;
     private final SqliteCompanionCoopCaptureOperations coopCaptures;
     private final SqliteCompanionCoopReleaseOperations coopReleases;
+    private final SqlitePaidRevivalOperations paidRevivals;
     private final SqliteProfileExtensionOperations extensions;
 
     SqlitePublicOperationSet(
@@ -218,6 +220,16 @@ final class SqlitePublicOperationSet {
                         CompanionCoopReleaseDefinition.INSTANCE.kind()
                 )
         );
+        paidRevivals = new SqlitePaidRevivalOperations(
+                engine,
+                publisher,
+                kernel.reads(),
+                clock,
+                refunds,
+                projections.requiredFor(
+                        PaidRevivalDefinition.INSTANCE.kind()
+                )
+        );
         extensions = new SqliteProfileExtensionOperations(
                 database,
                 projections.requiredFor(
@@ -301,6 +313,10 @@ final class SqlitePublicOperationSet {
 
     SqliteCompanionCoopReleaseOperations coopReleases() {
         return coopReleases;
+    }
+
+    SqlitePaidRevivalOperations paidRevivals() {
+        return paidRevivals;
     }
 
     SqliteProfileExtensionOperations extensions() {

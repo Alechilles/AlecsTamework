@@ -225,6 +225,11 @@ public final class SqlitePublicPersistenceAdapter {
     }
 
     @Nonnull
+    public SqlitePaidRevivalOperations paidRevivalOperations() {
+        return publicOperations.paidRevivals();
+    }
+
+    @Nonnull
     public SqliteProfileExtensionOperations extensionOperations() {
         return publicOperations.extensions();
     }
