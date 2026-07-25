@@ -2,11 +2,8 @@ package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
-import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
@@ -41,6 +38,7 @@ public final class SpawnerCaptureAuthor {
     private final SpawnerCaptureEvidenceFreezer evidence;
     private final SpawnerCaptureAdoptionFactory adoptions;
     private final SpawnerCapturePublishedEventPublisher eventPublisher;
+    private final SpawnerCaptureProfileCoordinator profiles;
     private final ResultDispatcher dispatcher;
 
     /** Creates the production author over replacement facades and UUID-safe feedback. */
@@ -94,6 +92,9 @@ public final class SpawnerCaptureAuthor {
         this.eventPublisher = new SpawnerCapturePublishedEventPublisher(
                 this::findProfile,
                 Objects.requireNonNull(events, "events")
+        );
+        this.profiles = new SpawnerCaptureProfileCoordinator(
+                persistence, this::findProfile
         );
     }
 
@@ -182,7 +183,8 @@ public final class SpawnerCaptureAuthor {
         try {
             adoption = adoptions.create(context, frozen);
         } catch (RuntimeException failure) {
-            return profileConflict(frozen.operationId(), failure);
+            return profileConflict(frozen.operationId(),
+                    "capture_profile_not_exact_live", failure);
         }
         String[] parts = {
                 context.profileId().toString(),
@@ -254,10 +256,22 @@ public final class SpawnerCaptureAuthor {
             FrozenCapture frozen,
             CompanionProfileReadModel profile
     ) {
+        return profiles.authorize(
+                context,
+                frozen,
+                profile,
+                exactProfile -> submitExactCapture(
+                        context, frozen, exactProfile
+                )
+        );
+    }
+
+    private CompletionStage<SpawnerPersistenceAuthorResult> submitExactCapture(
+            SpawnerCaptureContext context,
+            FrozenCapture frozen,
+            CompanionProfileReadModel profile
+    ) {
         CompanionLifecycle lifecycle = profile.lifecycle();
-        if (!exactLiveProfile(context, profile, lifecycle)) {
-            return profileConflict(frozen.operationId(), null);
-        }
         CompanionSnapshot snapshot = new CompanionSnapshot(
                 frozen.snapshotId(),
                 context.profileId(),
@@ -343,24 +357,6 @@ public final class SpawnerCaptureAuthor {
         );
     }
 
-    private boolean exactLiveProfile(
-            SpawnerCaptureContext context,
-            CompanionProfileReadModel profile,
-            CompanionLifecycle lifecycle
-    ) {
-        CompanionAlias alias = profile.currentAlias();
-        return profile.identity().profileId().equals(context.profileId())
-                && alias != null
-                && alias.alias().equals(context.sourceAlias())
-                && alias.state() == CompanionAlias.State.CURRENT
-                && lifecycle.state() == LifecycleState.ACTIVE
-                && lifecycle.location().equals(LifecycleLocation.liveEntity(
-                context.sourceAlias().toString(), context.worldKey()
-        ))
-                && lifecycle.activeOperationId() == null
-                && !lifecycle.quarantined();
-    }
-
     private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
     findProfile(ProfileId profileId) {
         try {
@@ -393,12 +389,13 @@ public final class SpawnerCaptureAuthor {
 
     private CompletionStage<SpawnerPersistenceAuthorResult> profileConflict(
             OperationId operationId,
+            String detail,
             Throwable failure
     ) {
         return completed(result(
                 SpawnerPersistenceAuthorResult.Status.PROFILE_CONFLICT,
                 operationId, null,
-                "capture_profile_not_exact_live", failure
+                detail, failure
         ));
     }
 
@@ -469,6 +466,12 @@ public final class SpawnerCaptureAuthor {
                 OperationId operationId,
                 IdempotencyKey idempotencyKey,
                 CompanionProfileMutation.AdoptLive adoption
+        );
+
+        PublicOperationSubmission reconcile(
+                OperationId operationId,
+                IdempotencyKey idempotencyKey,
+                CompanionProfileMutation.ReconcileLoaded reconciliation
         );
 
         PublicOperationSubmission capture(

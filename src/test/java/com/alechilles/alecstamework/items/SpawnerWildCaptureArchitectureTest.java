@@ -87,6 +87,16 @@ class SpawnerWildCaptureArchitectureTest {
         ).size() <= 500);
         assertTrue(Files.readAllLines(
                 ITEMS.resolve(
+                        "persistence/SpawnerCaptureProfileCoordinator.java"
+                )
+        ).size() <= 300);
+        assertTrue(Files.readAllLines(
+                ITEMS.resolve(
+                        "persistence/SpawnerCaptureProfileGate.java"
+                )
+        ).size() <= 200);
+        assertTrue(Files.readAllLines(
+                ITEMS.resolve(
                         "persistence/SpawnerCapturedArtifactReleaseAuthor.java"
                 )
         ).size() <= 500);

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.localization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hypixel.hytale.server.npc.role.Role;
@@ -61,6 +62,20 @@ class RoleNameResolverTest {
                         null
                 )
         );
+    }
+
+    @Test
+    void baseRoleIdentifierIsGenericButARealCustomNameIsNot() {
+        assertTrue(RoleNameResolver.isRoleIdentityDisplayName(
+                "Wolf_Black",
+                "Tamed_Wolf_Black",
+                "server.npcRoles.Wolf_Black.name"
+        ));
+        assertFalse(RoleNameResolver.isRoleIdentityDisplayName(
+                "Fenrir",
+                "Tamed_Wolf_Black",
+                "server.npcRoles.Wolf_Black.name"
+        ));
     }
 
     private static Role roleWithSensorScope(StdScope scope) throws ReflectiveOperationException {

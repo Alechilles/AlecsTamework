@@ -106,7 +106,7 @@ final class PublicImportPlanningModel {
         PublicImportPlan.Profile target() {
             return new PublicImportPlan.Profile(
                     source.profileId(),
-                    source.displayName(),
+                    PublicImportDisplayNameNormalizer.normalize(source),
                     source.roleId(),
                     metadataJson,
                     metadataHash,

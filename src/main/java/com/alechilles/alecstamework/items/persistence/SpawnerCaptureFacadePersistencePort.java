@@ -63,4 +63,15 @@ final class SpawnerCaptureFacadePersistencePort
                 operationId, idempotencyKey, capture
         );
     }
+
+    @Override
+    public PublicOperationSubmission reconcile(
+            OperationId operationId,
+            IdempotencyKey idempotencyKey,
+            CompanionProfileMutation.ReconcileLoaded reconciliation
+    ) {
+        return persistence.operations().mutateProfile(
+                operationId, idempotencyKey, reconciliation
+        );
+    }
 }

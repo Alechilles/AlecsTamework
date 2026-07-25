@@ -79,6 +79,14 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Captured spawners now treat generic role IDs such as `Wolf_Black` and
+  `Deer_Stag` as species identity rather than custom NPC names, so their item
+  titles show only the localized species name while genuine custom names remain
+  intact.
+- Capturing a companion whose canonical current alias is live but still marked
+  Unloaded or assigned to another world now reconciles that stale location
+  through the shared profile operation before capture. Historical aliases and
+  other identity conflicts still fail closed with specific diagnostics.
 - Fixed captured spawners created by public Tamework `v2.16.1` doing nothing
   after a world imported into replacement persistence. Their original item
   state now joins the imported canonical profile and capture record through the

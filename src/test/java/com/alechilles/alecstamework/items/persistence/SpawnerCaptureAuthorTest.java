@@ -50,6 +50,9 @@ class SpawnerCaptureAuthorTest {
     private static final ProfileId IMPORTED_PROFILE = ProfileId.parse(
             "81000000-0000-0000-0000-000000000099"
     );
+    private static final NpcAlias OTHER_ALIAS = NpcAlias.parse(
+            "81000000-0000-0000-0000-000000000003"
+    );
     private static final UUID ACTOR = UUID.fromString(
             "81000000-0000-0000-0000-000000000002"
     );
@@ -128,6 +131,108 @@ class SpawnerCaptureAuthorTest {
         assertEquals(derived, persistence.capture.profileId());
         assertEquals(LifecycleRevision.INITIAL,
                 persistence.capture.expectedLifecycleRevision());
+    }
+
+    @Test
+    void currentLiveAliasInAnotherWorldIsReconciledBeforeCapture() {
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                profileInWorld(IMPORTED_PROFILE, "old_world"),
+                projection(IMPORTED_PROFILE)
+        );
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> {
+                }
+        ).capture(intent(IMPORTED_PROFILE)).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(1, persistence.reconciliations);
+        assertEquals("world", persistence.capture.targetWorldKey());
+        assertEquals(
+                new LifecycleRevision(4L),
+                persistence.capture.expectedLifecycleRevision()
+        );
+    }
+
+    @Test
+    void currentUnloadedAliasIsReconciledBeforeCapture() {
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                unloadedProfile(IMPORTED_PROFILE),
+                projection(IMPORTED_PROFILE)
+        );
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> {
+                }
+        ).capture(intent(IMPORTED_PROFILE)).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(1, persistence.reconciliations);
+        assertEquals("world", persistence.capture.targetWorldKey());
+    }
+
+    @Test
+    void historicalAliasFailsClosedWithDistinctReason() {
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                profileWithCurrentAlias(IMPORTED_PROFILE, OTHER_ALIAS),
+                projection(IMPORTED_PROFILE)
+        );
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> {
+                }
+        ).capture(intent(IMPORTED_PROFILE)).toCompletableFuture().join();
+
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.PROFILE_CONFLICT,
+                result.status()
+        );
+        assertEquals("capture_alias_not_current", result.detail());
+        assertEquals(0, persistence.reconciliations);
+        assertEquals(null, persistence.capture);
+    }
+
+    @Test
+    void activeOperationFailsClosedWithDistinctReason() {
+        CompanionProfileReadModel base = profile(IMPORTED_PROFILE);
+        CompanionLifecycle current = base.lifecycle();
+        FakePersistence persistence = new FakePersistence(
+                IMPORTED_PROFILE,
+                withLifecycle(base, new CompanionLifecycle(
+                        IMPORTED_PROFILE,
+                        current.ownerId(),
+                        current.state(),
+                        current.location(),
+                        current.revision(),
+                        new OperationId(UUID.fromString(
+                                "81000000-0000-0000-0000-000000000004"
+                        )),
+                        current.stateChangedAtMs(),
+                        current.lastReconciledGeneration(),
+                        null,
+                        current.ownerWorldKey()
+                )),
+                projection(IMPORTED_PROFILE)
+        );
+
+        SpawnerPersistenceAuthorResult result = author(
+                persistence,
+                (profile, evidence) -> {
+                }
+        ).capture(intent(IMPORTED_PROFILE)).toCompletableFuture().join();
+
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.PROFILE_CONFLICT,
+                result.status()
+        );
+        assertEquals("capture_operation_in_progress", result.detail());
+        assertEquals(0, persistence.reconciliations);
     }
 
     @Test
@@ -305,6 +410,81 @@ class SpawnerCaptureAuthorTest {
         );
     }
 
+    private CompanionProfileReadModel profileInWorld(
+            ProfileId profileId,
+            String worldKey
+    ) {
+        CompanionProfileReadModel base = profile(profileId);
+        CompanionLifecycle current = base.lifecycle();
+        return withLifecycle(base, new CompanionLifecycle(
+                profileId,
+                current.ownerId(),
+                LifecycleState.ACTIVE,
+                LifecycleLocation.liveEntity(ALIAS.toString(), worldKey),
+                current.revision(),
+                null,
+                current.stateChangedAtMs(),
+                current.lastReconciledGeneration(),
+                null,
+                current.ownerWorldKey()
+        ));
+    }
+
+    private CompanionProfileReadModel profileWithCurrentAlias(
+            ProfileId profileId,
+            NpcAlias alias
+    ) {
+        CompanionProfileReadModel base = profile(profileId);
+        CompanionAlias current = base.currentAlias();
+        return new CompanionProfileReadModel(
+                base.identity(),
+                new CompanionAlias(
+                        alias,
+                        profileId,
+                        current.generation(),
+                        CompanionAlias.State.CURRENT,
+                        current.leaseOperationId(),
+                        current.mappedAtMs(),
+                        null
+                ),
+                base.lifecycle(),
+                base.toolLinks(),
+                base.currentSnapshots(),
+                base.currentCoopSlot()
+        );
+    }
+
+    private CompanionProfileReadModel unloadedProfile(ProfileId profileId) {
+        CompanionProfileReadModel base = profile(profileId);
+        CompanionLifecycle current = base.lifecycle();
+        return withLifecycle(base, new CompanionLifecycle(
+                profileId,
+                current.ownerId(),
+                LifecycleState.UNLOADED,
+                LifecycleLocation.none(),
+                current.revision(),
+                null,
+                current.stateChangedAtMs(),
+                current.lastReconciledGeneration(),
+                null,
+                current.ownerWorldKey()
+        ));
+    }
+
+    private CompanionProfileReadModel withLifecycle(
+            CompanionProfileReadModel base,
+            CompanionLifecycle lifecycle
+    ) {
+        return new CompanionProfileReadModel(
+                base.identity(),
+                base.currentAlias(),
+                lifecycle,
+                base.toolLinks(),
+                base.currentSnapshots(),
+                base.currentCoopSlot()
+        );
+    }
+
     private CompanionProfileReadModel observedLiveProfile(ProfileId profileId) {
         long observedAt = -500L;
         CompanionIdentity identity = new CompanionIdentity(
@@ -393,11 +573,12 @@ class SpawnerCaptureAuthorTest {
     private static final class FakePersistence
             implements SpawnerCaptureAuthor.PersistencePort {
         private final ProfileId canonicalProfile;
-        private final CompanionProfileReadModel profile;
+        private CompanionProfileReadModel profile;
         private final CompanionProfileProjectionState projection;
         private boolean absentBeforeAdoption;
         private boolean adopted;
         private int adoptions;
+        private int reconciliations;
         private CaptureMode captureMode = CaptureMode.PUBLISHED;
         private ProfileId lastReadProfile;
         private CompanionProfileMutation.AdoptLive adoption;
@@ -480,6 +661,29 @@ class SpawnerCaptureAuthorTest {
                             : OperationWorkflowResult.Status.PUBLISHED;
             return accepted(outcome(
                     operationId, idempotencyKey, phase, status
+            ));
+        }
+
+        @Override
+        public PublicOperationSubmission reconcile(
+                OperationId operationId,
+                IdempotencyKey idempotencyKey,
+                CompanionProfileMutation.ReconcileLoaded reconciliation
+        ) {
+            reconciliations++;
+            profile = new CompanionProfileReadModel(
+                    profile.identity(),
+                    profile.currentAlias(),
+                    reconciliation.resolvedLifecycle(profile.lifecycle()),
+                    profile.toolLinks(),
+                    profile.currentSnapshots(),
+                    profile.currentCoopSlot()
+            );
+            return accepted(outcome(
+                    operationId,
+                    idempotencyKey,
+                    OperationPhase.PUBLISHED,
+                    OperationWorkflowResult.Status.PUBLISHED
             ));
         }
 

@@ -76,6 +76,41 @@ class SpawnerItemDisplayMetadataServiceTest {
     }
 
     @Test
+    void baseRoleIdentifierDoesNotBecomeAFalseCustomName() {
+        TranslationRegistry translations = new TranslationRegistry();
+        translations.put("npcRoles.Wolf_Black.name", "Black Wolf");
+        CapturingDisplayMetadataWriter writer =
+                new CapturingDisplayMetadataWriter();
+        SpawnerItemDisplayMetadataService service = service(
+                translations,
+                null,
+                Message.raw("Base description"),
+                writer
+        );
+        BsonDocument metadata = capturedMetadata(
+                "Wolf_Black", "Tamed_Wolf_Black", null
+        ).append(
+                TameworkMetadataKeys.CAPTURE_NAME_KEY,
+                new BsonString("server.npcRoles.Wolf_Black.name")
+        );
+
+        service.applyCapturedDisplayMetadata(
+                stack(metadata),
+                config(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE)
+        );
+
+        assertNotNull(writer.metadata);
+        assertEquals(
+                "Black Wolf",
+                writer.metadata.getName().getAnsiMessage()
+        );
+        assertEquals(
+                "Base description\nSpecies: Black Wolf",
+                writer.metadata.getDescription().getAnsiMessage()
+        );
+    }
+
+    @Test
     void genericCapturedDisplayNameFallsBackToRoleOnly() {
         CapturingDisplayMetadataWriter writer = new CapturingDisplayMetadataWriter();
         SpawnerItemDisplayMetadataService service = service(writer, null);
