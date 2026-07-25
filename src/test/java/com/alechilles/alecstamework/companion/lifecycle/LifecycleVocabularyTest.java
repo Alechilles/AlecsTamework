@@ -19,6 +19,16 @@ class LifecycleVocabularyTest {
                         LifecycleLocation.keyed(LifecycleLocationKind.CAPTURE_ITEM, "claim-a")),
                 Map.entry(LifecycleState.COOP,
                         LifecycleLocation.keyed(LifecycleLocationKind.COOP_SLOT, "coop-a:0")),
+                Map.entry(LifecycleState.ROSTER_STORED,
+                        LifecycleLocation.keyed(
+                                LifecycleLocationKind.COMMAND_ROSTER,
+                                "slot-a"
+                        )),
+                Map.entry(LifecycleState.PROVISIONED_DORMANT,
+                        LifecycleLocation.keyed(
+                                LifecycleLocationKind.PROVISIONING,
+                                "hydragon:egg:claim-a"
+                        )),
                 Map.entry(LifecycleState.DEAD_REVIVABLE, LifecycleLocation.none()),
                 Map.entry(LifecycleState.LOST, LifecycleLocation.none()),
                 Map.entry(LifecycleState.RELEASED, LifecycleLocation.none()),
@@ -45,6 +55,10 @@ class LifecycleVocabularyTest {
                 () -> new LifecycleLocation(LifecycleLocationKind.COOP_SLOT, null, null));
         assertThrows(IllegalArgumentException.class,
                 () -> new LifecycleLocation(LifecycleLocationKind.CAPTURE_ITEM, "claim-a", "world-a"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new LifecycleLocation(LifecycleLocationKind.COMMAND_ROSTER, null, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new LifecycleLocation(LifecycleLocationKind.PROVISIONING, "claim-a", "world-a"));
         assertThrows(IllegalArgumentException.class,
                 () -> new LifecycleLocation(LifecycleLocationKind.NONE, "unexpected", null));
         assertThrows(IllegalArgumentException.class,

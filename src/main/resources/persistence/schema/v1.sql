@@ -98,10 +98,12 @@ CREATE TABLE companion_lifecycle (
     owner_uuid TEXT,
     lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN (
         'ACTIVE', 'UNLOADED', 'CAPTURED', 'COOP', 'DEAD_REVIVABLE',
-        'LOST', 'RELEASED', 'UNRESOLVED'
+        'LOST', 'RELEASED', 'UNRESOLVED', 'ROSTER_STORED',
+        'PROVISIONED_DORMANT'
     )),
     location_kind TEXT NOT NULL CHECK (location_kind IN (
-        'LIVE_ENTITY', 'CAPTURE_ITEM', 'COOP_SLOT', 'NONE', 'UNRESOLVED'
+        'LIVE_ENTITY', 'CAPTURE_ITEM', 'COOP_SLOT', 'COMMAND_ROSTER',
+        'PROVISIONING', 'NONE', 'UNRESOLVED'
     )),
     location_key TEXT,
     world_key TEXT,
@@ -130,6 +132,14 @@ CREATE TABLE companion_lifecycle (
             AND world_key IS NULL)
         OR (lifecycle_state = 'COOP'
             AND location_kind = 'COOP_SLOT'
+            AND location_key IS NOT NULL
+            AND world_key IS NULL)
+        OR (lifecycle_state = 'ROSTER_STORED'
+            AND location_kind = 'COMMAND_ROSTER'
+            AND location_key IS NOT NULL
+            AND world_key IS NULL)
+        OR (lifecycle_state = 'PROVISIONED_DORMANT'
+            AND location_kind = 'PROVISIONING'
             AND location_key IS NOT NULL
             AND world_key IS NULL)
         OR (lifecycle_state = 'UNRESOLVED'

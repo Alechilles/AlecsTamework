@@ -5,6 +5,8 @@ public enum LifecycleLocationKind {
     LIVE_ENTITY,
     CAPTURE_ITEM,
     COOP_SLOT,
+    COMMAND_ROSTER,
+    PROVISIONING,
     NONE,
     UNRESOLVED
 }

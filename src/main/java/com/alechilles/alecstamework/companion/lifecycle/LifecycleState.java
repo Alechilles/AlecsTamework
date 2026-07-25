@@ -8,6 +8,8 @@ public enum LifecycleState {
     UNLOADED(LifecycleLocationKind.NONE),
     CAPTURED(LifecycleLocationKind.CAPTURE_ITEM),
     COOP(LifecycleLocationKind.COOP_SLOT),
+    ROSTER_STORED(LifecycleLocationKind.COMMAND_ROSTER),
+    PROVISIONED_DORMANT(LifecycleLocationKind.PROVISIONING),
     DEAD_REVIVABLE(LifecycleLocationKind.NONE),
     LOST(LifecycleLocationKind.NONE),
     RELEASED(LifecycleLocationKind.NONE),
