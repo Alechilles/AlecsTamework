@@ -272,7 +272,9 @@ final class SqlitePublicRecoveryDispatcher {
             OperationWorkflowResult result
     ) {
         if (result.status()
-                == OperationWorkflowResult.Status.LIVE_RETRYABLE) {
+                == OperationWorkflowResult.Status.LIVE_RETRYABLE
+                || result.status()
+                == OperationWorkflowResult.Status.PUBLICATION_PENDING) {
             return deferClaim(
                     claims,
                     index,

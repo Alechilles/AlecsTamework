@@ -87,6 +87,7 @@ public final class SqliteCompanionCoopCaptureOperations {
                         request,
                         new SqliteCompanionCoopCapturePreparation(capture),
                         liveBoundary,
+                        liveBoundary,
                         this::commitCapture,
                         requiredConsumers,
                         "companion_coop_capture"

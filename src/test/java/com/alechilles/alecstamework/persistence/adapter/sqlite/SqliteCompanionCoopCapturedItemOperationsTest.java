@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
+import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionCodec;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
@@ -16,6 +17,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -183,6 +185,66 @@ class SqliteCompanionCoopCapturedItemOperationsTest {
         assertEquals(1, fixture.slot().residencyRevision());
         assertEquals(new LifecycleRevision(4), fixture.lifecycle().revision());
         assertEquals(4, replay.events().size());
+    }
+
+    @Test
+    void durableCleanupMustCompleteBeforePublicationAndResumesInPlace()
+            throws Exception {
+        fixture = new SqliteCompanionCoopCapturedItemFixture(tempDir);
+        AtomicInteger liveCalls = new AtomicInteger();
+        AtomicInteger cleanupCalls = new AtomicInteger();
+        CompanionCoopCaptureLiveBoundary boundary =
+                new CompanionCoopCaptureLiveBoundary() {
+                    @Override
+                    public CompletionStage<LiveOperationResult> applyOrResolve(
+                            CompanionCoopCaptureRequest request,
+                            com.alechilles.alecstamework.persistence.operation
+                                    .OperationEnvelope operation
+                    ) {
+                        liveCalls.incrementAndGet();
+                        return LiveOperationResult.confirmed(
+                                "captured_item_receipt_confirmed"
+                        ).completed();
+                    }
+
+                    @Override
+                    public CompletionStage<LiveOperationResult>
+                    cleanupAfterDurable(
+                            CompanionCoopCaptureRequest request,
+                            com.alechilles.alecstamework.persistence.operation
+                                    .OperationEnvelope operation
+                    ) {
+                        assertEquals(OperationPhase.DURABLE, operation.phase());
+                        return cleanupCalls.incrementAndGet() == 1
+                                ? LiveOperationResult.retryable(
+                                        "actor_temporarily_offline", null
+                                ).completed()
+                                : LiveOperationResult.confirmed(
+                                        "captured_item_cleanup_confirmed"
+                                ).completed();
+                    }
+                };
+
+        OperationWorkflowResult pending = fixture.capture(9, boundary);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLICATION_PENDING,
+                pending.status()
+        );
+        assertEquals(OperationPhase.DURABLE, pending.operation().phase());
+        assertEquals(LifecycleState.COOP, fixture.lifecycle().state());
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, cleanupCalls.get());
+
+        OperationWorkflowResult resumed = fixture.capture(9, boundary);
+        OperationWorkflowResult replay = fixture.capture(9, boundary);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, resumed.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        assertEquals(2, cleanupCalls.get());
+        assertEquals(1, fixture.slot().residencyRevision());
+        assertEquals(4, resumed.events().size());
     }
 
     @Test

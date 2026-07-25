@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.operation.DurableCommitEvidence;
+import com.alechilles.alecstamework.persistence.operation.DurableOperationCleanupBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
@@ -15,6 +16,7 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -52,8 +54,36 @@ public final class SqliteLiveOperationCoordinator {
             @Nonnull List<? extends ProjectionConsumer> requiredConsumers,
             @Nonnull String workflowCode
     ) {
+        return execute(
+                definition,
+                request,
+                detail,
+                liveBoundary,
+                DurableOperationCleanupBoundary.notRequired(),
+                durableWork,
+                requiredConsumers,
+                workflowCode
+        );
+    }
+
+    /**
+     * Starts or resumes an operation whose durable external cleanup must complete before
+     * projection publication.
+     */
+    @Nonnull
+    public <T> Submission execute(
+            @Nonnull OperationDefinition<T> definition,
+            @Nonnull OperationRequest<T> request,
+            @Nonnull PreparedOperationDetail detail,
+            @Nonnull LiveOperationBoundary<T> liveBoundary,
+            @Nonnull DurableOperationCleanupBoundary<T> durableCleanup,
+            @Nonnull TimedDurableOperationWork<T> durableWork,
+            @Nonnull List<? extends ProjectionConsumer> requiredConsumers,
+            @Nonnull String workflowCode
+    ) {
         if (definition == null || request == null || detail == null
-                || liveBoundary == null || durableWork == null) {
+                || liveBoundary == null || durableCleanup == null
+                || durableWork == null) {
             throw new IllegalArgumentException("Complete live operation request is required");
         }
         String code = requireCode(workflowCode);
@@ -81,6 +111,7 @@ public final class SqliteLiveOperationCoordinator {
                             operation,
                             request.payload(),
                             liveBoundary,
+                            durableCleanup,
                             durableWork,
                             consumers,
                             code
@@ -93,17 +124,28 @@ public final class SqliteLiveOperationCoordinator {
             OperationEnvelope operation,
             T payload,
             LiveOperationBoundary<T> liveBoundary,
+            DurableOperationCleanupBoundary<T> durableCleanup,
             TimedDurableOperationWork<T> durableWork,
             List<ProjectionConsumer> consumers,
             String code
     ) {
         return switch (operation.phase()) {
-            case PUBLISHED, DURABLE -> publisher.resume(operation, consumers);
+            case PUBLISHED -> publisher.resume(operation, consumers);
+            case DURABLE -> cleanupThenPublish(
+                    operation,
+                    payload,
+                    durableCleanup,
+                    List.of(),
+                    () -> publisher.resume(operation, consumers),
+                    code
+            );
             case PREPARED, RETRYABLE -> transitionToLive(
-                    operation, payload, liveBoundary, durableWork, consumers, code
+                    operation, payload, liveBoundary, durableCleanup,
+                    durableWork, consumers, code
             );
             case LIVE_APPLYING -> applyOrResolveLive(
-                    operation, payload, liveBoundary, durableWork, consumers, code
+                    operation, payload, liveBoundary, durableCleanup,
+                    durableWork, consumers, code
             );
             case UNKNOWN -> SqliteOperationResults.completed(
                     SqliteOperationResults.failed(
@@ -131,6 +173,7 @@ public final class SqliteLiveOperationCoordinator {
             OperationEnvelope operation,
             T payload,
             LiveOperationBoundary<T> liveBoundary,
+            DurableOperationCleanupBoundary<T> durableCleanup,
             TimedDurableOperationWork<T> durableWork,
             List<ProjectionConsumer> consumers,
             String code
@@ -145,7 +188,8 @@ public final class SqliteLiveOperationCoordinator {
             if (result instanceof PersistenceTransactionResult.Committed<?> committed
                     && committed.value() instanceof OperationEnvelope applying) {
                 return applyOrResolveLive(
-                        applying, payload, liveBoundary, durableWork, consumers, code
+                        applying, payload, liveBoundary, durableCleanup,
+                        durableWork, consumers, code
                 );
             }
             return SqliteOperationResults.completed(
@@ -166,6 +210,7 @@ public final class SqliteLiveOperationCoordinator {
             OperationEnvelope operation,
             T payload,
             LiveOperationBoundary<T> liveBoundary,
+            DurableOperationCleanupBoundary<T> durableCleanup,
             TimedDurableOperationWork<T> durableWork,
             List<ProjectionConsumer> consumers,
             String code
@@ -191,6 +236,7 @@ public final class SqliteLiveOperationCoordinator {
                 .thenCompose(live -> continueLiveResult(
                         operation,
                         payload,
+                        durableCleanup,
                         durableWork,
                         consumers,
                         code,
@@ -201,6 +247,7 @@ public final class SqliteLiveOperationCoordinator {
     private <T> CompletionStage<OperationWorkflowResult> continueLiveResult(
             OperationEnvelope operation,
             T payload,
+            DurableOperationCleanupBoundary<T> durableCleanup,
             TimedDurableOperationWork<T> durableWork,
             List<ProjectionConsumer> consumers,
             String code,
@@ -208,7 +255,8 @@ public final class SqliteLiveOperationCoordinator {
     ) {
         return switch (live.status()) {
             case CONFIRMED -> commit(
-                    operation, payload, durableWork, consumers, code
+                    operation, payload, durableCleanup,
+                    durableWork, consumers, code
             );
             case COMPENSATE -> SqliteOperationResults.completed(
                     SqliteOperationResults.failed(
@@ -291,6 +339,7 @@ public final class SqliteLiveOperationCoordinator {
     private <T> CompletionStage<OperationWorkflowResult> commit(
             OperationEnvelope operation,
             T payload,
+            DurableOperationCleanupBoundary<T> durableCleanup,
             TimedDurableOperationWork<T> durableWork,
             List<ProjectionConsumer> consumers,
             String code
@@ -308,7 +357,14 @@ public final class SqliteLiveOperationCoordinator {
         ).completion().thenCompose(result -> {
             if (result instanceof PersistenceTransactionResult.Committed<?> committed
                     && committed.value() instanceof DurableCommitEvidence durable) {
-                return publisher.publish(durable, consumers);
+                return cleanupThenPublish(
+                        durable.operation(),
+                        payload,
+                        durableCleanup,
+                        durable.events(),
+                        () -> publisher.publish(durable, consumers),
+                        code
+                );
             }
             return SqliteOperationResults.completed(
                     SqliteOperationResults.failed(
@@ -322,6 +378,88 @@ public final class SqliteLiveOperationCoordinator {
                     )
             );
         });
+    }
+
+    private <T> CompletionStage<OperationWorkflowResult> cleanupThenPublish(
+            OperationEnvelope durableOperation,
+            T payload,
+            DurableOperationCleanupBoundary<T> cleanup,
+            List<com.alechilles.alecstamework.persistence.projection
+                    .ProjectionEvent> events,
+            Supplier<CompletionStage<OperationWorkflowResult>> publication,
+            String code
+    ) {
+        CompletionStage<LiveOperationResult> resolution;
+        try {
+            resolution = cleanup.cleanupAfterDurable(
+                    payload, durableOperation
+            );
+            if (resolution == null) {
+                throw new IllegalStateException(
+                        code + "_durable_cleanup_returned_null"
+                );
+            }
+        } catch (Throwable failure) {
+            resolution = LiveOperationResult.retryable(
+                    code + "_durable_cleanup_failed", failure
+            ).completed();
+        }
+        return resolution.handle((result, failure) ->
+                failure == null && result != null
+                        ? result
+                        : LiveOperationResult.retryable(
+                                code + "_durable_cleanup_failed",
+                                failure
+                        )
+        ).thenCompose(result -> {
+            if (result.status() == LiveOperationResult.Status.CONFIRMED) {
+                try {
+                    CompletionStage<OperationWorkflowResult> published =
+                            publication.get();
+                    return published == null
+                            ? cleanupPending(
+                                    durableOperation,
+                                    events,
+                                    code + "_publication_missing",
+                                    null
+                            )
+                            : published;
+                } catch (Throwable failure) {
+                    return cleanupPending(
+                            durableOperation,
+                            events,
+                            code + "_publication_failed",
+                            failure
+                    );
+                }
+            }
+            return cleanupPending(
+                    durableOperation,
+                    events,
+                    result.code(),
+                    result.cause()
+            );
+        });
+    }
+
+    private CompletionStage<OperationWorkflowResult> cleanupPending(
+            OperationEnvelope durableOperation,
+            List<com.alechilles.alecstamework.persistence.projection
+                    .ProjectionEvent> events,
+            String detail,
+            Throwable cause
+    ) {
+        Throwable failure = cause == null
+                ? new IllegalStateException(detail)
+                : cause;
+        return SqliteOperationResults.completed(
+                SqliteOperationResults.failed(
+                        OperationWorkflowResult.Status.PUBLICATION_PENDING,
+                        durableOperation,
+                        events,
+                        failure
+                )
+        );
     }
 
     private Throwable operationFailure(OperationEnvelope operation, String fallback) {
