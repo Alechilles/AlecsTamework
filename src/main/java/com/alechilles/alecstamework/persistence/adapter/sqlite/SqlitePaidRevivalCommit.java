@@ -180,11 +180,17 @@ final class SqlitePaidRevivalCommit {
         result.add(PaidRevivalEventCodec.draft(
                 operation.operationId(),
                 new PaidRevivalOutcome(
+                        request.callerNamespace(),
+                        request.callerIdempotencyKey(),
+                        request.familyKey().ownerId(),
+                        request.familyKey().familyId(),
+                        request.slotId(),
                         active.profileId(),
                         request.sourceSnapshot().snapshotId(),
                         request.targetAlias(),
                         request.targetWorldKey(),
                         active.revision(),
+                        request.configId(),
                         request.configRevision(),
                         request.exactCost(),
                         request.chargeReceiptKey(),

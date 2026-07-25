@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.companion.revival;
 
+import com.alechilles.alecstamework.companion.command.CommandRosterSlotId;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonSessionId;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
@@ -18,7 +20,7 @@ import javax.annotation.Nonnull;
 
 /** Versioned outbox codec for successful paid revival. */
 public final class PaidRevivalEventCodec {
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
     public static final ProjectionEventType EVENT_TYPE =
             new ProjectionEventType("paid_companion_revived");
 
@@ -54,6 +56,18 @@ public final class PaidRevivalEventCodec {
             );
         }
         JsonObject json = new JsonObject();
+        json.addProperty(
+                "callerNamespace", outcome.callerNamespace()
+        );
+        json.addProperty(
+                "callerIdempotencyKey",
+                outcome.callerIdempotencyKey()
+        );
+        json.addProperty("ownerId", outcome.ownerId().toString());
+        json.addProperty(
+                "commandFamilyId", outcome.commandFamilyId()
+        );
+        json.addProperty("slotId", outcome.slotId().toString());
         json.addProperty("profileId", outcome.profileId().toString());
         json.addProperty(
                 "sourceSnapshotId",
@@ -64,6 +78,11 @@ public final class PaidRevivalEventCodec {
         json.addProperty(
                 "lifecycleRevision", outcome.lifecycleRevision().value()
         );
+        if (outcome.configId() == null) {
+            json.add("configId", JsonNull.INSTANCE);
+        } else {
+            json.addProperty("configId", outcome.configId());
+        }
         json.addProperty("configRevision", outcome.configRevision());
         JsonArray cost = new JsonArray();
         for (RevivalCostItem item : outcome.exactCost()) {
@@ -110,7 +129,15 @@ public final class PaidRevivalEventCodec {
             ));
         }
         JsonElement session = json.get("timedSessionId");
+        JsonElement configId = json.get("configId");
         return new PaidRevivalOutcome(
+                json.get("callerNamespace").getAsString(),
+                json.get("callerIdempotencyKey").getAsString(),
+                OwnerId.parse(json.get("ownerId").getAsString()),
+                json.get("commandFamilyId").getAsString(),
+                CommandRosterSlotId.parse(
+                        json.get("slotId").getAsString()
+                ),
                 ProfileId.parse(json.get("profileId").getAsString()),
                 SnapshotId.parse(
                         json.get("sourceSnapshotId").getAsString()
@@ -120,6 +147,9 @@ public final class PaidRevivalEventCodec {
                 new LifecycleRevision(
                         json.get("lifecycleRevision").getAsLong()
                 ),
+                configId == null || configId.isJsonNull()
+                        ? null
+                        : configId.getAsString(),
                 json.get("configRevision").getAsString(),
                 cost,
                 json.get("chargeReceiptKey").getAsString(),

@@ -80,6 +80,8 @@ final class PaidRevivalWorldTestFixture {
                         "source-fingerprint", 9
                 ));
         return new PaidRevivalRequest(
+                "hydragon",
+                "miniwyvern-revive-7",
                 FAMILY,
                 CommandRosterSlotId.parse(
                         "40000000-0000-0000-0000-000000000221"

@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
 
 /** Frozen authority for one exact charged revival of a revivable companion. */
 public record PaidRevivalRequest(
+        @Nonnull String callerNamespace,
+        @Nonnull String callerIdempotencyKey,
         @Nonnull CommandFamilyKey familyKey,
         @Nonnull CommandRosterSlotId slotId,
         long expectedMembershipRevision,
@@ -43,6 +45,12 @@ public record PaidRevivalRequest(
         long requestedAtMs
 ) {
     public PaidRevivalRequest {
+        callerNamespace = text(
+                callerNamespace, "Paid revival caller namespace"
+        );
+        callerIdempotencyKey = text(
+                callerIdempotencyKey, "Paid revival caller idempotency key"
+        );
         if (familyKey == null || slotId == null
                 || expectedMembershipRevision <= 0
                 || expectedProfileRevision < 0

@@ -71,7 +71,7 @@ class PaidRevivalDefinitionTest {
                 )
         );
 
-        assertEquals(3, PaidRevivalDefinition.INSTANCE.payloadVersion());
+        assertEquals(4, PaidRevivalDefinition.INSTANCE.payloadVersion());
         assertEquals(
                 request,
                 PaidRevivalDefinition.INSTANCE.decode(
@@ -231,11 +231,17 @@ class PaidRevivalDefinitionTest {
     @Test
     void successfulEventRoundTripsExactEconomicEvidence() {
         PaidRevivalOutcome outcome = new PaidRevivalOutcome(
+                "hydragon",
+                "miniwyvern-revive-7",
+                OWNER,
+                FAMILY.familyId(),
+                SLOT,
                 PROFILE,
                 snapshot().snapshotId(),
                 TARGET_ALIAS,
                 "world-target",
                 new LifecycleRevision(7),
+                "revive-config",
                 "revision-hash",
                 List.of(
                         new RevivalCostItem("life-essence", 3),
@@ -360,6 +366,8 @@ class PaidRevivalDefinitionTest {
                         NOW
                 );
         return new PaidRevivalRequest(
+                "hydragon",
+                "miniwyvern-revive-7",
                 FAMILY,
                 SLOT,
                 2,

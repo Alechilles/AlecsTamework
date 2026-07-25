@@ -30,6 +30,11 @@ public final class PaidRevivalJsonCodec {
             );
         }
         JsonObject json = new JsonObject();
+        json.addProperty("callerNamespace", request.callerNamespace());
+        json.addProperty(
+                "callerIdempotencyKey",
+                request.callerIdempotencyKey()
+        );
         json.addProperty(
                 "ownerId", request.familyKey().ownerId().toString()
         );
@@ -88,6 +93,8 @@ public final class PaidRevivalJsonCodec {
                 .getAsJsonObject();
         JsonElement timed = json.get("timedActivation");
         return new PaidRevivalRequest(
+                json.get("callerNamespace").getAsString(),
+                json.get("callerIdempotencyKey").getAsString(),
                 new CommandFamilyKey(
                         OwnerId.parse(json.get("ownerId").getAsString()),
                         json.get("familyId").getAsString()

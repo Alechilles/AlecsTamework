@@ -121,6 +121,8 @@ final class PaidRevivalTestSupport {
 
     static PaidRevivalRequest request(TimedSummonActivation timed) {
         return new PaidRevivalRequest(
+                "hydragon",
+                "miniwyvern-revive-7",
                 FAMILY,
                 SLOT,
                 1,

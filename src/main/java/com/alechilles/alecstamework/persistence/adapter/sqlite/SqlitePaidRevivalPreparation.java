@@ -154,7 +154,20 @@ final class SqlitePaidRevivalPreparation
 
     private boolean terminalOutcomeMatches(PaidRevivalOutcome outcome) {
         TimedSummonActivation timed = request.timedActivation();
-        return outcome.profileId().equals(
+        return outcome.callerNamespace().equals(
+                request.callerNamespace()
+        )
+                && outcome.callerIdempotencyKey().equals(
+                request.callerIdempotencyKey()
+        )
+                && outcome.ownerId().equals(
+                request.familyKey().ownerId()
+        )
+                && outcome.commandFamilyId().equals(
+                request.familyKey().familyId()
+        )
+                && outcome.slotId().equals(request.slotId())
+                && outcome.profileId().equals(
                 request.sourceSnapshot().profileId()
         )
                 && outcome.sourceSnapshotId().equals(
@@ -164,6 +177,9 @@ final class SqlitePaidRevivalPreparation
                 && outcome.worldKey().equals(request.targetWorldKey())
                 && outcome.lifecycleRevision().equals(
                 request.finalLifecycle().revision()
+        )
+                && java.util.Objects.equals(
+                outcome.configId(), request.configId()
         )
                 && outcome.configRevision().equals(
                 request.configRevision()

@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.companion.revival;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 
-/** Version-three shared operation definition for exact paid revival. */
+/** Version-four shared operation definition for exact paid revival. */
 public final class PaidRevivalDefinition
         implements OperationDefinition<PaidRevivalRequest> {
     public static final PaidRevivalDefinition INSTANCE =
@@ -21,7 +21,7 @@ public final class PaidRevivalDefinition
 
     @Override
     public int payloadVersion() {
-        return 3;
+        return 4;
     }
 
     @Override
