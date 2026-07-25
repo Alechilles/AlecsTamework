@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.runtime.HytaleCompanionCap
 import com.alechilles.alecstamework.companion.capture.runtime.HytaleCompanionCaptureReleaseBoundary;
 import com.alechilles.alecstamework.companion.capture.runtime.HytaleCompanionCaptureReleaseWorldGateway;
 import com.alechilles.alecstamework.companion.capture.runtime.HytaleCompanionCaptureWorldGateway;
+import com.alechilles.alecstamework.companion.capture.runtime.TameworkCaptureSourceReceiptsComponent;
 import com.alechilles.alecstamework.companion.coop.runtime.HytaleCompanionCoopCaptureBoundary;
 import com.alechilles.alecstamework.companion.coop.runtime.HytaleCompanionCoopCaptureWorldGateway;
 import com.alechilles.alecstamework.companion.coop.runtime.HytaleCompanionCoopReleaseBoundary;
@@ -30,6 +31,10 @@ public final class HytalePersistenceLiveBoundariesFactory {
     @Nonnull
     public static PublicPersistenceLiveBoundaries create(
             @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkCaptureSourceReceiptsComponent
+                    > captureSourceReceiptsType,
+            @Nonnull ComponentType<
                     ChunkStore,
                     TameworkCoopCaptureReceiptsComponent
                     > coopCaptureReceiptsType,
@@ -38,7 +43,9 @@ public final class HytalePersistenceLiveBoundariesFactory {
                     TameworkPersistenceRetirementComponent
                     > retirementType
     ) {
-        if (coopCaptureReceiptsType == null || retirementType == null) {
+        if (captureSourceReceiptsType == null
+                || coopCaptureReceiptsType == null
+                || retirementType == null) {
             throw new IllegalArgumentException(
                     "Persistence receipt component types are required"
             );
@@ -48,7 +55,9 @@ public final class HytalePersistenceLiveBoundariesFactory {
         var coopEffects = new CoopEffectService();
         return new PublicPersistenceLiveBoundaries(
                 new HytaleCompanionCaptureBoundary(
-                        new HytaleCompanionCaptureWorldGateway()
+                        new HytaleCompanionCaptureWorldGateway(
+                                captureSourceReceiptsType
+                        )
                 ),
                 new HytaleCompanionCaptureReleaseBoundary(
                         new HytaleCompanionCaptureReleaseWorldGateway(

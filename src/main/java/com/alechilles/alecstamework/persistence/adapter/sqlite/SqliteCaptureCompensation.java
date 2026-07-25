@@ -77,10 +77,28 @@ final class SqliteCaptureCompensation {
         CompanionLifecycle lifecycle = transaction.lifecycles()
                 .findByProfile(capture.profileId())
                 .orElse(null);
+        if (actual == null
+                || !actual.delivered()
+                || !sameClaim(expected, actual)
+                || lifecycle == null) {
+            return false;
+        }
+        if (capture.failedAttempt()) {
+            return lifecycle.revision().equals(
+                    capture.expectedLifecycleRevision()
+            )
+                    && lifecycle.activeOperationId() == null
+                    && lifecycle.state() == LifecycleState.ACTIVE
+                    && lifecycle.location().equals(
+                    LifecycleLocation.liveEntity(
+                            capture.targetAlias().toString(),
+                            capture.targetWorldKey()
+                    )
+            );
+        }
         return actual != null
                 && actual.delivered()
                 && sameClaim(expected, actual)
-                && lifecycle != null
                 && lifecycle.state() == LifecycleState.ACTIVE
                 && lifecycle.revision().equals(
                         capture.expectedLifecycleRevision().next().next()
@@ -179,10 +197,6 @@ final class SqliteCaptureCompensation {
                 String liveEvidence,
                 long compensatedAtMs
         ) {
-            CompanionLifecycle fenced = requireFenced(
-                    transaction,
-                    operation
-            );
             if (!transaction.refunds().complete(
                     operation.operationId(),
                     claim.receiptKey(),
@@ -193,6 +207,14 @@ final class SqliteCaptureCompensation {
                         "capture_refund_completion_rejected"
                 );
             }
+            if (capture.failedAttempt()) {
+                requireUnchanged(transaction);
+                return;
+            }
+            CompanionLifecycle fenced = requireFenced(
+                    transaction,
+                    operation
+            );
             CompanionLifecycle restored = new CompanionLifecycle(
                     fenced.profileId(),
                     fenced.ownerId(),
@@ -230,6 +252,38 @@ final class SqliteCaptureCompensation {
                     operation,
                     capture
             );
+        }
+
+        private void requireUnchanged(
+                SqlitePersistenceTransactionContext transaction
+        ) {
+            CompanionLifecycle lifecycle = transaction.lifecycles()
+                    .findByProfile(capture.profileId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "capture_compensation_lifecycle_missing"
+                    ));
+            CompanionAlias alias = transaction.identities()
+                    .resolveAlias(capture.targetAlias())
+                    .orElse(null);
+            if (!lifecycle.revision().equals(
+                    capture.expectedLifecycleRevision()
+            )
+                    || lifecycle.activeOperationId() != null
+                    || lifecycle.quarantined()
+                    || lifecycle.state() != LifecycleState.ACTIVE
+                    || !lifecycle.location().equals(
+                    LifecycleLocation.liveEntity(
+                            capture.targetAlias().toString(),
+                            capture.targetWorldKey()
+                    )
+            )
+                    || alias == null
+                    || alias.state() != CompanionAlias.State.CURRENT
+                    || !alias.profileId().equals(capture.profileId())) {
+                throw new IllegalStateException(
+                        "capture_compensation_unchanged_lifecycle_mismatch"
+                );
+            }
         }
 
         private CompanionLifecycle requireFenced(

@@ -14,6 +14,8 @@ import javax.annotation.Nullable;
  * be retried safely. Before it exists, target absence is never interpreted as success.</p>
  */
 final class CompanionCaptureWorldExecutor {
+    private final ResolvedCaptureSourceWorldExecutor sourceSpend =
+            new ResolvedCaptureSourceWorldExecutor();
 
     @Nonnull
     LiveOperationResult execute(
@@ -23,6 +25,9 @@ final class CompanionCaptureWorldExecutor {
     ) {
         if (!validOperation(request, operation) || attempts == null) {
             return unknown("operation_invariant_mismatch", null);
+        }
+        if (request.failedAttempt()) {
+            return sourceSpend.execute(attempts);
         }
 
         InventoryProbe inventory = safeInventoryProbe(attempts);
@@ -267,7 +272,28 @@ final class CompanionCaptureWorldExecutor {
         }
     }
 
-    interface AttemptGateway {
+    interface AttemptGateway
+            extends ResolvedCaptureSourceWorldExecutor.Gateway {
+        @Override
+        default ResolvedCaptureSourceWorldExecutor.SpendProbe probe() {
+            return ResolvedCaptureSourceWorldExecutor.SpendProbe
+                    .conflict(null);
+        }
+
+        @Override
+        default ResolvedCaptureSourceWorldExecutor.ReceiptAttempt
+        installReceipt() {
+            return ResolvedCaptureSourceWorldExecutor.ReceiptAttempt
+                    .ambiguous(null);
+        }
+
+        @Override
+        default ResolvedCaptureSourceWorldExecutor.ConsumptionAttempt
+        consumeReceiptedSource() {
+            return ResolvedCaptureSourceWorldExecutor
+                    .ConsumptionAttempt.ambiguous(null);
+        }
+
         @Nonnull
         InventoryProbe probeInventory();
 

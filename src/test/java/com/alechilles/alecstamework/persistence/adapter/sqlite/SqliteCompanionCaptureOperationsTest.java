@@ -1,6 +1,10 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptFormula;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolution;
+import com.alechilles.alecstamework.companion.capture.CaptureAttemptResolutionEventCodec;
+import com.alechilles.alecstamework.companion.capture.CaptureTerminalPlan;
 import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureDefinition;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureEventCodec;
@@ -19,6 +23,9 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileProjection
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.api.CaptureChanceMode;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
@@ -144,7 +151,7 @@ class SqliteCompanionCaptureOperationsTest {
 
         assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
         assertEquals(1, liveCalls.get());
-        assertEquals(3, result.events().size());
+        assertEquals(4, result.events().size());
         CompanionCaptureOutcome outcome = CompanionCaptureEventCodec.decode(
                 result.events().getFirst().payloadVersion(),
                 result.events().getFirst().payloadJson()
@@ -291,14 +298,74 @@ class SqliteCompanionCaptureOperationsTest {
         assertEquals(delivered, refundClaim(operationId(5)));
     }
 
+    @Test
+    void resolvedFailedAttemptSpendsOnceWithoutMutatingProfile()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+        CompanionCaptureRequest request = failedRequest();
+
+        OperationWorkflowResult first = submit(
+                6,
+                request,
+                (capture, operation) -> {
+                    liveCalls.incrementAndGet();
+                    assertEquals(
+                            LifecycleRevision.INITIAL,
+                            lifecycle().revision()
+                    );
+                    assertNull(lifecycle().activeOperationId());
+                    return LiveOperationResult.confirmed(
+                            "capture_resolved_source_spent"
+                    ).completed();
+                }
+        );
+        OperationWorkflowResult replay = submit(
+                6,
+                request,
+                (capture, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return LiveOperationResult.confirmed(
+                            "must_not_run"
+                    ).completed();
+                }
+        );
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, first.status());
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, first.events().size());
+        assertEquals(
+                request.resolution(),
+                CaptureAttemptResolutionEventCodec.decode(
+                        first.events().getFirst().payloadVersion(),
+                        first.events().getFirst().payloadJson()
+                )
+        );
+        assertEquals(
+                LifecycleRevision.INITIAL,
+                lifecycle().revision()
+        );
+        assertNull(lifecycle().activeOperationId());
+        assertEquals(LifecycleState.ACTIVE, lifecycle().state());
+        assertTrue(snapshot().isEmpty());
+    }
+
     private OperationWorkflowResult submit(
             int number,
+            com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary boundary
+    ) throws Exception {
+        return submit(number, captureRequest(), boundary);
+    }
+
+    private OperationWorkflowResult submit(
+            int number,
+            CompanionCaptureRequest request,
             com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBoundary boundary
     ) throws Exception {
         SqliteCompanionCaptureOperations.Submission submission = captures.submit(
                 operationId(number),
                 new IdempotencyKey("capture-" + number),
-                captureRequest(),
+                request,
                 boundary
         );
         assertNotNull(submission.acceptance());
@@ -343,6 +410,65 @@ class SqliteCompanionCaptureOperationsTest {
                         1,
                         Sha256Hash.ofUtf8("before"),
                         snapshot.snapshotId().toString()
+                ),
+                -600
+        );
+    }
+
+    private CompanionCaptureRequest failedRequest() {
+        UUID attemptId = UUID.fromString(
+                "70000000-0000-0000-0000-000000000001"
+        );
+        CaptureAttemptResolution resolution =
+                new CaptureAttemptResolution(
+                        attemptId,
+                        "role",
+                        new CaptureAttemptFormula(
+                                "HydragonSoulStone",
+                                9,
+                                CaptureChanceMode.PROBABILITY,
+                                3,
+                                0.2D,
+                                0.1D,
+                                0.05D,
+                                0.95D,
+                                "HydragonCapturePolicy",
+                                4,
+                                2,
+                                0.1D,
+                                1.0D,
+                                0.5D,
+                                null,
+                                Sha256Hash.ofUtf8("requirements"),
+                                8
+                        ),
+                        CaptureSourceConsumption.RESOLVED_ATTEMPT,
+                        CaptureSuccessDisposition.CAPTURED_ITEM,
+                        CaptureAttemptResolution.Outcome.FAILED_ROLL,
+                        "capture-probability-failure",
+                        0.35D,
+                        false,
+                        0.5D,
+                        0.8D,
+                        -300L
+                );
+        return new CompanionCaptureRequest(
+                PROFILE,
+                LifecycleRevision.INITIAL,
+                null,
+                ALIAS,
+                "world",
+                new CaptureTerminalPlan.FailedAttempt(resolution),
+                new CaptureSourceEvidence(
+                        UUID.fromString(
+                                "40000000-0000-0000-0000-000000000001"
+                        ),
+                        "world",
+                        2,
+                        "capture-device",
+                        1,
+                        Sha256Hash.ofUtf8("before"),
+                        attemptId.toString()
                 ),
                 -600
         );

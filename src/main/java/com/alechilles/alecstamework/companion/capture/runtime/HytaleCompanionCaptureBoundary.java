@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureLiveBounda
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.runtime.HytaleAsyncWorldOperationGateway;
 import com.alechilles.alecstamework.persistence.runtime.HytaleWorldOperationDispatcher;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.concurrent.CompletionStage;
@@ -48,12 +49,32 @@ public final class HytaleCompanionCaptureBoundary
             @Nonnull CompanionCaptureRequest request,
             @Nonnull OperationEnvelope operation
     ) {
+        if (gateway instanceof HytaleAsyncWorldOperationGateway<?>) {
+            return applyAsynchronously(request, operation);
+        }
         return dispatcher.applyOrResolve(
                 "capture",
                 request == null ? null : request.targetWorldKey(),
                 request,
                 operation,
                 gateway
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletionStage<LiveOperationResult> applyAsynchronously(
+            CompanionCaptureRequest request,
+            OperationEnvelope operation
+    ) {
+        HytaleAsyncWorldOperationGateway<CompanionCaptureRequest> async =
+                (HytaleAsyncWorldOperationGateway<CompanionCaptureRequest>)
+                        gateway;
+        return dispatcher.applyOrResolveAsync(
+                "capture",
+                request == null ? null : request.targetWorldKey(),
+                request,
+                operation,
+                async
         );
     }
 }

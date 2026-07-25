@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.companion.capture.runtime
+        .TameworkCaptureSourceReceiptsComponent;
 import com.alechilles.alecstamework.companion.coop.runtime
         .TameworkCoopCaptureReceiptsComponent;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
@@ -133,6 +135,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 events,
                 identityBootstrap,
                 identityIndex,
+                components.captureSourceReceipts(),
                 components.coopCaptureReceipts(),
                 components.persistenceRetirement()
         );
@@ -176,6 +179,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             @Nonnull LoadedNpcIdentityBootstrapService identityBootstrap,
             @Nonnull LoadedNpcIdentityIndex identityIndex,
             @Nonnull ComponentType<
+                    EntityStore,
+                    TameworkCaptureSourceReceiptsComponent
+                    > captureSourceReceipts,
+            @Nonnull ComponentType<
                     ChunkStore,
                     TameworkCoopCaptureReceiptsComponent
                     > coopReceipts,
@@ -197,6 +204,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         events,
                         identityBootstrap,
                         identityIndex,
+                        captureSourceReceipts,
                         coopReceipts,
                         retirement
                 )
@@ -239,6 +247,8 @@ final class TameworkPersistenceComposition implements AutoCloseable {
             TameworkEventBus events,
             LoadedNpcIdentityBootstrapService identityBootstrap,
             LoadedNpcIdentityIndex identityIndex,
+            ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent>
+                    captureSourceReceipts,
             ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent>
                     coopReceipts,
             ComponentType<EntityStore, TameworkPersistenceRetirementComponent>
@@ -252,6 +262,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                 new HytaleRefundDeliveryBoundary(),
                 events::publishProfileChanged,
                 HytalePersistenceLiveBoundariesFactory.create(
+                        captureSourceReceipts,
                         coopReceipts,
                         retirement
                 ),
