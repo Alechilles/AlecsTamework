@@ -66,6 +66,16 @@ final class LegacySnapshotJson {
         }
     }
 
+    static long requiredLong(
+            @Nonnull JsonObject root,
+            @Nonnull String field
+    ) {
+        if (!root.has(field) || root.get(field).isJsonNull()) {
+            throw invalid(field, "integer");
+        }
+        return optionalLong(root, field, 0L);
+    }
+
     static int optionalInt(@Nonnull JsonObject root,
                            @Nonnull String field,
                            int fallback) {

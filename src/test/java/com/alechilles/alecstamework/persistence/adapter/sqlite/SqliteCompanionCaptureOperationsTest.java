@@ -311,7 +311,7 @@ class SqliteCompanionCaptureOperationsTest {
                 SnapshotId.parse("50000000-0000-0000-0000-000000000001"),
                 PROFILE,
                 CompanionCaptureRequest.SNAPSHOT_KIND,
-                1,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
                 SNAPSHOT_JSON,
                 Sha256Hash.ofUtf8(SNAPSHOT_JSON),
                 new LifecycleRevision(1),

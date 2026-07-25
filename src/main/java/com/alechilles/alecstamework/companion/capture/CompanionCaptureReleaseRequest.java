@@ -119,6 +119,26 @@ public record CompanionCaptureReleaseRequest(
         );
         requireStringMetadata(
                 metadata,
+                TameworkMetadataKeys.TARGET_UUID,
+                sourceAlias.toString(),
+                "source alias"
+        );
+        BsonValue profileValue = metadata.get(
+                TameworkMetadataKeys.COMPANION_PROFILE_ID
+        );
+        BsonValue snapshotValue = metadata.get(
+                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+        );
+        if (profileValue == null && snapshotValue == null) {
+            return;
+        }
+        if (profileValue == null || snapshotValue == null) {
+            throw new IllegalArgumentException(
+                    "Captured artifact identity receipt is incomplete"
+            );
+        }
+        requireStringMetadata(
+                metadata,
                 TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
                 snapshotId,
                 "capture snapshot"
@@ -128,12 +148,6 @@ public record CompanionCaptureReleaseRequest(
                 TameworkMetadataKeys.COMPANION_PROFILE_ID,
                 profileId.toString(),
                 "companion profile"
-        );
-        requireStringMetadata(
-                metadata,
-                TameworkMetadataKeys.TARGET_UUID,
-                sourceAlias.toString(),
-                "source alias"
         );
     }
 

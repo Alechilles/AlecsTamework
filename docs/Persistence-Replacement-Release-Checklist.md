@@ -130,7 +130,9 @@ external whole-save backup before installing the candidate.
 - [ ] Boot the exact candidate and confirm the replacement imports into
       `tamework-state.sqlite`.
 - [ ] Verify representative active, captured, dead, lost, and coop profiles.
-- [ ] Exercise one capture/release, one restoration, and one coop release.
+- [ ] Release at least two filled spawners that were captured by public
+      `v2.16.1`, then perform one new capture/release, one restoration, and one
+      coop release.
 - [ ] Stop cleanly and boot the imported save a second time.
 - [ ] Confirm the public source files still have their original hashes and no
       source file was moved, renamed, or deleted.

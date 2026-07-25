@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureAuthor;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
+import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseAuthor;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
@@ -328,14 +329,7 @@ public final class SpawnerFeatureHandler {
         }
         String roleId = roles.resolveSpawnRoleId(source);
         return roleId != null && roles.isRoleAllowed(roleId, config)
-                && source.getFromMetadataOrNull(
-                        TameworkMetadataKeys.COMPANION_PROFILE_ID,
-                        Codec.UUID_STRING
-                ) != null
-                && source.getFromMetadataOrNull(
-                        TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
-                        Codec.STRING
-                ) != null;
+                && SpawnerCapturedArtifactIdentity.isSupported(source);
     }
 
     public boolean captureFromItemInteraction(

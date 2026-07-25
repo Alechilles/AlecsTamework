@@ -13,13 +13,11 @@ import javax.annotation.Nonnull;
  * Maps complete spawner state between the capture-v1 artifact and the source-neutral projection.
  */
 final class SpawnerCaptureSnapshotMapper {
-    static final int CAPTURE_VERSION = 1;
-
     private final SnapshotCodecRegistry codecs = new SnapshotCodecRegistry(
             List.of(
                     new FullStateSnapshotCodecAdapter(
                             CompanionCaptureRequest.SNAPSHOT_KIND,
-                            CAPTURE_VERSION
+                            CompanionCaptureRequest.SNAPSHOT_VERSION
                     ),
                     new FullStateSnapshotCodecAdapter(
                             CompanionFullStateProjection.KIND,
@@ -28,14 +26,14 @@ final class SpawnerCaptureSnapshotMapper {
             )
     );
 
-    /** Freezes complete live state into the sole capture payload version. */
+    /** Freezes complete live state into the replacement capture payload version. */
     @Nonnull
     SnapshotCodecRegistry.EncodedSnapshot encodeCapture(
             @Nonnull CoopResidentStateSnapshot state
     ) {
         return codecs.encode(
                 CompanionCaptureRequest.SNAPSHOT_KIND,
-                CAPTURE_VERSION,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
                 CoopResidentStateSnapshot.class,
                 state
         );

@@ -90,6 +90,27 @@ public final class HytaleCapturedArtifactAdapter {
         );
     }
 
+    /** Copies an engine-neutral artifact with the supplied persisted metadata additions. */
+    @Nonnull
+    CapturedArtifact withMetadata(
+            @Nonnull CapturedArtifact artifact,
+            @Nonnull BsonDocument additions
+    ) {
+        Objects.requireNonNull(artifact, "artifact");
+        Objects.requireNonNull(additions, "additions");
+        BsonDocument metadata = BsonDocument.parse(
+                artifact.metadataExtendedJson()
+        );
+        metadata.putAll(additions);
+        return CapturedArtifact.create(
+                artifact.itemId(),
+                artifact.quantity(),
+                artifact.durability(),
+                artifact.maxDurability(),
+                metadata.toJson(EXTENDED_JSON)
+        );
+    }
+
     /** Recreates the exact persisted item value without consulting mutable item assets. */
     @Nonnull
     public ItemStack toItemStack(@Nonnull CapturedArtifact artifact) {

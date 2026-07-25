@@ -25,7 +25,7 @@ class TameworkSnapshotCodecsTest {
             ProfileId.parse("30000000-0000-0000-0000-000000000003");
 
     @Test
-    void createsExactlyTheSevenSupportedKeysWithoutRuntimeComposition() {
+    void createsExactlyTheEightSupportedKeysWithoutRuntimeComposition() {
         SnapshotCodecRegistry registry = TameworkSnapshotCodecs.create();
         LegacyDeathV1Payload death = new LegacyDeathV1SnapshotCodec().decode(
                 "{\"diedAtMs\":-1,\"respawnAvailableAtMs\":-2}"
@@ -33,6 +33,10 @@ class TameworkSnapshotCodecsTest {
         LegacyLostV1Payload lost = new LegacyLostV1SnapshotCodec().decode(
                 "{\"lostAtMs\":-3}"
         );
+        LegacyCaptureV1Payload legacyCapture =
+                LegacyCaptureV1Payload.decodePayloadJson(
+                        "{\"capturedAtMs\":-4,\"roleId\":\"tamework_test\"}"
+                );
         CoopResidentStateSnapshot full = fullState();
         DeathSnapshotV2Payload modernDeath = DeathSnapshotV2Payload.capture(
                 full,
@@ -45,6 +49,13 @@ class TameworkSnapshotCodecsTest {
         assertRoundTrip(registry, TameworkSnapshotCodecs.DEATH, 1, LegacyDeathV1Payload.class, death);
         assertRoundTrip(registry, TameworkSnapshotCodecs.LOST, 1, LegacyLostV1Payload.class, lost);
         assertRoundTrip(registry, TameworkSnapshotCodecs.COOP, 1, CoopResidentStateSnapshot.class, full);
+        assertRoundTrip(
+                registry,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                LegacyCaptureV1Payload.VERSION,
+                LegacyCaptureV1Payload.class,
+                legacyCapture
+        );
         assertRoundTrip(
                 registry,
                 CompanionCaptureRequest.SNAPSHOT_KIND,

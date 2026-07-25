@@ -9,10 +9,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.StablePersistenceIds;
-import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.LongSupplier;
 import org.bson.BsonDocument;
 import org.bson.BsonString;
@@ -39,40 +36,61 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    FrozenRelease freeze(SpawnerCapturedArtifactReleaseIntent intent) {
-        ItemStack sourceStack = intent.sourceArtifactStack();
-        UUID profileUuid = sourceStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.COMPANION_PROFILE_ID,
-                Codec.UUID_STRING
-        );
-        UUID sourceUuid = sourceStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.TARGET_UUID,
-                Codec.UUID_STRING
-        );
-        String snapshotText = sourceStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID,
-                Codec.STRING
-        );
-        if (profileUuid == null || sourceUuid == null
-                || snapshotText == null || snapshotText.isBlank()) {
+    PendingRelease freezeSource(
+            SpawnerCapturedArtifactReleaseIntent intent
+    ) {
+        SpawnerCapturedArtifactIdentity.Claim claim =
+                SpawnerCapturedArtifactIdentity.parse(
+                        intent.sourceArtifactStack()
+                );
+        if (claim == null) {
             throw new ContextFailure(
-                    "capture_release_source_metadata_missing"
+                    "capture_release_source_identity_invalid"
             );
         }
-        ProfileId profileId = new ProfileId(profileUuid);
-        NpcAlias sourceAlias = new NpcAlias(sourceUuid);
-        SnapshotId snapshotId = SnapshotId.parse(snapshotText);
-        CapturedArtifact source = artifacts.toArtifact(sourceStack);
-        String[] parts = {
+        return new PendingRelease(
+                intent.frozenContext(),
                 intent.intentKey(),
-                intent.actorUuid().toString(),
-                intent.worldKey(),
+                claim,
+                artifacts.toArtifact(intent.sourceArtifactStack()),
+                artifacts.toArtifact(intent.receiptArtifactStack()),
+                intent.ownerAssignment(),
+                intent.ownerAssignmentName(),
+                clock.getAsLong()
+        );
+    }
+
+    FrozenRelease freeze(
+            PendingRelease pending,
+            ResolvedIdentity resolved
+    ) {
+        SpawnerCapturedArtifactIdentity.Claim claim = pending.claim();
+        if (claim == null || resolved == null
+                || !claim.sourceAlias().equals(resolved.sourceAlias())
+                || (claim.profileId() != null
+                        && !claim.profileId().equals(resolved.profileId()))
+                || (claim.snapshotId() != null
+                        && !claim.snapshotId().equals(
+                        resolved.snapshotId()
+                ))) {
+            throw new ContextFailure(
+                    "capture_release_source_identity_mismatch"
+            );
+        }
+        ProfileId profileId = resolved.profileId();
+        NpcAlias sourceAlias = resolved.sourceAlias();
+        SnapshotId snapshotId = resolved.snapshotId();
+        CapturedArtifact source = pending.sourceArtifact();
+        String[] parts = {
+                pending.intentKey(),
+                pending.context().actorUuid().toString(),
+                pending.context().worldKey(),
                 profileId.toString(),
                 sourceAlias.toString(),
                 snapshotId.toString(),
-                intent.ownerAssignment() == null
+                pending.ownerAssignment() == null
                         ? "preserve"
-                        : intent.ownerAssignment().toString(),
+                        : pending.ownerAssignment().toString(),
                 source.artifactHash().toString()
         };
         String inventoryReceipt = StablePersistenceIds.receipt(
@@ -90,16 +108,16 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
                     "capture_release_deterministic_identity_collision"
             );
         }
-        ItemStack receiptStack = artifacts.withMetadata(
-                intent.receiptArtifactStack(),
+        CapturedArtifact receiptArtifact = artifacts.withMetadata(
+                pending.receiptArtifact(),
                 new BsonDocument(
                         TameworkMetadataKeys.CAPTURE_RELEASE_RECEIPT,
                         new BsonString(inventoryReceipt)
                 )
         );
         return new FrozenRelease(
-                intent.frozenContext(),
-                clock.getAsLong(),
+                pending.context(),
+                pending.requestedAt(),
                 StablePersistenceIds.operationId(RELEASE, parts),
                 StablePersistenceIds.idempotencyKey(RELEASE, parts),
                 profileId,
@@ -107,17 +125,53 @@ final class SpawnerCaptureReleaseEvidenceFreezer {
                 targetAlias,
                 snapshotId,
                 source,
-                artifacts.toArtifact(receiptStack),
+                receiptArtifact,
                 inventoryReceipt,
                 spawnReceipt,
-                intent.ownerAssignment(),
-                intent.ownerAssignmentName()
+                pending.ownerAssignment(),
+                pending.ownerAssignmentName()
         );
     }
 
     static final class ContextFailure extends RuntimeException {
-        private ContextFailure(String detail) {
+        ContextFailure(String detail) {
             super(detail);
+        }
+    }
+
+    record ResolvedIdentity(
+            ProfileId profileId,
+            NpcAlias sourceAlias,
+            SnapshotId snapshotId
+    ) {
+        ResolvedIdentity {
+            if (profileId == null || sourceAlias == null
+                    || snapshotId == null) {
+                throw new IllegalArgumentException(
+                        "Resolved captured-artifact identity is required"
+                );
+            }
+        }
+    }
+
+    record PendingRelease(
+            SpawnerCaptureReleaseContext context,
+            String intentKey,
+            SpawnerCapturedArtifactIdentity.Claim claim,
+            CapturedArtifact sourceArtifact,
+            CapturedArtifact receiptArtifact,
+            OwnerId ownerAssignment,
+            String ownerAssignmentName,
+            long requestedAt
+    ) {
+        PendingRelease {
+            if (context == null || intentKey == null || intentKey.isBlank()
+                    || claim == null || sourceArtifact == null
+                    || receiptArtifact == null) {
+                throw new IllegalArgumentException(
+                        "Frozen captured-artifact release source is required"
+                );
+            }
         }
     }
 

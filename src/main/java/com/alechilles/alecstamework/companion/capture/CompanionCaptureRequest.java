@@ -25,7 +25,8 @@ public record CompanionCaptureRequest(
         long requestedAtMs
 ) {
     public static final SnapshotKind SNAPSHOT_KIND = new SnapshotKind("capture");
-    public static final int SNAPSHOT_VERSION = 1;
+    /** Version 1 is the released public minimal payload; replacement full-state capture is v2. */
+    public static final int SNAPSHOT_VERSION = 2;
 
     public CompanionCaptureRequest {
         if (profileId == null || expectedLifecycleRevision == null

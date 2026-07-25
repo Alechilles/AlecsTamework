@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseReq
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
@@ -41,11 +42,15 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.bson.BsonDocument;
+import org.bson.BsonBoolean;
+import org.bson.BsonDouble;
+import org.bson.BsonInt64;
 import org.bson.BsonString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,6 +76,9 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
     );
     private static final UUID ACTOR = UUID.fromString(
             "82000000-0000-0000-0000-000000000007"
+    );
+    private static final UUID TOOL = UUID.fromString(
+            "82000000-0000-0000-0000-000000000008"
     );
     private final SpawnerCaptureSnapshotMapper snapshots =
             new SpawnerCaptureSnapshotMapper();
@@ -155,6 +163,132 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         assertNull(persistence.request);
     }
 
+    @Test
+    void releasedPublicItemResolvesByAliasAndMapsItsSplitState() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile()
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                releasedPublicIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertEquals(1, persistence.aliasReads);
+        assertEquals(0, persistence.profileReads);
+        CoopResidentStateSnapshot projected = projection(
+                persistence.request
+        );
+        assertEquals(SOURCE.value(), projected.npcUuid());
+        assertEquals("tamework_test", projected.roleId());
+        assertTrue(projected.tamed().isTamed());
+        assertEquals("Legacy name", projected.npcName().getName());
+        assertEquals(0.5D, projected.healthPercent());
+        assertEquals(-777L, projected.happiness().getLastUpdateMs());
+        assertArrayEquals(
+                new String[]{TOOL.toString()},
+                projected.commandLinks().getToolIds()
+        );
+        BsonDocument frozenSource = BsonDocument.parse(
+                persistence.request.source().sourceArtifact()
+                        .metadataExtendedJson()
+        );
+        assertFalse(frozenSource.containsKey(
+                TameworkMetadataKeys.COMPANION_PROFILE_ID
+        ));
+        assertFalse(frozenSource.containsKey(
+                TameworkMetadataKeys.CAPTURE_SNAPSHOT_ID
+        ));
+    }
+
+    @Test
+    void mixedLegacyAndCurrentIdentityMetadataFailsBeforeRead() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile()
+        );
+        BsonDocument metadata = new BsonDocument()
+                .append(
+                        TameworkMetadataKeys.TARGET_UUID,
+                        new BsonString(SOURCE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.COMPANION_PROFILE_ID,
+                        new BsonString(PROFILE.toString())
+                );
+        SpawnerCapturedArtifactReleaseIntent malformed =
+                new SpawnerCapturedArtifactReleaseIntent(
+                        "release-click-mixed",
+                        ACTOR,
+                        "world",
+                        2,
+                        stack("capture-device-filled", metadata),
+                        stack(
+                                "capture-device-empty",
+                                new BsonDocument()
+                        ),
+                        null,
+                        null,
+                        null
+                );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                malformed,
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.INVALID_CONTEXT,
+                result.status()
+        );
+        assertEquals(0, persistence.aliasReads);
+        assertEquals(0, persistence.profileReads);
+        assertNull(persistence.request);
+    }
+
+    @Test
+    void incompleteReleasedPublicProgressionGroupFailsClosed() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile()
+        );
+        BsonDocument metadata = new BsonDocument()
+                .append(
+                        TameworkMetadataKeys.TARGET_UUID,
+                        new BsonString(SOURCE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.HAPPINESS_CONFIG_ID,
+                        new BsonString("happiness")
+                );
+        SpawnerCapturedArtifactReleaseIntent malformed =
+                new SpawnerCapturedArtifactReleaseIntent(
+                        "release-click-partial-state",
+                        ACTOR,
+                        "world",
+                        2,
+                        stack("capture-device-filled", metadata),
+                        stack(
+                                "capture-device-empty",
+                                new BsonDocument()
+                        ),
+                        null,
+                        null,
+                        null
+                );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                malformed,
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.SNAPSHOT_DECODE_FAILED,
+                result.status()
+        );
+        assertEquals(1, persistence.aliasReads);
+        assertNull(persistence.request);
+    }
+
     private SpawnerCapturedArtifactReleaseAuthor author(
             FakePersistence persistence
     ) {
@@ -198,6 +332,61 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 stack("capture-device-empty", new BsonDocument()),
                 ownerAssignment,
                 ownerName,
+                null
+        );
+    }
+
+    private SpawnerCapturedArtifactReleaseIntent releasedPublicIntent() {
+        BsonDocument sourceMetadata = new BsonDocument()
+                .append(
+                        TameworkMetadataKeys.TARGET_UUID,
+                        new BsonString(SOURCE.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.OWNER_UUID,
+                        new BsonString(CANONICAL_OWNER.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                        new BsonString(STALE_OWNER.toString())
+                )
+                .append(
+                        TameworkMetadataKeys.TAMED,
+                        BsonBoolean.TRUE
+                )
+                .append(
+                        TameworkMetadataKeys.NPC_NAME,
+                        new BsonString("Legacy name")
+                )
+                .append(
+                        TameworkMetadataKeys.NPC_NAME_UPDATED_MS,
+                        new BsonInt64(-700L)
+                )
+                .append(
+                        TameworkMetadataKeys.HEALTH_PERCENT,
+                        new BsonDouble(0.5D)
+                )
+                .append(
+                        TameworkMetadataKeys.HAPPINESS_CONFIG_ID,
+                        new BsonString("happiness")
+                )
+                .append(
+                        TameworkMetadataKeys.HAPPINESS_VALUE,
+                        new BsonDouble(75.0D)
+                )
+                .append(
+                        TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS,
+                        new BsonInt64(-777L)
+                );
+        return new SpawnerCapturedArtifactReleaseIntent(
+                "release-click-public",
+                ACTOR,
+                "world",
+                2,
+                stack("capture-device-filled", sourceMetadata),
+                stack("capture-device-empty", new BsonDocument()),
+                null,
+                null,
                 null
         );
     }
@@ -248,6 +437,76 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
                 alias,
                 lifecycle,
                 List.of(),
+                List.of(snapshot),
+                null
+        );
+    }
+
+    private CompanionProfileReadModel releasedPublicProfile() {
+        String metadata = """
+                {"owner_name":"Canonical owner","custom_name":"Legacy name","tamed":true}
+                """.trim();
+        CompanionIdentity identity = new CompanionIdentity(
+                PROFILE,
+                "Captured companion",
+                "tamework_test",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                "world",
+                -1_000L,
+                -900L,
+                -800L,
+                1L
+        );
+        CompanionAlias alias = new CompanionAlias(
+                SOURCE,
+                PROFILE,
+                1L,
+                CompanionAlias.State.CURRENT,
+                null,
+                -800L,
+                null
+        );
+        String payload = """
+                {"lastKnownPosition":{"x":1.0,"y":2.0,"z":3.0},"homePosition":{"x":4.0,"y":5.0,"z":6.0},"capturedAtMs":-650,"roleId":"tamework_test","displayName":"Captured companion"}
+                """.trim();
+        CompanionSnapshot snapshot = new CompanionSnapshot(
+                SNAPSHOT,
+                PROFILE,
+                CompanionCaptureRequest.SNAPSHOT_KIND,
+                LegacyCaptureV1Payload.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                new LifecycleRevision(4L),
+                true,
+                -600L
+        );
+        CompanionLifecycle lifecycle = new CompanionLifecycle(
+                PROFILE,
+                CANONICAL_OWNER,
+                LifecycleState.CAPTURED,
+                LifecycleLocation.keyed(
+                        LifecycleLocationKind.CAPTURE_ITEM,
+                        SNAPSHOT.toString()
+                ),
+                new LifecycleRevision(5L),
+                null,
+                -700L,
+                ReconciliationGeneration.INITIAL,
+                null,
+                null
+        );
+        return new CompanionProfileReadModel(
+                identity,
+                alias,
+                lifecycle,
+                List.of(new CompanionToolLink(
+                        PROFILE,
+                        TOOL,
+                        "capture",
+                        -700L,
+                        -700L
+                )),
                 List.of(snapshot),
                 null
         );
@@ -370,6 +629,8 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
             implements SpawnerCapturedArtifactReleaseAuthor.PersistencePort {
         private final CompanionProfileReadModel profile;
         private CompanionCaptureReleaseRequest request;
+        private int profileReads;
+        private int aliasReads;
 
         private FakePersistence(CompanionProfileReadModel profile) {
             this.profile = profile;
@@ -378,6 +639,16 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         @Override
         public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
         findProfile(ProfileId profileId) {
+            profileReads++;
+            return CompletableFuture.completedFuture(
+                    PersistenceReadResult.found(profile, 1L)
+            );
+        }
+
+        @Override
+        public CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+        findProfile(NpcAlias alias) {
+            aliasReads++;
             return CompletableFuture.completedFuture(
                     PersistenceReadResult.found(profile, 1L)
             );

@@ -155,7 +155,7 @@ class CompanionCaptureDefinitionTest {
                 SnapshotId.parse(SNAPSHOT_ID),
                 profileId,
                 CompanionCaptureRequest.SNAPSHOT_KIND,
-                1,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
                 PAYLOAD,
                 Sha256Hash.ofUtf8(PAYLOAD),
                 expected.next(),

@@ -134,7 +134,7 @@ final class CaptureProcessCrashChild {
                 ),
                 PROFILE,
                 CompanionCaptureRequest.SNAPSHOT_KIND,
-                1,
+                CompanionCaptureRequest.SNAPSHOT_VERSION,
                 snapshotJson,
                 Sha256Hash.ofUtf8(snapshotJson),
                 new LifecycleRevision(1),

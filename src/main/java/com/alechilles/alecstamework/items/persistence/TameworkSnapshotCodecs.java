@@ -27,6 +27,7 @@ public final class TameworkSnapshotCodecs {
                         COOP,
                         CompanionCoopCaptureRequest.SNAPSHOT_VERSION
                 ),
+                new LegacyCaptureV1SnapshotCodec(),
                 new FullStateSnapshotCodecAdapter(
                         CompanionCaptureRequest.SNAPSHOT_KIND,
                         CompanionCaptureRequest.SNAPSHOT_VERSION

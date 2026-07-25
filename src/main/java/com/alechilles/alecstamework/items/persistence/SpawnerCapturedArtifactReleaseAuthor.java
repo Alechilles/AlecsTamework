@@ -2,12 +2,15 @@ package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CaptureReleaseSourceEvidence;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseRequest;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileReadModel;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.FrozenRelease;
+import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.PendingRelease;
+import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity.Claim;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseProfilePreparer.Prepared;
 import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactReleaseProfilePreparer.Rejected;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
@@ -111,9 +114,11 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         }
         CompletionStage<SpawnerPersistenceAuthorResult> authored;
         try {
-            FrozenRelease frozen = evidence.freeze(intent);
+            PendingRelease frozen = evidence.freezeSource(intent);
             authored = freezePlacement(
-                    intent, placementResolver, frozen
+                    intent,
+                    placementResolver,
+                    frozen
             );
         } catch (RuntimeException | LinkageError failure) {
             authored = completed(result(
@@ -135,59 +140,82 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
     private CompletionStage<SpawnerPersistenceAuthorResult> freezePlacement(
             SpawnerCapturedArtifactReleaseIntent intent,
             SpawnerReleasePlacementResolver placementResolver,
-            FrozenRelease frozen
+            PendingRelease frozen
     ) {
         final CompanionSpawnPlacement placement;
         try {
             placement = placementResolver.freeze(intent);
         } catch (RuntimeException | LinkageError failure) {
-            return placementFailed(frozen.operationId(), failure);
+            return placementFailed(null, failure);
         }
-        if (placement == null || !frozen.context().worldKey().equals(
+        if (placement == null || !intent.worldKey().equals(
                 placement.worldKey()
         )) {
-            return placementFailed(frozen.operationId(), null);
+            return placementFailed(null, null);
         }
         return resolveProfile(frozen, placement);
     }
 
     private CompletionStage<SpawnerPersistenceAuthorResult> resolveProfile(
-            FrozenRelease frozen,
+            PendingRelease frozen,
             CompanionSpawnPlacement placement
     ) {
-        return findProfile(frozen.profileId()).thenCompose(read -> {
+        return findProfile(frozen.claim()).thenCompose(read -> {
             if (read instanceof PersistenceReadResult.Failed<?>) {
                 return completed(result(
                         SpawnerPersistenceAuthorResult.Status
                                 .PROFILE_READ_FAILED,
-                        frozen.operationId(), null,
+                        null, null,
                         "capture_release_profile_read_failed", null
                 ));
             }
             if (!(read instanceof PersistenceReadResult.Found<
                     CompanionProfileReadModel> found)) {
-                return profileConflict(frozen.operationId());
+                return profileConflict(null);
             }
             return decodeAndSubmit(
-                    frozen, found.value(), placement
+                    frozen,
+                    found.value(),
+                    placement
             );
         });
     }
 
     private CompletionStage<SpawnerPersistenceAuthorResult> decodeAndSubmit(
-            FrozenRelease frozen,
+            PendingRelease frozenSource,
             CompanionProfileReadModel profile,
             CompanionSpawnPlacement placement
     ) {
         SpawnerCapturedArtifactReleaseProfilePreparer.Result prepared =
-                profilePreparer.prepare(profile, frozen);
+                profilePreparer.prepare(
+                        profile,
+                        frozenSource.claim(),
+                        frozenSource.sourceArtifact(),
+                        frozenSource.ownerAssignment(),
+                        frozenSource.ownerAssignmentName()
+                );
         if (prepared instanceof Rejected rejected) {
             return completed(result(
-                    rejected.status(), frozen.operationId(), null,
+                    rejected.status(), null, null,
                     rejected.detail(), rejected.failure()
             ));
         }
         Prepared release = (Prepared) prepared;
+        final FrozenRelease frozen;
+        try {
+            frozen = evidence.freeze(
+                    frozenSource,
+                    release.resolvedIdentity()
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(result(
+                    SpawnerPersistenceAuthorResult.Status.INVALID_CONTEXT,
+                    null,
+                    null,
+                    contextDetail(failure),
+                    failure
+            ));
+        }
         return submit(
                 frozen, profile, release.sourceSnapshot(),
                 release.projection(), placement
@@ -249,10 +277,12 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
     }
 
     private CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
-    findProfile(ProfileId profileId) {
+    findProfile(Claim claim) {
         try {
             CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
-                    stage = persistence.findProfile(profileId);
+                    stage = claim.profileId() == null
+                    ? persistence.findProfile(claim.sourceAlias())
+                    : persistence.findProfile(claim.profileId());
             return stage == null
                     ? completedReadFailure(null)
                     : stage.exceptionally(this::readFailure);
@@ -382,6 +412,9 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
         findProfile(ProfileId profileId);
 
+        CompletionStage<PersistenceReadResult<CompanionProfileReadModel>>
+        findProfile(NpcAlias alias);
+
         PublicOperationSubmission release(
                 OperationId operationId,
                 IdempotencyKey idempotencyKey,
@@ -413,6 +446,12 @@ public final class SpawnerCapturedArtifactReleaseAuthor {
         public CompletionStage<PersistenceReadResult<
                 CompanionProfileReadModel>> findProfile(ProfileId profileId) {
             return persistence.queries().findProfile(profileId);
+        }
+
+        @Override
+        public CompletionStage<PersistenceReadResult<
+                CompanionProfileReadModel>> findProfile(NpcAlias alias) {
+            return persistence.queries().findProfile(alias);
         }
 
         @Override

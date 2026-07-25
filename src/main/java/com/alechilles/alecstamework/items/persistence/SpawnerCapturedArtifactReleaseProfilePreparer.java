@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items.persistence;
 
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
+import com.alechilles.alecstamework.companion.capture.CapturedArtifact;
 import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -13,7 +14,8 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
-import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.FrozenRelease;
+import com.alechilles.alecstamework.items.persistence.SpawnerCaptureReleaseEvidenceFreezer.ResolvedIdentity;
+import com.alechilles.alecstamework.items.persistence.SpawnerCapturedArtifactIdentity.Claim;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -26,47 +28,89 @@ import javax.annotation.Nullable;
 final class SpawnerCapturedArtifactReleaseProfilePreparer {
     private final SpawnerCaptureSnapshotMapper snapshots;
     private final SpawnerFullStateOwnershipNormalizer ownership;
+    private final LegacyCapturedArtifactFullStateMapper legacy;
 
     SpawnerCapturedArtifactReleaseProfilePreparer(
             SpawnerCaptureSnapshotMapper snapshots
     ) {
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.ownership = new SpawnerFullStateOwnershipNormalizer();
+        this.legacy = new LegacyCapturedArtifactFullStateMapper();
     }
 
     Result prepare(
             CompanionProfileReadModel profile,
-            FrozenRelease frozen
+            Claim claim,
+            CapturedArtifact sourceArtifact,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
     ) {
         CompanionSnapshot sourceSnapshot = exactCaptureSnapshot(
-                profile, frozen
+                profile, claim
         );
-        if (sourceSnapshot == null || !exactCapturedProfile(
-                profile, frozen, sourceSnapshot
-        )) {
+        if (sourceSnapshot == null
+                || !exactCapturedProfile(profile, claim, sourceSnapshot)) {
             return Rejected.profileConflict();
+        }
+        final CoopResidentStateSnapshot decoded;
+        try {
+            decoded = decode(
+                    profile, claim, sourceSnapshot, sourceArtifact
+            );
+        } catch (RuntimeException failure) {
+            return Rejected.decodeFailed(
+                    "capture_snapshot_decode_failed", failure
+            );
+        }
+        if (!claim.sourceAlias().value().equals(decoded.npcUuid())) {
+            return Rejected.decodeFailed(
+                    "capture_snapshot_alias_mismatch", null
+            );
+        }
+        return prepareProjection(
+                profile,
+                sourceSnapshot,
+                decoded,
+                ownerAssignment,
+                ownerAssignmentName
+        );
+    }
+
+    private CoopResidentStateSnapshot decode(
+            CompanionProfileReadModel profile,
+            Claim claim,
+            CompanionSnapshot sourceSnapshot,
+            CapturedArtifact sourceArtifact
+    ) {
+        if (claim.releasedPublic()) {
+            return legacy.map(
+                    profile,
+                    LegacyCaptureV1Payload.decode(sourceSnapshot),
+                    sourceArtifact
+            );
+        }
+        if (sourceSnapshot.payloadVersion()
+                != CompanionCaptureRequest.SNAPSHOT_VERSION) {
+            throw new IllegalArgumentException(
+                    "Current captured artifact requires capture-v2"
+            );
         }
         SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 snapshots.decodeCapture(sourceSnapshot);
-        if (!(decoded instanceof SnapshotDecodeResult.Decoded<
-                CoopResidentStateSnapshot> found)
-                || !frozen.sourceAlias().value().equals(
-                found.value().npcUuid()
-        )) {
-            return Rejected.decodeFailed(decodeDetail(decoded), null);
+        if (decoded instanceof SnapshotDecodeResult.Decoded<
+                CoopResidentStateSnapshot> found) {
+            return found.value();
         }
-        return prepareProjection(
-                profile, frozen, sourceSnapshot, found.value()
-        );
+        throw new IllegalArgumentException(decodeDetail(decoded));
     }
 
     private Result prepareProjection(
             CompanionProfileReadModel profile,
-            FrozenRelease frozen,
             CompanionSnapshot sourceSnapshot,
-            CoopResidentStateSnapshot decoded
+            CoopResidentStateSnapshot decoded,
+            @Nullable OwnerId ownerAssignment,
+            @Nullable String ownerAssignmentName
     ) {
-        OwnerId ownerAssignment = frozen.ownerAssignment();
         OwnerId canonicalOwner = profile.lifecycle().ownerId();
         if (ownerAssignment != null && canonicalOwner != null) {
             return Rejected.profileConflict();
@@ -76,7 +120,7 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                 : ownerAssignment;
         String effectiveOwnerName = ownerAssignment == null
                 ? projectedOwnerName(profile)
-                : frozen.ownerAssignmentName();
+                : ownerAssignmentName;
         try {
             return new Prepared(
                     sourceSnapshot,
@@ -84,7 +128,12 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
                             decoded,
                             effectiveOwner,
                             effectiveOwnerName
-                    ))
+                    )),
+                    new ResolvedIdentity(
+                            profile.identity().profileId(),
+                            profile.currentAlias().alias(),
+                            sourceSnapshot.snapshotId()
+                    )
             );
         } catch (RuntimeException failure) {
             return Rejected.decodeFailed(
@@ -96,8 +145,14 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
     @Nullable
     private CompanionSnapshot exactCaptureSnapshot(
             CompanionProfileReadModel profile,
-            FrozenRelease frozen
+            Claim claim
     ) {
+        if (profile == null || claim == null
+                || profile.lifecycle().location().kind()
+                != LifecycleLocationKind.CAPTURE_ITEM) {
+            return null;
+        }
+        final String locationKey = profile.lifecycle().location().key();
         CompanionSnapshot exact = null;
         for (CompanionSnapshot snapshot : profile.currentSnapshots()) {
             if (!snapshot.kind().equals(
@@ -105,25 +160,32 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
             )) {
                 continue;
             }
-            if (!snapshot.snapshotId().equals(frozen.snapshotId())
+            if (!snapshot.snapshotId().toString().equals(locationKey)
                     || exact != null) {
                 return null;
             }
             exact = snapshot;
+        }
+        if (exact != null && claim.snapshotId() != null
+                && !claim.snapshotId().equals(exact.snapshotId())) {
+            return null;
         }
         return exact;
     }
 
     private boolean exactCapturedProfile(
             CompanionProfileReadModel profile,
-            FrozenRelease frozen,
+            Claim claim,
             CompanionSnapshot sourceSnapshot
     ) {
         CompanionAlias alias = profile.currentAlias();
         CompanionLifecycle lifecycle = profile.lifecycle();
-        return profile.identity().profileId().equals(frozen.profileId())
+        return (claim.profileId() == null
+                || profile.identity().profileId().equals(
+                claim.profileId()
+        ))
                 && alias != null
-                && alias.alias().equals(frozen.sourceAlias())
+                && alias.alias().equals(claim.sourceAlias())
                 && alias.state() == CompanionAlias.State.CURRENT
                 && lifecycle.state() == LifecycleState.CAPTURED
                 && lifecycle.location().equals(LifecycleLocation.keyed(
@@ -165,7 +227,8 @@ final class SpawnerCapturedArtifactReleaseProfilePreparer {
 
     record Prepared(
             CompanionSnapshot sourceSnapshot,
-            SnapshotCodecRegistry.EncodedSnapshot projection
+            SnapshotCodecRegistry.EncodedSnapshot projection,
+            ResolvedIdentity resolvedIdentity
     ) implements Result {
     }
 

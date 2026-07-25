@@ -264,7 +264,7 @@ class CompanionCaptureWorldExecutorTest {
                         SNAPSHOT,
                         PROFILE,
                         CompanionCaptureRequest.SNAPSHOT_KIND,
-                        1,
+                        CompanionCaptureRequest.SNAPSHOT_VERSION,
                         payload,
                         Sha256Hash.ofUtf8(payload),
                         new LifecycleRevision(1),

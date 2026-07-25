@@ -79,6 +79,10 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed captured spawners created by public Tamework `v2.16.1` doing nothing
+  after a world imported into replacement persistence. Their original item
+  state now joins the imported canonical profile and capture record through the
+  same receipt-first release operation used by newly captured companions.
 - Fixed public-world migration remaining permanently read-only when an ordinary
   linked companion was unloaded. Startup now waits until Hytale reports all
   startup worlds loaded, then resolves sealed live observations to Active and
