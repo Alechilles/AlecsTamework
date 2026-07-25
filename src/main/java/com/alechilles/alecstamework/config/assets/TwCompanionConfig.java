@@ -10,7 +10,6 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -25,25 +24,6 @@ import javax.annotation.Nullable;
  */
 public final class TwCompanionConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwCompanionConfig>>,
         TwParentFallbackAsset<TwCompanionConfig> {
-    private static final int MILLIS_PER_MINUTE = 60_000;
-    private static final double DEFAULT_RETURN_HOME_TELEPORT_DISTANCE = 96.0;
-    private static final double DEFAULT_RETURN_HOME_PATH_DISTANCE_BEFORE_TELEPORT = 24.0;
-    private static final int DEFAULT_RETURN_HOME_TELEPORT_DELAY_MS = 2500;
-    private static final double DEFAULT_RECALL_SAFE_SPAWN_DISTANCE = 20.0;
-    private static final double DEFAULT_RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
-    private static final boolean DEFAULT_DEAD_RESPAWN_ENABLED = true;
-    private static final int DEFAULT_DEAD_RESPAWN_COOLDOWN_MS = 10000;
-    private static final int DEFAULT_DEAD_RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250;
-    private static final double DEFAULT_DEAD_RESPAWN_DISTANCE_CLOSE = 5.0;
-    private static final double DEFAULT_DEAD_RESPAWN_DISTANCE_NEAR = 8.0;
-    private static final double DEFAULT_DEAD_RESPAWN_DISTANCE_MID = 12.0;
-    private static final double DEFAULT_DEAD_RESPAWN_DISTANCE_FAR = 16.0;
-    private static final double DEFAULT_PLACEMENT_MIN_RELATIVE_Y = -2.0;
-    private static final double DEFAULT_PLACEMENT_MAX_RELATIVE_Y = 4.0;
-    private static final boolean DEFAULT_CROSS_WORLD_RECALL_ENABLED = true;
-    private static final boolean DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE = false;
-    private static final String[] DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER =
-            new String[] { "Follow", "Defend", "Aggressive" };
     private static final BuilderCodec<OwnershipProtectionSettings> OWNERSHIP_PROTECTION_CODEC = BuilderCodec.builder(
             OwnershipProtectionSettings.class,
             OwnershipProtectionSettings::new
@@ -68,163 +48,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     settings -> settings.invulnerableIfOwned
             )
             .documentation("If true, owned NPCs cannot take damage from normal sources.")
-            .add()
-            .build();
-
-    private static final BuilderCodec<TravelSettings> TRAVEL_CODEC = BuilderCodec.builder(
-            TravelSettings.class,
-            TravelSettings::new
-    )
-            .<Boolean>append(
-                    new KeyedCodec<>("CrossWorldRecallEnabled", Codec.BOOLEAN),
-                    (settings, value) -> settings.crossWorldRecallEnabled = value != null && value,
-                    settings -> settings.crossWorldRecallEnabled
-            )
-            .documentation("Allows companion recall to work across world boundaries.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("OnTransferFailure", Codec.STRING),
-                    (settings, value) -> settings.onTransferFailure =
-                            TransferFailurePolicy.parse(value, settings.onTransferFailure),
-                    settings -> settings.onTransferFailure.name()
-            )
-            .documentation("Fallback behavior to use when world transfer fails.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("FollowMasterOnWorldChange", Codec.BOOLEAN),
-                    (settings, value) -> settings.followMasterOnWorldChange = value != null && value,
-                    settings -> settings.followMasterOnWorldChange
-            )
-            .documentation("If true, companion follows owner during world changes.")
-            .add()
-            .<String[]>append(
-                    new KeyedCodec<>("FollowMasterOnWorldChangeStateFilter", Codec.STRING_ARRAY),
-                    (settings, value) -> settings.followMasterOnWorldChangeStateFilter = normalizeStateFilter(value),
-                    settings -> settings.followMasterOnWorldChangeStateFilter
-            )
-            .documentation("State filter for cross-world follow behavior.")
-            .add()
-            .build();
-
-    private static final BuilderCodec<CommandSettings> COMMAND_CODEC = BuilderCodec.builder(
-            CommandSettings.class,
-            CommandSettings::new
-    )
-            .<Double>append(
-                    new KeyedCodec<>("ReturnHomeTeleportDistance", Codec.DOUBLE),
-                    (settings, value) -> settings.returnHomeTeleportDistance = value,
-                    settings -> settings.returnHomeTeleportDistance
-            )
-            .documentation("Distance threshold before return-home teleport is attempted.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("ReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
-                    (settings, value) -> settings.returnHomePathDistanceBeforeTeleport = value,
-                    settings -> settings.returnHomePathDistanceBeforeTeleport
-            )
-            .documentation("Path distance threshold before teleport fallback is used.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("ReturnHomeTeleportDelayMs", Codec.INTEGER),
-                    (settings, value) -> settings.returnHomeTeleportDelayMs = value,
-                    settings -> settings.returnHomeTeleportDelayMs
-            )
-            .documentation("Delay in milliseconds before return-home teleport occurs.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("RecallSafeSpawnDistance", Codec.DOUBLE),
-                    (settings, value) -> settings.recallSafeSpawnDistance = value,
-                    settings -> settings.recallSafeSpawnDistance
-            )
-            .documentation("Distance used when searching a safe recall spawn position.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("RecallForceRelocateDistance", Codec.DOUBLE),
-                    (settings, value) -> settings.recallForceRelocateDistance = value,
-                    settings -> settings.recallForceRelocateDistance
-            )
-            .documentation("Distance threshold that forces relocation during recall.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
-                    (settings, value) -> settings.deadRespawnEnabled = value,
-                    settings -> settings.deadRespawnEnabled
-            )
-            .documentation("If true, dead linked NPCs can be respawned by command systems.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
-                    (settings, value) -> settings.deadRespawnCooldownMs = value,
-                    settings -> settings.deadRespawnCooldownMs
-            )
-            .documentation("Cooldown in milliseconds before dead respawn becomes available.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
-                    (settings, value) -> {
-                        if (value != null) {
-                            settings.deadRespawnCooldownMs = minutesToMillis(value, settings.deadRespawnCooldownMs);
-                        }
-                    },
-                    settings -> null
-            )
-            .documentation("Legacy minute-based respawn cooldown; converted to milliseconds when provided.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("DeadRespawnFollowRetryDelayMs", Codec.INTEGER),
-                    (settings, value) -> settings.deadRespawnFollowRetryDelayMs = value,
-                    settings -> settings.deadRespawnFollowRetryDelayMs
-            )
-            .documentation("Retry delay in milliseconds for dead-respawn follow attempts.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("DeadRespawnDistanceClose", Codec.DOUBLE),
-                    (settings, value) -> settings.deadRespawnDistanceClose = value,
-                    settings -> settings.deadRespawnDistanceClose
-            )
-            .documentation("Distance threshold for the close respawn range.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("DeadRespawnDistanceNear", Codec.DOUBLE),
-                    (settings, value) -> settings.deadRespawnDistanceNear = value,
-                    settings -> settings.deadRespawnDistanceNear
-            )
-            .documentation("Distance threshold for the near respawn range.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("DeadRespawnDistanceMid", Codec.DOUBLE),
-                    (settings, value) -> settings.deadRespawnDistanceMid = value,
-                    settings -> settings.deadRespawnDistanceMid
-            )
-            .documentation("Distance threshold for the mid respawn range.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("DeadRespawnDistanceFar", Codec.DOUBLE),
-                    (settings, value) -> settings.deadRespawnDistanceFar = value,
-                    settings -> settings.deadRespawnDistanceFar
-            )
-            .documentation("Distance threshold for the far respawn range.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
-                    (settings, value) -> settings.placementMinRelativeY = value,
-                    settings -> settings.placementMinRelativeY
-            )
-            .documentation("Minimum relative Y offset allowed for placement checks.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
-                    (settings, value) -> settings.placementMaxRelativeY = value,
-                    settings -> settings.placementMaxRelativeY
-            )
-            .documentation("Maximum relative Y offset allowed for placement checks.")
-            .add()
-            .<TravelSettings>append(
-                    new KeyedCodec<>("Travel", TRAVEL_CODEC),
-                    (settings, value) -> settings.travel = value == null ? new TravelSettings() : value,
-                    settings -> settings.travel
-            )
-            .documentation("Travel/recall behavior settings for companions.")
             .add()
             .build();
 
@@ -270,13 +93,19 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             .documentation("Owner-damage protection settings. Inheritance: omitted section inherits from parent; when "
                     + "present, only explicitly defined nested fields override parent.")
             .add()
-            .<CommandSettings>append(
-                    new KeyedCodec<>("Command", COMMAND_CODEC),
-                    (asset, value) -> asset.command = value == null ? new CommandSettings() : value,
+            .<TwCompanionCommandSettings>append(
+                    new KeyedCodec<>(
+                            "Command",
+                            TwCompanionCommandSettingsCodec.CODEC
+                    ),
+                    (asset, value) -> asset.command = value == null
+                            ? new TwCompanionCommandSettings()
+                            : value,
                     asset -> asset.command
             )
             .documentation("Companion command runtime settings. Inheritance: omitted section inherits from parent; when "
-                    + "present, only explicitly defined nested fields override parent.")
+                    + "present, only explicitly defined nested fields override parent. Nested Revive settings are "
+                    + "authoritative over legacy DeadRespawn fields; explicit Costs replace the parent array.")
             .add()
             .build();
 
@@ -294,7 +123,8 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private int priority;
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private OwnershipProtectionSettings ownershipProtection = new OwnershipProtectionSettings();
-    private CommandSettings command = new CommandSettings();
+    private TwCompanionCommandSettings command =
+            new TwCompanionCommandSettings();
 
     public static AssetStore<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -543,8 +373,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         return ownershipProtection == null ? new OwnershipProtectionSettings() : ownershipProtection;
     }
 
-    public CommandSettings getCommand() {
-        return command == null ? new CommandSettings() : command;
+    public TwCompanionCommandSettings getCommand() {
+        return command == null
+                ? new TwCompanionCommandSettings()
+                : command;
     }
 
     public boolean isBlockOwnerDamage() {
@@ -598,140 +430,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (nestedExplicit == null) {
             return;
         }
-        CommandSettings parentCommand = parent.getCommand();
-        CommandSettings currentCommand = getCommand();
-        if (!nestedExplicit.contains("ReturnHomeTeleportDistance")) {
-            currentCommand.returnHomeTeleportDistance = parentCommand.returnHomeTeleportDistance;
-        }
-        if (!nestedExplicit.contains("ReturnHomePathDistanceBeforeTeleport")) {
-            currentCommand.returnHomePathDistanceBeforeTeleport = parentCommand.returnHomePathDistanceBeforeTeleport;
-        }
-        if (!nestedExplicit.contains("ReturnHomeTeleportDelayMs")) {
-            currentCommand.returnHomeTeleportDelayMs = parentCommand.returnHomeTeleportDelayMs;
-        }
-        if (!nestedExplicit.contains("RecallSafeSpawnDistance")) {
-            currentCommand.recallSafeSpawnDistance = parentCommand.recallSafeSpawnDistance;
-        }
-        if (!nestedExplicit.contains("RecallForceRelocateDistance")) {
-            currentCommand.recallForceRelocateDistance = parentCommand.recallForceRelocateDistance;
-        }
-        if (!nestedExplicit.contains("DeadRespawnEnabled")) {
-            currentCommand.deadRespawnEnabled = parentCommand.deadRespawnEnabled;
-        }
-        if (!hasDeadRespawnCooldownOverride(nestedExplicit)) {
-            currentCommand.deadRespawnCooldownMs = parentCommand.deadRespawnCooldownMs;
-        }
-        if (!nestedExplicit.contains("DeadRespawnFollowRetryDelayMs")) {
-            currentCommand.deadRespawnFollowRetryDelayMs = parentCommand.deadRespawnFollowRetryDelayMs;
-        }
-        if (!nestedExplicit.contains("DeadRespawnDistanceClose")) {
-            currentCommand.deadRespawnDistanceClose = parentCommand.deadRespawnDistanceClose;
-        }
-        if (!nestedExplicit.contains("DeadRespawnDistanceNear")) {
-            currentCommand.deadRespawnDistanceNear = parentCommand.deadRespawnDistanceNear;
-        }
-        if (!nestedExplicit.contains("DeadRespawnDistanceMid")) {
-            currentCommand.deadRespawnDistanceMid = parentCommand.deadRespawnDistanceMid;
-        }
-        if (!nestedExplicit.contains("DeadRespawnDistanceFar")) {
-            currentCommand.deadRespawnDistanceFar = parentCommand.deadRespawnDistanceFar;
-        }
-        if (!nestedExplicit.contains("PlacementMinRelativeY")) {
-            currentCommand.placementMinRelativeY = parentCommand.placementMinRelativeY;
-        }
-        if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
-            currentCommand.placementMaxRelativeY = parentCommand.placementMaxRelativeY;
-        }
-        if (!nestedExplicit.contains("Travel")) {
-            currentCommand.travel = parentCommand.travel.copy();
-        } else if (currentCommand.travel != null && parentCommand.travel != null) {
-            if (!nestedExplicit.contains("Travel.CrossWorldRecallEnabled")) {
-                currentCommand.travel.crossWorldRecallEnabled = parentCommand.travel.crossWorldRecallEnabled;
-            }
-            if (!nestedExplicit.contains("Travel.OnTransferFailure")) {
-                currentCommand.travel.onTransferFailure = parentCommand.travel.onTransferFailure;
-            }
-        } else if (currentCommand.travel == null) {
-            currentCommand.travel = parentCommand.travel == null ? null : parentCommand.travel.copy();
-        }
-    }
-
-    private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
-        return nestedExplicit.contains("DeadRespawnCooldownMs")
-                || nestedExplicit.contains("DeadRespawnCooldownMins");
-    }
-
-    private static int minutesToMillis(double minutes, int fallbackMs) {
-        if (!Double.isFinite(minutes) || minutes < 0) {
-            return fallbackMs;
-        }
-        double millis = minutes * MILLIS_PER_MINUTE;
-        if (millis >= Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        return (int) Math.round(millis);
-    }
-
-    private static String[] normalizeStateFilter(@Nullable String[] rawStates) {
-        if (rawStates == null || rawStates.length == 0) {
-            return ArrayUtil.EMPTY_STRING_ARRAY;
-        }
-        ArrayList<String> normalized = new ArrayList<>(rawStates.length);
-        for (String value : rawStates) {
-            String normalizedValue = normalizeStateKey(value);
-            if (normalizedValue != null) {
-                normalized.add(normalizedValue);
-            }
-        }
-        return normalized.isEmpty() ? ArrayUtil.EMPTY_STRING_ARRAY : normalized.toArray(String[]::new);
-    }
-
-    @Nullable
-    private static String normalizeStateKey(@Nullable String state) {
-        if (state == null || state.isBlank()) {
-            return null;
-        }
-        String normalized = state.trim();
-        if (normalized.isBlank()) {
-            return null;
-        }
-        return normalized.toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean isStateAllowedByFilters(@Nullable String state, @Nullable String[] filters) {
-        if (filters == null || filters.length == 0) {
-            return true;
-        }
-        String normalizedState = normalizeStateKey(state);
-        if (normalizedState == null) {
-            return false;
-        }
-        for (String filter : filters) {
-            if (matchesStateFilter(normalizedState, filter)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean matchesStateFilter(@Nonnull String normalizedState, @Nullable String filter) {
-        String normalizedFilter = normalizeStateKey(filter);
-        if (normalizedFilter == null) {
-            return false;
-        }
-        if (normalizedState.equals(normalizedFilter) || normalizedState.startsWith(normalizedFilter)) {
-            return true;
-        }
-        String[] segments = normalizedState.split("[^a-z0-9]+");
-        for (String segment : segments) {
-            if (segment == null || segment.isBlank()) {
-                continue;
-            }
-            if (segment.equals(normalizedFilter) || segment.startsWith(normalizedFilter)) {
-                return true;
-            }
-        }
-        return false;
+        TwCompanionCommandInheritance.inheritMissing(
+                parent.getCommand(),
+                getCommand(),
+                nestedExplicit
+        );
     }
 
     public enum TransferFailurePolicy {
@@ -778,147 +481,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
     }
 
-    public static final class TravelSettings {
-        private boolean crossWorldRecallEnabled = DEFAULT_CROSS_WORLD_RECALL_ENABLED;
-        private TransferFailurePolicy onTransferFailure = TransferFailurePolicy.QueueForRecall;
-        private boolean followMasterOnWorldChange = DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE;
-        private String[] followMasterOnWorldChangeStateFilter =
-                normalizeStateFilter(DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER);
-
-        public boolean isCrossWorldRecallEnabled() {
-            return crossWorldRecallEnabled;
-        }
-
-        @Nonnull
-        public TransferFailurePolicy getOnTransferFailure() {
-            return onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
-        }
-
-        public boolean isFollowMasterOnWorldChange() {
-            return followMasterOnWorldChange;
-        }
-
-        public String[] getFollowMasterOnWorldChangeStateFilter() {
-            return followMasterOnWorldChangeStateFilter != null
-                    ? followMasterOnWorldChangeStateFilter.clone()
-                    : ArrayUtil.EMPTY_STRING_ARRAY;
-        }
-
-        public boolean isStateAllowedForWorldChange(@Nullable String state) {
-            if (!followMasterOnWorldChange) {
-                return false;
-            }
-            return isStateAllowedByFilters(state, followMasterOnWorldChangeStateFilter);
-        }
-
-        private TravelSettings copy() {
-            TravelSettings copy = new TravelSettings();
-            copy.crossWorldRecallEnabled = crossWorldRecallEnabled;
-            copy.onTransferFailure = getOnTransferFailure();
-            copy.followMasterOnWorldChange = followMasterOnWorldChange;
-            copy.followMasterOnWorldChangeStateFilter = getFollowMasterOnWorldChangeStateFilter();
-            return copy;
-        }
-    }
-
-    public static final class CommandSettings {
-        private double returnHomeTeleportDistance = DEFAULT_RETURN_HOME_TELEPORT_DISTANCE;
-        private double returnHomePathDistanceBeforeTeleport = DEFAULT_RETURN_HOME_PATH_DISTANCE_BEFORE_TELEPORT;
-        private int returnHomeTeleportDelayMs = DEFAULT_RETURN_HOME_TELEPORT_DELAY_MS;
-        private double recallSafeSpawnDistance = DEFAULT_RECALL_SAFE_SPAWN_DISTANCE;
-        private double recallForceRelocateDistance = DEFAULT_RECALL_FORCE_RELOCATE_DISTANCE;
-        private boolean deadRespawnEnabled = DEFAULT_DEAD_RESPAWN_ENABLED;
-        private int deadRespawnCooldownMs = DEFAULT_DEAD_RESPAWN_COOLDOWN_MS;
-        private int deadRespawnFollowRetryDelayMs = DEFAULT_DEAD_RESPAWN_FOLLOW_RETRY_DELAY_MS;
-        private double deadRespawnDistanceClose = DEFAULT_DEAD_RESPAWN_DISTANCE_CLOSE;
-        private double deadRespawnDistanceNear = DEFAULT_DEAD_RESPAWN_DISTANCE_NEAR;
-        private double deadRespawnDistanceMid = DEFAULT_DEAD_RESPAWN_DISTANCE_MID;
-        private double deadRespawnDistanceFar = DEFAULT_DEAD_RESPAWN_DISTANCE_FAR;
-        private double placementMinRelativeY = DEFAULT_PLACEMENT_MIN_RELATIVE_Y;
-        private double placementMaxRelativeY = DEFAULT_PLACEMENT_MAX_RELATIVE_Y;
-        private TravelSettings travel = new TravelSettings();
-
-        public double getReturnHomeTeleportDistance() {
-            return returnHomeTeleportDistance;
-        }
-
-        public double getReturnHomePathDistanceBeforeTeleport() {
-            return returnHomePathDistanceBeforeTeleport;
-        }
-
-        public int getReturnHomeTeleportDelayMs() {
-            return returnHomeTeleportDelayMs;
-        }
-
-        public double getRecallSafeSpawnDistance() {
-            return recallSafeSpawnDistance;
-        }
-
-        public double getRecallForceRelocateDistance() {
-            return recallForceRelocateDistance;
-        }
-
-        public boolean isDeadRespawnEnabled() {
-            return deadRespawnEnabled;
-        }
-
-        public int getDeadRespawnCooldownMs() {
-            return deadRespawnCooldownMs;
-        }
-
-        public int getDeadRespawnFollowRetryDelayMs() {
-            return deadRespawnFollowRetryDelayMs;
-        }
-
-        public double getDeadRespawnDistanceClose() {
-            return deadRespawnDistanceClose;
-        }
-
-        public double getDeadRespawnDistanceNear() {
-            return deadRespawnDistanceNear;
-        }
-
-        public double getDeadRespawnDistanceMid() {
-            return deadRespawnDistanceMid;
-        }
-
-        public double getDeadRespawnDistanceFar() {
-            return deadRespawnDistanceFar;
-        }
-
-        public double getPlacementMinRelativeY() {
-            return placementMinRelativeY;
-        }
-
-        public double getPlacementMaxRelativeY() {
-            return placementMaxRelativeY;
-        }
-
-        public TravelSettings getTravel() {
-            return travel != null ? travel : new TravelSettings();
-        }
-
-        private CommandSettings copy() {
-            CommandSettings copy = new CommandSettings();
-            copy.returnHomeTeleportDistance = returnHomeTeleportDistance;
-            copy.returnHomePathDistanceBeforeTeleport = returnHomePathDistanceBeforeTeleport;
-            copy.returnHomeTeleportDelayMs = returnHomeTeleportDelayMs;
-            copy.recallSafeSpawnDistance = recallSafeSpawnDistance;
-            copy.recallForceRelocateDistance = recallForceRelocateDistance;
-            copy.deadRespawnEnabled = deadRespawnEnabled;
-            copy.deadRespawnCooldownMs = deadRespawnCooldownMs;
-            copy.deadRespawnFollowRetryDelayMs = deadRespawnFollowRetryDelayMs;
-            copy.deadRespawnDistanceClose = deadRespawnDistanceClose;
-            copy.deadRespawnDistanceNear = deadRespawnDistanceNear;
-            copy.deadRespawnDistanceMid = deadRespawnDistanceMid;
-            copy.deadRespawnDistanceFar = deadRespawnDistanceFar;
-            copy.placementMinRelativeY = placementMinRelativeY;
-            copy.placementMaxRelativeY = placementMaxRelativeY;
-            copy.travel = getTravel().copy();
-            return copy;
-        }
-    }
-
     /**
      * Fully-resolved companion settings for a specific role.
      *
@@ -943,6 +505,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final double deadRespawnDistanceFar;
         private final double placementMinRelativeY;
         private final double placementMaxRelativeY;
+        private final TwCompanionReviveSettings revive;
         private final boolean crossWorldRecallEnabled;
         private final TransferFailurePolicy onTransferFailure;
         private final boolean followMasterOnWorldChange;
@@ -965,6 +528,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   double deadRespawnDistanceFar,
                                   double placementMinRelativeY,
                                   double placementMaxRelativeY,
+                                  TwCompanionReviveSettings revive,
                                   boolean crossWorldRecallEnabled,
                                   TransferFailurePolicy onTransferFailure,
                                   boolean followMasterOnWorldChange,
@@ -986,20 +550,33 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             this.deadRespawnDistanceFar = deadRespawnDistanceFar;
             this.placementMinRelativeY = placementMinRelativeY;
             this.placementMaxRelativeY = placementMaxRelativeY;
+            this.revive = revive != null
+                    ? revive.copy()
+                    : new TwCompanionReviveSettings();
             this.crossWorldRecallEnabled = crossWorldRecallEnabled;
             this.onTransferFailure = onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
             this.followMasterOnWorldChange = followMasterOnWorldChange;
             this.followMasterOnWorldChangeStateFilter =
                     followMasterOnWorldChangeStateFilter != null
-                            ? normalizeStateFilter(followMasterOnWorldChangeStateFilter)
+                            ? TwCompanionCommandSettings.TravelSettings
+                                    .normalizeStateFilter(
+                                            followMasterOnWorldChangeStateFilter
+                                    )
                             : ArrayUtil.EMPTY_STRING_ARRAY;
         }
 
         public static EffectiveSettings from(@Nullable TwCompanionConfig scoped, @Nullable TwGlobalConfig global) {
             if (scoped != null && scoped.isEnabled()) {
                 OwnershipProtectionSettings ownership = scoped.getOwnershipProtection();
-                CommandSettings command = scoped.getCommand();
-                TravelSettings travel = command.getTravel();
+                TwCompanionCommandSettings command = scoped.getCommand();
+                TwCompanionCommandSettings.TravelSettings travel =
+                        command.getTravel();
+                TwCompanionReviveSettings revive =
+                        command.getRevive().copy();
+                if (global != null
+                        && !global.isCommandDeadRespawnEnabled()) {
+                    revive.setEnabled(false);
+                }
                 boolean blockOwnerDamage = global != null
                         ? global.isBlockOwnerDamage()
                         : ownership.isBlockOwnerDamage();
@@ -1029,6 +606,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         command.getDeadRespawnDistanceFar(),
                         command.getPlacementMinRelativeY(),
                         command.getPlacementMaxRelativeY(),
+                        revive,
                         travel.isCrossWorldRecallEnabled(),
                         travel.getOnTransferFailure(),
                         travel.isFollowMasterOnWorldChange(),
@@ -1039,34 +617,67 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
 
         public static EffectiveSettings fromGlobal(@Nullable TwGlobalConfig global) {
+            TwCompanionCommandSettings defaults =
+                    new TwCompanionCommandSettings();
+            TwCompanionCommandSettings.TravelSettings travel =
+                    defaults.getTravel();
+            TwCompanionReviveSettings revive =
+                    defaults.getRevive().copy();
+            if (global != null) {
+                revive.setEnabled(global.isCommandDeadRespawnEnabled());
+                revive.setGameplayCooldownMs(
+                        global.getCommandDeadRespawnCooldownMs()
+                );
+            }
             return new EffectiveSettings(
                     global != null && global.isBlockOwnerDamage(),
                     global != null && global.isBlockAllPlayerDamageIfOwned(),
                     global != null && global.isInvulnerableIfOwned(),
-                    global != null ? global.getCommandReturnHomeTeleportDistance() : DEFAULT_RETURN_HOME_TELEPORT_DISTANCE,
+                    global != null
+                            ? global.getCommandReturnHomeTeleportDistance()
+                            : defaults.getReturnHomeTeleportDistance(),
                     global != null
                             ? global.getCommandReturnHomePathDistanceBeforeTeleport()
-                            : DEFAULT_RETURN_HOME_PATH_DISTANCE_BEFORE_TELEPORT,
-                    global != null ? global.getCommandReturnHomeTeleportDelayMs() : DEFAULT_RETURN_HOME_TELEPORT_DELAY_MS,
-                    global != null ? global.getCommandRecallSafeSpawnDistance() : DEFAULT_RECALL_SAFE_SPAWN_DISTANCE,
+                            : defaults.getReturnHomePathDistanceBeforeTeleport(),
+                    global != null
+                            ? global.getCommandReturnHomeTeleportDelayMs()
+                            : defaults.getReturnHomeTeleportDelayMs(),
+                    global != null
+                            ? global.getCommandRecallSafeSpawnDistance()
+                            : defaults.getRecallSafeSpawnDistance(),
                     global != null
                             ? global.getCommandRecallForceRelocateDistance()
-                            : DEFAULT_RECALL_FORCE_RELOCATE_DISTANCE,
+                            : defaults.getRecallForceRelocateDistance(),
                     global == null || global.isCommandDeadRespawnEnabled(),
-                    global != null ? global.getCommandDeadRespawnCooldownMs() : DEFAULT_DEAD_RESPAWN_COOLDOWN_MS,
+                    global != null
+                            ? global.getCommandDeadRespawnCooldownMs()
+                            : defaults.getDeadRespawnCooldownMs(),
                     global != null
                             ? global.getCommandDeadRespawnFollowRetryDelayMs()
-                            : DEFAULT_DEAD_RESPAWN_FOLLOW_RETRY_DELAY_MS,
-                    global != null ? global.getCommandDeadRespawnDistanceClose() : DEFAULT_DEAD_RESPAWN_DISTANCE_CLOSE,
-                    global != null ? global.getCommandDeadRespawnDistanceNear() : DEFAULT_DEAD_RESPAWN_DISTANCE_NEAR,
-                    global != null ? global.getCommandDeadRespawnDistanceMid() : DEFAULT_DEAD_RESPAWN_DISTANCE_MID,
-                    global != null ? global.getCommandDeadRespawnDistanceFar() : DEFAULT_DEAD_RESPAWN_DISTANCE_FAR,
-                    global != null ? global.getCommandPlacementMinRelativeY() : DEFAULT_PLACEMENT_MIN_RELATIVE_Y,
-                    global != null ? global.getCommandPlacementMaxRelativeY() : DEFAULT_PLACEMENT_MAX_RELATIVE_Y,
-                    DEFAULT_CROSS_WORLD_RECALL_ENABLED,
-                    TransferFailurePolicy.QueueForRecall,
-                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE,
-                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER
+                            : defaults.getDeadRespawnFollowRetryDelayMs(),
+                    global != null
+                            ? global.getCommandDeadRespawnDistanceClose()
+                            : defaults.getDeadRespawnDistanceClose(),
+                    global != null
+                            ? global.getCommandDeadRespawnDistanceNear()
+                            : defaults.getDeadRespawnDistanceNear(),
+                    global != null
+                            ? global.getCommandDeadRespawnDistanceMid()
+                            : defaults.getDeadRespawnDistanceMid(),
+                    global != null
+                            ? global.getCommandDeadRespawnDistanceFar()
+                            : defaults.getDeadRespawnDistanceFar(),
+                    global != null
+                            ? global.getCommandPlacementMinRelativeY()
+                            : defaults.getPlacementMinRelativeY(),
+                    global != null
+                            ? global.getCommandPlacementMaxRelativeY()
+                            : defaults.getPlacementMaxRelativeY(),
+                    revive,
+                    travel.isCrossWorldRecallEnabled(),
+                    travel.getOnTransferFailure(),
+                    travel.isFollowMasterOnWorldChange(),
+                    travel.getFollowMasterOnWorldChangeStateFilter()
             );
         }
 
@@ -1138,6 +749,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return placementMaxRelativeY;
         }
 
+        @Nonnull
+        public TwCompanionReviveSettings getRevive() {
+            return revive.copy();
+        }
+
         public boolean isCrossWorldRecallEnabled() {
             return crossWorldRecallEnabled;
         }
@@ -1159,7 +775,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             if (!followMasterOnWorldChange) {
                 return false;
             }
-            return isStateAllowedByFilters(state, followMasterOnWorldChangeStateFilter);
+            return TwCompanionCommandSettings.TravelSettings
+                    .isStateAllowedByFilters(
+                            state,
+                            followMasterOnWorldChangeStateFilter
+                    );
         }
     }
 }
