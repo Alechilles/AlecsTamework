@@ -257,7 +257,8 @@ final class SqlitePublicRecoveryRegistry {
                                 claim.operation().idempotencyKey(),
                                 payload(claim, PaidRevivalRequest.class),
                                 boundaries.paidRevivals().revivals(),
-                                boundaries.paidRevivals().releases()
+                                boundaries.paidRevivals().releases(),
+                                boundaries.paidRevivals().cleanups()
                         ).completion()
                 ),
                 Map.entry(

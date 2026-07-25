@@ -321,7 +321,9 @@ class SqlitePaidRevivalEvidenceTest {
                 request,
                 boundary,
                 (payload, operation) ->
-                        LiveOperationResult.confirmed("release").completed()
+                        LiveOperationResult.confirmed("release").completed(),
+                com.alechilles.alecstamework.persistence.operation
+                        .DurableOperationCleanupBoundary.notRequired()
         ).completion().toCompletableFuture().get(10, TimeUnit.SECONDS);
     }
 

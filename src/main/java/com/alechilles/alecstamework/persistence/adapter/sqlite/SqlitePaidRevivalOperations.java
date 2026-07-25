@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalReleaseBoundary;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalRequest;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
+import com.alechilles.alecstamework.persistence.operation
+        .DurableOperationCleanupBoundary;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -68,11 +70,13 @@ public final class SqlitePaidRevivalOperations {
             @Nonnull IdempotencyKey idempotencyKey,
             @Nonnull PaidRevivalRequest request,
             @Nonnull PaidRevivalLiveBoundary liveBoundary,
-            @Nonnull PaidRevivalReleaseBoundary releaseBoundary
+            @Nonnull PaidRevivalReleaseBoundary releaseBoundary,
+            @Nonnull DurableOperationCleanupBoundary<
+                    PaidRevivalRequest> cleanupBoundary
     ) {
         if (operationId == null || idempotencyKey == null
                 || request == null || liveBoundary == null
-                || releaseBoundary == null) {
+                || releaseBoundary == null || cleanupBoundary == null) {
             throw new IllegalArgumentException(
                     "Complete paid revival operation is required"
             );
@@ -101,6 +105,7 @@ public final class SqlitePaidRevivalOperations {
                                 new SqlitePaidRevivalPreparation(request)
                         ),
                         live,
+                        cleanupBoundary,
                         (transaction, operation, payload, committedAtMs) ->
                                 groups.decorate((current, envelope) ->
                                         commit.execute(
@@ -120,7 +125,8 @@ public final class SqlitePaidRevivalOperations {
                                 result,
                                 request,
                                 live.latest(),
-                                releaseBoundary
+                                releaseBoundary,
+                                cleanupBoundary
                         ));
         return new Submission(submitted.acceptance(), completion);
     }
@@ -129,7 +135,8 @@ public final class SqlitePaidRevivalOperations {
             OperationWorkflowResult result,
             PaidRevivalRequest request,
             PaidRevivalLiveResult disposition,
-            PaidRevivalReleaseBoundary releases
+            PaidRevivalReleaseBoundary releases,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
         OperationEnvelope operation = result.operation();
         if (operation != null
@@ -138,7 +145,7 @@ public final class SqlitePaidRevivalOperations {
                 || operation.phase() == OperationPhase.COMPENSATING
                 || operation.phase() == OperationPhase.COMPENSATED)) {
             return compensation.resume(
-                    operation, request, disposition, releases
+                    operation, request, disposition, releases, cleanup
             );
         }
         if (result.status()

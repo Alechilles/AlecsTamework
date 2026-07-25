@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
+import com.alechilles.alecstamework.persistence.operation
+        .DurableOperationCleanupBoundary;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
@@ -150,7 +152,8 @@ class PaidRevivalProcessCrashTest {
                         return LiveOperationResult.confirmed(
                                 "release-receipt"
                         ).completed();
-                    }
+                    },
+                    DurableOperationCleanupBoundary.notRequired()
             ).completion().toCompletableFuture().get(
                     20, TimeUnit.SECONDS
             );

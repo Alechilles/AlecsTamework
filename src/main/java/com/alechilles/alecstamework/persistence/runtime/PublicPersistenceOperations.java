@@ -230,7 +230,8 @@ public final class PublicPersistenceOperations {
                 idempotencyKey,
                 revival,
                 boundaries.paidRevivals().revivals(),
-                boundaries.paidRevivals().releases()
+                boundaries.paidRevivals().releases(),
+                boundaries.paidRevivals().cleanups()
         );
         return submission(submitted.acceptance(), submitted.completion());
     }

@@ -13,7 +13,11 @@ import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
 import com.alechilles.alecstamework.persistence.compensation.RefundDeliveryBoundary;
 import com.alechilles.alecstamework.persistence.compensation.TimedCompensatedOperationWork;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
+import com.alechilles.alecstamework.persistence.operation
+        .DurableOperationCleanupBoundary;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -49,18 +53,22 @@ final class SqlitePaidRevivalCompensation {
             OperationEnvelope operation,
             PaidRevivalRequest request,
             PaidRevivalLiveResult disposition,
-            PaidRevivalReleaseBoundary releases
+            PaidRevivalReleaseBoundary releases,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
-        if (operation == null || request == null || releases == null) {
+        if (operation == null || request == null || releases == null
+                || cleanup == null) {
             throw new IllegalArgumentException(
                     "Paid revival compensation request is required"
             );
         }
         return switch (operation.phase()) {
             case COMPENSATING, COMPENSATED ->
-                    resumeDurableMode(operation, request, releases);
+                    resumeDurableMode(
+                            operation, request, releases, cleanup
+                    );
             default -> resumeDisposition(
-                    operation, request, disposition, releases
+                    operation, request, disposition, releases, cleanup
             );
         };
     }
@@ -68,15 +76,20 @@ final class SqlitePaidRevivalCompensation {
     private CompletionStage<OperationWorkflowResult> resumeDurableMode(
             OperationEnvelope operation,
             PaidRevivalRequest request,
-            PaidRevivalReleaseBoundary releases
+            PaidRevivalReleaseBoundary releases,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
         return claims.find(operation.operationId()).thenCompose(result -> {
             if (result instanceof PersistenceReadResult.Found<RefundClaim>
                     found) {
-                return refund(operation, request, found.value());
+                return refund(
+                        operation, request, found.value(), cleanup
+                );
             }
             if (result instanceof PersistenceReadResult.Absent<RefundClaim>) {
-                return noCharge(operation, request, releases);
+                return noCharge(
+                        operation, request, releases, cleanup
+                );
             }
             PersistenceReadResult.Failed<RefundClaim> failed =
                     (PersistenceReadResult.Failed<RefundClaim>) result;
@@ -95,7 +108,8 @@ final class SqlitePaidRevivalCompensation {
             OperationEnvelope operation,
             PaidRevivalRequest request,
             PaidRevivalLiveResult disposition,
-            PaidRevivalReleaseBoundary releases
+            PaidRevivalReleaseBoundary releases,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
         if (disposition == null) {
             return completedFailure(
@@ -109,7 +123,7 @@ final class SqlitePaidRevivalCompensation {
         }
         return switch (disposition.status()) {
             case NO_CHARGE -> noCharge(
-                    operation, request, releases
+                    operation, request, releases, cleanup
             );
             case REFUND_REQUIRED -> {
                 try {
@@ -118,7 +132,8 @@ final class SqlitePaidRevivalCompensation {
                             request,
                             SqlitePaidRevivalRefunds.claim(
                                     operation.operationId(), request
-                            )
+                            ),
+                            cleanup
                     );
                 } catch (RuntimeException invalid) {
                     yield completedFailure(
@@ -145,7 +160,8 @@ final class SqlitePaidRevivalCompensation {
     private CompletionStage<OperationWorkflowResult> noCharge(
             OperationEnvelope operation,
             PaidRevivalRequest request,
-            PaidRevivalReleaseBoundary releases
+            PaidRevivalReleaseBoundary releases,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
         return coordinator.resume(
                 operation,
@@ -154,13 +170,15 @@ final class SqlitePaidRevivalCompensation {
                 releases,
                 new NoChargeWork(request),
                 "paid_revival_no_charge"
-        );
+        ).thenCompose(result ->
+                cleanupCompensated(result, request, cleanup));
     }
 
     private CompletionStage<OperationWorkflowResult> refund(
             OperationEnvelope operation,
             PaidRevivalRequest request,
-            RefundClaim claim
+            RefundClaim claim,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
     ) {
         RefundClaim expected = SqlitePaidRevivalRefunds.claim(
                 operation.operationId(), request
@@ -182,6 +200,71 @@ final class SqlitePaidRevivalCompensation {
                 refunds,
                 new RefundWork(request),
                 "paid_revival_refund"
+        ).thenCompose(result ->
+                cleanupCompensated(result, request, cleanup));
+    }
+
+    private CompletionStage<OperationWorkflowResult> cleanupCompensated(
+            OperationWorkflowResult result,
+            PaidRevivalRequest request,
+            DurableOperationCleanupBoundary<PaidRevivalRequest> cleanup
+    ) {
+        OperationEnvelope operation = result.operation();
+        if (result.status() != OperationWorkflowResult.Status.COMPENSATED
+                || operation == null
+                || operation.phase() != OperationPhase.COMPENSATED) {
+            return CompletableFuture.completedFuture(result);
+        }
+        CompletionStage<LiveOperationResult> resolution;
+        try {
+            resolution = cleanup.cleanupAfterDurable(
+                    request, operation
+            );
+            if (resolution == null) {
+                throw new IllegalStateException(
+                        "paid_revival_compensated_cleanup_missing"
+                );
+            }
+        } catch (Throwable failure) {
+            resolution = LiveOperationResult.retryable(
+                    "paid_revival_compensated_cleanup_failed", failure
+            ).completed();
+        }
+        return resolution.handle((cleanupResult, failure) ->
+                cleanupResult(result, cleanupResult, failure));
+    }
+
+    private OperationWorkflowResult cleanupResult(
+            OperationWorkflowResult compensated,
+            LiveOperationResult cleanup,
+            Throwable failure
+    ) {
+        if (failure == null && cleanup != null
+                && cleanup.status()
+                == LiveOperationResult.Status.CONFIRMED) {
+            return compensated;
+        }
+        LiveOperationResult resolved = failure == null && cleanup != null
+                ? cleanup
+                : LiveOperationResult.retryable(
+                        "paid_revival_compensated_cleanup_failed",
+                        failure
+                );
+        OperationWorkflowResult.Status status =
+                resolved.status()
+                == LiveOperationResult.Status.RETRYABLE
+                        ? OperationWorkflowResult.Status
+                        .COMPENSATION_RETRYABLE
+                        : OperationWorkflowResult.Status
+                        .COMPENSATION_UNKNOWN;
+        Throwable cause = resolved.cause() == null
+                ? new IllegalStateException(resolved.code())
+                : resolved.cause();
+        return new OperationWorkflowResult(
+                status,
+                compensated.operation(),
+                compensated.events(),
+                cause
         );
     }
 

@@ -91,7 +91,9 @@ final class PaidRevivalProcessCrashChild {
                     return LiveOperationResult.confirmed(
                             "release-receipt"
                     ).completed();
-                }
+                },
+                com.alechilles.alecstamework.persistence.operation
+                        .DurableOperationCleanupBoundary.notRequired()
         ).completion().toCompletableFuture().get(
                 20, TimeUnit.SECONDS
         );

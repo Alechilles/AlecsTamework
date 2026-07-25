@@ -12,6 +12,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalDefinition;
 import com.alechilles.alecstamework.companion.revival.PaidRevivalLiveResult;
 import com.alechilles.alecstamework.persistence.compensation.RefundClaim;
+import com.alechilles.alecstamework.persistence.operation
+        .DurableOperationCleanupBoundary;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinitionRegistry;
@@ -281,6 +283,142 @@ class SqlitePaidRevivalOperationsTest {
         assertEquals(after, timedLease());
     }
 
+    @Test
+    void durableCleanupRetriesBeforePublishingWithoutReplayingLiveWork()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+        AtomicInteger cleanupCalls = new AtomicInteger();
+        var boundary =
+                (com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalLiveBoundary) (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return PaidRevivalLiveResult.confirmed(
+                            "charge-and-spawn-receipts"
+                    ).completed();
+                };
+        DurableOperationCleanupBoundary<
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalRequest> cleanup =
+                (request, operation) -> {
+                    assertEquals(
+                            OperationPhase.DURABLE, operation.phase()
+                    );
+                    return cleanupCalls.incrementAndGet() == 1
+                            ? LiveOperationResult.retryable(
+                                    "receipt-cleanup-retry", null
+                            ).completed()
+                            : LiveOperationResult.confirmed(
+                                    "receipt-cleanup-complete"
+                            ).completed();
+                };
+
+        OperationWorkflowResult first =
+                submit(6, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLICATION_PENDING,
+                first.status()
+        );
+        assertEquals(OperationPhase.DURABLE, first.operation().phase());
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, cleanupCalls.get());
+
+        OperationWorkflowResult resumed =
+                submit(6, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.PUBLISHED, resumed.status()
+        );
+        assertEquals(1, liveCalls.get());
+        assertEquals(2, cleanupCalls.get());
+    }
+
+    @Test
+    void compensatedNoChargeCleanupRetriesWithoutDuplicateRelease()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+        AtomicInteger cleanupCalls = new AtomicInteger();
+        var boundary =
+                (com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalLiveBoundary) (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return PaidRevivalLiveResult.noCharge(
+                            "no-charge-no-spawn"
+                    ).completed();
+                };
+        DurableOperationCleanupBoundary<
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalRequest> cleanup =
+                compensatedCleanup(cleanupCalls);
+
+        OperationWorkflowResult first =
+                submit(7, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATION_RETRYABLE,
+                first.status()
+        );
+        assertEquals(OperationPhase.COMPENSATED, first.operation().phase());
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, releases.get());
+        assertEquals(0, refunds.get());
+        assertEquals(1, cleanupCalls.get());
+
+        OperationWorkflowResult resumed =
+                submit(7, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED, resumed.status()
+        );
+        assertEquals(1, liveCalls.get());
+        assertEquals(1, releases.get());
+        assertEquals(0, refunds.get());
+        assertEquals(2, cleanupCalls.get());
+    }
+
+    @Test
+    void compensatedRefundCleanupRetriesWithoutDuplicateRefund()
+            throws Exception {
+        AtomicInteger liveCalls = new AtomicInteger();
+        AtomicInteger cleanupCalls = new AtomicInteger();
+        var boundary =
+                (com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalLiveBoundary) (request, operation) -> {
+                    liveCalls.incrementAndGet();
+                    return PaidRevivalLiveResult.refundRequired(
+                            request, "charge-without-spawn"
+                    ).completed();
+                };
+        DurableOperationCleanupBoundary<
+                com.alechilles.alecstamework.companion.revival
+                        .PaidRevivalRequest> cleanup =
+                compensatedCleanup(cleanupCalls);
+
+        OperationWorkflowResult first =
+                submit(8, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATION_RETRYABLE,
+                first.status()
+        );
+        assertEquals(OperationPhase.COMPENSATED, first.operation().phase());
+        assertEquals(1, liveCalls.get());
+        assertEquals(0, releases.get());
+        assertEquals(1, refunds.get());
+        assertEquals(1, cleanupCalls.get());
+
+        OperationWorkflowResult resumed =
+                submit(8, PaidRevivalTestSupport.request(), boundary, cleanup);
+
+        assertEquals(
+                OperationWorkflowResult.Status.COMPENSATED, resumed.status()
+        );
+        assertEquals(1, liveCalls.get());
+        assertEquals(0, releases.get());
+        assertEquals(1, refunds.get());
+        assertEquals(2, cleanupCalls.get());
+    }
+
     private OperationWorkflowResult submit(
             int number,
             com.alechilles.alecstamework.companion.revival
@@ -300,6 +438,24 @@ class SqlitePaidRevivalOperationsTest {
             com.alechilles.alecstamework.companion.revival
                     .PaidRevivalLiveBoundary boundary
     ) throws Exception {
+        return submit(
+                number,
+                request,
+                boundary,
+                DurableOperationCleanupBoundary.notRequired()
+        );
+    }
+
+    private OperationWorkflowResult submit(
+            int number,
+            com.alechilles.alecstamework.companion.revival
+                    .PaidRevivalRequest request,
+            com.alechilles.alecstamework.companion.revival
+                    .PaidRevivalLiveBoundary boundary,
+            DurableOperationCleanupBoundary<
+                    com.alechilles.alecstamework.companion.revival
+                            .PaidRevivalRequest> cleanup
+    ) throws Exception {
         return revivals.submit(
                 operationId(number),
                 new IdempotencyKey("paid-revival-" + number),
@@ -310,10 +466,30 @@ class SqlitePaidRevivalOperationsTest {
                     return LiveOperationResult.confirmed(
                             "holds-released-no-receipts"
                     ).completed();
-                }
+                },
+                cleanup
         ).completion().toCompletableFuture().get(
                 10, TimeUnit.SECONDS
         );
+    }
+
+    private DurableOperationCleanupBoundary<
+            com.alechilles.alecstamework.companion.revival
+                    .PaidRevivalRequest> compensatedCleanup(
+            AtomicInteger calls
+    ) {
+        return (request, operation) -> {
+            assertEquals(
+                    OperationPhase.COMPENSATED, operation.phase()
+            );
+            return calls.incrementAndGet() == 1
+                    ? LiveOperationResult.retryable(
+                            "receipt-cleanup-retry", null
+                    ).completed()
+                    : LiveOperationResult.confirmed(
+                            "receipt-cleanup-complete"
+                    ).completed();
+        };
     }
 
     private TimedSummonLease previousLease() {

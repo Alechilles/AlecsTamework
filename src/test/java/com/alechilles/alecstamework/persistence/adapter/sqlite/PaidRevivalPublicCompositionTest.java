@@ -115,6 +115,10 @@ class PaidRevivalPublicCompositionTest {
                                 (request, operation) ->
                                         LiveOperationResult.confirmed(
                                                 "paid-revival-release"
+                                        ).completed(),
+                                (request, operation) ->
+                                        LiveOperationResult.confirmed(
+                                                "paid-revival-cleanup"
                                         ).completed()
                         )
                 );
