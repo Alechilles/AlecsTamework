@@ -25,6 +25,8 @@ final class FakeTimedSummonWorldAttempts implements AttemptGateway {
     );
     MutationAttempt spawnResult =
             MutationAttempt.exact(TimedSummonWorldTestFixture.CHUNK);
+    MutationAttempt releaseStartHoldResult =
+            MutationAttempt.exact(TimedSummonWorldTestFixture.CHUNK);
     MutationAttempt installResult =
             MutationAttempt.exact(TimedSummonWorldTestFixture.CHUNK);
     MutationAttempt retireResult =
@@ -74,6 +76,15 @@ final class FakeTimedSummonWorldAttempts implements AttemptGateway {
             throw new IllegalStateException("spawn interruption");
         }
         return spawnResult;
+    }
+
+    @Override
+    public MutationAttempt releaseStartHold(
+            TimedSummonWorldAuthority.Start authority
+    ) {
+        events.add("release-start-hold");
+        lastStartAuthority = authority;
+        return releaseStartHoldResult;
     }
 
     @Override

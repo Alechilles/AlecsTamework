@@ -56,6 +56,20 @@ final class TimedSummonWorldSafety {
         }
     }
 
+    MutationAttempt releaseStartHold(
+            AttemptGateway attempts,
+            TimedSummonWorldAuthority.Start authority
+    ) {
+        try {
+            MutationAttempt result = attempts.releaseStartHold(authority);
+            return result == null
+                    ? MutationAttempt.retryable(null)
+                    : result;
+        } catch (RuntimeException | LinkageError failure) {
+            return MutationAttempt.retryable(failure);
+        }
+    }
+
     MutationAttempt installReceipt(
             AttemptGateway attempts,
             TimedSummonWorldAuthority.Store authority

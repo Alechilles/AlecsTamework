@@ -188,6 +188,56 @@ class TimedSummonWorldStartExecutorTest {
         assertTrue(attempts.events.isEmpty());
     }
 
+    @Test
+    void durableCleanupReleasesStartHoldOnlyAfterExactProbe()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.startRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+        attempts.startProbe = ProjectionProbe.exact(
+                TimedSummonWorldTestFixture.CHUNK
+        );
+
+        LiveOperationResult result =
+                new TimedSummonDurableCleanupExecutor().execute(
+                        request,
+                        fixture.durableOperation(request),
+                        attempts
+                ).toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
+        assertEquals(
+                "timed_summon_cleanup_start_projection_released",
+                result.code()
+        );
+        assertEquals(
+                List.of(
+                        "probe-start",
+                        "release-start-hold",
+                        "probe-start"
+                ),
+                attempts.events
+        );
+    }
+
+    @Test
+    void durableCleanupDoesNotReleaseAbsentStartProjection()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.startRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+
+        LiveOperationResult result =
+                new TimedSummonDurableCleanupExecutor().execute(
+                        request,
+                        fixture.durableOperation(request),
+                        attempts
+                ).toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertFalse(attempts.events.contains("release-start-hold"));
+    }
+
     private LiveOperationResult execute(
             TimedSummonTransitionRequest request,
             FakeTimedSummonWorldAttempts attempts

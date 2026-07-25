@@ -1,10 +1,15 @@
 package com.alechilles.alecstamework.companion.command.timed.runtime;
 
-import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
-import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonWorldAttempt.ChunkPersistence;
-import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonWorldAttempt.ReceiptProbe;
-import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonWorldAttempt.SourceProbe;
-import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonWorldAttempt.StoreProbe;
+import com.alechilles.alecstamework.companion.command.timed
+        .TimedSummonTransitionRequest;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonWorldAttempt.ChunkPersistence;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonWorldAttempt.ReceiptProbe;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonWorldAttempt.SourceProbe;
+import com.alechilles.alecstamework.companion.command.timed.runtime
+        .TimedSummonWorldAttempt.StoreProbe;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -14,35 +19,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Crash-seam and exact-retirement coverage for timed summon STORE. */
+/** Crash-seam and post-durable exact-retirement coverage for timed STORE. */
 class TimedSummonWorldStoreExecutorTest {
     private final TimedSummonWorldTestFixture fixture =
             new TimedSummonWorldTestFixture();
 
     @Test
-    void receiptAndRetirementEachBecomeDurableBeforeConfirmation()
-            throws Exception {
+    void livePhaseDurablyMarksSourceWithoutRetiringIt() throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =
                 new FakeTimedSummonWorldAttempts();
         CompletableFuture<ChunkPersistence> receiptSave =
                 attempts.enqueuePendingPersistence();
-        CompletableFuture<ChunkPersistence> retirementSave =
-                attempts.enqueuePendingPersistence();
 
         CompletableFuture<LiveOperationResult> result =
-                new TimedSummonWorldExecutor().execute(
-                        request,
-                        fixture.operation(request, true),
-                        attempts
-                ).toCompletableFuture();
+                executeLiveAsync(request, attempts);
 
         assertFalse(result.isDone());
         assertFalse(attempts.events.contains("retire"));
-        assertEquals(
-                request.snapshot(),
-                attempts.lastStoreAuthority.snapshot()
-        );
+        assertEquals(request.snapshot(), attempts.lastStoreAuthority.snapshot());
         assertEquals(
                 request.receiptKey(),
                 attempts.lastStoreAuthority.receiptKey()
@@ -51,37 +46,22 @@ class TimedSummonWorldStoreExecutorTest {
         receiptSave.complete(ChunkPersistence.saved(
                 TimedSummonWorldTestFixture.CHUNK
         ));
-        assertFalse(result.isDone());
-        assertTrue(attempts.events.contains("retire"));
-        assertEquals(
-                2,
-                attempts.events.stream()
-                        .filter(event -> event.startsWith("persist:"))
-                        .count()
-        );
-
-        retirementSave.complete(ChunkPersistence.saved(
-                TimedSummonWorldTestFixture.CHUNK
-        ));
         LiveOperationResult resolved = result.get(5, TimeUnit.SECONDS);
 
         assertEquals(LiveOperationResult.Status.CONFIRMED, resolved.status());
         assertEquals(
-                "timed_summon_store_receipt_and_retirement_saved_exact",
+                "timed_summon_store_receipt_saved_exact",
                 resolved.code()
         );
-        assertTrue(
-                attempts.events.indexOf("persist:77")
-                        < attempts.events.indexOf("retire")
-        );
-        assertTrue(
-                attempts.events.indexOf("retire")
-                        < attempts.events.lastIndexOf("persist:77")
+        assertFalse(attempts.events.contains("retire"));
+        assertEquals(
+                SourceProbe.exact(TimedSummonWorldTestFixture.CHUNK),
+                attempts.storeProbe.source()
         );
     }
 
     @Test
-    void crashAfterReceiptInstallCannotRetireBeforeReceiptSave()
+    void crashAfterReceiptInstallCannotReachDurableBeforeReceiptSave()
             throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =
@@ -89,11 +69,7 @@ class TimedSummonWorldStoreExecutorTest {
         attempts.enqueuePendingPersistence();
 
         CompletableFuture<LiveOperationResult> result =
-                new TimedSummonWorldExecutor().execute(
-                        request,
-                        fixture.operation(request, true),
-                        attempts
-                ).toCompletableFuture();
+                executeLiveAsync(request, attempts);
 
         assertFalse(result.isDone());
         assertFalse(attempts.events.contains("retire"));
@@ -104,8 +80,7 @@ class TimedSummonWorldStoreExecutorTest {
     }
 
     @Test
-    void replayWithReceiptAndAbsentSourceStillSavesRetirement()
-            throws Exception {
+    void liveReplayWithReceiptAndAbsentSourceIsUnknown() throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =
                 new FakeTimedSummonWorldAttempts();
@@ -114,16 +89,18 @@ class TimedSummonWorldStoreExecutorTest {
                 SourceProbe.absent()
         );
 
-        LiveOperationResult result = execute(request, attempts);
+        LiveOperationResult result = executeLive(request, attempts);
 
-        assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
-        assertFalse(attempts.events.contains("install-receipt"));
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertEquals(
+                "timed_summon_store_source_absent_before_durable",
+                result.code()
+        );
         assertFalse(attempts.events.contains("retire"));
-        assertTrue(attempts.events.contains("persist:77"));
     }
 
     @Test
-    void entityAbsenceWithoutExactReceiptIsAlwaysUnknown()
+    void entityAbsenceWithoutExactReceiptIsUnknownBeforeDurable()
             throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =
@@ -133,7 +110,7 @@ class TimedSummonWorldStoreExecutorTest {
                 SourceProbe.absent()
         );
 
-        LiveOperationResult result = execute(request, attempts);
+        LiveOperationResult result = executeLive(request, attempts);
 
         assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
         assertEquals(
@@ -152,32 +129,11 @@ class TimedSummonWorldStoreExecutorTest {
                 new FakeTimedSummonWorldAttempts();
         attempts.throwInstallAfterApply = true;
 
-        LiveOperationResult result = execute(request, attempts);
+        LiveOperationResult result = executeLive(request, attempts);
 
         assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
-        assertEquals(
-                request.snapshot(),
-                attempts.lastStoreAuthority.snapshot()
-        );
-    }
-
-    @Test
-    void retirementExceptionAfterApplyRequiresSaveAndReadback()
-            throws Exception {
-        TimedSummonTransitionRequest request = fixture.storeRequest();
-        FakeTimedSummonWorldAttempts attempts =
-                new FakeTimedSummonWorldAttempts();
-        attempts.throwRetireAfterApply = true;
-
-        LiveOperationResult result = execute(request, attempts);
-
-        assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
-        assertEquals(
-                2,
-                attempts.events.stream()
-                        .filter(event -> event.startsWith("persist:"))
-                        .count()
-        );
+        assertEquals(request.snapshot(), attempts.lastStoreAuthority.snapshot());
+        assertFalse(attempts.events.contains("retire"));
     }
 
     @Test
@@ -192,7 +148,7 @@ class TimedSummonWorldStoreExecutorTest {
                 )
         ));
 
-        LiveOperationResult result = execute(request, attempts);
+        LiveOperationResult result = executeLive(request, attempts);
 
         assertEquals(LiveOperationResult.Status.RETRYABLE, result.status());
         assertFalse(attempts.events.contains("retire"));
@@ -210,12 +166,10 @@ class TimedSummonWorldStoreExecutorTest {
                 new FakeTimedSummonWorldAttempts();
         attempts.storeProbe = StoreProbe.of(
                 ReceiptProbe.exact(TimedSummonWorldTestFixture.CHUNK),
-                SourceProbe.exact(
-                        TimedSummonWorldTestFixture.CHUNK + 1
-                )
+                SourceProbe.exact(TimedSummonWorldTestFixture.CHUNK + 1)
         );
 
-        LiveOperationResult result = execute(request, attempts);
+        LiveOperationResult result = executeLive(request, attempts);
 
         assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
         assertEquals(
@@ -225,64 +179,164 @@ class TimedSummonWorldStoreExecutorTest {
     }
 
     @Test
-    void sourceStillPresentAfterRetirementSaveIsRetryable()
-            throws Exception {
+    void durableCleanupRetiresMarkedSourceThenForceSaves() throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =
-                new FakeTimedSummonWorldAttempts();
-        attempts.suppressRetireApply = true;
-
-        LiveOperationResult result = execute(request, attempts);
-
-        assertEquals(LiveOperationResult.Status.RETRYABLE, result.status());
-        assertEquals(
-                "timed_summon_store_source_still_present_after_save",
-                result.code()
-        );
-    }
-
-    @Test
-    void losingReceiptAfterRetirementNeverUsesAbsenceAsSuccess()
-            throws Exception {
-        TimedSummonTransitionRequest request = fixture.storeRequest();
-        FakeTimedSummonWorldAttempts attempts =
-                new FakeTimedSummonWorldAttempts();
-        attempts.persistence.add(CompletableFuture.completedFuture(
-                ChunkPersistence.saved(TimedSummonWorldTestFixture.CHUNK)
-        ));
+                markedSourceAttempts();
         CompletableFuture<ChunkPersistence> retirementSave =
                 attempts.enqueuePendingPersistence();
-        CompletableFuture<LiveOperationResult> result =
-                new TimedSummonWorldExecutor().execute(
-                        request,
-                        fixture.operation(request, true),
-                        attempts
-                ).toCompletableFuture();
 
-        attempts.storeProbe = StoreProbe.of(
-                ReceiptProbe.absent(),
-                SourceProbe.absent()
-        );
+        CompletableFuture<LiveOperationResult> result =
+                executeCleanupAsync(request, attempts);
+
+        assertTrue(attempts.events.contains("retire"));
+        assertFalse(result.isDone());
         retirementSave.complete(ChunkPersistence.saved(
                 TimedSummonWorldTestFixture.CHUNK
         ));
         LiveOperationResult resolved = result.get(5, TimeUnit.SECONDS);
 
-        assertEquals(LiveOperationResult.Status.UNKNOWN, resolved.status());
+        assertEquals(LiveOperationResult.Status.CONFIRMED, resolved.status());
         assertEquals(
-                "timed_summon_store_receipt_readback_conflict",
+                "timed_summon_cleanup_store_retirement_saved_exact",
                 resolved.code()
+        );
+        assertTrue(
+                attempts.events.indexOf("retire")
+                        < attempts.events.indexOf("persist:77")
         );
     }
 
-    private LiveOperationResult execute(
+    @Test
+    void durableCleanupReplayAcceptsCanonicalStoredAbsence()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+        attempts.storeProbe = StoreProbe.of(
+                ReceiptProbe.absent(),
+                SourceProbe.absent()
+        );
+
+        LiveOperationResult result = executeCleanup(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
+        assertEquals(
+                "timed_summon_cleanup_store_source_already_absent",
+                result.code()
+        );
+        assertFalse(attempts.events.contains("retire"));
+    }
+
+    @Test
+    void durableCleanupNeverRemovesPresentSourceWithoutExactMarker()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+
+        LiveOperationResult result = executeCleanup(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertEquals(
+                "timed_summon_cleanup_store_exact_receipt_missing",
+                result.code()
+        );
+        assertFalse(attempts.events.contains("retire"));
+    }
+
+    @Test
+    void cleanupRetirementExceptionAfterApplyStillRequiresChunkSave()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts = markedSourceAttempts();
+        attempts.throwRetireAfterApply = true;
+
+        LiveOperationResult result = executeCleanup(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.CONFIRMED, result.status());
+        assertTrue(attempts.events.contains("persist:77"));
+    }
+
+    @Test
+    void sourceStillPresentAfterCleanupSaveIsRetryable() throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts = markedSourceAttempts();
+        attempts.suppressRetireApply = true;
+
+        LiveOperationResult result = executeCleanup(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.RETRYABLE, result.status());
+        assertEquals(
+                "timed_summon_cleanup_store_source_still_present_after_save",
+                result.code()
+        );
+    }
+
+    @Test
+    void cleanupCannotRunBeforeDurablePhase() throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts = markedSourceAttempts();
+
+        LiveOperationResult result =
+                new TimedSummonDurableCleanupExecutor().execute(
+                        request,
+                        fixture.operation(request, true),
+                        attempts
+                ).toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertEquals(
+                "timed_summon_cleanup_operation_invariant_mismatch",
+                result.code()
+        );
+        assertFalse(attempts.events.contains("retire"));
+    }
+
+    private FakeTimedSummonWorldAttempts markedSourceAttempts() {
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+        attempts.storeProbe = StoreProbe.of(
+                ReceiptProbe.exact(TimedSummonWorldTestFixture.CHUNK),
+                SourceProbe.exact(TimedSummonWorldTestFixture.CHUNK)
+        );
+        return attempts;
+    }
+
+    private CompletableFuture<LiveOperationResult> executeLiveAsync(
             TimedSummonTransitionRequest request,
             FakeTimedSummonWorldAttempts attempts
-    ) throws Exception {
+    ) {
         return new TimedSummonWorldExecutor().execute(
                 request,
                 fixture.operation(request, true),
                 attempts
-        ).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        ).toCompletableFuture();
+    }
+
+    private LiveOperationResult executeLive(
+            TimedSummonTransitionRequest request,
+            FakeTimedSummonWorldAttempts attempts
+    ) throws Exception {
+        return executeLiveAsync(request, attempts).get(5, TimeUnit.SECONDS);
+    }
+
+    private CompletableFuture<LiveOperationResult> executeCleanupAsync(
+            TimedSummonTransitionRequest request,
+            FakeTimedSummonWorldAttempts attempts
+    ) {
+        return new TimedSummonDurableCleanupExecutor().execute(
+                request,
+                fixture.durableOperation(request),
+                attempts
+        ).toCompletableFuture();
+    }
+
+    private LiveOperationResult executeCleanup(
+            TimedSummonTransitionRequest request,
+            FakeTimedSummonWorldAttempts attempts
+    ) throws Exception {
+        return executeCleanupAsync(request, attempts)
+                .get(5, TimeUnit.SECONDS);
     }
 }

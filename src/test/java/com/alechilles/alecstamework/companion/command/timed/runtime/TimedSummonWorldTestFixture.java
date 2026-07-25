@@ -140,6 +140,22 @@ final class TimedSummonWorldTestFixture {
             TimedSummonTransitionRequest request,
             boolean completeScopes
     ) {
+        return operation(
+                request, completeScopes, OperationPhase.LIVE_APPLYING
+        );
+    }
+
+    OperationEnvelope durableOperation(
+            TimedSummonTransitionRequest request
+    ) {
+        return operation(request, true, OperationPhase.DURABLE);
+    }
+
+    private OperationEnvelope operation(
+            TimedSummonTransitionRequest request,
+            boolean completeScopes,
+            OperationPhase phase
+    ) {
         List<OperationScope> scopes = new ArrayList<>();
         scopes.add(OperationScope.operation(OPERATION));
         scopes.add(OperationScope.profile(PROFILE));
@@ -153,7 +169,7 @@ final class TimedSummonWorldTestFixture {
                 TimedSummonTransitionDefinition.KIND,
                 TimedSummonTransitionDefinition.INSTANCE.payloadVersion(),
                 TimedSummonTransitionDefinition.INSTANCE.encode(request),
-                OperationPhase.LIVE_APPLYING,
+                phase,
                 "timed_summon",
                 request.groupAdmission().before().revision(),
                 null,
@@ -163,7 +179,9 @@ final class TimedSummonWorldTestFixture {
                 null,
                 REQUESTED_AT,
                 REQUESTED_AT,
-                null,
+                phase == OperationPhase.DURABLE
+                        ? REQUESTED_AT
+                        : null,
                 null,
                 null,
                 scopes

@@ -122,6 +122,7 @@ public final class SqliteTimedSummonTransitionOperations {
                         ),
                         detail,
                         liveBoundary,
+                        liveBoundary,
                         durable,
                         requiredConsumers,
                         "timed_summon_transition"
@@ -331,4 +332,3 @@ public final class SqliteTimedSummonTransitionOperations {
         }
     }
 }
-

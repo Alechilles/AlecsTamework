@@ -231,6 +231,14 @@ final class TimedSummonWorldAttempt {
                 @Nonnull TimedSummonWorldAuthority.Start authority
         );
 
+        /**
+         * Releases the movement hold after the START transition is durable.
+         */
+        @Nonnull
+        MutationAttempt releaseStartHold(
+                @Nonnull TimedSummonWorldAuthority.Start authority
+        );
+
         @Nonnull
         StoreProbe probeStore(
                 @Nonnull TimedSummonWorldAuthority.Store authority

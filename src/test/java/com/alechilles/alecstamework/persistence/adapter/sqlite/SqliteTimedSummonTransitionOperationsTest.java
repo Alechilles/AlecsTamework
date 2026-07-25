@@ -1,13 +1,18 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionDefinition;
+import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,6 +24,55 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Live round-trip and late-world recovery tests for timed transitions. */
 class SqliteTimedSummonTransitionOperationsTest
         extends TimedSummonTestSupport {
+    @Test
+    void cleanupRunsWithDurableOperationBeforePublication()
+            throws Exception {
+        PreparedTimed prepared = prepareStoredTimedProfile(75);
+        TimedSummonTransitionRequest start = startRequest(
+                prepared, lifecycleRead(PROFILE_A), -3_000
+        );
+        AtomicInteger cleanupCalls = new AtomicInteger();
+        TimedSummonLiveBoundary boundary =
+                new TimedSummonLiveBoundary() {
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            LiveOperationResult> applyOrResolve(
+                            TimedSummonTransitionRequest request,
+                            OperationEnvelope operation
+                    ) {
+                        return LiveOperationResult.confirmed(
+                                "timed_summon_test_live"
+                        ).completed();
+                    }
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            LiveOperationResult> cleanupAfterDurable(
+                            TimedSummonTransitionRequest request,
+                            OperationEnvelope operation
+                    ) {
+                        cleanupCalls.incrementAndGet();
+                        assertEquals(
+                                OperationPhase.DURABLE,
+                                operation.phase()
+                        );
+                        return LiveOperationResult.confirmed(
+                                "timed_summon_test_cleanup"
+                        ).completed();
+                    }
+                };
+
+        published(adapter.timedSummonTransitionOperations().submit(
+                operationId(79),
+                new IdempotencyKey("timed:cleanup"),
+                start,
+                boundary
+        ).completion().toCompletableFuture()
+                .get(10, TimeUnit.SECONDS));
+
+        assertEquals(1, cleanupCalls.get());
+    }
+
     @Test
     void summonAndStoreCommitOneLeaseLifecycleAndAliasPath()
             throws Exception {
@@ -183,4 +237,3 @@ class SqliteTimedSummonTransitionOperationsTest
         );
     }
 }
-

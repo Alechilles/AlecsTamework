@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonW
 import com.alechilles.alecstamework.companion.command.timed.runtime.TimedSummonWorldAttempt.StoreProbe;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
 import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
+import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -20,34 +21,38 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Pure exact-receipt live protocol for timed summon start and store.
+ * Performs timed-summon world cleanup only after canonical state is durable.
  *
- * <p>The shared operation engine owns the durable fence. This executor owns
- * only idempotent world evidence, chunk durability, and conservative outcome
- * classification.</p>
+ * <p>START cleanup releases the temporary movement hold. STORE cleanup removes
+ * the exact source carrying the durable retirement receipt, saves its chunk,
+ * and verifies absence. A retry can therefore distinguish an already-complete
+ * cleanup from an unsafe pre-durable disappearance.</p>
  */
-final class TimedSummonWorldExecutor {
+final class TimedSummonDurableCleanupExecutor {
     private final TimedSummonWorldSafety safety =
             new TimedSummonWorldSafety();
+
     @Nonnull
     CompletionStage<LiveOperationResult> execute(
             @Nullable TimedSummonTransitionRequest request,
             @Nullable OperationEnvelope operation,
             @Nullable AttemptGateway attempts
     ) {
-        if (!valid(request, operation) || attempts == null) {
+        if (!valid(request, operation)
+                || operation.phase() != OperationPhase.DURABLE
+                || attempts == null) {
             return completed(unknown(
-                    "operation_invariant_mismatch", null
+                    "cleanup_operation_invariant_mismatch", null
             ));
         }
         return request.starting()
-                ? start(
+                ? releaseStartHold(
                         TimedSummonWorldAuthority.start(
                                 request, operation.operationId()
                         ),
                         attempts
                 )
-                : store(
+                : cleanupStoredSource(
                         TimedSummonWorldAuthority.store(
                                 request, operation.operationId()
                         ),
@@ -55,229 +60,183 @@ final class TimedSummonWorldExecutor {
                 );
     }
 
-    private CompletionStage<LiveOperationResult> start(
+    private CompletionStage<LiveOperationResult> releaseStartHold(
             TimedSummonWorldAuthority.Start authority,
             AttemptGateway attempts
     ) {
-        ProjectionProbe probe = safety.probeStart(attempts, authority);
-        return switch (probe.status()) {
-            case EXACT -> persistStart(
-                    authority, attempts, probe.chunkIndex()
-            );
-            case ABSENT -> spawn(authority, attempts);
-            case RETRYABLE -> completed(retryable(
-                    "start_probe_unavailable", probe.cause()
-            ));
-            case CONFLICT -> completed(unknown(
-                    "start_projection_conflict", probe.cause()
-            ));
-        };
-    }
-    private CompletionStage<LiveOperationResult> spawn(
-            TimedSummonWorldAuthority.Start authority,
-            AttemptGateway attempts
-    ) {
-        MutationAttempt mutation = safety.spawn(attempts, authority);
-        if (mutation.status() == MutationStatus.EXACT) {
-            return persistStart(
-                    authority, attempts, mutation.chunkIndex()
-            );
-        }
-        ProjectionProbe probe = safety.probeStart(attempts, authority);
-        if (probe.status() == EvidenceStatus.EXACT) {
-            return persistStart(
-                    authority, attempts, probe.chunkIndex()
-            );
-        }
-        if (mutation.status() == MutationStatus.CONFLICT
-                || probe.status() == EvidenceStatus.CONFLICT) {
+        ProjectionProbe before = safety.probeStart(attempts, authority);
+        if (before.status() == EvidenceStatus.ABSENT) {
             return completed(unknown(
-                    "start_mutation_ambiguous",
-                    first(mutation.cause(), probe.cause())
+                    "cleanup_start_projection_absent", null
             ));
         }
-        return completed(probe.status() == EvidenceStatus.ABSENT
-                || probe.status() == EvidenceStatus.RETRYABLE
-                ? retryable(
-                        "start_mutation_retryable",
-                        first(mutation.cause(), probe.cause())
-                )
-                : unknown(
-                        "start_mutation_ambiguous",
-                        first(mutation.cause(), probe.cause())
-                ));
-    }
-
-    private CompletionStage<LiveOperationResult> persistStart(
-            TimedSummonWorldAuthority.Start authority,
-            AttemptGateway attempts,
-            @Nullable Long chunkIndex
-    ) {
-        if (chunkIndex == null) {
+        if (before.status() == EvidenceStatus.RETRYABLE) {
+            return completed(retryable(
+                    "cleanup_start_probe_unavailable", before.cause()
+            ));
+        }
+        if (before.status() == EvidenceStatus.CONFLICT) {
             return completed(unknown(
-                    "start_chunk_evidence_missing", null
+                    "cleanup_start_projection_conflict", before.cause()
             ));
         }
-        return persistThenResume(
-                attempts,
-                chunkIndex,
-                "start_projection",
-                () -> verifyStart(authority, attempts, chunkIndex)
+        MutationAttempt release = safety.releaseStartHold(
+                attempts, authority
         );
+        ProjectionProbe after = safety.probeStart(attempts, authority);
+        if (after.status() == EvidenceStatus.EXACT
+                && Objects.equals(
+                before.chunkIndex(), after.chunkIndex()
+        )) {
+            return completed(confirmed(
+                    "cleanup_start_projection_released"
+            ));
+        }
+        if (release.status() == MutationStatus.RETRYABLE
+                || after.status() == EvidenceStatus.RETRYABLE) {
+            return completed(retryable(
+                    "cleanup_start_release_retryable",
+                    first(release.cause(), after.cause())
+            ));
+        }
+        return completed(unknown(
+                "cleanup_start_release_conflict",
+                first(release.cause(), after.cause())
+        ));
     }
 
-    private CompletionStage<LiveOperationResult> verifyStart(
-            TimedSummonWorldAuthority.Start authority,
-            AttemptGateway attempts,
-            long expectedChunk
-    ) {
-        ProjectionProbe probe = safety.probeStart(attempts, authority);
-        return completed(switch (probe.status()) {
-            case EXACT -> Objects.equals(
-                    probe.chunkIndex(), expectedChunk
-            )
-                    ? confirmed("start_projection_saved_exact")
-                    : unknown(
-                            "start_chunk_readback_conflict",
-                            probe.cause()
-                    );
-            case ABSENT -> unknown(
-                    "start_projection_absent_after_save", probe.cause()
-            );
-            case RETRYABLE -> retryable(
-                    "start_readback_unavailable", probe.cause()
-            );
-            case CONFLICT -> unknown(
-                    "start_projection_readback_conflict", probe.cause()
-            );
-        });
-    }
-
-    private CompletionStage<LiveOperationResult> store(
+    private CompletionStage<LiveOperationResult> cleanupStoredSource(
             TimedSummonWorldAuthority.Store authority,
             AttemptGateway attempts
     ) {
         StoreProbe probe = safety.probeStore(attempts, authority);
-        LiveOperationResult failure = storeProbeFailure(probe);
+        LiveOperationResult failure = cleanupProbeFailure(probe);
         if (failure != null) {
             return completed(failure);
         }
-        if (probe.receipt().status() == EvidenceStatus.ABSENT) {
-            return probe.source().status() == EvidenceStatus.ABSENT
-                    ? completed(unknown(
-                            "store_source_absent_without_receipt", null
-                    ))
-                    : installReceipt(authority, attempts);
-        }
         if (probe.source().status() == EvidenceStatus.ABSENT) {
-            return completed(unknown(
-                    "store_source_absent_before_durable", null
+            return completed(confirmed(
+                    "cleanup_store_source_already_absent"
             ));
         }
-        return persistReceipt(
+        if (probe.receipt().status() != EvidenceStatus.EXACT) {
+            return completed(unknown(
+                    "cleanup_store_exact_receipt_missing", null
+            ));
+        }
+        return retireAfterDurable(
                 authority, attempts, probe.receipt().chunkIndex()
         );
     }
 
-    private CompletionStage<LiveOperationResult> installReceipt(
+    private CompletionStage<LiveOperationResult> retireAfterDurable(
             TimedSummonWorldAuthority.Store authority,
-            AttemptGateway attempts
+            AttemptGateway attempts,
+            long receiptChunk
     ) {
-        MutationAttempt mutation =
-                safety.installReceipt(attempts, authority);
+        MutationAttempt mutation = safety.retire(attempts, authority);
         if (mutation.status() == MutationStatus.EXACT) {
-            return persistReceipt(
-                    authority, attempts, mutation.chunkIndex()
-            );
+            return Objects.equals(mutation.chunkIndex(), receiptChunk)
+                    ? persistCleanupRetirement(
+                            authority, attempts, receiptChunk
+                    )
+                    : completed(unknown(
+                            "cleanup_store_retirement_chunk_conflict",
+                            mutation.cause()
+                    ));
         }
         StoreProbe probe = safety.probeStore(attempts, authority);
-        LiveOperationResult failure = storeProbeFailure(probe);
+        if (probe.source().status() == EvidenceStatus.ABSENT) {
+            return persistCleanupRetirement(
+                    authority, attempts, receiptChunk
+            );
+        }
+        LiveOperationResult failure = cleanupProbeFailure(probe);
         if (failure != null) {
             return completed(mutation.status() == MutationStatus.CONFLICT
                     ? unknown(
-                            "store_receipt_install_ambiguous",
+                            "cleanup_store_retirement_ambiguous",
                             first(mutation.cause(), failure.cause())
                     )
                     : failure);
         }
-        if (probe.receipt().status() == EvidenceStatus.EXACT) {
-            return probe.source().status() == EvidenceStatus.ABSENT
-                    ? completed(unknown(
-                            "store_source_absent_before_durable", null
-                    ))
-                    : persistReceipt(
-                            authority,
-                            attempts,
-                            probe.receipt().chunkIndex()
-                    );
-        }
         return completed(mutation.status() == MutationStatus.RETRYABLE
                 ? retryable(
-                        "store_receipt_install_retryable",
+                        "cleanup_store_retirement_retryable",
                         mutation.cause()
                 )
                 : unknown(
-                        "store_receipt_install_ambiguous",
+                        "cleanup_store_retirement_ambiguous",
                         mutation.cause()
                 ));
     }
 
-    private CompletionStage<LiveOperationResult> persistReceipt(
+    private CompletionStage<LiveOperationResult> persistCleanupRetirement(
             TimedSummonWorldAuthority.Store authority,
             AttemptGateway attempts,
             @Nullable Long chunkIndex
     ) {
         if (chunkIndex == null) {
             return completed(unknown(
-                    "store_receipt_chunk_missing", null
+                    "cleanup_store_retirement_chunk_missing", null
             ));
         }
         return persistThenResume(
                 attempts,
                 chunkIndex,
-                "store_receipt",
-                () -> afterReceiptPersistence(
+                () -> verifyCleanupRetirement(
                         authority, attempts, chunkIndex
                 )
         );
     }
 
-    private CompletionStage<LiveOperationResult> afterReceiptPersistence(
+    private CompletionStage<LiveOperationResult> verifyCleanupRetirement(
             TimedSummonWorldAuthority.Store authority,
             AttemptGateway attempts,
             long expectedChunk
     ) {
         StoreProbe probe = safety.probeStore(attempts, authority);
-        LiveOperationResult failure =
-                exactReceiptFailure(probe, expectedChunk);
+        if (probe.source().status() == EvidenceStatus.ABSENT) {
+            return completed(confirmed(
+                    "cleanup_store_retirement_saved_exact"
+            ));
+        }
+        LiveOperationResult failure = cleanupProbeFailure(probe);
         if (failure != null) {
             return completed(failure);
         }
-        if (probe.source().status() == EvidenceStatus.ABSENT) {
-            return completed(unknown(
-                    "store_source_absent_after_receipt_save", null
+        if (probe.source().status() == EvidenceStatus.EXACT
+                && Objects.equals(
+                probe.source().chunkIndex(), expectedChunk
+        )) {
+            return completed(retryable(
+                    "cleanup_store_source_still_present_after_save",
+                    probe.source().cause()
             ));
         }
-        return completed(confirmed("store_receipt_saved_exact"));
+        return completed(unknown(
+                "cleanup_store_retirement_readback_conflict",
+                evidenceCause(probe)
+        ));
     }
 
     private CompletionStage<LiveOperationResult> persistThenResume(
             AttemptGateway attempts,
             long chunkIndex,
-            String phase,
             Supplier<CompletionStage<LiveOperationResult>> continuation
     ) {
         return safety.persist(attempts, chunkIndex)
                 .thenCompose(persistence -> {
                     LiveOperationResult failure = persistenceFailure(
-                            persistence, chunkIndex, phase
+                            persistence, chunkIndex
                     );
                     return failure == null
                             ? safety.resume(
                                     attempts,
                                     continuation,
                                     retryable(
-                                            phase + "_world_resume_failed",
+                                            "cleanup_store_retirement"
+                                                    + "_world_resume_failed",
                                             null
                                     )
                             )
@@ -288,68 +247,52 @@ final class TimedSummonWorldExecutor {
     @Nullable
     private LiveOperationResult persistenceFailure(
             ChunkPersistence persistence,
-            long expectedChunk,
-            String phase
+            long expectedChunk
     ) {
         if (persistence.status()
                 == TimedSummonWorldAttempt.PersistenceStatus.RETRYABLE) {
             return retryable(
-                    phase + "_save_failed", persistence.cause()
+                    "cleanup_store_retirement_save_failed",
+                    persistence.cause()
             );
         }
         if (persistence.status()
                 == TimedSummonWorldAttempt.PersistenceStatus.CONFLICT
                 || !Objects.equals(
-                        persistence.chunkIndex(), expectedChunk
-                )) {
+                persistence.chunkIndex(), expectedChunk
+        )) {
             return unknown(
-                    phase + "_save_conflict", persistence.cause()
+                    "cleanup_store_retirement_save_conflict",
+                    persistence.cause()
             );
         }
         return null;
     }
 
     @Nullable
-    private LiveOperationResult storeProbeFailure(StoreProbe probe) {
-        if (probe.receipt().status() == EvidenceStatus.CONFLICT
-                || probe.source().status() == EvidenceStatus.CONFLICT) {
+    private LiveOperationResult cleanupProbeFailure(StoreProbe probe) {
+        if (probe.source().status() == EvidenceStatus.CONFLICT
+                || probe.receipt().status() == EvidenceStatus.CONFLICT) {
             return unknown(
-                    "store_evidence_conflict", evidenceCause(probe)
+                    "cleanup_store_evidence_conflict",
+                    evidenceCause(probe)
             );
         }
-        if (probe.receipt().status() == EvidenceStatus.RETRYABLE
-                || probe.source().status() == EvidenceStatus.RETRYABLE) {
+        if (probe.source().status() == EvidenceStatus.RETRYABLE
+                || probe.receipt().status() == EvidenceStatus.RETRYABLE) {
             return retryable(
-                    "store_probe_unavailable", evidenceCause(probe)
+                    "cleanup_store_probe_unavailable",
+                    evidenceCause(probe)
             );
         }
-        if (probe.receipt().status() == EvidenceStatus.EXACT
-                && probe.source().status() == EvidenceStatus.EXACT
+        if (probe.source().status() == EvidenceStatus.EXACT
+                && probe.receipt().status() == EvidenceStatus.EXACT
                 && !Objects.equals(
-                        probe.receipt().chunkIndex(),
-                        probe.source().chunkIndex()
-                )) {
-            return unknown("store_chunk_evidence_conflict", null);
-        }
-        return null;
-    }
-
-    @Nullable
-    private LiveOperationResult exactReceiptFailure(
-            StoreProbe probe,
-            long expectedChunk
-    ) {
-        LiveOperationResult failure = storeProbeFailure(probe);
-        if (failure != null) {
-            return failure;
-        }
-        if (probe.receipt().status() != EvidenceStatus.EXACT
-                || !Objects.equals(
-                        probe.receipt().chunkIndex(), expectedChunk
-                )) {
+                probe.source().chunkIndex(),
+                probe.receipt().chunkIndex()
+        )) {
             return unknown(
-                    "store_receipt_readback_conflict",
-                    probe.receipt().cause()
+                    "cleanup_store_chunk_evidence_conflict", null
             );
         }
         return null;
@@ -390,27 +333,33 @@ final class TimedSummonWorldExecutor {
                 probe.source().cause()
         );
     }
+
     private Throwable first(Throwable first, Throwable second) {
         return first == null ? second : first;
     }
+
     private LiveOperationResult confirmed(String suffix) {
         return LiveOperationResult.confirmed(code(suffix));
     }
+
     private LiveOperationResult retryable(
             String suffix,
             @Nullable Throwable cause
     ) {
         return LiveOperationResult.retryable(code(suffix), cause);
     }
+
     private LiveOperationResult unknown(
             String suffix,
             @Nullable Throwable cause
     ) {
         return LiveOperationResult.unknown(code(suffix), cause);
     }
+
     private String code(String suffix) {
         return "timed_summon_" + suffix;
     }
+
     private CompletionStage<LiveOperationResult> completed(
             LiveOperationResult result
     ) {
