@@ -140,6 +140,12 @@ public final class CommandItemFeatureHandler {
         CommandPersistenceView persistenceView = persistence != null
                 ? new CommandPersistenceView(persistence)
                 : null;
+        CommandRosterPanelRecordSource rosterPanelRecordSource =
+                persistence != null
+                        ? new CommandRosterPanelRecordSource(
+                                persistence.queries()
+                        )
+                        : null;
         CommandNpcIdentityService npcIdentityService = persistenceView != null
                 ? new CommandNpcIdentityService(
                         persistenceView, npcExistenceService)
@@ -163,7 +169,8 @@ public final class CommandItemFeatureHandler {
                 panelEntryService,
                 panelPreferenceService,
                 linkPolicyService,
-                npcNameResolver
+                npcNameResolver,
+                rosterPanelRecordSource
         );
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,

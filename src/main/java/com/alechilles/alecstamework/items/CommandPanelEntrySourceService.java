@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Builds command-panel entries using linked and nearby-owned companions.
@@ -32,10 +33,27 @@ final class CommandPanelEntrySourceService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
+    @Nullable
+    private final CommandRosterPanelRecordSource rosterRecordSource;
+
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandNpcNameResolver npcNameResolver) {
+        this(
+                linkedPanelEntryService,
+                panelPreferenceService,
+                linkPolicyService,
+                npcNameResolver,
+                null
+        );
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource) {
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -48,6 +66,7 @@ final class CommandPanelEntrySourceService {
                 new CommandLinkedPanelProgressionPresentationService(),
                 new CommandLinkedPanelCooldownSnapshotService()
         );
+        this.rosterRecordSource = rosterRecordSource;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -55,8 +74,12 @@ final class CommandPanelEntrySourceService {
                                       ItemStack stack,
                                       TwCommandItemConfig config,
                                       String toolId) {
-        List<LinkedNpcEntry> linkedEntries =
-                linkedPanelEntryService.buildEntries(player, store, stack, toolId);
+        List<LinkedNpcEntry> linkedEntries = config != null
+                && config.usesOwnerCommandFamilyRoster()
+                ? buildRosterEntries(player, store, stack, config, toolId)
+                : linkedPanelEntryService.buildEntries(
+                        player, store, stack, toolId
+                );
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -158,6 +181,24 @@ final class CommandPanelEntrySourceService {
             }
         });
         return applyFiltersAndSort(out, stack);
+    }
+
+    private List<LinkedNpcEntry> buildRosterEntries(
+            Player player,
+            Store<EntityStore> store,
+            ItemStack stack,
+            TwCommandItemConfig config,
+            String toolId
+    ) {
+        if (player == null || rosterRecordSource == null) {
+            return List.of();
+        }
+        List<LinkedNpcRecord> records = rosterRecordSource.recordsFor(
+                player.getUuid(), config.getCommandFamilyId()
+        );
+        return linkedPanelEntryService.buildEntriesFromRecords(
+                player, store, stack, toolId, records
+        );
     }
 
     private boolean resolveLinkingRequireOwner() {
