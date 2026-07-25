@@ -96,6 +96,8 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.commandRosterTransitionOperations());
         assertNotNull(adapter.timedSummonOperations());
         assertNotNull(adapter.timedSummonTransitionOperations());
+        assertNotNull(adapter.provisioningOperations());
+        assertNotNull(adapter.provisioningActivationOperations());
         assertNotNull(adapter.captureOperations());
         assertNotNull(adapter.dormantOperations());
         assertNotNull(adapter.restorationOperations());
@@ -110,11 +112,13 @@ class SqlitePublicPersistenceAdapterTest {
         assertNotNull(adapter.populationGroupReader());
         assertNotNull(adapter.commandRosterReader());
         assertNotNull(adapter.timedSummonReader());
+        assertNotNull(adapter.provisioningReader());
         assertNotNull(adapter.coopIndex());
         assertNotNull(adapter.ownerPopulationIndex());
         assertNotNull(adapter.populationGroupIndex());
         assertNotNull(adapter.commandRosterIndex());
         assertNotNull(adapter.timedSummonIndex());
+        assertNotNull(adapter.provisioningIndex());
         assertNotNull(adapter.extensionIndex());
         assertNotSame(
                 adapter.publicOperations().engine(),
@@ -165,7 +169,7 @@ class SqlitePublicPersistenceAdapterTest {
                 SqlitePublicProjectionStartupResult.Status.COMPLETE,
                 result.status()
         );
-        assertEquals(7, result.catchUps().size());
+        assertEquals(8, result.catchUps().size());
         assertEquals(0, adapter.coopIndex().snapshot().size());
     }
 

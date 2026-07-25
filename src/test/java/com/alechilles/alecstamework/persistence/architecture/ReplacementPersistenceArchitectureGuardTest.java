@@ -26,6 +26,7 @@ class ReplacementPersistenceArchitectureGuardTest {
             MAIN.resolve("companion/lifecycle"),
             MAIN.resolve("companion/population"),
             MAIN.resolve("companion/profile"),
+            MAIN.resolve("companion/provisioning"),
             MAIN.resolve("companion/snapshot"),
             MAIN.resolve("persistence/adapter/sqlite"),
             MAIN.resolve("persistence/facade"),
@@ -182,6 +183,7 @@ class ReplacementPersistenceArchitectureGuardTest {
 
         assertEquals(
                 List.of(
+                        "activateProvisionedCompanion",
                         "assignPopulationGroups",
                         "capture",
                         "captureToCoop",
@@ -190,6 +192,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "mutateExtension",
                         "mutateProfile",
                         "mutateTimedSummonLease",
+                        "provisionCompanion",
                         "reconcileOwnerPopulation",
                         "registerCoopSlot",
                         "releaseCapturedCompanion",
@@ -221,7 +224,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "restorations",
                         "coopCaptures",
                         "coopReleases",
-                        "timedSummons"
+                        "timedSummons",
+                        "provisioningActivations"
                 ),
                 boundaries
         );
@@ -308,6 +312,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findAllCommandRosters",
                         "findAllLifecycles",
                         "findAllPopulationGroupAssignments",
+                        "findAllProvisioningRecords",
                         "findCommandRoster",
                         "findCommandRosterMembership",
                         "findCoopResidency",
@@ -316,6 +321,7 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "findExtensions",
                         "findOperation",
                         "findProfile",
+                        "findProvisioning",
                         "findStalePopulationGroupProfiles",
                         "findTimedSummonLease",
                         "projectedCommandRosterActions",
@@ -332,6 +338,8 @@ class ReplacementPersistenceArchitectureGuardTest {
                         "projectedPopulationGroupCounts",
                         "projectedProfile",
                         "projectedProfileSnapshot",
+                        "projectedProvisioning",
+                        "projectedProvisioningSnapshot",
                         "projectedTimedSummons"
                 ),
                 queries

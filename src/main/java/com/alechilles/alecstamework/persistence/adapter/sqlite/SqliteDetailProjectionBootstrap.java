@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionData;
 import com.alechilles.alecstamework.companion.extension.ProfileExtensionProjectionIndex;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningProjectionIndex;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningRecord;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -14,15 +16,33 @@ final class SqliteDetailProjectionBootstrap {
 
     @Nonnull
     static CompletionStage<Result> rebuild(
+            @Nonnull SqliteProvisioningReader provisioningReader,
+            @Nonnull ProvisioningProjectionIndex provisioning,
             @Nonnull SqliteProfileExtensionReader extensionReader,
             @Nonnull ProfileExtensionProjectionIndex extensions
     ) {
-        if (extensionReader == null || extensions == null) {
+        if (provisioningReader == null || provisioning == null
+                || extensionReader == null || extensions == null) {
             throw new IllegalArgumentException(
                     "Detail projection bootstrap dependencies are required"
             );
         }
-        return rebuildExtensions(extensionReader, extensions);
+        return provisioningReader.findAll().thenCompose(read -> {
+            if (!(read instanceof PersistenceReadResult.Found<
+                    List<ProvisioningRecord>> found)) {
+                return java.util.concurrent.CompletableFuture
+                        .completedFuture(
+                                Result.readFailure("provisioning", read)
+                        );
+            }
+            try {
+                provisioning.rebuild(found.value());
+            } catch (Throwable failure) {
+                return java.util.concurrent.CompletableFuture
+                        .completedFuture(Result.rebuildFailure(failure));
+            }
+            return rebuildExtensions(extensionReader, extensions);
+        });
     }
 
     private static CompletionStage<Result> rebuildExtensions(

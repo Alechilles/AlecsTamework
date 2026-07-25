@@ -398,6 +398,21 @@ CREATE TABLE timed_summon_lease (
     )
 );
 
+CREATE TABLE provisioning_record (
+    profile_id TEXT PRIMARY KEY,
+    caller_namespace TEXT NOT NULL,
+    caller_key TEXT NOT NULL,
+    correlation_id TEXT,
+    policy_revision INTEGER NOT NULL CHECK (policy_revision >= 0),
+    creation_operation_id TEXT NOT NULL UNIQUE,
+    created_at_ms INTEGER NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES companion_profile(profile_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (creation_operation_id)
+        REFERENCES operation_envelope(operation_id),
+    UNIQUE (caller_namespace, caller_key)
+);
+
 CREATE TABLE companion_snapshot (
     snapshot_id TEXT PRIMARY KEY,
     profile_id TEXT NOT NULL,

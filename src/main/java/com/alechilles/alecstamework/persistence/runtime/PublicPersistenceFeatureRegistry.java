@@ -41,6 +41,8 @@ public final class PublicPersistenceFeatureRegistry {
             new PersistenceFeatureId("command_roster");
     public static final PersistenceFeatureId TIMED_SUMMON =
             new PersistenceFeatureId("timed_summon");
+    public static final PersistenceFeatureId PROVISIONING =
+            new PersistenceFeatureId("provisioning");
     public static final PersistenceFeatureId ECONOMIC_COMPENSATION =
             new PersistenceFeatureId("economic_compensation");
     public static final PersistenceFeatureId CAPTURE =
@@ -63,6 +65,8 @@ public final class PublicPersistenceFeatureRegistry {
             new ProjectionConsumerId("command_roster_index");
     public static final ProjectionConsumerId TIMED_SUMMON_INDEX =
             new ProjectionConsumerId("timed_summon_index");
+    public static final ProjectionConsumerId PROVISIONING_INDEX =
+            new ProjectionConsumerId("provisioning_index");
     public static final ProjectionConsumerId EXTENSION_INDEX =
             ProfileExtensionProjectionIndex.CONSUMER_ID;
 
@@ -77,6 +81,7 @@ public final class PublicPersistenceFeatureRegistry {
                 populationGroups(),
                 commandRoster(),
                 PublicPersistenceTimedFeature.create(),
+                PublicPersistenceProvisioningFeature.create(),
                 economicCompensation(),
                 capture(),
                 dormant(),

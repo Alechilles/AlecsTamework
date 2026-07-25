@@ -6,6 +6,7 @@ public enum PersistenceFeatureDomain {
     LIFECYCLE,
     POPULATION,
     COMMAND,
+    PROVISIONING,
     CAPTURE,
     DORMANT,
     COOP,

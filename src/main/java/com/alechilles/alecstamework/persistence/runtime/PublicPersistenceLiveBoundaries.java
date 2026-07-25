@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.companion.capture.CompanionCaptureReleaseLiv
 import com.alechilles.alecstamework.companion.command.timed.TimedSummonLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureLiveBoundary;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopReleaseLiveBoundary;
+import com.alechilles.alecstamework.companion.provisioning.ProvisioningActivationLiveBoundary;
 import com.alechilles.alecstamework.companion.restoration.CompanionRestorationLiveBoundary;
 import javax.annotation.Nonnull;
 
@@ -15,17 +16,44 @@ public record PublicPersistenceLiveBoundaries(
         @Nonnull CompanionRestorationLiveBoundary restorations,
         @Nonnull CompanionCoopCaptureLiveBoundary coopCaptures,
         @Nonnull CompanionCoopReleaseLiveBoundary coopReleases,
-        @Nonnull TimedSummonLiveBoundary timedSummons
+        @Nonnull TimedSummonLiveBoundary timedSummons,
+        @Nonnull ProvisioningActivationLiveBoundary provisioningActivations
 ) {
     public PublicPersistenceLiveBoundaries {
         if (captures == null || capturedReleases == null
                 || restorations == null
                 || coopCaptures == null || coopReleases == null
-                || timedSummons == null) {
+                || timedSummons == null
+                || provisioningActivations == null) {
             throw new IllegalArgumentException(
                     "Every public live persistence boundary is required"
             );
         }
+    }
+
+    /** Compatibility composition for callers without provisioning activation. */
+    public PublicPersistenceLiveBoundaries(
+            CompanionCaptureLiveBoundary captures,
+            CompanionCaptureReleaseLiveBoundary capturedReleases,
+            CompanionRestorationLiveBoundary restorations,
+            CompanionCoopCaptureLiveBoundary coopCaptures,
+            CompanionCoopReleaseLiveBoundary coopReleases,
+            TimedSummonLiveBoundary timedSummons
+    ) {
+        this(
+                captures,
+                capturedReleases,
+                restorations,
+                coopCaptures,
+                coopReleases,
+                timedSummons,
+                (request, operation) ->
+                        com.alechilles.alecstamework.persistence.operation
+                                .LiveOperationResult.retryable(
+                                        "provisioning_boundary_unavailable",
+                                        null
+                                ).completed()
+        );
     }
 
     /**
