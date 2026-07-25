@@ -44,6 +44,8 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.population.PopulationGroupAssetRegistrar;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
@@ -275,6 +277,8 @@ public class Tamework extends JavaPlugin {
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
+    private PopulationGroupConfigRegistry populationGroupConfigRegistry;
+    private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private CompanionXpEventDebugLogService companionXpEventDebugLogService;
@@ -459,6 +463,12 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         capturePolicyRegistry = new CapturePolicyRegistry();
+        populationGroupConfigRegistry = new PopulationGroupConfigRegistry();
+        populationGroupAssetRegistrar = new PopulationGroupAssetRegistrar(
+                this,
+                populationGroupConfigRegistry,
+                this::emitExperimentalConfigReload
+        );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
         assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
         assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
@@ -517,6 +527,7 @@ public class Tamework extends JavaPlugin {
         registerGlobalConfigAssets();
         registerCompanionAssets();
         registerCapturePolicyAssets();
+        populationGroupAssetRegistrar.register();
         registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();

@@ -22,6 +22,7 @@ public enum TameworkConfigFamily {
     TRAIT,
     TALENT,
     DEBUG,
-    CAPTURE_POLICY
+    CAPTURE_POLICY,
+    POPULATION_GROUP
 }
 

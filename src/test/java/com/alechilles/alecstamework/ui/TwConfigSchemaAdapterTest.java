@@ -130,6 +130,59 @@ class TwConfigSchemaAdapterTest {
         assertTrue(requirements.tooltip().contains("replaces parent"));
     }
 
+    @Test
+    void populationGroupSchemaExposesInheritedLimitsAndScopeOptions() {
+        TwConfigAssetDescriptor descriptor = descriptor(
+                TwConfigFamily.POPULATION_GROUP,
+                "Hydragon_FullDragons"
+        );
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields =
+                TwConfigSchemaAdapter.fieldsFor(descriptor);
+
+        assertFalse(fields.isEmpty());
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields,
+                "Parent"
+        ));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields,
+                "GroupId"
+        ));
+        TwConfigEditorFieldPolicy.EditorFieldSpec roleIds =
+                TwConfigEditorFieldPolicy.findField(fields, "RoleIds");
+        assertNotNull(roleIds);
+        assertEquals(
+                TwConfigEditorFieldPolicy.EditorFieldType.STRING_LIST,
+                roleIds.type()
+        );
+        assertTrue(roleIds.tooltip().contains("replaces the parent"));
+        TwConfigEditorFieldPolicy.EditorFieldSpec maxOwned =
+                TwConfigEditorFieldPolicy.findField(
+                        fields,
+                        "Limits.MaxOwnedPerOwner"
+                );
+        assertNotNull(maxOwned);
+        assertTrue(maxOwned.tooltip().contains("0 is unlimited"));
+        assertTrue(maxOwned.tooltip().contains("omission inherits"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields,
+                "Limits.MaxActivePerOwner"
+        ));
+        TwConfigEditorFieldPolicy.EditorFieldSpec scope =
+                TwConfigEditorFieldPolicy.findField(
+                        fields,
+                        "Limits.Scope"
+                );
+        assertNotNull(scope);
+        assertEquals(
+                TwConfigEditorFieldPolicy.EditorFieldType.OPTION,
+                scope.type()
+        );
+        assertEquals(List.of("Global", "PerWorld"), scope.options());
+        assertTrue(scope.tooltip().contains("omission inherits"));
+    }
+
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {
         return new TwConfigAssetDescriptor(
                 family,

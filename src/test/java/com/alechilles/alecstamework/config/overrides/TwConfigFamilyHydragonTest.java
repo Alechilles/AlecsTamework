@@ -22,6 +22,27 @@ class TwConfigFamilyHydragonTest {
     }
 
     @Test
+    void populationGroupUsesStableEditorIdentityAndAssetPath() {
+        TwConfigFamily family = TwConfigFamily.POPULATION_GROUP;
+
+        assertEquals("population-group", family.getId());
+        assertEquals("Population Groups", family.getDisplayName());
+        assertEquals("Tamework/PopulationGroups", family.getStorePath());
+        assertEquals(
+                "Server/Tamework/PopulationGroups",
+                family.getServerRelativePrefix()
+        );
+        assertEquals(
+                family,
+                TwConfigFamily.fromStorePath(
+                        " Tamework/PopulationGroups "
+                )
+        );
+        assertTrue(family.isEditableInV1());
+        assertTrue(family.isKnownType());
+    }
+
+    @Test
     void fallbackSourcePathsStayInsideCanonicalFamilyDirectories() {
         assertEquals(
                 Path.of("Server/Tamework/CapturePolicies/Config_Hydragon_CapturePolicy.json"),
@@ -29,6 +50,17 @@ class TwConfigFamilyHydragonTest {
                         null,
                         TwConfigFamily.CAPTURE_POLICY.getStorePath(),
                         "Hydragon_CapturePolicy"
+                )
+        );
+        assertEquals(
+                Path.of(
+                        "Server/Tamework/PopulationGroups/"
+                                + "Config_Hydragon_FullDragons.json"
+                ),
+                TwConfigOverrideManager.resolveRelativeServerPath(
+                        null,
+                        TwConfigFamily.POPULATION_GROUP.getStorePath(),
+                        "Hydragon_FullDragons"
                 )
         );
     }
