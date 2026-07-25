@@ -98,7 +98,7 @@ class CompanionCoopCaptureDefinitionTest {
     @Test
     void sourceSnapshotMustBeTheExactCurrentLifecycleFence() {
         CompanionSnapshot stale = captureSnapshot(
-                new LifecycleRevision(6),
+                new LifecycleRevision(5),
                 true
         );
 
@@ -116,14 +116,18 @@ class CompanionCoopCaptureDefinitionTest {
                 () -> new CoopCapturedItemSourceEvidence(
                         SOURCE,
                         PROFILE,
-                        captureSnapshot(EXPECTED, false),
+                        captureSnapshot(captureRevision(), false),
                         ACTOR,
                         "world",
                         position(),
-                        sourceArtifact(captureSnapshot(EXPECTED, false)),
+                        sourceArtifact(captureSnapshot(
+                                captureRevision(), false
+                        )),
                         receiptArtifact(
                                 sourceArtifact(
-                                        captureSnapshot(EXPECTED, false)
+                                        captureSnapshot(
+                                                captureRevision(), false
+                                        )
                                 ),
                                 RECEIPT_KEY
                         ),
@@ -134,7 +138,9 @@ class CompanionCoopCaptureDefinitionTest {
 
     @Test
     void receiptArtifactMustBeOnlyTheExactlyMarkedSource() {
-        CompanionSnapshot capture = captureSnapshot(EXPECTED, true);
+        CompanionSnapshot capture = captureSnapshot(
+                captureRevision(), true
+        );
         CapturedArtifact source = sourceArtifact(capture);
         BsonDocument damaged = BsonDocument.parse(
                 source.metadataExtendedJson()
@@ -173,7 +179,9 @@ class CompanionCoopCaptureDefinitionTest {
     private CompanionCoopCaptureRequest capturedItemRequest(
             String targetPayload
     ) {
-        CompanionSnapshot capture = captureSnapshot(EXPECTED, true);
+        CompanionSnapshot capture = captureSnapshot(
+                captureRevision(), true
+        );
         CapturedArtifact source = sourceArtifact(capture);
         return capturedItemRequest(
                 capture,
@@ -239,6 +247,10 @@ class CompanionCoopCaptureDefinitionTest {
                 current,
                 -200
         );
+    }
+
+    private LifecycleRevision captureRevision() {
+        return new LifecycleRevision(EXPECTED.value() - 1);
     }
 
     private CompanionSnapshot coopSnapshot(String payload) {

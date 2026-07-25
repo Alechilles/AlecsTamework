@@ -60,9 +60,9 @@ public record CompanionCoopCaptureRequest(
         CompanionSnapshot captureSnapshot = source.captureSnapshot();
         if (!profileId.equals(source.sourceProfileId())
                 || !profileId.equals(captureSnapshot.profileId())
-                || !captureSnapshot.sourceLifecycleRevision().equals(
-                expectedLifecycleRevision
-        )) {
+                || !captureSnapshot.sourceLifecycleRevision().next().equals(
+                        expectedLifecycleRevision
+                )) {
             throw new IllegalArgumentException(
                     "Captured-item coop source must match the exact current profile fence"
             );

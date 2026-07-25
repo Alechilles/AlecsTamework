@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CoopConflictDiagnostic;
 import com.alechilles.alecstamework.companion.coop.CoopResidency;
 import com.alechilles.alecstamework.companion.coop.CoopSlot;
-import com.alechilles.alecstamework.companion.identity.CompanionAlias;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocationKind;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
@@ -14,16 +13,18 @@ import com.alechilles.alecstamework.persistence.operation.OperationEnvelope;
 import com.alechilles.alecstamework.persistence.operation.OperationPhase;
 import com.alechilles.alecstamework.persistence.operation.PreparedOperationDetail;
 
-/** Atomically reserves one empty coop slot and fences its exact live source lifecycle. */
+/** Atomically reserves one empty coop slot and fences its exact variant-specific source. */
 final class SqliteCompanionCoopCapturePreparation
         implements PreparedOperationDetail {
     private final CompanionCoopCaptureRequest capture;
+    private final SqliteCompanionCoopCaptureSourceAuthority source;
 
     SqliteCompanionCoopCapturePreparation(CompanionCoopCaptureRequest capture) {
         if (capture == null) {
             throw new IllegalArgumentException("Coop capture preparation is required");
         }
         this.capture = capture;
+        source = new SqliteCompanionCoopCaptureSourceAuthority(capture);
     }
 
     @Override
@@ -31,7 +32,7 @@ final class SqliteCompanionCoopCapturePreparation
             SqlitePersistenceTransactionContext transaction,
             OperationEnvelope operation
     ) {
-        CompanionLifecycle current = requireExactLiveSource(transaction);
+        CompanionLifecycle current = source.requireExactSource(transaction);
         CoopConflictDiagnostic conflict = transaction.coops().diagnoseCapture(
                 capture.targetSlot(), capture.profileId()
         );
@@ -83,10 +84,9 @@ final class SqliteCompanionCoopCapturePreparation
         if (lifecycle == null || slot == null) {
             return false;
         }
-        boolean fenced = lifecycle.revision().equals(
-                capture.expectedLifecycleRevision().next()
-        ) && lifecycle.state() == LifecycleState.ACTIVE
-                && operation.operationId().equals(lifecycle.activeOperationId())
+        boolean fenced = source.matchesFence(
+                transaction, lifecycle, operation
+        )
                 && operation.operationId().equals(slot.activeOperationId())
                 && capture.profileId().equals(slot.reservedProfileId())
                 && transaction.coops()
@@ -124,38 +124,8 @@ final class SqliteCompanionCoopCapturePreparation
                 && transaction.snapshots()
                 .findById(capture.snapshot().snapshotId())
                 .filter(capture.snapshot()::equals)
-                .isPresent();
-    }
-
-    private CompanionLifecycle requireExactLiveSource(
-            SqlitePersistenceTransactionContext transaction
-    ) {
-        CompanionLifecycle current = transaction.lifecycles()
-                .findByProfile(capture.profileId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "coop_capture_profile_lifecycle_missing"
-                ));
-        CompanionAlias alias = transaction.identities()
-                .resolveAlias(capture.source().sourceAlias())
-                .orElse(null);
-        boolean exactLocation = current.state() == LifecycleState.ACTIVE
-                && current.location().kind() == LifecycleLocationKind.LIVE_ENTITY
-                && capture.source().sourceAlias().toString().equals(
-                current.location().key()
-        )
-                && capture.source().sourceWorldKey().equals(
-                current.location().worldKey()
-        );
-        if (!current.revision().equals(capture.expectedLifecycleRevision())
-                || current.activeOperationId() != null || current.quarantined()
-                || !exactLocation || alias == null
-                || !capture.profileId().equals(alias.profileId())
-                || alias.state() != CompanionAlias.State.CURRENT) {
-            throw new IllegalStateException(
-                    "coop_capture_not_exact_live_source"
-            );
-        }
-        return current;
+                .isPresent()
+                && source.matchesDurableSource(transaction);
     }
 
     private boolean exactResidency(CoopResidency residency) {

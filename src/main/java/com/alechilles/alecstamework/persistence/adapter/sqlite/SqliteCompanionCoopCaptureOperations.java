@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.companion.coop.CoopOccupancy;
 import com.alechilles.alecstamework.companion.coop.CoopResidency;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionChange;
 import com.alechilles.alecstamework.companion.coop.CoopResidencyProjectionCodec;
+import com.alechilles.alecstamework.companion.coop.CoopCapturedItemSourceEvidence;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
@@ -27,11 +29,12 @@ import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
+import java.util.TreeSet;
 import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** One slot-reserved live-to-coop transition through the shared operation protocol. */
+/** One slot-reserved entity-or-captured-item transition through the shared operation protocol. */
 public final class SqliteCompanionCoopCaptureOperations {
     public static final String FEATURE_SCOPE = "companion_coop_capture";
     public static final ProjectionEventType EVENT_TYPE =
@@ -75,12 +78,7 @@ public final class SqliteCompanionCoopCaptureOperations {
                         capture,
                         FEATURE_SCOPE,
                         capture.expectedLifecycleRevision(),
-                        List.of(
-                                OperationScope.profile(capture.profileId()),
-                                OperationScope.coop(
-                                        capture.targetSlot().toString()
-                                )
-                        ),
+                        participants(capture),
                         capture.requestedAtMs()
                 );
         SqliteLiveOperationCoordinator.Submission submission =
@@ -100,7 +98,8 @@ public final class SqliteCompanionCoopCaptureOperations {
                                 capture.profileId(),
                                 capture.targetSlot(),
                                 "Coop capture could not prove whether the exact "
-                                        + "source entity retirement completed"
+                                        + sourceLabel(capture)
+                                        + " retirement completed"
                         )
                 );
         return new Submission(submission.acceptance(), completion);
@@ -115,10 +114,18 @@ public final class SqliteCompanionCoopCaptureOperations {
         CompanionLifecycle fenced = requireFencedLifecycle(
                 transaction, operation, capture
         );
+        SqliteCompanionCoopCaptureSourceAuthority source =
+                new SqliteCompanionCoopCaptureSourceAuthority(capture);
+        if (!source.matchesFence(transaction, fenced, operation)) {
+            throw new IllegalStateException(
+                    "coop_capture_source_fence_mismatch"
+            );
+        }
         CompanionProfileProjectionState before =
                 SqliteCompanionProfileProjectionComposer.compose(
                         transaction, capture.profileId()
                 );
+        source.retireCapturedSnapshot(transaction);
         requireApplied(
                 transaction.snapshots().replaceCurrent(capture.snapshot()),
                 "coop_capture_snapshot"
@@ -251,7 +258,6 @@ public final class SqliteCompanionCoopCaptureOperations {
         if (!lifecycle.revision().equals(
                 capture.expectedLifecycleRevision().next()
         )
-                || lifecycle.state() != LifecycleState.ACTIVE
                 || !operation.operationId().equals(
                 lifecycle.activeOperationId()
         )
@@ -261,6 +267,28 @@ public final class SqliteCompanionCoopCaptureOperations {
             );
         }
         return lifecycle;
+    }
+
+    private List<OperationScope> participants(
+            CompanionCoopCaptureRequest capture
+    ) {
+        TreeSet<OperationScope> scopes = new TreeSet<>();
+        scopes.add(OperationScope.profile(capture.profileId()));
+        scopes.add(OperationScope.coop(capture.targetSlot().toString()));
+        if (capture.source()
+                instanceof CoopCapturedItemSourceEvidence capturedItem) {
+            scopes.add(OperationScope.owner(OwnerId.parse(
+                    capturedItem.actorUuid().toString()
+            )));
+        }
+        return List.copyOf(scopes);
+    }
+
+    private String sourceLabel(CompanionCoopCaptureRequest capture) {
+        return capture.source()
+                instanceof CoopCapturedItemSourceEvidence
+                ? "source captured item"
+                : "source entity";
     }
 
     private <T> T requireApplied(
