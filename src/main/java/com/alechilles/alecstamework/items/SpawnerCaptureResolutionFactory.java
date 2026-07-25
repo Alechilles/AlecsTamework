@@ -36,7 +36,8 @@ final class SpawnerCaptureResolutionFactory {
             ItemFeatureConfig.CaptureItemMechanics mechanics,
             @Nullable CapturePolicyConfigView policy,
             SpawnerCaptureChanceService.Evaluation evaluation,
-            long requirementGeneration
+            long requirementGeneration,
+            @Nullable SpawnerCapturePolicyService.CaptureHealth health
     ) {
         if (attempt == null || mechanics == null || evaluation == null) {
             throw new IllegalArgumentException(
@@ -76,7 +77,12 @@ final class SpawnerCaptureResolutionFactory {
                 evaluation.entropy(),
                 successful
                         ? null
-                        : failureCooldown(mechanics.failureCooldownMs())
+                        : failureCooldown(mechanics.failureCooldownMs()),
+                attempt.callerNamespace(),
+                attempt.idempotencyKey(),
+                null,
+                health == null ? null : health.currentHealth(),
+                health == null ? null : health.maximumHealth()
         );
     }
 

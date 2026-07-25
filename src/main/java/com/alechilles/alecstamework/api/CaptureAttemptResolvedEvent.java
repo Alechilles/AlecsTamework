@@ -19,8 +19,8 @@ public record CaptureAttemptResolvedEvent(@Nonnull UUID attemptId,
                                           long capturePolicyRevision,
                                           int power,
                                           int minimumPower,
-                                          double currentHealth,
-                                          double maximumHealth,
+                                          @Nullable Double currentHealth,
+                                          @Nullable Double maximumHealth,
                                           double missingHealthFraction,
                                           double configuredConditionBonus,
                                           double effectiveChance,
@@ -28,7 +28,9 @@ public record CaptureAttemptResolvedEvent(@Nonnull UUID attemptId,
                                           @Nonnull CaptureAttemptOutcome outcome,
                                           @Nonnull String reason,
                                           long resolvedAtMs,
-                                          long emittedAtMs) implements TameworkEvent {
+                                          long emittedAtMs,
+                                          @Nullable CaptureAttemptReplayEvidence replayEvidence)
+        implements TameworkEvent {
     public CaptureAttemptResolvedEvent {
         attemptId = Objects.requireNonNull(attemptId, "attemptId");
         operationId = Objects.requireNonNull(operationId, "operationId");
@@ -51,10 +53,20 @@ public record CaptureAttemptResolvedEvent(@Nonnull UUID attemptId,
         if (power < 0 || minimumPower < 0) {
             throw new IllegalArgumentException("Capture power values cannot be negative.");
         }
-        validateFinite("currentHealth", currentHealth);
-        validateFinite("maximumHealth", maximumHealth);
-        if (maximumHealth <= 0.0D || currentHealth < 0.0D || currentHealth > maximumHealth) {
-            throw new IllegalArgumentException("Current health must be within a positive maximum health range.");
+        if ((currentHealth == null) != (maximumHealth == null)) {
+            throw new IllegalArgumentException(
+                    "Current and maximum health must appear together."
+            );
+        }
+        if (currentHealth != null) {
+            validateFinite("currentHealth", currentHealth);
+            validateFinite("maximumHealth", maximumHealth);
+            if (maximumHealth <= 0.0D || currentHealth < 0.0D
+                    || currentHealth > maximumHealth) {
+                throw new IllegalArgumentException(
+                        "Current health must be within a positive maximum health range."
+                );
+            }
         }
         validateUnit("missingHealthFraction", missingHealthFraction);
         validateFinite("configuredConditionBonus", configuredConditionBonus);
@@ -62,6 +74,43 @@ public record CaptureAttemptResolvedEvent(@Nonnull UUID attemptId,
             throw new IllegalArgumentException("Configured condition bonus cannot be negative.");
         }
         validateUnit("effectiveChance", effectiveChance);
+    }
+
+    /** Source-compatible constructor for callers compiled against the original API event. */
+    public CaptureAttemptResolvedEvent(
+            UUID attemptId,
+            UUID operationId,
+            UUID actorUuid,
+            UUID targetNpcUuid,
+            String profileId,
+            String roleId,
+            String sourceItemId,
+            String spawnerConfigId,
+            long spawnerConfigRevision,
+            String capturePolicyConfigId,
+            long capturePolicyRevision,
+            int power,
+            int minimumPower,
+            double currentHealth,
+            double maximumHealth,
+            double missingHealthFraction,
+            double configuredConditionBonus,
+            double effectiveChance,
+            boolean guaranteed,
+            CaptureAttemptOutcome outcome,
+            String reason,
+            long resolvedAtMs,
+            long emittedAtMs
+    ) {
+        this(
+                attemptId, operationId, actorUuid, targetNpcUuid,
+                profileId, roleId, sourceItemId, spawnerConfigId,
+                spawnerConfigRevision, capturePolicyConfigId,
+                capturePolicyRevision, power, minimumPower,
+                currentHealth, maximumHealth, missingHealthFraction,
+                configuredConditionBonus, effectiveChance, guaranteed,
+                outcome, reason, resolvedAtMs, emittedAtMs, null
+        );
     }
 
     private static void validateFinite(String field, double value) {

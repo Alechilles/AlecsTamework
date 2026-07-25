@@ -19,11 +19,19 @@ public record CaptureAttemptResolution(
         boolean guaranteed,
         double missingHealthFraction,
         @Nullable Double entropy,
-        @Nullable Long failureCooldownUntilMs
+        @Nullable Long failureCooldownUntilMs,
+        @Nullable String callerNamespace,
+        @Nullable String callerIdempotencyKey,
+        @Nullable String targetDisplayName,
+        @Nullable Double currentHealth,
+        @Nullable Double maximumHealth
 ) {
     public CaptureAttemptResolution {
         targetRoleId = requireText(targetRoleId, "Capture target role");
         reason = requireText(reason, "Capture resolution reason");
+        callerNamespace = normalize(callerNamespace);
+        callerIdempotencyKey = normalize(callerIdempotencyKey);
+        targetDisplayName = normalize(targetDisplayName);
         if (attemptId == null || formula == null || sourceConsumption == null
                 || successDisposition == null || outcome == null) {
             throw new IllegalArgumentException(
@@ -51,6 +59,66 @@ public record CaptureAttemptResolution(
                     "Successful capture cannot carry failure cooldown"
             );
         }
+        if ((callerNamespace == null) != (callerIdempotencyKey == null)) {
+            throw new IllegalArgumentException(
+                    "Capture caller namespace and idempotency key must appear together"
+            );
+        }
+        if ((currentHealth == null) != (maximumHealth == null)) {
+            throw new IllegalArgumentException(
+                    "Capture absolute health values must appear together"
+            );
+        }
+        if (currentHealth != null
+                && (!Double.isFinite(currentHealth)
+                || !Double.isFinite(maximumHealth)
+                || maximumHealth <= 0.0D
+                || currentHealth < 0.0D
+                || currentHealth > maximumHealth)) {
+            throw new IllegalArgumentException(
+                    "Capture absolute health evidence is invalid"
+            );
+        }
+    }
+
+    /** Source-compatible constructor for evidence authored before replay facts were additive. */
+    public CaptureAttemptResolution(
+            UUID attemptId,
+            String targetRoleId,
+            CaptureAttemptFormula formula,
+            CaptureSourceConsumption sourceConsumption,
+            CaptureSuccessDisposition successDisposition,
+            Outcome outcome,
+            String reason,
+            double effectiveChance,
+            boolean guaranteed,
+            double missingHealthFraction,
+            Double entropy,
+            Long failureCooldownUntilMs
+    ) {
+        this(
+                attemptId, targetRoleId, formula, sourceConsumption,
+                successDisposition, outcome, reason, effectiveChance,
+                guaranteed, missingHealthFraction, entropy,
+                failureCooldownUntilMs, null, null, null, null, null
+        );
+    }
+
+    /** Adds live display-name evidence after the world-thread snapshot is frozen. */
+    public CaptureAttemptResolution withTargetDisplayName(
+            @Nullable String displayName
+    ) {
+        String normalized = normalize(displayName);
+        return java.util.Objects.equals(normalized, targetDisplayName)
+                ? this
+                : new CaptureAttemptResolution(
+                        attemptId, targetRoleId, formula, sourceConsumption,
+                        successDisposition, outcome, reason, effectiveChance,
+                        guaranteed, missingHealthFraction, entropy,
+                        failureCooldownUntilMs, callerNamespace,
+                        callerIdempotencyKey, normalized, currentHealth,
+                        maximumHealth
+                );
     }
 
     public boolean successful() {
@@ -66,10 +134,15 @@ public record CaptureAttemptResolution(
     }
 
     private static String requireText(String value, String label) {
-        if (value == null || value.isBlank()) {
+        String normalized = normalize(value);
+        if (normalized == null) {
             throw new IllegalArgumentException(label + " is required");
         }
-        return value.trim();
+        return normalized;
+    }
+
+    private static String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public enum Outcome {

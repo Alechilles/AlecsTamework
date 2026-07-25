@@ -88,7 +88,10 @@ class SpawnerCaptureResolutionFactoryTest {
                 mechanics,
                 policy,
                 evaluation,
-                11L
+                11L,
+                new SpawnerCapturePolicyService.CaptureHealth(
+                        5.0D, 10.0D
+                )
         );
 
         assertEquals(
@@ -142,7 +145,8 @@ class SpawnerCaptureResolutionFactoryTest {
                         0.0D,
                         null
                 ),
-                0L
+                0L,
+                null
         );
 
         assertNull(result.failureCooldownUntilMs());

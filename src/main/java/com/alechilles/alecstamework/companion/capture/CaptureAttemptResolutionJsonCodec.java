@@ -51,6 +51,15 @@ public final class CaptureAttemptResolutionJsonCodec {
                 "failureCooldownUntilMs",
                 resolution.failureCooldownUntilMs()
         );
+        nullable(json, "callerNamespace", resolution.callerNamespace());
+        nullable(
+                json,
+                "callerIdempotencyKey",
+                resolution.callerIdempotencyKey()
+        );
+        nullable(json, "targetDisplayName", resolution.targetDisplayName());
+        nullable(json, "currentHealth", resolution.currentHealth());
+        nullable(json, "maximumHealth", resolution.maximumHealth());
         return json;
     }
 
@@ -79,7 +88,12 @@ public final class CaptureAttemptResolutionJsonCodec {
                 json.get("guaranteed").getAsBoolean(),
                 json.get("missingHealthFraction").getAsDouble(),
                 nullableDouble(json, "entropy"),
-                nullableLong(json, "failureCooldownUntilMs")
+                nullableLong(json, "failureCooldownUntilMs"),
+                nullableText(json, "callerNamespace"),
+                nullableText(json, "callerIdempotencyKey"),
+                nullableText(json, "targetDisplayName"),
+                nullableDouble(json, "currentHealth"),
+                nullableDouble(json, "maximumHealth")
         );
     }
 

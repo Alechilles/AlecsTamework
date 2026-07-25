@@ -69,7 +69,7 @@ class CaptureAttemptCooldownIndexTest {
                 CaptureAttemptResolutionEventCodec.EVENT_TYPE,
                 "capture-attempt:" + resolution.attemptId(),
                 1L,
-                CaptureAttemptResolutionEventCodec.VERSION,
+                CaptureAttemptResolutionEventCodec.LEGACY_VERSION,
                 CaptureAttemptResolutionEventCodec.encode(
                         ACTOR, resolution
                 ),

@@ -168,7 +168,8 @@ final class SpawnerCaptureRollService {
                                 mechanics,
                                 policy,
                                 evaluation,
-                                generation
+                                generation,
+                                health
                         );
         return new Resolution(
                 evaluation,

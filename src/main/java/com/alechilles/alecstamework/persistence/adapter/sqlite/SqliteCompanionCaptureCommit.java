@@ -152,8 +152,10 @@ final class SqliteCompanionCaptureCommit {
                 1,
                 CaptureAttemptResolutionEventCodec.VERSION,
                 CaptureAttemptResolutionEventCodec.encode(
-                        capture.source().actorUuid(),
-                        capture.resolution()
+                        operation.operationId(),
+                        operation.idempotencyKey(),
+                        capture,
+                        committedAtMs
                 ),
                 committedAtMs
         );
