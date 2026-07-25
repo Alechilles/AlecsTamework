@@ -18,7 +18,6 @@ public record CompanionProvisioningOperationView(@Nonnull UUID operationId,
                                                  @Nullable PopulationCompanionLifecycle lifecycle,
                                                  @Nonnull CompanionProvisioningProjectionStatus projectionStatus,
                                                  long profileRevision,
-                                                 boolean recovered,
                                                  long updatedAtMs) {
     public CompanionProvisioningOperationView {
         operationId = Objects.requireNonNull(operationId, "operationId");

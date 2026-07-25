@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityView;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetRequest;
 import com.alechilles.alecstamework.api.ProfileDataCompareAndSetResult;
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.ProfileId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
@@ -12,6 +15,9 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
+import com.alechilles.alecstamework.persistence.facade.ReplacementCompanionProvisioningApi;
+import com.alechilles.alecstamework.persistence.facade.ReplacementPaidCommandRevivalApi;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
 import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
@@ -23,6 +29,8 @@ import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldRe
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -105,6 +113,47 @@ class ReplacementTameworkApiFactoryTest {
         }
     }
 
+    @Test
+    void composesRestoredFeaturesBehindReadinessAndLifecycleSeam() {
+        TameworkEventBus events = new TameworkEventBus(null);
+        try (PersistenceBootstrap persistence = new PersistenceBootstrap(
+                configuration(events)
+        )) {
+            assertTrue(
+                    persistence.start().toCompletableFuture().join().complete()
+            );
+            try (ReplacementTameworkApiFactory.Composition composition =
+                         ReplacementTameworkApiFactory.compose(
+                                 persistence,
+                                 Duration.ofSeconds(5),
+                                 () -> -50L,
+                                 events,
+                                 null,
+                                 new InteractionExtensionRegistry(null),
+                                 new TraitEffectRegistry(null, null),
+                                 new SimpleClaimsTamedDamagePolicy(),
+                                 restoredDependencies()
+                         )) {
+                TameworkApi api = composition.api();
+                assertTrue(api instanceof ReplacementTameworkApi);
+                assertTrue(api.getCapabilities().containsAll(List.of(
+                        TameworkApiCapability.PERSISTENCE_RESILIENCE,
+                        TameworkApiCapability.POPULATION_GROUPS,
+                        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
+                        TameworkApiCapability.COMMAND_TIMED_SUMMONING,
+                        TameworkApiCapability.COMPANION_PROVISIONING,
+                        TameworkApiCapability.PAID_COMMAND_REVIVAL,
+                        TameworkApiCapability
+                                .CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
+                        TameworkApiCapability.CAPTURE_TAME_AND_LINK
+                )));
+                composition.onRuntimeSettingsChanged();
+            }
+        } finally {
+            events.close();
+        }
+    }
+
     private PublicPersistenceRuntimeConfiguration configuration(
             TameworkEventBus events
     ) {
@@ -134,6 +183,92 @@ class ReplacementTameworkApiFactoryTest {
             String code
     ) {
         return LiveOperationResult.confirmed(code).completed();
+    }
+
+    private ReplacementFeatureApiDependencies restoredDependencies() {
+        var rosterAuthor = (com.alechilles.alecstamework.persistence.facade
+                .ReplacementCommandFamilyRosterApi.MutationAuthor)
+                (request, action) -> CompletableFuture.completedFuture(null);
+        var timedAuthor = (com.alechilles.alecstamework.persistence.facade
+                .ReplacementCommandTimedSummoningApi.TransitionAuthor)
+                (request, action) -> CompletableFuture.completedFuture(null);
+        var provisioningAuthor =
+                new ReplacementCompanionProvisioningApi.MutationAuthor() {
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            ReplacementCompanionProvisioningApi
+                                    .PreparedProvisioning> prepare(
+                            com.alechilles.alecstamework.api
+                                    .CompanionProvisioningRequest request
+                    ) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            ReplacementCompanionProvisioningApi
+                                    .PreparedProvisioning> prepare(
+                            com.alechilles.alecstamework.api
+                                    .CompanionProvisioningLinkRequest request
+                    ) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            ReplacementCompanionProvisioningApi
+                                    .PreparedTransition> prepare(
+                            com.alechilles.alecstamework.api
+                                    .ProvisionedCompanionTransitionRequest request
+                    ) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                };
+        var paidAuthor =
+                new ReplacementPaidCommandRevivalApi.RequestAuthor() {
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            com.alechilles.alecstamework.api
+                                    .PaidCommandRevivalQuote> quote(
+                            com.alechilles.alecstamework.api
+                                    .PaidCommandRevivalQuoteRequest request
+                    ) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<
+                            ReplacementPaidCommandRevivalApi.PreparedRevival>
+                    prepare(
+                            com.alechilles.alecstamework.api
+                                    .PaidCommandRevivalRequest request
+                    ) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    @Override
+                    public IdempotencyKey operationKey(
+                            String callerNamespace,
+                            String idempotencyKey
+                    ) {
+                        return new IdempotencyKey(
+                                callerNamespace + ":" + idempotencyKey
+                        );
+                    }
+                };
+        return new ReplacementFeatureApiDependencies(
+                new PopulationGroupConfigRegistry(),
+                rosterAuthor,
+                timedAuthor,
+                provisioningAuthor,
+                paidAuthor,
+                request -> new PersistenceMutationAvailabilityView(
+                        "ALLOW", "ready", null
+                ),
+                ignored -> Optional.empty(),
+                true,
+                true
+        );
     }
 
     private CompanionProfileMutation.Create profile() {

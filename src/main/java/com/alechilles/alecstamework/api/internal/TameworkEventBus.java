@@ -106,6 +106,11 @@ public final class TameworkEventBus
         dispatch(event);
     }
 
+    /** Publishes an already-mapped checkpointed persistence event. */
+    public void publishPersistenceEvent(@Nonnull TameworkEvent event) {
+        dispatch(Objects.requireNonNull(event));
+    }
+
     @Override
     public void close() {
         subscriptions.clear();
