@@ -8,6 +8,8 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
+import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkEvidenceSource;
+import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkIntentFactory;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -28,6 +30,7 @@ final class SpawnerCaptureIntentFactory {
     private final SpawnerItemDisplayMetadataService displayMetadata;
     private final SpawnerNpcStateService npcState;
     private final SpawnerNpcIdentityService npcIdentity;
+    private final SpawnerTameAndLinkIntentFactory tameAndLinkIntents;
 
     SpawnerCaptureIntentFactory(
             SpawnerCaptureMetadataService captureMetadata,
@@ -37,12 +40,35 @@ final class SpawnerCaptureIntentFactory {
             SpawnerNpcStateService npcState,
             SpawnerNpcIdentityService npcIdentity
     ) {
+        this(
+                captureMetadata,
+                progression,
+                itemMetadata,
+                displayMetadata,
+                npcState,
+                npcIdentity,
+                SpawnerTameAndLinkEvidenceSource.unavailable()
+        );
+    }
+
+    SpawnerCaptureIntentFactory(
+            SpawnerCaptureMetadataService captureMetadata,
+            SpawnerNpcProgressionMetadataService progression,
+            SpawnerItemStackMetadataService itemMetadata,
+            SpawnerItemDisplayMetadataService displayMetadata,
+            SpawnerNpcStateService npcState,
+            SpawnerNpcIdentityService npcIdentity,
+            SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence
+    ) {
         this.captureMetadata = captureMetadata;
         this.progression = progression;
         this.itemMetadata = itemMetadata;
         this.displayMetadata = displayMetadata;
         this.npcState = npcState;
         this.npcIdentity = npcIdentity;
+        this.tameAndLinkIntents = new SpawnerTameAndLinkIntentFactory(
+                tameAndLinkEvidence
+        );
     }
 
     @Nullable
@@ -84,12 +110,69 @@ final class SpawnerCaptureIntentFactory {
             );
         }
         if (roll.terminal().successDisposition()
-                != CaptureSuccessDisposition.CAPTURED_ITEM) {
-            return null;
+                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            return tameAndLinkIntent(
+                    player,
+                    targetRef,
+                    store,
+                    source,
+                    config,
+                    attempt,
+                    roll,
+                    existingOwner,
+                    particleSystemOverride
+            );
         }
-        return capturedItemIntent(
-                player, targetRef, store, source, config, attempt, roll,
-                existingOwner, particleSystemOverride
+        if (roll.terminal().successDisposition()
+                == CaptureSuccessDisposition.CAPTURED_ITEM) {
+            return capturedItemIntent(
+                    player, targetRef, store, source, config, attempt, roll,
+                    existingOwner, particleSystemOverride
+            );
+        }
+        return null;
+    }
+
+    private SpawnerCaptureIntent tameAndLinkIntent(
+            Player player,
+            Ref<EntityStore> targetRef,
+            Store<EntityStore> store,
+            ItemStack source,
+            ItemFeatureConfig config,
+            CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            @Nullable UUID existingOwner,
+            @Nullable String particleSystemOverride
+    ) {
+        String particleSystem =
+                particleSystemOverride == null
+                        || particleSystemOverride.isBlank()
+                        ? config.getCaptureParticleSystem()
+                        : particleSystemOverride;
+        return tameAndLinkIntents.create(
+                new SpawnerTameAndLinkIntentFactory.Input(
+                        attempt.attemptId().toString(),
+                        player.getUuid(),
+                        OwnerNameUtil.resolve(player),
+                        player.getWorld().getName(),
+                        attempt.hotbarSlot(),
+                        source,
+                        targetRef,
+                        store,
+                        new ProfileId(roll.targetUuid()),
+                        new NpcAlias(roll.targetUuid()),
+                        existingOwner == null
+                                ? null
+                                : new OwnerId(existingOwner),
+                        roll.roleId(),
+                        roll.terminal(),
+                        publishedEffect(
+                                targetRef,
+                                store,
+                                particleSystem,
+                                config.getCaptureSoundEvent()
+                        )
+                )
         );
     }
 

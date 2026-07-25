@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items.persistence;
 
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.capture.CaptureSourceEvidence;
+import com.alechilles.alecstamework.companion.capture.CaptureTameAndLinkEvidence;
 import com.alechilles.alecstamework.companion.capture.CaptureTerminalPlan;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.capture.CompanionSnapshotEvidence;
@@ -10,6 +12,8 @@ import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 
 /** Builds one canonical capture request from frozen Hytale-free evidence. */
 final class SpawnerCaptureRequestFactory {
+    private final SpawnerTameAndLinkEvidenceAuthor tameAndLink =
+            new SpawnerTameAndLinkEvidenceAuthor();
 
     CompanionCaptureRequest create(
             SpawnerCaptureContext context,
@@ -41,6 +45,30 @@ final class SpawnerCaptureRequestFactory {
                     context.worldKey(),
                     new CaptureTerminalPlan.FailedAttempt(
                             frozen.resolution()
+                    ),
+                    source,
+                    frozen.requestedAt()
+            );
+        }
+        if (frozen.resolution().successDisposition()
+                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            CaptureTameAndLinkEvidence evidence = tameAndLink.author(
+                    new SpawnerTameAndLinkEvidenceInput(
+                            frozen.operationId(),
+                            frozen.requestedAt(),
+                            profile.identity(),
+                            lifecycle,
+                            frozen.tameAndLinkEvidence()
+                    )
+            );
+            return new CompanionCaptureRequest(
+                    context.profileId(),
+                    lifecycle.revision(),
+                    context.resultingOwnerId(),
+                    context.sourceAlias(),
+                    context.worldKey(),
+                    new CaptureTerminalPlan.TameAndCommandLink(
+                            frozen.resolution(), evidence
                     ),
                     source,
                     frozen.requestedAt()

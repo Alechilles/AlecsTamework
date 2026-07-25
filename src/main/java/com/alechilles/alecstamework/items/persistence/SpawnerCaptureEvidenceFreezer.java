@@ -64,6 +64,10 @@ final class SpawnerCaptureEvidenceFreezer {
         }
         SpawnerCaptureLiveFacts liveFacts =
                 SpawnerCaptureLiveFacts.freeze(fullState);
+        CaptureAttemptResolution resolution =
+                intent.resolution().withTargetDisplayName(
+                        liveFacts.displayName()
+                );
         long requestedAt = clock.getAsLong();
         CapturedArtifact source = artifacts.toArtifact(intent.sourceStack());
         CapturedArtifact remainder = source.quantity() == 1
@@ -76,7 +80,7 @@ final class SpawnerCaptureEvidenceFreezer {
         String[] parts = intentParts(intent, source);
         OperationId operationId =
                 StablePersistenceIds.operationId(CAPTURE, parts);
-        if (!intent.resolution().successful()) {
+        if (!resolution.successful()) {
             return new FrozenCapture(
                     context,
                     requestedAt,
@@ -88,10 +92,28 @@ final class SpawnerCaptureEvidenceFreezer {
                     source,
                     remainder,
                     null,
-                    intent.resolution()
+                    resolution,
+                    null
             );
         }
-        if (intent.resolution().successDisposition()
+        if (resolution.successDisposition()
+                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK) {
+            return new FrozenCapture(
+                    context,
+                    requestedAt,
+                    operationId,
+                    StablePersistenceIds.idempotencyKey(CAPTURE, parts),
+                    null,
+                    null,
+                    liveFacts,
+                    source,
+                    remainder,
+                    null,
+                    resolution,
+                    intent.tameAndLinkEvidence()
+            );
+        }
+        if (resolution.successDisposition()
                 != CaptureSuccessDisposition.CAPTURED_ITEM) {
             throw new EvidenceFailure(
                     "capture_success_disposition_not_supported"
@@ -103,7 +125,7 @@ final class SpawnerCaptureEvidenceFreezer {
                 intent.resultingOwnerName()
         );
         SnapshotId snapshotId = new SnapshotId(
-                intent.resolution().attemptId()
+                resolution.attemptId()
         );
         BsonDocument metadata = new BsonDocument()
                 .append(
@@ -133,7 +155,8 @@ final class SpawnerCaptureEvidenceFreezer {
                 source,
                 remainder,
                 artifacts.toArtifact(tagged),
-                intent.resolution()
+                resolution,
+                null
         );
     }
 
@@ -170,7 +193,8 @@ final class SpawnerCaptureEvidenceFreezer {
             CapturedArtifact source,
             @Nullable CapturedArtifact remainder,
             @Nullable CapturedArtifact artifact,
-            CaptureAttemptResolution resolution
+            CaptureAttemptResolution resolution,
+            @Nullable SpawnerTameAndLinkIntentEvidence tameAndLinkEvidence
     ) {
     }
 }

@@ -29,7 +29,7 @@ public record SpawnerCaptureIntent(
         @Nonnull String worldKey,
         int sourceSlot,
         @Nonnull ItemStack sourceStack,
-        @Nonnull ItemStack filledArtifactStack,
+        @Nullable ItemStack filledArtifactStack,
         @Nullable Ref<EntityStore> sourceRef,
         @Nullable Store<EntityStore> sourceStore,
         @Nonnull ProfileId profileId,
@@ -39,7 +39,8 @@ public record SpawnerCaptureIntent(
         @Nullable String resultingOwnerName,
         @Nullable String roleId,
         @Nonnull CaptureAttemptResolution resolution,
-        @Nullable SpawnerPublishedEffect publishedEffect
+        @Nullable SpawnerPublishedEffect publishedEffect,
+        @Nullable SpawnerTameAndLinkIntentEvidence tameAndLinkEvidence
 ) {
     public SpawnerCaptureIntent {
         if (intentKey == null || intentKey.isBlank()
@@ -54,14 +55,35 @@ public record SpawnerCaptureIntent(
         if (resolution.successful()
                 && resolution.successDisposition()
                 == CaptureSuccessDisposition.CAPTURED_ITEM
-                && filledArtifactStack == null) {
+                && (filledArtifactStack == null
+                || tameAndLinkEvidence != null)) {
             throw new IllegalArgumentException(
-                    "Captured-item success requires a filled artifact"
+                    "Captured-item success requires only a filled artifact"
+            );
+        }
+        if (resolution.successful()
+                && resolution.successDisposition()
+                == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
+                && (filledArtifactStack != null
+                || tameAndLinkEvidence == null
+                || liveOwnerId != null
+                || resultingOwnerId == null
+                || !resultingOwnerId.value().equals(actorUuid)
+                || !resultingOwnerId.equals(
+                        tameAndLinkEvidence.target().ownerId()
+                )
+                || !java.util.Objects.equals(
+                        resultingOwnerName,
+                        tameAndLinkEvidence.target().ownerName()
+                ))) {
+            throw new IllegalArgumentException(
+                    "Tame/link success requires exact owner evidence"
             );
         }
         if (!resolution.successful()
                 && (filledArtifactStack != null
-                || resultingOwnerId != null)) {
+                || resultingOwnerId != null
+                || tameAndLinkEvidence != null)) {
             throw new IllegalArgumentException(
                     "Failed capture cannot contain success mutations"
             );
@@ -94,7 +116,8 @@ public record SpawnerCaptureIntent(
                 resultingOwnerName,
                 roleId,
                 resolution,
-                publishedEffect
+                publishedEffect,
+                tameAndLinkEvidence
         );
     }
 
@@ -147,7 +170,48 @@ public record SpawnerCaptureIntent(
                 resultingOwnerName,
                 roleId,
                 legacyResolution(intentKey, roleId),
-                publishedEffect
+                publishedEffect,
+                null
+        );
+    }
+
+    /** Source-compatible constructor for resolved callers without tame/link evidence. */
+    public SpawnerCaptureIntent(
+            String intentKey,
+            UUID actorUuid,
+            String worldKey,
+            int sourceSlot,
+            ItemStack sourceStack,
+            ItemStack filledArtifactStack,
+            Ref<EntityStore> sourceRef,
+            Store<EntityStore> sourceStore,
+            ProfileId profileId,
+            NpcAlias sourceAlias,
+            OwnerId liveOwnerId,
+            OwnerId resultingOwnerId,
+            String resultingOwnerName,
+            String roleId,
+            CaptureAttemptResolution resolution,
+            SpawnerPublishedEffect publishedEffect
+    ) {
+        this(
+                intentKey,
+                actorUuid,
+                worldKey,
+                sourceSlot,
+                sourceStack,
+                filledArtifactStack,
+                sourceRef,
+                sourceStore,
+                profileId,
+                sourceAlias,
+                liveOwnerId,
+                resultingOwnerId,
+                resultingOwnerName,
+                roleId,
+                resolution,
+                publishedEffect,
+                null
         );
     }
 
