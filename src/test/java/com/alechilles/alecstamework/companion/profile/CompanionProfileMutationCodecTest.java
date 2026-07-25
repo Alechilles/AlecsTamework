@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -191,6 +192,51 @@ class CompanionProfileMutationCodecTest {
         assertEquals(new LifecycleRevision(4), resolved.revision());
         assertEquals(
                 new ReconciliationGeneration(6),
+                resolved.lastReconciledGeneration()
+        );
+        assertEquals("owner-world", resolved.ownerWorldKey());
+    }
+
+    @Test
+    void importedRecallRecoveryRoundTripsExactSingleUseEvidence() {
+        CompanionProfileMutation.RecoverImportedMissing recovery =
+                new CompanionProfileMutation.RecoverImportedMissing(
+                        PROFILE,
+                        new LifecycleRevision(3),
+                        7,
+                        ALIAS,
+                        OWNER,
+                        SnapshotId.parse(
+                                "60000000-0000-0000-0000-000000000001"
+                        ),
+                        Sha256Hash.ofUtf8("payload"),
+                        -8_500,
+                        -8_000
+                );
+
+        CompanionProfileMutation.RecoverImportedMissing decoded =
+                (CompanionProfileMutation.RecoverImportedMissing) decode(
+                        encode(recovery)
+                );
+        CompanionLifecycle current = new CompanionLifecycle(
+                PROFILE,
+                OWNER,
+                LifecycleState.UNLOADED,
+                LifecycleLocation.none(),
+                new LifecycleRevision(3),
+                null,
+                -9_000,
+                new ReconciliationGeneration(5),
+                null,
+                "owner-world"
+        );
+
+        assertEquals(recovery, decoded);
+        CompanionLifecycle resolved = decoded.resolvedLifecycle(current);
+        assertEquals(LifecycleState.LOST, resolved.state());
+        assertEquals(new LifecycleRevision(4), resolved.revision());
+        assertEquals(
+                new ReconciliationGeneration(5),
                 resolved.lastReconciledGeneration()
         );
         assertEquals("owner-world", resolved.ownerWorldKey());

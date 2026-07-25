@@ -109,7 +109,9 @@ final class CommandRelocationDispatchService {
                     sourceHint,
                     record.homePosition,
                     settings.isCrossWorldRecallEnabled(),
-                    settings.getOnTransferFailure()
+                    settings.getOnTransferFailure(),
+                    null,
+                    true
             );
             queued++;
         }

@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.companion.lifecycle.LifecycleLocation;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleState;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import java.util.HashSet;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -20,6 +22,7 @@ public sealed interface CompanionProfileMutation
         permits CompanionProfileMutation.Create,
                 CompanionProfileMutation.AdoptLive,
                 CompanionProfileMutation.StartupReconciliation,
+                CompanionProfileMutation.RecoverImportedMissing,
                 CompanionProfileMutation.Update {
     @Nonnull
     ProfileId profileId();
@@ -232,6 +235,73 @@ public sealed interface CompanionProfileMutation
                     null,
                     requestedAtMs,
                     current.lastReconciledGeneration().next(),
+                    null,
+                    current.ownerWorldKey()
+            );
+        }
+    }
+
+    /**
+     * Converts one exact public-import recovery artifact after an explicit
+     * recall exhausted every normal relocation attempt.
+     *
+     * <p>This is deliberately not generic missing-entity inference. It applies
+     * only to the single-use released-coop evidence retained by the importer,
+     * and the transaction rechecks every lifecycle, alias, owner, snapshot ID,
+     * and payload-hash fence before transitioning to {@code LOST}.</p>
+     */
+    record RecoverImportedMissing(
+            @Nonnull ProfileId profileId,
+            @Nonnull LifecycleRevision expectedLifecycleRevision,
+            long expectedMetadataRevision,
+            @Nonnull NpcAlias expectedCurrentAlias,
+            @Nonnull OwnerId expectedOwnerId,
+            @Nonnull SnapshotId recoverySnapshotId,
+            @Nonnull Sha256Hash recoveryPayloadHash,
+            long recallQueuedAtMs,
+            long requestedAtMs
+    ) implements CompanionProfileMutation {
+        public RecoverImportedMissing {
+            if (profileId == null || expectedLifecycleRevision == null
+                    || expectedCurrentAlias == null || expectedOwnerId == null
+                    || recoverySnapshotId == null
+                    || recoveryPayloadHash == null) {
+                throw new IllegalArgumentException(
+                        "Complete imported recall recovery evidence is required"
+                );
+            }
+            if (expectedMetadataRevision < 0) {
+                throw new IllegalArgumentException(
+                        "Imported recall recovery metadata revision is invalid"
+                );
+            }
+            if (recallQueuedAtMs > requestedAtMs) {
+                throw new IllegalArgumentException(
+                        "Imported recall recovery time ordering is invalid"
+                );
+            }
+        }
+
+        @Nonnull
+        public CompanionLifecycle resolvedLifecycle(
+                @Nonnull CompanionLifecycle current
+        ) {
+            if (current == null || !profileId.equals(current.profileId())
+                    || !expectedLifecycleRevision.equals(current.revision())
+                    || !expectedOwnerId.equals(current.ownerId())) {
+                throw new IllegalArgumentException(
+                        "Imported recall recovery lifecycle fence mismatch"
+                );
+            }
+            return new CompanionLifecycle(
+                    profileId,
+                    current.ownerId(),
+                    LifecycleState.LOST,
+                    LifecycleLocation.none(),
+                    current.revision().next(),
+                    null,
+                    requestedAtMs,
+                    current.lastReconciledGeneration(),
                     null,
                     current.ownerWorldKey()
             );

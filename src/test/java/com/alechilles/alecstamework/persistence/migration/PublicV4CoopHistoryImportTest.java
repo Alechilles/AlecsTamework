@@ -57,6 +57,22 @@ class PublicV4CoopHistoryImportTest {
                 SELECT COUNT(*) FROM companion_snapshot
                 WHERE snapshot_kind = 'coop' AND is_current = 0
                 """));
+        assertEquals(1, scalar(target, """
+                SELECT COUNT(*) FROM companion_snapshot
+                WHERE profile_id = '%s'
+                  AND snapshot_kind = 'public_import_recovery'
+                  AND payload_version = 1
+                  AND is_current = 1
+                """.formatted(ACTIVE_PROFILE)));
+        assertEquals(
+                "00000000-0000-0000-0000-000000000001",
+                text(target, """
+                        SELECT json_extract(payload_json, '$.npcUuid')
+                        FROM companion_snapshot
+                        WHERE profile_id = '%s'
+                          AND snapshot_kind = 'public_import_recovery'
+                        """.formatted(ACTIVE_PROFILE))
+        );
         assertEquals("COOP", text(target, """
                 SELECT lifecycle_state FROM companion_lifecycle
                 WHERE profile_id = '%s'
@@ -71,6 +87,45 @@ class PublicV4CoopHistoryImportTest {
                 """.formatted(ACTIVE_PROFILE)));
         assertEquals("ok", text(target, "PRAGMA integrity_check"));
         assertEquals(0, rows(target, "PRAGMA foreign_key_check"));
+    }
+
+    @Test
+    void invalidOptionalReleasedHistoryDoesNotQuarantineTheProfile()
+            throws Exception {
+        Path source = tempDir.resolve("invalid-history.sqlite");
+        Path target = tempDir.resolve("invalid-history-state.sqlite");
+        PersistenceConsolidationFixtureDatabase.materialize(
+                "public-v4-coop-history.sql", source
+        );
+        execute(source, """
+                UPDATE coop_slots
+                SET state_snapshot_json = '{"version":"1","npcUuid":"not-a-uuid"}'
+                WHERE coop_id = 'released-coop' AND resident_slot = 1
+                """);
+
+        assertInstanceOf(
+                PublicImportResult.Imported.class,
+                new PublicPersistenceImporter(() -> -7_000)
+                        .importSource(source, target)
+        );
+
+        assertEquals(0, scalar(target, """
+                SELECT COUNT(*) FROM companion_snapshot
+                WHERE profile_id = '%s'
+                  AND snapshot_kind = 'public_import_recovery'
+                """.formatted(ACTIVE_PROFILE)));
+        assertEquals(0, scalar(target, "SELECT COUNT(*) FROM persistence_quarantine"));
+        assertEquals("UNRESOLVED", text(target, """
+                SELECT lifecycle_state FROM companion_lifecycle
+                WHERE profile_id = '%s'
+                """.formatted(ACTIVE_PROFILE)));
+    }
+
+    private void execute(Path database, String sql) throws Exception {
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        }
     }
 
     private long scalar(Path database, String sql) throws Exception {

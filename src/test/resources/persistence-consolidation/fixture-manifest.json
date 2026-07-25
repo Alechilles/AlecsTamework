@@ -33,7 +33,7 @@
     },
     {
       "resource": "public-v4-coop-history.sql",
-      "normalizedLfSha256": "9a550ad071f7c008c1e9f8f41033af9493aaa6eb7a3d2c3825b02ca691af8bb3"
+      "normalizedLfSha256": "4cc27fc74593d00d922912777dd137d416ded4694302fc4b93f9f8bf4bddf78f"
     },
     {
       "resource": "public-v4-conflicting-flags.sql",

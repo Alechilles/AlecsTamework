@@ -20,6 +20,8 @@ import static com.alechilles.alecstamework.persistence.migration.PublicImportPla
 /** Resolves snapshots, coop detail, lifecycle, and bounded quarantine from public evidence. */
 final class PublicImportLifecyclePlanner {
     private static final int RELEASED_SNAPSHOT_PAYLOAD_VERSION = 1;
+    private final PublicReleasedCoopRecoveryPlanner releasedCoopRecovery =
+            new PublicReleasedCoopRecoveryPlanner();
 
     @Nonnull
     PublicImportPlanningModel.Lifecycle plan(
@@ -32,9 +34,16 @@ final class PublicImportLifecyclePlanner {
                 snapshots(source, identity.profiles(), fingerprint);
         PublicImportPlanningModel.CoopAnalysis coop =
                 coops(source, identity.profiles(), snapshots, fingerprint);
-        markDuplicateActiveSnapshots(snapshots, identity.profiles());
         Map<String, LegacyPublicData.ProfileState> states =
                 profileStates(source, identity.profiles());
+        releasedCoopRecovery.addRecoveryProjections(
+                source,
+                identity.profiles(),
+                states,
+                snapshots,
+                fingerprint
+        );
+        markDuplicateActiveSnapshots(snapshots, identity.profiles());
         resolveLifecycles(identity.profiles(), snapshots, coop, states);
 
         ArrayList<PublicImportPlan.Lifecycle> lifecycles = new ArrayList<>();

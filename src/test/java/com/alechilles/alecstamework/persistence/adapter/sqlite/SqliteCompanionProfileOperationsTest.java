@@ -16,6 +16,10 @@ import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEv
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationOutcome;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChangeCodec;
+import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
+import com.alechilles.alecstamework.companion.snapshot.PublicImportRecoveryProjection;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
 import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
@@ -354,6 +358,147 @@ class SqliteCompanionProfileOperationsTest {
                 lifecycle.lastReconciledGeneration());
         assertEquals("owner-world", lifecycle.ownerWorldKey());
         assertEquals(ALIAS_A, storedAlias(ALIAS_A).alias());
+    }
+
+    @Test
+    void explicitRecallConvertsExactImportRecoveryToLostOnce()
+            throws Exception {
+        CompanionProfileMutation.Create imported =
+                new CompanionProfileMutation.Create(
+                        identity(0, "Imported", -9_000),
+                        new CompanionLifecycle(
+                                PROFILE, OWNER_A, LifecycleState.UNRESOLVED,
+                                LifecycleLocation.unresolved(),
+                                LifecycleRevision.INITIAL, null, -9_000,
+                                ReconciliationGeneration.INITIAL, null,
+                                "owner-world"
+                        ),
+                        List.of(),
+                        -9_000
+                );
+        submit(1, "profile-import-recovery-create", imported);
+        insertCurrentAlias(ALIAS_A);
+        String payload = """
+                {"version":"1","npcUuid":"%s","roleId":"role","commandLinks":{"ownerId":"%s"},"owner":{"ownerId":"%s"}}
+                """.formatted(ALIAS_A, OWNER_A, OWNER_A).trim();
+        CompanionSnapshot source = new CompanionSnapshot(
+                SnapshotId.parse(
+                        "60000000-0000-0000-0000-000000000001"
+                ),
+                PROFILE,
+                PublicImportRecoveryProjection.KIND,
+                PublicImportRecoveryProjection.VERSION,
+                payload,
+                Sha256Hash.ofUtf8(payload),
+                LifecycleRevision.INITIAL,
+                true,
+                -8_500
+        );
+        insertSnapshot(source);
+        OperationWorkflowResult unloaded = submitAsync(
+                2,
+                "profile-import-recovery-unloaded",
+                new CompanionProfileMutation.ReconcileUnloaded(
+                        PROFILE,
+                        LifecycleRevision.INITIAL,
+                        ReconciliationGeneration.INITIAL,
+                        ALIAS_A,
+                        -8_000
+                )
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED,
+                unloaded.status());
+        CompanionProfileMutation.RecoverImportedMissing recovery =
+                new CompanionProfileMutation.RecoverImportedMissing(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        0,
+                        ALIAS_A,
+                        OWNER_A,
+                        source.snapshotId(),
+                        source.payloadHash(),
+                        -7_500,
+                        -7_000
+                );
+        CompanionProfileMutation.RecoverImportedMissing staleMetadata =
+                new CompanionProfileMutation.RecoverImportedMissing(
+                        PROFILE,
+                        new LifecycleRevision(1),
+                        1,
+                        ALIAS_A,
+                        OWNER_A,
+                        source.snapshotId(),
+                        source.payloadHash(),
+                        -7_500,
+                        -7_000
+                );
+
+        OperationWorkflowResult rejected = submitAsync(
+                3,
+                "profile-import-recovery-stale-metadata",
+                staleMetadata
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(
+                OperationWorkflowResult.Status.DURABLE_COMMIT_FAILED,
+                rejected.status()
+        );
+        assertEquals(LifecycleState.UNLOADED,
+                storedLifecycle(PROFILE).state());
+        assertEquals(ALIAS_A, storedCurrentAlias().alias());
+        assertTrue(storedSnapshot(source.snapshotId()).current());
+        assertNull(storedCurrentSnapshotOrNull(new SnapshotKind("lost")));
+
+        OperationWorkflowResult result = submitAsync(
+                4,
+                "profile-import-recovery",
+                recovery
+        ).get(10, TimeUnit.SECONDS);
+
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, result.status());
+        assertEquals(3, result.events().size());
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UPDATED,
+                CompanionProfileMutationEventCodec.decode(
+                        result.events().getFirst().payloadVersion(),
+                        result.events().getFirst().payloadJson()
+                ).status()
+        );
+        CompanionLifecycle lifecycle = storedLifecycle(PROFILE);
+        assertEquals(LifecycleState.LOST, lifecycle.state());
+        assertEquals(new LifecycleRevision(2), lifecycle.revision());
+        assertEquals(
+                new ReconciliationGeneration(1),
+                lifecycle.lastReconciledGeneration()
+        );
+        assertEquals(
+                com.alechilles.alecstamework.companion.identity.CompanionAlias
+                        .State.RETIRED,
+                storedAlias(ALIAS_A).state()
+        );
+        assertNull(storedCurrentAlias());
+        assertFalse(storedSnapshot(source.snapshotId()).current());
+        CompanionSnapshot lost = storedCurrentSnapshot(
+                new SnapshotKind("lost")
+        );
+        assertEquals(2, lost.payloadVersion());
+        assertEquals(payload, lost.payloadJson());
+        assertEquals(source.payloadHash(), lost.payloadHash());
+
+        OperationWorkflowResult replay = submitAsync(
+                5,
+                "profile-import-recovery-replay",
+                recovery
+        ).get(10, TimeUnit.SECONDS);
+        assertEquals(OperationWorkflowResult.Status.PUBLISHED, replay.status());
+        assertEquals(1, replay.events().size());
+        assertEquals(
+                CompanionProfileMutationOutcome.Status.UNCHANGED,
+                CompanionProfileMutationEventCodec.decode(
+                        replay.events().getFirst().payloadVersion(),
+                        replay.events().getFirst().payloadJson()
+                ).status()
+        );
+        assertEquals(lost, storedCurrentSnapshot(new SnapshotKind("lost")));
     }
 
     @Test
@@ -749,6 +894,68 @@ class SqliteCompanionProfileOperationsTest {
             statement.setString(2, PROFILE.toString());
             statement.setLong(3, -9_000);
             statement.executeUpdate();
+        }
+    }
+
+    private void insertRetiredAlias(NpcAlias alias, int generation)
+            throws Exception {
+        try (Connection connection = connections.openWriterConnection();
+             java.sql.PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO companion_alias(
+                         npc_uuid, profile_id, alias_generation, alias_state,
+                         lease_operation_id, mapped_at_ms, retired_at_ms
+                     ) VALUES (?, ?, ?, 'RETIRED', NULL, ?, ?)
+                     """)) {
+            statement.setString(1, alias.toString());
+            statement.setString(2, PROFILE.toString());
+            statement.setInt(3, generation);
+            statement.setLong(4, -9_500);
+            statement.setLong(5, -9_000);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertSnapshot(CompanionSnapshot snapshot) throws Exception {
+        try (Connection connection = connections.openWriterConnection()) {
+            assertTrue(new SqliteCompanionSnapshotStore(connection)
+                    .replaceCurrent(snapshot)
+                    .applied());
+        }
+    }
+
+    private com.alechilles.alecstamework.companion.identity.CompanionAlias
+    storedCurrentAlias() throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionIdentityStore(connection)
+                    .findCurrentAlias(PROFILE)
+                    .orElse(null);
+        }
+    }
+
+    private CompanionSnapshot storedSnapshot(SnapshotId snapshotId)
+            throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionSnapshotStore(connection)
+                    .findById(snapshotId)
+                    .orElseThrow();
+        }
+    }
+
+    private CompanionSnapshot storedCurrentSnapshot(SnapshotKind kind)
+            throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionSnapshotStore(connection)
+                    .findCurrent(PROFILE, kind)
+                    .orElseThrow();
+        }
+    }
+
+    private CompanionSnapshot storedCurrentSnapshotOrNull(SnapshotKind kind)
+            throws Exception {
+        try (Connection connection = connections.openReadConnection()) {
+            return new SqliteCompanionSnapshotStore(connection)
+                    .findCurrent(PROFILE, kind)
+                    .orElse(null);
         }
     }
 

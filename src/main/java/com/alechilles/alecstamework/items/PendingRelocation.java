@@ -26,6 +26,7 @@ final class PendingRelocation {
     final long queuedAtMs;
     final boolean allowCrossWorldTransfer;
     final TwCompanionConfig.TransferFailurePolicy onTransferFailure;
+    final boolean explicitRecall;
     private final Set<String> requiredStateFilter;
     private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
             new ConcurrentHashMap<>();
@@ -57,6 +58,42 @@ final class PendingRelocation {
                       boolean allowCrossWorldTransfer,
                       @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                       @Nullable String[] requiredStateFilter) {
+        this(
+                npcUuid,
+                destination,
+                destinationWorldName,
+                sourceHintPosition,
+                alternateSourceHintPosition,
+                ownerUuid,
+                assignOwnerAsMasterTarget,
+                clearLockedTarget,
+                state,
+                subState,
+                executeAfterMs,
+                queuedAtMs,
+                allowCrossWorldTransfer,
+                onTransferFailure,
+                requiredStateFilter,
+                false
+        );
+    }
+
+    PendingRelocation(UUID npcUuid,
+                      Vector3d destination,
+                      String destinationWorldName,
+                      Vector3d sourceHintPosition,
+                      Vector3d alternateSourceHintPosition,
+                      UUID ownerUuid,
+                      boolean assignOwnerAsMasterTarget,
+                      boolean clearLockedTarget,
+                      String state,
+                      String subState,
+                      long executeAfterMs,
+                      long queuedAtMs,
+                      boolean allowCrossWorldTransfer,
+                      @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
+                      @Nullable String[] requiredStateFilter,
+                      boolean explicitRecall) {
         this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
         this.destination = Objects.requireNonNull(destination, "destination");
         this.destinationWorldName = Objects.requireNonNull(destinationWorldName, "destinationWorldName");
@@ -72,6 +109,7 @@ final class PendingRelocation {
         this.allowCrossWorldTransfer = allowCrossWorldTransfer;
         this.onTransferFailure = onTransferFailure == null
                 ? TwCompanionConfig.TransferFailurePolicy.QueueForRecall : onTransferFailure;
+        this.explicitRecall = explicitRecall;
         this.requiredStateFilter = normalizeStateFilter(requiredStateFilter);
         this.lastRetryCountedAtMs = queuedAtMs;
     }
@@ -218,6 +256,7 @@ final class PendingRelocation {
                 && Objects.equals(subState, other.subState)
                 && allowCrossWorldTransfer == other.allowCrossWorldTransfer
                 && onTransferFailure == other.onTransferFailure
+                && explicitRecall == other.explicitRecall
                 && requiredStateFilter.equals(other.requiredStateFilter);
     }
 

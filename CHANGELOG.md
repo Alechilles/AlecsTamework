@@ -138,7 +138,11 @@
 - Fixed named linked companions reverting to their species name in the panel after their chunk unloaded or the world restarted. Ordinary unloaded rows now use the latest live state snapshot, then memoized durable profile metadata, before falling back to older command-item metadata. Names consistently prefer an explicit display name, then the translated role name, then the raw role id, including lowercase saved ids such as `tamed_chicken`.
 - Fixed Recall after a coop-released companion unloads. The released live
   companion now participates in ordinary relocation, and repeated equivalent
-  Recall requests coalesce while its chunks load.
+  Recall requests coalesce while its chunks load. For public `v2.16.1` worlds
+  where the released NPC is genuinely absent, one verified retained coop
+  snapshot now changes the initial imported Unloaded entry to Lost after a
+  clean Recall search finishes, allowing Revive without treating ordinary
+  timeouts or uncertain transfers as death evidence.
 - Fixed linked companions removed by destructive external cleanup becoming
   unrecoverable Recall entries. A complete last-live snapshot now transitions
   an explicit destructive removal to Lost recovery, while ordinary chunk

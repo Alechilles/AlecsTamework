@@ -118,6 +118,7 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.items.persistence.ImportedCompanionRecallRecovery;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -822,10 +823,16 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
-        commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
         persistenceComposition = TameworkPersistenceComposition.create(
                 this, components, apiEventBus
+        );
+        commandNpcRelocationService = new CommandNpcRelocationService(
+                getLogger(),
+                new ImportedCompanionRecallRecovery(
+                        persistenceComposition.facades(),
+                        getLogger()
+                )
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
         persistenceBootstrap = persistenceComposition.persistence();

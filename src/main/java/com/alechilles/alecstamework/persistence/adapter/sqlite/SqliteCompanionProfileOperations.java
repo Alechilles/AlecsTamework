@@ -5,10 +5,8 @@ import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
 import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycle;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChange;
-import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleProjectionChangeCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationDefinition;
-import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationEventCodec;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileMutationOutcome;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionChange;
 import com.alechilles.alecstamework.companion.profile.CompanionProfileProjectionState;
@@ -19,7 +17,6 @@ import com.alechilles.alecstamework.persistence.operation.OperationId;
 import com.alechilles.alecstamework.persistence.operation.OperationRequest;
 import com.alechilles.alecstamework.persistence.operation.OperationScope;
 import com.alechilles.alecstamework.persistence.projection.ProjectionConsumer;
-import com.alechilles.alecstamework.persistence.projection.ProjectionEventDraft;
 import com.alechilles.alecstamework.persistence.projection.ProjectionEventType;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -67,10 +64,16 @@ public final class SqliteCompanionProfileOperations {
                         List.of(OperationScope.profile(mutation.profileId())),
                         mutation.requestedAtMs()
                 ),
-                (transaction, operation) -> events(
-                        operation.operationId(),
-                        apply(transaction, operation.operationId(), mutation)
-                ),
+                (transaction, operation) -> {
+                    AppliedMutation applied =
+                            apply(transaction, operation.operationId(), mutation);
+                    return SqliteProfileMutationEventFactory.create(
+                            operation.operationId(),
+                            applied.outcome(),
+                            applied.change(),
+                            applied.lifecycleChange()
+                    );
+                },
                 requiredConsumers
         );
     }
@@ -94,6 +97,10 @@ public final class SqliteCompanionProfileOperations {
                     reconciliation
             );
         }
+        if (mutation instanceof
+                CompanionProfileMutation.RecoverImportedMissing recovery) {
+            return recoverImportedMissing(transaction, recovery);
+        }
         return update(transaction, (CompanionProfileMutation.Update) mutation);
     }
 
@@ -102,7 +109,39 @@ public final class SqliteCompanionProfileOperations {
         return mutation instanceof
                 CompanionProfileMutation.StartupReconciliation reconciliation
                 ? reconciliation.expectedLifecycleRevision()
+                : mutation instanceof
+                CompanionProfileMutation.RecoverImportedMissing recovery
+                ? recovery.expectedLifecycleRevision()
                 : null;
+    }
+
+    private AppliedMutation recoverImportedMissing(
+            SqlitePersistenceTransactionContext transaction,
+            CompanionProfileMutation.RecoverImportedMissing recovery
+    ) {
+        SqliteMissingImportedProfileRecovery.Result applied =
+                SqliteMissingImportedProfileRecovery.apply(
+                        transaction,
+                        recovery
+                );
+        CompanionProfileMutationOutcome outcome = outcome(
+                applied.before() == null
+                        ? CompanionProfileMutationOutcome.Status.UNCHANGED
+                        : CompanionProfileMutationOutcome.Status.UPDATED,
+                recovery,
+                applied.identity().metadataRevision()
+        );
+        if (applied.before() == null) {
+            return unchanged(outcome);
+        }
+        return changed(
+                outcome,
+                applied.before(),
+                applied.after(),
+                applied.source(),
+                recovery.expectedLifecycleRevision().next().value(),
+                applied.lifecycleChange()
+        );
     }
 
     private AppliedMutation reconcileStartup(
@@ -382,45 +421,6 @@ public final class SqliteCompanionProfileOperations {
                 revision,
                 mutation.requestedAtMs()
         );
-    }
-
-    private ProjectionEventDraft event(
-            OperationId operationId,
-            CompanionProfileMutationOutcome outcome
-    ) {
-        return new ProjectionEventDraft(
-                operationId,
-                EVENT_TYPE,
-                "profile-mutation-result:" + outcome.profileId(),
-                outcome.metadataRevision(),
-                CompanionProfileMutationEventCodec.VERSION,
-                CompanionProfileMutationEventCodec.encode(outcome),
-                outcome.updatedAtMs()
-        );
-    }
-
-    private List<ProjectionEventDraft> events(
-            OperationId operationId,
-            AppliedMutation applied
-    ) {
-        java.util.ArrayList<ProjectionEventDraft> events =
-                new java.util.ArrayList<>();
-        events.add(event(operationId, applied.outcome()));
-        if (applied.change() != null) {
-            events.add(SqliteCompanionProfileProjectionComposer.event(
-                    operationId,
-                    applied.change()
-            ));
-        }
-        if (applied.lifecycleChange() != null) {
-            events.add(CompanionLifecycleProjectionChangeCodec.draft(
-                    operationId,
-                    applied.lifecycleChange().before(),
-                    applied.lifecycleChange().after(),
-                    applied.outcome().updatedAtMs()
-            ));
-        }
-        return List.copyOf(events);
     }
 
     private AppliedMutation unchanged(CompanionProfileMutationOutcome outcome) {

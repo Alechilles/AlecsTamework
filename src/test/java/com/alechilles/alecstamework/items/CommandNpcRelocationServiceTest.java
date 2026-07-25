@@ -46,13 +46,14 @@ class CommandNpcRelocationServiceTest {
     @Test
     void relocationRevalidatesOwnerAndCoalescesRepeatedClicksBeforeMoving() throws Exception {
         String service = source("CommandNpcRelocationService.java");
+        String queue = source("CommandRelocationQueueCoordinator.java");
         String dispatch = source("CommandRelocationDispatchService.java");
 
         int ownerCheck = service.indexOf("if (!hasExpectedLiveOwner(store, ref, pending))");
         int move = service.indexOf("npc.moveTo(ref, pending.destination.x");
         assertTrue(ownerCheck >= 0 && ownerCheck < move);
         assertTrue(service.contains("Objects.equals(owner.getOwnerId(), pending.ownerUuid)"));
-        assertTrue(service.contains("current.hasSameCommandIntent(pending)"));
+        assertTrue(queue.contains("current.hasSameCommandIntent(pending)"));
         assertTrue(dispatch.contains("relocationService.queueRelocation("));
         assertTrue(dispatch.contains(
                 "relocationService.rememberSourceWorld(record.npcUuid, record.lastKnownWorldName)"
@@ -92,6 +93,30 @@ class CommandNpcRelocationServiceTest {
         assertTrue(drainStart >= 0 && markDirty > drainStart);
         assertTrue(unload > markDirty, "The source chunk must be dirty before UNLOAD.");
         assertFalse(holderService.substring(markDirty, unload).contains("RemoveReason.REMOVE"));
+    }
+
+    @Test
+    void importRecoveryRunsOnlyForCleanExplicitRecallExhaustion()
+            throws Exception {
+        String service = source("CommandNpcRelocationService.java");
+        String terminal = source("CommandRelocationTerminalService.java");
+        String pending = source("PendingRelocation.java");
+        String dispatch = source("CommandRelocationDispatchService.java");
+
+        assertTrue(service.contains("boolean cleanRetryExhaustion"));
+        assertTrue(terminal.contains("cleanRetryExhaustion\n"
+                + "                && pending.explicitRecall"));
+        assertTrue(terminal.contains("&& !pending.physicalMutationAttempted()"));
+        assertTrue(service.contains(
+                "finishDroppedRelocation(npcUuid, pending, droppedAtMs, false)"
+        ));
+        assertTrue(service.contains(
+                "finishDroppedRelocation(npcUuid, pending, droppedAtMs, true)"
+        ));
+        assertTrue(pending.contains(
+                "&& explicitRecall == other.explicitRecall"
+        ));
+        assertTrue(dispatch.contains("null,\n                    true"));
     }
 
     private static String source(String fileName) throws Exception {

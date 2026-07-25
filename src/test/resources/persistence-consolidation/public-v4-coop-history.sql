@@ -35,5 +35,5 @@ INSERT INTO coop_slots(
         181,
         221,
         221,
-        '{"version":"1","history":"released-profile-no-longer-cooped"}'
+        '{"version":"1","npcUuid":"00000000-0000-0000-0000-000000000011","roleId":"Tamework_Active","commandLinks":{"ownerId":"10000000-0000-0000-0000-000000000001","toolIds":[],"hasHome":false,"homeX":0.0,"homeY":0.0,"homeZ":0.0},"owner":{"ownerId":"10000000-0000-0000-0000-000000000001","ownerName":"Owner"}}'
     );

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items.persistence;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotKind;
 import com.alechilles.alecstamework.companion.snapshot.CompanionFullStateProjection;
+import com.alechilles.alecstamework.companion.snapshot.PublicImportRecoveryProjection;
 import com.alechilles.alecstamework.companion.capture.CompanionCaptureRequest;
 import com.alechilles.alecstamework.companion.coop.CompanionCoopCaptureRequest;
 import java.util.List;
@@ -36,6 +37,10 @@ public final class TameworkSnapshotCodecs {
                 new FullStateSnapshotCodecAdapter(
                         CompanionFullStateProjection.KIND,
                         CompanionFullStateProjection.VERSION
+                ),
+                new FullStateSnapshotCodecAdapter(
+                        PublicImportRecoveryProjection.KIND,
+                        PublicImportRecoveryProjection.VERSION
                 ),
                 new FullStateSnapshotCodecAdapter(LOST, 2)
         ));

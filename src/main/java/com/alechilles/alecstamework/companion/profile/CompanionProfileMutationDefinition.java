@@ -8,6 +8,8 @@ import com.alechilles.alecstamework.companion.identity.OwnerId;
 import com.alechilles.alecstamework.companion.lifecycle.CompanionLifecycleJsonCodec;
 import com.alechilles.alecstamework.companion.lifecycle.LifecycleRevision;
 import com.alechilles.alecstamework.companion.lifecycle.ReconciliationGeneration;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
 import com.alechilles.alecstamework.persistence.operation.OperationDefinition;
 import com.alechilles.alecstamework.persistence.operation.OperationKind;
 import com.google.gson.JsonArray;
@@ -56,6 +58,9 @@ public final class CompanionProfileMutationDefinition
         } else if (payload instanceof
                 CompanionProfileMutation.ReconcileUnloaded reconciliation) {
             json = encodeUnloadedReconciliation(reconciliation);
+        } else if (payload instanceof
+                CompanionProfileMutation.RecoverImportedMissing recovery) {
+            json = encodeImportedRecovery(recovery);
         } else if (payload instanceof CompanionProfileMutation.Update update) {
             json = encodeUpdate(update);
         } else {
@@ -76,6 +81,8 @@ public final class CompanionProfileMutationDefinition
                     decodeLoadedReconciliation(json, requestedAtMs);
             case "RECONCILE_UNLOADED" ->
                     decodeUnloadedReconciliation(json, requestedAtMs);
+            case "RECOVER_IMPORTED_MISSING" ->
+                    decodeImportedRecovery(json, requestedAtMs);
             case "UPDATE" -> decodeUpdate(json, requestedAtMs);
             default -> throw new IllegalArgumentException(
                     "companion_profile_mutation_action_unknown"
@@ -127,6 +134,40 @@ public final class CompanionProfileMutationDefinition
     ) {
         JsonObject json = encodeReconciliationFence(reconciliation);
         json.addProperty("action", "RECONCILE_UNLOADED");
+        return json;
+    }
+
+    private JsonObject encodeImportedRecovery(
+            CompanionProfileMutation.RecoverImportedMissing recovery
+    ) {
+        JsonObject json = new JsonObject();
+        json.addProperty("action", "RECOVER_IMPORTED_MISSING");
+        json.addProperty("profileId", recovery.profileId().toString());
+        json.addProperty(
+                "expectedLifecycleRevision",
+                recovery.expectedLifecycleRevision().value()
+        );
+        json.addProperty(
+                "expectedMetadataRevision",
+                recovery.expectedMetadataRevision()
+        );
+        json.addProperty(
+                "expectedCurrentAlias",
+                recovery.expectedCurrentAlias().toString()
+        );
+        json.addProperty(
+                "expectedOwnerId",
+                recovery.expectedOwnerId().toString()
+        );
+        json.addProperty(
+                "recoverySnapshotId",
+                recovery.recoverySnapshotId().toString()
+        );
+        json.addProperty(
+                "recoveryPayloadHash",
+                recovery.recoveryPayloadHash().toString()
+        );
+        json.addProperty("recallQueuedAtMs", recovery.recallQueuedAtMs());
         return json;
     }
 
@@ -226,6 +267,27 @@ public final class CompanionProfileMutationDefinition
                         json.get("expectedReconciliationGeneration").getAsLong()
                 ),
                 NpcAlias.parse(json.get("expectedCurrentAlias").getAsString()),
+                requestedAtMs
+        );
+    }
+
+    private CompanionProfileMutation decodeImportedRecovery(
+            JsonObject json,
+            long requestedAtMs
+    ) {
+        return new CompanionProfileMutation.RecoverImportedMissing(
+                com.alechilles.alecstamework.companion.identity.ProfileId.parse(
+                        json.get("profileId").getAsString()
+                ),
+                new LifecycleRevision(
+                        json.get("expectedLifecycleRevision").getAsLong()
+                ),
+                json.get("expectedMetadataRevision").getAsLong(),
+                NpcAlias.parse(json.get("expectedCurrentAlias").getAsString()),
+                OwnerId.parse(json.get("expectedOwnerId").getAsString()),
+                SnapshotId.parse(json.get("recoverySnapshotId").getAsString()),
+                Sha256Hash.parse(json.get("recoveryPayloadHash").getAsString()),
+                json.get("recallQueuedAtMs").getAsLong(),
                 requestedAtMs
         );
     }

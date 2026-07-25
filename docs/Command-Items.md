@@ -175,6 +175,14 @@ Unloaded flow:
   unobservable stays `UNLOADED`, not `LOST`. Observing the destination
   projection restores normal loaded status. A failed or exhausted transfer
   stops retrying without manufacturing a durable lifecycle transition.
+- One migration-only exception applies to a public `v2.16.1` companion whose
+  released coop row retained a complete owner-bound snapshot. The importer
+  normalizes that snapshot to the released current alias. If the companion was
+  absent during its first startup reconciliation and an explicit Recall later
+  exhausts every lookup before any physical move, Tamework consumes that exact
+  one-use artifact and changes the entry to `LOST`, where normal Revive is
+  available. Later lifecycle revisions, malformed or ownerless snapshots,
+  Return Home, and unconfirmed physical transfers cannot use this recovery.
 
 Lost flow:
 - If relocation retry windows are exhausted, the request stops and may retain
@@ -183,6 +191,9 @@ Lost flow:
 - A durable Lost transition requires positive evidence. An external destructive
   command using Hytale's `REMOVE` reason qualifies; ordinary unload, absence,
   and timeout observations do not.
+- The bounded public-import recovery artifact described above is also positive
+  evidence, but only for the exact initial imported-unloaded lineage and only
+  after a clean explicit Recall exhaustion.
 - A delete-on-remove world can also provide terminal Lost evidence while the
   companion's complete live state is still available.
 - `Recall`/`Return Home` are blocked while `LOST`.
