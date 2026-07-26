@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -13,6 +16,7 @@ import com.hypixel.hytale.server.core.inventory.transaction.ListTransaction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
@@ -28,7 +32,9 @@ final class HytaleBondedCompanionActionContextFactory {
             boolean placementRequired) {
         Ref<EntityStore> playerRef = player == null ? null : player.getReference();
         if (playerRef == null || !playerRef.isValid() || store == null
-                || playerRef.getStore() != store) return null;
+                || playerRef.getStore() != store || player.getUuid() == null) {
+            return null;
+        }
         TwCompanionConfig.EffectiveSettings settings =
                 TwCompanionConfig.resolveEffectiveForRole(roleId);
         double distance = settings == null
@@ -39,13 +45,33 @@ final class HytaleBondedCompanionActionContextFactory {
                 ? placements.computeRestorationPlacement(
                         playerRef, store, distance, roleId, null)
                 : null;
+        String worldKey = player.getWorld() == null
+                ? "bonded-context" : player.getWorld().getName();
         return new BondedCompanionActionContext(
-                placement, new PlayerInventory(playerRef, store));
+                placement, new PlayerInventory(
+                        playerRef, store, player.getUuid(), worldKey,
+                        receiptType()));
+    }
+
+    @Nullable
+    private ComponentType<EntityStore,
+            TameworkInventoryOperationReceiptsComponent> receiptType() {
+        try {
+            Tamework plugin = Tamework.getInstance();
+            return plugin == null
+                    ? null : plugin.getInventoryOperationReceiptsComponentType();
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
     }
 
     private record PlayerInventory(
             Ref<EntityStore> playerRef,
-            Store<EntityStore> store
+            Store<EntityStore> store,
+            UUID ownerUuid,
+            String worldKey,
+            @Nullable ComponentType<EntityStore,
+                    TameworkInventoryOperationReceiptsComponent> receiptType
     ) implements BondedCompanionActionContext.Inventory {
         @Override
         public int availableQuantity(String itemId) {
@@ -62,17 +88,34 @@ final class HytaleBondedCompanionActionContextFactory {
         }
 
         @Override
+        public BondedCompanionActionContext.ChargeReceipt findCharge(
+                String operationId, String itemId, int quantity) {
+            HytaleBondedCompanionChargeReceiptPlan receipt = receipt(
+                    operationId, itemId, quantity);
+            if (receipt == null || !receipt.recoverable()) return null;
+            CombinedItemContainer inventory = inventory();
+            return inventory == null
+                    ? null : new ExactChargeReceipt(receipt, inventory, true);
+        }
+
+        @Override
         public BondedCompanionActionContext.ChargeReceipt consumeExact(
                 String operationId, String itemId, int quantity) {
-            if (operationId == null || operationId.isBlank()
-                    || itemId == null || itemId.isBlank() || quantity <= 0) {
-                return null;
-            }
+            HytaleBondedCompanionChargeReceiptPlan receipt = receipt(
+                    operationId, itemId, quantity);
+            if (receipt == null) return null;
             CombinedItemContainer inventory = this.inventory();
             if (inventory == null) return null;
+            if (receipt.charged()) {
+                return new ExactChargeReceipt(receipt, inventory, true);
+            }
+            if (!receipt.installPending()) return null;
             Map<Short, SlotCharge> charges = chargePlan(
                     inventory, itemId, quantity);
-            if (charges == null) return null;
+            if (charges == null) {
+                receipt.release();
+                return null;
+            }
             AtomicBoolean mismatch = new AtomicBoolean();
             ListTransaction<ItemStackSlotTransaction> transaction =
                     inventory.replaceAll((slot, current) -> {
@@ -85,10 +128,27 @@ final class HytaleBondedCompanionActionContextFactory {
                         return charge.replacement();
                     });
             if (transaction == null || !transaction.succeeded()
-                    || mismatch.get() || !postStateMatches(inventory, charges)) {
+                    || mismatch.get()) {
+                receipt.release();
                 return null;
             }
-            return new ExactChargeReceipt(operationId, this, charges);
+            receipt.markCharged();
+            return new ExactChargeReceipt(receipt, inventory, false);
+        }
+
+        @Nullable
+        private HytaleBondedCompanionChargeReceiptPlan receipt(
+                String operationId, String itemId, int quantity) {
+            if (receiptType == null || operationId == null
+                    || operationId.isBlank() || itemId == null
+                    || itemId.isBlank() || quantity <= 0) return null;
+            try {
+                return new HytaleBondedCompanionChargeReceiptPlan(
+                        playerRef, store, receiptType, ownerUuid, worldKey,
+                        operationId, itemId, quantity);
+            } catch (RuntimeException | LinkageError failure) {
+                return null;
+            }
         }
 
         private CombinedItemContainer inventory() {
@@ -122,62 +182,54 @@ final class HytaleBondedCompanionActionContextFactory {
             return remaining == 0 ? Map.copyOf(charges) : null;
         }
 
-        private boolean postStateMatches(
-                CombinedItemContainer inventory,
-                Map<Short, SlotCharge> charges) {
-            for (Map.Entry<Short, SlotCharge> entry : charges.entrySet()) {
-                if (!java.util.Objects.equals(entry.getValue().replacement(),
-                        inventory.getItemStack(entry.getKey()))) return false;
-            }
-            return true;
-        }
-
-        private boolean refund(Map<Short, SlotCharge> charges) {
-            CombinedItemContainer inventory = inventory();
-            if (inventory == null) return false;
-            AtomicBoolean mismatch = new AtomicBoolean();
-            ListTransaction<ItemStackSlotTransaction> transaction =
-                    inventory.replaceAll((slot, current) -> {
-                        SlotCharge charge = charges.get(slot);
-                        if (charge == null) return current;
-                        if (!java.util.Objects.equals(
-                                charge.replacement(), current)) {
-                            mismatch.set(true);
-                            return current;
-                        }
-                        return charge.original();
-                    });
-            return transaction != null && transaction.succeeded()
-                    && !mismatch.get();
-        }
     }
 
     private record SlotCharge(ItemStack original, ItemStack replacement) {}
 
     private static final class ExactChargeReceipt implements
             BondedCompanionActionContext.ChargeReceipt {
-        private final PlayerInventory inventory;
-        private final Map<Short, SlotCharge> charges;
-        private final String operationId;
+        private final HytaleBondedCompanionChargeReceiptPlan receipt;
+        private final CombinedItemContainer inventory;
+        private final boolean replayed;
         private boolean refunded;
+        private boolean completed;
 
-        private ExactChargeReceipt(String operationId, PlayerInventory inventory,
-                                   Map<Short, SlotCharge> charges) {
-            this.operationId = operationId;
+        private ExactChargeReceipt(
+                HytaleBondedCompanionChargeReceiptPlan receipt,
+                CombinedItemContainer inventory, boolean replayed) {
+            this.receipt = receipt;
             this.inventory = inventory;
-            this.charges = charges;
+            this.replayed = replayed;
         }
 
         @Override
         public String operationId() {
-            return operationId;
+            return receipt.operationKey();
+        }
+
+        @Override
+        public boolean replayed() {
+            return replayed;
+        }
+
+        @Override
+        public boolean compensationPending() {
+            return receipt.compensating();
         }
 
         @Override
         public synchronized boolean refund() {
             if (refunded) return true;
-            if (!inventory.refund(charges)) return false;
+            if (!receipt.refund(inventory)) return false;
             refunded = true;
+            return true;
+        }
+
+        @Override
+        public synchronized boolean complete() {
+            if (completed || refunded) return true;
+            if (!receipt.release()) return false;
+            completed = true;
             return true;
         }
     }

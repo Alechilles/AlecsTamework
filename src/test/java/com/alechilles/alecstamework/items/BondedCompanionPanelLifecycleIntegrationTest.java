@@ -157,7 +157,8 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
     /** Protects against charging both callers when only one SQLite revive CAS wins. */
     @Test
-    void concurrentReviveRaceRefundsTheRejectedDurableMutation() throws Exception {
+    void concurrentReviveRaceRecoversRejectedChargeExactlyOnceOnRetry()
+            throws Exception {
         Path database = temporaryDirectory.resolve("revive-race.db");
         BondedCompanionRosterRegistry rosters = registry();
         AtomicLong clock = new AtomicLong(30_000L);
@@ -184,9 +185,9 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
         Harness secondRuntime = harness(database, rosters, clock, world);
         CyclicBarrier bothCharged = new CyclicBarrier(2);
-        TestInventory firstInventory = new BarrierInventory(
+        TestInventory firstInventory = new RecoverableBarrierInventory(
                 Map.of("Ingredient_Life_Essence", 2), bothCharged);
-        TestInventory secondInventory = new BarrierInventory(
+        TestInventory secondInventory = new RecoverableBarrierInventory(
                 Map.of("Ingredient_Life_Essence", 2), bothCharged);
         BondedCompanionReviveRequest firstRequest = reviveRequest(
                 "race-first", dead, firstInventory, rosters);
@@ -209,7 +210,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
             assertEquals(1L, results.stream()
                     .filter(BondedCompanionResult::successful).count());
-            assertEquals(2, firstInventory.availableQuantity(
+            assertEquals(0, firstInventory.availableQuantity(
                             "Ingredient_Life_Essence")
                     + secondInventory.availableQuantity(
                             "Ingredient_Life_Essence"));
@@ -217,14 +218,28 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                     firstRuntime.api.list(OWNER, ROSTER).join().value()
                             .getFirst().state());
 
-            TestInventory rejectedInventory = firstResult.successful()
-                    ? secondInventory : firstInventory;
+            RecoverableBarrierInventory rejectedInventory =
+                    (RecoverableBarrierInventory) (firstResult.successful()
+                            ? secondInventory : firstInventory);
             BondedCompanionReviveRequest rejectedRequest = firstResult.successful()
                     ? secondRequest : firstRequest;
+            BondedCompanionResult<BondedCompanionProfileView> rejected =
+                    firstResult.successful() ? secondResult : firstResult;
+            assertEquals("bonded-revive-payment-compensation-pending",
+                    rejected.reason());
+            assertTrue(rejectedInventory.hasDurableCharge());
             assertFalse(firstRuntime.api.revive(rejectedRequest)
                     .join().successful());
             assertEquals(2, rejectedInventory.availableQuantity(
                     "Ingredient_Life_Essence"));
+            assertEquals(1, rejectedInventory.availableQuantity(
+                    "Concurrent_Slot_Mutation"));
+            assertFalse(firstRuntime.api.revive(rejectedRequest)
+                    .join().successful());
+            assertEquals(2, rejectedInventory.availableQuantity(
+                    "Ingredient_Life_Essence"));
+            assertEquals(1, rejectedInventory.refundApplications());
+            assertFalse(rejectedInventory.hasDurableCharge());
         } finally {
             firstRuntime.close();
             secondRuntime.close();
@@ -381,7 +396,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
     private static class TestInventory implements
             BondedCompanionActionContext.Inventory {
-        private final Map<String, Integer> quantities;
+        protected final Map<String, Integer> quantities;
 
         private TestInventory(Map<String, Integer> quantities) {
             this.quantities = new HashMap<>(quantities);
@@ -412,7 +427,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         }
     }
 
-    private static final class BarrierInventory extends TestInventory {
+    private static class BarrierInventory extends TestInventory {
         private final CyclicBarrier bothCharged;
 
         private BarrierInventory(Map<String, Integer> quantities,
@@ -433,6 +448,89 @@ class BondedCompanionPanelLifecycleIntegrationTest {
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
             }
+        }
+    }
+
+    private static final class RecoverableBarrierInventory
+            extends BarrierInventory {
+        private BondedCompanionActionContext.ChargeReceipt durableCharge;
+        private String chargedOperationId;
+        private String chargedItemId;
+        private int chargedQuantity;
+        private boolean firstRefund = true;
+        private int refundApplications;
+
+        private RecoverableBarrierInventory(
+                Map<String, Integer> quantities, CyclicBarrier bothCharged) {
+            super(quantities, bothCharged);
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            BondedCompanionActionContext.ChargeReceipt charged =
+                    super.consumeExact(operationId, itemId, quantity);
+            if (charged == null) return null;
+            quantities.put("Concurrent_Slot_Mutation", 1);
+            durableCharge = charged;
+            chargedOperationId = operationId;
+            chargedItemId = itemId;
+            chargedQuantity = quantity;
+            return receipt(false);
+        }
+
+        @Override
+        public synchronized BondedCompanionActionContext.ChargeReceipt findCharge(
+                String operationId, String itemId, int quantity) {
+            return durableCharge != null
+                    && operationId.equals(chargedOperationId)
+                    && itemId.equals(chargedItemId)
+                    && quantity == chargedQuantity
+                    ? receipt(true) : null;
+        }
+
+        private BondedCompanionActionContext.ChargeReceipt receipt(
+                boolean replayed) {
+            return new BondedCompanionActionContext.ChargeReceipt() {
+
+                @Override public String operationId() {
+                    return chargedOperationId;
+                }
+
+                @Override public boolean replayed() { return replayed; }
+
+                @Override public boolean compensationPending() {
+                    return !firstRefund;
+                }
+
+                @Override
+                public synchronized boolean refund() {
+                    if (firstRefund) {
+                        firstRefund = false;
+                        return false;
+                    }
+                    boolean restored = durableCharge.refund();
+                    if (restored) {
+                        refundApplications++;
+                        durableCharge = null;
+                    }
+                    return restored;
+                }
+
+                @Override
+                public boolean complete() {
+                    durableCharge = null;
+                    return true;
+                }
+            };
+        }
+
+        private synchronized int refundApplications() {
+            return refundApplications;
+        }
+
+        private synchronized boolean hasDurableCharge() {
+            return durableCharge != null;
         }
     }
 }

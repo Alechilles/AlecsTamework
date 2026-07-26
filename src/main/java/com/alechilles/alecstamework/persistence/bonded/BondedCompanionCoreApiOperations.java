@@ -212,12 +212,30 @@ public final class BondedCompanionCoreApiOperations {
         if (policy == null || policy.revivePrice() == null) {
             return policyDenied();
         }
+        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        String reviveOperationId = operationId(
+                action.callerNamespace(), action.idempotencyKey());
+        BondedCompanionActionContext.Inventory inventory =
+                inventory(action.actionContext());
+        BondedCompanionActionContext.ChargeReceipt recovered =
+                inventory == null ? null : safeFindCharge(
+                        inventory, reviveOperationId,
+                        price.itemId(), price.quantity());
+        if (recovered != null) {
+            if (safeCompensationPending(recovered)) {
+                if (!safeRefund(recovered)) {
+                    return internal(
+                            "bonded-revive-payment-compensation-pending");
+                }
+                return internal("bonded-revive-payment-compensated");
+            }
+            return commitRevive(action, price, recovered);
+        }
         if (cooldownRemaining(profile.reviveCooldownUntilMs(),
                 clock.getAsLong()) > 0L) {
             return failure(BondedCompanionResultCode.POLICY_DENIED,
                     "bonded-revive-cooldown-active");
         }
-        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
         BondedCompanionSnapshot snapshot = decode(profile);
         if (snapshot == null) return internal("bonded-snapshot-invalid");
         var validation = transitions.revive(
@@ -227,10 +245,6 @@ public final class BondedCompanionCoreApiOperations {
         if (!validation.applied()) {
             return transitionFailure(validation.code());
         }
-        BondedCompanionActionContext.Inventory inventory =
-                inventory(action.actionContext());
-        String reviveOperationId = operationId(
-                action.callerNamespace(), action.idempotencyKey());
         BondedCompanionActionContext.ChargeReceipt charge = inventory == null
                 ? null : safeConsume(inventory, reviveOperationId,
                         price.itemId(), price.quantity());
@@ -238,9 +252,19 @@ public final class BondedCompanionCoreApiOperations {
             return failure(BondedCompanionResultCode.POLICY_DENIED,
                     "bonded-revive-payment-unavailable");
         }
-        if (!safeChargeMatches(charge, reviveOperationId)) {
+        return commitRevive(action, price, charge);
+    }
+
+    private BondedCompanionResult<BondedCompanionProfileView> commitRevive(
+            BondedCompanionActionRequest action,
+            BondedCompanionPolicy.RevivePrice price,
+            BondedCompanionActionContext.ChargeReceipt charge
+    ) {
+        String expectedOperationId = operationId(
+                action.callerNamespace(), action.idempotencyKey());
+        if (!safeChargeMatches(charge, expectedOperationId)) {
             if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-failed");
+                return internal("bonded-revive-payment-compensation-pending");
             }
             return internal("bonded-revive-payment-receipt-invalid");
         }
@@ -255,12 +279,16 @@ public final class BondedCompanionCoreApiOperations {
         if (saved.code() != BondedCompanionStoreResult.Code.APPLIED
                 || saved.value() == null) {
             if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-failed");
+                return internal("bonded-revive-payment-compensation-pending");
             }
             return storeFailure(saved);
         }
-        if (saved.replayed() && !safeRefund(charge)) {
-            return internal("bonded-revive-payment-compensation-failed");
+        if (saved.replayed() && !safeReplayed(charge)) {
+            if (!safeRefund(charge)) {
+                return internal("bonded-revive-payment-compensation-pending");
+            }
+        } else if (!safeComplete(charge)) {
+            return internal("bonded-revive-payment-receipt-release-pending");
         }
         if (!saved.replayed()) {
             publish(saved.value(), BondedCompanionState.DEAD,
@@ -474,6 +502,17 @@ public final class BondedCompanionCoreApiOperations {
         }
     }
 
+    private BondedCompanionActionContext.ChargeReceipt safeFindCharge(
+            BondedCompanionActionContext.Inventory inventory,
+            String operationId, String itemId, int quantity
+    ) {
+        try {
+            return inventory.findCharge(operationId, itemId, quantity);
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
     private boolean safeRefund(
             BondedCompanionActionContext.ChargeReceipt receipt
     ) {
@@ -490,6 +529,36 @@ public final class BondedCompanionCoreApiOperations {
     ) {
         try {
             return operationId.equals(receipt.operationId());
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean safeReplayed(
+            BondedCompanionActionContext.ChargeReceipt receipt
+    ) {
+        try {
+            return receipt.replayed();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean safeCompensationPending(
+            BondedCompanionActionContext.ChargeReceipt receipt
+    ) {
+        try {
+            return receipt.compensationPending();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean safeComplete(
+            BondedCompanionActionContext.ChargeReceipt receipt
+    ) {
+        try {
+            return receipt.complete();
         } catch (RuntimeException | LinkageError failure) {
             return false;
         }

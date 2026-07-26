@@ -131,6 +131,7 @@ import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
+import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -371,6 +372,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazardComponentType;
     private ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarkerComponentType;
     private ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectileComponentType;
+    private ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+            inventoryOperationReceiptsComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -623,6 +626,8 @@ public class Tamework extends JavaPlugin {
         lingeringHazardComponentType = components.lingeringHazard();
         apiSelfTestFixtureMarkerComponentType = components.apiSelfTestFixtureMarker();
         homingVisualProjectileComponentType = components.homingVisualProjectile();
+        inventoryOperationReceiptsComponentType =
+                components.inventoryOperationReceipts();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         getEntityStoreRegistry().registerSystem(
@@ -2974,6 +2979,11 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, HomingVisualProjectileComponent> getHomingVisualProjectileComponentType() {
         return homingVisualProjectileComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+            getInventoryOperationReceiptsComponentType() {
+        return inventoryOperationReceiptsComponentType;
     }
 
     public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {
