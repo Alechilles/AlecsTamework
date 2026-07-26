@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.api.internal;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,8 +15,7 @@ class BondedOnlyTameworkApiTest {
     @TempDir Path temporaryDirectory;
 
     @Test
-    void advertisesAndReturnsBondedOnlyWhenItsIntegrationsAreReady()
-            throws Exception {
+    void advertisesHealthyBondedAuthorityWithoutCaptureOrPanelIntegration() {
         TameworkBondedCompanionComposition composition =
                 TameworkBondedCompanionComposition.open(
                         temporaryDirectory,
@@ -25,15 +23,9 @@ class BondedOnlyTameworkApiTest {
                 );
         BondedOnlyTameworkApi api = new BondedOnlyTameworkApi(composition.api());
         try {
-            assertFalse(api.getCapabilities().contains(
+            assertTrue(api.getCapabilities().contains(
                     TameworkApiCapability.BONDED_COMPANIONS));
-            try (AutoCloseable capture =
-                         composition.registerCaptureIntegration();
-                 AutoCloseable panel = composition.registerPanelIntegration()) {
-                assertTrue(api.getCapabilities().contains(
-                        TameworkApiCapability.BONDED_COMPANIONS));
-                assertSame(composition.api(), api.bondedCompanions());
-            }
+            assertSame(composition.api(), api.bondedCompanions());
         } finally {
             composition.close();
         }

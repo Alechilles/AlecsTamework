@@ -34,7 +34,6 @@ public final class BondedCompanionApiFacade
     private static final String CLOSED = "bonded-companion-authority-closed";
 
     private final Supplier<BondedCompanionPersistenceReadiness> readiness;
-    private final Supplier<BondedCompanionAvailability> capability;
     private final BondedCompanionStore store;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
@@ -45,14 +44,12 @@ public final class BondedCompanionApiFacade
 
     public BondedCompanionApiFacade(
             @Nonnull Supplier<BondedCompanionPersistenceReadiness> readiness,
-            @Nonnull Supplier<BondedCompanionAvailability> capability,
             @Nonnull BondedCompanionStore store,
             @Nonnull BondedCompanionChangePublisher changes,
             @Nonnull BondedCompanionDiagnosticContributor diagnostics,
             @Nonnull BondedCompanionCoreApiOperations operations
     ) {
         this.readiness = Objects.requireNonNull(readiness, "readiness");
-        this.capability = Objects.requireNonNull(capability, "capability");
         this.store = Objects.requireNonNull(store, "store");
         this.changes = Objects.requireNonNull(changes, "changes");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
@@ -63,7 +60,7 @@ public final class BondedCompanionApiFacade
     public BondedCompanionAvailability availability() {
         return closed.get()
                 ? BondedCompanionAvailability.unavailable(CLOSED)
-                : capability.get();
+                : readiness.get().availability();
     }
 
     @Override

@@ -28,8 +28,6 @@ import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionChangePublisher;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCoreApiOperations;
-import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionIntegrationReadiness;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionDataPath;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPersistenceRuntime;
@@ -61,7 +59,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionApiFacade api;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
-    private final BondedCompanionIntegrationReadiness integrations;
     private final BondedCompanionTransitionService transitions;
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
@@ -80,7 +77,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionApiFacade api,
             BondedCompanionChangePublisher changes,
             BondedCompanionDiagnosticContributor diagnostics,
-            BondedCompanionIntegrationReadiness integrations,
             BondedCompanionTransitionService transitions,
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
@@ -96,7 +92,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.api = api;
         this.changes = changes;
         this.diagnostics = diagnostics;
-        this.integrations = integrations;
         this.transitions = transitions;
         this.projections = projections;
         this.observer = observer;
@@ -135,8 +130,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         BondedCompanionChangePublisher changes =
                 new BondedCompanionChangePublisher(logger);
-        BondedCompanionIntegrationReadiness integrations =
-                new BondedCompanionIntegrationReadiness();
         BondedCompanionPersistenceReadiness started = runtime.start();
         if (!started.availability().available()) {
             diagnostics.recordFailure(
@@ -179,7 +172,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         BondedCompanionApiFacade api = new BondedCompanionApiFacade(
                 runtime::readiness,
-                () -> integrations.availability(runtime.readiness()),
                 store, changes, diagnostics, operations
         );
         if (started.availability().available()) {
@@ -197,7 +189,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             );
         }
         return new TameworkBondedCompanionComposition(
-                runtime, api, changes, diagnostics, integrations,
+                runtime, api, changes, diagnostics,
                 transitions, projections, observer, expiry,
                 cleanup, durability, world, store, clock
         );
@@ -211,16 +203,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     @Nonnull
     public BondedCompanionDiagnosticContributor diagnostics() {
         return diagnostics;
-    }
-
-    /** Registers the Task 6 capture surface without moving capture ownership here. */
-    @Nonnull public AutoCloseable registerCaptureIntegration() {
-        return integrations.registerCapture();
-    }
-
-    /** Registers the Task 7 panel surface without moving UI ownership here. */
-    @Nonnull public AutoCloseable registerPanelIntegration() {
-        return integrations.registerPanel();
     }
 
     /** Reconciles one started world using only exact persisted leases. */
@@ -350,7 +332,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     public void close() {
         if (closed.compareAndSet(false, true)) {
             api.close();
-            integrations.close();
             ownerWorlds.clear();
             changes.close();
             persistence.close();

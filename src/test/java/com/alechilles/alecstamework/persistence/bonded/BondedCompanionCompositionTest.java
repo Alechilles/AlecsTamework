@@ -49,13 +49,9 @@ class BondedCompanionCompositionTest {
                         new BondedCompanionRosterRegistry(),
                         null,
                         () -> -5_000L
-                );
+        );
         try {
-            assertFalse(composition.api().availability().available());
-            assertEquals(
-                    "bonded-capture-integration-unavailable",
-                    composition.api().availability().reason()
-            );
+            assertTrue(composition.api().availability().available());
             var listed = composition.api().list(OWNER, "hydragon:dragons")
                     .join();
             assertEquals(BondedCompanionResultCode.SUCCESS, listed.code());
@@ -75,28 +71,19 @@ class BondedCompanionCompositionTest {
     }
 
     @Test
-    void capabilityBecomesReadyOnlyWhileCaptureAndPanelSurfacesAreRegistered()
-            throws Exception {
+    void captureAndPanelAbsenceDoesNotDisableCoreBondedAuthority() {
         TameworkBondedCompanionComposition composition =
                 TameworkBondedCompanionComposition.open(
                         temporaryDirectory,
                         new BondedCompanionRosterRegistry(),
                         null,
                         () -> -5_000L
-                );
+        );
         try {
-            AutoCloseable capture = composition.registerCaptureIntegration();
-            assertFalse(composition.api().availability().available());
-            assertEquals(
-                    "bonded-panel-integration-unavailable",
-                    composition.api().availability().reason()
-            );
-            AutoCloseable panel = composition.registerPanelIntegration();
             assertTrue(composition.api().availability().available());
-
-            panel.close();
-            assertFalse(composition.api().availability().available());
-            capture.close();
+            assertEquals(BondedCompanionResultCode.SUCCESS,
+                    composition.api().list(OWNER, "hydragon:dragons")
+                            .join().code());
         } finally {
             composition.close();
         }
@@ -221,6 +208,87 @@ class BondedCompanionCompositionTest {
         assertEquals(0, publisher.listenerCount());
         assertFalse(subscriber.isAlive());
         assertFalse(closer.isAlive());
+    }
+
+    @Test
+    void closeWaitsForConcurrentPublishAndStartsNoLaterListener()
+            throws Exception {
+        BondedCompanionChangePublisher publisher =
+                new BondedCompanionChangePublisher(null);
+        CountDownLatch listenerEntered = new CountDownLatch(1);
+        CountDownLatch allowListenerReturn = new CountDownLatch(1);
+        CountDownLatch closeReturned = new CountDownLatch(1);
+        AtomicInteger laterDeliveries = new AtomicInteger();
+        publisher.subscribe(ignored -> {
+            listenerEntered.countDown();
+            try {
+                assertTrue(allowListenerReturn.await(5, TimeUnit.SECONDS));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(interrupted);
+            }
+        });
+        publisher.subscribe(ignored -> laterDeliveries.incrementAndGet());
+        BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(
+                "profile-close-race", OWNER, "hydragon:dragons",
+                BondedCompanionState.STORED, BondedCompanionState.ACTIVE,
+                5L, "summoned"
+        );
+
+        Thread publishing = new Thread(() -> publisher.publishCommitted(
+                event,
+                BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED
+        ));
+        publishing.start();
+        assertTrue(listenerEntered.await(5, TimeUnit.SECONDS));
+        Thread closing = new Thread(() -> {
+            publisher.close();
+            closeReturned.countDown();
+        });
+        closing.start();
+
+        assertFalse(closeReturned.await(250L, TimeUnit.MILLISECONDS));
+        allowListenerReturn.countDown();
+        publishing.join(5_000L);
+        closing.join(5_000L);
+
+        assertFalse(publishing.isAlive());
+        assertFalse(closing.isAlive());
+        assertEquals(0, laterDeliveries.get());
+    }
+
+    @Test
+    void listenerCanClosePublisherWithoutDeadlockOrLaterDelivery()
+            throws Exception {
+        BondedCompanionChangePublisher publisher =
+                new BondedCompanionChangePublisher(null);
+        CountDownLatch listenerClosed = new CountDownLatch(1);
+        AtomicInteger laterDeliveries = new AtomicInteger();
+        publisher.subscribe(ignored -> {
+            publisher.close();
+            listenerClosed.countDown();
+        });
+        publisher.subscribe(ignored -> laterDeliveries.incrementAndGet());
+        BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(
+                "profile-reentrant-close", OWNER, "hydragon:dragons",
+                BondedCompanionState.STORED, BondedCompanionState.ACTIVE,
+                6L, "summoned"
+        );
+
+        Thread publishing = new Thread(() -> publisher.publishCommitted(
+                event,
+                BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED
+        ));
+        publishing.start();
+        publishing.join(1_000L);
+
+        assertFalse(publishing.isAlive());
+        assertTrue(listenerClosed.await(1L, TimeUnit.SECONDS));
+        assertEquals(0, laterDeliveries.get());
+        assertFalse(publisher.publishCommitted(
+                event,
+                BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED
+        ));
     }
 
     @Test
