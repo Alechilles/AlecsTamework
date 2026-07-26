@@ -34,8 +34,8 @@ public final class BondedCompanionConfigReloadService {
     ) {
         Objects.requireNonNull(rosterConfigs, "rosterConfigs");
         Objects.requireNonNull(commandConfigs, "commandConfigs");
-        synchronized (rosters) {
-            synchronized (commands) {
+        synchronized (commands) {
+            synchronized (rosters) {
                 return reloadLocked(rosterConfigs, commandConfigs);
             }
         }
@@ -58,8 +58,10 @@ public final class BondedCompanionConfigReloadService {
                             commandConfigs,
                             rosterCandidate.candidate()
                     );
-            if (!rosters.publishPrepared(rosterCandidate)
-                    || !commands.publishPrepared(commandCandidate)) {
+            if (!rosters.publishCoherent(
+                    rosterCandidate,
+                    commandCandidate.candidate()
+            )) {
                 throw new IllegalStateException(
                         "bonded-config-generation-publication-raced"
                 );

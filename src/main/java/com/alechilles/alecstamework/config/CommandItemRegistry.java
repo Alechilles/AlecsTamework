@@ -13,7 +13,7 @@ import java.util.Objects;
  */
 public final class CommandItemRegistry {
     private final BondedCompanionRosterRegistry bondedRosters;
-    private volatile State state = State.empty();
+    private volatile Snapshot state = Snapshot.empty();
 
     public CommandItemRegistry() {
         this(null);
@@ -34,7 +34,7 @@ public final class CommandItemRegistry {
     ) {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(config, "config");
-        State active = state;
+        Snapshot active = activeSnapshot();
         HashMap<String, TwCommandItemConfig> byItem =
                 new HashMap<>(active.byItemId());
         HashMap<String, TwCommandItemConfig> byId =
@@ -45,18 +45,18 @@ public final class CommandItemRegistry {
         if (configId != null && !configId.isBlank()) {
             byId.put(configId.trim(), config);
         }
-        state = new State(
+        publishOrThrow(active, new Snapshot(
                 byItem,
                 byId,
                 Math.addExact(active.revision(), 1L)
-        );
+        ));
     }
 
     public TwCommandItemConfig get(String itemId) {
         if (itemId == null) {
             return null;
         }
-        State active = state;
+        Snapshot active = activeSnapshot();
         TwCommandItemConfig config = active.byItemId().get(itemId);
         if (config != null) {
             return config;
@@ -69,17 +69,17 @@ public final class CommandItemRegistry {
     }
 
     public Map<String, TwCommandItemConfig> snapshot() {
-        return state.byItemId();
+        return activeSnapshot().byItemId();
     }
 
     public TwCommandItemConfig getByConfigId(String configId) {
         return configId == null
                 ? null
-                : state.byConfigId().get(configId.trim());
+                : activeSnapshot().byConfigId().get(configId.trim());
     }
 
     public long revision() {
-        return state.revision();
+        return activeSnapshot().revision();
     }
 
     /**
@@ -130,11 +130,12 @@ public final class CommandItemRegistry {
     }
 
     public synchronized void clear() {
-        state = new State(
+        Snapshot active = activeSnapshot();
+        publishOrThrow(active, new Snapshot(
                 Map.of(),
                 Map.of(),
-                Math.addExact(state.revision(), 1L)
-        );
+                Math.addExact(active.revision(), 1L)
+        ));
     }
 
     /** Compiles a complete command generation without changing active lookups. */
@@ -144,7 +145,7 @@ public final class CommandItemRegistry {
     ) {
         Objects.requireNonNull(configs, "configs");
         Objects.requireNonNull(bondedSnapshot, "bondedSnapshot");
-        State active = state;
+        Snapshot active = activeSnapshot();
         HashMap<String, TwCommandItemConfig> byItem = new HashMap<>();
         HashMap<String, TwCommandItemConfig> byId = new HashMap<>();
         int loaded = 0;
@@ -171,11 +172,13 @@ public final class CommandItemRegistry {
             }
         }
         return new PreparedReplacement(
-                active.revision(),
-                Math.addExact(active.revision(), 1L),
-                loaded,
-                byItem,
-                byId
+                active,
+                new Snapshot(
+                        byItem,
+                        byId,
+                        Math.addExact(active.revision(), 1L)
+                ),
+                loaded
         );
     }
 
@@ -184,15 +187,7 @@ public final class CommandItemRegistry {
             PreparedReplacement replacement
     ) {
         Objects.requireNonNull(replacement, "replacement");
-        if (state.revision() != replacement.baseRevision) {
-            return false;
-        }
-        state = new State(
-                replacement.byItemId,
-                replacement.byConfigId,
-                replacement.revision
-        );
-        return true;
+        return publish(replacement.base, replacement.candidate);
     }
 
     private void validateOwnerFamily(
@@ -267,43 +262,76 @@ public final class CommandItemRegistry {
 
     /** Opaque, immutable candidate returned only after full validation. */
     public static final class PreparedReplacement {
-        private final long baseRevision;
-        private final long revision;
+        private final Snapshot base;
+        private final Snapshot candidate;
         private final int loadedCount;
-        private final Map<String, TwCommandItemConfig> byItemId;
-        private final Map<String, TwCommandItemConfig> byConfigId;
 
         private PreparedReplacement(
-                long baseRevision,
-                long revision,
-                int loadedCount,
-                Map<String, TwCommandItemConfig> byItemId,
-                Map<String, TwCommandItemConfig> byConfigId
+                Snapshot base,
+                Snapshot candidate,
+                int loadedCount
         ) {
-            this.baseRevision = baseRevision;
-            this.revision = revision;
+            this.base = Objects.requireNonNull(base, "base");
+            this.candidate = Objects.requireNonNull(candidate, "candidate");
             this.loadedCount = loadedCount;
-            this.byItemId = Map.copyOf(byItemId);
-            this.byConfigId = Map.copyOf(byConfigId);
         }
 
         public int loadedCount() {
             return loadedCount;
         }
-    }
 
-    private record State(
-            Map<String, TwCommandItemConfig> byItemId,
-            Map<String, TwCommandItemConfig> byConfigId,
-            long revision
-    ) {
-        private State {
-            byItemId = Map.copyOf(byItemId);
-            byConfigId = Map.copyOf(byConfigId);
+        public Snapshot candidate() {
+            return candidate;
         }
 
-        private static State empty() {
-            return new State(Map.of(), Map.of(), 0L);
+        public Snapshot base() {
+            return base;
+        }
+    }
+
+    /** Immutable command half of a coherent bonded config generation. */
+    public record Snapshot(
+            @javax.annotation.Nonnull Map<String, TwCommandItemConfig> byItemId,
+            @javax.annotation.Nonnull Map<String, TwCommandItemConfig> byConfigId,
+            long revision
+    ) {
+        public Snapshot {
+            byItemId = Map.copyOf(byItemId);
+            byConfigId = Map.copyOf(byConfigId);
+            if (revision < 0L) {
+                throw new IllegalArgumentException(
+                        "Command registry revision cannot be negative."
+                );
+            }
+        }
+
+        public static Snapshot empty() {
+            return new Snapshot(Map.of(), Map.of(), 0L);
+        }
+    }
+
+    private Snapshot activeSnapshot() {
+        return bondedRosters == null
+                ? state
+                : bondedRosters.coherentSnapshot().commands();
+    }
+
+    private boolean publish(Snapshot base, Snapshot candidate) {
+        if (bondedRosters != null) {
+            return bondedRosters.publishCommands(base, candidate);
+        }
+        if (state != base) {
+            return false;
+        }
+        state = candidate;
+        return true;
+    }
+
+    private void publishOrThrow(Snapshot base, Snapshot candidate) {
+        if (!publish(base, candidate)) {
+            throw new IllegalStateException(
+                    "command-config-generation-publication-raced"
+            );
         }
     }
 }

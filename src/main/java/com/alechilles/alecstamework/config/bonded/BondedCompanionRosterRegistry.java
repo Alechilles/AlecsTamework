@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.config.bonded;
 
+import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -14,12 +16,12 @@ import javax.annotation.Nullable;
 
 /** Atomically retains the last valid immutable bonded-roster policy snapshot. */
 public final class BondedCompanionRosterRegistry {
-    private final AtomicReference<Snapshot> current =
-            new AtomicReference<>(Snapshot.empty());
+    private final AtomicReference<CoherentSnapshot> current =
+            new AtomicReference<>(CoherentSnapshot.empty());
 
     @Nonnull
     public Snapshot snapshot() {
-        return current.get();
+        return current.get().rosters();
     }
 
     @Nonnull
@@ -27,8 +29,14 @@ public final class BondedCompanionRosterRegistry {
         return rosterId == null
                 ? Optional.empty()
                 : Optional.ofNullable(
-                        current.get().byRosterId().get(rosterId.trim())
+                        current.get().rosters().byRosterId().get(rosterId.trim())
                 );
+    }
+
+    /** Captures roster and dependent-command lookups from one publication. */
+    @Nonnull
+    public CoherentSnapshot coherentSnapshot() {
+        return current.get();
     }
 
     @Nonnull
@@ -40,10 +48,18 @@ public final class BondedCompanionRosterRegistry {
         try {
             PreparedReplacement replacement =
                     prepareReplacement(configs, revision);
+            validateDependentCommands(
+                    replacement.candidate(),
+                    replacement.base().commands()
+            );
             publishPrepared(replacement);
             return new ReloadResult(true, replacement.candidate(), null);
         } catch (RuntimeException invalid) {
-            return new ReloadResult(false, current.get(), invalid.getMessage());
+            return new ReloadResult(
+                    false,
+                    current.get().rosters(),
+                    invalid.getMessage()
+            );
         }
     }
 
@@ -56,9 +72,36 @@ public final class BondedCompanionRosterRegistry {
 
     synchronized boolean publishPrepared(PreparedReplacement replacement) {
         Objects.requireNonNull(replacement, "replacement");
+        return publishCoherent(replacement, replacement.base().commands());
+    }
+
+    synchronized boolean publishCoherent(
+            PreparedReplacement replacement,
+            CommandItemRegistry.Snapshot commands
+    ) {
+        Objects.requireNonNull(replacement, "replacement");
+        Objects.requireNonNull(commands, "commands");
         return current.compareAndSet(
                 replacement.base(),
-                replacement.candidate()
+                new CoherentSnapshot(replacement.candidate(), commands)
+        );
+    }
+
+    /** Atomically replaces only the command half while retaining active rosters. */
+    public synchronized boolean publishCommands(
+            CommandItemRegistry.Snapshot base,
+            CommandItemRegistry.Snapshot candidate
+    ) {
+        Objects.requireNonNull(base, "base");
+        Objects.requireNonNull(candidate, "candidate");
+        CoherentSnapshot active = current.get();
+        if (active.commands() != base) {
+            return false;
+        }
+        validateDependentCommands(active.rosters(), candidate);
+        return current.compareAndSet(
+                active,
+                new CoherentSnapshot(active.rosters(), candidate)
         );
     }
 
@@ -134,6 +177,22 @@ public final class BondedCompanionRosterRegistry {
                         configuredFeatures.isRevive()
                 )
         );
+    }
+
+    private static void validateDependentCommands(
+            Snapshot rosters,
+            CommandItemRegistry.Snapshot commands
+    ) {
+        for (TwCommandItemConfig config : commands.byItemId().values()) {
+            if (config != null && config.usesBondedCompanionRoster()
+                    && !rosters.byRosterId().containsKey(
+                            config.getBondedRosterId()
+                    )) {
+                throw new IllegalArgumentException(
+                        "Unknown bonded roster: " + config.getBondedRosterId()
+                );
+            }
+        }
     }
 
     /** Immutable resolver snapshot for one accepted asset revision. */
@@ -220,7 +279,25 @@ public final class BondedCompanionRosterRegistry {
         }
     }
 
-    record PreparedReplacement(Snapshot base, Snapshot candidate) {
+    /** Immutable roster and command lookup boundary from one atomic generation. */
+    public record CoherentSnapshot(
+            @Nonnull Snapshot rosters,
+            @Nonnull CommandItemRegistry.Snapshot commands
+    ) {
+        public CoherentSnapshot {
+            rosters = Objects.requireNonNull(rosters, "rosters");
+            commands = Objects.requireNonNull(commands, "commands");
+        }
+
+        private static CoherentSnapshot empty() {
+            return new CoherentSnapshot(
+                    Snapshot.empty(),
+                    CommandItemRegistry.Snapshot.empty()
+            );
+        }
+    }
+
+    record PreparedReplacement(CoherentSnapshot base, Snapshot candidate) {
         PreparedReplacement {
             base = Objects.requireNonNull(base, "base");
             candidate = Objects.requireNonNull(candidate, "candidate");
