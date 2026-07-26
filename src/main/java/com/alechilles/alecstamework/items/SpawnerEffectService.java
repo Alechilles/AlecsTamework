@@ -64,14 +64,16 @@ public final class SpawnerEffectService {
             String soundEvent
     ) {
         Store<EntityStore> store = world.getEntityStore().getStore();
+        boolean invoked = false;
         if (particleSystem != null && !particleSystem.isBlank()) {
             if (ParticleSystem.getAssetMap() == null
                     || ParticleSystem.getAssetMap().getAsset(
                     particleSystem) == null) return false;
             ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+            invoked = true;
         }
         if (soundEvent == null || soundEvent.isBlank()) {
-            return true;
+            return invoked;
         }
         if (SoundEvent.getAssetMap() == null) return false;
         int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEvent);

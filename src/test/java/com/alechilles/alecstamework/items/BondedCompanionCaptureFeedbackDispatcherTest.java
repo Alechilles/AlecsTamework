@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -80,6 +81,23 @@ class BondedCompanionCaptureFeedbackDispatcherTest {
         assertEquals(1, sink.effects);
         assertEquals(1, sink.messages.size());
         assertEquals(true, result.feedbackDelivered());
+    }
+
+    /** Regression: a bonded config with no completion outputs is not success. */
+    @Test
+    void bondedPlanWithoutParticleOrSoundDoesNotEffectOrSpend() {
+        RecordingSink sink = new RecordingSink();
+        var feedback = new BondedCompanionCaptureFeedbackDispatcher(sink);
+        var noOutput = new SpawnerPublishedEffect(
+                1, 2, 3, " ", null);
+
+        var result = feedback.success(intent(noOutput), null);
+
+        assertEquals(BondedCompanionCaptureFeedbackDispatcher.SuccessStatus
+                .EFFECT_FAILED, result.status());
+        assertEquals(0, sink.effects);
+        assertEquals(0, sink.spends);
+        assertEquals(1, sink.messages.size());
     }
 
     /** Regression: the concrete production sink must reject a skipped effect. */
@@ -164,13 +182,20 @@ class BondedCompanionCaptureFeedbackDispatcherTest {
     }
 
     private static BondedCompanionCaptureIntent intent() {
+        return intent(null);
+    }
+
+    private static BondedCompanionCaptureIntent intent(
+            SpawnerPublishedEffect completionEffect
+    ) {
         return new BondedCompanionCaptureIntent(
                 "spawner-bonded-capture:v1", "attempt",
                 UUID.fromString("10000000-0000-0000-0000-000000000001"),
                 "world", 1, "fingerprint",
                 UUID.fromString("20000000-0000-0000-0000-000000000002"),
                 "Dragon_Fire", "hydragon:companions", 4L,
-                null, null, true, true, true, true, true, true
+                null, completionEffect,
+                true, true, true, true, true, true
         );
     }
 

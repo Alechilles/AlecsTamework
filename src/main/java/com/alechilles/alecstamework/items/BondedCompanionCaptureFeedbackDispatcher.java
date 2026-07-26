@@ -101,6 +101,13 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             @Nullable BondedCompanionCaptureIntent intent,
             @Nullable CompletionContext context
     ) {
+        if (intent != null && !hasCompletionOutput(intent)) {
+            boolean delivered = safeMessage(intent, context,
+                    "Your companion was stored, but no completion effect "
+                    + "is configured. The capture item was not spent; "
+                    + "contact an admin.");
+            return new SuccessResult(SuccessStatus.EFFECT_FAILED, delivered);
+        }
         boolean effected;
         try {
             effected = sink.effect(intent, context);
@@ -128,6 +135,12 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
                     SuccessStatus.FINALIZATION_FAILED, delivered);
         }
         return new SuccessResult(SuccessStatus.APPLIED, true);
+    }
+
+    private boolean hasCompletionOutput(BondedCompanionCaptureIntent intent) {
+        var effect = intent.completionEffect();
+        return effect != null && (effect.particleSystem() != null
+                || effect.soundEvent() != null);
     }
 
     /** Sends one actionable message and no success presentation. */
