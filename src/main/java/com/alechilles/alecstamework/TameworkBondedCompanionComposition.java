@@ -22,6 +22,8 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteBondedCompanionDatabase;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteBondedCompanionProjectionDurability;
+import com.alechilles.alecstamework.persistence.adapter.sqlite
+        .SqliteBondedCompanionCapturePersistenceAdapter;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionApiFacade;
 import com.alechilles.alecstamework.persistence.bonded
@@ -39,6 +41,8 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticSnapshot;
+import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
+import com.alechilles.alecstamework.items.BondedCompanionCaptureFeedbackDispatcher;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -69,6 +73,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final com.alechilles.alecstamework.persistence.bonded
             .BondedCompanionStore store;
     private final LongSupplier clock;
+    private final BondedCompanionCaptureAuthor captureAuthor;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -86,7 +91,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             HytaleBondedCompanionWorldGateway world,
             com.alechilles.alecstamework.persistence.bonded
                     .BondedCompanionStore store,
-            LongSupplier clock
+            LongSupplier clock,
+            BondedCompanionCaptureAuthor captureAuthor
     ) {
         this.persistence = persistence;
         this.api = api;
@@ -101,6 +107,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.world = world;
         this.store = store;
         this.clock = clock;
+        this.captureAuthor = captureAuthor;
     }
 
     /** Opens the bonded authority without accepting generic persistence state. */
@@ -174,6 +181,17 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 runtime::readiness,
                 store, changes, diagnostics, operations
         );
+        SqliteBondedCompanionCapturePersistenceAdapter capturePersistence =
+                new SqliteBondedCompanionCapturePersistenceAdapter(
+                        rosters, transitions, store, store, durability, cleanup
+                );
+        BondedCompanionCaptureAuthor captureAuthor =
+                new BondedCompanionCaptureAuthor(
+                        capturePersistence::validate,
+                        capturePersistence::store,
+                        capturePersistence::cleanup,
+                        BondedCompanionCaptureFeedbackDispatcher.production()
+                );
         if (started.availability().available()) {
             long startupTime = clock.getAsLong();
             durability.replayPendingCleanup(
@@ -191,13 +209,19 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, expiry,
-                cleanup, durability, world, store, clock
+                cleanup, durability, world, store, clock, captureAuthor
         );
     }
 
     @Nonnull
     public BondedCompanionApi api() {
         return api;
+    }
+
+    /** Returns the isolated explicit-disposition capture author. */
+    @Nonnull
+    public BondedCompanionCaptureAuthor captureAuthor() {
+        return captureAuthor;
     }
 
     @Nonnull

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkEvidenceSource;
 import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkIntentFactory;
+import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -20,6 +21,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Translates one accepted live roll into the exact canonical capture-author intent. */
@@ -31,6 +33,9 @@ final class SpawnerCaptureIntentFactory {
     private final SpawnerNpcStateService npcState;
     private final SpawnerNpcIdentityService npcIdentity;
     private final SpawnerTameAndLinkIntentFactory tameAndLinkIntents;
+    private final TameworkFullStateSnapshotReader bondedSnapshots =
+            new TameworkFullStateSnapshotReader(
+                    new CoopResidentStateSnapshotService());
 
     SpawnerCaptureIntentFactory(
             SpawnerCaptureMetadataService captureMetadata,
@@ -137,6 +142,47 @@ final class SpawnerCaptureIntentFactory {
     @Nullable
     String lastEvidenceFailureReason() {
         return tameAndLinkIntents.lastEvidenceFailureReason();
+    }
+
+    /** Freezes only the explicit bonded disposition into its isolated intent. */
+    @Nullable
+    BondedCompanionCaptureIntent createBonded(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemStack source,
+            ItemFeatureConfig config,
+            CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            long rosterRevision,
+            boolean toolAccess,
+            boolean tranquilized,
+            @Nullable String particleSystemOverride
+    ) {
+        World world = player == null ? null : player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        if (world == null || store == null || targetRef == null || source == null
+                || config == null || attempt == null || roll == null
+                || roll.terminal() == null) return null;
+        var captured = bondedSnapshots.readSourceNeutral(
+                targetRef, store, new NpcAlias(roll.targetUuid()), roll.roleId());
+        var snapshot = captured.successful()
+                ? com.alechilles.alecstamework.companion.bonded
+                .BondedCompanionSnapshot.of(captured.snapshot(), Map.of())
+                : null;
+        String particle = particleSystemOverride == null
+                || particleSystemOverride.isBlank()
+                ? config.getCaptureParticleSystem() : particleSystemOverride;
+        return new BondedCompanionCaptureIntent(
+                "spawner-bonded-capture:v1",
+                player.getUuid() + ":" + config.getCaptureMechanics()
+                        .bondedRosterId() + ":" + roll.targetUuid(),
+                player.getUuid(), world.getName(), attempt.hotbarSlot(),
+                attempt.sourceFingerprint(), roll.targetUuid(), roll.roleId(),
+                config.getCaptureMechanics().bondedRosterId(), rosterRevision,
+                snapshot, publishedEffect(targetRef, store, particle,
+                config.getCaptureSoundEvent()), targetRef.isValid(),
+                roll.terminal().successful(), tranquilized, toolAccess, true, true);
     }
 
     private SpawnerCaptureIntent tameAndLinkIntent(

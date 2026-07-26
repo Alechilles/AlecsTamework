@@ -93,6 +93,32 @@ final class SqliteBondedCompanionStore {
         });
     }
 
+    /** Inserts a stored capture and its exact source cleanup in one transaction. */
+    @Nonnull
+    public MutationResult<SqliteBondedCompanionProfileRow> createCapturedProfile(
+            @Nonnull SqliteBondedCompanionProfileRow profile,
+            @Nonnull SqliteBondedCompanionCleanupRow cleanup,
+            int maximumOwned
+    ) {
+        if (maximumOwned < 0) {
+            return result(MutationCode.VALIDATION_FAILED, null,
+                    "bonded-capacity-invalid");
+        }
+        long owned = listProfiles(profile.ownerUuid(), profile.rosterId()).size();
+        if (owned >= maximumOwned) {
+            return result(MutationCode.CONFLICT, null,
+                    "bonded-roster-capacity-reached");
+        }
+        MutationResult<SqliteBondedCompanionProfileRow> created =
+                createProfile(profile);
+        if (!created.applied()) return created;
+        MutationResult<SqliteBondedCompanionCleanupRow> queued =
+                enqueueCleanup(profile.ownerUuid(), profile.rosterId(), cleanup);
+        return queued.applied() ? created : result(
+                MutationCode.STORAGE_FAILURE, null,
+                "bonded-capture-cleanup-not-enqueued");
+    }
+
     /** Lists profiles in deterministic order for exactly one owner roster. */
     @Nonnull
     public List<SqliteBondedCompanionProfileRow> listProfiles(

@@ -1070,7 +1070,10 @@ public class Tamework extends JavaPlugin {
                 persistenceComposition.releaseAuthor(),
                 capturePolicyRegistry,
                 interactionExtensionRegistry,
-                persistenceComposition.tameAndLinkEvidence()
+                persistenceComposition.tameAndLinkEvidence(),
+                bondedCompanionComposition.captureAuthor(),
+                bondedCompanionRosterRegistry,
+                commandItemRegistry
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);

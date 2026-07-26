@@ -39,6 +39,22 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 store -> store.createProfile(mapper.toRow(profile)), mapper::toDomain);
     }
 
+    /** Atomically creates one captured profile and its exact cleanup intent. */
+    public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            createCapturedProfile(
+            BondedCompanionOperation operation,
+            BondedCompanionRecord.Profile profile,
+            BondedCompanionRecord.Cleanup cleanup,
+            int maximumOwned
+    ) {
+        requireScope(operation, profile.ownerUuid(), profile.rosterId(),
+                profile.profileId());
+        return mutate(operation, SqliteBondedCompanionProfileRow.class,
+                store -> store.createCapturedProfile(
+                        mapper.toRow(profile), mapper.toRow(cleanup), maximumOwned),
+                mapper::toDomain);
+    }
+
     @Override public List<BondedCompanionRecord.Profile> listProfiles(
             UUID ownerUuid, String rosterId) {
         return read(store -> store.listProfiles(ownerUuid, rosterId).stream()

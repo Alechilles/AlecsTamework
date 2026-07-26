@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
@@ -59,6 +61,9 @@ public final class SpawnerFeatureHandler {
     @Nullable
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final SpawnerCaptureChannelService channels;
+    @Nullable private final BondedCompanionCaptureAuthor bondedCaptureAuthor;
+    @Nullable private final BondedCompanionRosterRegistry bondedRosters;
+    private final BondedCompanionCaptureAdmissionService bondedAdmission;
 
     /** Creates the released spawner composition over the canonical operation authors. */
     public SpawnerFeatureHandler(
@@ -78,7 +83,8 @@ public final class SpawnerFeatureHandler {
                 releaseAuthor,
                 capturePolicies,
                 captureRequirements,
-                SpawnerTameAndLinkEvidenceSource.unavailable()
+                SpawnerTameAndLinkEvidenceSource.unavailable(),
+                null, null, null
         );
     }
 
@@ -106,8 +112,28 @@ public final class SpawnerFeatureHandler {
                 Objects.requireNonNull(
                         tameAndLinkEvidence, "tameAndLinkEvidence"
                 ),
+                null, null, null,
                 true
         );
+    }
+
+    /** Creates the canonical composition with the isolated bonded capture route. */
+    public SpawnerFeatureHandler(
+            @Nonnull HytaleLogger logger,
+            @Nonnull ItemFeatureRegistry registry,
+            @Nullable TranslationRegistry translations,
+            @Nonnull SpawnerCaptureAuthor captureAuthor,
+            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
+            @Nonnull CapturePolicyRegistry capturePolicies,
+            @Nonnull CaptureRequirementRuntime captureRequirements,
+            @Nonnull SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
+            @Nonnull BondedCompanionCaptureAuthor bondedCaptureAuthor,
+            @Nonnull BondedCompanionRosterRegistry bondedRosters,
+            @Nonnull CommandItemRegistry commandItems
+    ) {
+        this(logger, registry, translations, captureAuthor, releaseAuthor,
+                capturePolicies, captureRequirements, tameAndLinkEvidence,
+                bondedCaptureAuthor, bondedRosters, commandItems, true);
     }
 
     private SpawnerFeatureHandler(
@@ -119,12 +145,17 @@ public final class SpawnerFeatureHandler {
             CapturePolicyRegistry capturePolicies,
             CaptureRequirementRuntime captureRequirements,
             SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
+            BondedCompanionCaptureAuthor bondedCaptureAuthor,
+            BondedCompanionRosterRegistry bondedRosters,
+            CommandItemRegistry commandItems,
             boolean canonicalComposition
     ) {
         this.logger = logger;
         this.registry = registry;
         this.captureAuthor = captureAuthor;
         this.releaseAuthor = releaseAuthor;
+        this.bondedCaptureAuthor = bondedCaptureAuthor;
+        this.bondedRosters = bondedRosters;
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata =
@@ -146,6 +177,8 @@ public final class SpawnerFeatureHandler {
                 ownership,
                 npcIdentity
         );
+        this.bondedAdmission = new BondedCompanionCaptureAdmissionService(
+                capturePolicy, commandItems);
         this.captureRolls = new SpawnerCaptureRollService(
                 capturePolicies,
                 captureRequirements,
@@ -199,6 +232,7 @@ public final class SpawnerFeatureHandler {
                 new CapturePolicyRegistry(),
                 NoCaptureRequirements.INSTANCE,
                 SpawnerTameAndLinkEvidenceSource.unavailable(),
+                null, null, null,
                 false
         );
     }
@@ -533,6 +567,12 @@ public final class SpawnerFeatureHandler {
                     + " item=" + source.getItemId());
             return false;
         }
+        if (resolved.getCaptureMechanics().successDisposition()
+                == CaptureSuccessDisposition.STORE_BONDED_COMPANION) {
+            return captureBonded(
+                    player, targetRef, source, resolved, attempt, roll,
+                    captureParticleSystemOverride);
+        }
         if (roll.evaluation().outcome()
                 == SpawnerCaptureChanceService.Outcome.FAILED_ROLL
                 && resolved.getCaptureMechanics().sourceConsumption()
@@ -571,7 +611,12 @@ public final class SpawnerFeatureHandler {
             @Nullable ItemFeatureConfig resolved,
             @Nonnull CaptureAttemptHandle attempt
     ) {
-        if (captureAuthor == null) return "capture-author-unavailable";
+        boolean bonded = resolved != null && resolved.getCaptureMechanics()
+                .successDisposition()
+                == CaptureSuccessDisposition.STORE_BONDED_COMPANION;
+        if (bonded ? bondedCaptureAuthor == null : captureAuthor == null) {
+            return "capture-author-unavailable";
+        }
         if (player == null) return "player-unavailable";
         if (targetRef == null || !targetRef.isValid()) return "target-unavailable";
         if (source == null || source.isEmpty()) return "source-unavailable";
@@ -587,6 +632,23 @@ public final class SpawnerFeatureHandler {
             return "terminal-policy-revalidation";
         }
         return null;
+    }
+
+    private boolean captureBonded(
+            Player player, Ref<EntityStore> targetRef, ItemStack source,
+            ItemFeatureConfig config, CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            @Nullable String particleOverride
+    ) {
+        if (bondedCaptureAuthor == null || bondedRosters == null) return false;
+        BondedCompanionCaptureIntent intent = captureIntents.createBonded(
+                player, targetRef, source, config, attempt, roll,
+                bondedRosters.snapshot().revision(), bondedAdmission.hasToolAccess(
+                        player, config), bondedAdmission.isTranquilized(player, targetRef),
+                particleOverride);
+        if (intent == null) return false;
+        bondedCaptureAuthor.capture(intent);
+        return true;
     }
 
     private boolean spawnFromItem(

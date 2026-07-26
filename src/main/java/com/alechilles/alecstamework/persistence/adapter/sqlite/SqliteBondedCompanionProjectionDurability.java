@@ -182,6 +182,19 @@ public final class SqliteBondedCompanionProjectionDurability implements
         return attempted;
     }
 
+    /** Attempts one newly committed capture cleanup and records its outcome. */
+    @Nonnull
+    public BondedCompanionProjectionCleanupService.Outcome attemptCleanup(
+            @Nonnull BondedCompanionProjectionCleanupService cleanup,
+            @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent intent,
+            long nowMs
+    ) {
+        BondedCompanionProjectionCleanupService.Outcome outcome =
+                cleanup.recover(intent);
+        recordOutcome(intent.cleanupId(), outcome, nowMs);
+        return outcome;
+    }
+
     /** Returns a bounded exact lease view for observer reconciliation. */
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>

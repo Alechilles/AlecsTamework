@@ -210,6 +210,17 @@ public final class SpawnerCapturePolicyService {
         return TameworkEntityEffectService.hasActiveEffect(effectController, requiredEffectId);
     }
 
+    /** Checks the explicit tranquilized fence used only by bonded capture. */
+    boolean isTranquilized(Ref<EntityStore> targetRef,
+                           Store<EntityStore> store) {
+        var effectType = EffectControllerComponent.getComponentType();
+        if (targetRef == null || store == null || effectType == null) return false;
+        EffectControllerComponent controller = store.getComponent(
+                targetRef, effectType);
+        return TameworkEntityEffectService.hasActiveEffect(
+                controller, TRANQUILIZED_EFFECT_ID);
+    }
+
     static String missingRequiredEffectMessageKey(String requiredEffectId) {
         return TRANQUILIZED_EFFECT_ID.equals(requiredEffectId)
                 ? TRANQUILIZED_REQUIRED_MESSAGE
