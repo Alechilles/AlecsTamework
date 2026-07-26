@@ -522,6 +522,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("FailureSoundEvent")) capture.failureSoundEvent = parent.capture.failureSoundEvent;
         if (!nestedExplicitKeys.contains("SourceConsumption")) capture.sourceConsumption = parent.capture.sourceConsumption;
         if (!nestedExplicitKeys.contains("SuccessDisposition")) capture.successDisposition = parent.capture.successDisposition;
+        if (!nestedExplicitKeys.contains("BondedRosterId")) capture.bondedRosterId = parent.capture.bondedRosterId;
         if (!nestedExplicitKeys.contains("CommandFamilyId")) capture.commandFamilyId = parent.capture.commandFamilyId;
         if (!nestedExplicitKeys.contains("RequiredCommandConfigId")) capture.requiredCommandConfigId = parent.capture.requiredCommandConfigId;
         if (!nestedExplicitKeys.contains("RequireCommandAccessItem")) capture.requireCommandAccessItem = parent.capture.requireCommandAccessItem;
@@ -770,6 +771,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
                 CaptureSourceConsumption.SUCCESS_ONLY;
         CaptureSuccessDisposition successDisposition =
                 CaptureSuccessDisposition.CAPTURED_ITEM;
+        String bondedRosterId;
         String commandFamilyId;
         String requiredCommandConfigId;
         boolean requireCommandAccessItem;

@@ -34,6 +34,42 @@ final class TwCommandItemCodecs {
     private static final Codec<Vector3d> VECTOR3D_CODEC =
             new Vector3dArrayCodec();
 
+    static final Codec<TwCommandItemConfig.RosterStorage>
+            ROSTER_STORAGE_CODEC = new TwSilentCodec<>() {
+                @Override
+                public TwCommandItemConfig.RosterStorage decode(
+                        @Nonnull BsonValue value,
+                        ExtraInfo extraInfo
+                ) {
+                    return TwCommandItemConfig.RosterStorage.fromString(
+                            TwCodecLenient.asStringOrNull(value)
+                    );
+                }
+
+                @Override
+                public BsonValue encode(
+                        TwCommandItemConfig.RosterStorage value,
+                        ExtraInfo extraInfo
+                ) {
+                    TwCommandItemConfig.RosterStorage storage = value == null
+                            ? TwCommandItemConfig.RosterStorage.ItemMetadata
+                            : value;
+                    return Codec.STRING.encode(storage.name(), extraInfo);
+                }
+
+                @Nonnull
+                @Override
+                public Schema toSchema(@Nonnull SchemaContext context) {
+                    StringSchema schema = new StringSchema();
+                    schema.setEnum(new String[] {
+                            "ItemMetadata",
+                            "OwnerCommandFamily",
+                            "BondedCompanions"
+                    });
+                    return schema;
+                }
+            };
+
     static final StringCodecMapCodec<
             TwCommandItemConfig.AllowedRoles,
             BuilderCodec<? extends TwCommandItemConfig.AllowedRoles>>

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -153,6 +154,10 @@ public final class ReplacementTameworkApiFactory {
                         facades.operations(),
                         dependencies.paidRevival()
                 );
+        BondedCompanionApi bondedCompanions =
+                dependencies.bondedCompanions() == null
+                        ? BondedCompanionApi.unavailable()
+                        : dependencies.bondedCompanions();
         ReplacementTameworkApi api = new ReplacementTameworkApi(
                 base,
                 persistence,
@@ -162,7 +167,8 @@ public final class ReplacementTameworkApiFactory {
                 rosters,
                 timed,
                 provisioning,
-                paidRevival
+                paidRevival,
+                bondedCompanions
         );
         AutoCloseable timedEventBridge = timedFacade == null
                 ? () -> { }

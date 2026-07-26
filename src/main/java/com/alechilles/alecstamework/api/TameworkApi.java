@@ -54,5 +54,10 @@ public interface TameworkApi {
     default PopulationGroupApi populationGroups() {
         return PopulationGroupApi.unavailable();
     }
+
+    /** Returns the separate bonded-companion authority when advertised. */
+    default BondedCompanionApi bondedCompanions() {
+        return BondedCompanionApi.unavailable();
+    }
 }
 

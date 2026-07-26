@@ -291,6 +291,7 @@ public final class ItemFeatureConfig {
                                        String failureSoundEvent,
                                        CaptureSourceConsumption sourceConsumption,
                                        CaptureSuccessDisposition successDisposition,
+                                       String bondedRosterId,
                                        String commandFamilyId,
                                        String requiredCommandConfigId,
                                        boolean requireCommandAccessItem) {
@@ -299,7 +300,7 @@ public final class ItemFeatureConfig {
                 1.0D, 0, null, null,
                 CaptureSourceConsumption.SUCCESS_ONLY,
                 CaptureSuccessDisposition.CAPTURED_ITEM,
-                null, null, false
+                null, null, null, false
         );
 
         /** Source-compatible constructor for the original capture mechanics. */
@@ -317,7 +318,30 @@ public final class ItemFeatureConfig {
                     failureParticleSystem, failureSoundEvent,
                     CaptureSourceConsumption.SUCCESS_ONLY,
                     CaptureSuccessDisposition.CAPTURED_ITEM,
-                    null, null, false);
+                    null, null, null, false);
+        }
+
+        /** Source-compatible constructor for command-family capture settings. */
+        public CaptureItemMechanics(CaptureChanceMode chanceMode,
+                                    int power,
+                                    double baseChance,
+                                    double chancePerPower,
+                                    double minimumChance,
+                                    double maximumChance,
+                                    int failureCooldownMs,
+                                    String failureParticleSystem,
+                                    String failureSoundEvent,
+                                    CaptureSourceConsumption sourceConsumption,
+                                    CaptureSuccessDisposition successDisposition,
+                                    String commandFamilyId,
+                                    String requiredCommandConfigId,
+                                    boolean requireCommandAccessItem) {
+            this(chanceMode, power, baseChance, chancePerPower,
+                    minimumChance, maximumChance, failureCooldownMs,
+                    failureParticleSystem, failureSoundEvent,
+                    sourceConsumption, successDisposition, null,
+                    commandFamilyId, requiredCommandConfigId,
+                    requireCommandAccessItem);
         }
 
         public CaptureItemMechanics {
@@ -330,6 +354,7 @@ public final class ItemFeatureConfig {
                     : successDisposition;
             failureParticleSystem = normalizeBlank(failureParticleSystem);
             failureSoundEvent = normalizeBlank(failureSoundEvent);
+            bondedRosterId = normalizeBlank(bondedRosterId);
             commandFamilyId = normalizeBlank(commandFamilyId);
             requiredCommandConfigId = normalizeBlank(requiredCommandConfigId);
             if (power < 0 || failureCooldownMs < 0) {
@@ -349,6 +374,29 @@ public final class ItemFeatureConfig {
                     && commandFamilyId == null) {
                 throw new IllegalArgumentException(
                         "TameAndCommandLink requires a non-blank CommandFamilyId."
+                );
+            }
+            if (successDisposition
+                    == CaptureSuccessDisposition.STORE_BONDED_COMPANION) {
+                if (bondedRosterId == null) {
+                    throw new IllegalArgumentException(
+                            "StoreBondedCompanion requires a non-blank BondedRosterId."
+                    );
+                }
+                if (!requireCommandAccessItem
+                        || requiredCommandConfigId == null) {
+                    throw new IllegalArgumentException(
+                            "StoreBondedCompanion requires an item access policy."
+                    );
+                }
+                if (commandFamilyId != null) {
+                    throw new IllegalArgumentException(
+                            "StoreBondedCompanion cannot require a generic CommandFamilyId."
+                    );
+                }
+            } else if (bondedRosterId != null) {
+                throw new IllegalArgumentException(
+                        "BondedRosterId is valid only for StoreBondedCompanion."
                 );
             }
             if (requireCommandAccessItem

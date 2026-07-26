@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.config;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,7 +14,16 @@ import java.util.Objects;
 public final class CommandItemRegistry {
     private final Map<String, TwCommandItemConfig> configsByItemId = new HashMap<>();
     private final Map<String, TwCommandItemConfig> configsById = new HashMap<>();
+    private final BondedCompanionRosterRegistry bondedRosters;
     private long revision;
+
+    public CommandItemRegistry() {
+        this(null);
+    }
+
+    public CommandItemRegistry(BondedCompanionRosterRegistry bondedRosters) {
+        this.bondedRosters = bondedRosters;
+    }
 
     public void register(String itemId, TwCommandItemConfig config) {
         register(config == null ? null : config.getId(), itemId, config);
@@ -27,6 +37,7 @@ public final class CommandItemRegistry {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(config, "config");
         validateOwnerFamily(itemId, config);
+        validateBondedRoster(config);
         configsByItemId.put(itemId, config);
         if (configId != null && !configId.isBlank()) {
             configsById.put(configId.trim(), config);
@@ -143,6 +154,33 @@ public final class CommandItemRegistry {
             throw new IllegalArgumentException(
                     "One command item cannot access conflicting families: "
                             + itemId
+            );
+        }
+    }
+
+    private void validateBondedRoster(TwCommandItemConfig config) {
+        if (!config.usesBondedCompanionRoster()) {
+            return;
+        }
+        if (config.getBondedRosterId() == null) {
+            throw new IllegalArgumentException(
+                    "BondedCompanions command configs require BondedRosterId"
+            );
+        }
+        if (config.getCommandFamilyId() != null) {
+            throw new IllegalArgumentException(
+                    "BondedCompanions command configs cannot declare CommandFamilyId"
+            );
+        }
+        if (config.isProjectRosterToItemMetadata()) {
+            throw new IllegalArgumentException(
+                    "BondedCompanions command configs cannot project owner-family metadata"
+            );
+        }
+        if (bondedRosters == null
+                || bondedRosters.resolve(config.getBondedRosterId()).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Unknown bonded roster: " + config.getBondedRosterId()
             );
         }
     }

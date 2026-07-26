@@ -42,6 +42,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.population.PopulationGroupAssetRegistrar;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
@@ -49,6 +50,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -278,6 +280,7 @@ public class Tamework extends JavaPlugin {
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
+    private BondedCompanionRosterRegistry bondedCompanionRosterRegistry;
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
@@ -311,6 +314,8 @@ public class Tamework extends JavaPlugin {
     private boolean debugAssetsRegistered;
     private boolean capturePolicyAssetsRegistered;
     private long capturePolicyAssetRevision;
+    private boolean bondedCompanionRosterAssetsRegistered;
+    private long bondedCompanionRosterAssetRevision;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -462,7 +467,10 @@ public class Tamework extends JavaPlugin {
                             : java.util.OptionalInt.of(item.getMaxStack());
                 });
         nameItemRegistry = new NameItemRegistry();
-        commandItemRegistry = new CommandItemRegistry();
+        bondedCompanionRosterRegistry = new BondedCompanionRosterRegistry();
+        commandItemRegistry = new CommandItemRegistry(
+                bondedCompanionRosterRegistry
+        );
         capturePolicyRegistry = new CapturePolicyRegistry();
         populationGroupConfigRegistry = new PopulationGroupConfigRegistry();
         populationGroupAssetRegistrar = new PopulationGroupAssetRegistrar(
@@ -533,6 +541,7 @@ public class Tamework extends JavaPlugin {
         registerGlobalConfigAssets();
         registerCompanionAssets();
         registerCapturePolicyAssets();
+        registerBondedCompanionRosterAssets();
         populationGroupAssetRegistrar.register();
         registerCoopAssets();
         registerSpawnerItemAssets();
@@ -1751,6 +1760,35 @@ public class Tamework extends JavaPlugin {
         commandAssetsRegistered = true;
     }
 
+    private void registerBondedCompanionRosterAssets() {
+        if (bondedCompanionRosterAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(
+                                TwBondedCompanionRosterConfig.class,
+                                new DefaultAssetMap<>()
+                        )
+                        .setPath("Tamework/BondedCompanions/Rosters")
+                        .setCodec(TwBondedCompanionRosterConfig.CODEC)
+                        .setKeyFunction(
+                                TwBondedCompanionRosterConfig::getId
+                        )
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwBondedCompanionRosterConfig.class,
+                this::onBondedCompanionRosterAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwBondedCompanionRosterConfig.class,
+                this::onBondedCompanionRosterAssetsRemoved
+        );
+        bondedCompanionRosterAssetsRegistered = true;
+    }
+
     private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
         try {
             getEntityStoreRegistry().registerSystem(new CommandLinkedRevivableDropSuppressionSystem());
@@ -2307,6 +2345,52 @@ public class Tamework extends JavaPlugin {
         if (rebuildCapturePolicyIndex()) {
             emitExperimentalConfigReload(TameworkConfigFamily.CAPTURE_POLICY, event.getRemovedAssets());
         }
+    }
+
+    private void onBondedCompanionRosterAssetsLoaded(
+            LoadedAssetsEvent<
+                    String,
+                    TwBondedCompanionRosterConfig,
+                    DefaultAssetMap<String, TwBondedCompanionRosterConfig>
+                    > event
+    ) {
+        rebuildBondedCompanionRosterIndex();
+    }
+
+    private void onBondedCompanionRosterAssetsRemoved(
+            RemovedAssetsEvent<
+                    String,
+                    TwBondedCompanionRosterConfig,
+                    DefaultAssetMap<String, TwBondedCompanionRosterConfig>
+                    > event
+    ) {
+        rebuildBondedCompanionRosterIndex();
+    }
+
+    private boolean rebuildBondedCompanionRosterIndex() {
+        TwBondedCompanionRosterConfig.clearInheritanceFallbackCache();
+        if (bondedCompanionRosterRegistry == null) {
+            return false;
+        }
+        DefaultAssetMap<String, TwBondedCompanionRosterConfig> assetMap =
+                TwBondedCompanionRosterConfig.getAssetMap();
+        java.util.Collection<TwBondedCompanionRosterConfig> configs =
+                assetMap == null || assetMap.getAssetMap() == null
+                        ? java.util.List.of()
+                        : assetMap.getAssetMap().values();
+        BondedCompanionRosterRegistry.ReloadResult result =
+                bondedCompanionRosterRegistry.replace(
+                        configs,
+                        ++bondedCompanionRosterAssetRevision
+                );
+        if (!result.applied()) {
+            getLogger().at(Level.WARNING).log(
+                    "Bonded-companion roster reload rejected; retaining "
+                            + "revision " + result.active().revision()
+                            + ": " + result.error()
+            );
+        }
+        return result.applied();
     }
 
     private boolean rebuildCapturePolicyIndex() {

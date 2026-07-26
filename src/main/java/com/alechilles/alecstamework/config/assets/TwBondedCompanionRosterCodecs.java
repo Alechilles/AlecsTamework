@@ -1,0 +1,205 @@
+package com.alechilles.alecstamework.config.assets;
+
+import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
+import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.KeyedCodec;
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.common.util.ArrayUtil;
+
+/** Focused codecs for the bonded-roster asset and its nested policy sections. */
+public final class TwBondedCompanionRosterCodecs {
+    static final BuilderCodec<
+            TwBondedCompanionRosterConfig.RevivePriceDefinition>
+            REVIVE_PRICE_CODEC = BuilderCodec.builder(
+                    TwBondedCompanionRosterConfig.RevivePriceDefinition.class,
+                    TwBondedCompanionRosterConfig.RevivePriceDefinition::new
+            )
+            .<String>append(
+                    new KeyedCodec<>("ItemId", Codec.STRING),
+                    (price, value) -> price.itemId = value,
+                    price -> price.itemId
+            )
+            .documentation(
+                    "Item charged for revival. Within explicit RevivePrice, "
+                            + "omission inherits from the parent."
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("Quantity", Codec.INTEGER),
+                    (price, value) -> price.quantity = value == null ? 0 : value,
+                    price -> price.quantity
+            )
+            .documentation(
+                    "Positive item quantity charged for revival. Within "
+                            + "explicit RevivePrice, omission inherits."
+            )
+            .add()
+            .build();
+
+    static final BuilderCodec<
+            TwBondedCompanionRosterConfig.FeatureToggles>
+            FEATURES_CODEC = BuilderCodec.builder(
+                    TwBondedCompanionRosterConfig.FeatureToggles.class,
+                    TwBondedCompanionRosterConfig.FeatureToggles::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("Capture", Codec.BOOLEAN),
+                    (features, value) -> features.capture =
+                            value == null || value,
+                    features -> features.capture
+            )
+            .documentation("Allows capture into this bonded roster; omission inherits.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("Provision", Codec.BOOLEAN),
+                    (features, value) -> features.provision =
+                            value == null || value,
+                    features -> features.provision
+            )
+            .documentation("Allows direct provisioning; omission inherits.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("Summon", Codec.BOOLEAN),
+                    (features, value) -> features.summon =
+                            value == null || value,
+                    features -> features.summon
+            )
+            .documentation("Allows summoning stored profiles; omission inherits.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("Dismiss", Codec.BOOLEAN),
+                    (features, value) -> features.dismiss =
+                            value == null || value,
+                    features -> features.dismiss
+            )
+            .documentation("Allows storing active profiles; omission inherits.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("Revive", Codec.BOOLEAN),
+                    (features, value) -> features.revive =
+                            value == null || value,
+                    features -> features.revive
+            )
+            .documentation("Allows revival of dead profiles; omission inherits.")
+            .add()
+            .build();
+
+    public static final AssetBuilderCodec<
+            String,
+            TwBondedCompanionRosterConfig
+            > CODEC = AssetBuilderCodec.builder(
+                    TwBondedCompanionRosterConfig.class,
+                    TwBondedCompanionRosterConfig::new,
+                    Codec.STRING,
+                    (asset, id) -> asset.id = id,
+                    asset -> asset.id,
+                    (asset, data) -> asset.data = data,
+                    asset -> asset.data
+            )
+            .documentation(
+                    "Separate bonded-companion roster policy for Alec's Tamework."
+            )
+            .<Integer>append(
+                    new KeyedCodec<>("Priority", Codec.INTEGER),
+                    (asset, value) -> asset.priority = value == null ? 0 : value,
+                    asset -> asset.priority
+            )
+            .documentation("Resolver priority. An omitted value inherits.")
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("RosterId", Codec.STRING),
+                    (asset, value) -> asset.rosterId = value,
+                    asset -> asset.rosterId
+            )
+            .documentation("Stable namespaced roster ID. An omitted value inherits.")
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("FamilyId", Codec.STRING),
+                    (asset, value) -> asset.familyId = value,
+                    asset -> asset.familyId
+            )
+            .documentation("Stable namespaced companion family ID. An omitted value inherits.")
+            .add()
+            .<String[]>append(
+                    new KeyedCodec<>("AllowedRoles", Codec.STRING_ARRAY),
+                    (asset, value) -> asset.allowedRoles = value == null
+                            ? ArrayUtil.EMPTY_STRING_ARRAY
+                            : value,
+                    asset -> asset.allowedRoles
+            )
+            .documentation(
+                    "Exact allowed role IDs. Omission inherits; an explicit "
+                            + "array replaces the parent value (no merge)."
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("MaximumOwned", Codec.INTEGER),
+                    (asset, value) -> asset.maximumOwned = value == null
+                            ? 0
+                            : value,
+                    asset -> asset.maximumOwned
+            )
+            .documentation("Maximum owned profiles; 0 is unlimited. Omission inherits.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("MaximumActive", Codec.INTEGER),
+                    (asset, value) -> asset.maximumActive = value == null
+                            ? 0
+                            : value,
+                    asset -> asset.maximumActive
+            )
+            .documentation("Maximum active profiles; 0 is unlimited. Omission inherits.")
+            .add()
+            .<Long>append(
+                    new KeyedCodec<>("SessionDurationSeconds", Codec.LONG),
+                    (asset, value) -> asset.sessionDurationSeconds = value == null
+                            ? 0L
+                            : value,
+                    asset -> asset.sessionDurationSeconds
+            )
+            .documentation(
+                    "Active lease duration in seconds; exactly 0 disables the "
+                            + "timer. An omitted value inherits."
+            )
+            .add()
+            .<Long>append(
+                    new KeyedCodec<>("SummonCooldownSeconds", Codec.LONG),
+                    (asset, value) -> asset.summonCooldownSeconds = value == null
+                            ? 0L
+                            : value,
+                    asset -> asset.summonCooldownSeconds
+            )
+            .documentation(
+                    "Summon cooldown in seconds; exactly 0 disables the timer. "
+                            + "An omitted value inherits."
+            )
+            .add()
+            .<TwBondedCompanionRosterConfig.RevivePriceDefinition>append(
+                    new KeyedCodec<>("RevivePrice", REVIVE_PRICE_CODEC),
+                    (asset, value) -> asset.revivePrice = value,
+                    asset -> asset.revivePrice
+            )
+            .documentation(
+                    "Optional revive price. Omission inherits the parent object; "
+                            + "explicit nested fields override and missing nested "
+                            + "fields inherit."
+            )
+            .add()
+            .<TwBondedCompanionRosterConfig.FeatureToggles>append(
+                    new KeyedCodec<>("Features", FEATURES_CODEC),
+                    (asset, value) -> asset.features = value == null
+                            ? new TwBondedCompanionRosterConfig.FeatureToggles()
+                            : value,
+                    asset -> asset.features
+            )
+            .documentation(
+                    "Bonded feature policy. Omission inherits the parent object; "
+                            + "explicit nested fields override and missing nested "
+                            + "fields inherit."
+            )
+            .add()
+            .build();
+
+    private TwBondedCompanionRosterCodecs() {
+    }
+}
