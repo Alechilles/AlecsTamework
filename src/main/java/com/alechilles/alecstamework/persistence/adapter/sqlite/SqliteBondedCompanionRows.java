@@ -47,11 +47,12 @@ final class SqliteBondedCompanionRows {
         statement.setString(6, row.targetKind());
         statement.setString(7, row.targetNpcUuid().toString());
         statement.setString(8, row.cleanupReason());
-        statement.setString(9, row.cleanupState());
-        statement.setInt(10, row.attemptCount());
-        statement.setLong(11, row.nextAttemptAtMs());
-        statement.setLong(12, row.createdAtMs());
-        statement.setLong(13, row.retainedUntilMs());
+        statement.setString(9, row.worldKey());
+        statement.setString(10, row.cleanupState());
+        statement.setInt(11, row.attemptCount());
+        statement.setLong(12, row.nextAttemptAtMs());
+        statement.setLong(13, row.createdAtMs());
+        statement.setLong(14, row.retainedUntilMs());
     }
 
     static void bindExtension(PreparedStatement statement,
@@ -110,7 +111,8 @@ final class SqliteBondedCompanionRows {
                 row.getString("roster_id"), row.getString("profile_id"),
                 row.getString("lease_token"), row.getString("target_kind"),
                 UUID.fromString(row.getString("target_npc_uuid")),
-                row.getString("cleanup_reason"), row.getString("cleanup_state"),
+                row.getString("world_key"), row.getString("cleanup_reason"),
+                row.getString("cleanup_state"),
                 row.getInt("attempt_count"), row.getLong("next_attempt_at_ms"),
                 row.getLong("created_at_ms"), row.getLong("retained_until_ms")
         );

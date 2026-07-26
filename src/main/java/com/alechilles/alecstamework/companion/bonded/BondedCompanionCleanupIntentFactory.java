@@ -28,10 +28,12 @@ final class BondedCompanionCleanupIntentFactory {
             @Nonnull String reason,
             long nowMs
     ) {
-        return BondedCompanionProjectionCleanupService.CleanupIntent.projection(
+        return new BondedCompanionProjectionCleanupService.CleanupIntent(
                 cleanupId(lease, targetNpcUuid, reason),
                 lease.ownerUuid(), lease.rosterId(), lease.profileId(),
-                lease.leaseToken(), targetNpcUuid, worldKey, reason,
+                lease.leaseToken(),
+                BondedCompanionProjectionCleanupService.Target.PROJECTION,
+                targetNpcUuid, worldKey, reason, nowMs,
                 retainedUntil(nowMs)
         );
     }

@@ -274,6 +274,8 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private Path runtimeDataDirectory;
     private TameworkPersistenceComposition persistenceComposition;
+    private TameworkBondedCompanionComposition bondedCompanionComposition;
+    private AutoCloseable bondedDiagnosticRegistration;
     private PersistenceBootstrap persistenceBootstrap;
     private TameworkApi api;
     private ReplacementTameworkApiFactory.Composition apiComposition;
@@ -872,6 +874,16 @@ public class Tamework extends JavaPlugin {
                 )
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
+        bondedCompanionComposition = TameworkBondedCompanionComposition.open(
+                runtimeDataDirectory,
+                bondedCompanionRosterRegistry,
+                getLogger(),
+                System::currentTimeMillis
+        );
+        bondedDiagnosticRegistration =
+                persistenceComposition.registerBondedDiagnostics(
+                        bondedCompanionComposition.diagnostics()
+                );
         persistenceBootstrap = persistenceComposition.persistence();
         commandLinkedNpcStateSnapshotService =
                 persistenceComposition.snapshots();
@@ -927,7 +939,8 @@ public class Tamework extends JavaPlugin {
                 interactionExtensionRegistry,
                 traitEffectRegistry,
                 damagePolicy,
-                persistenceComposition.featureApiDependencies()
+                persistenceComposition.featureApiDependencies(),
+                bondedCompanionComposition.api()
         );
         api = apiComposition.api();
         apiComposition.activateCapturePolicyRuntime(
@@ -1293,6 +1306,7 @@ public class Tamework extends JavaPlugin {
             apiComposition = null;
         }
         api = null;
+        closeBondedCompanions();
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
@@ -1763,6 +1777,23 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
         commandAssetsRegistered = true;
+    }
+
+    private void closeBondedCompanions() {
+        if (bondedDiagnosticRegistration != null) {
+            try {
+                bondedDiagnosticRegistration.close();
+            } catch (Exception failure) {
+                getLogger().at(Level.WARNING).withCause(failure).log(
+                        "Bonded diagnostic aggregation teardown failed."
+                );
+            }
+            bondedDiagnosticRegistration = null;
+        }
+        if (bondedCompanionComposition != null) {
+            bondedCompanionComposition.close();
+            bondedCompanionComposition = null;
+        }
     }
 
     private void registerBondedCompanionRosterAssets() {

@@ -83,15 +83,20 @@ public final class BondedCompanionRecord {
             @Nonnull String cleanupId, @Nonnull UUID ownerUuid,
             @Nonnull String rosterId, @Nonnull String profileId,
             @Nullable String leaseToken, @Nonnull CleanupTarget target,
-            @Nonnull UUID targetNpcUuid, @Nonnull String reason,
+            @Nonnull UUID targetNpcUuid, @Nonnull String worldKey,
+            @Nonnull String reason,
             @Nonnull CleanupState state, int attemptCount,
             long nextAttemptAtMs, long createdAtMs, long retainedUntilMs
     ) {
+        public static final String LEGACY_UNKNOWN_WORLD =
+                "__legacy_unknown_world__";
+
         public Cleanup {
             cleanupId = text(cleanupId, "cleanupId"); ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
             rosterId = text(rosterId, "rosterId"); profileId = text(profileId, "profileId");
             leaseToken = optional(leaseToken); target = Objects.requireNonNull(target, "target");
             targetNpcUuid = Objects.requireNonNull(targetNpcUuid, "targetNpcUuid");
+            worldKey = text(worldKey, "worldKey");
             reason = text(reason, "reason"); state = Objects.requireNonNull(state, "state");
             if (attemptCount < 0) throw new IllegalArgumentException("negative attempt count");
             if (retainedUntilMs == 0) throw new IllegalArgumentException("retainedUntilMs must be bounded");

@@ -75,4 +75,7 @@ public interface BondedCompanionStore {
 
     /** Deletes at most the supplied number of expired operation records. */
     int pruneOperations(long nowMs, int limit);
+
+    /** Returns aggregate-only counts without exposing any durable identity. */
+    @Nonnull BondedCompanionStoreDiagnostics diagnostics();
 }

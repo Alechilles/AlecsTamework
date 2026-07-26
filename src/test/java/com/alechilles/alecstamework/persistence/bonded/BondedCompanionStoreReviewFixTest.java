@@ -262,7 +262,8 @@ class BondedCompanionStoreReviewFixTest {
         return new BondedCompanionRecord.Cleanup(
                 "cleanup-a", OWNER, "roster-a", "profile-a", null,
                 BondedCompanionRecord.CleanupTarget.PROJECTION, NPC_A,
-                "stale-projection", BondedCompanionRecord.CleanupState.COMPLETED,
+                "world-a", "stale-projection",
+                BondedCompanionRecord.CleanupState.COMPLETED,
                 1, -8_000L, -9_000L, retainedUntilMs
         );
     }

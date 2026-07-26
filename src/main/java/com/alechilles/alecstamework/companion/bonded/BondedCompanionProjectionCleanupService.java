@@ -45,6 +45,7 @@ public final class BondedCompanionProjectionCleanupService {
             @Nonnull UUID targetNpcUuid,
             @Nonnull String worldKey,
             @Nonnull String reason,
+            long createdAtMs,
             long retainedUntilMs
     ) {
         public CleanupIntent {
@@ -74,7 +75,7 @@ public final class BondedCompanionProjectionCleanupService {
             return new CleanupIntent(
                     cleanupId, ownerUuid, rosterId, profileId, leaseToken,
                     Target.PROJECTION, targetNpcUuid, worldKey, reason,
-                    retainedUntilMs
+                    inferredCreatedAt(retainedUntilMs), retainedUntilMs
             );
         }
 
@@ -88,8 +89,16 @@ public final class BondedCompanionProjectionCleanupService {
             return new CleanupIntent(
                     cleanupId, ownerUuid, rosterId, profileId, null,
                     Target.SOURCE, targetNpcUuid, worldKey, reason,
-                    retainedUntilMs
+                    inferredCreatedAt(retainedUntilMs), retainedUntilMs
             );
+        }
+
+        private static long inferredCreatedAt(long retainedUntilMs) {
+            try {
+                return Math.subtractExact(retainedUntilMs, 300_000L);
+            } catch (ArithmeticException underflow) {
+                return Long.MIN_VALUE;
+            }
         }
     }
 

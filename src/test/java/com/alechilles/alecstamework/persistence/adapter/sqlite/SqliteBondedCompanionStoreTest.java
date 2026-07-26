@@ -273,7 +273,7 @@ class SqliteBondedCompanionStoreTest {
     ) {
         return new SqliteBondedCompanionCleanupRow(
                 id, OWNER_A, "roster-a", "profile-a", null,
-                "PROJECTION", npc, "stale-projection", "COMPLETED",
+                "PROJECTION", npc, "world-a", "stale-projection", "COMPLETED",
                 1, -7_000L, -7_000L, retainedUntil
         );
     }

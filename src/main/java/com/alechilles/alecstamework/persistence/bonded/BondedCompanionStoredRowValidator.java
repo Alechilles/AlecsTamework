@@ -60,16 +60,17 @@ final class BondedCompanionStoredRowValidator {
             throws SQLException, InvalidRecordException {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("""
-                     SELECT owner_uuid, target_npc_uuid, target_kind,
+                     SELECT owner_uuid, target_npc_uuid, world_key, target_kind,
                             cleanup_state, retained_until_ms
                      FROM bonded_companion_cleanup
                      """)) {
             while (rows.next()) {
                 requireUuid(rows.getString(1));
                 requireUuid(rows.getString(2));
-                if (!Set.of("SOURCE", "PROJECTION").contains(rows.getString(3))
+                if (rows.getString(3) == null || rows.getString(3).isBlank()
+                        || !Set.of("SOURCE", "PROJECTION").contains(rows.getString(4))
                         || !Set.of("PENDING", "COMPLETED", "ABANDONED")
-                        .contains(rows.getString(4)) || rows.getLong(5) == 0) {
+                        .contains(rows.getString(5)) || rows.getLong(6) == 0) {
                     throw invalid();
                 }
             }

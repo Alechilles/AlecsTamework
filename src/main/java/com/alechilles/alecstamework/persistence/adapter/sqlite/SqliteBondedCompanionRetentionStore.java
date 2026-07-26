@@ -43,9 +43,9 @@ final class SqliteBondedCompanionRetentionStore {
                     INSERT INTO bonded_companion_cleanup(
                         cleanup_id, owner_uuid, roster_id, profile_id,
                         lease_token, target_kind, target_npc_uuid,
-                        cleanup_reason, cleanup_state, attempt_count,
+                        cleanup_reason, world_key, cleanup_state, attempt_count,
                         next_attempt_at_ms, created_at_ms, retained_until_ms
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)) {
                 SqliteBondedCompanionRows.bindCleanup(statement, row);
                 statement.executeUpdate();
@@ -64,7 +64,7 @@ final class SqliteBondedCompanionRetentionStore {
         try (PreparedStatement statement = connection.prepareStatement("""
                      SELECT cleanup_id, owner_uuid, roster_id, profile_id,
                             lease_token, target_kind, target_npc_uuid,
-                            cleanup_reason, cleanup_state, attempt_count,
+                            world_key, cleanup_reason, cleanup_state, attempt_count,
                             next_attempt_at_ms, created_at_ms, retained_until_ms
                      FROM bonded_companion_cleanup
                      WHERE owner_uuid = ? AND roster_id = ?

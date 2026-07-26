@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.annotation.Nonnull;
@@ -44,6 +45,8 @@ public final class PersistenceDiagnosticExporter {
 
     private final Path bundleDirectory;
     private final PersistenceDiagnosticsReader diagnostics;
+    private final AtomicReference<BondedCompanionDiagnosticContributor>
+            bondedContributor = new AtomicReference<>();
 
     public PersistenceDiagnosticExporter(
             @Nonnull Path dataDirectory,
@@ -72,6 +75,31 @@ public final class PersistenceDiagnosticExporter {
                 .thenApplyAsync(read -> export(status, metrics, read));
     }
 
+    /** Registers the isolated bonded diagnostic source at this aggregation boundary. */
+    @Nonnull
+    public AutoCloseable registerBondedContributor(
+            @Nonnull BondedCompanionDiagnosticContributor contributor
+    ) {
+        Objects.requireNonNull(contributor, "contributor");
+        if (!bondedContributor.compareAndSet(null, contributor)) {
+            throw new IllegalStateException(
+                    "A bonded diagnostic contributor is already registered"
+            );
+        }
+        return () -> bondedContributor.compareAndSet(contributor, null);
+    }
+
+    /** Returns the optional aggregate-only bonded status used by debugdb. */
+    @Nonnull
+    public java.util.Optional<BondedCompanionDiagnosticSnapshot>
+    bondedSnapshot() {
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        return contributor == null
+                ? java.util.Optional.empty()
+                : java.util.Optional.of(contributor.snapshot());
+    }
+
     private ExportResult export(
             PublicPersistenceOperationalStatus status,
             PublicPersistenceMetricsSnapshot metrics,
@@ -89,6 +117,11 @@ public final class PersistenceDiagnosticExporter {
         members.put("operational-status.json", json(statusJson(status)));
         members.put("metrics.json", json(metrics));
         members.put("diagnostic-detail.json", json(found.value()));
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        if (contributor != null) {
+            appendBondedEntry(members, contributor);
+        }
         try {
             return writeBundle(
                     bundleDirectory,
@@ -102,6 +135,22 @@ public final class PersistenceDiagnosticExporter {
                     failure
             );
         }
+    }
+
+    static void appendBondedEntry(
+            Map<String, byte[]> members,
+            BondedCompanionDiagnosticContributor contributor
+    ) {
+        Objects.requireNonNull(members, "members");
+        BondedCompanionDiagnosticContributor.ExportEntry entry =
+                Objects.requireNonNull(contributor, "contributor")
+                        .exportEntry();
+        if (!"bonded-companions.json".equals(entry.name())) {
+            throw new IllegalArgumentException(
+                    "Unexpected bonded diagnostic member name"
+            );
+        }
+        members.put(entry.name(), entry.content());
     }
 
     static ExportResult writeBundle(

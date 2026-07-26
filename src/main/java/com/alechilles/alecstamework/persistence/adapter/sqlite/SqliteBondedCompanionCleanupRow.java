@@ -14,6 +14,7 @@ public record SqliteBondedCompanionCleanupRow(
         @Nullable String leaseToken,
         @Nonnull String targetKind,
         @Nonnull UUID targetNpcUuid,
+        @Nonnull String worldKey,
         @Nonnull String cleanupReason,
         @Nonnull String cleanupState,
         int attemptCount,
@@ -29,6 +30,7 @@ public record SqliteBondedCompanionCleanupRow(
         leaseToken = normalize(leaseToken);
         targetKind = requireText(targetKind, "targetKind");
         targetNpcUuid = Objects.requireNonNull(targetNpcUuid, "targetNpcUuid");
+        worldKey = requireText(worldKey, "worldKey");
         cleanupReason = requireText(cleanupReason, "cleanupReason");
         cleanupState = requireText(cleanupState, "cleanupState");
         if (attemptCount < 0) {

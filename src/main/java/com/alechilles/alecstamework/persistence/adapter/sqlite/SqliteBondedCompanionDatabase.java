@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreDiagnostics;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import com.google.gson.Gson;
 import java.nio.file.Path;
@@ -149,6 +150,34 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
 
     @Override public int pruneOperations(long nowMs, int limit) {
         return integerWrite(store -> store.pruneOperations(nowMs, limit));
+    }
+
+    @Override
+    public BondedCompanionStoreDiagnostics diagnostics() {
+        try (Connection connection = connections.openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT
+                       SUM(CASE WHEN state = 'STORED' THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN state = 'ACTIVE' THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN state = 'DEAD' THEN 1 ELSE 0 END),
+                       (SELECT COUNT(*) FROM bonded_companion_lease),
+                       (SELECT COUNT(*) FROM bonded_companion_cleanup
+                         WHERE cleanup_state = 'PENDING')
+                     FROM bonded_companion_profile
+                     """);
+             ResultSet row = statement.executeQuery()) {
+            if (!row.next()) {
+                throw new SQLException("bonded_diagnostic_row_missing");
+            }
+            return new BondedCompanionStoreDiagnostics(
+                    row.getLong(1), row.getLong(2), row.getLong(3),
+                    row.getLong(4), row.getLong(5)
+            );
+        } catch (SQLException failure) {
+            throw new IllegalStateException(
+                    "bonded-diagnostic-read-failed", failure
+            );
+        }
     }
 
     private <R, D> BondedCompanionStoreResult<D> mutate(

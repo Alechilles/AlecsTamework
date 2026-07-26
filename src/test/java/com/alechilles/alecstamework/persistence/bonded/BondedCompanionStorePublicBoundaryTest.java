@@ -95,7 +95,8 @@ class BondedCompanionStorePublicBoundaryTest {
         BondedCompanionRecord.Cleanup cleanup = new BondedCompanionRecord.Cleanup(
                 "cleanup-a", OWNER, "roster-a", "profile-a", null,
                 BondedCompanionRecord.CleanupTarget.PROJECTION, NPC,
-                "stale-projection", BondedCompanionRecord.CleanupState.COMPLETED,
+                "world-a", "stale-projection",
+                BondedCompanionRecord.CleanupState.COMPLETED,
                 1, -8_000L, -9_000L, -1L);
 
         assertEquals(BondedCompanionStoreResult.Code.APPLIED,

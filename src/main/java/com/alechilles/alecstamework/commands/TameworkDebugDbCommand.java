@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.commands;
 import com.alechilles.alecstamework.persistence.control.PersistenceStartupNode;
 import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .BondedCompanionDiagnosticSnapshot;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDiagnosticsReader;
@@ -96,6 +98,7 @@ public final class TameworkDebugDbCommand
         send(context, "Schema/integrity validation="
                 + (schemaVerified ? "complete" : "not complete")
                 + ", checkpoint=" + status.lastCheckpoint().status());
+        printBondedStatus(context);
     }
 
     private void printDetail(CommandContext context) {
@@ -121,7 +124,29 @@ public final class TameworkDebugDbCommand
                     + ", activeQuarantines=" + quarantines
                     + ", openCircuits=" + detail.openCircuitCount()
                     + ", operationPhases=" + detail.operationsByPhase());
+            printBondedStatus(context);
         });
+    }
+
+    private void printBondedStatus(CommandContext context) {
+        if (exporter == null) {
+            return;
+        }
+        exporter.bondedSnapshot().ifPresent(snapshot -> send(
+                context,
+                bondedLine(snapshot)
+        ));
+    }
+
+    private String bondedLine(BondedCompanionDiagnosticSnapshot snapshot) {
+        return "Bonded companions: readiness=" + snapshot.readiness()
+                + ", schema=" + snapshot.schemaVersion()
+                + ", stored=" + snapshot.storedProfiles()
+                + ", active=" + snapshot.activeProfiles()
+                + ", dead=" + snapshot.deadProfiles()
+                + ", leases=" + snapshot.activeLeases()
+                + ", pendingCleanup=" + snapshot.pendingBoundedCleanups()
+                + ", lastFailure=" + snapshot.lastFailureCategory();
     }
 
     private void export(CommandContext context) {

@@ -70,7 +70,8 @@ final class SqliteBondedCompanionMapper {
         return new SqliteBondedCompanionCleanupRow(
                 value.cleanupId(), value.ownerUuid(), value.rosterId(),
                 value.profileId(), value.leaseToken(), value.target().name(),
-                value.targetNpcUuid(), value.reason(), value.state().name(),
+                value.targetNpcUuid(), value.worldKey(), value.reason(),
+                value.state().name(),
                 value.attemptCount(), value.nextAttemptAtMs(), value.createdAtMs(),
                 value.retainedUntilMs());
     }
@@ -80,7 +81,8 @@ final class SqliteBondedCompanionMapper {
                 row.cleanupId(), row.ownerUuid(), row.rosterId(), row.profileId(),
                 row.leaseToken(), BondedCompanionRecord.CleanupTarget
                         .valueOf(row.targetKind()), row.targetNpcUuid(),
-                row.cleanupReason(), BondedCompanionRecord.CleanupState
+                row.worldKey(), row.cleanupReason(),
+                BondedCompanionRecord.CleanupState
                         .valueOf(row.cleanupState()), row.attemptCount(),
                 row.nextAttemptAtMs(), row.createdAtMs(), row.retainedUntilMs());
     }

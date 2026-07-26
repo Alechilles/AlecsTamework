@@ -41,15 +41,20 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(first.availability().available());
         assertTrue(second.availability().available());
         assertEquals(BondedCompanionSchemaManager.requiredTables(), tables(database));
-        assertEquals(3, BondedCompanionSchemaManager.VERSION);
-        assertEquals(3L, queryLong(database,
+        assertEquals(4, BondedCompanionSchemaManager.VERSION);
+        assertEquals(4L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(3L, queryLong(database,
+        assertEquals(4L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(-5_000L, queryLong(database,
-                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 3"));
+                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 4"));
         assertEquals(manager.schemaHash(), queryString(database,
-                "SELECT schema_hash FROM bonded_schema_history WHERE version = 3"));
+                "SELECT schema_hash FROM bonded_schema_history WHERE version = 4"));
+        assertEquals(1L, queryLong(database, """
+                SELECT COUNT(*) FROM pragma_table_info(
+                    'bonded_companion_cleanup'
+                ) WHERE name = 'world_key'
+                """));
     }
 
     @Test
@@ -62,6 +67,14 @@ class BondedCompanionSchemaManagerTest {
     void bundledV2RemainsByteStableForUpgradeRecognition() throws Exception {
         assertEquals("d21790785972ab126ea9723b17148fe2d99d75ec355becddb090e563fad1fc19",
                 hash(resource("/persistence/bonded/v2.sql")));
+    }
+
+    @Test
+    void bundledV3RemainsByteStableForUpgradeRecognition() throws Exception {
+        assertEquals(
+                "aec0fd76bd67d52047034a4acedac4bbeab36fab48fda405c50d576f31f328cf",
+                hash(resource("/persistence/bonded/v3.sql"))
+        );
     }
 
     @Test
@@ -141,9 +154,9 @@ class BondedCompanionSchemaManagerTest {
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertTrue(readiness.availability().available());
-        assertEquals(3L, queryLong(database,
+        assertEquals(4L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(3L, queryLong(database,
+        assertEquals(4L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         BondedCompanionStore store =
                 new com.alechilles.alecstamework.persistence.adapter.sqlite
@@ -162,7 +175,14 @@ class BondedCompanionSchemaManagerTest {
         assertEquals(1, store.listCleanup(
                 java.util.UUID.fromString(
                         "10000000-0000-0000-0000-000000000001"),
-                "roster-a", 10).size());
+                        "roster-a", 10).size());
+        assertEquals(
+                BondedCompanionRecord.Cleanup.LEGACY_UNKNOWN_WORLD,
+                store.listCleanup(
+                        java.util.UUID.fromString(
+                                "10000000-0000-0000-0000-000000000001"),
+                        "roster-a", 10).getFirst().worldKey()
+        );
         assertEquals(1L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_companion_operation"));
         BondedCompanionOperation replayOperation = new BondedCompanionOperation(
