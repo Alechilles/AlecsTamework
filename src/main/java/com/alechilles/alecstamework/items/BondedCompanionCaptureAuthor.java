@@ -64,19 +64,22 @@ public final class BondedCompanionCaptureAuthor {
         }
         PersistenceOutcome stored = safePersist(intent);
         if (stored == PersistenceOutcome.REPLAYED) {
-            feedback.failure(intent, completion, Status.REPLAYED);
-            return new Result(Status.REPLAYED, true, null);
+            boolean delivered = feedback.failure(
+                    intent, completion, Status.REPLAYED);
+            return new Result(Status.REPLAYED, true, null, delivered);
         }
         if (stored != PersistenceOutcome.APPLIED) {
             return rejected(intent, completion, Status.DATABASE_FAILED);
         }
         CleanupOutcome cleanupOutcome = safeCleanup(intent);
-        if (!feedback.success(intent, completion)) {
-            return new Result(
-                    Status.FINALIZATION_FAILED, true, cleanupOutcome
-            );
-        }
-        return new Result(Status.APPLIED, true, cleanupOutcome);
+        var completed = feedback.success(intent, completion);
+        Status status = switch (completed.status()) {
+            case APPLIED -> Status.APPLIED;
+            case EFFECT_FAILED -> Status.EFFECT_FAILED;
+            case FINALIZATION_FAILED -> Status.FINALIZATION_FAILED;
+        };
+        return new Result(
+                status, true, cleanupOutcome, completed.feedbackDelivered());
     }
 
     /** Emits one terminal bonded-route rejection before an intent can be frozen. */
@@ -96,11 +99,11 @@ public final class BondedCompanionCaptureAuthor {
     @Nullable
     private Status intrinsicDenial(@Nullable BondedCompanionCaptureIntent intent) {
         if (intent == null || !intent.targetValid()) return Status.TARGET_INVALID;
+        if (!intent.ownerAllowed()) return Status.OWNER_DENIED;
+        if (!intent.roleAllowed()) return Status.ROLE_DENIED;
         if (!intent.chanceSuccessful()) return Status.CHANCE_FAILED;
         if (!intent.tranquilized()) return Status.TRANQUILIZED_REQUIRED;
         if (!intent.toolAccess()) return Status.TOOL_ACCESS_REQUIRED;
-        if (!intent.ownerAllowed()) return Status.OWNER_DENIED;
-        if (!intent.roleAllowed()) return Status.ROLE_DENIED;
         return intent.snapshot() == null ? Status.SNAPSHOT_FAILED : null;
     }
 
@@ -139,15 +142,15 @@ public final class BondedCompanionCaptureAuthor {
             BondedCompanionCaptureFeedbackDispatcher.CompletionContext completion,
             Status status
     ) {
-        feedback.failure(intent, completion, status);
-        return new Result(status, false, null);
+        boolean delivered = feedback.failure(intent, completion, status);
+        return new Result(status, false, null, delivered);
     }
 
     public enum Status {
         APPLIED, REPLAYED, TARGET_INVALID, CHANCE_FAILED,
         ADMISSION_DENIED, TRANQUILIZED_REQUIRED, TOOL_ACCESS_REQUIRED, OWNER_DENIED,
         ROLE_DENIED, CAPACITY_REJECTED, POLICY_UNAVAILABLE, SNAPSHOT_FAILED,
-        DATABASE_FAILED, FINALIZATION_FAILED
+        DATABASE_FAILED, EFFECT_FAILED, FINALIZATION_FAILED
     }
     public enum PolicyDecision {
         ALLOWED, ROLE_REJECTED, CAPACITY_REJECTED, REJECTED
@@ -156,7 +159,8 @@ public final class BondedCompanionCaptureAuthor {
     public enum CleanupOutcome { REMOVED, ALREADY_MISSING, RETRY_PENDING }
 
     public record Result(@Nonnull Status status, boolean durable,
-                         @Nullable CleanupOutcome cleanupOutcome) {
+                         @Nullable CleanupOutcome cleanupOutcome,
+                         boolean feedbackDelivered) {
         public Result { Objects.requireNonNull(status, "status"); }
     }
     private record PolicyCheck(

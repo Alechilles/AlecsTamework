@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.bson.BsonDocument;
 import com.hypixel.hytale.codec.ExtraInfo;
 import org.junit.jupiter.api.Test;
@@ -225,6 +226,85 @@ class BondedCompanionCapturePipelineTest {
         assertEquals(List.of("message"), harness.events);
     }
 
+    /** Regression: chance must not hide deterministic owner or role denial. */
+    @Test
+    void factoryRoutePrioritizesOwnerAndRoleOverFailedChance() {
+        Harness ownerHarness = new Harness();
+        var ownerDenied = frozenIntent(false, false, true);
+
+        var ownerResult = ownerHarness.author.capture(ownerDenied);
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.OWNER_DENIED,
+                ownerResult.status());
+        assertEquals(List.of("message"), ownerHarness.events);
+
+        Harness roleHarness = new Harness();
+        var roleDenied = frozenIntent(false, true, false);
+
+        var roleResult = roleHarness.author.capture(roleDenied);
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.ROLE_DENIED,
+                roleResult.status());
+        assertEquals(List.of("message"), roleHarness.events);
+    }
+
+    @Test
+    void routeDoesNotRollChanceWhenOwnerOrRoleAlreadyDenies() {
+        AtomicInteger rollAttempts = new AtomicInteger();
+
+        var ownerDecision = BondedCompanionCaptureRoute.resolveAdmission(
+                new SpawnerCapturePolicyService.BondedAdmissionEvidence(
+                        null, false, true),
+                () -> { rollAttempts.incrementAndGet(); return null; });
+        var roleDecision = BondedCompanionCaptureRoute.resolveAdmission(
+                new SpawnerCapturePolicyService.BondedAdmissionEvidence(
+                        null, true, false),
+                () -> { rollAttempts.incrementAndGet(); return null; });
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.OWNER_DENIED,
+                ownerDecision.denial());
+        assertEquals(BondedCompanionCaptureAuthor.Status.ROLE_DENIED,
+                roleDecision.denial());
+        assertEquals(0, rollAttempts.get());
+    }
+
+    @Test
+    void failedRequiredEffectIsDurableAndNeverReportedApplied() {
+        Harness harness = new Harness();
+        harness.effectSuccessful = false;
+
+        var result = harness.author().capture(validIntent());
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.EFFECT_FAILED,
+                result.status());
+        assertTrue(result.durable());
+        assertEquals(List.of(
+                "policy", "persist", "cleanup", "effect", "message"
+        ), harness.events);
+    }
+
+    @Test
+    void failedMessageDeliveryIsVisibleInAuthorResult() {
+        Harness harness = new Harness();
+        harness.messageSuccessful = false;
+        var source = validIntent();
+        var ownerDenied = new BondedCompanionCaptureIntent(
+                source.callerNamespace(), source.idempotencyKey(),
+                source.actorUuid(), source.worldKey(), source.hotbarSlot(),
+                source.sourceFingerprint(), source.sourceNpcUuid(),
+                source.roleId(), source.rosterId(), source.rosterRevision(),
+                source.snapshot(), source.completionEffect(), true, true,
+                true, true, false, true);
+
+        var result = harness.author.capture(ownerDenied);
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.OWNER_DENIED,
+                result.status());
+        assertFalse(result.feedbackDelivered());
+        assertEquals(List.of("message", "feedback-diagnostic"),
+                harness.events);
+    }
+
     @Test
     void sqliteCommitAtomicallyCreatesProfileCleanupAndReplayReceipt() {
         Path path = tempDir.resolve("bonded-companions.sqlite");
@@ -348,6 +428,18 @@ class BondedCompanionCapturePipelineTest {
         return intent(snapshot(), true, true, true, true, true);
     }
 
+    private static BondedCompanionCaptureIntent frozenIntent(
+            boolean chance, boolean owner, boolean role
+    ) {
+        return SpawnerCaptureIntentFactory.freezeBonded(
+                new SpawnerCaptureIntentFactory.FrozenBondedCapture(
+                        "spawner-bonded-capture:v1", "attempt", OWNER,
+                        "world", 2, "fingerprint", SOURCE, "Dragon_Fire",
+                        "hydragon:companions", 4L, snapshot(),
+                        new SpawnerPublishedEffect(1, 2, 3, "burst", "success"),
+                        true, chance, true, true, owner, role));
+    }
+
     private static BondedCompanionCaptureIntent frozenIntentAt(long capturedAtMs) {
         return SpawnerCaptureIntentFactory.freezeBonded(
                 new SpawnerCaptureIntentFactory.FrozenBondedCapture(
@@ -417,6 +509,8 @@ class BondedCompanionCapturePipelineTest {
                 BondedCompanionCaptureAuthor.CleanupOutcome.REMOVED;
         private RuntimeException policyFailure;
         private boolean spendSuccessful = true;
+        private boolean effectSuccessful = true;
+        private boolean messageSuccessful = true;
         private BondedCompanionCaptureAuthor author = author();
 
         private BondedCompanionCaptureAuthor author() {
@@ -429,7 +523,9 @@ class BondedCompanionCapturePipelineTest {
                     intent -> { events.add("persist"); return persistence; },
                     intent -> { events.add("cleanup"); return cleanup; },
                     new BondedCompanionCaptureFeedbackDispatcher(
-                            new Sink(events, this)),
+                            new Sink(events, this),
+                            (intent, message, failure) -> events.add(
+                                    "feedback-diagnostic")),
                     (intent, failure) -> events.add("diagnostic")
             );
             return author;
@@ -444,15 +540,18 @@ class BondedCompanionCapturePipelineTest {
             events.add("spend");
             return harness.spendSuccessful;
         }
-        @Override public void effect(
+        @Override public boolean effect(
                 BondedCompanionCaptureIntent intent,
                 BondedCompanionCaptureFeedbackDispatcher.CompletionContext context) {
             events.add("effect");
+            return harness.effectSuccessful;
         }
-        @Override public void message(BondedCompanionCaptureIntent intent,
-                                      BondedCompanionCaptureFeedbackDispatcher.CompletionContext context,
-                                      String message) {
+        @Override public boolean message(
+                BondedCompanionCaptureIntent intent,
+                BondedCompanionCaptureFeedbackDispatcher.CompletionContext context,
+                String message) {
             events.add("message");
+            return harness.messageSuccessful;
         }
     }
 }

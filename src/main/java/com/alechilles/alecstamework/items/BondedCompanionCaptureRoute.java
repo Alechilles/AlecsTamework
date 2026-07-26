@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 /** Owns the bonded-only admission, roll, intent, and terminal-feedback route. */
@@ -51,20 +52,48 @@ final class BondedCompanionCaptureRoute {
                     completion);
             return true;
         }
-        if (assessed.denial() != null) {
-            author.reject(assessed.denial(), completion);
+        RouteDecision decision = resolveAdmission(
+                assessed,
+                () -> rolls.evaluate(
+                        player, targetRef, source, config, attempt));
+        if (decision.denial() != null) {
+            author.reject(decision.denial(), completion);
             return true;
         }
-        var roll = rolls.evaluate(player, targetRef, source, config, attempt);
-        if (roll == null || roll.evaluation().outcome()
-                == SpawnerCaptureChanceService.Outcome.DENIED) {
-            author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
-                    completion);
-            return true;
-        }
+        var roll = decision.roll();
         return finish(player, targetRef, source, config, attempt, roll,
                 assessed, particleOverride, completion);
     }
+
+    /** Resolves deterministic denials before sampling the chance boundary. */
+    static RouteDecision resolveAdmission(
+            SpawnerCapturePolicyService.BondedAdmissionEvidence admission,
+            Supplier<SpawnerCaptureRollService.Resolution> roll
+    ) {
+        if (admission.denial() != null) {
+            return new RouteDecision(admission.denial(), null);
+        }
+        if (!admission.ownerAllowed()) {
+            return new RouteDecision(
+                    BondedCompanionCaptureAuthor.Status.OWNER_DENIED, null);
+        }
+        if (!admission.roleAllowed()) {
+            return new RouteDecision(
+                    BondedCompanionCaptureAuthor.Status.ROLE_DENIED, null);
+        }
+        var resolved = roll.get();
+        if (resolved == null || resolved.evaluation().outcome()
+                == SpawnerCaptureChanceService.Outcome.DENIED) {
+            return new RouteDecision(
+                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED, null);
+        }
+        return new RouteDecision(null, resolved);
+    }
+
+    record RouteDecision(
+            @Nullable BondedCompanionCaptureAuthor.Status denial,
+            @Nullable SpawnerCaptureRollService.Resolution roll
+    ) {}
 
     private boolean finish(
             Player player, Ref<EntityStore> targetRef, ItemStack source,

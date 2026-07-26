@@ -6,6 +6,9 @@ import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -13,9 +16,18 @@ import javax.annotation.Nullable;
 /** Emits exactly one terminal player response for a bonded capture attempt. */
 public final class BondedCompanionCaptureFeedbackDispatcher {
     private final Sink sink;
+    private final Diagnostics diagnostics;
 
     BondedCompanionCaptureFeedbackDispatcher(@Nonnull Sink sink) {
+        this(sink, (intent, message, failure) -> {});
+    }
+
+    BondedCompanionCaptureFeedbackDispatcher(
+            @Nonnull Sink sink,
+            @Nonnull Diagnostics diagnostics
+    ) {
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
     }
 
     /** Creates world-thread item, effect, and player-message feedback. */
@@ -53,47 +65,54 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
                 return true;
             }
 
-            @Override public void effect(
+            @Override public boolean effect(
                     BondedCompanionCaptureIntent intent,
                     CompletionContext context
             ) {
                 if (!worldThread(context) || intent == null) {
-                    return;
+                    return false;
                 }
-                effects.playPublishedEffect(
+                return effects.playPublishedEffect(
                         context.world(), intent.completionEffect());
             }
 
             @Override
-            public void message(
+            public boolean message(
                     BondedCompanionCaptureIntent intent,
                     CompletionContext context,
                     String message
             ) {
                 if (worldThread(context)) {
-                    messages.show(
+                    return messages.show(
                             context.player(), message,
                             NotificationStyle.Warning);
-                } else {
-                    log(logger, message);
                 }
+                return false;
             }
-        });
+        }, new ThrottledDiagnostics(logger));
     }
 
     /** Emits the durable-success effect once, then finalizes the exact item. */
-    boolean success(@Nullable BondedCompanionCaptureIntent intent) {
+    SuccessResult success(@Nullable BondedCompanionCaptureIntent intent) {
         return success(intent, null);
     }
 
-    boolean success(
+    SuccessResult success(
             @Nullable BondedCompanionCaptureIntent intent,
             @Nullable CompletionContext context
     ) {
+        boolean effected;
         try {
-            sink.effect(intent, context);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Item finalization and terminal feedback must still resolve.
+            effected = sink.effect(intent, context);
+        } catch (RuntimeException | LinkageError failure) {
+            effected = false;
+        }
+        if (!effected) {
+            boolean delivered = safeMessage(intent, context,
+                    "Your companion was stored, but its completion effect "
+                    + "could not be played. The capture item was not spent; "
+                    + "contact an admin.");
+            return new SuccessResult(SuccessStatus.EFFECT_FAILED, delivered);
         }
         boolean spent;
         try {
@@ -102,38 +121,41 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             spent = false;
         }
         if (!spent) {
-            safeMessage(intent, context,
+            boolean delivered = safeMessage(intent, context,
                     "Your companion was stored, but the capture item "
                     + "could not be finalized. Keep the item unchanged and contact an admin.");
-            return false;
+            return new SuccessResult(
+                    SuccessStatus.FINALIZATION_FAILED, delivered);
         }
-        return true;
+        return new SuccessResult(SuccessStatus.APPLIED, true);
     }
 
     /** Sends one actionable message and no success presentation. */
-    void failure(@Nullable BondedCompanionCaptureIntent intent,
-                 @Nonnull BondedCompanionCaptureAuthor.Status status) {
-        failure(intent, null, status);
+    boolean failure(@Nullable BondedCompanionCaptureIntent intent,
+                    @Nonnull BondedCompanionCaptureAuthor.Status status) {
+        return failure(intent, null, status);
     }
 
-    void failure(
+    boolean failure(
             @Nullable BondedCompanionCaptureIntent intent,
             @Nullable CompletionContext context,
             @Nonnull BondedCompanionCaptureAuthor.Status status
     ) {
-        safeMessage(intent, context, message(status));
+        return safeMessage(intent, context, message(status));
     }
 
-    private void safeMessage(
+    private boolean safeMessage(
             BondedCompanionCaptureIntent intent,
             CompletionContext context,
             String message
     ) {
         try {
-            sink.message(intent, context, message);
-        } catch (RuntimeException | LinkageError ignored) {
-            // The production sink logs when a live UI recipient is unavailable.
+            if (sink.message(intent, context, message)) return true;
+            diagnostics.feedbackUnavailable(intent, message, null);
+        } catch (RuntimeException | LinkageError failure) {
+            diagnostics.feedbackUnavailable(intent, message, failure);
         }
+        return false;
     }
 
     private String message(BondedCompanionCaptureAuthor.Status status) {
@@ -150,6 +172,7 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             case SNAPSHOT_FAILED -> "The companion state could not be read. Try again without moving it.";
             case DATABASE_FAILED -> "The bonded roster could not be saved. Your item and companion were unchanged.";
             case REPLAYED -> "That companion is already stored in your bonded roster; no item was spent.";
+            case EFFECT_FAILED -> "Your companion was stored, but its completion effect could not be played. The capture item was not spent; contact an admin.";
             case FINALIZATION_FAILED -> "Your companion was stored, but the capture item could not be finalized. Contact an admin.";
             default -> "The bonded capture could not be completed. Your item and companion were unchanged.";
         };
@@ -158,11 +181,29 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
     interface Sink {
         boolean spend(@Nullable BondedCompanionCaptureIntent intent,
                       @Nullable CompletionContext context);
-        void effect(@Nullable BondedCompanionCaptureIntent intent,
-                    @Nullable CompletionContext context);
-        void message(@Nullable BondedCompanionCaptureIntent intent,
-                     @Nullable CompletionContext context,
-                     @Nonnull String message);
+        boolean effect(@Nullable BondedCompanionCaptureIntent intent,
+                       @Nullable CompletionContext context);
+        boolean message(@Nullable BondedCompanionCaptureIntent intent,
+                        @Nullable CompletionContext context,
+                        @Nonnull String message);
+    }
+
+    enum SuccessStatus { APPLIED, EFFECT_FAILED, FINALIZATION_FAILED }
+
+    record SuccessResult(
+            @Nonnull SuccessStatus status,
+            boolean feedbackDelivered
+    ) {
+        SuccessResult { Objects.requireNonNull(status, "status"); }
+    }
+
+    @FunctionalInterface
+    interface Diagnostics {
+        void feedbackUnavailable(
+                @Nullable BondedCompanionCaptureIntent intent,
+                @Nonnull String message,
+                @Nullable Throwable failure
+        );
     }
 
     /** Live context retained only for this synchronous world-thread call. */
@@ -190,7 +231,65 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
                 && context.world().isAlive() && context.world().isInThread();
     }
 
-    private static void log(HytaleLogger logger, String message) {
-        if (logger != null) logger.at(Level.WARNING).log(message);
+    /** Throttles admin-facing delivery warnings across repeated unavailable UI. */
+    static final class ThrottledDiagnostics implements Diagnostics {
+        private static final long INTERVAL_MS = TimeUnit.SECONDS.toMillis(10L);
+        private final LongSupplier clock;
+        private final WarningSink warnings;
+        private final AtomicLong nextWarningAtMs = new AtomicLong();
+
+        private ThrottledDiagnostics(@Nullable HytaleLogger logger) {
+            this(System::currentTimeMillis, (message, failure) -> {
+                if (logger == null) return;
+                var entry = logger.at(Level.WARNING);
+                if (failure != null) entry = entry.withCause(failure);
+                entry.log(message);
+            });
+        }
+
+        ThrottledDiagnostics(
+                @Nonnull LongSupplier clock,
+                @Nonnull WarningSink warnings
+        ) {
+            this.clock = Objects.requireNonNull(clock, "clock");
+            this.warnings = Objects.requireNonNull(warnings, "warnings");
+        }
+
+        @Override
+        public void feedbackUnavailable(
+                BondedCompanionCaptureIntent intent,
+                String message,
+                Throwable failure
+        ) {
+            if (!claim(clock.getAsLong())) return;
+            try {
+                warnings.warn(
+                        "Bonded capture player feedback unavailable (actor="
+                        + (intent == null ? null : intent.actorUuid())
+                        + ", roster="
+                        + (intent == null ? null : intent.rosterId())
+                        + ", world="
+                        + (intent == null ? null : intent.worldKey())
+                        + "): " + message,
+                        failure);
+            } catch (RuntimeException | LinkageError ignored) {
+                // Diagnostics must not change the durable operation outcome.
+            }
+        }
+
+        private boolean claim(long nowMs) {
+            long next = nextWarningAtMs.get();
+            while (nowMs >= next) {
+                if (nextWarningAtMs.compareAndSet(
+                        next, nowMs + INTERVAL_MS)) return true;
+                next = nextWarningAtMs.get();
+            }
+            return false;
+        }
+    }
+
+    @FunctionalInterface
+    interface WarningSink {
+        void warn(@Nonnull String message, @Nullable Throwable failure);
     }
 }
