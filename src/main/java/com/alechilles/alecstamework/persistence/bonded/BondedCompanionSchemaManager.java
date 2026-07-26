@@ -1,17 +1,21 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import com.google.gson.JsonParser;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -34,13 +38,13 @@ public final class BondedCompanionSchemaManager {
     private final String script;
     private final String scriptHash;
 
-    public BondedCompanionSchemaManager(
+    BondedCompanionSchemaManager(
             @Nonnull SqliteConnectionFactory connections
     ) {
         this(connections, System::currentTimeMillis);
     }
 
-    public BondedCompanionSchemaManager(
+    BondedCompanionSchemaManager(
             @Nonnull SqliteConnectionFactory connections,
             @Nonnull LongSupplier clock
     ) {
@@ -48,6 +52,20 @@ public final class BondedCompanionSchemaManager {
         this.clock = Objects.requireNonNull(clock, "clock");
         script = loadScript();
         scriptHash = sha256(script);
+    }
+
+    /** Creates a manager that owns connections to the supplied database path. */
+    public BondedCompanionSchemaManager(@Nonnull Path databasePath) {
+        this(databasePath, System::currentTimeMillis);
+    }
+
+    /** Creates a path-owned manager with an injectable signed timestamp source. */
+    public BondedCompanionSchemaManager(
+            @Nonnull Path databasePath,
+            @Nonnull LongSupplier clock
+    ) {
+        this(new SqliteConnectionFactory(
+                Objects.requireNonNull(databasePath, "databasePath")), clock);
     }
 
     /** Initializes an empty bonded database or verifies the existing exact lineage. */
@@ -136,6 +154,7 @@ public final class BondedCompanionSchemaManager {
                 );
             }
         }
+        verifyStoredRows(connection);
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",
                 "bonded-integrity-check-failed");
         try (Statement statement = connection.createStatement();
@@ -161,6 +180,111 @@ public final class BondedCompanionSchemaManager {
                         "bonded-orphaned-active-lease"
                 );
             }
+        }
+    }
+
+    private void verifyStoredRows(Connection connection) throws Exception {
+        verifyProfiles(connection);
+        verifyLeases(connection);
+        verifyCleanup(connection);
+        verifyOperations(connection);
+    }
+
+    private void verifyProfiles(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("""
+                     SELECT owner_uuid, state, snapshot_json, policy_json
+                     FROM bonded_companion_profile
+                     """)) {
+            while (rows.next()) {
+                requireUuid(rows.getString(1));
+                com.alechilles.alecstamework.companion.bonded.BondedCompanionState
+                        .valueOf(rows.getString(2));
+                var snapshot = JsonParser.parseString(rows.getString(3));
+                if (!snapshot.isJsonObject()) throw invalidRecord();
+                var object = snapshot.getAsJsonObject();
+                if (!object.has("encoding")
+                        || !"base64".equals(object.get("encoding").getAsString())
+                        || !object.has("payload")) throw invalidRecord();
+                if (Base64.getDecoder().decode(object.get("payload").getAsString()).length == 0)
+                    throw invalidRecord();
+                if (!JsonParser.parseString(rows.getString(4)).isJsonObject())
+                    throw invalidRecord();
+            }
+        } catch (VerificationFailure failure) {
+            throw failure;
+        } catch (RuntimeException failure) {
+            throw invalidRecord();
+        }
+    }
+
+    private void verifyLeases(Connection connection) throws Exception {
+        verifyUuidAndVocabulary(connection, """
+                SELECT live_npc_uuid, projection_state FROM bonded_companion_lease
+                """, Set.of("PENDING", "LIVE", "REMOVE_PENDING"));
+    }
+
+    private void verifyCleanup(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("""
+                     SELECT owner_uuid, target_npc_uuid, target_kind,
+                            cleanup_state, retained_until_ms
+                     FROM bonded_companion_cleanup
+                     """)) {
+            while (rows.next()) {
+                requireUuid(rows.getString(1));
+                requireUuid(rows.getString(2));
+                if (!Set.of("SOURCE", "PROJECTION").contains(rows.getString(3))
+                        || !Set.of("PENDING", "COMPLETED", "ABANDONED").contains(rows.getString(4))
+                        || rows.getLong(5) == 0) throw invalidRecord();
+            }
+        } catch (VerificationFailure failure) { throw failure; }
+        catch (RuntimeException failure) { throw invalidRecord(); }
+    }
+
+    private void verifyOperations(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("""
+                     SELECT owner_uuid, operation_type, operation_state,
+                            request_hash, expires_at_ms
+                     FROM bonded_companion_operation
+                     """)) {
+            while (rows.next()) {
+                requireUuid(rows.getString(1));
+                if (!Set.of("CAPTURE", "PROVISION", "SUMMON", "STORE", "REVIVE", "CLEANUP")
+                        .contains(rows.getString(2))
+                        || !Set.of("PENDING", "SUCCEEDED", "REJECTED", "FAILED")
+                        .contains(rows.getString(3))
+                        || !rows.getString(4).matches("[0-9a-f]{64}")
+                        || rows.getLong(5) == 0) throw invalidRecord();
+            }
+        } catch (VerificationFailure failure) { throw failure; }
+        catch (RuntimeException failure) { throw invalidRecord(); }
+    }
+
+    private void verifyUuidAndVocabulary(Connection connection, String sql,
+                                         Set<String> vocabulary) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(sql)) {
+            while (rows.next()) {
+                requireUuid(rows.getString(1));
+                if (!vocabulary.contains(rows.getString(2))) throw invalidRecord();
+            }
+        } catch (VerificationFailure failure) { throw failure; }
+        catch (RuntimeException failure) { throw invalidRecord(); }
+    }
+
+    private VerificationFailure invalidRecord() {
+        return new VerificationFailure("bonded-stored-record-invalid");
+    }
+
+    private void requireUuid(String value) throws VerificationFailure {
+        try {
+            if (!UUID.fromString(value).toString().equals(value)) {
+                throw invalidRecord();
+            }
+        } catch (IllegalArgumentException failure) {
+            throw invalidRecord();
         }
     }
 

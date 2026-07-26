@@ -7,18 +7,32 @@ CREATE TABLE bonded_schema_history (
 
 CREATE TABLE bonded_companion_profile (
     profile_id TEXT PRIMARY KEY CHECK (length(trim(profile_id)) > 0),
-    owner_uuid TEXT NOT NULL CHECK (length(owner_uuid) = 36),
+    owner_uuid TEXT NOT NULL CHECK (
+        length(owner_uuid) = 36
+        AND substr(owner_uuid, 9, 1) = '-'
+        AND substr(owner_uuid, 14, 1) = '-'
+        AND substr(owner_uuid, 19, 1) = '-'
+        AND substr(owner_uuid, 24, 1) = '-'
+        AND lower(owner_uuid) = owner_uuid
+        AND replace(owner_uuid, '-', '') NOT GLOB '*[^0-9a-f]*'
+    ),
     roster_id TEXT NOT NULL CHECK (length(trim(roster_id)) > 0),
     family_id TEXT NOT NULL CHECK (length(trim(family_id)) > 0),
     role_id TEXT NOT NULL CHECK (length(trim(role_id)) > 0),
     state TEXT NOT NULL CHECK (state IN ('STORED', 'ACTIVE', 'DEAD')),
     revision INTEGER NOT NULL CHECK (revision >= 0),
     snapshot_json TEXT NOT NULL CHECK (
-        json_valid(snapshot_json) AND length(trim(snapshot_json)) > 0
+        json_valid(snapshot_json)
+        AND json_type(snapshot_json) = 'object'
+        AND json_extract(snapshot_json, '$.encoding') = 'base64'
+        AND json_type(snapshot_json, '$.payload') = 'text'
+        AND length(json_extract(snapshot_json, '$.payload')) > 0
     ),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
-    policy_json TEXT NOT NULL CHECK (json_valid(policy_json)),
+    policy_json TEXT NOT NULL CHECK (
+        json_valid(policy_json) AND json_type(policy_json) = 'object'
+    ),
     display_name TEXT,
     species TEXT,
     gender TEXT,
@@ -37,7 +51,15 @@ CREATE INDEX bonded_profile_owner_roster_idx
 CREATE TABLE bonded_companion_lease (
     profile_id TEXT PRIMARY KEY,
     lease_token TEXT NOT NULL UNIQUE CHECK (length(trim(lease_token)) > 0),
-    live_npc_uuid TEXT NOT NULL UNIQUE CHECK (length(live_npc_uuid) = 36),
+    live_npc_uuid TEXT NOT NULL UNIQUE CHECK (
+        length(live_npc_uuid) = 36
+        AND substr(live_npc_uuid, 9, 1) = '-'
+        AND substr(live_npc_uuid, 14, 1) = '-'
+        AND substr(live_npc_uuid, 19, 1) = '-'
+        AND substr(live_npc_uuid, 24, 1) = '-'
+        AND lower(live_npc_uuid) = live_npc_uuid
+        AND replace(live_npc_uuid, '-', '') NOT GLOB '*[^0-9a-f]*'
+    ),
     world_key TEXT NOT NULL CHECK (length(trim(world_key)) > 0),
     started_at_ms INTEGER NOT NULL,
     expires_at_ms INTEGER NOT NULL,
@@ -78,7 +100,7 @@ CREATE TABLE bonded_companion_cleanup (
     attempt_count INTEGER NOT NULL CHECK (attempt_count >= 0),
     next_attempt_at_ms INTEGER NOT NULL,
     created_at_ms INTEGER NOT NULL,
-    retained_until_ms INTEGER NOT NULL,
+    retained_until_ms INTEGER NOT NULL CHECK (retained_until_ms <> 0),
     FOREIGN KEY(profile_id, owner_uuid, roster_id)
         REFERENCES bonded_companion_profile(profile_id, owner_uuid, roster_id)
         ON DELETE CASCADE
@@ -98,14 +120,17 @@ CREATE TABLE bonded_companion_operation (
     operation_type TEXT NOT NULL CHECK (
         operation_type IN ('CAPTURE', 'PROVISION', 'SUMMON', 'STORE', 'REVIVE', 'CLEANUP')
     ),
-    request_hash TEXT NOT NULL CHECK (length(request_hash) = 64),
+    request_hash TEXT NOT NULL CHECK (
+        length(request_hash) = 64 AND lower(request_hash) = request_hash
+        AND request_hash NOT GLOB '*[^0-9a-f]*'
+    ),
     operation_state TEXT NOT NULL CHECK (
         operation_state IN ('PENDING', 'SUCCEEDED', 'REJECTED', 'FAILED')
     ),
     result_json TEXT CHECK (result_json IS NULL OR json_valid(result_json)),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
-    expires_at_ms INTEGER NOT NULL,
+    expires_at_ms INTEGER NOT NULL CHECK (expires_at_ms <> 0),
     PRIMARY KEY(caller_namespace, idempotency_key)
 );
 

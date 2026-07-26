@@ -34,6 +34,9 @@ public record SqliteBondedCompanionCleanupRow(
         if (attemptCount < 0) {
             throw new IllegalArgumentException("Cleanup attempt count cannot be negative");
         }
+        if (retainedUntilMs == 0) {
+            throw new IllegalArgumentException("Cleanup retention must be bounded");
+        }
     }
 
     private static String requireText(String value, String field) {

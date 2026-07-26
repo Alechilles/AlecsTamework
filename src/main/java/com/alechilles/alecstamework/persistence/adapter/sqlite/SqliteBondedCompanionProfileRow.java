@@ -55,8 +55,8 @@ public record SqliteBondedCompanionProfileRow(
 
     private static String requireJson(String value, String field, boolean emptyAllowed) {
         String normalized = requireText(value, field);
-        if ((!emptyAllowed && !SqliteBondedJson.isNonEmptyObject(normalized))
-                || (emptyAllowed && !SqliteBondedJson.isJson(normalized))) {
+        if ((!emptyAllowed && !SqliteBondedJson.isSnapshotEnvelope(normalized))
+                || (emptyAllowed && !SqliteBondedJson.isObject(normalized))) {
             throw new IllegalArgumentException(field + " must be JSON");
         }
         return normalized;

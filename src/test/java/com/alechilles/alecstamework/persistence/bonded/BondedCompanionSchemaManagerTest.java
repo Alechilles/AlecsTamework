@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Man
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Optional;
@@ -123,7 +124,9 @@ class BondedCompanionSchemaManagerTest {
                         'profile-a',
                         '10000000-0000-0000-0000-000000000001',
                         'roster-a', 'family:wolf', 'role:companion',
-                        'ACTIVE', 1, '{"health":10}', -10000, -9000,
+                        'ACTIVE', 1,
+                        '{"encoding":"base64","payload":"MTA="}',
+                        -10000, -9000,
                         '{}', 0, 0
                     )
                     """);
@@ -134,6 +137,71 @@ class BondedCompanionSchemaManagerTest {
         assertEquals("bonded-orphaned-active-lease", readiness.diagnosticCode());
         assertFalse(tables(database).contains("persistence_incident"));
         assertFalse(tables(database).contains("projection_outbox"));
+    }
+
+    @Test
+    void rawSnapshotShapeMismatchFailsClosedWithoutChangingTheRow()
+            throws Exception {
+        for (String raw : Set.of("{}", "[]", "\"scalar\"", "null")) {
+            Path database = tempDir.resolve("raw-"
+                    + Integer.toHexString(raw.hashCode()) + ".sqlite");
+            BondedCompanionSchemaManager manager = manager(database, -7_000L);
+            assertTrue(manager.initialize().availability().available());
+            insertRawProfile(database, "profile-raw", raw,
+                    "10000000-0000-0000-0000-000000000001", "STORED");
+
+            BondedCompanionPersistenceReadiness readiness = manager.verify();
+
+            assertFalse(readiness.availability().available());
+            assertEquals("bonded-stored-record-invalid", readiness.diagnosticCode());
+            assertEquals(raw, queryString(database,
+                    "SELECT snapshot_json FROM bonded_companion_profile"));
+        }
+    }
+
+    @Test
+    void malformedRawUuidOrStateFailsClosedWithoutRepair()
+            throws Exception {
+        for (String corruption : Set.of("OWNER", "STATE")) {
+            Path database = tempDir.resolve("malformed-" + corruption + ".sqlite");
+            BondedCompanionSchemaManager manager = manager(database, -7_000L);
+            assertTrue(manager.initialize().availability().available());
+            String owner = corruption.equals("OWNER") ? "not-a-uuid"
+                    : "10000000-0000-0000-0000-000000000001";
+            String state = corruption.equals("STATE") ? "UNKNOWN" : "STORED";
+            String snapshot = "{\"encoding\":\"base64\",\"payload\":\"eA==\"}";
+            insertRawProfile(database, "profile-raw", snapshot, owner, state);
+
+            BondedCompanionPersistenceReadiness readiness = manager.verify();
+
+            assertFalse(readiness.availability().available());
+            assertEquals("bonded-stored-record-invalid", readiness.diagnosticCode());
+            assertEquals(1L, queryLong(database,
+                    "SELECT COUNT(*) FROM bonded_companion_profile"));
+        }
+    }
+
+    private void insertRawProfile(Path database, String profileId,
+                                  String snapshot, String owner, String state)
+            throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement pragma = connection.createStatement();
+             PreparedStatement insert = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_profile(
+                         profile_id, owner_uuid, roster_id, family_id, role_id,
+                         state, revision, snapshot_json, created_at_ms,
+                         updated_at_ms, policy_json,
+                         revive_cooldown_until_ms, revive_count
+                     ) VALUES (?, ?, 'roster-a', 'family:wolf',
+                         'role:companion', ?, 0, ?, -10000, -10000,
+                         '{}', 0, 0)
+                     """)) {
+            pragma.execute("PRAGMA ignore_check_constraints=ON");
+            insert.setString(1, profileId); insert.setString(2, owner);
+            insert.setString(3, state); insert.setString(4, snapshot);
+            insert.executeUpdate();
+        }
     }
 
     private BondedCompanionSchemaManager manager(Path database, long now) {

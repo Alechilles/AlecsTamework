@@ -2,11 +2,12 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaManager;
-import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,16 +29,28 @@ class SqliteBondedCompanionStoreTest {
     @TempDir
     Path tempDir;
 
-    private BondedCompanionStore store;
+    private Connection connection;
+    private SqliteBondedCompanionStore store;
 
     @BeforeEach
     void setUp() {
         SqliteConnectionFactory connections = new SqliteConnectionFactory(
                 tempDir.resolve("bonded-companions.sqlite")
         );
-        assertTrue(new BondedCompanionSchemaManager(connections, () -> -20_000L)
+        assertTrue(new BondedCompanionSchemaManager(
+                connections.databasePath(), () -> -20_000L)
                 .initialize().availability().available());
-        store = new BondedCompanionStore(connections);
+        try {
+            connection = connections.openWriterConnection();
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        }
+        store = new SqliteBondedCompanionStore(connection);
+    }
+
+    @AfterEach
+    void closeConnection() throws Exception {
+        connection.close();
     }
 
     @Test
@@ -64,7 +77,7 @@ class SqliteBondedCompanionStoreTest {
         assertEquals(SqliteBondedCompanionStore.MutationCode.NOT_OWNER,
                 store.updateSnapshot(
                         OWNER_B, "roster-a", "profile-a", 0,
-                        "{\"health\":9}", -7_000L
+                        "{\"encoding\":\"base64\",\"payload\":\"OQ==\"}", -7_000L
                 ).code());
     }
 
@@ -78,12 +91,12 @@ class SqliteBondedCompanionStoreTest {
         assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
                 store.updateSnapshot(
                         OWNER_A, "roster-a", "profile-a", 0,
-                        "{\"health\":9}", -9_000L
+                        "{\"encoding\":\"base64\",\"payload\":\"OQ==\"}", -9_000L
                 ).code());
         assertEquals(SqliteBondedCompanionStore.MutationCode.REVISION_CONFLICT,
                 store.updateSnapshot(
                         OWNER_A, "roster-a", "profile-a", 0,
-                        "{\"health\":8}", -8_000L
+                        "{\"encoding\":\"base64\",\"payload\":\"OA==\"}", -8_000L
                 ).code());
         assertEquals(1L, store.findProfile(
                 OWNER_A, "roster-a", "profile-a"
@@ -233,7 +246,8 @@ class SqliteBondedCompanionStoreTest {
     ) {
         return new SqliteBondedCompanionProfileRow(
                 id, owner, roster, "family:wolf", "role:companion",
-                BondedCompanionState.STORED, 0, "{\"health\":10}",
+                BondedCompanionState.STORED, 0,
+                "{\"encoding\":\"base64\",\"payload\":\"MTA=\"}",
                 createdAt, createdAt, "{\"leaseMs\":0}", "Wolf",
                 "Wolf", "Female", null, 0L, 0L, null, null
         );

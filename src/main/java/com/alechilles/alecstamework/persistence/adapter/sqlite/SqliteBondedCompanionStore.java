@@ -15,20 +15,19 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Standalone SQLite authority for bonded profiles, leases, extension data,
- * cleanup intents, and idempotency records.
+ * Package-private transaction-local SQLite authority for bonded records.
  *
- * <p>Every operation opens its own bonded-database connection. Owner and roster
- * scope is checked before mutation, while revision changes and lease uniqueness
- * are committed atomically.</p>
+ * <p>The connection-owning adapter controls commit and rollback. Owner and
+ * roster scope is checked before mutation, while revision changes and lease
+ * uniqueness are performed on the caller's transaction.</p>
  */
-public final class SqliteBondedCompanionStore {
+final class SqliteBondedCompanionStore {
     private final Connection connection;
     private final SqliteBondedCompanionRetentionStore retention;
     private final SqliteBondedCompanionExtensionStore extensions;
     private final SqliteBondedCompanionLeaseStore leases;
 
-    public SqliteBondedCompanionStore(
+    SqliteBondedCompanionStore(
             @Nonnull Connection connection
     ) {
         this.connection = Objects.requireNonNull(connection, "connection");
@@ -158,7 +157,7 @@ public final class SqliteBondedCompanionStore {
             @Nonnull String snapshotJson,
             long updatedAtMs
     ) {
-        if (!SqliteBondedJson.isNonEmptyObject(snapshotJson)) {
+        if (!SqliteBondedJson.isSnapshotEnvelope(snapshotJson)) {
             return result(MutationCode.VALIDATION_FAILED, null,
                     "complete-snapshot-required");
         }
@@ -261,7 +260,10 @@ public final class SqliteBondedCompanionStore {
                 statement.setLong(1, updatedAtMs);
                 statement.setString(2, current.profileId());
                 statement.setLong(3, expectedRevision);
-                statement.executeUpdate();
+                if (statement.executeUpdate() != 1) {
+                    return result(MutationCode.REVISION_CONFLICT, current,
+                            "profile-revision-conflict");
+                }
             }
             return applied(profile(connection, profileId));
         });

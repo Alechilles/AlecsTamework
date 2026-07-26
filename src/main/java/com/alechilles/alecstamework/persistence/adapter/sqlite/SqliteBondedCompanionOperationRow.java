@@ -33,6 +33,12 @@ public record SqliteBondedCompanionOperationRow(
         if (requestHash.length() != 64) {
             throw new IllegalArgumentException("requestHash must be a SHA-256 hex value");
         }
+        if (!requestHash.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("requestHash must be lowercase SHA-256 hex");
+        }
+        if (expiresAtMs == 0) {
+            throw new IllegalArgumentException("Operation retention must be bounded");
+        }
     }
 
     private static String requireText(String value, String field) {
