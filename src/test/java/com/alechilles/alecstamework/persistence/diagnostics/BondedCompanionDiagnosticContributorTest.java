@@ -84,12 +84,34 @@ class BondedCompanionDiagnosticContributorTest {
         );
 
         assertEquals("UNAVAILABLE", snapshot.readiness());
+        assertEquals(0, snapshot.schemaVersion());
         assertEquals(
                 BondedCompanionDiagnosticSnapshot.FailureCategory.DIAGNOSTIC,
                 snapshot.lastFailureCategory()
         );
         assertTrue(json.contains("DIAGNOSTIC"));
         assertFalse(json.contains("canary"));
+    }
+
+    @Test
+    void schemaStartupFailureUsesTruthfulVersionAndFixedSchemaCategory() {
+        BondedCompanionDiagnosticContributor contributor =
+                new BondedCompanionDiagnosticContributor(
+                        () -> BondedCompanionPersistenceReadiness.failed(
+                                "bonded-schema-history-mismatch"
+                        ),
+                        BondedCompanionStoreDiagnostics::empty,
+                        4
+                );
+
+        BondedCompanionDiagnosticSnapshot snapshot = contributor.snapshot();
+
+        assertEquals("UNAVAILABLE", snapshot.readiness());
+        assertEquals(0, snapshot.schemaVersion());
+        assertEquals(
+                BondedCompanionDiagnosticSnapshot.FailureCategory.SCHEMA,
+                snapshot.lastFailureCategory()
+        );
     }
 
     @Test

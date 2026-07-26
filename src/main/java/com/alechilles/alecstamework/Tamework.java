@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
@@ -159,6 +160,13 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .PersistenceDiagnosticExporter;
+import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionMaintenanceSystem;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionDeathSystem;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
@@ -242,6 +250,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
+import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
@@ -858,14 +867,55 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         apiEventBus = new TameworkEventBus(getLogger());
-        persistenceComposition = TameworkPersistenceComposition.create(
-                this,
-                components,
-                apiEventBus,
-                itemFeatureRegistry,
-                commandItemRegistry,
-                populationGroupConfigRegistry
+        runtimeDataDirectory = new TameworkDataPathService(getLogger())
+                .resolveAndInitializeDataPathLayout(getDataDirectory())
+                .targetDirectory();
+        bondedCompanionComposition = TameworkBondedCompanionComposition.open(
+                runtimeDataDirectory,
+                bondedCompanionRosterRegistry,
+                getLogger(),
+                System::currentTimeMillis
         );
+        getEntityStoreRegistry().registerSystem(
+                new BondedCompanionMaintenanceSystem(
+                        bondedCompanionComposition
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new BondedCompanionDeathSystem(
+                        bondedCompanionComposition,
+                        projectionIdentityComponentType,
+                        UUIDComponent.getComponentType()
+                )
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, StartWorldEvent.class,
+                bondedCompanionComposition::onWorldLoad,
+                "bonded companion world-load reconciliation"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, AddPlayerToWorldEvent.class,
+                bondedCompanionComposition::onPlayerAdded,
+                "bonded companion player join/transfer reconciliation"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, PlayerDisconnectEvent.class,
+                bondedCompanionComposition::onPlayerLogout,
+                "bonded companion logout reconciliation"
+        );
+        try {
+            persistenceComposition = TameworkPersistenceComposition.create(
+                    this,
+                    components,
+                    apiEventBus,
+                    itemFeatureRegistry,
+                    commandItemRegistry,
+                    populationGroupConfigRegistry
+            );
+        } catch (RuntimeException genericStartupFailure) {
+            activateBondedOnlyFallback(genericStartupFailure);
+            return;
+        }
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
                 new ImportedCompanionRecallRecovery(
@@ -874,12 +924,6 @@ public class Tamework extends JavaPlugin {
                 )
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
-        bondedCompanionComposition = TameworkBondedCompanionComposition.open(
-                runtimeDataDirectory,
-                bondedCompanionRosterRegistry,
-                getLogger(),
-                System::currentTimeMillis
-        );
         bondedDiagnosticRegistration =
                 persistenceComposition.registerBondedDiagnostics(
                         bondedCompanionComposition.diagnostics()
@@ -1068,7 +1112,8 @@ public class Tamework extends JavaPlugin {
             getCommandRegistry().registerCommand(
                     new TameworkCommandRoot(
                             persistenceComposition.diagnosticsReader(),
-                            persistenceComposition.diagnosticsExporter()
+                            persistenceComposition.diagnosticsExporter(),
+                            bondedCompanionComposition.diagnostics()
                     )
             );
         }
@@ -1777,6 +1822,25 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
         commandAssetsRegistered = true;
+    }
+
+    /** Keeps the isolated bonded authority reachable after generic startup aborts. */
+    private void activateBondedOnlyFallback(RuntimeException failure) {
+        api = new BondedOnlyTameworkApi(bondedCompanionComposition.api());
+        if (getCommandRegistry() != null) {
+            PersistenceDiagnosticExporter exporter =
+                    PersistenceDiagnosticExporter.bondedOnly(
+                            runtimeDataDirectory,
+                            bondedCompanionComposition.diagnostics()
+                    );
+            getCommandRegistry().registerCommand(new TameworkCommandRoot(
+                    null, exporter, bondedCompanionComposition.diagnostics()
+            ));
+        }
+        getLogger().at(Level.SEVERE).withCause(failure).log(
+                "Generic persistence composition failed; bonded companion "
+                        + "persistence remains isolated and available."
+        );
     }
 
     private void closeBondedCompanions() {

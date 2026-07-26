@@ -9,13 +9,23 @@ import javax.annotation.Nonnull;
 public final class BondedCompanionWorldLifecycleObserver {
     private final BondedCompanionProjectionService projections;
     private final ProjectionSource source;
+    private final ReconciliationListener listener;
 
     public BondedCompanionWorldLifecycleObserver(
             @Nonnull BondedCompanionProjectionService projections,
             @Nonnull ProjectionSource source
     ) {
+        this(projections, source, (lease, cause, result) -> { });
+    }
+
+    public BondedCompanionWorldLifecycleObserver(
+            @Nonnull BondedCompanionProjectionService projections,
+            @Nonnull ProjectionSource source,
+            @Nonnull ReconciliationListener listener
+    ) {
         this.projections = Objects.requireNonNull(projections, "projections");
         this.source = Objects.requireNonNull(source, "source");
+        this.listener = Objects.requireNonNull(listener, "listener");
     }
 
     public void onStartup(
@@ -87,11 +97,14 @@ public final class BondedCompanionWorldLifecycleObserver {
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long observedAtMs
     ) {
-        projections.reconcile(
+        BondedCompanionProjectionService.ReconcileResult result =
+                projections.reconcile(
                 lease, source.projections(),
                 BondedCompanionProjectionService.RecoveryCause.EXPIRED,
                 observedAtMs
         );
+        listener.onReconciled(lease,
+                BondedCompanionProjectionService.RecoveryCause.EXPIRED, result);
     }
 
     public void onConfirmedDeath(
@@ -99,7 +112,9 @@ public final class BondedCompanionWorldLifecycleObserver {
             @Nonnull BondedCompanionProjectionValidator.Projection projection,
             long diedAtMs
     ) {
-        projections.confirmDeath(lease, projection, diedAtMs);
+        BondedCompanionProjectionService.ReconcileResult result =
+                projections.confirmDeath(lease, projection, diedAtMs);
+        listener.onReconciled(lease, null, result);
     }
 
     private void reconcile(
@@ -112,7 +127,9 @@ public final class BondedCompanionWorldLifecycleObserver {
                 source.projections();
         for (var lease : leases) {
             if (lease != null) {
-                projections.reconcile(lease, observed, cause, observedAtMs);
+                BondedCompanionProjectionService.ReconcileResult result =
+                        projections.reconcile(lease, observed, cause, observedAtMs);
+                listener.onReconciled(lease, cause, result);
             }
         }
     }
@@ -130,6 +147,16 @@ public final class BondedCompanionWorldLifecycleObserver {
     /** Supplies a world-thread snapshot of loaded projections; it never scans Universe players. */
     public interface ProjectionSource {
         @Nonnull List<BondedCompanionProjectionValidator.Projection> projections();
+    }
+
+    /** Receives only completed durability/world outcomes for change publication. */
+    @FunctionalInterface
+    public interface ReconciliationListener {
+        void onReconciled(
+                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+                BondedCompanionProjectionService.RecoveryCause cause,
+                @Nonnull BondedCompanionProjectionService.ReconcileResult result
+        );
     }
 
     private static String text(String value, String field) {

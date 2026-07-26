@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpirySystem;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
@@ -25,6 +26,10 @@ import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionApiFacade;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionChangePublisher;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionCoreApiOperations;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionIntegrationReadiness;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionDataPath;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPersistenceRuntime;
@@ -39,7 +44,9 @@ import com.alechilles.alecstamework.persistence.diagnostics
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -54,10 +61,18 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionApiFacade api;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
+    private final BondedCompanionIntegrationReadiness integrations;
     private final BondedCompanionTransitionService transitions;
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
     private final BondedCompanionExpirySystem expiry;
+    private final BondedCompanionProjectionCleanupService cleanup;
+    private final SqliteBondedCompanionProjectionDurability durability;
+    private final HytaleBondedCompanionWorldGateway world;
+    private final com.alechilles.alecstamework.persistence.bonded
+            .BondedCompanionStore store;
+    private final LongSupplier clock;
+    private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     private TameworkBondedCompanionComposition(
@@ -65,19 +80,32 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionApiFacade api,
             BondedCompanionChangePublisher changes,
             BondedCompanionDiagnosticContributor diagnostics,
+            BondedCompanionIntegrationReadiness integrations,
             BondedCompanionTransitionService transitions,
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
-            BondedCompanionExpirySystem expiry
+            BondedCompanionExpirySystem expiry,
+            BondedCompanionProjectionCleanupService cleanup,
+            SqliteBondedCompanionProjectionDurability durability,
+            HytaleBondedCompanionWorldGateway world,
+            com.alechilles.alecstamework.persistence.bonded
+                    .BondedCompanionStore store,
+            LongSupplier clock
     ) {
         this.persistence = persistence;
         this.api = api;
         this.changes = changes;
         this.diagnostics = diagnostics;
+        this.integrations = integrations;
         this.transitions = transitions;
         this.projections = projections;
         this.observer = observer;
         this.expiry = expiry;
+        this.cleanup = cleanup;
+        this.durability = durability;
+        this.world = world;
+        this.store = store;
+        this.clock = clock;
     }
 
     /** Opens the bonded authority without accepting generic persistence state. */
@@ -107,9 +135,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         BondedCompanionChangePublisher changes =
                 new BondedCompanionChangePublisher(logger);
-        BondedCompanionApiFacade api = new BondedCompanionApiFacade(
-                runtime::readiness, store, changes, diagnostics
-        );
+        BondedCompanionIntegrationReadiness integrations =
+                new BondedCompanionIntegrationReadiness();
         BondedCompanionPersistenceReadiness started = runtime.start();
         if (!started.availability().available()) {
             diagnostics.recordFailure(
@@ -118,10 +145,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
         HytaleBondedCompanionWorldGateway world =
                 new HytaleBondedCompanionWorldGateway();
+        BondedCompanionPolicyResolver policies =
+                new BondedCompanionPolicyResolver(rosters);
         BondedCompanionTransitionService transitions =
-                new BondedCompanionTransitionService(
-                        new BondedCompanionPolicyResolver(rosters)
-                );
+                new BondedCompanionTransitionService(policies);
         BondedCompanionProjectionCleanupService cleanup =
                 new BondedCompanionProjectionCleanupService(world);
         SqliteBondedCompanionProjectionDurability durability =
@@ -137,10 +164,23 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                         () -> durability.activeLeases(256).stream()
                                 .map(world::readExact)
                                 .filter(Objects::nonNull)
-                                .toList()
+                                .toList(),
+                        (lease, cause, result) -> publishLifecycleChange(
+                                store, changes, lease, result
+                        )
                 );
         BondedCompanionExpirySystem expiry = new BondedCompanionExpirySystem(
                 observer, durability::findExpired, 64
+        );
+        BondedCompanionCoreApiOperations operations =
+                new BondedCompanionCoreApiOperations(
+                        store, rosters, policies, transitions, projections,
+                        changes, diagnostics, clock
+                );
+        BondedCompanionApiFacade api = new BondedCompanionApiFacade(
+                runtime::readiness,
+                () -> integrations.availability(runtime.readiness()),
+                store, changes, diagnostics, operations
         );
         if (started.availability().available()) {
             long startupTime = clock.getAsLong();
@@ -157,8 +197,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             );
         }
         return new TameworkBondedCompanionComposition(
-                runtime, api, changes, diagnostics,
-                transitions, projections, observer, expiry
+                runtime, api, changes, diagnostics, integrations,
+                transitions, projections, observer, expiry,
+                cleanup, durability, world, store, clock
         );
     }
 
@@ -172,10 +213,145 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return diagnostics;
     }
 
+    /** Registers the Task 6 capture surface without moving capture ownership here. */
+    @Nonnull public AutoCloseable registerCaptureIntegration() {
+        return integrations.registerCapture();
+    }
+
+    /** Registers the Task 7 panel surface without moving UI ownership here. */
+    @Nonnull public AutoCloseable registerPanelIntegration() {
+        return integrations.registerPanel();
+    }
+
+    /** Reconciles one started world using only exact persisted leases. */
+    public void onWorldLoad(@Nonnull String worldKey) {
+        if (!operational()) return;
+        observer.onWorldLoad(worldKey, durability.activeLeases(256),
+                clock.getAsLong());
+    }
+
+    /** Hytale event adapter retaining no world object after this call. */
+    public void onWorldLoad(
+            @Nonnull com.hypixel.hytale.server.core.universe.world.events
+                    .StartWorldEvent event
+    ) {
+        if (event.getWorld() != null) onWorldLoad(event.getWorld().getName());
+    }
+
+    /** Routes first arrival as join and later world changes as transfer. */
+    public void onPlayerAdded(@Nonnull UUID ownerUuid, @Nonnull String worldKey) {
+        if (!operational()) return;
+        String previous = ownerWorlds.put(ownerUuid, worldKey);
+        long now = clock.getAsLong();
+        if (previous == null || previous.equals(worldKey)) {
+            observer.onPlayerJoin(ownerUuid, durability.activeLeases(256), now);
+        } else {
+            observer.onPlayerWorldTransfer(ownerUuid, previous, worldKey,
+                    durability.activeLeases(256), now);
+        }
+    }
+
+    /** Hytale event adapter retaining only stable owner and world identifiers. */
+    public void onPlayerAdded(
+            @Nonnull com.hypixel.hytale.server.core.event.events.player
+                    .AddPlayerToWorldEvent event
+    ) {
+        if (event.getWorld() == null || event.getHolder() == null) return;
+        com.hypixel.hytale.server.core.universe.PlayerRef player =
+                event.getHolder().getComponent(
+                        com.hypixel.hytale.server.core.universe.PlayerRef
+                                .getComponentType()
+                );
+        if (player != null && player.getUuid() != null) {
+            onPlayerAdded(player.getUuid(), event.getWorld().getName());
+        }
+    }
+
+    /** Stores exact active projections when their owner disconnects. */
+    public void onPlayerLogout(@Nonnull UUID ownerUuid) {
+        if (!operational()) return;
+        ownerWorlds.remove(ownerUuid);
+        observer.onPlayerLogout(ownerUuid, durability.activeLeases(256),
+                clock.getAsLong());
+    }
+
+    /** Hytale disconnect adapter retaining no Player component. */
+    public void onPlayerLogout(
+            @Nonnull com.hypixel.hytale.server.core.event.events.player
+                    .PlayerDisconnectEvent event
+    ) {
+        if (event.getPlayerRef() != null
+                && event.getPlayerRef().getUuid() != null) {
+            onPlayerLogout(event.getPlayerRef().getUuid());
+        }
+    }
+
+    /** Converts only an exact marked projection death to durable DEAD. */
+    public void onConfirmedDeath(@Nonnull String worldKey, @Nonnull UUID npcUuid) {
+        if (!operational()) return;
+        for (var lease : durability.activeLeases(256)) {
+            if (!worldKey.equals(lease.worldKey())
+                    || !npcUuid.equals(lease.liveNpcUuid())) continue;
+            var projection = world.readExact(lease);
+            if (projection != null) {
+                observer.onConfirmedDeath(lease, projection, clock.getAsLong());
+            }
+            return;
+        }
+    }
+
+    /** Drives bounded cleanup retry and expiry without owning an executor. */
+    public void maintenanceTick() {
+        if (!operational()) return;
+        long now = clock.getAsLong();
+        durability.replayPendingCleanup(cleanup, now, 64);
+        expiry.tick(now);
+    }
+
+    private boolean operational() {
+        return !closed.get() && persistence.readiness()
+                .availability().available();
+    }
+
+    private static void publishLifecycleChange(
+            com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore store,
+            BondedCompanionChangePublisher changes,
+            BondedCompanionProjectionValidator.LeaseExpectation lease,
+            BondedCompanionProjectionService.ReconcileResult result
+    ) {
+        if (result.status() != BondedCompanionProjectionService.ReconcileStatus.STORED
+                && result.status() != BondedCompanionProjectionService.ReconcileStatus.DEAD) {
+            return;
+        }
+        store.findProfile(lease.ownerUuid(), lease.rosterId(), lease.profileId())
+                .ifPresent(profile -> changes.publishCommitted(
+                        new BondedCompanionChangedEvent(
+                                profile.profileId(), profile.ownerUuid(),
+                                profile.rosterId(),
+                                com.alechilles.alecstamework.companion.bonded
+                                        .BondedCompanionState.ACTIVE,
+                                profile.state(), profile.revision(),
+                                result.status().name().toLowerCase(
+                                        java.util.Locale.ROOT)
+                        ),
+                        result.status()
+                                == BondedCompanionProjectionService.ReconcileStatus.DEAD
+                                ? BondedCompanionChangePublisher.WorldEffectOutcome
+                                .CONFIRMED
+                                : result.cleanups().isEmpty()
+                                ? BondedCompanionChangePublisher.WorldEffectOutcome
+                                .NOT_REQUIRED
+                                : BondedCompanionChangePublisher.WorldEffectOutcome
+                                .DEFERRED
+                ));
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
             api.close();
+            integrations.close();
+            ownerWorlds.clear();
             changes.close();
             persistence.close();
             diagnostics.recordFailure(

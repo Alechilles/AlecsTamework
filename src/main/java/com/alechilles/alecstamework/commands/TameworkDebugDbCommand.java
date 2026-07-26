@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticSnapshot;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDiagnosticsReader;
@@ -24,6 +26,7 @@ public final class TameworkDebugDbCommand
         extends AbstractTameworkServerCommand {
     private final PersistenceDiagnosticsReader diagnostics;
     private final PersistenceDiagnosticExporter exporter;
+    private final BondedCompanionDiagnosticContributor bonded;
 
     public TameworkDebugDbCommand(
             @Nullable PersistenceDiagnosticsReader diagnostics
@@ -35,18 +38,27 @@ public final class TameworkDebugDbCommand
             @Nullable PersistenceDiagnosticsReader diagnostics,
             @Nullable PersistenceDiagnosticExporter exporter
     ) {
+        this(diagnostics, exporter, null);
+    }
+
+    public TameworkDebugDbCommand(
+            @Nullable PersistenceDiagnosticsReader diagnostics,
+            @Nullable PersistenceDiagnosticExporter exporter,
+            @Nullable BondedCompanionDiagnosticContributor bonded
+    ) {
         super(
                 "debugdb",
                 "Inspect bounded replacement persistence diagnostics."
         );
         this.diagnostics = diagnostics;
         this.exporter = exporter;
+        this.bonded = bonded;
         setAllowsExtraArguments(true);
     }
 
     @Override
     protected void executeServer(@Nonnull CommandContext context) {
-        if (diagnostics == null) {
+        if (diagnostics == null && exporter == null && bonded == null) {
             send(context, "Replacement persistence runtime is not available.");
             return;
         }
@@ -72,9 +84,21 @@ public final class TameworkDebugDbCommand
     }
 
     private void printStatus(CommandContext context) {
-        PublicPersistenceOperationalStatus status =
-                diagnostics.status();
-        PublicPersistenceMetricsSnapshot metrics = diagnostics.metrics();
+        if (diagnostics == null) {
+            send(context, "Generic persistence status is unavailable.");
+            printBondedStatus(context);
+            return;
+        }
+        final PublicPersistenceOperationalStatus status;
+        final PublicPersistenceMetricsSnapshot metrics;
+        try {
+            status = diagnostics.status();
+            metrics = diagnostics.metrics();
+        } catch (RuntimeException unavailable) {
+            send(context, "Generic persistence status is unavailable.");
+            printBondedStatus(context);
+            return;
+        }
         send(context, "Persistence engine=" + status.engine()
                 + ", mode=" + status.storageMode()
                 + ", origin=" + status.targetOrigin()
@@ -102,14 +126,31 @@ public final class TameworkDebugDbCommand
     }
 
     private void printDetail(CommandContext context) {
-        diagnostics.details().whenComplete((read, failure) -> {
+        if (diagnostics == null) {
+            send(context, "Generic persistence detail is unavailable.");
+            printBondedStatus(context);
+            return;
+        }
+        final java.util.concurrent.CompletionStage<
+                PersistenceReadResult<PublicPersistenceDiagnosticsSnapshot>>
+                details;
+        try {
+            details = diagnostics.details();
+        } catch (RuntimeException unavailable) {
+            send(context, "Generic persistence detail is unavailable.");
+            printBondedStatus(context);
+            return;
+        }
+        details.whenComplete((read, failure) -> {
             if (failure != null || read == null) {
                 send(context, "Persistence detail is unavailable.");
+                printBondedStatus(context);
                 return;
             }
             if (!(read instanceof PersistenceReadResult.Found<
                     PublicPersistenceDiagnosticsSnapshot> found)) {
                 send(context, "Persistence detail read did not complete.");
+                printBondedStatus(context);
                 return;
             }
             PublicPersistenceDiagnosticsSnapshot detail = found.value();
@@ -129,6 +170,10 @@ public final class TameworkDebugDbCommand
     }
 
     private void printBondedStatus(CommandContext context) {
+        if (bonded != null) {
+            send(context, bondedLine(bonded.snapshot()));
+            return;
+        }
         if (exporter == null) {
             return;
         }

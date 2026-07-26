@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Writes bounded, redacted replacement-persistence support bundles.
@@ -44,7 +45,7 @@ public final class PersistenceDiagnosticExporter {
             .create();
 
     private final Path bundleDirectory;
-    private final PersistenceDiagnosticsReader diagnostics;
+    @Nullable private final PersistenceDiagnosticsReader diagnostics;
     private final AtomicReference<BondedCompanionDiagnosticContributor>
             bondedContributor = new AtomicReference<>();
 
@@ -62,17 +63,72 @@ public final class PersistenceDiagnosticExporter {
         );
     }
 
+    private PersistenceDiagnosticExporter(@Nonnull Path dataDirectory) {
+        this.bundleDirectory = Objects.requireNonNull(
+                dataDirectory, "dataDirectory"
+        ).toAbsolutePath().normalize().resolve("diagnostics");
+        this.diagnostics = null;
+    }
+
+    /** Creates an exporter that remains useful without generic persistence. */
+    @Nonnull
+    public static PersistenceDiagnosticExporter bondedOnly(
+            @Nonnull Path dataDirectory,
+            @Nonnull BondedCompanionDiagnosticContributor contributor
+    ) {
+        PersistenceDiagnosticExporter exporter =
+                new PersistenceDiagnosticExporter(dataDirectory);
+        exporter.bondedContributor.set(Objects.requireNonNull(
+                contributor, "contributor"
+        ));
+        return exporter;
+    }
+
     /**
      * Collects the isolated diagnostic snapshot and writes the bundle away
      * from the caller's thread.
      */
     @Nonnull
     public CompletionStage<ExportResult> export() {
-        PublicPersistenceOperationalStatus status = diagnostics.status();
-        PublicPersistenceMetricsSnapshot metrics = diagnostics.metrics();
+        if (diagnostics == null) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(
+                    this::exportBondedOnly
+            );
+        }
+        final PublicPersistenceOperationalStatus status;
+        final PublicPersistenceMetricsSnapshot metrics;
+        try {
+            status = diagnostics.status();
+            metrics = diagnostics.metrics();
+        } catch (RuntimeException unavailable) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(
+                    this::exportBondedOnly
+            );
+        }
         return diagnostics.details().toCompletableFuture()
                 .orTimeout(MAX_COLLECTION_SECONDS, TimeUnit.SECONDS)
-                .thenApplyAsync(read -> export(status, metrics, read));
+                .handleAsync((read, failure) -> failure == null
+                        && read instanceof PersistenceReadResult.Found<?>
+                        ? export(status, metrics, read)
+                        : exportBondedOnly());
+    }
+
+    private ExportResult exportBondedOnly() {
+        LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        if (contributor == null) {
+            throw new IllegalStateException("No diagnostic source is available");
+        }
+        appendBondedEntry(members, contributor);
+        String supportId = UUID.randomUUID().toString().replace("-", "");
+        try {
+            return writeBundle(bundleDirectory, supportId, Instant.now(), members);
+        } catch (IOException failure) {
+            throw new IllegalStateException(
+                    "Could not write persistence diagnostic bundle", failure
+            );
+        }
     }
 
     /** Registers the isolated bonded diagnostic source at this aggregation boundary. */

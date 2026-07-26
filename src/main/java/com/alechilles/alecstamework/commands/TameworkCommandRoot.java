@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.persistence.runtime
         .PersistenceDiagnosticsReader;
 import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .BondedCompanionDiagnosticContributor;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import javax.annotation.Nullable;
 
@@ -26,6 +28,14 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     public TameworkCommandRoot(
             @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
             @Nullable PersistenceDiagnosticExporter persistenceExporter
+    ) {
+        this(persistenceDiagnostics, persistenceExporter, null);
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter,
+            @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics
     ) {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
@@ -78,7 +88,8 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());
         addSubCommand(new TameworkDebugDbCommand(
                 persistenceDiagnostics,
-                persistenceExporter
+                persistenceExporter,
+                bondedDiagnostics
         ));
         addSubCommand(new TameworkDebugCrashTelemetryCommand());
     }

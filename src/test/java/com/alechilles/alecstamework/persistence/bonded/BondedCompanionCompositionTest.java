@@ -2,6 +2,9 @@ package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.TameworkBondedCompanionComposition;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
+import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
+import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
+import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.companion.bonded
@@ -9,10 +12,18 @@ import com.alechilles.alecstamework.companion.bonded
 import com.alechilles.alecstamework.companion.bonded.runtime
         .HytaleBondedCompanionWorldGateway;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
+import com.hypixel.hytale.codec.ExtraInfo;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Map;
+import org.bson.BsonDocument;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,7 +51,11 @@ class BondedCompanionCompositionTest {
                         () -> -5_000L
                 );
         try {
-            assertTrue(composition.api().availability().available());
+            assertFalse(composition.api().availability().available());
+            assertEquals(
+                    "bonded-capture-integration-unavailable",
+                    composition.api().availability().reason()
+            );
             var listed = composition.api().list(OWNER, "hydragon:dragons")
                     .join();
             assertEquals(BondedCompanionResultCode.SUCCESS, listed.code());
@@ -57,6 +72,91 @@ class BondedCompanionCompositionTest {
         assertFalse(composition.api().availability().available());
         assertEquals("CLOSED", composition.diagnostics().snapshot().readiness());
         composition.close();
+    }
+
+    @Test
+    void capabilityBecomesReadyOnlyWhileCaptureAndPanelSurfacesAreRegistered()
+            throws Exception {
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> -5_000L
+                );
+        try {
+            AutoCloseable capture = composition.registerCaptureIntegration();
+            assertFalse(composition.api().availability().available());
+            assertEquals(
+                    "bonded-panel-integration-unavailable",
+                    composition.api().availability().reason()
+            );
+            AutoCloseable panel = composition.registerPanelIntegration();
+            assertTrue(composition.api().availability().available());
+
+            panel.close();
+            assertFalse(composition.api().availability().available());
+            capture.close();
+        } finally {
+            composition.close();
+        }
+    }
+
+    @Test
+    void provisionAndExtensionMutationsAreRealIdempotentAndPublished()
+            throws Exception {
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory, rosters, null, () -> -5_000L
+                );
+        AtomicInteger changes = new AtomicInteger();
+        AutoCloseable subscription = composition.api().subscribe(
+                ignored -> changes.incrementAndGet()
+        );
+        try {
+            BondedCompanionProvisionRequest request =
+                    new BondedCompanionProvisionRequest(
+                            "test", "provision-1", OWNER,
+                            "hydragon:dragons", "Tamed_Dragon_Fire",
+                            "Ember", "Dragon", "Female",
+                            Map.of("variant", "ember"), 1L
+                    );
+
+            var created = composition.api().provision(request).join();
+            var replay = composition.api().provision(request).join();
+            var conflictingReplay = composition.api().provision(
+                    new BondedCompanionProvisionRequest(
+                            "test", "provision-1", OWNER,
+                            "hydragon:dragons", "Tamed_Dragon_Fire",
+                            "Not Ember", "Dragon", "Female",
+                            Map.of("variant", "ember"), 1L
+                    )
+            ).join();
+
+            assertEquals(BondedCompanionResultCode.SUCCESS, created.code());
+            assertEquals(BondedCompanionResultCode.SUCCESS, replay.code());
+            assertEquals(BondedCompanionResultCode.REVISION_CONFLICT,
+                    conflictingReplay.code());
+            assertEquals(created.value().profileId(), replay.value().profileId());
+            assertEquals(1, changes.get());
+
+            BondedCompanionExtensionDataKey key =
+                    new BondedCompanionExtensionDataKey(
+                            OWNER, created.value().profileId(), "hydragon.combat"
+                    );
+            var extension = composition.api().compareAndSetExtensionData(
+                    new BondedCompanionExtensionDataUpdate(
+                            key, "{\"stance\":\"guard\"}", 0L
+                    )
+            ).join();
+            assertEquals(BondedCompanionResultCode.SUCCESS, extension.code());
+            assertEquals(extension.value(), composition.api()
+                    .getExtensionData(key).join().value());
+        } finally {
+            subscription.close();
+            composition.close();
+        }
     }
 
     @Test
@@ -92,6 +192,35 @@ class BondedCompanionCompositionTest {
                 BondedCompanionChangePublisher.WorldEffectOutcome.NOT_REQUIRED
         ));
         assertEquals(1, delivered.get());
+    }
+
+    @Test
+    void closeCannotRaceAListenerIntoTheClosedPublisher() throws Exception {
+        CountDownLatch registrationEntered = new CountDownLatch(1);
+        CountDownLatch allowRegistration = new CountDownLatch(1);
+        BondedCompanionChangePublisher publisher =
+                new BondedCompanionChangePublisher(null, () -> {
+                    registrationEntered.countDown();
+                    try {
+                        assertTrue(allowRegistration.await(5, TimeUnit.SECONDS));
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(interrupted);
+                    }
+                });
+        Thread subscriber = new Thread(() -> publisher.subscribe(ignored -> { }));
+
+        subscriber.start();
+        assertTrue(registrationEntered.await(5, TimeUnit.SECONDS));
+        Thread closer = new Thread(publisher::close);
+        closer.start();
+        allowRegistration.countDown();
+        subscriber.join(5_000L);
+        closer.join(5_000L);
+
+        assertEquals(0, publisher.listenerCount());
+        assertFalse(subscriber.isAlive());
+        assertFalse(closer.isAlive());
     }
 
     @Test
@@ -132,5 +261,29 @@ class BondedCompanionCompositionTest {
                         null, null, 0L
                 )
         ));
+    }
+
+    private BondedCompanionRosterRegistry rosterRegistry() throws Exception {
+        TwBondedCompanionRosterConfig config =
+                TwBondedCompanionRosterConfig.CODEC.decode(
+                        BsonDocument.parse("""
+                                {
+                                  "RosterId": "hydragon:dragons",
+                                  "FamilyId": "hydragon:dragon",
+                                  "AllowedRoles": ["Tamed_Dragon_Fire"],
+                                  "MaximumOwned": 4,
+                                  "MaximumActive": 1,
+                                  "Features": {"Provision": true}
+                                }
+                                """),
+                        new ExtraInfo()
+                );
+        Field id = config.getClass().getDeclaredField("id");
+        id.setAccessible(true);
+        id.set(config, "HydragonDragons");
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(config), 1L).applied());
+        return registry;
     }
 }

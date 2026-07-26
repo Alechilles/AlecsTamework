@@ -7,14 +7,12 @@ import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionData;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
-import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionReviveRequest;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.diagnostics
@@ -36,28 +34,36 @@ public final class BondedCompanionApiFacade
     private static final String CLOSED = "bonded-companion-authority-closed";
 
     private final Supplier<BondedCompanionPersistenceReadiness> readiness;
+    private final Supplier<BondedCompanionAvailability> capability;
     private final BondedCompanionStore store;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
+    private final BondedCompanionCoreApiOperations operations;
+    private final BondedCompanionViewFactory views =
+            new BondedCompanionViewFactory();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public BondedCompanionApiFacade(
             @Nonnull Supplier<BondedCompanionPersistenceReadiness> readiness,
+            @Nonnull Supplier<BondedCompanionAvailability> capability,
             @Nonnull BondedCompanionStore store,
             @Nonnull BondedCompanionChangePublisher changes,
-            @Nonnull BondedCompanionDiagnosticContributor diagnostics
+            @Nonnull BondedCompanionDiagnosticContributor diagnostics,
+            @Nonnull BondedCompanionCoreApiOperations operations
     ) {
         this.readiness = Objects.requireNonNull(readiness, "readiness");
+        this.capability = Objects.requireNonNull(capability, "capability");
         this.store = Objects.requireNonNull(store, "store");
         this.changes = Objects.requireNonNull(changes, "changes");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+        this.operations = Objects.requireNonNull(operations, "operations");
     }
 
     @Override
     public BondedCompanionAvailability availability() {
         return closed.get()
                 ? BondedCompanionAvailability.unavailable(CLOSED)
-                : readiness.get().availability();
+                : capability.get();
     }
 
     @Override
@@ -68,7 +74,8 @@ public final class BondedCompanionApiFacade
     ) {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(rosterId, "rosterId");
-        BondedCompanionResult<List<BondedCompanionProfileView>> denied = denied();
+        BondedCompanionResult<List<BondedCompanionProfileView>> denied =
+                persistenceDenied();
         if (denied != null) {
             return CompletableFuture.completedFuture(denied);
         }
@@ -77,12 +84,12 @@ public final class BondedCompanionApiFacade
             store.findActiveLeases(ownerUuid, rosterId).forEach(
                     lease -> leases.put(lease.profileId(), lease)
             );
-            List<BondedCompanionProfileView> views = store.listProfiles(
+            List<BondedCompanionProfileView> profileViews = store.listProfiles(
                     ownerUuid, rosterId
-            ).stream().map(profile -> view(profile, leases.get(
+            ).stream().map(profile -> views.view(profile, leases.get(
                     profile.profileId()
             ))).toList();
-            return completed(views);
+            return completed(profileViews);
         } catch (RuntimeException failure) {
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
@@ -96,49 +103,49 @@ public final class BondedCompanionApiFacade
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             provision(BondedCompanionProvisionRequest request) {
         Objects.requireNonNull(request, "request");
-        return notYetComposed("bonded-provision-snapshot-context-required");
+        return execute(() -> operations.provision(request));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             summon(BondedCompanionActionRequest request) {
         Objects.requireNonNull(request, "request");
-        return worldContext(request.worldKey());
+        return execute(() -> operations.summon(request));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             store(BondedCompanionActionRequest request) {
         Objects.requireNonNull(request, "request");
-        return worldContext(request.worldKey());
+        return execute(() -> operations.store(request));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionReviveQuote>>
             quoteRevive(BondedCompanionActionRequest request) {
         Objects.requireNonNull(request, "request");
-        return worldContext(request.worldKey());
+        return execute(() -> operations.quoteRevive(request));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             revive(BondedCompanionReviveRequest request) {
         Objects.requireNonNull(request, "request");
-        return worldContext(request.action().worldKey());
+        return execute(() -> operations.revive(request));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionExtensionData>>
             getExtensionData(BondedCompanionExtensionDataKey key) {
         Objects.requireNonNull(key, "key");
-        return notYetComposed("bonded-extension-roster-context-required");
+        return execute(() -> operations.extension(key));
     }
 
     @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionExtensionData>>
             compareAndSetExtensionData(BondedCompanionExtensionDataUpdate update) {
         Objects.requireNonNull(update, "update");
-        return notYetComposed("bonded-extension-roster-context-required");
+        return execute(() -> operations.updateExtension(update));
     }
 
     @Override
@@ -148,60 +155,32 @@ public final class BondedCompanionApiFacade
         return changes.subscribe(listener);
     }
 
-    private BondedCompanionProfileView view(
-            BondedCompanionRecord.Profile profile,
-            BondedCompanionRecord.Lease lease
+    private <T> CompletableFuture<BondedCompanionResult<T>> execute(
+            Supplier<BondedCompanionResult<T>> operation
     ) {
-        Map<String, String> presentation = profile.policy().entrySet().stream()
-                .filter(entry -> entry.getKey().startsWith("presentation:"))
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                        entry -> entry.getKey().substring("presentation:".length()),
-                        Map.Entry::getValue
-                ));
-        BondedCompanionLeaseView active = lease == null ? null
-                : new BondedCompanionLeaseView(
-                        lease.leaseToken(), lease.liveNpcUuid(), lease.worldKey(),
-                        lease.startedAtMs(), lease.expiresAtMs()
-                );
-        return new BondedCompanionProfileView(
-                profile.profileId(), profile.ownerUuid(), profile.rosterId(),
-                profile.familyId(), profile.roleId(), profile.displayName(),
-                profile.species(), profile.gender(), profile.revision(),
-                profile.state(), profile.state() == BondedCompanionState.STORED,
-                profile.state() == BondedCompanionState.ACTIVE,
-                profile.state() == BondedCompanionState.DEAD,
-                presentation, active, profile.reviveCooldownUntilMs(), null
-        );
-    }
-
-    private <T> CompletableFuture<BondedCompanionResult<T>> worldContext(
-            String worldKey
-    ) {
-        BondedCompanionResult<T> denied = denied();
+        BondedCompanionResult<T> denied = persistenceDenied();
         if (denied != null) {
             return CompletableFuture.completedFuture(denied);
         }
-        diagnostics.recordFailure(
-                BondedCompanionDiagnosticSnapshot.FailureCategory.WORLD_CONTEXT
-        );
-        return failed(
-                BondedCompanionResultCode.WORLD_UNAVAILABLE,
-                worldKey == null ? "bonded-world-context-required"
-                        : "bonded-world-context-unavailable"
-        );
+        try {
+            return CompletableFuture.completedFuture(operation.get());
+        } catch (IllegalArgumentException invalid) {
+            return failed(BondedCompanionResultCode.VALIDATION_FAILED,
+                    "bonded-request-invalid");
+        } catch (RuntimeException failure) {
+            diagnostics.recordFailure(
+                    BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+            );
+            return failed(BondedCompanionResultCode.INTERNAL_FAILURE,
+                    "bonded-operation-failed");
+        }
     }
 
-    private <T> CompletableFuture<BondedCompanionResult<T>> notYetComposed(
-            String reason
-    ) {
-        BondedCompanionResult<T> denied = denied();
-        return denied != null
-                ? CompletableFuture.completedFuture(denied)
-                : failed(BondedCompanionResultCode.VALIDATION_FAILED, reason);
-    }
-
-    private <T> BondedCompanionResult<T> denied() {
-        BondedCompanionAvailability state = availability();
+    private <T> BondedCompanionResult<T> persistenceDenied() {
+        if (closed.get()) {
+            return BondedCompanionResult.unavailable(CLOSED);
+        }
+        BondedCompanionAvailability state = readiness.get().availability();
         return state.available() ? null
                 : BondedCompanionResult.unavailable(state.reason());
     }

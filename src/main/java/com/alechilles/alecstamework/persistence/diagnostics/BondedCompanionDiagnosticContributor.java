@@ -61,13 +61,20 @@ public final class BondedCompanionDiagnosticContributor {
             BondedCompanionPersistenceReadiness state = readiness.get();
             String status = state.availability().available()
                     ? "READY" : closed(state) ? "CLOSED" : "UNAVAILABLE";
-            return snapshot(status, aggregates.get(), lastFailure.get());
+            BondedCompanionDiagnosticSnapshot.FailureCategory category =
+                    lastFailure.get();
+            if (category == BondedCompanionDiagnosticSnapshot.FailureCategory.NONE
+                    && !state.availability().available()) {
+                category = category(state.diagnosticCode());
+            }
+            return snapshot(status, state.availability().available()
+                    ? schemaVersion : 0, aggregates.get(), category);
         } catch (RuntimeException failure) {
             lastFailure.set(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.DIAGNOSTIC
             );
             return snapshot(
-                    "UNAVAILABLE",
+                    "UNAVAILABLE", 0,
                     BondedCompanionStoreDiagnostics.empty(),
                     BondedCompanionDiagnosticSnapshot.FailureCategory.DIAGNOSTIC
             );
@@ -90,15 +97,34 @@ public final class BondedCompanionDiagnosticContributor {
 
     private BondedCompanionDiagnosticSnapshot snapshot(
             String status,
+            int actualSchemaVersion,
             BondedCompanionStoreDiagnostics counts,
             BondedCompanionDiagnosticSnapshot.FailureCategory category
     ) {
         Objects.requireNonNull(counts, "counts");
         return new BondedCompanionDiagnosticSnapshot(
-                status, schemaVersion, counts.storedProfiles(),
+                status, actualSchemaVersion, counts.storedProfiles(),
                 counts.activeProfiles(), counts.deadProfiles(),
                 counts.activeLeases(), counts.pendingBoundedCleanups(), category
         );
+    }
+
+    private BondedCompanionDiagnosticSnapshot.FailureCategory category(
+            String code
+    ) {
+        String normalized = code.toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("schema") || normalized.contains("integrity")
+                || normalized.contains("history")
+                || normalized.contains("stored-record")) {
+            return BondedCompanionDiagnosticSnapshot.FailureCategory.SCHEMA;
+        }
+        if (normalized.contains("closed")) {
+            return BondedCompanionDiagnosticSnapshot.FailureCategory.CLOSED;
+        }
+        if (normalized.contains("storage") || normalized.contains("connection")) {
+            return BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE;
+        }
+        return BondedCompanionDiagnosticSnapshot.FailureCategory.STARTUP;
     }
 
     private boolean closed(BondedCompanionPersistenceReadiness state) {

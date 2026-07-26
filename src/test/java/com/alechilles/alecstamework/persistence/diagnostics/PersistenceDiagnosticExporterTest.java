@@ -115,4 +115,32 @@ class PersistenceDiagnosticExporterTest {
         assertFalse(bonded.contains("snapshot"));
         assertFalse(bonded.contains("position"));
     }
+
+    @Test
+    void bondedOnlyExportSucceedsWithoutGenericDiagnostics() throws Exception {
+        BondedCompanionDiagnosticContributor contributor =
+                new BondedCompanionDiagnosticContributor(
+                        () -> com.alechilles.alecstamework.persistence.bonded
+                                .BondedCompanionPersistenceReadiness.ready(),
+                        () -> new com.alechilles.alecstamework.persistence.bonded
+                                .BondedCompanionStoreDiagnostics(1, 0, 0, 0, 0),
+                        4
+                );
+        PersistenceDiagnosticExporter exporter =
+                PersistenceDiagnosticExporter.bondedOnly(
+                        temporaryDirectory, contributor
+                );
+
+        PersistenceDiagnosticExporter.ExportResult result = exporter.export()
+                .toCompletableFuture().join();
+
+        try (ZipFile zip = new ZipFile(result.path().toFile())) {
+            Set<String> names = zip.stream().map(entry -> entry.getName())
+                    .collect(java.util.stream.Collectors.toSet());
+            assertEquals(
+                    Set.of("manifest.json", "bonded-companions.json"),
+                    names
+            );
+        }
+    }
 }

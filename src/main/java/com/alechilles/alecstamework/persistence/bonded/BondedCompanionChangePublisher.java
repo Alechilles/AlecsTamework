@@ -16,9 +16,21 @@ public final class BondedCompanionChangePublisher implements AutoCloseable {
     private final CopyOnWriteArrayList<Consumer<BondedCompanionChangedEvent>>
             listeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object lifecycleLock = new Object();
+    private final Runnable beforeRegistration;
 
     public BondedCompanionChangePublisher(@Nullable HytaleLogger logger) {
+        this(logger, () -> { });
+    }
+
+    BondedCompanionChangePublisher(
+            @Nullable HytaleLogger logger,
+            @Nonnull Runnable beforeRegistration
+    ) {
         this.logger = logger;
+        this.beforeRegistration = Objects.requireNonNull(
+                beforeRegistration, "beforeRegistration"
+        );
     }
 
     /** Subscribes until the returned handle or this publisher is closed. */
@@ -29,10 +41,13 @@ public final class BondedCompanionChangePublisher implements AutoCloseable {
         Consumer<BondedCompanionChangedEvent> exact = Objects.requireNonNull(
                 listener, "listener"
         );
-        if (closed.get()) {
-            return () -> { };
+        synchronized (lifecycleLock) {
+            if (closed.get()) {
+                return () -> { };
+            }
+            beforeRegistration.run();
+            listeners.add(exact);
         }
-        listeners.add(exact);
         return () -> listeners.remove(exact);
     }
 
@@ -66,9 +81,15 @@ public final class BondedCompanionChangePublisher implements AutoCloseable {
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
-            listeners.clear();
+        synchronized (lifecycleLock) {
+            if (closed.compareAndSet(false, true)) {
+                listeners.clear();
+            }
         }
+    }
+
+    int listenerCount() {
+        return listeners.size();
     }
 
     /** Whether the committed mutation's matching physical outcome is known. */
