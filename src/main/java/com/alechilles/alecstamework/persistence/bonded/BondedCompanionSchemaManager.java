@@ -148,8 +148,31 @@ public final class BondedCompanionSchemaManager {
     }
 
     private void upgradeV2(Connection connection) throws Exception {
+        convertV2NoValueOperationTypes(connection);
         prepareEmptyOperationBackup(connection);
         applyV3(connection);
+    }
+
+    private void convertV2NoValueOperationTypes(Connection connection)
+            throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE bonded_companion_operation
+                    SET result_json = json_set(
+                        result_json,
+                        '$.valueType',
+                        CASE operation_type
+                            WHEN 'SUMMON' THEN 'LEASE'
+                            WHEN 'CLEANUP' THEN 'CLEANUP'
+                            ELSE 'PROFILE'
+                        END
+                    )
+                    WHERE operation_state <> 'PENDING'
+                      AND json_type(result_json, '$.valueType') = 'text'
+                      AND json_extract(result_json, '$.valueType') = 'NONE'
+                      AND json_type(result_json, '$.value') = 'null'
+                    """);
+        }
     }
 
     private void applyV3(Connection connection) throws Exception {

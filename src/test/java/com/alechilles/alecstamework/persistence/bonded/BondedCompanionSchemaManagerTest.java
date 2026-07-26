@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteSchemaV1Manager;
@@ -12,13 +13,16 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Contract tests for the independent bonded-companion schema lineage and runtime. */
@@ -170,6 +174,65 @@ class BondedCompanionSchemaManagerTest {
         assertEquals(BondedCompanionStoreResult.Code.APPLIED, replay.code());
         assertTrue(replay.replayed());
         assertEquals(migrated, replay.value());
+    }
+
+    @Test
+    void historicalV2NoValueTerminalOperationUpgradesToTypedReplay()
+            throws Exception {
+        Path database = tempDir.resolve("historical-v2-no-value.sqlite");
+        initializeHistoricalV2(database, -12_000L, -11_000L);
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO bonded_companion_operation(
+                        caller_namespace, idempotency_key, owner_uuid, roster_id,
+                        profile_id, operation_type, request_hash, operation_state,
+                        result_json, created_at_ms, updated_at_ms, expires_at_ms
+                    ) VALUES (
+                        'legacy-v2', 'no-value-rejection',
+                        '10000000-0000-0000-0000-000000000001', 'roster-a',
+                        'profile-v2', 'PROVISION',
+                        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                        'REJECTED',
+                        '{"code":"CONFLICT","reason":"legacy-v2-rejection",'
+                            || '"valueType":"NONE","value":null}',
+                        -10000, -10000, 10000
+                    )
+                    """);
+        }
+
+        BondedCompanionPersistenceReadiness readiness =
+                manager(database, -9_000L).initialize();
+
+        assertTrue(readiness.availability().available());
+        assertEquals("PROFILE", queryString(database, """
+                SELECT json_extract(result_json, '$.valueType')
+                FROM bonded_companion_operation
+                WHERE caller_namespace = 'legacy-v2'
+                  AND idempotency_key = 'no-value-rejection'
+                """));
+        BondedCompanionRecord.Profile profile = new BondedCompanionRecord.Profile(
+                "profile-v2",
+                UUID.fromString("10000000-0000-0000-0000-000000000001"),
+                "roster-a", "family:wolf", "role:companion",
+                BondedCompanionState.STORED, 0,
+                BondedCompanionPayload.of("snapshot"
+                        .getBytes(StandardCharsets.UTF_8)),
+                -10_000L, -10_000L, Map.of(), null, null, null,
+                null, 0L, 0L, null, null);
+        BondedCompanionOperation operation = new BondedCompanionOperation(
+                "legacy-v2", "no-value-rejection", "b".repeat(64),
+                profile.ownerUuid(), profile.rosterId(), profile.profileId(),
+                BondedCompanionOperation.Type.PROVISION, -9_000L, 10_000L);
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> replay =
+                new com.alechilles.alecstamework.persistence.adapter.sqlite
+                        .SqliteBondedCompanionDatabase(database)
+                        .createProfile(operation, profile);
+        assertEquals(BondedCompanionStoreResult.Code.CONFLICT, replay.code());
+        assertNull(replay.value());
+        assertEquals("legacy-v2-rejection", replay.reason());
+        assertTrue(replay.replayed());
     }
 
     @Test
@@ -501,6 +564,34 @@ class BondedCompanionSchemaManagerTest {
                     ) VALUES (1, 'bonded-companions', ?, ?)
                     """)) {
                 insert.setLong(1, appliedAt);
+                insert.setString(2, hash(script));
+                insert.executeUpdate();
+            }
+        }
+    }
+
+    private void initializeHistoricalV2(
+            Path database,
+            long v1AppliedAt,
+            long v2AppliedAt
+    ) throws Exception {
+        initializeHistoricalV1(database, v1AppliedAt);
+        String script = resource("/persistence/bonded/v2.sql");
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection()) {
+            for (String sql : script.split(";\\s*(?:\\R|\\z)")) {
+                if (!sql.isBlank()) {
+                    try (Statement statement = connection.createStatement()) {
+                        statement.execute(sql);
+                    }
+                }
+            }
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO bonded_schema_history(
+                        version, lineage, applied_at_ms, schema_hash
+                    ) VALUES (2, 'bonded-companions', ?, ?)
+                    """)) {
+                insert.setLong(1, v2AppliedAt);
                 insert.setString(2, hash(script));
                 insert.executeUpdate();
             }
