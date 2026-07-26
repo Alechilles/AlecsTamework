@@ -16,12 +16,13 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** Creates and verifies only the standalone bonded-companion schema lineage v1. */
+/** Creates, upgrades, and verifies the standalone bonded-companion schema. */
 public final class BondedCompanionSchemaManager {
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
     public static final String LINEAGE = "bonded-companions";
     private static final String V1_RESOURCE = "/persistence/bonded/v1.sql";
     private static final String V2_RESOURCE = "/persistence/bonded/v2.sql";
+    private static final String V3_RESOURCE = "/persistence/bonded/v3.sql";
     private static final Set<String> REQUIRED_TABLES = Set.of(
             "bonded_schema_history",
             "bonded_companion_profile",
@@ -35,8 +36,10 @@ public final class BondedCompanionSchemaManager {
     private final LongSupplier clock;
     private final String v1Script;
     private final String v2Script;
+    private final String v3Script;
     private final String v1Hash;
     private final String v2Hash;
+    private final String v3Hash;
 
     BondedCompanionSchemaManager(
             @Nonnull SqliteConnectionFactory connections
@@ -52,8 +55,10 @@ public final class BondedCompanionSchemaManager {
         this.clock = Objects.requireNonNull(clock, "clock");
         v1Script = loadScript(V1_RESOURCE);
         v2Script = loadScript(V2_RESOURCE);
+        v3Script = loadScript(V3_RESOURCE);
         v1Hash = sha256(v1Script);
         v2Hash = sha256(v2Script);
+        v3Hash = sha256(v3Script);
     }
 
     /** Creates a manager that owns connections to the supplied database path. */
@@ -85,6 +90,9 @@ public final class BondedCompanionSchemaManager {
                 } else if (latestVersion(connection) == 1) {
                     verifyV1(connection);
                     upgradeV1(connection);
+                } else if (latestVersion(connection) == 2) {
+                    verifyV2(connection);
+                    upgradeV2(connection);
                 } else {
                     verify(connection);
                 }
@@ -114,10 +122,10 @@ public final class BondedCompanionSchemaManager {
         }
     }
 
-    /** Returns the SHA-256 of the exact bundled bonded v1 schema. */
+    /** Returns the SHA-256 of the exact bundled current bonded schema. */
     @Nonnull
     public String schemaHash() {
-        return v2Hash;
+        return v3Hash;
     }
 
     /** Returns the exact bonded-only user-table set. */
@@ -133,8 +141,20 @@ public final class BondedCompanionSchemaManager {
     }
 
     private void upgradeV1(Connection connection) throws Exception {
+        prepareV1OperationBackup(connection);
         executeScript(connection, v2Script);
         insertHistory(connection, 2, v2Hash);
+        applyV3(connection);
+    }
+
+    private void upgradeV2(Connection connection) throws Exception {
+        prepareEmptyOperationBackup(connection);
+        applyV3(connection);
+    }
+
+    private void applyV3(Connection connection) throws Exception {
+        executeScript(connection, v3Script);
+        insertHistory(connection, 3, v3Hash);
         verify(connection);
     }
 
@@ -164,6 +184,7 @@ public final class BondedCompanionSchemaManager {
                      """)) {
             verifyHistoryRow(rows, 1, v1Hash);
             verifyHistoryRow(rows, 2, v2Hash);
+            verifyHistoryRow(rows, 3, v3Hash);
             if (rows.next()) throw historyMismatch();
         }
         try {
@@ -218,6 +239,61 @@ public final class BondedCompanionSchemaManager {
             if (rows.next()) {
                 throw new VerificationFailure("bonded-foreign-key-check-failed");
             }
+        }
+    }
+
+    private void verifyV2(Connection connection) throws Exception {
+        if (!tables(connection).equals(REQUIRED_TABLES)) {
+            throw new VerificationFailure("bonded-schema-table-mismatch");
+        }
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("""
+                     SELECT version, lineage, schema_hash
+                     FROM bonded_schema_history ORDER BY version
+                     """)) {
+            verifyHistoryRow(rows, 1, v1Hash);
+            verifyHistoryRow(rows, 2, v2Hash);
+            if (rows.next()) throw historyMismatch();
+        }
+        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
+                "bonded-integrity-check-failed");
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA foreign_key_check")) {
+            if (rows.next()) {
+                throw new VerificationFailure("bonded-foreign-key-check-failed");
+            }
+        }
+    }
+
+    private void prepareV1OperationBackup(Connection connection) throws Exception {
+        prepareEmptyOperationBackup(connection);
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO temp.bonded_v1_terminal_operation(
+                        caller_namespace, idempotency_key, operation_type,
+                        operation_state, result_json
+                    )
+                    SELECT caller_namespace, idempotency_key, operation_type,
+                           operation_state, result_json
+                    FROM bonded_companion_operation
+                    WHERE operation_state <> 'PENDING'
+                    """);
+        }
+    }
+
+    private void prepareEmptyOperationBackup(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS temp.bonded_v1_terminal_operation");
+            statement.execute("""
+                    CREATE TEMP TABLE bonded_v1_terminal_operation(
+                        caller_namespace TEXT NOT NULL,
+                        idempotency_key TEXT NOT NULL,
+                        operation_type TEXT NOT NULL,
+                        operation_state TEXT NOT NULL,
+                        result_json TEXT,
+                        PRIMARY KEY(caller_namespace, idempotency_key)
+                    )
+                    """);
         }
     }
 

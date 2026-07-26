@@ -123,7 +123,10 @@ final class BondedCompanionStoredRowValidator {
             JsonObject object = JsonParser.parseString(json).getAsJsonObject();
             for (var entry : object.entrySet()) {
                 if (entry.getValue().isJsonNull()
-                        || !entry.getValue().isJsonPrimitive()) throw invalid();
+                        || !entry.getValue().isJsonPrimitive()
+                        || !entry.getValue().getAsJsonPrimitive().isString()) {
+                    throw invalid();
+                }
             }
         } catch (InvalidRecordException failure) {
             throw failure;
@@ -152,7 +155,7 @@ final class BondedCompanionStoredRowValidator {
                 throw invalid();
             }
             requireOptionalString(result, "reason");
-            requireStoredValue(result);
+            requireStoredValue(result, code);
             requireOptionalJsonString(result, "value");
         } catch (InvalidRecordException failure) {
             throw failure;
@@ -161,7 +164,10 @@ final class BondedCompanionStoredRowValidator {
         }
     }
 
-    private void requireStoredValue(JsonObject result)
+    private void requireStoredValue(
+            JsonObject result,
+            BondedCompanionStoreResult.Code code
+    )
             throws InvalidRecordException {
         if (!result.has("valueType")
                 || !result.get("valueType").isJsonPrimitive()) {
@@ -169,11 +175,10 @@ final class BondedCompanionStoredRowValidator {
         }
         String type = result.get("valueType").getAsString();
         boolean hasValue = result.has("value") && !result.get("value").isJsonNull();
-        if ("NONE".equals(type)) {
-            if (hasValue) throw invalid();
-            return;
-        }
         if (!Set.of("PROFILE", "LEASE", "EXTENSION", "CLEANUP").contains(type)) {
+            throw invalid();
+        }
+        if (code == BondedCompanionStoreResult.Code.APPLIED && !hasValue) {
             throw invalid();
         }
         if (!hasValue) return;

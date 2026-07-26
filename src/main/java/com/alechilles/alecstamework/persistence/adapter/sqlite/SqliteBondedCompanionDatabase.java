@@ -226,8 +226,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                     null, "operation-still-pending", false);
         StoredResult envelope = GSON.fromJson(claim.resultJson(), StoredResult.class);
         String expectedType = storedTypeName(storedType);
-        if (!"NONE".equals(envelope.valueType)
-                && !expectedType.equals(envelope.valueType)) {
+        if (!expectedType.equals(envelope.valueType)) {
             return new BondedCompanionStoreResult<>(
                     BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT, null,
                     "idempotency-key-result-type-mismatch", false);

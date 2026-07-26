@@ -37,15 +37,15 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(first.availability().available());
         assertTrue(second.availability().available());
         assertEquals(BondedCompanionSchemaManager.requiredTables(), tables(database));
-        assertEquals(2, BondedCompanionSchemaManager.VERSION);
-        assertEquals(2L, queryLong(database,
+        assertEquals(3, BondedCompanionSchemaManager.VERSION);
+        assertEquals(3L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(2L, queryLong(database,
+        assertEquals(3L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(-5_000L, queryLong(database,
-                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 2"));
+                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 3"));
         assertEquals(manager.schemaHash(), queryString(database,
-                "SELECT schema_hash FROM bonded_schema_history WHERE version = 2"));
+                "SELECT schema_hash FROM bonded_schema_history WHERE version = 3"));
     }
 
     @Test
@@ -55,7 +55,13 @@ class BondedCompanionSchemaManagerTest {
     }
 
     @Test
-    void historicalV1UpgradesToV2AndPreservesOpaqueProfileSnapshot()
+    void bundledV2RemainsByteStableForUpgradeRecognition() throws Exception {
+        assertEquals("d21790785972ab126ea9723b17148fe2d99d75ec355becddb090e563fad1fc19",
+                hash(resource("/persistence/bonded/v2.sql")));
+    }
+
+    @Test
+    void historicalV1UpgradesToCurrentAndPreservesTypedReplayAndSnapshot()
             throws Exception {
         Path database = tempDir.resolve("historical-v1.sqlite");
         initializeHistoricalV1(database, -12_000L);
@@ -66,14 +72,14 @@ class BondedCompanionSchemaManagerTest {
                     INSERT INTO bonded_companion_profile(
                         profile_id, owner_uuid, roster_id, family_id, role_id,
                         state, revision, snapshot_json, created_at_ms,
-                        updated_at_ms, policy_json,
+                        updated_at_ms, policy_json, display_name, species, gender,
                         revive_cooldown_until_ms, revive_count
                     ) VALUES (
                         'profile-v1',
                         '10000000-0000-0000-0000-000000000001',
                         'roster-a', 'family:wolf', 'role:companion',
                         'STORED', 0, '{"health":10}', -11000, -11000,
-                        '{"policy":"unlimited"}', 0, 0
+                        '{"policy":"unlimited"}', 'Wolf', 'Wolf', 'Female', 0, 0
                     )
                     """);
             statement.executeUpdate("""
@@ -105,7 +111,24 @@ class BondedCompanionSchemaManagerTest {
                         '10000000-0000-0000-0000-000000000001', 'roster-a',
                         'profile-v1', 'PROVISION',
                         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                        'SUCCEEDED', '{"ok":true}', -11000, -11000, 10000
+                        'SUCCEEDED', json_object(
+                            'profileId', 'profile-v1',
+                            'ownerUuid', '10000000-0000-0000-0000-000000000001',
+                            'rosterId', 'roster-a',
+                            'familyId', 'family:wolf',
+                            'roleId', 'role:companion',
+                            'state', 'STORED',
+                            'revision', 0,
+                            'snapshotJson', '{"health":10}',
+                            'createdAtMs', -11000,
+                            'updatedAtMs', -11000,
+                            'policyJson', '{"policy":"unlimited"}',
+                            'displayName', 'Wolf',
+                            'species', 'Wolf',
+                            'gender', 'Female',
+                            'reviveCooldownUntilMs', 0,
+                            'reviveCount', 0
+                        ), -11000, -11000, 10000
                     )
                     """);
         }
@@ -114,18 +137,19 @@ class BondedCompanionSchemaManagerTest {
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertTrue(readiness.availability().available());
-        assertEquals(2L, queryLong(database,
+        assertEquals(3L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(2L, queryLong(database,
+        assertEquals(3L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         BondedCompanionStore store =
                 new com.alechilles.alecstamework.persistence.adapter.sqlite
                         .SqliteBondedCompanionDatabase(database);
-        assertEquals("{\"health\":10}", new String(store.findProfile(
+        BondedCompanionRecord.Profile migrated = store.findProfile(
                         java.util.UUID.fromString(
                                 "10000000-0000-0000-0000-000000000001"),
-                        "roster-a", "profile-v1").orElseThrow()
-                .snapshot().bytes(), StandardCharsets.UTF_8));
+                        "roster-a", "profile-v1").orElseThrow();
+        assertEquals("{\"health\":10}", new String(
+                migrated.snapshot().bytes(), StandardCharsets.UTF_8));
         assertEquals("{\"xp\":1}", new String(store.findExtensionData(
                         java.util.UUID.fromString(
                                 "10000000-0000-0000-0000-000000000001"),
@@ -137,6 +161,15 @@ class BondedCompanionSchemaManagerTest {
                 "roster-a", 10).size());
         assertEquals(1L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_companion_operation"));
+        BondedCompanionOperation replayOperation = new BondedCompanionOperation(
+                "legacy", "operation-v1", "a".repeat(64), migrated.ownerUuid(),
+                migrated.rosterId(), migrated.profileId(),
+                BondedCompanionOperation.Type.PROVISION, -9_000L, 20_000L);
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> replay =
+                store.createProfile(replayOperation, migrated);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED, replay.code());
+        assertTrue(replay.replayed());
+        assertEquals(migrated, replay.value());
     }
 
     @Test
@@ -304,6 +337,37 @@ class BondedCompanionSchemaManagerTest {
     }
 
     @Test
+    void booleanAndNumberPolicyValuesFailClosedBeforeMapperUse()
+            throws Exception {
+        for (String policy : Set.of("{\"flag\":true}", "{\"limit\":3}")) {
+            Path database = tempDir.resolve("primitive-policy-"
+                    + Integer.toHexString(policy.hashCode()) + ".sqlite");
+            BondedCompanionSchemaManager manager = manager(database, -7_000L);
+            assertTrue(manager.initialize().availability().available());
+            String snapshot = "{\"encoding\":\"base64\",\"payload\":\"eA==\"}";
+            insertRawProfile(database, "profile-raw", snapshot,
+                    "10000000-0000-0000-0000-000000000001", "STORED");
+            try (Connection connection = new SqliteConnectionFactory(database)
+                    .openWriterConnection();
+                 PreparedStatement statement = connection.prepareStatement("""
+                         UPDATE bonded_companion_profile SET policy_json = ?
+                         WHERE profile_id = 'profile-raw'
+                         """)) {
+                statement.setString(1, policy);
+                statement.executeUpdate();
+            }
+
+            BondedCompanionPersistenceReadiness readiness = manager.verify();
+
+            assertFalse(readiness.availability().available());
+            assertEquals("bonded-stored-record-invalid",
+                    readiness.diagnosticCode());
+            assertEquals(policy, queryString(database,
+                    "SELECT policy_json FROM bonded_companion_profile"));
+        }
+    }
+
+    @Test
     void malformedTerminalOperationResultFailsClosedWithoutRepair()
             throws Exception {
         Path database = tempDir.resolve("malformed-operation-result.sqlite");
@@ -377,7 +441,7 @@ class BondedCompanionSchemaManagerTest {
              Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA ignore_check_constraints=ON");
             statement.executeUpdate("""
-                    UPDATE bonded_schema_history SET version = 99 WHERE version = 2
+                    UPDATE bonded_schema_history SET version = 99 WHERE version = 3
                     """);
         }
 
