@@ -19,7 +19,7 @@ public record BondedCompanionProfile(
         long summonCooldownUntilMs,
         @Nullable Long diedAtMs,
         long reviveCount,
-        @Nullable String lastOperationId
+        @Nonnull BondedCompanionOperationLedger operationLedger
 ) {
     public BondedCompanionProfile {
         profileId = text(profileId, "profileId");
@@ -29,7 +29,9 @@ public record BondedCompanionProfile(
         roleId = text(roleId, "roleId");
         state = Objects.requireNonNull(state, "state");
         snapshot = Objects.requireNonNull(snapshot, "snapshot");
-        lastOperationId = optional(lastOperationId);
+        operationLedger = Objects.requireNonNull(
+                operationLedger, "operationLedger"
+        );
         if (revision < 0L || reviveCount < 0L) {
             throw new IllegalArgumentException("profile counters cannot be negative");
         }
@@ -45,10 +47,6 @@ public record BondedCompanionProfile(
         }
     }
 
-    boolean wasApplied(String operationId) {
-        return lastOperationId != null && lastOperationId.equals(operationId);
-    }
-
     private static String text(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) {
@@ -57,7 +55,4 @@ public record BondedCompanionProfile(
         return normalized;
     }
 
-    private static String optional(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
 }

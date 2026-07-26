@@ -95,3 +95,54 @@ HyDragon code was added.
   tasks must atomically translate accepted results into the bonded store and
   world projection flows; they must continue to rely on the bonded SQLite
   operation table for durable replay across intervening operations/restarts.
+
+## Review Fix Round
+
+All four Task 3 review findings were addressed in a separate follow-up change.
+This section supersedes the earlier description of the single-operation replay
+fast path.
+
+- Creation and store now reject snapshots whose embedded owner or role does
+  not match the canonical request/profile. The embedded role is also checked
+  against the current policy allowlist before a store merge can occur.
+- Finite session or cooldown arithmetic that lands exactly on absolute `0` is
+  rejected with `VALIDATION_FAILED`. This preserves `0` exclusively as the
+  unlimited/unset sentinel while retaining valid negative Hytale timestamps.
+- Each accepted operation now records an immutable receipt containing its
+  action, owner, expected profile and policy revisions, request time, canonical
+  profile identity, and a SHA-256 identity of stable payload fields. Receipt
+  history follows the immutable profile across later mutations, so an exact
+  stale retry returns the current profile without rolling state back. Reusing
+  an operation ID for a different action, payload, or revision returns
+  `IDEMPOTENCY_CONFLICT`; ownership is checked before replay classification.
+- Snapshot extension keys are sorted during encoding so semantically identical
+  extension maps produce stable operation payload identities.
+- The static boundary guard now also rejects generic command, provisioning,
+  profile, population, revival, command-item, and spawner API imports, including
+  `CommandTimedSummoningApi`, `NpcProfilesApi`, `ProfileDataApi`, and
+  `PopulationGroupApi`.
+- Transition validation and receipt construction were extracted into focused
+  collaborators. Every bonded production class remains below 500 lines; the
+  largest is `BondedCompanionTransitionService` at 494 lines.
+
+### Review TDD and Verification
+
+- RED: after introducing only the new result-code symbols, the focused run
+  completed 16 tests with 6 expected failures. They covered create/store owner
+  and role mismatch, finite lease/cooldown collisions at
+  `now=-5000,duration=5s`, cross-action/payload/revision operation-ID conflicts,
+  and exact replay after an intervening mutation.
+- Focused lifecycle/snapshot/boundary tests: PASS, 22 tests.
+- Combined focused, touched snapshot seams, persistence architecture, ECS write,
+  and async thread-safety guards: PASS, 50 tests.
+- Full `./mvnw test`: completed 3,084 tests with 4 failures, 0 errors, and
+  1 skipped. The failures are the same four pre-existing source-text failures
+  listed in the original verification section; no new full-suite failures were
+  introduced.
+- Required player/thread-affinity grep: PASS, no matches.
+- Expanded forbidden bonded-import grep and architecture test: PASS, no matches.
+- `git diff --check`: PASS.
+- `scripts/tools/check-agent-docs.ps1`: attempted from Git Bash via
+  `powershell.exe`; it cannot run in this linked worktree because the repository
+  root `AGENTS.md` is not materialized there.
+- No task-created Maven or Surefire process remained after verification.

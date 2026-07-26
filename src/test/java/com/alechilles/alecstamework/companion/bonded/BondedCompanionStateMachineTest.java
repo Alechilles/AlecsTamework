@@ -192,6 +192,46 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
+    void finiteSessionLandingOnZeroIsRejectedInsteadOfBecomingUnlimited()
+            throws Exception {
+        installPolicy(2L, 2, 1, 5, 5, true, true, true, true, true);
+        BondedCompanionProfile stored = service.createCaptured(
+                creation("capture-zero-collision", 2L), counts(0, 0)
+        ).profile();
+
+        BondedCompanionTransitionService.TransitionResult result = service.summon(
+                mutation("summon-zero-collision", stored, 2L, -5_000L),
+                stored, counts(1, 0), "lease-zero-collision", "world:alpha"
+        );
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.VALIDATION_FAILED,
+                result.code());
+        assertSame(stored, result.profile());
+    }
+
+    @Test
+    void finiteCooldownLandingOnZeroIsRejectedInsteadOfBecomingDisabled()
+            throws Exception {
+        installPolicy(2L, 2, 1, 5, 5, true, true, true, true, true);
+        BondedCompanionProfile stored = service.createCaptured(
+                creation("capture-cooldown-collision", 2L), counts(0, 0)
+        ).profile();
+        BondedCompanionProfile active = service.summon(
+                mutation("summon-before-collision", stored, 2L, -10_000L),
+                stored, counts(1, 0), "lease-collision", "world:alpha"
+        ).profile();
+
+        BondedCompanionTransitionService.TransitionResult result = service.store(
+                mutation("store-zero-collision", active, 2L, -5_000L),
+                active, snapshot(ROLE, "Ember")
+        );
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.VALIDATION_FAILED,
+                result.code());
+        assertSame(active, result.profile());
+    }
+
+    @Test
     void ownedAndActiveCapacityRejectAtTheExactLimit() {
         assertEquals(
                 BondedCompanionTransitionService.ResultCode.OWNED_CAPACITY_REACHED,
@@ -215,7 +255,7 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
-    void duplicateOperationReturnsTheAlreadyAppliedProfileWithoutAnotherMutation() {
+    void exactDuplicateOperationReturnsTheCurrentProfileWithoutAnotherMutation() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionTransitionService.MutationRequest request =
                 mutation("summon-once", stored, 1_000L);
@@ -224,7 +264,7 @@ class BondedCompanionStateMachineTest {
         );
         BondedCompanionTransitionService.TransitionResult replay = service.summon(
                 request, first.profile(), counts(1, 0),
-                "lease-different", "world:beta"
+                "lease-once", "world:alpha"
         );
 
         assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENT_REPLAY,
@@ -232,6 +272,122 @@ class BondedCompanionStateMachineTest {
         assertSame(first.profile(), replay.profile());
         assertEquals(first.profile().revision(), replay.profile().revision());
         assertEquals("lease-once", replay.profile().activeLease().leaseToken());
+    }
+
+    @Test
+    void operationIdConflictsAcrossActionsPayloadsAndRevisionIdentity() {
+        BondedCompanionProfile stored = createStored();
+        BondedCompanionTransitionService.MutationRequest request =
+                mutation("summon-once", stored, 1_000L);
+        BondedCompanionProfile active = service.summon(
+                request, stored, counts(1, 0), "lease-once", "world:alpha"
+        ).profile();
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+                service.store(
+                        new BondedCompanionTransitionService.MutationRequest(
+                                "summon-once", OWNER, request.expectedRevision(),
+                                request.expectedPolicyRevision(), 1_000L
+                        ),
+                        active, snapshot(ROLE, "Ember")
+                ).code());
+        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+                service.summon(
+                        request, active, counts(1, 0),
+                        "lease-different", "world:alpha"
+                ).code());
+        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+                service.summon(
+                        new BondedCompanionTransitionService.MutationRequest(
+                                "summon-once", OWNER, active.revision(), 1L, 1_000L
+                        ),
+                        active, counts(1, 0), "lease-once", "world:alpha"
+                ).code());
+        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+                service.summon(
+                        mutation("capture-base", stored, 1_000L),
+                        stored, counts(1, 0), "lease-new", "world:alpha"
+                ).code());
+    }
+
+    @Test
+    void staleExactDuplicateSurvivesInterveningMutationButStillChecksOwner() {
+        BondedCompanionProfile stored = createStored();
+        BondedCompanionTransitionService.MutationRequest summonRequest =
+                mutation("summon-durable", stored, -20_000L);
+        BondedCompanionProfile active = service.summon(
+                summonRequest, stored, counts(1, 0),
+                "lease-durable", "world:alpha"
+        ).profile();
+        BondedCompanionProfile storedAgain = service.store(
+                mutation("store-intervening", active, -19_000L), active,
+                snapshot(ROLE, "Ember")
+        ).profile();
+
+        BondedCompanionTransitionService.TransitionResult replay = service.summon(
+                summonRequest, storedAgain, counts(1, 0),
+                "lease-durable", "world:alpha"
+        );
+        BondedCompanionTransitionService.TransitionResult stranger = service.summon(
+                new BondedCompanionTransitionService.MutationRequest(
+                        "summon-durable", STRANGER,
+                        summonRequest.expectedRevision(), 1L, -20_000L
+                ),
+                storedAgain, counts(1, 0), "lease-durable", "world:alpha"
+        );
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENT_REPLAY,
+                replay.code());
+        assertSame(storedAgain, replay.profile());
+        assertEquals(BondedCompanionState.STORED, replay.profile().state());
+        assertEquals(2L, replay.profile().revision());
+        assertEquals(BondedCompanionTransitionService.ResultCode.NOT_OWNER,
+                stranger.code());
+    }
+
+    @Test
+    void creationRejectsSnapshotOwnerAndRoleIdentityMismatches() {
+        BondedCompanionTransitionService.CreationRequest wrongOwner =
+                new BondedCompanionTransitionService.CreationRequest(
+                        "capture-wrong-owner", OWNER, ROSTER, "wrong-owner",
+                        ROLE, snapshot(STRANGER, ROLE, "Ember"), 1L, -30_000L
+                );
+        BondedCompanionTransitionService.CreationRequest wrongRole =
+                new BondedCompanionTransitionService.CreationRequest(
+                        "capture-wrong-role", OWNER, ROSTER, "wrong-role",
+                        ROLE, snapshot(OWNER, "Bonded_Miniwyvern", "Ember"),
+                        1L, -30_000L
+                );
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.SNAPSHOT_OWNER_MISMATCH,
+                service.createCaptured(wrongOwner, counts(0, 0)).code());
+        assertEquals(BondedCompanionTransitionService.ResultCode.SNAPSHOT_ROLE_MISMATCH,
+                service.createCaptured(wrongRole, counts(0, 0)).code());
+    }
+
+    @Test
+    void storeRejectsSnapshotOwnerAndRoleIdentityMismatchesBeforeMerge() {
+        BondedCompanionProfile stored = createStored();
+        BondedCompanionProfile active = service.summon(
+                mutation("summon-identity", stored, 1_000L), stored,
+                counts(1, 0), "lease-identity", "world:alpha"
+        ).profile();
+
+        BondedCompanionTransitionService.TransitionResult wrongOwner = service.store(
+                mutation("store-wrong-owner", active, 2_000L), active,
+                snapshot(STRANGER, ROLE, "Impostor")
+        );
+        BondedCompanionTransitionService.TransitionResult wrongRole = service.store(
+                mutation("store-wrong-role", active, 2_000L), active,
+                snapshot(OWNER, "Bonded_Miniwyvern", "Impostor")
+        );
+
+        assertEquals(BondedCompanionTransitionService.ResultCode.SNAPSHOT_OWNER_MISMATCH,
+                wrongOwner.code());
+        assertSame(active, wrongOwner.profile());
+        assertEquals(BondedCompanionTransitionService.ResultCode.SNAPSHOT_ROLE_MISMATCH,
+                wrongRole.code());
+        assertSame(active, wrongRole.profile());
     }
 
     @Test
@@ -341,11 +497,19 @@ class BondedCompanionStateMachineTest {
     }
 
     private BondedCompanionSnapshot snapshot(String roleId, String name) {
+        return snapshot(OWNER, roleId, name);
+    }
+
+    private BondedCompanionSnapshot snapshot(
+            UUID owner, String roleId, String name
+    ) {
         return BondedCompanionSnapshot.of(
                 new com.alechilles.alecstamework.items
                         .CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
                         UUID.fromString("20000000-0000-0000-0000-000000000001"),
-                        null, -1, roleId, null, null, null,
+                        null, -1, roleId, null,
+                        new com.alechilles.alecstamework.npc.components
+                                .TameworkOwnerComponent(owner, "Owner"), null,
                         name == null ? null : new com.alechilles.alecstamework.npc
                                 .components.TameworkNpcNameComponent(
                                 name, OWNER, -100L,

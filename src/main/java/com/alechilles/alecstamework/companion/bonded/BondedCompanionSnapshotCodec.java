@@ -30,7 +30,11 @@ public final class BondedCompanionSnapshotCodec {
                 ))
         );
         JsonObject extensions = new JsonObject();
-        snapshot.extensionData().forEach(extensions::addProperty);
+        snapshot.extensionData().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> extensions.addProperty(
+                        entry.getKey(), entry.getValue()
+                ));
         root.add("extensions", extensions);
         return root.toString();
     }

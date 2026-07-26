@@ -9,6 +9,8 @@ import javax.annotation.Nullable;
 /** Pure policy-gated transition authority for the three-state bonded lifecycle. */
 public final class BondedCompanionTransitionService {
     private final BondedCompanionPolicyResolver policies;
+    private final BondedCompanionOperationFactory operations =
+            new BondedCompanionOperationFactory();
 
     public BondedCompanionTransitionService(
             @Nonnull BondedCompanionPolicyResolver policies
@@ -22,7 +24,10 @@ public final class BondedCompanionTransitionService {
             @Nonnull CreationRequest request,
             @Nonnull RosterCounts counts
     ) {
-        return create(request, counts, policy -> policy.features().capture());
+        return create(
+                request, counts, policy -> policy.features().capture(),
+                BondedCompanionOperationReceipt.Action.CAPTURE
+        );
     }
 
     /** Creates one provisioned profile directly in durable stored state. */
@@ -31,13 +36,17 @@ public final class BondedCompanionTransitionService {
             @Nonnull CreationRequest request,
             @Nonnull RosterCounts counts
     ) {
-        return create(request, counts, policy -> policy.features().provision());
+        return create(
+                request, counts, policy -> policy.features().provision(),
+                BondedCompanionOperationReceipt.Action.PROVISION
+        );
     }
 
     private TransitionResult create(
             CreationRequest request,
             RosterCounts counts,
-            Predicate<BondedCompanionPolicy> enabled
+            Predicate<BondedCompanionPolicy> enabled,
+            BondedCompanionOperationReceipt.Action action
     ) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(counts, "counts");
@@ -51,11 +60,14 @@ public final class BondedCompanionTransitionService {
         if (denial != null) {
             return rejected(denial, null);
         }
+        BondedCompanionOperationReceipt receipt = operations.creation(
+                request, action
+        );
         return applied(new BondedCompanionProfile(
                 request.profileId(), request.ownerUuid(), request.rosterId(),
                 policy.familyId(), request.roleId(), BondedCompanionState.STORED,
                 0L, request.snapshot(), null, 0L, null, 0L,
-                request.operationId()
+                BondedCompanionOperationLedger.empty().record(receipt)
         ));
     }
 
@@ -68,7 +80,13 @@ public final class BondedCompanionTransitionService {
             @Nonnull String leaseToken,
             @Nonnull String worldKey
     ) {
-        TransitionResult prerequisite = prerequisite(request, profile);
+        String normalizedLease = text(leaseToken, "leaseToken");
+        String normalizedWorld = text(worldKey, "worldKey");
+        BondedCompanionOperationReceipt receipt = operations.mutation(
+                request, BondedCompanionOperationReceipt.Action.SUMMON,
+                profile.profileId(), normalizedLease, normalizedWorld
+        );
+        TransitionResult prerequisite = prerequisite(request, profile, receipt);
         if (prerequisite != null) {
             return prerequisite;
         }
@@ -82,16 +100,16 @@ public final class BondedCompanionTransitionService {
         }
         try {
             BondedCompanionPolicy policy = checked.policy();
-            long expiresAt = timeAfterSeconds(
+            long expiresAt = BondedCompanionTransitionRules.timeAfterSeconds(
                     request.nowMs(), policy.sessionDurationSeconds()
             );
             BondedCompanionLease lease = new BondedCompanionLease(
-                    leaseToken, worldKey, request.nowMs(), expiresAt
+                    normalizedLease, normalizedWorld, request.nowMs(), expiresAt
             );
             return applied(copy(
                     profile, BondedCompanionState.ACTIVE,
                     profile.snapshot(), lease, profile.summonCooldownUntilMs(),
-                    null, profile.reviveCount(), request.operationId()
+                    null, profile.reviveCount(), receipt
             ));
         } catch (ArithmeticException invalidTime) {
             return rejected(ResultCode.VALIDATION_FAILED, profile);
@@ -105,7 +123,12 @@ public final class BondedCompanionTransitionService {
             @Nonnull BondedCompanionProfile profile,
             @Nonnull BondedCompanionSnapshot captured
     ) {
-        TransitionResult prerequisite = prerequisite(request, profile);
+        Objects.requireNonNull(captured, "captured");
+        BondedCompanionOperationReceipt receipt = operations.mutation(
+                request, BondedCompanionOperationReceipt.Action.STORE,
+                profile.profileId(), operations.snapshotPayload(captured)
+        );
+        TransitionResult prerequisite = prerequisite(request, profile, receipt);
         if (prerequisite != null) {
             return prerequisite;
         }
@@ -120,15 +143,21 @@ public final class BondedCompanionTransitionService {
         if (profile.state() != BondedCompanionState.ACTIVE) {
             return rejected(ResultCode.INVALID_STATE, profile);
         }
+        ResultCode snapshotDenial = BondedCompanionTransitionRules.snapshotIdentity(
+                checked.policy(), profile.ownerUuid(), profile.roleId(), captured
+        );
+        if (snapshotDenial != null) {
+            return rejected(snapshotDenial, profile);
+        }
         try {
-            long cooldownUntil = timeAfterSeconds(
+            long cooldownUntil = BondedCompanionTransitionRules.timeAfterSeconds(
                     request.nowMs(), checked.policy().summonCooldownSeconds()
             );
             return applied(copy(
                     profile, BondedCompanionState.STORED,
                     profile.snapshot().mergeForStore(captured), null,
                     cooldownUntil, null, profile.reviveCount(),
-                    request.operationId()
+                    receipt
             ));
         } catch (ArithmeticException invalidTime) {
             return rejected(ResultCode.VALIDATION_FAILED, profile);
@@ -141,7 +170,11 @@ public final class BondedCompanionTransitionService {
             @Nonnull MutationRequest request,
             @Nonnull BondedCompanionProfile profile
     ) {
-        TransitionResult prerequisite = prerequisite(request, profile);
+        BondedCompanionOperationReceipt receipt = operations.mutation(
+                request, BondedCompanionOperationReceipt.Action.CONFIRM_DEATH,
+                profile.profileId()
+        );
+        TransitionResult prerequisite = prerequisite(request, profile, receipt);
         if (prerequisite != null) {
             return prerequisite;
         }
@@ -157,7 +190,7 @@ public final class BondedCompanionTransitionService {
         return applied(copy(
                 profile, BondedCompanionState.DEAD, profile.snapshot(), null,
                 0L, request.nowMs(), profile.reviveCount(),
-                request.operationId()
+                receipt
         ));
     }
 
@@ -168,7 +201,13 @@ public final class BondedCompanionTransitionService {
             @Nonnull BondedCompanionProfile profile,
             @Nonnull RevivePayment payment
     ) {
-        TransitionResult prerequisite = prerequisite(request, profile);
+        Objects.requireNonNull(payment, "payment");
+        BondedCompanionOperationReceipt receipt = operations.mutation(
+                request, BondedCompanionOperationReceipt.Action.REVIVE,
+                profile.profileId(), payment.itemId(),
+                Integer.toString(payment.quantity())
+        );
+        TransitionResult prerequisite = prerequisite(request, profile, receipt);
         if (prerequisite != null) {
             return prerequisite;
         }
@@ -190,7 +229,7 @@ public final class BondedCompanionTransitionService {
             return applied(copy(
                     profile, BondedCompanionState.STORED, profile.snapshot(),
                     null, 0L, null, Math.incrementExact(profile.reviveCount()),
-                    request.operationId()
+                    receipt
             ));
         } catch (ArithmeticException counterOverflow) {
             return rejected(ResultCode.VALIDATION_FAILED, profile);
@@ -199,15 +238,21 @@ public final class BondedCompanionTransitionService {
 
     private TransitionResult prerequisite(
             MutationRequest request,
-            BondedCompanionProfile profile
+            BondedCompanionProfile profile,
+            BondedCompanionOperationReceipt receipt
     ) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(profile, "profile");
-        if (profile.wasApplied(request.operationId())) {
-            return new TransitionResult(ResultCode.IDEMPOTENT_REPLAY, profile);
-        }
         if (!profile.ownerUuid().equals(request.actorOwnerUuid())) {
             return rejected(ResultCode.NOT_OWNER, profile);
+        }
+        BondedCompanionOperationLedger.Classification classification =
+                profile.operationLedger().classify(receipt);
+        if (classification == BondedCompanionOperationLedger.Classification.REPLAY) {
+            return new TransitionResult(ResultCode.IDEMPOTENT_REPLAY, profile);
+        }
+        if (classification == BondedCompanionOperationLedger.Classification.CONFLICT) {
+            return rejected(ResultCode.IDEMPOTENCY_CONFLICT, profile);
         }
         if (profile.revision() != request.expectedRevision()) {
             return rejected(ResultCode.REVISION_CONFLICT, profile);
@@ -226,6 +271,12 @@ public final class BondedCompanionTransitionService {
         }
         if (!policy.allowedRoles().contains(request.roleId())) {
             return ResultCode.ROLE_NOT_ALLOWED;
+        }
+        ResultCode identityDenial = BondedCompanionTransitionRules.snapshotIdentity(
+                policy, request.ownerUuid(), request.roleId(), request.snapshot()
+        );
+        if (identityDenial != null) {
+            return identityDenial;
         }
         if (counts.owned() >= policy.maximumOwned()) {
             return ResultCode.OWNED_CAPACITY_REACHED;
@@ -297,13 +348,14 @@ public final class BondedCompanionTransitionService {
             long cooldownUntil,
             Long diedAt,
             long reviveCount,
-            String operationId
+            BondedCompanionOperationReceipt receipt
     ) {
         return new BondedCompanionProfile(
                 source.profileId(), source.ownerUuid(), source.rosterId(),
                 source.familyId(), source.roleId(), state,
                 Math.incrementExact(source.revision()), snapshot, lease,
-                cooldownUntil, diedAt, reviveCount, operationId
+                cooldownUntil, diedAt, reviveCount,
+                source.operationLedger().record(receipt)
         );
     }
 
@@ -314,12 +366,6 @@ public final class BondedCompanionTransitionService {
         return price != null
                 && price.itemId().equals(payment.itemId())
                 && price.quantity() == payment.quantity();
-    }
-
-    private static long timeAfterSeconds(long nowMs, long seconds) {
-        return seconds == 0L
-                ? 0L
-                : Math.addExact(nowMs, Math.multiplyExact(seconds, 1_000L));
     }
 
     private static TransitionResult applied(BondedCompanionProfile profile) {
@@ -337,6 +383,7 @@ public final class BondedCompanionTransitionService {
     public enum ResultCode {
         APPLIED,
         IDEMPOTENT_REPLAY,
+        IDEMPOTENCY_CONFLICT,
         POLICY_NOT_FOUND,
         POLICY_REVISION_CONFLICT,
         POLICY_MISMATCH,
@@ -345,6 +392,8 @@ public final class BondedCompanionTransitionService {
         REVISION_CONFLICT,
         INVALID_STATE,
         ROLE_NOT_ALLOWED,
+        SNAPSHOT_OWNER_MISMATCH,
+        SNAPSHOT_ROLE_MISMATCH,
         OWNED_CAPACITY_REACHED,
         ACTIVE_CAPACITY_REACHED,
         COOLDOWN_ACTIVE,
