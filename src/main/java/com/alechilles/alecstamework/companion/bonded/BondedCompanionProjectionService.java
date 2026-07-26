@@ -11,12 +11,13 @@ import javax.annotation.Nullable;
 
 /** Coordinates durable bonded leases with disposable world projections. */
 public final class BondedCompanionProjectionService {
-    private static final long CLEANUP_RETENTION_MS = 300_000L;
     private final Durability durability;
     private final World world;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final BondedCompanionProjectionValidator validator =
             new BondedCompanionProjectionValidator();
+    private final BondedCompanionCleanupIntentFactory cleanupIntents =
+            new BondedCompanionCleanupIntentFactory();
     private final Supplier<String> leaseTokens;
     private final Supplier<UUID> npcUuids;
 
@@ -45,7 +46,9 @@ public final class BondedCompanionProjectionService {
                 npcUuid, request.worldKey(), request.nowMs(), request.expiresAtMs(),
                 BondedCompanionProjectionValidator.LeasePhase.PENDING
         );
-        var recovery = cleanupIntent(lease, "spawn-recovery", request.nowMs());
+        var recovery = cleanupIntents.projection(
+                lease, "spawn-recovery", request.nowMs()
+        );
         if (!durability.beginSummon(request, lease, recovery)) {
             return new SummonResult(SummonStatus.DURABILITY_REJECTED, null);
         }
@@ -56,15 +59,15 @@ public final class BondedCompanionProjectionService {
         SpawnResult spawned = safeSpawn(new SpawnPlan(
                 lease, request.roleId(), request.snapshot(), marker
         ));
-        if (!spawned.success() || !npcUuid.equals(spawned.npcUuid())) {
-            removeUnexpectedSpawn(lease, spawned, request.nowMs());
-            durability.failSpawn(lease, "SPAWN_FAILED");
-            return new SummonResult(SummonStatus.SPAWN_FAILED_STORED, lease);
+        if (spawned.status() != SpawnStatus.SPAWNED
+                || !npcUuid.equals(spawned.npcUuid())) {
+            String reason = spawnFailureReason(spawned, npcUuid);
+            return rollbackFailedSpawn(lease, spawned, reason, request.nowMs());
         }
-        if (!durability.confirmSpawn(lease, spawned.npcUuid())) {
-            cleanup.recover(cleanupIntent(lease, "spawn-confirm-failed", request.nowMs()));
-            durability.failSpawn(lease, "SPAWN_CONFIRM_FAILED");
-            return new SummonResult(SummonStatus.SPAWN_FAILED_STORED, lease);
+        if (!safeConfirmSpawn(lease, spawned.npcUuid())) {
+            return rollbackFailedSpawn(
+                    lease, spawned, "SPAWN_CONFIRM_FAILED", request.nowMs()
+            );
         }
         return new SummonResult(SummonStatus.ACTIVE, live(lease));
     }
@@ -82,7 +85,9 @@ public final class BondedCompanionProjectionService {
                 || projection.snapshot() == null) {
             return new StoreResult(StoreStatus.PROJECTION_NOT_FOUND, null);
         }
-        var intent = cleanupIntent(request.lease(), "store", request.nowMs());
+        var intent = cleanupIntents.projection(
+                request.lease(), "store", request.nowMs()
+        );
         if (!durability.storeAndEnqueueCleanup(
                 request, projection.snapshot(), intent)) {
             return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
@@ -105,7 +110,10 @@ public final class BondedCompanionProjectionService {
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(cause, "cause");
         var validation = validator.validate(lease, observed);
-        boolean forced = cause == RecoveryCause.EXPIRED
+        boolean expired = BondedCompanionExpirySystem.isExpired(
+                lease.expiresAtMs(), observedAtMs
+        );
+        boolean forced = expired || cause == RecoveryCause.EXPIRED
                 || cause == RecoveryCause.WORLD_TRANSFER
                 || cause == RecoveryCause.LOGOUT;
         boolean interrupted = lease.phase()
@@ -114,10 +122,12 @@ public final class BondedCompanionProjectionService {
                 && validation.status() == BondedCompanionProjectionValidator.Status.VALID) {
             return new ReconcileResult(ReconcileStatus.ACTIVE_VALID, List.of());
         }
-        String reason = interrupted ? "SPAWN_INTERRUPTED" : reason(cause, validation.status());
+        String reason = expired ? "LEASE_EXPIRED"
+                : interrupted ? "SPAWN_INTERRUPTED"
+                : reason(cause, validation.status());
         BondedCompanionSnapshot snapshot = snapshot(validation);
         List<BondedCompanionProjectionCleanupService.CleanupIntent> intents =
-                cleanupIntents(
+                cleanupIntents.projections(
                         lease, validation.exactMatches(), reason, observedAtMs
                 );
         if (!durability.reconcileStored(lease, snapshot, intents, reason)) {
@@ -154,65 +164,75 @@ public final class BondedCompanionProjectionService {
         }
     }
 
-    private void removeUnexpectedSpawn(
+    private boolean safeConfirmSpawn(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            SpawnResult spawned,
-            long nowMs
+            UUID spawnedNpcUuid
     ) {
-        if (spawned != null && spawned.npcUuid() != null) {
-            cleanup.recover(BondedCompanionProjectionCleanupService.CleanupIntent.projection(
-                    cleanupId(lease, spawned.npcUuid(), "spawn-mismatch"),
-                    lease.ownerUuid(), lease.rosterId(), lease.profileId(),
-                    lease.leaseToken(), spawned.npcUuid(), "spawn-mismatch",
-                    retainedUntil(nowMs)
-            ));
+        try {
+            return durability.confirmSpawn(lease, spawnedNpcUuid);
+        } catch (RuntimeException failure) {
+            return false;
         }
     }
 
-    private List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanupIntents(
+    private SummonResult rollbackFailedSpawn(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            List<BondedCompanionProjectionValidator.Projection> projections,
+            SpawnResult spawned,
             String reason,
-            long observedAtMs
+            long nowMs
     ) {
+        List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups =
+                spawnFailureCleanups(lease, spawned, reason, nowMs);
+        boolean stored;
+        try {
+            stored = durability.failSpawnAndEnqueueCleanup(
+                    lease, cleanups, reason
+            );
+        } catch (RuntimeException failure) {
+            stored = false;
+        }
+        if (!stored) {
+            return new SummonResult(SummonStatus.SPAWN_ROLLBACK_PENDING, lease);
+        }
+        for (var intent : cleanups) {
+            cleanup.recover(intent);
+        }
+        return new SummonResult(SummonStatus.SPAWN_FAILED_STORED, lease);
+    }
+
+    private List<BondedCompanionProjectionCleanupService.CleanupIntent>
+            spawnFailureCleanups(
+                    BondedCompanionProjectionValidator.LeaseExpectation lease,
+                    SpawnResult spawned,
+                    String reason,
+                    long nowMs
+            ) {
         ArrayList<BondedCompanionProjectionCleanupService.CleanupIntent> result =
                 new ArrayList<>();
-        for (var projection : projections) {
-            result.add(BondedCompanionProjectionCleanupService.CleanupIntent.projection(
-                    cleanupId(lease, projection.npcUuid(), reason),
-                    lease.ownerUuid(), lease.rosterId(), lease.profileId(),
-                    lease.leaseToken(), projection.npcUuid(), reason,
-                    retainedUntil(observedAtMs)
+        UUID observedUuid = spawned == null ? null : spawned.npcUuid();
+        if (observedUuid != null) {
+            result.add(cleanupIntents.projection(
+                    lease, observedUuid, lease.worldKey(), reason, nowMs
+            ));
+        }
+        if (!lease.liveNpcUuid().equals(observedUuid)) {
+            result.add(cleanupIntents.projection(
+                    lease, lease.liveNpcUuid(), lease.worldKey(), reason, nowMs
             ));
         }
         return List.copyOf(result);
     }
 
-    private BondedCompanionProjectionCleanupService.CleanupIntent cleanupIntent(
-            BondedCompanionProjectionValidator.LeaseExpectation lease,
-            String reason,
-            long nowMs
-    ) {
-        return BondedCompanionProjectionCleanupService.CleanupIntent.projection(
-                cleanupId(lease, lease.liveNpcUuid(), reason),
-                lease.ownerUuid(), lease.rosterId(), lease.profileId(),
-                lease.leaseToken(), lease.liveNpcUuid(), reason,
-                retainedUntil(nowMs)
-        );
-    }
-
-    private String cleanupId(
-            BondedCompanionProjectionValidator.LeaseExpectation lease,
-            UUID npcUuid,
-            String reason
-    ) {
-        return lease.profileId() + ":" + lease.leaseToken() + ":"
-                + npcUuid + ":" + reason;
-    }
-
-    private long retainedUntil(long nowMs) {
-        long retained = Math.addExact(nowMs, CLEANUP_RETENTION_MS);
-        return retained == 0L ? 1L : retained;
+    private String spawnFailureReason(SpawnResult spawned, UUID plannedNpcUuid) {
+        if (spawned.status() == SpawnStatus.RETRY_REQUIRED) {
+            return "SPAWN_RETRY_REQUIRED";
+        }
+        if (spawned.status() == SpawnStatus.IDENTITY_MISMATCH
+                || spawned.npcUuid() != null
+                && !plannedNpcUuid.equals(spawned.npcUuid())) {
+            return "SPAWN_IDENTITY_MISMATCH";
+        }
+        return "SPAWN_FAILED";
     }
 
     private BondedCompanionProjectionValidator.LeaseExpectation live(
@@ -270,9 +290,10 @@ public final class BondedCompanionProjectionService {
                 @Nonnull UUID spawnedNpcUuid
         );
 
-        /** Atomically invalidates the lease, clears spawn recovery, and returns STORED. */
-        void failSpawn(
+        /** Atomically stores, persists exact cleanup, and clears/replaces spawn recovery. */
+        boolean failSpawnAndEnqueueCleanup(
                 @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+                @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
                 @Nonnull String reason
         );
 
@@ -359,17 +380,47 @@ public final class BondedCompanionProjectionService {
         }
     }
 
-    public record SpawnResult(boolean success, @Nullable UUID npcUuid) {
+    public record SpawnResult(
+            @Nonnull SpawnStatus status,
+            @Nullable UUID npcUuid
+    ) {
+        public SpawnResult {
+            status = Objects.requireNonNull(status, "status");
+            if ((status == SpawnStatus.SPAWNED
+                    || status == SpawnStatus.IDENTITY_MISMATCH)
+                    && npcUuid == null) {
+                throw new IllegalArgumentException("spawn status requires npcUuid");
+            }
+        }
+
         @Nonnull public static SpawnResult spawned(UUID npcUuid) {
-            return new SpawnResult(true, Objects.requireNonNull(npcUuid, "npcUuid"));
+            return new SpawnResult(
+                    SpawnStatus.SPAWNED,
+                    Objects.requireNonNull(npcUuid, "npcUuid")
+            );
         }
 
         @Nonnull public static SpawnResult failed() {
-            return new SpawnResult(false, null);
+            return new SpawnResult(SpawnStatus.FAILED, null);
+        }
+
+        @Nonnull public static SpawnResult retryRequired() {
+            return new SpawnResult(SpawnStatus.RETRY_REQUIRED, null);
+        }
+
+        @Nonnull public static SpawnResult identityMismatch(UUID npcUuid) {
+            return new SpawnResult(
+                    SpawnStatus.IDENTITY_MISMATCH,
+                    Objects.requireNonNull(npcUuid, "npcUuid")
+            );
         }
     }
 
-    public enum SummonStatus { ACTIVE, DURABILITY_REJECTED, SPAWN_FAILED_STORED }
+    public enum SpawnStatus { SPAWNED, RETRY_REQUIRED, IDENTITY_MISMATCH, FAILED }
+    public enum SummonStatus {
+        ACTIVE, DURABILITY_REJECTED, SPAWN_FAILED_STORED,
+        SPAWN_ROLLBACK_PENDING
+    }
     public enum StoreStatus {
         STORED, STORED_CLEANUP_PENDING, PROJECTION_NOT_FOUND, DURABILITY_REJECTED
     }

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.companion.bonded;
 
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -18,32 +17,18 @@ public final class BondedCompanionProjectionCleanupService {
     @Nonnull
     public Outcome recover(@Nonnull CleanupIntent intent) {
         Objects.requireNonNull(intent, "intent");
-        ObservedTarget observed = world.find(intent.targetNpcUuid());
-        if (observed == null) {
-            return Outcome.ALREADY_MISSING;
+        try {
+            Outcome outcome = world.removeIfExact(intent);
+            return outcome == null ? Outcome.RETRY_REQUIRED : outcome;
+        } catch (RuntimeException failure) {
+            return Outcome.RETRY_REQUIRED;
         }
-        if (intent.target() == Target.PROJECTION
-                && !projectionMatches(intent, observed)) {
-            return Outcome.IDENTITY_MISMATCH;
-        }
-        return world.remove(intent.targetNpcUuid())
-                ? Outcome.REMOVED : Outcome.RETRY_REQUIRED;
     }
 
-    private boolean projectionMatches(CleanupIntent intent, ObservedTarget observed) {
-        TameworkProjectionIdentityComponent marker = observed.marker();
-        return marker != null
-                && marker.isBondedCompanion()
-                && intent.profileId().equals(marker.getProfileId())
-                && intent.leaseToken().equals(marker.getBondedLeaseToken())
-                && intent.targetNpcUuid().equals(observed.npcUuid());
-    }
-
-    /** World implementations resolve the UUID and remove through a command buffer or world callback. */
+    /** Revalidates the complete intent and removes in one world-thread/command-buffer operation. */
+    @FunctionalInterface
     public interface WorldGateway {
-        @Nullable ObservedTarget find(@Nonnull UUID targetNpcUuid);
-
-        boolean remove(@Nonnull UUID targetNpcUuid);
+        @Nonnull Outcome removeIfExact(@Nonnull CleanupIntent intent);
     }
 
     public enum Target { SOURCE, PROJECTION }
@@ -58,6 +43,7 @@ public final class BondedCompanionProjectionCleanupService {
             @Nullable String leaseToken,
             @Nonnull Target target,
             @Nonnull UUID targetNpcUuid,
+            @Nonnull String worldKey,
             @Nonnull String reason,
             long retainedUntilMs
     ) {
@@ -69,6 +55,7 @@ public final class BondedCompanionProjectionCleanupService {
             leaseToken = optional(leaseToken);
             target = Objects.requireNonNull(target, "target");
             targetNpcUuid = Objects.requireNonNull(targetNpcUuid, "targetNpcUuid");
+            worldKey = text(worldKey, "worldKey");
             reason = text(reason, "reason");
             if (target == Target.PROJECTION && leaseToken == null) {
                 throw new IllegalArgumentException("projection cleanup requires leaseToken");
@@ -82,37 +69,27 @@ public final class BondedCompanionProjectionCleanupService {
         public static CleanupIntent projection(
                 String cleanupId, UUID ownerUuid, String rosterId,
                 String profileId, String leaseToken, UUID targetNpcUuid,
-                String reason, long retainedUntilMs
+                String worldKey, String reason, long retainedUntilMs
         ) {
             return new CleanupIntent(
                     cleanupId, ownerUuid, rosterId, profileId, leaseToken,
-                    Target.PROJECTION, targetNpcUuid, reason, retainedUntilMs
+                    Target.PROJECTION, targetNpcUuid, worldKey, reason,
+                    retainedUntilMs
             );
         }
 
         @Nonnull
         public static CleanupIntent source(
                 String cleanupId, UUID ownerUuid, String rosterId,
-                String profileId, UUID targetNpcUuid, String reason,
+                String profileId, UUID targetNpcUuid, String worldKey,
+                String reason,
                 long retainedUntilMs
         ) {
             return new CleanupIntent(
                     cleanupId, ownerUuid, rosterId, profileId, null,
-                    Target.SOURCE, targetNpcUuid, reason, retainedUntilMs
+                    Target.SOURCE, targetNpcUuid, worldKey, reason,
+                    retainedUntilMs
             );
-        }
-    }
-
-    /** Current world-thread observation used to recheck identity immediately before removal. */
-    public record ObservedTarget(
-            @Nonnull UUID npcUuid,
-            @Nonnull String worldKey,
-            @Nullable TameworkProjectionIdentityComponent marker
-    ) {
-        public ObservedTarget {
-            npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
-            worldKey = text(worldKey, "worldKey");
-            marker = marker == null ? null : marker.clone();
         }
     }
 
