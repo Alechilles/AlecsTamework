@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.config;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -12,10 +12,8 @@ import java.util.Objects;
  * Registry for command item configs keyed by item id.
  */
 public final class CommandItemRegistry {
-    private final Map<String, TwCommandItemConfig> configsByItemId = new HashMap<>();
-    private final Map<String, TwCommandItemConfig> configsById = new HashMap<>();
     private final BondedCompanionRosterRegistry bondedRosters;
-    private long revision;
+    private volatile State state = State.empty();
 
     public CommandItemRegistry() {
         this(null);
@@ -29,49 +27,59 @@ public final class CommandItemRegistry {
         register(config == null ? null : config.getId(), itemId, config);
     }
 
-    public void register(
+    public synchronized void register(
             String configId,
             String itemId,
             TwCommandItemConfig config
     ) {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(config, "config");
-        validateOwnerFamily(itemId, config);
-        validateBondedRoster(config);
-        configsByItemId.put(itemId, config);
+        State active = state;
+        HashMap<String, TwCommandItemConfig> byItem =
+                new HashMap<>(active.byItemId());
+        HashMap<String, TwCommandItemConfig> byId =
+                new HashMap<>(active.byConfigId());
+        validateOwnerFamily(itemId, config, byItem);
+        validateBondedRoster(config, null);
+        byItem.put(itemId, config);
         if (configId != null && !configId.isBlank()) {
-            configsById.put(configId.trim(), config);
+            byId.put(configId.trim(), config);
         }
-        revision = Math.addExact(revision, 1);
+        state = new State(
+                byItem,
+                byId,
+                Math.addExact(active.revision(), 1L)
+        );
     }
 
     public TwCommandItemConfig get(String itemId) {
         if (itemId == null) {
             return null;
         }
-        TwCommandItemConfig config = configsByItemId.get(itemId);
+        State active = state;
+        TwCommandItemConfig config = active.byItemId().get(itemId);
         if (config != null) {
             return config;
         }
         String normalized = ItemFeatureRegistry.normalizeStateItemId(itemId);
         if (normalized != null && !normalized.equals(itemId)) {
-            return configsByItemId.get(normalized);
+            return active.byItemId().get(normalized);
         }
         return null;
     }
 
     public Map<String, TwCommandItemConfig> snapshot() {
-        return Collections.unmodifiableMap(new HashMap<>(configsByItemId));
+        return state.byItemId();
     }
 
     public TwCommandItemConfig getByConfigId(String configId) {
         return configId == null
                 ? null
-                : configsById.get(configId.trim());
+                : state.byConfigId().get(configId.trim());
     }
 
     public long revision() {
-        return revision;
+        return state.revision();
     }
 
     /**
@@ -121,15 +129,76 @@ public final class CommandItemRegistry {
         return listed ? "profile-role-denied" : null;
     }
 
-    public void clear() {
-        configsByItemId.clear();
-        configsById.clear();
-        revision = Math.addExact(revision, 1);
+    public synchronized void clear() {
+        state = new State(
+                Map.of(),
+                Map.of(),
+                Math.addExact(state.revision(), 1L)
+        );
+    }
+
+    /** Compiles a complete command generation without changing active lookups. */
+    public synchronized PreparedReplacement prepareReplacement(
+            Collection<TwCommandItemConfig> configs,
+            BondedCompanionRosterRegistry.Snapshot bondedSnapshot
+    ) {
+        Objects.requireNonNull(configs, "configs");
+        Objects.requireNonNull(bondedSnapshot, "bondedSnapshot");
+        State active = state;
+        HashMap<String, TwCommandItemConfig> byItem = new HashMap<>();
+        HashMap<String, TwCommandItemConfig> byId = new HashMap<>();
+        int loaded = 0;
+        for (TwCommandItemConfig config : configs) {
+            if (config == null || !config.isEnabled()) {
+                continue;
+            }
+            String[] itemIds = config.getItemIds();
+            if (itemIds == null) {
+                continue;
+            }
+            for (String itemId : itemIds) {
+                if (itemId == null || itemId.isBlank()) {
+                    continue;
+                }
+                validateOwnerFamily(itemId, config, byItem);
+                validateBondedRoster(config, bondedSnapshot);
+                byItem.put(itemId, config);
+                String configId = config.getId();
+                if (configId != null && !configId.isBlank()) {
+                    byId.put(configId.trim(), config);
+                }
+                loaded++;
+            }
+        }
+        return new PreparedReplacement(
+                active.revision(),
+                Math.addExact(active.revision(), 1L),
+                loaded,
+                byItem,
+                byId
+        );
+    }
+
+    /** Publishes a previously validated command generation in one map swap. */
+    public synchronized boolean publishPrepared(
+            PreparedReplacement replacement
+    ) {
+        Objects.requireNonNull(replacement, "replacement");
+        if (state.revision() != replacement.baseRevision) {
+            return false;
+        }
+        state = new State(
+                replacement.byItemId,
+                replacement.byConfigId,
+                replacement.revision
+        );
+        return true;
     }
 
     private void validateOwnerFamily(
             String itemId,
-            TwCommandItemConfig config
+            TwCommandItemConfig config,
+            Map<String, TwCommandItemConfig> configsByItemId
     ) {
         if (!config.usesOwnerCommandFamilyRoster()) {
             return;
@@ -158,7 +227,10 @@ public final class CommandItemRegistry {
         }
     }
 
-    private void validateBondedRoster(TwCommandItemConfig config) {
+    private void validateBondedRoster(
+            TwCommandItemConfig config,
+            BondedCompanionRosterRegistry.Snapshot candidate
+    ) {
         if (!config.usesBondedCompanionRoster()) {
             return;
         }
@@ -172,16 +244,66 @@ public final class CommandItemRegistry {
                     "BondedCompanions command configs cannot declare CommandFamilyId"
             );
         }
-        if (config.isProjectRosterToItemMetadata()) {
+        if (config.hasProjectRosterToItemMetadataSetting()) {
             throw new IllegalArgumentException(
-                    "BondedCompanions command configs cannot project owner-family metadata"
+                    "BondedCompanions command configs cannot declare "
+                            + "ProjectRosterToItemMetadata"
             );
         }
-        if (bondedRosters == null
-                || bondedRosters.resolve(config.getBondedRosterId()).isEmpty()) {
+        boolean exists = candidate == null
+                ? bondedRosters != null
+                        && bondedRosters.resolve(
+                                config.getBondedRosterId()
+                        ).isPresent()
+                : candidate.byRosterId().containsKey(
+                        config.getBondedRosterId()
+                );
+        if (!exists) {
             throw new IllegalArgumentException(
                     "Unknown bonded roster: " + config.getBondedRosterId()
             );
+        }
+    }
+
+    /** Opaque, immutable candidate returned only after full validation. */
+    public static final class PreparedReplacement {
+        private final long baseRevision;
+        private final long revision;
+        private final int loadedCount;
+        private final Map<String, TwCommandItemConfig> byItemId;
+        private final Map<String, TwCommandItemConfig> byConfigId;
+
+        private PreparedReplacement(
+                long baseRevision,
+                long revision,
+                int loadedCount,
+                Map<String, TwCommandItemConfig> byItemId,
+                Map<String, TwCommandItemConfig> byConfigId
+        ) {
+            this.baseRevision = baseRevision;
+            this.revision = revision;
+            this.loadedCount = loadedCount;
+            this.byItemId = Map.copyOf(byItemId);
+            this.byConfigId = Map.copyOf(byConfigId);
+        }
+
+        public int loadedCount() {
+            return loadedCount;
+        }
+    }
+
+    private record State(
+            Map<String, TwCommandItemConfig> byItemId,
+            Map<String, TwCommandItemConfig> byConfigId,
+            long revision
+    ) {
+        private State {
+            byItemId = Map.copyOf(byItemId);
+            byConfigId = Map.copyOf(byConfigId);
+        }
+
+        private static State empty() {
+            return new State(Map.of(), Map.of(), 0L);
         }
     }
 }

@@ -59,7 +59,9 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                     return storage;
                 }
             }
-            return ItemMetadata;
+            throw new IllegalArgumentException(
+                    "Unknown RosterStorage: " + value.trim()
+            );
         }
     }
 
@@ -235,11 +237,12 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .<Boolean>append(
             new KeyedCodec<>("ProjectRosterToItemMetadata", Codec.BOOLEAN),
-            (asset, value) -> asset.projectRosterToItemMetadata = value == null || value,
+            (asset, value) -> asset.projectRosterToItemMetadata = value,
             asset -> asset.projectRosterToItemMetadata
         )
         .documentation("Projects an owner-family roster to item metadata as a disposable cache. "
-                + "Item metadata never becomes the authority. Inheritance: omitted value inherits.")
+                + "Item metadata never becomes the authority. Omission defaults true for legacy/owner storage "
+                + "and false for bonded storage; an inherited or explicit setting is invalid for bonded storage.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("LinkEnabled", Codec.BOOLEAN),
@@ -328,7 +331,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private String commandFamilyId;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
     private String bondedRosterId;
-    private boolean projectRosterToItemMetadata = true;
+    private Boolean projectRosterToItemMetadata;
     private boolean linkEnabled = true;
     private boolean linkUseTogglesMembership = true;
     private boolean requireTamed = true;
@@ -500,7 +503,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isProjectRosterToItemMetadata() {
-        return projectRosterToItemMetadata;
+        if (projectRosterToItemMetadata != null) {
+            return projectRosterToItemMetadata;
+        }
+        return !usesBondedCompanionRoster();
+    }
+
+    public boolean hasProjectRosterToItemMetadataSetting() {
+        return projectRosterToItemMetadata != null;
     }
 
     public boolean usesOwnerCommandFamilyRoster() {

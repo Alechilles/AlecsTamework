@@ -32,18 +32,34 @@ public final class BondedCompanionRosterRegistry {
     }
 
     @Nonnull
-    public ReloadResult replace(
+    public synchronized ReloadResult replace(
             @Nonnull Collection<TwBondedCompanionRosterConfig> configs,
             long revision
     ) {
         Objects.requireNonNull(configs, "configs");
         try {
-            Snapshot replacement = compile(configs, revision);
-            current.set(replacement);
-            return new ReloadResult(true, replacement, null);
+            PreparedReplacement replacement =
+                    prepareReplacement(configs, revision);
+            publishPrepared(replacement);
+            return new ReloadResult(true, replacement.candidate(), null);
         } catch (RuntimeException invalid) {
             return new ReloadResult(false, current.get(), invalid.getMessage());
         }
+    }
+
+    synchronized PreparedReplacement prepareReplacement(
+            Collection<TwBondedCompanionRosterConfig> configs,
+            long revision
+    ) {
+        return new PreparedReplacement(current.get(), compile(configs, revision));
+    }
+
+    synchronized boolean publishPrepared(PreparedReplacement replacement) {
+        Objects.requireNonNull(replacement, "replacement");
+        return current.compareAndSet(
+                replacement.base(),
+                replacement.candidate()
+        );
     }
 
     private static Snapshot compile(
@@ -95,12 +111,16 @@ public final class BondedCompanionRosterRegistry {
                 );
         TwBondedCompanionRosterConfig.FeatureToggles configuredFeatures =
                 config.getFeatures();
+        LinkedHashSet<String> allowedRoles = new LinkedHashSet<>();
+        for (String allowedRole : config.getAllowedRoles()) {
+            allowedRoles.add(allowedRole.trim());
+        }
         return new RosterDefinition(
                 config.getId(),
                 config.getPriority(),
                 config.getRosterId(),
                 config.getFamilyId(),
-                Set.of(config.getAllowedRoles()),
+                allowedRoles,
                 config.getMaximumOwned(),
                 config.getMaximumActive(),
                 config.getSessionDurationSeconds(),
@@ -197,6 +217,13 @@ public final class BondedCompanionRosterRegistry {
             if (!applied && (error == null || error.isBlank())) {
                 error = "bonded-roster-index-invalid";
             }
+        }
+    }
+
+    record PreparedReplacement(Snapshot base, Snapshot candidate) {
+        PreparedReplacement {
+            base = Objects.requireNonNull(base, "base");
+            candidate = Objects.requireNonNull(candidate, "candidate");
         }
     }
 }

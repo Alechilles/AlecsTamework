@@ -202,8 +202,7 @@ class TwBondedCompanionRosterConfigTest {
         TwCommandItemConfig valid = command("""
                 {
                   "RosterStorage": "BondedCompanions",
-                  "BondedRosterId": "hydragon:dragons",
-                  "ProjectRosterToItemMetadata": false
+                  "BondedRosterId": "hydragon:dragons"
                 }
                 """);
 
@@ -211,6 +210,7 @@ class TwBondedCompanionRosterConfigTest {
 
         assertTrue(valid.usesBondedCompanionRoster());
         assertEquals("hydragon:dragons", valid.getBondedRosterId());
+        assertFalse(valid.isProjectRosterToItemMetadata());
         assertThrows(
                 IllegalArgumentException.class,
                 () -> commands.register(
@@ -219,8 +219,7 @@ class TwBondedCompanionRosterConfigTest {
                         command("""
                                 {
                                   "RosterStorage": "BondedCompanions",
-                                  "BondedRosterId": "hydragon:missing",
-                                  "ProjectRosterToItemMetadata": false
+                                  "BondedRosterId": "hydragon:missing"
                                 }
                                 """)
                 )
@@ -234,12 +233,87 @@ class TwBondedCompanionRosterConfigTest {
                                 {
                                   "RosterStorage": "BondedCompanions",
                                   "BondedRosterId": "hydragon:dragons",
-                                  "CommandFamilyId": "hydragon:legacy",
+                                  "CommandFamilyId": "hydragon:legacy"
+                                }
+                                """)
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> commands.register(
+                        "Projection",
+                        "HyDragon_Projection_Horn",
+                        command("""
+                                {
+                                  "RosterStorage": "BondedCompanions",
+                                  "BondedRosterId": "hydragon:dragons",
                                   "ProjectRosterToItemMetadata": false
                                 }
                                 """)
                 )
         );
+    }
+
+    @Test
+    void resolverCanonicalizesAllowedRoleWhitespace() throws Exception {
+        BondedCompanionRosterRegistry registry = registryWith(roster(
+                "Whitespace",
+                """
+                {
+                  "RosterId": "hydragon:dragons",
+                  "FamilyId": "hydragon:dragon",
+                  "AllowedRoles": ["  Tamed_Dragon_Fire  "]
+                }
+                """
+        ));
+
+        assertEquals(
+                Set.of("Tamed_Dragon_Fire"),
+                registry.resolve("hydragon:dragons")
+                        .orElseThrow()
+                        .allowedRoles()
+        );
+    }
+
+    @Test
+    void coherentReloadAddsAndRemovesRosterWithDependentCommands()
+            throws Exception {
+        BondedCompanionRosterRegistry rosters =
+                new BondedCompanionRosterRegistry();
+        CommandItemRegistry commands = new CommandItemRegistry(rosters);
+        BondedCompanionConfigReloadService reloads =
+                new BondedCompanionConfigReloadService(rosters, commands);
+        TwBondedCompanionRosterConfig roster = roster(
+                "Roster",
+                minimalRosterJson("hydragon:dragons")
+        );
+        TwCommandItemConfig command = command("""
+                {
+                  "Enabled": true,
+                  "ItemIds": ["HyDragon_Dragon_Horn"],
+                  "RosterStorage": "BondedCompanions",
+                  "BondedRosterId": "hydragon:dragons"
+                }
+                """);
+
+        assertTrue(reloads.reload(List.of(roster), List.of(command)).applied());
+        assertTrue(rosters.resolve("hydragon:dragons").isPresent());
+        assertEquals(command, commands.get("HyDragon_Dragon_Horn"));
+        long rosterRevision = rosters.snapshot().revision();
+        long commandRevision = commands.revision();
+
+        BondedCompanionConfigReloadService.ReloadResult rejected =
+                reloads.reload(List.of(), List.of(command));
+
+        assertFalse(rejected.applied());
+        assertEquals(rosterRevision, rosters.snapshot().revision());
+        assertEquals(commandRevision, commands.revision());
+        assertTrue(rosters.resolve("hydragon:dragons").isPresent());
+        assertEquals(command, commands.get("HyDragon_Dragon_Horn"));
+
+        assertTrue(reloads.reload(List.of(), List.of()).applied());
+        assertTrue(rosters.resolve("hydragon:dragons").isEmpty());
+        assertNull(commands.get("HyDragon_Dragon_Horn"));
     }
 
     @Test

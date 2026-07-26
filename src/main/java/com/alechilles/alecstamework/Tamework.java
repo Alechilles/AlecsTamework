@@ -42,6 +42,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionConfigReloadService;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.population.PopulationGroupAssetRegistrar;
@@ -281,6 +282,7 @@ public class Tamework extends JavaPlugin {
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
     private BondedCompanionRosterRegistry bondedCompanionRosterRegistry;
+    private BondedCompanionConfigReloadService bondedCompanionConfigReloadService;
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
@@ -315,7 +317,6 @@ public class Tamework extends JavaPlugin {
     private boolean capturePolicyAssetsRegistered;
     private long capturePolicyAssetRevision;
     private boolean bondedCompanionRosterAssetsRegistered;
-    private long bondedCompanionRosterAssetRevision;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -471,6 +472,11 @@ public class Tamework extends JavaPlugin {
         commandItemRegistry = new CommandItemRegistry(
                 bondedCompanionRosterRegistry
         );
+        bondedCompanionConfigReloadService =
+                new BondedCompanionConfigReloadService(
+                        bondedCompanionRosterRegistry,
+                        commandItemRegistry
+                );
         capturePolicyRegistry = new CapturePolicyRegistry();
         populationGroupConfigRegistry = new PopulationGroupConfigRegistry();
         populationGroupAssetRegistrar = new PopulationGroupAssetRegistrar(
@@ -1678,7 +1684,6 @@ public class Tamework extends JavaPlugin {
             loadedNaming += loadNameItemAssets();
         }
         if (commandItemRegistry != null) {
-            commandItemRegistry.clear();
             registerCommandItemAssets();
             loadedCommands += loadCommandItemAssets();
         }
@@ -2369,28 +2374,21 @@ public class Tamework extends JavaPlugin {
 
     private boolean rebuildBondedCompanionRosterIndex() {
         TwBondedCompanionRosterConfig.clearInheritanceFallbackCache();
-        if (bondedCompanionRosterRegistry == null) {
+        TwCommandItemConfig.clearInheritanceFallbackCache();
+        BondedCompanionConfigReloadService.ReloadResult result =
+                reloadBondedCompanionConfigGeneration();
+        if (!result.applied()) {
+            for (String error : result.errors()) {
+                getLogger().at(Level.WARNING).log(
+                        "Bonded companion config reload rejected; retaining "
+                                + "roster revision " + result.rosterRevision()
+                                + " and command revision "
+                                + result.commandRevision() + ": " + error
+                );
+            }
             return false;
         }
-        DefaultAssetMap<String, TwBondedCompanionRosterConfig> assetMap =
-                TwBondedCompanionRosterConfig.getAssetMap();
-        java.util.Collection<TwBondedCompanionRosterConfig> configs =
-                assetMap == null || assetMap.getAssetMap() == null
-                        ? java.util.List.of()
-                        : assetMap.getAssetMap().values();
-        BondedCompanionRosterRegistry.ReloadResult result =
-                bondedCompanionRosterRegistry.replace(
-                        configs,
-                        ++bondedCompanionRosterAssetRevision
-                );
-        if (!result.applied()) {
-            getLogger().at(Level.WARNING).log(
-                    "Bonded-companion roster reload rejected; retaining "
-                            + "revision " + result.active().revision()
-                            + ": " + result.error()
-            );
-        }
-        return result.applied();
+        return true;
     }
 
     private boolean rebuildCapturePolicyIndex() {
@@ -2693,31 +2691,42 @@ public class Tamework extends JavaPlugin {
     }
 
     private int loadCommandItemAssets() {
-        if (commandItemRegistry == null) {
+        BondedCompanionConfigReloadService.ReloadResult result =
+                reloadBondedCompanionConfigGeneration();
+        if (!result.applied()) {
+            for (String error : result.errors()) {
+                getLogger().at(Level.WARNING).log(
+                        "Command/bonded roster config reload rejected; "
+                                + "retaining last coherent generation: "
+                                + error
+                );
+            }
             return 0;
         }
-        DefaultAssetMap<String, TwCommandItemConfig> assetMap = TwCommandItemConfig.getAssetMap();
-        if (assetMap == null) {
-            return 0;
+        return result.commandCount();
+    }
+
+    private BondedCompanionConfigReloadService.ReloadResult
+            reloadBondedCompanionConfigGeneration() {
+        if (bondedCompanionConfigReloadService == null) {
+            return new BondedCompanionConfigReloadService.ReloadResult(
+                    false, 0, 0, 0L, 0L,
+                    java.util.List.of("bonded-config-reload-service-unavailable")
+            );
         }
-        int loaded = 0;
-        for (TwCommandItemConfig asset : assetMap.getAssetMap().values()) {
-            if (asset == null || !asset.isEnabled()) {
-                continue;
-            }
-            String[] itemIds = asset.getItemIds();
-            if (itemIds == null || itemIds.length == 0) {
-                continue;
-            }
-            for (String itemId : itemIds) {
-                if (itemId == null || itemId.isBlank()) {
-                    continue;
-                }
-                commandItemRegistry.register(asset.getId(), itemId, asset);
-                loaded++;
-            }
-        }
-        return loaded;
+        DefaultAssetMap<String, TwBondedCompanionRosterConfig> rosterAssets =
+                TwBondedCompanionRosterConfig.getAssetMap();
+        DefaultAssetMap<String, TwCommandItemConfig> commandAssets =
+                TwCommandItemConfig.getAssetMap();
+        java.util.Collection<TwBondedCompanionRosterConfig> rosters =
+                rosterAssets == null || rosterAssets.getAssetMap() == null
+                        ? java.util.List.of()
+                        : rosterAssets.getAssetMap().values();
+        java.util.Collection<TwCommandItemConfig> commands =
+                commandAssets == null || commandAssets.getAssetMap() == null
+                        ? java.util.List.of()
+                        : commandAssets.getAssetMap().values();
+        return bondedCompanionConfigReloadService.reload(rosters, commands);
     }
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {
