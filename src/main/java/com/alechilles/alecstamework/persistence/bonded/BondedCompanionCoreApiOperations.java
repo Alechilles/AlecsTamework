@@ -229,10 +229,20 @@ public final class BondedCompanionCoreApiOperations {
         }
         BondedCompanionActionContext.Inventory inventory =
                 inventory(action.actionContext());
-        if (inventory == null || !safeConsume(
-                inventory, price.itemId(), price.quantity())) {
+        String reviveOperationId = operationId(
+                action.callerNamespace(), action.idempotencyKey());
+        BondedCompanionActionContext.ChargeReceipt charge = inventory == null
+                ? null : safeConsume(inventory, reviveOperationId,
+                        price.itemId(), price.quantity());
+        if (charge == null) {
             return failure(BondedCompanionResultCode.POLICY_DENIED,
                     "bonded-revive-payment-unavailable");
+        }
+        if (!safeChargeMatches(charge, reviveOperationId)) {
+            if (!safeRefund(charge)) {
+                return internal("bonded-revive-payment-compensation-failed");
+            }
+            return internal("bonded-revive-payment-receipt-invalid");
         }
         long now = clock.getAsLong();
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved =
@@ -244,7 +254,13 @@ public final class BondedCompanionCoreApiOperations {
                         action.expectedRevision(), now);
         if (saved.code() != BondedCompanionStoreResult.Code.APPLIED
                 || saved.value() == null) {
+            if (!safeRefund(charge)) {
+                return internal("bonded-revive-payment-compensation-failed");
+            }
             return storeFailure(saved);
+        }
+        if (saved.replayed() && !safeRefund(charge)) {
+            return internal("bonded-revive-payment-compensation-failed");
         }
         if (!saved.replayed()) {
             publish(saved.value(), BondedCompanionState.DEAD,
@@ -446,13 +462,34 @@ public final class BondedCompanionCoreApiOperations {
         return context == null ? null : context.inventory();
     }
 
-    private boolean safeConsume(
+    private BondedCompanionActionContext.ChargeReceipt safeConsume(
             BondedCompanionActionContext.Inventory inventory,
-            String itemId,
+            String operationId, String itemId,
             int quantity
     ) {
         try {
-            return inventory.consumeExact(itemId, quantity);
+            return inventory.consumeExact(operationId, itemId, quantity);
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
+    private boolean safeRefund(
+            BondedCompanionActionContext.ChargeReceipt receipt
+    ) {
+        try {
+            return receipt.refund();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean safeChargeMatches(
+            BondedCompanionActionContext.ChargeReceipt receipt,
+            String operationId
+    ) {
+        try {
+            return operationId.equals(receipt.operationId());
         } catch (RuntimeException | LinkageError failure) {
             return false;
         }

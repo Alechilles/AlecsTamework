@@ -60,7 +60,8 @@ final class BondedCompanionPanelActionRouter {
                 || feature == null || feature.bonded() == null) return;
         String world = player.getWorld() == null ? null : player.getWorld().getName();
         var context = contexts.create(
-                player, store, feature.bonded().roleId());
+                player, store, feature.bonded().roleId(),
+                action == BondedCompanionPanelActionService.Action.SUMMON);
         var outcome = actions.perform(
                 action, player.getUuid(), world, context, feature.bonded());
         if (!outcome.applied()) {

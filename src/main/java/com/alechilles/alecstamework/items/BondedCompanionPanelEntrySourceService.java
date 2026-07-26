@@ -59,7 +59,9 @@ final class BondedCompanionPanelEntrySourceService {
                 List.copyOf(entries), presentations.snapshot(
                         player.getUuid(), worldKey, snapshot,
                         profile -> contexts.create(player, store,
-                                profile.roleId())));
+                                profile.roleId(), profile.state()
+                                        == com.alechilles.alecstamework.companion
+                                        .bonded.BondedCompanionState.STORED)));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(

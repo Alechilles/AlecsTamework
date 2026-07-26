@@ -242,6 +242,18 @@ final class CommandSelectionPageService {
     ) {
         CommandPanelFeaturePresentation feature = snapshot == null
                 ? null : snapshot.presentation(presentationUuid);
+        routeFeatureAction(player, store, config, presentationUuid,
+                feature, action);
+    }
+
+    FeatureRoute routeFeatureAction(
+            Player player,
+            Store<EntityStore> store,
+            TwCommandItemConfig config,
+            UUID presentationUuid,
+            CommandPanelFeaturePresentation feature,
+            FeatureAction action
+    ) {
         if (config != null && config.usesBondedCompanionRoster()) {
             if (bondedActions != null) {
                 bondedActions.route(player, store, config, feature,
@@ -251,10 +263,10 @@ final class CommandSelectionPageService {
                     case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
                         });
             }
-            return;
+            return FeatureRoute.BONDED;
         }
         if (featureActions == null) {
-            return;
+            return FeatureRoute.IGNORED;
         }
         switch (action) {
             case SUMMON -> featureActions.summon(
@@ -267,6 +279,7 @@ final class CommandSelectionPageService {
                     player, config, presentationUuid
             );
         }
+        return FeatureRoute.GENERIC;
     }
 
     private boolean resolveRequireUnlinkConfirm() {
@@ -310,9 +323,11 @@ final class CommandSelectionPageService {
                    Consumer<String> selectCommand) {
     }
 
-    private enum FeatureAction {
+    enum FeatureAction {
         SUMMON,
         DISMISS,
         REVIVE
     }
+
+    enum FeatureRoute { BONDED, GENERIC, IGNORED }
 }

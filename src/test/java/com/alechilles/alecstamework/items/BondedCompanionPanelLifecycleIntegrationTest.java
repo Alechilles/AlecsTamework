@@ -21,6 +21,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -149,6 +153,91 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 active, clock.get(), null, context, "world-b")
                 .status().actionEnabled());
         runtime.close();
+    }
+
+    /** Protects against charging both callers when only one SQLite revive CAS wins. */
+    @Test
+    void concurrentReviveRaceRefundsTheRejectedDurableMutation() throws Exception {
+        Path database = temporaryDirectory.resolve("revive-race.db");
+        BondedCompanionRosterRegistry rosters = registry();
+        AtomicLong clock = new AtomicLong(30_000L);
+        TestWorld world = new TestWorld();
+        Harness firstRuntime = harness(database, rosters, clock, world);
+        firstRuntime.capture.store(captureIntent(
+                UUID.fromString("73000000-0000-0000-0000-000000000005"),
+                "Tempest", "Miniwyvern"));
+        BondedCompanionProfileView stored = firstRuntime.api.list(OWNER, ROSTER)
+                .join().value().getFirst();
+        BondedCompanionActionContext setupContext = new BondedCompanionActionContext(
+                new CompanionSpawnPlacement(
+                        "world-a", 4D, 64D, 7D, 0F, 1F, 0F),
+                new TestInventory(Map.of()));
+        assertTrue(firstRuntime.api.summon(action(
+                "summon-race", stored, setupContext)).join().successful());
+        var lease = firstRuntime.durability.activeLeases(8).getFirst();
+        assertEquals(BondedCompanionProjectionService.ReconcileStatus.DEAD,
+                firstRuntime.projections.confirmDeath(
+                        lease, world.readExact(lease), clock.incrementAndGet())
+                        .status());
+        BondedCompanionProfileView dead = firstRuntime.api.list(OWNER, ROSTER)
+                .join().value().getFirst();
+
+        Harness secondRuntime = harness(database, rosters, clock, world);
+        CyclicBarrier bothCharged = new CyclicBarrier(2);
+        TestInventory firstInventory = new BarrierInventory(
+                Map.of("Ingredient_Life_Essence", 2), bothCharged);
+        TestInventory secondInventory = new BarrierInventory(
+                Map.of("Ingredient_Life_Essence", 2), bothCharged);
+        BondedCompanionReviveRequest firstRequest = reviveRequest(
+                "race-first", dead, firstInventory, rosters);
+        BondedCompanionReviveRequest secondRequest = reviveRequest(
+                "race-second", dead, secondInventory, rosters);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<BondedCompanionResult<BondedCompanionProfileView>> first =
+                    executor.submit(() -> firstRuntime.api.revive(firstRequest)
+                            .join());
+            Future<BondedCompanionResult<BondedCompanionProfileView>> second =
+                    executor.submit(() -> secondRuntime.api.revive(secondRequest)
+                            .join());
+            BondedCompanionResult<BondedCompanionProfileView> firstResult =
+                    first.get();
+            BondedCompanionResult<BondedCompanionProfileView> secondResult =
+                    second.get();
+            List<BondedCompanionResult<BondedCompanionProfileView>> results =
+                    List.of(firstResult, secondResult);
+
+            assertEquals(1L, results.stream()
+                    .filter(BondedCompanionResult::successful).count());
+            assertEquals(2, firstInventory.availableQuantity(
+                            "Ingredient_Life_Essence")
+                    + secondInventory.availableQuantity(
+                            "Ingredient_Life_Essence"));
+            assertEquals(BondedCompanionState.STORED,
+                    firstRuntime.api.list(OWNER, ROSTER).join().value()
+                            .getFirst().state());
+
+            TestInventory rejectedInventory = firstResult.successful()
+                    ? secondInventory : firstInventory;
+            BondedCompanionReviveRequest rejectedRequest = firstResult.successful()
+                    ? secondRequest : firstRequest;
+            assertFalse(firstRuntime.api.revive(rejectedRequest)
+                    .join().successful());
+            assertEquals(2, rejectedInventory.availableQuantity(
+                    "Ingredient_Life_Essence"));
+        } finally {
+            firstRuntime.close();
+            secondRuntime.close();
+        }
+    }
+
+    private BondedCompanionReviveRequest reviveRequest(
+            String key, BondedCompanionProfileView profile,
+            TestInventory inventory, BondedCompanionRosterRegistry rosters) {
+        BondedCompanionActionContext context = new BondedCompanionActionContext(
+                null, inventory);
+        return new BondedCompanionReviveRequest(
+                action(key, profile, context), rosters.snapshot().revision());
     }
 
     private Harness harness(Path database, BondedCompanionRosterRegistry rosters,
@@ -290,7 +379,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         }
     }
 
-    private static final class TestInventory implements
+    private static class TestInventory implements
             BondedCompanionActionContext.Inventory {
         private final Map<String, Integer> quantities;
 
@@ -302,11 +391,48 @@ class BondedCompanionPanelLifecycleIntegrationTest {
             return quantities.getOrDefault(itemId, 0);
         }
 
-        @Override public boolean consumeExact(String itemId, int quantity) {
+        @Override public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
             int available = availableQuantity(itemId);
-            if (available < quantity) return false;
+            if (available < quantity) return null;
             quantities.put(itemId, available - quantity);
-            return true;
+            return new BondedCompanionActionContext.ChargeReceipt() {
+                private boolean refunded;
+
+                @Override public String operationId() { return operationId; }
+
+                @Override
+                public synchronized boolean refund() {
+                    if (refunded) return true;
+                    quantities.merge(itemId, quantity, Math::addExact);
+                    refunded = true;
+                    return true;
+                }
+            };
+        }
+    }
+
+    private static final class BarrierInventory extends TestInventory {
+        private final CyclicBarrier bothCharged;
+
+        private BarrierInventory(Map<String, Integer> quantities,
+                                 CyclicBarrier bothCharged) {
+            super(quantities);
+            this.bothCharged = bothCharged;
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            BondedCompanionActionContext.ChargeReceipt receipt = super.consumeExact(
+                    operationId, itemId, quantity);
+            if (receipt == null) return null;
+            try {
+                bothCharged.await();
+                return receipt;
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
         }
     }
 }

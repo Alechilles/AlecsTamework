@@ -24,7 +24,8 @@ final class HytaleBondedCompanionActionContextFactory {
 
     @Nullable
     BondedCompanionActionContext create(
-            Player player, Store<EntityStore> store, String roleId) {
+            Player player, Store<EntityStore> store, String roleId,
+            boolean placementRequired) {
         Ref<EntityStore> playerRef = player == null ? null : player.getReference();
         if (playerRef == null || !playerRef.isValid() || store == null
                 || playerRef.getStore() != store) return null;
@@ -34,8 +35,10 @@ final class HytaleBondedCompanionActionContextFactory {
                 || !Double.isFinite(settings.getRecallSafeSpawnDistance())
                 || settings.getRecallSafeSpawnDistance() <= 0D
                 ? DEFAULT_DISTANCE : settings.getRecallSafeSpawnDistance();
-        var placement = placements.computeRestorationPlacement(
-                playerRef, store, distance, roleId, null);
+        var placement = placementRequired
+                ? placements.computeRestorationPlacement(
+                        playerRef, store, distance, roleId, null)
+                : null;
         return new BondedCompanionActionContext(
                 placement, new PlayerInventory(playerRef, store));
     }
@@ -59,27 +62,33 @@ final class HytaleBondedCompanionActionContextFactory {
         }
 
         @Override
-        public boolean consumeExact(String itemId, int quantity) {
-            if (itemId == null || itemId.isBlank() || quantity <= 0) return false;
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            if (operationId == null || operationId.isBlank()
+                    || itemId == null || itemId.isBlank() || quantity <= 0) {
+                return null;
+            }
             CombinedItemContainer inventory = this.inventory();
-            if (inventory == null) return false;
-            Map<Short, Integer> removals = removalPlan(
+            if (inventory == null) return null;
+            Map<Short, SlotCharge> charges = chargePlan(
                     inventory, itemId, quantity);
-            if (removals == null) return false;
+            if (charges == null) return null;
             AtomicBoolean mismatch = new AtomicBoolean();
             ListTransaction<ItemStackSlotTransaction> transaction =
                     inventory.replaceAll((slot, current) -> {
-                        Integer remove = removals.get(slot);
-                        if (remove == null) return current;
-                        if (current == null || !itemId.equals(current.getItemId())
-                                || current.getQuantity() < remove) {
+                        SlotCharge charge = charges.get(slot);
+                        if (charge == null) return current;
+                        if (!charge.original().equals(current)) {
                             mismatch.set(true);
                             return current;
                         }
-                        return current.withQuantity(current.getQuantity() - remove);
+                        return charge.replacement();
                     });
-            return transaction != null && transaction.succeeded()
-                    && !mismatch.get();
+            if (transaction == null || !transaction.succeeded()
+                    || mismatch.get() || !postStateMatches(inventory, charges)) {
+                return null;
+            }
+            return new ExactChargeReceipt(operationId, this, charges);
         }
 
         private CombinedItemContainer inventory() {
@@ -94,19 +103,82 @@ final class HytaleBondedCompanionActionContextFactory {
             }
         }
 
-        private Map<Short, Integer> removalPlan(
+        private Map<Short, SlotCharge> chargePlan(
                 CombinedItemContainer inventory, String itemId, int quantity) {
-            HashMap<Short, Integer> removals = new HashMap<>();
+            HashMap<Short, SlotCharge> charges = new HashMap<>();
             int remaining = quantity;
             for (short slot = 0;
                     slot < inventory.getCapacity() && remaining > 0; slot++) {
                 ItemStack stack = inventory.getItemStack(slot);
                 if (stack == null || !itemId.equals(stack.getItemId())) continue;
                 int remove = Math.min(remaining, stack.getQuantity());
-                if (remove > 0) removals.put(slot, remove);
+                if (remove > 0) {
+                    charges.put(slot, new SlotCharge(
+                            stack, stack.withQuantity(
+                                    stack.getQuantity() - remove)));
+                }
                 remaining -= remove;
             }
-            return remaining == 0 ? Map.copyOf(removals) : null;
+            return remaining == 0 ? Map.copyOf(charges) : null;
+        }
+
+        private boolean postStateMatches(
+                CombinedItemContainer inventory,
+                Map<Short, SlotCharge> charges) {
+            for (Map.Entry<Short, SlotCharge> entry : charges.entrySet()) {
+                if (!java.util.Objects.equals(entry.getValue().replacement(),
+                        inventory.getItemStack(entry.getKey()))) return false;
+            }
+            return true;
+        }
+
+        private boolean refund(Map<Short, SlotCharge> charges) {
+            CombinedItemContainer inventory = inventory();
+            if (inventory == null) return false;
+            AtomicBoolean mismatch = new AtomicBoolean();
+            ListTransaction<ItemStackSlotTransaction> transaction =
+                    inventory.replaceAll((slot, current) -> {
+                        SlotCharge charge = charges.get(slot);
+                        if (charge == null) return current;
+                        if (!java.util.Objects.equals(
+                                charge.replacement(), current)) {
+                            mismatch.set(true);
+                            return current;
+                        }
+                        return charge.original();
+                    });
+            return transaction != null && transaction.succeeded()
+                    && !mismatch.get();
+        }
+    }
+
+    private record SlotCharge(ItemStack original, ItemStack replacement) {}
+
+    private static final class ExactChargeReceipt implements
+            BondedCompanionActionContext.ChargeReceipt {
+        private final PlayerInventory inventory;
+        private final Map<Short, SlotCharge> charges;
+        private final String operationId;
+        private boolean refunded;
+
+        private ExactChargeReceipt(String operationId, PlayerInventory inventory,
+                                   Map<Short, SlotCharge> charges) {
+            this.operationId = operationId;
+            this.inventory = inventory;
+            this.charges = charges;
+        }
+
+        @Override
+        public String operationId() {
+            return operationId;
+        }
+
+        @Override
+        public synchronized boolean refund() {
+            if (refunded) return true;
+            if (!inventory.refund(charges)) return false;
+            refunded = true;
+            return true;
         }
     }
 }
