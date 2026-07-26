@@ -75,8 +75,11 @@ final class HytaleTimedSummonStoreGateway {
             if (chunk == null) {
                 return retryable(null);
             }
-            if (!exactSource(authority, components)) {
-                return conflict(null);
+            String sourceMismatch = sourceMismatch(authority, components);
+            if (sourceMismatch != null) {
+                return conflict(new IllegalStateException(
+                        "timed_summon_store_source_" + sourceMismatch
+                ));
             }
             TameworkPersistenceRetirementComponent receipt =
                     components.receipt();
@@ -84,7 +87,9 @@ final class HytaleTimedSummonStoreGateway {
                     ? ReceiptProbe.absent()
                     : receipt.matches(authority.profileId(), operation)
                     ? ReceiptProbe.exact(chunk.getIndex())
-                    : ReceiptProbe.conflict(null);
+                    : ReceiptProbe.conflict(new IllegalStateException(
+                            "timed_summon_store_receipt-conflict"
+                    ));
             return StoreProbe.of(
                     receiptProbe,
                     SourceProbe.exact(chunk.getIndex())
@@ -215,19 +220,13 @@ final class HytaleTimedSummonStoreGateway {
         );
     }
 
-    private boolean exactSource(
+    @Nullable
+    private String sourceMismatch(
             TimedSummonWorldAuthority.Store authority,
             Components components
     ) {
-        if (components.identity() == null
-                || components.npc() == null
-                || !authority.liveAlias().value().equals(
-                components.identity().getUuid()
-        )
-                || !authority.liveAlias().value().equals(
-                components.npc().getUuid()
-        )) {
-            return false;
+        if (components.identity() == null || components.npc() == null) {
+            return "missing-components";
         }
         SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
                 snapshotCodecs.decode(
@@ -237,13 +236,16 @@ final class HytaleTimedSummonStoreGateway {
         if (!(decoded instanceof SnapshotDecodeResult.Decoded<?> exact)
                 || !(exact.value()
                 instanceof CoopResidentStateSnapshot snapshot)) {
-            return false;
+            return "snapshot-decode";
         }
-        return authority.liveAlias().value().equals(snapshot.npcUuid())
-                && snapshot.roleId() != null
-                && sameRole(snapshot.roleId(),
-                        components.npc().getRoleName()
-                );
+        return TimedSummonStoreSourceEvidence.mismatch(
+                authority.liveAlias().value(),
+                components.identity().getUuid(),
+                components.npc().getUuid(),
+                snapshot.npcUuid(),
+                snapshot.roleId(),
+                components.npc().getRoleName()
+        );
     }
 
     /** Accepts only the tester-era case damage, never a different role ID. */

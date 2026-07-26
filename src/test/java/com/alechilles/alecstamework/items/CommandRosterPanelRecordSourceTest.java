@@ -136,6 +136,40 @@ class CommandRosterPanelRecordSourceTest {
     }
 
     @Test
+    void snapshotUsesOneCanonicalMemberSetForRecordsAndFeatureRows() {
+        ProfileId profileId = profile(7);
+        CommandRosterPanelRecordSource source =
+                new CommandRosterPanelRecordSource(() -> Map.of(
+                        profileId,
+                        action(
+                                profileId,
+                                OWNER_UUID,
+                                FAMILY_ID,
+                                new NpcAlias(UUID.fromString(
+                                        "60000000-0000-0000-0000-000000000007"
+                                )),
+                                true,
+                                null,
+                                LifecycleState.ACTIVE
+                        )
+                ));
+
+        CommandRosterPanelRecordSource.PanelSnapshot snapshot =
+                source.snapshotFor(OWNER_UUID, FAMILY_ID);
+
+        assertEquals(1, snapshot.members().size());
+        assertEquals(1, snapshot.records().size());
+        assertEquals(
+                snapshot.members().getFirst().presentationUuid(),
+                snapshot.records().getFirst().npcUuid
+        );
+        assertEquals(
+                snapshot.members().getFirst().profileId(),
+                snapshot.records().getFirst().profileId
+        );
+    }
+
+    @Test
     void missingIdentityOrProjectionFailureFailsClosed() {
         CommandRosterPanelRecordSource source =
                 new CommandRosterPanelRecordSource(() -> {

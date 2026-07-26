@@ -503,6 +503,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!nestedExplicitKeys.contains("MaxHealthPercent")) capture.maxHealthPercent = parent.capture.maxHealthPercent;
         if (!nestedExplicitKeys.contains("RequiredEffectId")) capture.requiredEffectId = parent.capture.requiredEffectId;
         if (!nestedExplicitKeys.contains("ChannelAuraEffectId")) capture.channelAuraEffectId = parent.capture.channelAuraEffectId;
+        if (!nestedExplicitKeys.contains("ChannelSoundEvent")) capture.channelSoundEvent = parent.capture.channelSoundEvent;
         if (!nestedExplicitKeys.contains("TamedRoleOverrides")) capture.tamedRoleOverrides = parent.capture.tamedRoleOverrides;
         if (!nestedExplicitKeys.contains("OwnerRestricted")) capture.ownerRestricted = parent.capture.ownerRestricted;
         if (!nestedExplicitKeys.contains("RequireOwner")) capture.requireOwner = parent.capture.requireOwner;
@@ -599,6 +600,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .captureSoundEvent(captureSettings.soundEvent)
             .captureRequiredEffectId(captureSettings.requiredEffectId)
             .captureChannelAuraEffectId(captureSettings.channelAuraEffectId)
+            .captureChannelSoundEvent(captureSettings.channelSoundEvent)
             .captureMaxHealthPercent(captureSettings.maxHealthPercent)
             .captureTamedRoleOverrides(captureSettings.tamedRoleOverrides)
             .spawnSoundEvent(spawnSettings.soundEvent)
@@ -747,6 +749,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         Double maxHealthPercent;
         String requiredEffectId;
         String channelAuraEffectId;
+        String channelSoundEvent;
         Map<String, String> tamedRoleOverrides = Collections.emptyMap();
         boolean ownerRestricted = true;
         Boolean requireOwner;

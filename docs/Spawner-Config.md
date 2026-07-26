@@ -40,6 +40,7 @@ Fields:
 - `MaxHealthPercent` (optional, `0-100`). Requires target health to be at or below this percentage at both channel start and completion.
 - `RequiredEffectId` (optional). Requires this entity effect to be active at both channel start and completion (for example, `Tw_Status_Tranquilized`).
 - `ChannelAuraEffectId` (optional). Entity effect applied to the target by the `Begin` channel phase and removed by `Cancel` or `Complete`.
+- `ChannelSoundEvent` (optional). A one-shot sound event played at the target when the `Begin` channel phase succeeds.
 - `TamedRoleOverrides` (optional map). Maps each capturable wild role to the role stored in the filled item. A mapped role is required when `TamesTarget` is enabled.
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.

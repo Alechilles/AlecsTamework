@@ -32,6 +32,14 @@ public final class SpawnerEffectService {
         playEffects(world, targetRef, config.getCaptureParticleSystem(), config.getCaptureSoundEvent());
     }
 
+    /** Emits the configured immediate sound feedback for a capture channel beginning. */
+    public void playCaptureChannelSound(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
+        if (config == null) {
+            return;
+        }
+        playEffects(world, targetRef, null, config.getCaptureChannelSoundEvent());
+    }
+
     /** Emits one immutable effect plan after its canonical workflow publishes. */
     public void playPublishedEffect(
             World world,

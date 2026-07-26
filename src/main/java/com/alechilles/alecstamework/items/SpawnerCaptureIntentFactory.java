@@ -133,6 +133,12 @@ final class SpawnerCaptureIntentFactory {
         return null;
     }
 
+    /** Returns the bounded tame/link evidence diagnostic for the latest capture attempt. */
+    @Nullable
+    String lastEvidenceFailureReason() {
+        return tameAndLinkIntents.lastEvidenceFailureReason();
+    }
+
     private SpawnerCaptureIntent tameAndLinkIntent(
             Player player,
             Ref<EntityStore> targetRef,

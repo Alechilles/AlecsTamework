@@ -19,6 +19,16 @@ public interface SpawnerTameAndLinkEvidenceSource {
             @Nonnull SpawnerTameAndLinkIntentFactory.Input input
     );
 
+    /**
+     * Returns the bounded reason for the current-thread failed freeze, when the
+     * implementation can provide one. This is diagnostic-only and never
+     * participates in capture authorization.
+     */
+    @Nullable
+    default String lastFailureReason() {
+        return null;
+    }
+
     /** Fail-closed source used until production composition supplies every authority. */
     @Nonnull
     static SpawnerTameAndLinkEvidenceSource unavailable() {

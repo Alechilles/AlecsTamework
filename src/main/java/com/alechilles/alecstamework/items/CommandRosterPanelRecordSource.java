@@ -54,16 +54,28 @@ final class CommandRosterPanelRecordSource {
             @Nullable UUID ownerUuid,
             @Nullable String commandFamilyId
     ) {
+        return snapshotFor(ownerUuid, commandFamilyId).records();
+    }
+
+    /**
+     * Resolves the canonical roster once so every UI concern can use the same
+     * member identities during a single panel refresh.
+     */
+    @Nonnull
+    PanelSnapshot snapshotFor(
+            @Nullable UUID ownerUuid,
+            @Nullable String commandFamilyId
+    ) {
         List<PanelMember> members = membersFor(ownerUuid, commandFamilyId);
         if (members.isEmpty()) {
-            return List.of();
+            return PanelSnapshot.empty();
         }
         ArrayList<LinkedNpcRecord> records =
                 new ArrayList<>(members.size());
         for (PanelMember member : members) {
             records.add(toRecord(member.view()));
         }
-        return List.copyOf(records);
+        return new PanelSnapshot(members, List.copyOf(records));
     }
 
     /**
@@ -199,6 +211,21 @@ final class CommandRosterPanelRecordSource {
             roleId = Objects.requireNonNull(roleId, "Role ID is required");
             Objects.requireNonNull(lifecycleState, "Lifecycle state is required");
             Objects.requireNonNull(view, "Roster action view is required");
+        }
+    }
+
+    /** Immutable roster read shared by card-data and feature presentation. */
+    record PanelSnapshot(
+            @Nonnull List<PanelMember> members,
+            @Nonnull List<LinkedNpcRecord> records
+    ) {
+        PanelSnapshot {
+            members = List.copyOf(members);
+            records = List.copyOf(records);
+        }
+
+        static PanelSnapshot empty() {
+            return new PanelSnapshot(List.of(), List.of());
         }
     }
 }

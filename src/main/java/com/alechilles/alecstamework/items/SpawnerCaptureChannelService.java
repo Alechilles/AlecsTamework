@@ -14,7 +14,10 @@ import javax.annotation.Nullable;
 
 /** Owns the intentionally process-local begin/cancel/complete channel handoff. */
 final class SpawnerCaptureChannelService {
+    private static final long COMPLETION_RESTART_GUARD_MS = 750L;
     private final ConcurrentHashMap<UUID, CaptureAttemptHandle> attempts =
+            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> completionRestartGuards =
             new ConcurrentHashMap<>();
 
     boolean start(
@@ -41,6 +44,7 @@ final class SpawnerCaptureChannelService {
         UUID targetUuid = componentUuid(store, targetRef);
         if (world == null || actorUuid == null || targetUuid == null
                 || config == null || attempt == null
+                || completionRestartGuardActive(actorUuid)
                 || !CaptureChannelVfxSystem.start(
                         actorUuid,
                         targetUuid,
@@ -62,6 +66,7 @@ final class SpawnerCaptureChannelService {
                 config.getCaptureChannelAuraEffectId(),
                 store
         );
+        new SpawnerEffectService().playCaptureChannelSound(world, targetRef, config);
         attempts.put(actorUuid, attempt);
         return true;
     }
@@ -98,7 +103,29 @@ final class SpawnerCaptureChannelService {
     @Nullable
     CaptureAttemptHandle take(Player player) {
         UUID actorUuid = actorUuid(player);
-        return actorUuid == null ? null : attempts.remove(actorUuid);
+        if (actorUuid == null) {
+            return null;
+        }
+        CaptureAttemptHandle attempt = attempts.remove(actorUuid);
+        if (attempt != null) {
+            completionRestartGuards.put(
+                    actorUuid,
+                    System.currentTimeMillis() + COMPLETION_RESTART_GUARD_MS
+            );
+        }
+        return attempt;
+    }
+
+    private boolean completionRestartGuardActive(UUID actorUuid) {
+        Long untilMs = completionRestartGuards.get(actorUuid);
+        if (untilMs == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() < untilMs) {
+            return true;
+        }
+        completionRestartGuards.remove(actorUuid, untilMs);
+        return false;
     }
 
     @Nullable

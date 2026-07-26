@@ -95,21 +95,24 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
+        // Owner-family roster membership is canonical. Its feature actions
+        // must never fall back to legacy per-item link metadata.
+        boolean legacyLinked = isLinked && !config.ownerCommandFamilyRoster();
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();
-        boolean showReviveAction = !paidRevivalManaged && isLinked
+        boolean showReviveAction = !paidRevivalManaged && legacyLinked
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showLocate = isLinked && !entry.dead() && !entry.lost() && !pendingUnlink;
-        boolean showRecall = isLinked
+        boolean showLocate = legacyLinked && !entry.dead() && !entry.lost() && !pendingUnlink;
+        boolean showRecall = legacyLinked
                 && config.recallActionEnabled()
                 && !entry.dead()
                 && !entry.captured()
                 && !entry.inCoop()
                 && !entry.lost()
                 && !pendingUnlink;
-        boolean showSetHome = isLinked
+        boolean showSetHome = legacyLinked
                 && entry.loaded()
                 && !entry.dead()
                 && !entry.captured()
@@ -117,7 +120,7 @@ final class LinkedNpcPanelCardBinder {
                 && !entry.lost()
                 && !pendingUnlink;
         boolean showReturnHome =
-                isLinked
+                legacyLinked
                         && !entry.dead()
                         && !entry.captured()
                         && !entry.inCoop()
@@ -125,23 +128,24 @@ final class LinkedNpcPanelCardBinder {
                         && entry.hasHome()
                         && !pendingUnlink;
         boolean canOpenReleaseActions =
-                !isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
-        boolean showLink = !isLinked && !pendingUnlink;
-        boolean showUnlink = isLinked || canOpenReleaseActions;
+                !legacyLinked && !config.ownerCommandFamilyRoster()
+                        && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
+        boolean showLink = !legacyLinked && !config.ownerCommandFamilyRoster() && !pendingUnlink;
+        boolean showUnlink = legacyLinked || canOpenReleaseActions;
         boolean showRelease = pendingUnlink && canOpenReleaseActions;
         boolean showCull = pendingUnlink && canOpenReleaseActions;
-        boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
-        boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
+        boolean showActiveToggleActive = legacyLinked && entry.active() && !pendingUnlink;
+        boolean showActiveToggleInactive = legacyLinked && !entry.active() && !pendingUnlink;
         boolean showBreedingToggleEnabled =
-                isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
+                legacyLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
-                isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
+                legacyLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
         boolean showRespawn = paidRevivalManaged
                 ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
                 : showReviveAction;
-        boolean showInactiveBadge = isLinked && !entry.active()
+        boolean showInactiveBadge = legacyLinked && !entry.active()
                 && !showRespawn && !pendingUnlink;
-        boolean showRecallCountdown = isLinked
+        boolean showRecallCountdown = legacyLinked
                 && entry.recallPending()
                 && !entry.loaded()
                 && !entry.dead()
@@ -166,7 +170,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
         commandBuilder.set(
                 statusConfirmSelector + ".Text",
-                isLinked
+                legacyLinked
                         ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.confirmRemove")
                         : LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
         );
@@ -385,6 +389,7 @@ final class LinkedNpcPanelCardBinder {
                              String setHomeCommandPrefix,
                              String returnHomeCommandPrefix,
                              String openTalentsCommandPrefix,
-                             boolean recallActionEnabled) {
+                             boolean recallActionEnabled,
+                             boolean ownerCommandFamilyRoster) {
     }
 }

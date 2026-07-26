@@ -53,6 +53,7 @@ public final class TameworkSpawnerTameAndLinkEvidenceSource
     private final ConfigSource configs;
     private final ProjectionSource projections;
     private final LiveTargetSource live;
+    private final ThreadLocal<String> lastFailureReason = new ThreadLocal<>();
 
     public TameworkSpawnerTameAndLinkEvidenceSource(
             @Nonnull PublicPersistenceQueries queries,
@@ -88,27 +89,39 @@ public final class TameworkSpawnerTameAndLinkEvidenceSource
     public SpawnerTameAndLinkIntentEvidence freeze(
             @Nonnull SpawnerTameAndLinkIntentFactory.Input input
     ) {
+        lastFailureReason.remove();
         if (input == null) {
+            lastFailureReason.set("invalid-input");
             return null;
         }
         try {
             ConfigSnapshot config = configs.freeze(input);
             if (config == null) {
+                lastFailureReason.set("config-evidence-unavailable");
                 return null;
             }
             LiveTargetSnapshot target = live.freeze(input, config);
             if (target == null) {
+                lastFailureReason.set("live-target-evidence-unavailable");
                 return null;
             }
             ProjectionSnapshot projection =
                     projections.freeze(input, config);
             if (projection == null) {
+                lastFailureReason.set("projection-evidence-unavailable");
                 return null;
             }
             return evidence(input, config, target, projection);
         } catch (RuntimeException | LinkageError failure) {
+            lastFailureReason.set("evidence-freeze-exception");
             return null;
         }
+    }
+
+    @Override
+    @Nullable
+    public String lastFailureReason() {
+        return lastFailureReason.get();
     }
 
     private SpawnerTameAndLinkIntentEvidence evidence(

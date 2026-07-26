@@ -192,6 +192,19 @@ public final class CommandItemFeatureHandler {
                                 persistence.queries()
                         )
                         : null;
+        CommandPanelFeaturePresentationSource featurePresentations =
+                rosterPanelRecordSource != null
+                        && timedSummoning != null
+                        && paidRevival != null
+                        && populationGroups != null
+                        ? new CommandPanelFeaturePresentationSource(
+                                rosterPanelRecordSource,
+                                timedSummoning,
+                                paidRevival,
+                                populationGroups,
+                                System::currentTimeMillis
+                        )
+                        : null;
         CommandNpcIdentityService npcIdentityService = persistenceView != null
                 ? new CommandNpcIdentityService(
                         persistenceView, npcExistenceService)
@@ -216,7 +229,8 @@ public final class CommandItemFeatureHandler {
                 panelPreferenceService,
                 linkPolicyService,
                 npcNameResolver,
-                rosterPanelRecordSource
+                rosterPanelRecordSource,
+                featurePresentations
         );
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
@@ -330,19 +344,6 @@ public final class CommandItemFeatureHandler {
                         linkMutationService,
                         feedbackService
                 );
-        CommandPanelFeaturePresentationSource featurePresentations =
-                rosterPanelRecordSource != null
-                        && timedSummoning != null
-                        && paidRevival != null
-                        && populationGroups != null
-                        ? new CommandPanelFeaturePresentationSource(
-                                rosterPanelRecordSource,
-                                timedSummoning,
-                                paidRevival,
-                                populationGroups,
-                                System::currentTimeMillis
-                        )
-                        : null;
         CommandPanelFeatureActionService featureActions =
                 featurePresentations == null
                         ? null

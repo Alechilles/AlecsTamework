@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
  */
 public final class SpawnerTameAndLinkIntentFactory {
     private final SpawnerTameAndLinkEvidenceSource evidence;
+    private final ThreadLocal<String> lastFailureReason = new ThreadLocal<>();
 
     public SpawnerTameAndLinkIntentFactory(
             @Nonnull SpawnerTameAndLinkEvidenceSource evidence
@@ -32,20 +33,33 @@ public final class SpawnerTameAndLinkIntentFactory {
     /** Creates an exact intent, or null when the target/evidence is not wild and authoritative. */
     @Nullable
     public SpawnerCaptureIntent create(@Nonnull Input input) {
+        lastFailureReason.remove();
         if (input == null
                 || !input.resolution().successful()
                 || input.resolution().successDisposition()
                 != CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
                 || input.liveOwnerId() != null) {
+            lastFailureReason.set("invalid-tame-link-input");
             return null;
         }
         SpawnerTameAndLinkIntentEvidence frozen;
         try {
             frozen = evidence.freeze(input);
         } catch (RuntimeException | LinkageError failure) {
+            lastFailureReason.set("evidence-freeze-exception");
+            return null;
+        }
+        if (frozen == null) {
+            String reason = evidence.lastFailureReason();
+            lastFailureReason.set(
+                    reason == null || reason.isBlank()
+                            ? "evidence-unavailable"
+                            : reason
+            );
             return null;
         }
         if (!consistent(input, frozen)) {
+            lastFailureReason.set("evidence-inconsistent");
             return null;
         }
         return new SpawnerCaptureIntent(
@@ -67,6 +81,12 @@ public final class SpawnerTameAndLinkIntentFactory {
                 input.publishedEffect(),
                 frozen
         );
+    }
+
+    /** Returns the bounded failure diagnostic from the immediately preceding creation attempt. */
+    @Nullable
+    public String lastEvidenceFailureReason() {
+        return lastFailureReason.get();
     }
 
     private boolean consistent(

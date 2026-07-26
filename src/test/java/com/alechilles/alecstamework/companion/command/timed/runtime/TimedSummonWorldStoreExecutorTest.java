@@ -179,6 +179,52 @@ class TimedSummonWorldStoreExecutorTest {
     }
 
     @Test
+    void sourceProofConflictPreservesItsExactDiagnosticCode()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+        IllegalStateException mismatch = new IllegalStateException(
+                "timed_summon_store_source_npc-uuid"
+        );
+        attempts.storeProbe = StoreProbe.of(
+                ReceiptProbe.conflict(mismatch),
+                SourceProbe.conflict(mismatch)
+        );
+
+        LiveOperationResult result = executeLive(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertEquals(
+                "timed_summon_store_evidence_conflict_source_npc-uuid",
+                result.code()
+        );
+    }
+
+    @Test
+    void receiptProofConflictPreservesItsExactDiagnosticCode()
+            throws Exception {
+        TimedSummonTransitionRequest request = fixture.storeRequest();
+        FakeTimedSummonWorldAttempts attempts =
+                new FakeTimedSummonWorldAttempts();
+        IllegalStateException mismatch = new IllegalStateException(
+                "timed_summon_store_receipt-conflict"
+        );
+        attempts.storeProbe = StoreProbe.of(
+                ReceiptProbe.conflict(mismatch),
+                SourceProbe.conflict(mismatch)
+        );
+
+        LiveOperationResult result = executeLive(request, attempts);
+
+        assertEquals(LiveOperationResult.Status.UNKNOWN, result.status());
+        assertEquals(
+                "timed_summon_store_evidence_conflict_receipt-conflict",
+                result.code()
+        );
+    }
+
+    @Test
     void durableCleanupRetiresMarkedSourceThenForceSaves() throws Exception {
         TimedSummonTransitionRequest request = fixture.storeRequest();
         FakeTimedSummonWorldAttempts attempts =

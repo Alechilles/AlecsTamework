@@ -136,6 +136,32 @@ class PlannedNpcProjectionSpawnerTest {
     }
 
     @Test
+    void commandRosterMarkerIsAllowedForTimedSummonProjectionSpawn() {
+        RecordingGateway gateway = new RecordingGateway();
+        PlannedNpcProjectionSpawner spawner = new PlannedNpcProjectionSpawner(
+                new PlannedNpcProjectionSpawnPlanner(),
+                gateway
+        );
+        TameworkProjectionIdentityComponent marker =
+                new TameworkProjectionIdentityComponent(
+                        "profile-a",
+                        "operation-a",
+                        TameworkProjectionIdentityComponent
+                                .KIND_COMMAND_ROSTER,
+                        "receipt-a",
+                        null,
+                        0L
+                );
+
+        PlannedNpcProjectionSpawner.SpawnResult result = spawner.spawn(
+                request("tamed_test", uuid(7), marker)
+        );
+
+        assertEquals(PlannedNpcProjectionSpawner.Status.SPAWNED, result.status());
+        assertEquals(1, gateway.spawnCalls);
+    }
+
+    @Test
     void spawnFailureReturnsNoHandlesOrPostAddWork() {
         RecordingGateway gateway = new RecordingGateway();
         gateway.resultStatus = PlannedNpcProjectionSpawner.Status.SPAWN_FAILED;

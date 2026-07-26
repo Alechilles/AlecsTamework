@@ -26,6 +26,7 @@ class TwSpawnerWildCaptureConfigTest {
         setField(capture, "maxHealthPercent", 20.0d);
         setField(capture, "requiredEffectId", "Tw_Status_Tranquilized");
         setField(capture, "channelAuraEffectId", "Capture_Aura");
+        setField(capture, "channelSoundEvent", "SFX_Tamework_Capture_Channel_Dark_Magic");
         setField(capture, "tamedRoleOverrides", Map.of("Wild_Dragon", "Tamed_Dragon"));
         setField(config, "capture", capture);
 
@@ -36,6 +37,7 @@ class TwSpawnerWildCaptureConfigTest {
         assertEquals(20.0d, runtime.getCaptureMaxHealthPercent());
         assertEquals("Tw_Status_Tranquilized", runtime.getCaptureRequiredEffectId());
         assertEquals("Capture_Aura", runtime.getCaptureChannelAuraEffectId());
+        assertEquals("SFX_Tamework_Capture_Channel_Dark_Magic", runtime.getCaptureChannelSoundEvent());
         assertEquals("Tamed_Dragon", runtime.resolveCaptureTamedRole("Wild_Dragon"));
     }
 
@@ -49,6 +51,7 @@ class TwSpawnerWildCaptureConfigTest {
         setField(parentCapture, "maxHealthPercent", 20.0d);
         setField(parentCapture, "requiredEffectId", "Required");
         setField(parentCapture, "channelAuraEffectId", "Aura");
+        setField(parentCapture, "channelSoundEvent", "Parent_Channel_Sound");
         setField(parentCapture, "tamedRoleOverrides", Map.of("Wild", "Tamed"));
         setField(childCapture, "maxHealthPercent", 15.0d);
         setField(parent, "capture", parentCapture);
@@ -63,6 +66,7 @@ class TwSpawnerWildCaptureConfigTest {
         assertEquals(15.0d, runtime.getCaptureMaxHealthPercent());
         assertEquals("Required", runtime.getCaptureRequiredEffectId());
         assertEquals("Aura", runtime.getCaptureChannelAuraEffectId());
+        assertEquals("Parent_Channel_Sound", runtime.getCaptureChannelSoundEvent());
         assertEquals(Map.of("Wild", "Tamed"), runtime.getCaptureTamedRoleOverrides());
     }
 

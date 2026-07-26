@@ -250,7 +250,7 @@ class SqliteTimedSummonTransitionOperationsTest
                         store,
                         (request, operation) ->
                                 LiveOperationResult.unknown(
-                                        "timed_summon_store_evidence_conflict",
+                "timed_summon_store_evidence_conflict_source_npc-uuid",
                                         null
                                 ).completed()
                 ).completion().toCompletableFuture()

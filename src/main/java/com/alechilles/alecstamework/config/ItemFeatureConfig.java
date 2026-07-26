@@ -71,6 +71,7 @@ public final class ItemFeatureConfig {
     private final String captureSoundEvent;
     private final String captureRequiredEffectId;
     private final String captureChannelAuraEffectId;
+    private final String captureChannelSoundEvent;
     private final Double captureMaxHealthPercent;
     private final Map<String, String> captureTamedRoleOverrides;
     private final String spawnSoundEvent;
@@ -106,6 +107,7 @@ public final class ItemFeatureConfig {
         this.captureSoundEvent = builder.captureSoundEvent;
         this.captureRequiredEffectId = builder.captureRequiredEffectId;
         this.captureChannelAuraEffectId = builder.captureChannelAuraEffectId;
+        this.captureChannelSoundEvent = builder.captureChannelSoundEvent;
         this.captureMaxHealthPercent = builder.captureMaxHealthPercent;
         this.captureTamedRoleOverrides = builder.captureTamedRoleOverrides;
         this.spawnSoundEvent = builder.spawnSoundEvent;
@@ -205,6 +207,10 @@ public final class ItemFeatureConfig {
 
     public String getCaptureChannelAuraEffectId() {
         return captureChannelAuraEffectId;
+    }
+
+    public String getCaptureChannelSoundEvent() {
+        return captureChannelSoundEvent;
     }
 
     public Double getCaptureMaxHealthPercent() {
@@ -444,6 +450,7 @@ public final class ItemFeatureConfig {
         private String captureSoundEvent;
         private String captureRequiredEffectId;
         private String captureChannelAuraEffectId;
+        private String captureChannelSoundEvent;
         private Double captureMaxHealthPercent;
         private Map<String, String> captureTamedRoleOverrides = Collections.emptyMap();
         private String spawnSoundEvent;
@@ -567,6 +574,11 @@ public final class ItemFeatureConfig {
 
         public Builder captureChannelAuraEffectId(String captureChannelAuraEffectId) {
             this.captureChannelAuraEffectId = captureChannelAuraEffectId;
+            return this;
+        }
+
+        public Builder captureChannelSoundEvent(String captureChannelSoundEvent) {
+            this.captureChannelSoundEvent = captureChannelSoundEvent;
             return this;
         }
 
@@ -720,6 +732,7 @@ public final class ItemFeatureConfig {
                 && Objects.equals(captureSoundEvent, other.captureSoundEvent)
                 && Objects.equals(captureRequiredEffectId, other.captureRequiredEffectId)
                 && Objects.equals(captureChannelAuraEffectId, other.captureChannelAuraEffectId)
+                && Objects.equals(captureChannelSoundEvent, other.captureChannelSoundEvent)
                 && Objects.equals(captureMaxHealthPercent, other.captureMaxHealthPercent)
                 && Objects.equals(captureTamedRoleOverrides, other.captureTamedRoleOverrides)
                 && Objects.equals(spawnSoundEvent, other.spawnSoundEvent)
@@ -758,6 +771,7 @@ public final class ItemFeatureConfig {
                 captureSoundEvent,
                 captureRequiredEffectId,
                 captureChannelAuraEffectId,
+                captureChannelSoundEvent,
                 captureMaxHealthPercent,
                 captureTamedRoleOverrides,
                 spawnSoundEvent,

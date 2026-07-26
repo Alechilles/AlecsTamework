@@ -310,6 +310,7 @@ public final class SpawnerFeatureHandler {
             Player player,
             Ref<EntityStore> targetRef,
             ItemStack source,
+            int sourceHotbarSlot,
             String beamParticleSystem,
             double beamNativeLength,
             double beamNativeDurationSeconds,
@@ -318,16 +319,34 @@ public final class SpawnerFeatureHandler {
             double channelDurationSeconds,
             CaptureHomingProjectileSettings homingProjectileSettings
     ) {
-        if (!canBeginCaptureChannelInteraction(
-                player, targetRef, source
+        ItemStack liveSource = sourceHotbarSlot < 0
+                ? null : inventory.getHotbarItem(player, sourceHotbarSlot);
+        if (liveSource == null || liveSource.isEmpty()
+                || source == null || !Objects.equals(
+                source.getItemId(), liveSource.getItemId()
         )) {
+            logCaptureChannelDiagnostic(
+                    "begin-denied reason=live-source-slot-mismatch"
+            );
+            return false;
+        }
+        if (!canBeginCaptureChannelInteraction(
+                player, targetRef, liveSource
+        )) {
+            logCaptureChannelDiagnostic("begin-denied reason=eligibility");
             return false;
         }
         CaptureAttemptHandle attempt = prepareCaptureAttempt(
-                player, source, null
+                player, liveSource, sourceHotbarSlot
         );
-        ItemFeatureConfig config = resolveConfigForItem(source);
-        return channels.start(
+        if (attempt == null) {
+            logCaptureChannelDiagnostic(
+                    "begin-denied reason=source-not-in-exact-hotbar-slot"
+            );
+            return false;
+        }
+        ItemFeatureConfig config = resolveConfigForItem(liveSource);
+        boolean started = channels.start(
                 player,
                 targetRef,
                 config,
@@ -340,6 +359,12 @@ public final class SpawnerFeatureHandler {
                 channelDurationSeconds,
                 homingProjectileSettings
         );
+        if (!started) {
+            logCaptureChannelDiagnostic(
+                    "begin-denied reason=channel-session-unavailable"
+            );
+        }
+        return started;
     }
 
     public void endCaptureChannel(
@@ -489,16 +514,14 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(
                 config, null
         );
-        if (captureAuthor == null || player == null || targetRef == null
-                || source == null || source.isEmpty() || resolved == null
-                || (source.getQuantity() != 1
-                && resolved.getCaptureMechanics().successDisposition()
-                == CaptureSuccessDisposition.CAPTURED_ITEM)
-                || itemMetadata.isAlreadyCaptured(source)
-                || !sourceMatches(player, attempt)
-                || !capturePolicy.canCapture(
-                        player, targetRef, resolved, source
-                )) {
+        String denial = captureAdmissionDenial(
+                player, targetRef, source, resolved, attempt
+        );
+        if (denial != null) {
+            logCaptureChannelDiagnostic("terminal-denied reason=" + denial
+                    + " item=" + (source == null ? null : source.getItemId())
+                    + " expectedFingerprint=" + attempt.sourceFingerprint()
+                    + " actualFingerprint=" + currentSourceFingerprint(player, attempt));
             return false;
         }
         SpawnerCaptureRollService.Resolution roll = captureRolls.evaluate(
@@ -506,6 +529,8 @@ public final class SpawnerFeatureHandler {
         );
         if (roll == null || roll.evaluation().outcome()
                 == SpawnerCaptureChanceService.Outcome.DENIED) {
+            logCaptureChannelDiagnostic("terminal-denied reason=roll-unavailable-or-denied"
+                    + " item=" + source.getItemId());
             return false;
         }
         if (roll.evaluation().outcome()
@@ -529,10 +554,39 @@ public final class SpawnerFeatureHandler {
                 captureParticleSystemOverride
         );
         if (intent == null) {
+            logCaptureChannelDiagnostic("terminal-denied reason=intent-unavailable"
+                    + " item=" + source.getItemId()
+                    + " evidence=" + captureIntents.lastEvidenceFailureReason());
             return false;
         }
         captureAuthor.capture(intent);
         return true;
+    }
+
+    @Nullable
+    private String captureAdmissionDenial(
+            @Nullable Player player,
+            @Nullable Ref<EntityStore> targetRef,
+            @Nullable ItemStack source,
+            @Nullable ItemFeatureConfig resolved,
+            @Nonnull CaptureAttemptHandle attempt
+    ) {
+        if (captureAuthor == null) return "capture-author-unavailable";
+        if (player == null) return "player-unavailable";
+        if (targetRef == null || !targetRef.isValid()) return "target-unavailable";
+        if (source == null || source.isEmpty()) return "source-unavailable";
+        if (resolved == null) return "item-config-unavailable";
+        if (source.getQuantity() != 1
+                && resolved.getCaptureMechanics().successDisposition()
+                == CaptureSuccessDisposition.CAPTURED_ITEM) {
+            return "stacked-captured-item-source";
+        }
+        if (itemMetadata.isAlreadyCaptured(source)) return "source-already-captured";
+        if (!sourceMatches(player, attempt)) return "source-fingerprint-mismatch";
+        if (!capturePolicy.canCapture(player, targetRef, resolved, source)) {
+            return "terminal-policy-revalidation";
+        }
+        return null;
     }
 
     private boolean spawnFromItem(
@@ -601,8 +655,22 @@ public final class SpawnerFeatureHandler {
                 );
     }
 
+    @Nullable
+    private String currentSourceFingerprint(
+            @Nullable Player player,
+            @Nonnull CaptureAttemptHandle attempt
+    ) {
+        if (player == null) return null;
+        ItemStack current = inventory.getHotbarItem(player, attempt.hotbarSlot());
+        return current == null || current.isEmpty()
+                ? null
+                : SpawnerSourceFingerprint.of(current);
+    }
+
     public void logCaptureChannelDiagnostic(String message) {
-        log(Level.FINE, "Spawner capture channel: " + message);
+        Tamework plugin = Tamework.getInstance();
+        log(plugin != null && plugin.isDebugSpawnerEnabled() ? Level.INFO : Level.FINE,
+                "Spawner capture channel: " + message);
     }
 
     private void log(Level level, String message) {

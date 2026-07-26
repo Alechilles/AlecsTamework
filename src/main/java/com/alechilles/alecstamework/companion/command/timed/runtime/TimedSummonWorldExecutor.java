@@ -314,7 +314,8 @@ final class TimedSummonWorldExecutor {
         if (probe.receipt().status() == EvidenceStatus.CONFLICT
                 || probe.source().status() == EvidenceStatus.CONFLICT) {
             return unknown(
-                    "store_evidence_conflict", evidenceCause(probe)
+                    storeConflictCode(evidenceCause(probe)),
+                    evidenceCause(probe)
             );
         }
         if (probe.receipt().status() == EvidenceStatus.RETRYABLE
@@ -332,6 +333,15 @@ final class TimedSummonWorldExecutor {
             return unknown("store_chunk_evidence_conflict", null);
         }
         return null;
+    }
+
+    private String storeConflictCode(@Nullable Throwable cause) {
+        String message = cause == null ? null : cause.getMessage();
+        String prefix = "timed_summon_store_";
+        return message != null && message.startsWith(prefix)
+                ? "store_evidence_conflict_"
+                + message.substring(prefix.length())
+                : "store_evidence_conflict";
     }
 
     @Nullable

@@ -39,6 +39,7 @@ final class SpawnerInteractionConfigResolver {
                 .captureSoundEvent(baseConfig.getCaptureSoundEvent())
                 .captureRequiredEffectId(baseConfig.getCaptureRequiredEffectId())
                 .captureChannelAuraEffectId(baseConfig.getCaptureChannelAuraEffectId())
+                .captureChannelSoundEvent(baseConfig.getCaptureChannelSoundEvent())
                 .captureMaxHealthPercent(baseConfig.getCaptureMaxHealthPercent())
                 .captureTamedRoleOverrides(baseConfig.getCaptureTamedRoleOverrides())
                 .spawnSoundEvent(baseConfig.getSpawnSoundEvent())

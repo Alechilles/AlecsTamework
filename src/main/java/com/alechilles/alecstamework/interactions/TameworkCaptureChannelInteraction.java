@@ -255,34 +255,52 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             return;
         }
         switch (parsedPhase) {
-            case BEGIN -> commandBuffer.run(store -> handler.beginCaptureChannel(
-                    player,
-                    targetRef,
-                    heldItem,
-                    beamParticleSystem,
-                    beamNativeLength,
-                    beamNativeDurationSeconds,
-                    scaleBeamToTarget,
-                    beamFromTarget,
-                    channelDurationSeconds,
-                    new CaptureHomingProjectileSettings(
-                            homingProjectileEnabled,
-                            homingProjectileModelId,
-                            homingProjectileSpawnIntervalSeconds,
-                            homingProjectileSpeed,
-                            homingProjectileTurnRateDegreesPerSecond,
-                            homingProjectileArrivalRadius,
-                            homingProjectileLifetimeSeconds,
-                            homingProjectileMaxConcurrent
-                    )
-            ));
+            case BEGIN -> commandBuffer.run(store -> {
+                boolean started = handler.beginCaptureChannel(
+                        player,
+                        targetRef,
+                        heldItem,
+                        context.getHeldItemSlot(),
+                        beamParticleSystem,
+                        beamNativeLength,
+                        beamNativeDurationSeconds,
+                        scaleBeamToTarget,
+                        beamFromTarget,
+                        channelDurationSeconds,
+                        new CaptureHomingProjectileSettings(
+                                homingProjectileEnabled,
+                                homingProjectileModelId,
+                                homingProjectileSpawnIntervalSeconds,
+                                homingProjectileSpeed,
+                                homingProjectileTurnRateDegreesPerSecond,
+                                homingProjectileArrivalRadius,
+                                homingProjectileLifetimeSeconds,
+                                homingProjectileMaxConcurrent
+                        )
+                );
+                handler.logCaptureChannelDiagnostic(
+                        "phase=BEGIN started=" + started
+                                + " item=" + heldItem.getItemId()
+                );
+            });
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
-            case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(
-                    player,
-                    targetRef,
-                    heldItem,
-                    captureBurstParticleSystem
-            ));
+            case COMPLETE -> commandBuffer.run(store -> {
+                boolean scheduled = handler.completeCaptureChannel(
+                        player,
+                        targetRef,
+                        heldItem,
+                        captureBurstParticleSystem
+                );
+                handler.logCaptureChannelDiagnostic(
+                        "phase=COMPLETE scheduled=" + scheduled
+                                + " item=" + heldItem.getItemId()
+                );
+            });
+        }
+        if (parsedPhase == Phase.COMPLETE) {
+            // Completion is terminal for this native Charging sequence. Leaving
+            // it active lets the held-use input immediately begin another channel.
+            context.getState().state = InteractionState.Finished;
         }
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);

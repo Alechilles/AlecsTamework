@@ -26,7 +26,6 @@ final class CommandSelectionPageService {
     private final CommandResolutionService resolutionService;
     private final CommandPanelActionService panelActionService;
     private final CommandTalentPageService talentPageService;
-    private final CommandPanelFeaturePresentationSource featurePresentations;
     private final CommandPanelFeatureActionService featureActions;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
@@ -59,7 +58,6 @@ final class CommandSelectionPageService {
         this.resolutionService = resolutionService;
         this.panelActionService = panelActionService;
         this.talentPageService = talentPageService;
-        this.featurePresentations = featurePresentations;
         this.featureActions = featureActions;
     }
 
@@ -108,14 +106,19 @@ final class CommandSelectionPageService {
                 : null;
         boolean requireUnlinkConfirm = resolveRequireUnlinkConfirm();
         boolean recallTeleportingEnabled = CommandTravelSettings.isRecallTeleportingEnabled();
+        CoherentPanelSnapshot panelSnapshot = new CoherentPanelSnapshot(
+                () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
+                        player, toolId, config
+                )
+        );
         return new TameworkCommandSelectionPage(
                 uiPlayerRef,
                 config,
                 selectedId,
                 requireUnlinkConfirm,
-                () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
-                () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
-                () -> buildFeaturePresentations(player, config),
+                panelSnapshot::refreshEntries,
+                panelSnapshot::refreshEntries,
+                panelSnapshot::featurePresentations,
                 () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
@@ -165,20 +168,42 @@ final class CommandSelectionPageService {
         );
     }
 
-    private Map<UUID, CommandPanelFeaturePresentation>
-    buildFeaturePresentations(
-            Player player,
-            TwCommandItemConfig config
-    ) {
-        if (featurePresentations == null || player == null) {
-            return Map.of();
+    /**
+     * Keeps card data and roster actions aligned for one UI refresh pass.
+     * The page requests entries before feature presentation, so refreshing
+     * entries atomically replaces both views.
+     */
+    private static final class CoherentPanelSnapshot {
+        private final java.util.function.Supplier<
+                CommandPanelEntrySourceService.CommandPanelSnapshot> supplier;
+        private CommandPanelEntrySourceService.CommandPanelSnapshot current =
+                new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                        java.util.List.of(), Map.of()
+                );
+
+        private CoherentPanelSnapshot(
+                java.util.function.Supplier<
+                        CommandPanelEntrySourceService.CommandPanelSnapshot> supplier
+        ) {
+            this.supplier = supplier;
         }
-        String worldName = player.getWorld() == null
-                ? null
-                : player.getWorld().getName();
-        return featurePresentations.snapshot(
-                player.getUuid(), worldName, config
-        );
+
+        private java.util.List<com.alechilles.alecstamework.ui.LinkedNpcEntry>
+        refreshEntries() {
+            CommandPanelEntrySourceService.CommandPanelSnapshot next =
+                    supplier.get();
+            current = next != null
+                    ? next
+                    : new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                            java.util.List.of(), Map.of()
+                    );
+            return current.entries();
+        }
+
+        private Map<UUID, CommandPanelFeaturePresentation>
+        featurePresentations() {
+            return current.featurePresentations();
+        }
     }
 
     private void applyFeatureAction(

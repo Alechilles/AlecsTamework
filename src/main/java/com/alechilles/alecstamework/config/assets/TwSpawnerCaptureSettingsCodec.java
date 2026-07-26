@@ -32,6 +32,9 @@ final class TwSpawnerCaptureSettingsCodec {
         .<String>append(new KeyedCodec<>("ChannelAuraEffectId", Codec.STRING),
             (settings, value) -> settings.channelAuraEffectId = value, settings -> settings.channelAuraEffectId)
         .documentation("Optional temporary entity effect applied while a capture channel is active.").add()
+        .<String>append(new KeyedCodec<>("ChannelSoundEvent", Codec.STRING),
+            (settings, value) -> settings.channelSoundEvent = value, settings -> settings.channelSoundEvent)
+        .documentation("Optional one-shot sound event played when a capture channel begins; omitted values inherit the parent.").add()
         .<java.util.Map<String, String>>append(
             new KeyedCodec<>("TamedRoleOverrides", MapCodec.STRING_HASH_MAP_CODEC),
             (settings, value) -> settings.tamedRoleOverrides = value == null

@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -87,15 +88,30 @@ final class CommandLinkedPanelEntryService {
                                                  ItemStack stack,
                                                  String toolId,
                                                  List<LinkedNpcRecord> records) {
+        return resolveEntriesFromRecords(
+                player, store, stack, toolId, records
+        ).entries();
+    }
+
+    /**
+     * Builds cards and records the current live UUID for every presentation
+     * UUID that had to redirect through canonical profile identity.
+     */
+    ResolvedEntries resolveEntriesFromRecords(Player player,
+                                              Store<EntityStore> store,
+                                              ItemStack stack,
+                                              String toolId,
+                                              List<LinkedNpcRecord> records) {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
-            return List.of();
+            return ResolvedEntries.empty();
         }
         if (records.isEmpty()) {
-            return List.of();
+            return ResolvedEntries.empty();
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
         World world = player.getWorld();
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
+        Map<UUID, UUID> renderedIds = new LinkedHashMap<>();
         for (LinkedNpcRecord record : records) {
             if (record == null || record.npcUuid == null) {
                 continue;
@@ -213,6 +229,7 @@ final class CommandLinkedPanelEntryService {
                 }
                 if (loadedEntry != null) {
                     entries.add(loadedEntry);
+                    renderedIds.put(record.npcUuid, loadedEntry.npcUuid());
                     continue;
                 }
             }
@@ -275,8 +292,24 @@ final class CommandLinkedPanelEntryService {
                     recallLostRemainingMs
             );
             entries.add(entry);
+            renderedIds.put(record.npcUuid, entry.npcUuid());
         }
-        return entries;
+        return new ResolvedEntries(entries, renderedIds);
+    }
+
+    /** One refresh's cards and the aliases they resolved to for rendering. */
+    record ResolvedEntries(
+            List<LinkedNpcEntry> entries,
+            Map<UUID, UUID> renderedIds
+    ) {
+        ResolvedEntries {
+            entries = List.copyOf(entries);
+            renderedIds = Map.copyOf(renderedIds);
+        }
+
+        static ResolvedEntries empty() {
+            return new ResolvedEntries(List.of(), Map.of());
+        }
     }
 
     static long remainingUntil(long availableAtMs, long nowMs) {

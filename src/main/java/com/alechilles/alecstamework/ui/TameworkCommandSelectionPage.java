@@ -168,7 +168,10 @@ public final class TameworkCommandSelectionPage
                 resolveLanguage(),
                 MAX_COMMAND_BUTTONS
         );
-        this.cardBindingConfig = buildCardBindingConfig(recallActionEnabled);
+        this.cardBindingConfig = buildCardBindingConfig(
+                recallActionEnabled,
+                config != null && config.usesOwnerCommandFamilyRoster()
+        );
         this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
         this.linkedNpcBaseEntriesSupplier = linkedNpcBaseEntriesSupplier;
@@ -1171,7 +1174,10 @@ public final class TameworkCommandSelectionPage
         return CommandSelectionPanelOptions.resolveFilterModeDropdownEntries(resolveLanguage());
     }
 
-    private static LinkedNpcPanelCardBinder.CardBindingConfig buildCardBindingConfig(boolean recallActionEnabled) {
+    private static LinkedNpcPanelCardBinder.CardBindingConfig buildCardBindingConfig(
+            boolean recallActionEnabled,
+            boolean ownerCommandFamilyRoster
+    ) {
         return new LinkedNpcPanelCardBinder.CardBindingConfig(
                 LINKED_PANEL_CARD_UI_PATH,
                 EVENT_COMMAND_ID,
@@ -1190,7 +1196,8 @@ public final class TameworkCommandSelectionPage
                 SET_HOME_COMMAND_PREFIX,
                 RETURN_HOME_COMMAND_PREFIX,
                 OPEN_TALENTS_COMMAND_PREFIX,
-                recallActionEnabled
+                recallActionEnabled,
+                ownerCommandFamilyRoster
         );
     }
 

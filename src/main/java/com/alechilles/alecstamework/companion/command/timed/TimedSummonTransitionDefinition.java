@@ -21,6 +21,8 @@ public final class TimedSummonTransitionDefinition
             new TimedSummonTransitionDefinition();
     public static final OperationKind KIND =
             new OperationKind("timed_summon_transition");
+    private static final String STORE_EVIDENCE_CONFLICT =
+            "timed_summon_store_evidence_conflict";
 
     private TimedSummonTransitionDefinition() {
     }
@@ -47,9 +49,7 @@ public final class TimedSummonTransitionDefinition
         if (operation == null
                 || operation.phase() != OperationPhase.UNKNOWN
                 || !"live".equals(operation.failureKind())
-                || !"timed_summon_store_evidence_conflict".equals(
-                operation.failureCode()
-        )) {
+                || !storeEvidenceConflict(operation.failureCode())) {
             return false;
         }
         try {
@@ -58,6 +58,13 @@ public final class TimedSummonTransitionDefinition
         } catch (RuntimeException invalid) {
             return false;
         }
+    }
+
+    private boolean storeEvidenceConflict(String failureCode) {
+        return STORE_EVIDENCE_CONFLICT.equals(failureCode)
+                || failureCode != null && failureCode.startsWith(
+                STORE_EVIDENCE_CONFLICT + "_source_"
+        );
     }
 
     @Override

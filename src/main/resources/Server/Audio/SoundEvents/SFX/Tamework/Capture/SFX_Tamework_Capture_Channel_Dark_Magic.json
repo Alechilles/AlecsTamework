@@ -1,0 +1,17 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/Capture/Tamework_Capture_Channel_Dark_Magic.ogg"
+      ],
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -4.0,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 30.0
+}

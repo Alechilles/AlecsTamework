@@ -182,6 +182,54 @@ final class CommandToolInventoryService {
         return List.of();
     }
 
+    /**
+     * Resolves one coherent command-panel refresh snapshot for the current
+     * physical access item.
+     */
+    CommandPanelEntrySourceService.CommandPanelSnapshot
+    buildLinkedPanelSnapshotForTool(
+            Player player,
+            String toolId,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config
+    ) {
+        if (player == null || toolId == null || toolId.isBlank()
+                || panelEntrySourceService == null) {
+            return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                    List.of(), java.util.Map.of()
+            );
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                    List.of(), java.util.Map.of()
+            );
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING
+            );
+            if (!toolId.equals(stackToolId)) {
+                continue;
+            }
+            World world = player.getWorld();
+            if (world == null || world.getEntityStore().getStore() == null) {
+                break;
+            }
+            return panelEntrySourceService.buildSnapshot(
+                    player, world.getEntityStore().getStore(), stack, config,
+                    toolId
+            );
+        }
+        return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                List.of(), java.util.Map.of()
+        );
+    }
+
     boolean mutateToolStack(Player player, String toolId, UnaryOperator<ItemStack> mutator) {
         if (player == null || toolId == null || toolId.isBlank() || mutator == null) {
             return false;

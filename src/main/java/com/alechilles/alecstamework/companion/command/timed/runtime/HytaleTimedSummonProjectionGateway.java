@@ -4,8 +4,6 @@ import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.MutationAttempt;
 import com.alechilles.alecstamework.companion.command.timed.runtime
         .TimedSummonWorldAttempt.ProjectionProbe;
-import com.alechilles.alecstamework.companion.placement
-        .CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot
         .SnapshotCodecRegistry;
 import com.alechilles.alecstamework.items
@@ -19,7 +17,6 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.NonTicking;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -217,40 +214,7 @@ final class HytaleTimedSummonProjectionGateway {
                 && authority.receiptKey().equals(marker.getSlotKey())
                 && marker.getSourceNpcUuid() == null
                 && authority.snapshot().sourceLifecycleRevision().value()
-                == marker.getGeneration()
-                && exactPlacement(
-                authority.placement(),
-                components.transform()
-        );
-    }
-
-    private boolean exactPlacement(
-            CompanionSpawnPlacement placement,
-            @Nullable TransformComponent transform
-    ) {
-        if (transform == null || transform.getPosition() == null
-                || transform.getRotation() == null) {
-            return false;
-        }
-        Rotation3f rotation = transform.getRotation();
-        return Double.compare(
-                placement.x(), transform.getPosition().x
-        ) == 0
-                && Double.compare(
-                placement.y(), transform.getPosition().y
-        ) == 0
-                && Double.compare(
-                placement.z(), transform.getPosition().z
-        ) == 0
-                && Float.compare(
-                placement.pitchRadians(), rotation.pitch()
-        ) == 0
-                && Float.compare(
-                placement.yawRadians(), rotation.yaw()
-        ) == 0
-                && Float.compare(
-                placement.rollRadians(), rotation.roll()
-        ) == 0;
+                == marker.getGeneration();
     }
 
     private long placementChunk(

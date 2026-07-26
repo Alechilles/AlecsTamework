@@ -97,7 +97,26 @@ final class CommandPanelFeaturePresentationSource {
         }
         List<CommandRosterPanelRecordSource.PanelMember> members =
                 rosterSource.membersFor(ownerUuid, familyId);
-        if (members.isEmpty()) {
+        return snapshotForMembers(
+                ownerUuid, ownershipWorldName, familyId, members
+        );
+    }
+
+    /**
+     * Builds feature rows from the exact roster member set used to create the
+     * accompanying command-panel cards.
+     */
+    @Nonnull
+    Map<UUID, CommandPanelFeaturePresentation> snapshotForMembers(
+            @Nullable UUID ownerUuid,
+            @Nullable String ownershipWorldName,
+            @Nullable String familyId,
+            @Nullable List<CommandRosterPanelRecordSource.PanelMember> members
+    ) {
+        if (ownerUuid == null || familyId == null || familyId.isBlank()) {
+            return Map.of();
+        }
+        if (members == null || members.isEmpty()) {
             return Map.of();
         }
         long nowMs = clock.getAsLong();
