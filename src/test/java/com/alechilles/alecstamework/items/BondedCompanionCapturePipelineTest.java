@@ -7,9 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionCleanupService;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionTransitionService;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionDatabase;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionCapturePersistenceAdapter;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
@@ -17,10 +24,13 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaMana
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.bson.BsonDocument;
+import com.hypixel.hytale.codec.ExtraInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,7 +49,7 @@ class BondedCompanionCapturePipelineTest {
                 true, true, true));
 
         assertEquals(BondedCompanionCaptureAuthor.Status.APPLIED, result.status());
-        assertEquals(List.of("policy", "persist", "cleanup", "spend", "effect"),
+        assertEquals(List.of("policy", "persist", "cleanup", "effect", "spend"),
                 harness.events);
     }
 
@@ -111,7 +121,59 @@ class BondedCompanionCapturePipelineTest {
         var result = harness.author().capture(validIntent());
 
         assertEquals(BondedCompanionCaptureAuthor.Status.REPLAYED, result.status());
-        assertEquals(List.of("policy", "persist"), harness.events);
+        assertEquals(List.of("policy", "persist", "message"), harness.events);
+    }
+
+    /** Regression: accepted scheduling is not completed item finalization. */
+    @Test
+    void itemFinalizationFailureIsDurableButNotReportedAsApplied() {
+        Harness harness = new Harness();
+        harness.spendSuccessful = false;
+
+        var result = harness.author().capture(validIntent());
+
+        assertEquals("FINALIZATION_FAILED", result.status().name());
+        assertTrue(result.durable());
+        assertEquals(List.of(
+                "policy", "persist", "cleanup", "effect", "spend", "message"
+        ), harness.events);
+    }
+
+    @Test
+    void unavailablePolicyIsNotMisreportedAsRoleDenial() {
+        Harness harness = new Harness();
+        harness.policy = BondedCompanionCaptureAuthor.PolicyDecision.REJECTED;
+
+        var result = harness.author().capture(validIntent());
+
+        assertEquals("POLICY_UNAVAILABLE", result.status().name());
+        assertEquals(List.of("policy", "diagnostic", "message"),
+                harness.events);
+    }
+
+    @Test
+    void policyExceptionProducesOneUnavailableDiagnosticAndMessage() {
+        Harness harness = new Harness();
+        harness.policyFailure = new IllegalStateException("policy offline");
+
+        var result = harness.author().capture(validIntent());
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.POLICY_UNAVAILABLE,
+                result.status());
+        assertEquals(List.of("policy", "diagnostic", "message"),
+                harness.events);
+    }
+
+    @Test
+    void prefreezeAdmissionRejectionProducesOneActionableMessage() {
+        Harness harness = new Harness();
+
+        var result = harness.author.reject(
+                BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED, null);
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
+                result.status());
+        assertEquals(List.of("message"), harness.events);
     }
 
     @Test
@@ -124,7 +186,7 @@ class BondedCompanionCapturePipelineTest {
         assertEquals(BondedCompanionCaptureAuthor.Status.APPLIED, result.status());
         assertEquals(BondedCompanionCaptureAuthor.CleanupOutcome.RETRY_PENDING,
                 result.cleanupOutcome());
-        assertEquals(List.of("policy", "persist", "cleanup", "spend", "effect"),
+        assertEquals(List.of("policy", "persist", "cleanup", "effect", "spend"),
                 harness.events);
     }
 
@@ -138,6 +200,29 @@ class BondedCompanionCapturePipelineTest {
                 source.rosterRevision(), source.snapshot(), source.completionEffect(),
                 false, true, true, true, true, true);
         assertRejected(invalid, BondedCompanionCaptureAuthor.Status.TARGET_INVALID);
+    }
+
+    @Test
+    void factoryRoutePreservesLiveOwnerAndRosterRoleEvidence() {
+        BondedCompanionCaptureIntent intent =
+                SpawnerCaptureIntentFactory.freezeBonded(
+                        new SpawnerCaptureIntentFactory.FrozenBondedCapture(
+                                "spawner-bonded-capture:v1", "attempt", OWNER,
+                                "world", 2, "fingerprint", SOURCE,
+                                "Dragon_Fire", "hydragon:companions", 4L,
+                                snapshot(), null, true, true, true, true,
+                                false, false
+                        )
+                );
+        Harness harness = new Harness();
+
+        var result = harness.author.capture(intent);
+
+        assertFalse(intent.ownerAllowed());
+        assertFalse(intent.roleAllowed());
+        assertEquals(BondedCompanionCaptureAuthor.Status.OWNER_DENIED,
+                result.status());
+        assertEquals(List.of("message"), harness.events);
     }
 
     @Test
@@ -174,6 +259,82 @@ class BondedCompanionCapturePipelineTest {
         assertEquals(1, database.listCleanup(OWNER, "hydragon:companions", 10).size());
     }
 
+    /** Regression: a retry re-reads the NPC later but retains request identity. */
+    @Test
+    void realAdapterReplaysSameCaptureWhenFreshSnapshotTimestampDiffers()
+            throws Exception {
+        Path path = tempDir.resolve("fresh-snapshot-replay.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        var adapter = new SqliteBondedCompanionCapturePersistenceAdapter(
+                rosters,
+                new BondedCompanionTransitionService(
+                        new BondedCompanionPolicyResolver(rosters)),
+                database, database,
+                new SqliteBondedCompanionProjectionDurability(path),
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService
+                                .Outcome.RETRY_REQUIRED)
+        );
+        BondedCompanionCaptureIntent first = frozenIntentAt(10L);
+        BondedCompanionCaptureIntent retry = frozenIntentAt(20L);
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                adapter.store(first));
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED,
+                adapter.store(retry));
+        assertEquals(1, database.listProfiles(
+                OWNER, "hydragon:companions").size());
+        assertEquals(1, database.listCleanup(
+                OWNER, "hydragon:companions", 10).size());
+    }
+
+    @Test
+    void realAdapterSeparatesRosterRoleDenialFromMissingPolicy()
+            throws Exception {
+        Path path = tempDir.resolve("policy-classification.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        var adapter = new SqliteBondedCompanionCapturePersistenceAdapter(
+                rosters,
+                new BondedCompanionTransitionService(
+                        new BondedCompanionPolicyResolver(rosters)),
+                database, database,
+                new SqliteBondedCompanionProjectionDurability(path),
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService
+                                .Outcome.RETRY_REQUIRED)
+        );
+        var allowed = frozenIntentAt(10L);
+        var wrongRole = new BondedCompanionCaptureIntent(
+                allowed.callerNamespace(), "wrong-role", allowed.actorUuid(),
+                allowed.worldKey(), allowed.hotbarSlot(),
+                allowed.sourceFingerprint(), allowed.sourceNpcUuid(),
+                "Dragon_Ice", allowed.rosterId(), allowed.rosterRevision(),
+                BondedCompanionSnapshot.of(new CoopResidentStateSnapshot(
+                        SOURCE, null, -1, "Dragon_Ice", null, null, null, null,
+                        null, null, null, null, null, null, null, null,
+                        0.75D, 10L), Map.of()), null,
+                true, true, true, true, true, true);
+        var missingPolicy = new BondedCompanionCaptureIntent(
+                allowed.callerNamespace(), "missing-policy", allowed.actorUuid(),
+                allowed.worldKey(), allowed.hotbarSlot(),
+                allowed.sourceFingerprint(), allowed.sourceNpcUuid(),
+                allowed.roleId(), "missing:roster", allowed.rosterRevision(),
+                allowed.snapshot(), null, true, true, true, true, true, true);
+
+        assertEquals(BondedCompanionCaptureAuthor.PolicyDecision.ROLE_REJECTED,
+                adapter.validate(wrongRole));
+        assertEquals(BondedCompanionCaptureAuthor.PolicyDecision.REJECTED,
+                adapter.validate(missingPolicy));
+    }
+
     private void assertRejected(BondedCompanionCaptureIntent intent,
                                 BondedCompanionCaptureAuthor.Status status) {
         Harness harness = new Harness();
@@ -185,6 +346,17 @@ class BondedCompanionCapturePipelineTest {
 
     private static BondedCompanionCaptureIntent validIntent() {
         return intent(snapshot(), true, true, true, true, true);
+    }
+
+    private static BondedCompanionCaptureIntent frozenIntentAt(long capturedAtMs) {
+        return SpawnerCaptureIntentFactory.freezeBonded(
+                new SpawnerCaptureIntentFactory.FrozenBondedCapture(
+                        "spawner-bonded-capture:v1", "source:" + SOURCE,
+                        OWNER, "world", 2, "fingerprint", SOURCE,
+                        "Dragon_Fire", "hydragon:companions", 4L,
+                        snapshotAt(capturedAtMs), null,
+                        true, true, true, true, true, true
+                ));
     }
 
     private static BondedCompanionCaptureIntent intent(
@@ -199,10 +371,40 @@ class BondedCompanionCapturePipelineTest {
     }
 
     private static BondedCompanionSnapshot snapshot() {
+        return snapshotAt(10L);
+    }
+
+    private static BondedCompanionSnapshot snapshotAt(long capturedAtMs) {
         return BondedCompanionSnapshot.of(new CoopResidentStateSnapshot(
                 SOURCE, null, -1, "Dragon_Fire", null, null, null, null,
-                null, null, null, null, null, null, null, null, 0.75D, 10L),
+                null, null, null, null, null, null, null, null, 0.75D,
+                capturedAtMs),
                 Map.of());
+    }
+
+    private static BondedCompanionRosterRegistry rosterRegistry()
+            throws Exception {
+        TwBondedCompanionRosterConfig config =
+                TwBondedCompanionRosterConfig.CODEC.decode(
+                        BsonDocument.parse("""
+                                {
+                                  "RosterId": "hydragon:companions",
+                                  "FamilyId": "hydragon:dragon",
+                                  "AllowedRoles": ["Dragon_Fire"],
+                                  "MaximumOwned": 3,
+                                  "MaximumActive": 1,
+                                  "Features": {"Capture": true}
+                                }
+                                """),
+                        new ExtraInfo()
+                );
+        Field id = config.getClass().getDeclaredField("id");
+        id.setAccessible(true);
+        id.set(config, "HydragonCompanions");
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(config), 4L).applied());
+        return registry;
     }
 
     private static final class Harness {
@@ -213,29 +415,42 @@ class BondedCompanionCapturePipelineTest {
                 BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED;
         private BondedCompanionCaptureAuthor.CleanupOutcome cleanup =
                 BondedCompanionCaptureAuthor.CleanupOutcome.REMOVED;
+        private RuntimeException policyFailure;
+        private boolean spendSuccessful = true;
         private BondedCompanionCaptureAuthor author = author();
 
         private BondedCompanionCaptureAuthor author() {
             author = new BondedCompanionCaptureAuthor(
-                    intent -> { events.add("policy"); return policy; },
+                    intent -> {
+                        events.add("policy");
+                        if (policyFailure != null) throw policyFailure;
+                        return policy;
+                    },
                     intent -> { events.add("persist"); return persistence; },
                     intent -> { events.add("cleanup"); return cleanup; },
-                    new BondedCompanionCaptureFeedbackDispatcher(new Sink(events))
+                    new BondedCompanionCaptureFeedbackDispatcher(
+                            new Sink(events, this)),
+                    (intent, failure) -> events.add("diagnostic")
             );
             return author;
         }
     }
 
-    private record Sink(List<String> events)
+    private record Sink(List<String> events, Harness harness)
             implements BondedCompanionCaptureFeedbackDispatcher.Sink {
-        @Override public boolean spend(BondedCompanionCaptureIntent intent) {
+        @Override public boolean spend(
+                BondedCompanionCaptureIntent intent,
+                BondedCompanionCaptureFeedbackDispatcher.CompletionContext context) {
             events.add("spend");
-            return true;
+            return harness.spendSuccessful;
         }
-        @Override public void effect(BondedCompanionCaptureIntent intent) {
+        @Override public void effect(
+                BondedCompanionCaptureIntent intent,
+                BondedCompanionCaptureFeedbackDispatcher.CompletionContext context) {
             events.add("effect");
         }
         @Override public void message(BondedCompanionCaptureIntent intent,
+                                      BondedCompanionCaptureFeedbackDispatcher.CompletionContext context,
                                       String message) {
             events.add("message");
         }

@@ -61,9 +61,7 @@ public final class SpawnerFeatureHandler {
     @Nullable
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final SpawnerCaptureChannelService channels;
-    @Nullable private final BondedCompanionCaptureAuthor bondedCaptureAuthor;
-    @Nullable private final BondedCompanionRosterRegistry bondedRosters;
-    private final BondedCompanionCaptureAdmissionService bondedAdmission;
+    private final BondedCompanionCaptureRoute bondedCaptureRoute;
 
     /** Creates the released spawner composition over the canonical operation authors. */
     public SpawnerFeatureHandler(
@@ -154,8 +152,6 @@ public final class SpawnerFeatureHandler {
         this.registry = registry;
         this.captureAuthor = captureAuthor;
         this.releaseAuthor = releaseAuthor;
-        this.bondedCaptureAuthor = bondedCaptureAuthor;
-        this.bondedRosters = bondedRosters;
         this.roles = new SpawnerRolePolicyService(logger);
         this.inventory = new SpawnerPlayerInventoryService();
         SpawnerCaptureMetadataService captureMetadata =
@@ -177,8 +173,9 @@ public final class SpawnerFeatureHandler {
                 ownership,
                 npcIdentity
         );
-        this.bondedAdmission = new BondedCompanionCaptureAdmissionService(
-                capturePolicy, commandItems);
+        BondedCompanionCaptureAdmissionService bondedAdmission =
+                new BondedCompanionCaptureAdmissionService(
+                capturePolicy, commandItems, bondedRosters);
         this.captureRolls = new SpawnerCaptureRollService(
                 capturePolicies,
                 captureRequirements,
@@ -208,6 +205,9 @@ public final class SpawnerFeatureHandler {
                 npcIdentity,
                 tameAndLinkEvidence
         );
+        this.bondedCaptureRoute = new BondedCompanionCaptureRoute(
+                bondedCaptureAuthor, bondedRosters, bondedAdmission,
+                captureRolls, captureIntents);
         SpawnerSpawnPositionService positions =
                 new SpawnerSpawnPositionService(logger);
         this.releaseIntents = new SpawnerReleaseIntentFactory(
@@ -548,6 +548,16 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(
                 config, null
         );
+        if (bondedDisposition(resolved)) {
+            boolean sourceEligible = player != null
+                    && source != null && !source.isEmpty()
+                    && sourceMatches(player, attempt)
+                    && !itemMetadata.isAlreadyCaptured(source);
+            return bondedCaptureRoute.capture(
+                    player, targetRef, source, resolved, attempt,
+                    sourceEligible, captureParticleSystemOverride
+            );
+        }
         String denial = captureAdmissionDenial(
                 player, targetRef, source, resolved, attempt
         );
@@ -566,12 +576,6 @@ public final class SpawnerFeatureHandler {
             logCaptureChannelDiagnostic("terminal-denied reason=roll-unavailable-or-denied"
                     + " item=" + source.getItemId());
             return false;
-        }
-        if (resolved.getCaptureMechanics().successDisposition()
-                == CaptureSuccessDisposition.STORE_BONDED_COMPANION) {
-            return captureBonded(
-                    player, targetRef, source, resolved, attempt, roll,
-                    captureParticleSystemOverride);
         }
         if (roll.evaluation().outcome()
                 == SpawnerCaptureChanceService.Outcome.FAILED_ROLL
@@ -611,12 +615,7 @@ public final class SpawnerFeatureHandler {
             @Nullable ItemFeatureConfig resolved,
             @Nonnull CaptureAttemptHandle attempt
     ) {
-        boolean bonded = resolved != null && resolved.getCaptureMechanics()
-                .successDisposition()
-                == CaptureSuccessDisposition.STORE_BONDED_COMPANION;
-        if (bonded ? bondedCaptureAuthor == null : captureAuthor == null) {
-            return "capture-author-unavailable";
-        }
+        if (captureAuthor == null) return "capture-author-unavailable";
         if (player == null) return "player-unavailable";
         if (targetRef == null || !targetRef.isValid()) return "target-unavailable";
         if (source == null || source.isEmpty()) return "source-unavailable";
@@ -634,21 +633,10 @@ public final class SpawnerFeatureHandler {
         return null;
     }
 
-    private boolean captureBonded(
-            Player player, Ref<EntityStore> targetRef, ItemStack source,
-            ItemFeatureConfig config, CaptureAttemptHandle attempt,
-            SpawnerCaptureRollService.Resolution roll,
-            @Nullable String particleOverride
-    ) {
-        if (bondedCaptureAuthor == null || bondedRosters == null) return false;
-        BondedCompanionCaptureIntent intent = captureIntents.createBonded(
-                player, targetRef, source, config, attempt, roll,
-                bondedRosters.snapshot().revision(), bondedAdmission.hasToolAccess(
-                        player, config), bondedAdmission.isTranquilized(player, targetRef),
-                particleOverride);
-        if (intent == null) return false;
-        bondedCaptureAuthor.capture(intent);
-        return true;
+    private boolean bondedDisposition(ItemFeatureConfig config) {
+        return config != null && config.getCaptureMechanics()
+                .successDisposition()
+                == CaptureSuccessDisposition.STORE_BONDED_COMPANION;
     }
 
     private boolean spawnFromItem(

@@ -23,6 +23,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.logging.Level;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 
 /**
  * Evaluates whether a spawner item is currently allowed to capture a target NPC.
@@ -219,6 +220,85 @@ public final class SpawnerCapturePolicyService {
                 targetRef, effectType);
         return TameworkEntityEffectService.hasActiveEffect(
                 controller, TRANQUILIZED_EFFECT_ID);
+    }
+
+    /** Reads bonded admission evidence without emitting generic-path feedback. */
+    BondedAdmissionEvidence assessBonded(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemFeatureConfig config,
+            ItemStack itemStack,
+            BondedCompanionRosterRegistry.RosterDefinition roster
+    ) {
+        if (player == null || targetRef == null || !targetRef.isValid()
+                || config == null || itemStack == null || roster == null) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID);
+        }
+        World world = player.getWorld();
+        if (world == null || world.getEntityStore() == null) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED);
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        NPCEntity npc = store.getComponent(
+                targetRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID);
+        }
+        String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
+        boolean roleAllowed = rolePolicyService.isRoleAllowed(roleId, config)
+                && roster.allowedRoles().contains(roleId);
+        UUID owner = npcStateService.resolveOwnerFromComponent(
+                targetRef, world);
+        boolean ownerAllowed = ownershipPolicyService.isCaptureAllowed(
+                player.getUuid(), owner, config);
+        BondedCompanionCaptureAuthor.Status denial = bondedPolicyDenial(
+                player, targetRef, config, itemStack, world, store, owner, roleId);
+        return new BondedAdmissionEvidence(
+                denial, ownerAllowed, roleAllowed);
+    }
+
+    private BondedCompanionCaptureAuthor.Status bondedPolicyDenial(
+            Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config,
+            ItemStack itemStack, World world, Store<EntityStore> store,
+            UUID ownerUuid, String roleId
+    ) {
+        if (isCooldownActive(itemStack,
+                TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
+                config.getCaptureCooldownMs())) return admissionDenied();
+        if (config.isCaptureRequireTamed()
+                && !npcStateService.resolveTamedState(targetRef, world)) {
+            return admissionDenied();
+        }
+        if (config.isCaptureTamesTarget()
+                && (npcStateService.resolveTamedState(targetRef, world)
+                || ownerUuid != null
+                || config.resolveCaptureTamedRole(roleId) == null)) {
+            return admissionDenied();
+        }
+        if (!meetsHealthRequirement(targetRef, config, store)
+                || !isWithinCaptureDistance(player, targetRef, config, store)) {
+            return admissionDenied();
+        }
+        return null;
+    }
+
+    private BondedCompanionCaptureAuthor.Status admissionDenied() {
+        return BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED;
+    }
+
+    record BondedAdmissionEvidence(
+            BondedCompanionCaptureAuthor.Status denial,
+            boolean ownerAllowed,
+            boolean roleAllowed
+    ) {
+        static BondedAdmissionEvidence denied(
+                BondedCompanionCaptureAuthor.Status denial
+        ) {
+            return new BondedAdmissionEvidence(denial, false, false);
+        }
     }
 
     static String missingRequiredEffectMessageKey(String requiredEffectId) {

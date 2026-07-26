@@ -72,13 +72,14 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
         }
         BondedCompanionTransitionService.TransitionResult result =
                 transition(intent);
-        if (result.code() == BondedCompanionTransitionService.ResultCode.APPLIED) {
-            return BondedCompanionCaptureAuthor.PolicyDecision.ALLOWED;
-        }
-        return result.code() == BondedCompanionTransitionService.ResultCode
-                .OWNED_CAPACITY_REACHED
-                ? BondedCompanionCaptureAuthor.PolicyDecision.CAPACITY_REJECTED
-                : BondedCompanionCaptureAuthor.PolicyDecision.REJECTED;
+        return switch (result.code()) {
+            case APPLIED -> BondedCompanionCaptureAuthor.PolicyDecision.ALLOWED;
+            case ROLE_NOT_ALLOWED -> BondedCompanionCaptureAuthor.PolicyDecision
+                    .ROLE_REJECTED;
+            case OWNED_CAPACITY_REACHED -> BondedCompanionCaptureAuthor
+                    .PolicyDecision.CAPACITY_REJECTED;
+            default -> BondedCompanionCaptureAuthor.PolicyDecision.REJECTED;
+        };
     }
 
     /** Commits the complete stored profile and exact cleanup atomically. */
@@ -240,13 +241,29 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
     private String hash(BondedCompanionCaptureIntent intent) {
         String canonical = intent.actorUuid() + "\0" + intent.rosterId()
                 + "\0" + intent.roleId() + "\0" + intent.sourceNpcUuid()
-                + "\0" + snapshots.encode(claimed(intent));
+                + "\0" + snapshots.encode(requestIdentitySnapshot(intent));
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonical.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception failure) {
             throw new IllegalStateException(failure);
         }
+    }
+
+    /** Excludes only the volatile observation timestamp from retry identity. */
+    private BondedCompanionSnapshot requestIdentitySnapshot(
+            BondedCompanionCaptureIntent intent
+    ) {
+        BondedCompanionSnapshot claimed = claimed(intent);
+        CoopResidentStateSnapshot state = claimed.fullState();
+        CoopResidentStateSnapshot stable = new CoopResidentStateSnapshot(
+                state.npcUuid(), state.coopId(), state.residentSlot(),
+                state.roleId(), state.commandLinks(), state.owner(), state.tamed(),
+                state.npcName(), state.happiness(), state.needs(), state.breeding(),
+                state.leveling(), state.traits(), state.talents(), state.lifeStage(),
+                state.attachments(), state.healthPercent(), 0L
+        );
+        return BondedCompanionSnapshot.of(stable, claimed.extensionData());
     }
 
     private long safeAdd(long value, long amount) {

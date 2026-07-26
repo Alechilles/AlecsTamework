@@ -43,6 +43,7 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticSnapshot;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureFeedbackDispatcher;
+import com.alechilles.alecstamework.items.BondedCompanionCaptureIntent;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -51,6 +52,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -190,7 +192,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                         capturePersistence::validate,
                         capturePersistence::store,
                         capturePersistence::cleanup,
-                        BondedCompanionCaptureFeedbackDispatcher.production()
+                        BondedCompanionCaptureFeedbackDispatcher.production(
+                                logger),
+                        (intent, failure) -> logCapturePolicyFailure(
+                                logger, intent, failure)
                 );
         if (started.availability().available()) {
             long startupTime = clock.getAsLong();
@@ -222,6 +227,19 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     @Nonnull
     public BondedCompanionCaptureAuthor captureAuthor() {
         return captureAuthor;
+    }
+
+    private static void logCapturePolicyFailure(
+            HytaleLogger logger,
+            BondedCompanionCaptureIntent intent,
+            RuntimeException failure
+    ) {
+        if (logger == null) return;
+        var entry = logger.at(Level.WARNING);
+        if (failure != null) entry = entry.withCause(failure);
+        entry.log("Bonded capture policy unavailable (roster="
+                + (intent == null ? null : intent.rosterId()) + ", role="
+                + (intent == null ? null : intent.roleId()) + ").");
     }
 
     @Nonnull

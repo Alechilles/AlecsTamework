@@ -156,6 +156,8 @@ final class SpawnerCaptureIntentFactory {
             long rosterRevision,
             boolean toolAccess,
             boolean tranquilized,
+            boolean ownerAllowed,
+            boolean roleAllowed,
             @Nullable String particleSystemOverride
     ) {
         World world = player == null ? null : player.getWorld();
@@ -173,7 +175,7 @@ final class SpawnerCaptureIntentFactory {
         String particle = particleSystemOverride == null
                 || particleSystemOverride.isBlank()
                 ? config.getCaptureParticleSystem() : particleSystemOverride;
-        return new BondedCompanionCaptureIntent(
+        return freezeBonded(new FrozenBondedCapture(
                 "spawner-bonded-capture:v1",
                 player.getUuid() + ":" + config.getCaptureMechanics()
                         .bondedRosterId() + ":" + roll.targetUuid(),
@@ -182,8 +184,38 @@ final class SpawnerCaptureIntentFactory {
                 config.getCaptureMechanics().bondedRosterId(), rosterRevision,
                 snapshot, publishedEffect(targetRef, store, particle,
                 config.getCaptureSoundEvent()), targetRef.isValid(),
-                roll.terminal().successful(), tranquilized, toolAccess, true, true);
+                roll.terminal().successful(), tranquilized, toolAccess,
+                ownerAllowed, roleAllowed));
     }
+
+    /** Maps already-frozen live evidence without replacing denial bits. */
+    static BondedCompanionCaptureIntent freezeBonded(
+            FrozenBondedCapture frozen
+    ) {
+        return new BondedCompanionCaptureIntent(
+                frozen.callerNamespace(), frozen.idempotencyKey(),
+                frozen.actorUuid(), frozen.worldKey(), frozen.hotbarSlot(),
+                frozen.sourceFingerprint(), frozen.sourceNpcUuid(),
+                frozen.roleId(), frozen.rosterId(), frozen.rosterRevision(),
+                frozen.snapshot(), frozen.completionEffect(),
+                frozen.targetValid(), frozen.chanceSuccessful(),
+                frozen.tranquilized(), frozen.toolAccess(),
+                frozen.ownerAllowed(), frozen.roleAllowed()
+        );
+    }
+
+    record FrozenBondedCapture(
+            String callerNamespace, String idempotencyKey, UUID actorUuid,
+            String worldKey, int hotbarSlot, String sourceFingerprint,
+            UUID sourceNpcUuid, String roleId, String rosterId,
+            long rosterRevision,
+            com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot
+                    snapshot,
+            SpawnerPublishedEffect completionEffect,
+            boolean targetValid, boolean chanceSuccessful,
+            boolean tranquilized, boolean toolAccess,
+            boolean ownerAllowed, boolean roleAllowed
+    ) {}
 
     private SpawnerCaptureIntent tameAndLinkIntent(
             Player player,

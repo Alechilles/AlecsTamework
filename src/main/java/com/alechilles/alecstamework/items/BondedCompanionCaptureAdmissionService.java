@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -16,12 +17,15 @@ import javax.annotation.Nullable;
 final class BondedCompanionCaptureAdmissionService {
     private final SpawnerCapturePolicyService capturePolicy;
     @Nullable private final CommandItemRegistry commandItems;
+    @Nullable private final BondedCompanionRosterRegistry rosters;
 
     BondedCompanionCaptureAdmissionService(
             SpawnerCapturePolicyService capturePolicy,
-            @Nullable CommandItemRegistry commandItems) {
+            @Nullable CommandItemRegistry commandItems,
+            @Nullable BondedCompanionRosterRegistry rosters) {
         this.capturePolicy = Objects.requireNonNull(capturePolicy, "capturePolicy");
         this.commandItems = commandItems;
+        this.rosters = rosters;
     }
 
     boolean hasToolAccess(Player player, ItemFeatureConfig config) {
@@ -50,5 +54,19 @@ final class BondedCompanionCaptureAdmissionService {
         return world != null && world.getEntityStore() != null
                 && capturePolicy.isTranquilized(
                 targetRef, world.getEntityStore().getStore());
+    }
+
+    @Nullable
+    SpawnerCapturePolicyService.BondedAdmissionEvidence assess(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemStack source,
+            ItemFeatureConfig config
+    ) {
+        if (config == null || rosters == null) return null;
+        var roster = rosters.resolve(
+                config.getCaptureMechanics().bondedRosterId()).orElse(null);
+        return roster == null ? null : capturePolicy.assessBonded(
+                player, targetRef, config, source, roster);
     }
 }
