@@ -57,6 +57,20 @@ public final class TameworkFullStateSnapshotReader {
             @Nullable NpcAlias sourceAlias,
             @Nullable String roleId
     ) {
+        return readSourceNeutral(reference, store, sourceAlias, roleId);
+    }
+
+    /**
+     * Reads a profile-owned full-state snapshot without assigning the source
+     * NPC any durable roster or lifecycle authority.
+     */
+    @Nonnull
+    public ReadResult readSourceNeutral(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable Store<EntityStore> store,
+            @Nullable NpcAlias sourceAlias,
+            @Nullable String roleId
+    ) {
         return readInternal(
                 reference,
                 store,
