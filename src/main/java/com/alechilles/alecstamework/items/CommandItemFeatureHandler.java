@@ -230,7 +230,8 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 npcNameResolver,
                 rosterPanelRecordSource,
-                featurePresentations
+                featurePresentations,
+                BondedCompanionPanelEntrySourceService.production()
         );
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
@@ -360,7 +361,8 @@ public final class CommandItemFeatureHandler {
                 panelActionService,
                 talentPageService,
                 featurePresentations,
-                featureActions
+                featureActions,
+                BondedCompanionPanelActionRouter.production(feedbackService)
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

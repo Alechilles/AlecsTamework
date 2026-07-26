@@ -38,6 +38,27 @@ public final class BondedCompanionSnapshotPresentationMapper {
                 ? null : Double.toString(state.healthPercent()));
         put(data, "happiness", state.happiness() == null
                 ? null : Double.toString(state.happiness().getValue()));
+        put(data, "hunger", state.needs() == null
+                ? null : Double.toString(state.needs().getHunger()));
+        put(data, "thirst", state.needs() == null
+                ? null : Double.toString(state.needs().getThirst()));
+        put(data, "breedingReady", state.breeding() == null
+                ? null : Boolean.toString(state.breeding().isReady()));
+        put(data, "breedingEnabled", state.breeding() == null
+                ? null : Boolean.toString(state.breeding().isEnabled()));
+        if (state.attachments() != null) {
+            put(data, "attachments", state.attachments().getAttachmentIds().toString());
+        }
+        if (state.traits() != null) {
+            put(data, "traits", java.util.Arrays.stream(
+                    state.traits().getTraitValues())
+                    .map(value -> value.getId() + "=" + value.getValue())
+                    .collect(java.util.stream.Collectors.joining(", ")));
+        }
+        if (state.talents() != null) {
+            put(data, "talents", String.join(", ",
+                    state.talents().getPurchasedTalentIds()));
+        }
         return new Presentation(
                 first(snapshotName, role.displayName()),
                 role.species(),

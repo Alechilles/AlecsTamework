@@ -132,12 +132,12 @@ final class LinkedNpcPanelFeatureController {
         }
         if (commandId.startsWith(SUMMON_COMMAND_PREFIX)) {
             return invoke(
-                    commandId, SUMMON_COMMAND_PREFIX, summon
+                    commandId, SUMMON_COMMAND_PREFIX, summon, Action.SUMMON
             );
         }
         if (commandId.startsWith(DISMISS_COMMAND_PREFIX)) {
             return invoke(
-                    commandId, DISMISS_COMMAND_PREFIX, dismiss
+                    commandId, DISMISS_COMMAND_PREFIX, dismiss, Action.DISMISS
             );
         }
         if (!commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
@@ -163,16 +163,39 @@ final class LinkedNpcPanelFeatureController {
     private Outcome invoke(
             String commandId,
             String prefix,
-            Consumer<UUID> action
+            Consumer<UUID> action,
+            Action expected
     ) {
         UUID npcUuid = CommandUiIdParser.parseNpcUuid(
                 commandId, prefix
         );
-        if (npcUuid != null && presentation(npcUuid) != null) {
+        if (npcUuid != null && actionAvailable(
+                presentation(npcUuid), expected)) {
             action.accept(npcUuid);
         }
         return Outcome.REFRESH;
     }
+
+    private boolean actionAvailable(
+            CommandPanelFeaturePresentation row,
+            Action expected
+    ) {
+        if (row == null) return false;
+        if (row.bonded() != null) {
+            BondedCompanionStatusPresentation.Action action =
+                    row.bonded().status().action();
+            return row.bonded().status().actionEnabled()
+                    && (expected == Action.SUMMON
+                            ? action == BondedCompanionStatusPresentation.Action.SUMMON
+                            : action == BondedCompanionStatusPresentation.Action.DISMISS);
+        }
+        if (row.roster() == null) return false;
+        return expected == Action.SUMMON
+                ? row.roster().summonEnabled()
+                : row.roster().dismissEnabled();
+    }
+
+    private enum Action { SUMMON, DISMISS }
 
     enum Outcome {
         NOT_HANDLED,

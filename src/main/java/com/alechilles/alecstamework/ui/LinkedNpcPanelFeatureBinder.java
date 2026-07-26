@@ -33,18 +33,20 @@ final class LinkedNpcPanelFeatureBinder {
         builder.set(stateSelector + ".Visible", visible);
         builder.set(timerSelector + ".Visible", visible);
         builder.set(capacitySelector + ".Visible", visible);
-        builder.set(
-                summonSelector + ".Visible",
-                visible && row.roster().summonVisible()
-        );
-        builder.set(
-                dismissSelector + ".Visible",
-                visible && row.roster().dismissVisible()
-        );
         if (!visible) {
+            builder.set(summonSelector + ".Visible", false);
+            builder.set(dismissSelector + ".Visible", false);
+            return;
+        }
+        if (row.bonded() != null) {
+            bindBonded(builder, events, npcUuid, row.bonded(), config,
+                    stateSelector, timerSelector, capacitySelector,
+                    summonSelector, dismissSelector);
             return;
         }
         CommandRosterStatusPresentation roster = row.roster();
+        builder.set(summonSelector + ".Visible", roster.summonVisible());
+        builder.set(dismissSelector + ".Visible", roster.dismissVisible());
         builder.set(stateSelector + ".Text", stateText(roster, language));
         builder.set(timerSelector + ".Text", timerText(row, language));
         builder.set(
@@ -80,8 +82,61 @@ final class LinkedNpcPanelFeatureBinder {
     ) {
         return row != null
                 && row.managesPaidRevival()
-                && row.revival() != null
-                && row.revival().actionVisible();
+                && (row.bonded() != null
+                        ? row.bonded().status().action()
+                                == BondedCompanionStatusPresentation.Action.REVIVE
+                                && row.bonded().status().actionEnabled()
+                        : row.revival() != null
+                                && row.revival().actionVisible());
+    }
+
+    private static void bindBonded(
+            UICommandBuilder builder, UIEventBuilder events, UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            LinkedNpcPanelCardBinder.CardBindingConfig config,
+            String stateSelector, String detailSelector, String reasonSelector,
+            String summonSelector, String dismissSelector) {
+        BondedCompanionStatusPresentation status = row.status();
+        builder.set(stateSelector + ".Text", switch (status.state()) {
+            case STORED -> "Stored";
+            case ACTIVE -> "Active";
+            case DEAD -> "Dead";
+        });
+        builder.set(detailSelector + ".Text", bondedDetailText(row));
+        builder.set(reasonSelector + ".Text",
+                status.unavailableReason() == null ? "" : status.unavailableReason());
+        boolean summon = status.action()
+                == BondedCompanionStatusPresentation.Action.SUMMON;
+        boolean dismiss = status.action()
+                == BondedCompanionStatusPresentation.Action.DISMISS;
+        builder.set(summonSelector + ".Visible", summon);
+        builder.set(dismissSelector + ".Visible", dismiss);
+        if (summon && status.actionEnabled()) {
+            events.addEventBinding(CustomUIEventBindingType.Activating,
+                    summonSelector, EventData.of(config.eventCommandId(),
+                            config.summonCommandPrefix() + cardUuid), false);
+        }
+        if (dismiss && status.actionEnabled()) {
+            events.addEventBinding(CustomUIEventBindingType.Activating,
+                    dismissSelector, EventData.of(config.eventCommandId(),
+                            config.dismissCommandPrefix() + cardUuid), false);
+        }
+    }
+
+    static String bondedDetailText(BondedCompanionPanelPresentation row) {
+        java.util.ArrayList<String> details = new java.util.ArrayList<>();
+        if (row.species() != null) details.add(row.species());
+        if (row.rolePresentation() != null
+                && !row.rolePresentation().equalsIgnoreCase(row.species())) {
+            details.add(row.rolePresentation());
+        }
+        row.attributes().entrySet().stream()
+                .sorted(java.util.Map.Entry.comparingByKey())
+                .forEach(entry -> details.add(entry.getKey() + ": " + entry.getValue()));
+        row.extensions().entrySet().stream()
+                .sorted(java.util.Map.Entry.comparingByKey())
+                .forEach(entry -> details.add(entry.getKey() + ": " + entry.getValue()));
+        return String.join(" | ", details);
     }
 
     private static String stateText(

@@ -40,6 +40,8 @@ final class CommandPanelEntrySourceService {
     private final CommandRosterPanelRecordSource rosterRecordSource;
     @Nullable
     private final CommandPanelFeaturePresentationSource featurePresentations;
+    @Nullable
+    private final BondedCompanionPanelEntrySourceService bondedEntrySource;
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
@@ -51,6 +53,7 @@ final class CommandPanelEntrySourceService {
                 linkPolicyService,
                 npcNameResolver,
                 null,
+                null,
                 null
         );
     }
@@ -61,6 +64,18 @@ final class CommandPanelEntrySourceService {
                                    CommandNpcNameResolver npcNameResolver,
                                    @Nullable CommandRosterPanelRecordSource rosterRecordSource,
                                    @Nullable CommandPanelFeaturePresentationSource featurePresentations) {
+        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService,
+                npcNameResolver, rosterRecordSource, featurePresentations,
+                null);
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource,
+                                   @Nullable CommandPanelFeaturePresentationSource featurePresentations,
+                                   @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource) {
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -75,6 +90,7 @@ final class CommandPanelEntrySourceService {
         );
         this.rosterRecordSource = rosterRecordSource;
         this.featurePresentations = featurePresentations;
+        this.bondedEntrySource = bondedEntrySource;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -95,6 +111,14 @@ final class CommandPanelEntrySourceService {
                                        ItemStack stack,
                                        TwCommandItemConfig config,
                                        String toolId) {
+        if (player != null && config != null
+                && config.usesBondedCompanionRoster()
+                && bondedEntrySource != null) {
+            String worldName = player.getWorld() == null
+                    ? null : player.getWorld().getName();
+            return bondedEntrySource.buildSnapshot(
+                    player.getUuid(), config.getBondedRosterId(), worldName);
+        }
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);
         CommandLinkedPanelEntryService.ResolvedEntries rosterEntries =

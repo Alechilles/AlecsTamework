@@ -27,6 +27,7 @@ final class CommandSelectionPageService {
     private final CommandPanelActionService panelActionService;
     private final CommandTalentPageService talentPageService;
     private final CommandPanelFeatureActionService featureActions;
+    private final BondedCompanionPanelActionRouter bondedActions;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -39,6 +40,7 @@ final class CommandSelectionPageService {
                 resolutionService,
                 panelActionService,
                 talentPageService,
+                null,
                 null,
                 null
         );
@@ -53,12 +55,28 @@ final class CommandSelectionPageService {
             CommandPanelFeaturePresentationSource featurePresentations,
             CommandPanelFeatureActionService featureActions
     ) {
+        this(toolInventoryService, groupAssignPageService, resolutionService,
+                panelActionService, talentPageService, featurePresentations,
+                featureActions, null);
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions,
+            BondedCompanionPanelActionRouter bondedActions
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
         this.panelActionService = panelActionService;
         this.talentPageService = talentPageService;
         this.featureActions = featureActions;
+        this.bondedActions = bondedActions;
     }
 
     boolean open(Player player,
@@ -138,13 +156,16 @@ final class CommandSelectionPageService {
                 actions.cull(),
                 actions.respawn(),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.SUMMON
+                        player, config, npcUuid, FeatureAction.SUMMON,
+                        panelSnapshot
                 ),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.DISMISS
+                        player, config, npcUuid, FeatureAction.DISMISS,
+                        panelSnapshot
                 ),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.REVIVE
+                        player, config, npcUuid, FeatureAction.REVIVE,
+                        panelSnapshot
                 ),
                 actions.locate(),
                 actions.recall(),
@@ -204,14 +225,31 @@ final class CommandSelectionPageService {
         featurePresentations() {
             return current.featurePresentations();
         }
+
+        private CommandPanelFeaturePresentation presentation(UUID id) {
+            return id == null ? null : current.featurePresentations().get(id);
+        }
     }
 
     private void applyFeatureAction(
             Player player,
             TwCommandItemConfig config,
             UUID presentationUuid,
-            FeatureAction action
+            FeatureAction action,
+            CoherentPanelSnapshot snapshot
     ) {
+        CommandPanelFeaturePresentation feature = snapshot == null
+                ? null : snapshot.presentation(presentationUuid);
+        if (config != null && config.usesBondedCompanionRoster()) {
+            if (bondedActions != null) {
+                bondedActions.route(player, config, feature, switch (action) {
+                    case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
+                    case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
+                    case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
+                });
+            }
+            return;
+        }
         if (featureActions == null) {
             return;
         }
