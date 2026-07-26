@@ -1,0 +1,266 @@
+package com.alechilles.alecstamework.persistence.adapter.sqlite;
+
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaManager;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Behavioral contract tests for owner-scoped bonded profile and lease storage. */
+class SqliteBondedCompanionStoreTest {
+    private static final UUID OWNER_A =
+            UUID.fromString("10000000-0000-0000-0000-000000000001");
+    private static final UUID OWNER_B =
+            UUID.fromString("10000000-0000-0000-0000-000000000002");
+    private static final UUID NPC_A =
+            UUID.fromString("20000000-0000-0000-0000-000000000001");
+    private static final UUID NPC_B =
+            UUID.fromString("20000000-0000-0000-0000-000000000002");
+
+    @TempDir
+    Path tempDir;
+
+    private BondedCompanionStore store;
+
+    @BeforeEach
+    void setUp() {
+        SqliteConnectionFactory connections = new SqliteConnectionFactory(
+                tempDir.resolve("bonded-companions.sqlite")
+        );
+        assertTrue(new BondedCompanionSchemaManager(connections, () -> -20_000L)
+                .initialize().availability().available());
+        store = new BondedCompanionStore(connections);
+    }
+
+    @Test
+    void createsAndListsOnlyProfilesInTheExactOwnerRosterScope() {
+        SqliteBondedCompanionProfileRow alpha = profile(
+                "profile-a", OWNER_A, "roster-a", -10_000L
+        );
+        SqliteBondedCompanionProfileRow beta = profile(
+                "profile-b", OWNER_A, "roster-b", -9_000L
+        );
+        SqliteBondedCompanionProfileRow foreign = profile(
+                "profile-c", OWNER_B, "roster-a", -8_000L
+        );
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.createProfile(alpha).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.createProfile(beta).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.createProfile(foreign).code());
+
+        assertEquals(List.of(alpha), store.listProfiles(OWNER_A, "roster-a"));
+        assertEquals(List.of(), store.listProfiles(OWNER_B, "roster-b"));
+        assertEquals(SqliteBondedCompanionStore.MutationCode.NOT_OWNER,
+                store.updateSnapshot(
+                        OWNER_B, "roster-a", "profile-a", 0,
+                        "{\"health\":9}", -7_000L
+                ).code());
+    }
+
+    @Test
+    void optimisticRevisionRejectsStaleProfileWritesAndEmptySnapshots() {
+        SqliteBondedCompanionProfileRow initial = profile(
+                "profile-a", OWNER_A, "roster-a", -10_000L
+        );
+        store.createProfile(initial);
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.updateSnapshot(
+                        OWNER_A, "roster-a", "profile-a", 0,
+                        "{\"health\":9}", -9_000L
+                ).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.REVISION_CONFLICT,
+                store.updateSnapshot(
+                        OWNER_A, "roster-a", "profile-a", 0,
+                        "{\"health\":8}", -8_000L
+                ).code());
+        assertEquals(1L, store.findProfile(
+                OWNER_A, "roster-a", "profile-a"
+        ).orElseThrow().revision());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.VALIDATION_FAILED,
+                store.updateSnapshot(
+                        OWNER_A, "roster-a", "profile-a", 1,
+                        " ", -7_000L
+                ).code());
+        assertThrows(IllegalArgumentException.class, () ->
+                new SqliteBondedCompanionProfileRow(
+                        "empty", OWNER_A, "roster-a", "family:wolf",
+                        "role:companion", BondedCompanionState.STORED, 0,
+                        "{}", -10_000L, -10_000L, "{}", null, null,
+                        null, null, 0L, 0L, null, null
+                ));
+    }
+
+    @Test
+    void extensionDataCompareAndSetIsOwnerScopedAndRevisionSafe() {
+        store.createProfile(profile("profile-a", OWNER_A, "roster-a", -10_000L));
+        SqliteBondedCompanionExtensionDataRow first =
+                new SqliteBondedCompanionExtensionDataRow(
+                        "profile-a", "example:stats", "{\"xp\":1}",
+                        0, -9_000L
+                );
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.compareAndSetExtensionData(
+                        OWNER_A, "roster-a", first, -1
+                ).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.REVISION_CONFLICT,
+                store.compareAndSetExtensionData(
+                        OWNER_A, "roster-a",
+                        new SqliteBondedCompanionExtensionDataRow(
+                                "profile-a", "example:stats", "{\"xp\":2}",
+                                1, -8_000L
+                        ),
+                        -1
+                ).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.NOT_OWNER,
+                store.compareAndSetExtensionData(
+                        OWNER_B, "roster-a",
+                        new SqliteBondedCompanionExtensionDataRow(
+                                "profile-a", "example:stats", "{\"xp\":2}",
+                                1, -8_000L
+                        ),
+                        0
+                ).code());
+        assertEquals(first, store.findExtensionData(
+                OWNER_A, "roster-a", "profile-a", "example:stats"
+        ).orElseThrow());
+    }
+
+    @Test
+    void oneProfileCannotAcquireTwoLeasesAndExpirySupportsSignedTimeAndUnlimitedZero() {
+        store.createProfile(profile("profile-a", OWNER_A, "roster-a", -10_000L));
+        store.createProfile(profile("profile-b", OWNER_A, "roster-a", -9_000L));
+        SqliteBondedCompanionLeaseRow lease = lease(
+                "profile-a", "lease-a", NPC_A, -8_000L, -2_000L
+        );
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.acquireLease(OWNER_A, "roster-a", 0, lease).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.INVALID_STATE,
+                store.acquireLease(
+                        OWNER_A, "roster-a", 1,
+                        lease("profile-a", "lease-b", NPC_B, -7_000L, 0L)
+                ).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.CONFLICT,
+                store.acquireLease(
+                        OWNER_A, "roster-a", 0,
+                        lease("profile-b", "lease-c", NPC_A, -7_000L, 0L)
+                ).code());
+        assertEquals(List.of(lease), store.findExpiredLeases(-1_000L, 10));
+        assertEquals(List.of(), store.findExpiredLeases(-3_000L, 10));
+
+        SqliteBondedCompanionLeaseRow unlimited = lease(
+                "profile-b", "lease-unlimited", NPC_B, -7_000L, 0L
+        );
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.acquireLease(
+                        OWNER_A, "roster-a", 0, unlimited
+                ).code());
+        assertTrue(unlimited.unlimited());
+        assertEquals(List.of(lease), store.findExpiredLeases(50_000L, 10));
+    }
+
+    @Test
+    void invalidTransitionsAreRejectedAndLeaseReleaseReturnsProfileToStored() {
+        store.createProfile(profile("profile-a", OWNER_A, "roster-a", -10_000L));
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.INVALID_STATE,
+                store.reviveProfile(
+                        OWNER_A, "roster-a", "profile-a", 0, -9_000L
+                ).code());
+        SqliteBondedCompanionLeaseRow lease = lease(
+                "profile-a", "lease-a", NPC_A, -8_000L, 0L
+        );
+        store.acquireLease(OWNER_A, "roster-a", 0, lease);
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.releaseLease(
+                        OWNER_A, "roster-a", "profile-a", "lease-a",
+                        1, -7_000L
+                ).code());
+        assertEquals(BondedCompanionState.STORED, store.findProfile(
+                OWNER_A, "roster-a", "profile-a"
+        ).orElseThrow().state());
+    }
+
+    @Test
+    void cleanupAndOperationRetentionAreBoundedAndIdempotencyIsScoped() {
+        store.createProfile(profile("profile-a", OWNER_A, "roster-a", -10_000L));
+        SqliteBondedCompanionCleanupRow old = cleanup("cleanup-a", NPC_A, -6_000L);
+        SqliteBondedCompanionCleanupRow future = cleanup("cleanup-b", NPC_B, 5_000L);
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.enqueueCleanup(OWNER_A, "roster-a", old).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.enqueueCleanup(OWNER_A, "roster-a", future).code());
+        assertEquals(1, store.pruneCleanup(0L, 1));
+        assertEquals(List.of(future), store.listCleanup(OWNER_A, "roster-a", 10));
+
+        SqliteBondedCompanionOperationRow operation =
+                new SqliteBondedCompanionOperationRow(
+                        "example", "request-1", OWNER_A, "roster-a",
+                        "profile-a", "SUMMON", "a".repeat(64), "PENDING",
+                        null, -5_000L, -5_000L, 1_000L
+                );
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.recordOperation(operation).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.IDEMPOTENT_REPLAY,
+                store.recordOperation(operation).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.CONFLICT,
+                store.recordOperation(new SqliteBondedCompanionOperationRow(
+                        "example", "request-1", OWNER_A, "roster-a",
+                        "profile-a", "STORE", "b".repeat(64), "PENDING",
+                        null, -4_000L, -4_000L, 1_000L
+                )).code());
+        assertEquals(1, store.pruneOperations(2_000L, 1));
+    }
+
+    private SqliteBondedCompanionProfileRow profile(
+            String id,
+            UUID owner,
+            String roster,
+            long createdAt
+    ) {
+        return new SqliteBondedCompanionProfileRow(
+                id, owner, roster, "family:wolf", "role:companion",
+                BondedCompanionState.STORED, 0, "{\"health\":10}",
+                createdAt, createdAt, "{\"leaseMs\":0}", "Wolf",
+                "Wolf", "Female", null, 0L, 0L, null, null
+        );
+    }
+
+    private SqliteBondedCompanionLeaseRow lease(
+            String profileId,
+            String token,
+            UUID npc,
+            long startedAt,
+            long expiresAt
+    ) {
+        return new SqliteBondedCompanionLeaseRow(
+                profileId, token, npc, "world-a", startedAt, expiresAt,
+                "LIVE"
+        );
+    }
+
+    private SqliteBondedCompanionCleanupRow cleanup(
+            String id,
+            UUID npc,
+            long retainedUntil
+    ) {
+        return new SqliteBondedCompanionCleanupRow(
+                id, OWNER_A, "roster-a", "profile-a", null,
+                "PROJECTION", npc, "stale-projection", "COMPLETED",
+                1, -7_000L, -7_000L, retainedUntil
+        );
+    }
+}
