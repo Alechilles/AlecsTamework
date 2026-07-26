@@ -78,3 +78,48 @@ No live in-game UI session was run for this isolated task. Documentation/changel
 - Required ECS/player-access grep: no matches.
 - `git diff --check`: PASS.
 - Full `./mvnw test`: 3170 tests executed, 3165 passed, 1 skipped, with only the same four unrelated pre-existing failures listed above. All bonded companion and changed-area tests passed.
+
+## Review fix round 4
+
+### Root causes
+
+- `HytaleBondedCompanionActionContextFactory` used `CombinedItemContainer.replaceAll` as though the returned list transaction were atomic. Hytale 0.5.7 source shows `ItemContainer.replaceAll` writes each replacement immediately while iterating and returns a successful list transaction. A late slot mismatch could therefore leave earlier slots debited, after which the old failure branch removed the pending receipt.
+- The same adapter ignored the verified boolean returned by `markCharged()`. A full debit could be returned to the API without canonical charged evidence; a retry could neither recover that charge nor prevent another debit.
+- The direct panel payment path had only pending/charged/compensating markers, but no durable quantity evidence for distinguishing a prepared attempt from a partial/full debit after a failed state transition.
+
+### Corrections
+
+- Added a focused `BondedCompanionChargeCoordinator` state machine. It admits a debit only after a prepared receipt has been read back, never debits a prepared/recovery/conflict operation twice, and compensates any observed partial/full noncanonical debit before allowing another action.
+- Replaced slot-by-slot `replaceAll` charging with Hytale's `removeItemStack(..., allOrNothing=true, filter=false)`. The engine prevalidates the full combined inventory and performs the removal while holding all constituent container write locks.
+- Prepared receipt keys now retain the operation's pre-debit item quantity. Immediate readback classifies the bounded operation-keyed marker as `PREPARED`, `DEBITED`, `CHARGED`, `COMPENSATING`, `COMPENSATED`, or `CONFLICT`. An unexpected partial result refunds only the measured debit, never the full quote.
+- Failed charged transitions immediately enter receipt-first compensation. If the refund or receipt transition cannot finish synchronously, the prepared/compensating receipt remains on the player and retry resumes compensation instead of charging again.
+- Successful compensation now leaves one bounded compensated tombstone for that operation. This prevents the same idempotency key from charging again after receipt-tagged refund delivery. Canonically committed charges still release their receipt after the SQLite mutation is durable.
+- The core API now recognizes compensation-pending receipts returned directly by a fresh consume attempt, not only receipts recovered at the start of a retry.
+
+### TDD evidence
+
+- RED: `BondedCompanionChargeCoordinatorTest` initially failed compilation because the coordinator contract did not exist.
+- RED: the compensation tombstone regression then failed compilation on the missing `COMPENSATED` state.
+- GREEN: deterministic coverage now proves multi-slot contention leaves the untouched slot intact, an unexpected one-slot partial debit restores only that slot, a failed charged transition preserves recovery, and subsequent retries neither debit nor refund twice.
+
+### Hytale source verification
+
+- Hytale Workshop release `0.5.7`, `com.hypixel.hytale.server.core.inventory.container.ItemContainer#replaceAll`: replacements are installed one slot at a time inside the loop.
+- Hytale Workshop release `0.5.7`, `com.hypixel.hytale.server.core.inventory.container.InternalContainerUtilItemStack#internal_removeItemStack`: `allOrNothing` performs a complete prevalidation before mutation.
+- Hytale Workshop release `0.5.7`, `com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer`: the combined write action locks every constituent container for the operation.
+- Engine reference validation found all changed receipt-plan references. Factory validation found all real engine calls; its one reported `CombinedItemContainer#inventory` miss is a static-analysis false association with the mod's private `PlayerInventory.inventory()` helper, and the Java compile passed.
+
+### Review-fix verification
+
+- Coordinator plus real SQLite lifecycle suite: 6 tests, 0 failures, 0 errors.
+- Expanded bonded panel/payment/refund/receipt suite: 25 tests, 0 failures, 0 errors.
+- Routing, bonded boundary, ECS/thread safety, replacement architecture, and forked crash matrix: 22 tests, 0 failures, 0 errors.
+- Required ECS/player-access grep: no matches.
+- `git diff --check`: PASS.
+- Generated agent index rebuilt for the added source/test files.
+- Full `./mvnw test`: 3,175 tests executed, 3,170 passed, 1 skipped, with only the same four unrelated pre-existing failures listed above. Every bonded/payment/changed-area test passed.
+- `check-agent-docs.ps1` reached the known linked-worktree limitation and stopped because this worktree does not contain the externally supplied root `AGENTS.md`.
+
+### Remaining validation
+
+No live in-game inventory contention session was run. The atomicity contract is grounded in Hytale 0.5.7 source and covered through the deterministic coordinator seam; runtime behavior still warrants normal release smoke testing.

@@ -11,13 +11,9 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
-import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
-import com.hypixel.hytale.server.core.inventory.transaction.ListTransaction;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
 /** Freezes panel placement and exposes the current player's exact inventory. */
@@ -73,6 +69,9 @@ final class HytaleBondedCompanionActionContextFactory {
             @Nullable ComponentType<EntityStore,
                     TameworkInventoryOperationReceiptsComponent> receiptType
     ) implements BondedCompanionActionContext.Inventory {
+        private static final BondedCompanionChargeCoordinator CHARGES =
+                new BondedCompanionChargeCoordinator();
+
         @Override
         public int availableQuantity(String itemId) {
             CombinedItemContainer inventory = this.inventory();
@@ -92,10 +91,13 @@ final class HytaleBondedCompanionActionContextFactory {
                 String operationId, String itemId, int quantity) {
             HytaleBondedCompanionChargeReceiptPlan receipt = receipt(
                     operationId, itemId, quantity);
-            if (receipt == null || !receipt.recoverable()) return null;
             CombinedItemContainer inventory = inventory();
-            return inventory == null
-                    ? null : new ExactChargeReceipt(receipt, inventory, true);
+            if (receipt == null || inventory == null) return null;
+            ChargeAttempt attempt = new ChargeAttempt(
+                    receipt, inventory, itemId, quantity);
+            BondedCompanionChargeCoordinator.Outcome outcome =
+                    CHARGES.find(attempt);
+            return chargeReceipt(receipt, inventory, outcome);
         }
 
         @Override
@@ -106,34 +108,11 @@ final class HytaleBondedCompanionActionContextFactory {
             if (receipt == null) return null;
             CombinedItemContainer inventory = this.inventory();
             if (inventory == null) return null;
-            if (receipt.charged()) {
-                return new ExactChargeReceipt(receipt, inventory, true);
-            }
-            if (!receipt.installPending()) return null;
-            Map<Short, SlotCharge> charges = chargePlan(
-                    inventory, itemId, quantity);
-            if (charges == null) {
-                receipt.release();
-                return null;
-            }
-            AtomicBoolean mismatch = new AtomicBoolean();
-            ListTransaction<ItemStackSlotTransaction> transaction =
-                    inventory.replaceAll((slot, current) -> {
-                        SlotCharge charge = charges.get(slot);
-                        if (charge == null) return current;
-                        if (!charge.original().equals(current)) {
-                            mismatch.set(true);
-                            return current;
-                        }
-                        return charge.replacement();
-                    });
-            if (transaction == null || !transaction.succeeded()
-                    || mismatch.get()) {
-                receipt.release();
-                return null;
-            }
-            receipt.markCharged();
-            return new ExactChargeReceipt(receipt, inventory, false);
+            ChargeAttempt attempt = new ChargeAttempt(
+                    receipt, inventory, itemId, quantity);
+            BondedCompanionChargeCoordinator.Outcome outcome =
+                    CHARGES.consume(attempt);
+            return chargeReceipt(receipt, inventory, outcome);
         }
 
         @Nullable
@@ -163,43 +142,132 @@ final class HytaleBondedCompanionActionContextFactory {
             }
         }
 
-        private Map<Short, SlotCharge> chargePlan(
-                CombinedItemContainer inventory, String itemId, int quantity) {
-            HashMap<Short, SlotCharge> charges = new HashMap<>();
-            int remaining = quantity;
-            for (short slot = 0;
-                    slot < inventory.getCapacity() && remaining > 0; slot++) {
-                ItemStack stack = inventory.getItemStack(slot);
-                if (stack == null || !itemId.equals(stack.getItemId())) continue;
-                int remove = Math.min(remaining, stack.getQuantity());
-                if (remove > 0) {
-                    charges.put(slot, new SlotCharge(
-                            stack, stack.withQuantity(
-                                    stack.getQuantity() - remove)));
-                }
-                remaining -= remove;
-            }
-            return remaining == 0 ? Map.copyOf(charges) : null;
+        @Nullable
+        private ExactChargeReceipt chargeReceipt(
+                HytaleBondedCompanionChargeReceiptPlan receipt,
+                CombinedItemContainer inventory,
+                BondedCompanionChargeCoordinator.Outcome outcome) {
+            return switch (outcome.status()) {
+                case UNAVAILABLE -> null;
+                case CHARGED -> new ExactChargeReceipt(
+                        receipt, inventory, outcome.replayed(), false);
+                case RECOVERY_PENDING -> new ExactChargeReceipt(
+                        receipt, inventory, true, true);
+            };
         }
-
     }
 
-    private record SlotCharge(ItemStack original, ItemStack replacement) {}
+    private static final class ChargeAttempt implements
+            BondedCompanionChargeCoordinator.Attempt {
+        private final HytaleBondedCompanionChargeReceiptPlan receipt;
+        private final CombinedItemContainer inventory;
+        private final String itemId;
+        private final int quantity;
+
+        private ChargeAttempt(HytaleBondedCompanionChargeReceiptPlan receipt,
+                              CombinedItemContainer inventory,
+                              String itemId, int quantity) {
+            this.receipt = receipt;
+            this.inventory = inventory;
+            this.itemId = itemId;
+            this.quantity = quantity;
+        }
+
+        @Override
+        public BondedCompanionChargeCoordinator.State state() {
+            try {
+                return receipt.state(availableQuantity());
+            } catch (RuntimeException | LinkageError failure) {
+                return BondedCompanionChargeCoordinator.State.CONFLICT;
+            }
+        }
+
+        @Override
+        public boolean installPending() {
+            try {
+                return receipt.installPending(availableQuantity());
+            } catch (RuntimeException | LinkageError failure) {
+                return false;
+            }
+        }
+
+        @Override
+        public BondedCompanionChargeCoordinator.DebitResult debitAtomically() {
+            int before = availableQuantity();
+            ItemStackTransaction transaction = null;
+            try {
+                transaction = inventory.removeItemStack(
+                        new ItemStack(itemId, quantity), true, false);
+            } catch (RuntimeException | LinkageError ignored) {
+                // The measured post-state below decides whether recovery is needed.
+            }
+            int debited = before - availableQuantity();
+            if (debited == 0) {
+                return BondedCompanionChargeCoordinator.DebitResult.NONE;
+            }
+            return debited == quantity && transaction != null
+                    && transaction.succeeded()
+                    && ItemStack.isEmpty(transaction.getRemainder())
+                    ? BondedCompanionChargeCoordinator.DebitResult.EXACT
+                    : BondedCompanionChargeCoordinator.DebitResult.PARTIAL;
+        }
+
+        @Override
+        public boolean markCharged() {
+            try {
+                return receipt.markCharged(availableQuantity());
+            } catch (RuntimeException | LinkageError failure) {
+                return false;
+            }
+        }
+
+        @Override
+        public boolean refund() {
+            try {
+                return receipt.refund(inventory);
+            } catch (RuntimeException | LinkageError failure) {
+                return false;
+            }
+        }
+
+        @Override
+        public boolean releasePrepared() {
+            try {
+                return receipt.releasePrepared(availableQuantity());
+            } catch (RuntimeException | LinkageError failure) {
+                return false;
+            }
+        }
+
+        private int availableQuantity() {
+            int available = 0;
+            for (short slot = 0; slot < inventory.getCapacity(); slot++) {
+                ItemStack stack = inventory.getItemStack(slot);
+                if (stack != null && itemId.equals(stack.getItemId())) {
+                    available = Math.addExact(available, stack.getQuantity());
+                }
+            }
+            return available;
+        }
+    }
 
     private static final class ExactChargeReceipt implements
             BondedCompanionActionContext.ChargeReceipt {
         private final HytaleBondedCompanionChargeReceiptPlan receipt;
         private final CombinedItemContainer inventory;
         private final boolean replayed;
+        private final boolean recoveryPending;
         private boolean refunded;
         private boolean completed;
 
         private ExactChargeReceipt(
                 HytaleBondedCompanionChargeReceiptPlan receipt,
-                CombinedItemContainer inventory, boolean replayed) {
+                CombinedItemContainer inventory, boolean replayed,
+                boolean recoveryPending) {
             this.receipt = receipt;
             this.inventory = inventory;
             this.replayed = replayed;
+            this.recoveryPending = recoveryPending;
         }
 
         @Override
@@ -214,7 +282,7 @@ final class HytaleBondedCompanionActionContextFactory {
 
         @Override
         public boolean compensationPending() {
-            return receipt.compensating();
+            return recoveryPending;
         }
 
         @Override

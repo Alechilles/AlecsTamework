@@ -252,6 +252,12 @@ public final class BondedCompanionCoreApiOperations {
             return failure(BondedCompanionResultCode.POLICY_DENIED,
                     "bonded-revive-payment-unavailable");
         }
+        if (safeCompensationPending(charge)) {
+            if (!safeRefund(charge)) {
+                return internal("bonded-revive-payment-compensation-pending");
+            }
+            return internal("bonded-revive-payment-compensated");
+        }
         return commitRevive(action, price, charge);
     }
 
