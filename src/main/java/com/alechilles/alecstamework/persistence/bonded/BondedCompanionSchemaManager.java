@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
-import com.google.gson.JsonParser;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -10,20 +9,19 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
 /** Creates and verifies only the standalone bonded-companion schema lineage v1. */
 public final class BondedCompanionSchemaManager {
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
     public static final String LINEAGE = "bonded-companions";
-    private static final String RESOURCE = "/persistence/bonded/v1.sql";
+    private static final String V1_RESOURCE = "/persistence/bonded/v1.sql";
+    private static final String V2_RESOURCE = "/persistence/bonded/v2.sql";
     private static final Set<String> REQUIRED_TABLES = Set.of(
             "bonded_schema_history",
             "bonded_companion_profile",
@@ -35,8 +33,10 @@ public final class BondedCompanionSchemaManager {
 
     private final SqliteConnectionFactory connections;
     private final LongSupplier clock;
-    private final String script;
-    private final String scriptHash;
+    private final String v1Script;
+    private final String v2Script;
+    private final String v1Hash;
+    private final String v2Hash;
 
     BondedCompanionSchemaManager(
             @Nonnull SqliteConnectionFactory connections
@@ -50,8 +50,10 @@ public final class BondedCompanionSchemaManager {
     ) {
         this.connections = Objects.requireNonNull(connections, "connections");
         this.clock = Objects.requireNonNull(clock, "clock");
-        script = loadScript();
-        scriptHash = sha256(script);
+        v1Script = loadScript(V1_RESOURCE);
+        v2Script = loadScript(V2_RESOURCE);
+        v1Hash = sha256(v1Script);
+        v2Hash = sha256(v2Script);
     }
 
     /** Creates a manager that owns connections to the supplied database path. */
@@ -72,17 +74,28 @@ public final class BondedCompanionSchemaManager {
     @Nonnull
     public BondedCompanionPersistenceReadiness initialize() {
         try (Connection connection = connections.openWriterConnection()) {
+            setForeignKeys(connection, false);
             connection.setAutoCommit(false);
             try {
-                if (tables(connection).isEmpty()) {
-                    create(connection);
+                Set<String> existingTables = tables(connection);
+                if (existingTables.isEmpty()) {
+                    createCurrent(connection);
+                } else if (!existingTables.equals(REQUIRED_TABLES)) {
+                    throw new VerificationFailure("bonded-schema-table-mismatch");
+                } else if (latestVersion(connection) == 1) {
+                    verifyV1(connection);
+                    upgradeV1(connection);
                 } else {
                     verify(connection);
                 }
                 connection.commit();
+                connection.setAutoCommit(true);
+                setForeignKeys(connection, true);
                 return BondedCompanionPersistenceReadiness.ready();
             } catch (Exception failure) {
                 connection.rollback();
+                connection.setAutoCommit(true);
+                setForeignKeys(connection, true);
                 return failure(failure);
             }
         } catch (Exception failure) {
@@ -104,7 +117,7 @@ public final class BondedCompanionSchemaManager {
     /** Returns the SHA-256 of the exact bundled bonded v1 schema. */
     @Nonnull
     public String schemaHash() {
-        return scriptHash;
+        return v2Hash;
     }
 
     /** Returns the exact bonded-only user-table set. */
@@ -113,26 +126,31 @@ public final class BondedCompanionSchemaManager {
         return REQUIRED_TABLES;
     }
 
-    private void create(Connection connection) throws Exception {
-        for (String sql : script.split(";\\s*(?:\\R|\\z)")) {
-            if (!sql.isBlank()) {
-                try (Statement statement = connection.createStatement()) {
-                    statement.execute(sql);
-                }
-            }
-        }
+    private void createCurrent(Connection connection) throws Exception {
+        executeScript(connection, v1Script);
+        insertHistory(connection, 1, v1Hash);
+        upgradeV1(connection);
+    }
+
+    private void upgradeV1(Connection connection) throws Exception {
+        executeScript(connection, v2Script);
+        insertHistory(connection, 2, v2Hash);
+        verify(connection);
+    }
+
+    private void insertHistory(Connection connection, int version, String hash)
+            throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO bonded_schema_history(
                     version, lineage, applied_at_ms, schema_hash
                 ) VALUES (?, ?, ?, ?)
                 """)) {
-            statement.setInt(1, VERSION);
+            statement.setInt(1, version);
             statement.setString(2, LINEAGE);
             statement.setLong(3, clock.getAsLong());
-            statement.setString(4, scriptHash);
+            statement.setString(4, hash);
             statement.executeUpdate();
         }
-        verify(connection);
     }
 
     private void verify(Connection connection) throws Exception {
@@ -140,21 +158,19 @@ public final class BondedCompanionSchemaManager {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
         try (Statement statement = connection.createStatement();
-             ResultSet row = statement.executeQuery("""
+             ResultSet rows = statement.executeQuery("""
                      SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history
+                     FROM bonded_schema_history ORDER BY version
                      """)) {
-            if (!row.next()
-                    || row.getInt("version") != VERSION
-                    || !LINEAGE.equals(row.getString("lineage"))
-                    || !scriptHash.equals(row.getString("schema_hash"))
-                    || row.next()) {
-                throw new VerificationFailure(
-                        "bonded-schema-history-mismatch"
-                );
-            }
+            verifyHistoryRow(rows, 1, v1Hash);
+            verifyHistoryRow(rows, 2, v2Hash);
+            if (rows.next()) throw historyMismatch();
         }
-        verifyStoredRows(connection);
+        try {
+            new BondedCompanionStoredRowValidator().verify(connection);
+        } catch (BondedCompanionStoredRowValidator.InvalidRecordException failure) {
+            throw new VerificationFailure("bonded-stored-record-invalid");
+        }
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",
                 "bonded-integrity-check-failed");
         try (Statement statement = connection.createStatement();
@@ -183,108 +199,47 @@ public final class BondedCompanionSchemaManager {
         }
     }
 
-    private void verifyStoredRows(Connection connection) throws Exception {
-        verifyProfiles(connection);
-        verifyLeases(connection);
-        verifyCleanup(connection);
-        verifyOperations(connection);
-    }
-
-    private void verifyProfiles(Connection connection) throws Exception {
+    private void verifyV1(Connection connection) throws Exception {
+        if (!tables(connection).equals(REQUIRED_TABLES)) {
+            throw new VerificationFailure("bonded-schema-table-mismatch");
+        }
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("""
-                     SELECT owner_uuid, state, snapshot_json, policy_json
-                     FROM bonded_companion_profile
+                     SELECT version, lineage, schema_hash
+                     FROM bonded_schema_history ORDER BY version
                      """)) {
-            while (rows.next()) {
-                requireUuid(rows.getString(1));
-                com.alechilles.alecstamework.companion.bonded.BondedCompanionState
-                        .valueOf(rows.getString(2));
-                var snapshot = JsonParser.parseString(rows.getString(3));
-                if (!snapshot.isJsonObject()) throw invalidRecord();
-                var object = snapshot.getAsJsonObject();
-                if (!object.has("encoding")
-                        || !"base64".equals(object.get("encoding").getAsString())
-                        || !object.has("payload")) throw invalidRecord();
-                if (Base64.getDecoder().decode(object.get("payload").getAsString()).length == 0)
-                    throw invalidRecord();
-                if (!JsonParser.parseString(rows.getString(4)).isJsonObject())
-                    throw invalidRecord();
+            verifyHistoryRow(rows, 1, v1Hash);
+            if (rows.next()) throw historyMismatch();
+        }
+        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
+                "bonded-integrity-check-failed");
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA foreign_key_check")) {
+            if (rows.next()) {
+                throw new VerificationFailure("bonded-foreign-key-check-failed");
             }
-        } catch (VerificationFailure failure) {
-            throw failure;
-        } catch (RuntimeException failure) {
-            throw invalidRecord();
         }
     }
 
-    private void verifyLeases(Connection connection) throws Exception {
-        verifyUuidAndVocabulary(connection, """
-                SELECT live_npc_uuid, projection_state FROM bonded_companion_lease
-                """, Set.of("PENDING", "LIVE", "REMOVE_PENDING"));
+    private void verifyHistoryRow(ResultSet rows, int version, String hash)
+            throws Exception {
+        if (!rows.next() || rows.getInt("version") != version
+                || !LINEAGE.equals(rows.getString("lineage"))
+                || !hash.equals(rows.getString("schema_hash"))) {
+            throw historyMismatch();
+        }
     }
 
-    private void verifyCleanup(Connection connection) throws Exception {
+    private VerificationFailure historyMismatch() {
+        return new VerificationFailure("bonded-schema-history-mismatch");
+    }
+
+    private int latestVersion(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT owner_uuid, target_npc_uuid, target_kind,
-                            cleanup_state, retained_until_ms
-                     FROM bonded_companion_cleanup
-                     """)) {
-            while (rows.next()) {
-                requireUuid(rows.getString(1));
-                requireUuid(rows.getString(2));
-                if (!Set.of("SOURCE", "PROJECTION").contains(rows.getString(3))
-                        || !Set.of("PENDING", "COMPLETED", "ABANDONED").contains(rows.getString(4))
-                        || rows.getLong(5) == 0) throw invalidRecord();
-            }
-        } catch (VerificationFailure failure) { throw failure; }
-        catch (RuntimeException failure) { throw invalidRecord(); }
-    }
-
-    private void verifyOperations(Connection connection) throws Exception {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT owner_uuid, operation_type, operation_state,
-                            request_hash, expires_at_ms
-                     FROM bonded_companion_operation
-                     """)) {
-            while (rows.next()) {
-                requireUuid(rows.getString(1));
-                if (!Set.of("CAPTURE", "PROVISION", "SUMMON", "STORE", "REVIVE", "CLEANUP")
-                        .contains(rows.getString(2))
-                        || !Set.of("PENDING", "SUCCEEDED", "REJECTED", "FAILED")
-                        .contains(rows.getString(3))
-                        || !rows.getString(4).matches("[0-9a-f]{64}")
-                        || rows.getLong(5) == 0) throw invalidRecord();
-            }
-        } catch (VerificationFailure failure) { throw failure; }
-        catch (RuntimeException failure) { throw invalidRecord(); }
-    }
-
-    private void verifyUuidAndVocabulary(Connection connection, String sql,
-                                         Set<String> vocabulary) throws Exception {
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
-            while (rows.next()) {
-                requireUuid(rows.getString(1));
-                if (!vocabulary.contains(rows.getString(2))) throw invalidRecord();
-            }
-        } catch (VerificationFailure failure) { throw failure; }
-        catch (RuntimeException failure) { throw invalidRecord(); }
-    }
-
-    private VerificationFailure invalidRecord() {
-        return new VerificationFailure("bonded-stored-record-invalid");
-    }
-
-    private void requireUuid(String value) throws VerificationFailure {
-        try {
-            if (!UUID.fromString(value).toString().equals(value)) {
-                throw invalidRecord();
-            }
-        } catch (IllegalArgumentException failure) {
-            throw invalidRecord();
+             ResultSet row = statement.executeQuery(
+                     "SELECT MAX(version) FROM bonded_schema_history")) {
+            if (!row.next()) throw historyMismatch();
+            return row.getInt(1);
         }
     }
 
@@ -300,6 +255,24 @@ public final class BondedCompanionSchemaManager {
             }
         }
         return Set.copyOf(names);
+    }
+
+    private void executeScript(Connection connection, String script)
+            throws Exception {
+        for (String sql : script.split(";\\s*(?:\\R|\\z)")) {
+            if (!sql.isBlank()) {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute(sql);
+                }
+            }
+        }
+    }
+
+    private void setForeignKeys(Connection connection, boolean enabled)
+            throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA foreign_keys=" + (enabled ? "ON" : "OFF"));
+        }
     }
 
     private void assertSingleValue(
@@ -324,18 +297,19 @@ public final class BondedCompanionSchemaManager {
         return BondedCompanionPersistenceReadiness.failed(code);
     }
 
-    private String loadScript() {
-        try (InputStream stream = getClass().getResourceAsStream(RESOURCE)) {
+    private String loadScript(String resource) {
+        try (InputStream stream = getClass().getResourceAsStream(resource)) {
             if (stream == null) {
                 throw new IllegalStateException(
-                        "Missing bonded schema resource: " + RESOURCE
+                        "Missing bonded schema resource: " + resource
                 );
             }
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8)
                     .replace("\r\n", "\n")
                     .replace('\r', '\n');
         } catch (Exception failure) {
-            throw new IllegalStateException("Unable to load bonded schema v1", failure);
+            throw new IllegalStateException(
+                    "Unable to load bonded schema resource " + resource, failure);
         }
     }
 

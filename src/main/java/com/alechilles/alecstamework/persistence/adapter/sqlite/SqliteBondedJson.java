@@ -33,10 +33,15 @@ final class SqliteBondedJson {
         if (!isObject(value)) return false;
         try {
             var object = JsonParser.parseString(value).getAsJsonObject();
-            return object.has("encoding") && object.has("payload")
-                    && "base64".equals(object.get("encoding").getAsString())
-                    && Base64.getDecoder().decode(
-                            object.get("payload").getAsString()).length > 0;
+            if (!object.has("encoding") || !object.has("payload")) return false;
+            byte[] payload = switch (object.get("encoding").getAsString()) {
+                case "base64" -> Base64.getDecoder().decode(
+                        object.get("payload").getAsString());
+                case "hex-utf8" -> java.util.HexFormat.of().parseHex(
+                        object.get("payload").getAsString());
+                default -> new byte[0];
+            };
+            return payload.length > 0;
         } catch (RuntimeException failure) {
             return false;
         }

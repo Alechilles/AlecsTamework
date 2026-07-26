@@ -34,4 +34,45 @@ public interface BondedCompanionStore {
     @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> reviveProfile(
             @Nonnull BondedCompanionOperation operation, long expectedRevision,
             long updatedAtMs);
+
+    /** Replaces a complete profile snapshot under an optimistic revision. */
+    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> updateSnapshot(
+            @Nonnull BondedCompanionOperation operation, long expectedRevision,
+            @Nonnull BondedCompanionPayload snapshot, long updatedAtMs);
+
+    /** Releases the exact lease and returns its active profile to stored state. */
+    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> releaseLease(
+            @Nonnull BondedCompanionOperation operation, long expectedRevision,
+            @Nonnull String leaseToken, long updatedAtMs);
+
+    /** Finds one namespaced extension within the exact owner roster scope. */
+    @Nonnull Optional<BondedCompanionRecord.ExtensionData> findExtensionData(
+            @Nonnull UUID ownerUuid, @Nonnull String rosterId,
+            @Nonnull String profileId, @Nonnull String namespace);
+
+    /** Creates or replaces extension data under compare-and-set semantics. */
+    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.ExtensionData>
+            compareAndSetExtensionData(
+                    @Nonnull BondedCompanionOperation operation,
+                    @Nonnull BondedCompanionRecord.ExtensionData extension,
+                    long expectedRevision);
+
+    /** Lists finite leases expired at the supplied signed world timestamp. */
+    @Nonnull List<BondedCompanionRecord.Lease> findExpiredLeases(
+            long nowMs, int limit);
+
+    /** Enqueues one owner-scoped physical cleanup intent atomically. */
+    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Cleanup> enqueueCleanup(
+            @Nonnull BondedCompanionOperation operation,
+            @Nonnull BondedCompanionRecord.Cleanup cleanup);
+
+    /** Lists bounded cleanup intents in one exact owner roster scope. */
+    @Nonnull List<BondedCompanionRecord.Cleanup> listCleanup(
+            @Nonnull UUID ownerUuid, @Nonnull String rosterId, int limit);
+
+    /** Deletes at most the supplied number of retained cleanup intents. */
+    int pruneCleanup(long nowMs, int limit);
+
+    /** Deletes at most the supplied number of expired operation records. */
+    int pruneOperations(long nowMs, int limit);
 }

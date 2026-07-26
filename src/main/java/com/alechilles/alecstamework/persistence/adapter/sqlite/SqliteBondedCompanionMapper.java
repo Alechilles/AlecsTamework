@@ -18,7 +18,7 @@ final class SqliteBondedCompanionMapper {
         return new SqliteBondedCompanionProfileRow(
                 value.profileId(), value.ownerUuid(), value.rosterId(),
                 value.familyId(), value.roleId(), value.state(), value.revision(),
-                snapshotJson(value.snapshot()), value.createdAtMs(),
+                payloadJson(value.snapshot()), value.createdAtMs(),
                 value.updatedAtMs(), GSON.toJson(value.policy()),
                 value.displayName(), value.species(), value.gender(),
                 value.diedAtMs(), value.reviveCooldownUntilMs(),
@@ -31,7 +31,7 @@ final class SqliteBondedCompanionMapper {
         if (policy == null) throw new IllegalArgumentException("policy must be an object");
         return new BondedCompanionRecord.Profile(
                 row.profileId(), row.ownerUuid(), row.rosterId(), row.familyId(),
-                row.roleId(), row.state(), row.revision(), snapshot(row.snapshotJson()),
+                row.roleId(), row.state(), row.revision(), payload(row.snapshotJson()),
                 row.createdAtMs(), row.updatedAtMs(), policy, row.displayName(),
                 row.species(), row.gender(), row.diedAtMs(),
                 row.reviveCooldownUntilMs(), row.reviveCount(),
@@ -52,20 +52,59 @@ final class SqliteBondedCompanionMapper {
                 BondedCompanionRecord.ProjectionState.valueOf(row.projectionState()));
     }
 
-    private String snapshotJson(BondedCompanionPayload payload) {
+    SqliteBondedCompanionExtensionDataRow toRow(
+            BondedCompanionRecord.ExtensionData value) {
+        return new SqliteBondedCompanionExtensionDataRow(
+                value.profileId(), value.namespace(), payloadJson(value.payload()),
+                value.revision(), value.updatedAtMs());
+    }
+
+    BondedCompanionRecord.ExtensionData toDomain(
+            SqliteBondedCompanionExtensionDataRow row) {
+        return new BondedCompanionRecord.ExtensionData(
+                row.profileId(), row.namespace(), payload(row.jsonPayload()),
+                row.revision(), row.updatedAtMs());
+    }
+
+    SqliteBondedCompanionCleanupRow toRow(BondedCompanionRecord.Cleanup value) {
+        return new SqliteBondedCompanionCleanupRow(
+                value.cleanupId(), value.ownerUuid(), value.rosterId(),
+                value.profileId(), value.leaseToken(), value.target().name(),
+                value.targetNpcUuid(), value.reason(), value.state().name(),
+                value.attemptCount(), value.nextAttemptAtMs(), value.createdAtMs(),
+                value.retainedUntilMs());
+    }
+
+    BondedCompanionRecord.Cleanup toDomain(SqliteBondedCompanionCleanupRow row) {
+        return new BondedCompanionRecord.Cleanup(
+                row.cleanupId(), row.ownerUuid(), row.rosterId(), row.profileId(),
+                row.leaseToken(), BondedCompanionRecord.CleanupTarget
+                        .valueOf(row.targetKind()), row.targetNpcUuid(),
+                row.cleanupReason(), BondedCompanionRecord.CleanupState
+                        .valueOf(row.cleanupState()), row.attemptCount(),
+                row.nextAttemptAtMs(), row.createdAtMs(), row.retainedUntilMs());
+    }
+
+    String payloadJson(BondedCompanionPayload payload) {
         JsonObject json = new JsonObject();
         json.addProperty("encoding", "base64");
         json.addProperty("payload", Base64.getEncoder().encodeToString(payload.bytes()));
         return GSON.toJson(json);
     }
 
-    private BondedCompanionPayload snapshot(String json) {
+    BondedCompanionPayload payload(String json) {
         JsonObject object = GSON.fromJson(json, JsonObject.class);
-        if (object == null || !object.has("encoding") || !object.has("payload")
-                || !"base64".equals(object.get("encoding").getAsString())) {
+        if (object == null || !object.has("encoding") || !object.has("payload")) {
             throw new IllegalArgumentException("invalid complete snapshot envelope");
         }
-        byte[] bytes = Base64.getDecoder().decode(object.get("payload").getAsString());
+        byte[] bytes = switch (object.get("encoding").getAsString()) {
+            case "base64" -> Base64.getDecoder().decode(
+                    object.get("payload").getAsString());
+            case "hex-utf8" -> java.util.HexFormat.of().parseHex(
+                    object.get("payload").getAsString());
+            default -> throw new IllegalArgumentException(
+                    "invalid complete snapshot encoding");
+        };
         return BondedCompanionPayload.of(bytes);
     }
 }

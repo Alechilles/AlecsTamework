@@ -62,6 +62,22 @@ public final class BondedCompanionRecord {
         }
     }
 
+    /** One revisioned namespaced opaque extension payload. */
+    public record ExtensionData(
+            @Nonnull String profileId, @Nonnull String namespace,
+            @Nonnull BondedCompanionPayload payload, long revision,
+            long updatedAtMs
+    ) {
+        public ExtensionData {
+            profileId = text(profileId, "profileId");
+            namespace = text(namespace, "namespace");
+            payload = Objects.requireNonNull(payload, "payload");
+            if (revision < 0) {
+                throw new IllegalArgumentException("negative extension revision");
+            }
+        }
+    }
+
     /** Bounded cleanup intent. */
     public record Cleanup(
             @Nonnull String cleanupId, @Nonnull UUID ownerUuid,
