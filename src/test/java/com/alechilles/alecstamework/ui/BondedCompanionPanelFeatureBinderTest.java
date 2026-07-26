@@ -17,7 +17,8 @@ class BondedCompanionPanelFeatureBinderTest {
     @Test
     void bondedBindingDoesNotReadGenericRosterOrWriteEnabledProperties() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
-                "profile-7", "hydragon:dragons", 4L, "Nimbus",
+                "profile-7", "hydragon:dragons",
+                "Bonded_Miniwyvern_Storm", 4L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern", Map.of(), Map.of(),
                 new BondedCompanionStatusPresentation(
                         BondedCompanionState.STORED,
@@ -33,9 +34,32 @@ class BondedCompanionPanelFeatureBinderTest {
     }
 
     @Test
+    void ownerFamilyRowsSuppressLegacyActionsWithoutFeaturePresentation() {
+        UICommandBuilder commands = new UICommandBuilder();
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Dragon", 100, 100, 100, 100, "",
+                100, 100, 100, 100, true, false, false, false, false,
+                false, 0L, new LinkedNpcTraitIndicator[0]);
+
+        LinkedNpcPanelCardBinder.bind(
+                commands, new UIEventBuilder(), 0, entry, false, false,
+                bindingConfig(true), "en-US", null);
+
+        java.util.List<String> visibilityCommands = java.util.Arrays.stream(commands.getCommands())
+                .filter(command -> command.selector.endsWith("#LinkButton.Visible")
+                        || command.selector.endsWith("#RemoveButton.Visible"))
+                .map(command -> command.data)
+                .toList();
+        assertTrue(visibilityCommands.size() == 2
+                && visibilityCommands.stream().allMatch(data -> data.contains("false")),
+                visibilityCommands.toString());
+    }
+
+    @Test
     void durableDetailsIncludeSpeciesRoleAttributesAndMiniwyvernExtension() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
-                "profile-7", "hydragon:dragons", 4L, "Nimbus",
+                "profile-7", "hydragon:dragons",
+                "Bonded_Miniwyvern_Storm", 4L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern",
                 Map.of("level", "7", "healthPercent", "63.25"),
                 Map.of("hydragon:bond",
@@ -57,7 +81,8 @@ class BondedCompanionPanelFeatureBinderTest {
     @Test
     void deadBondedCardUsesPaidReviveWithoutLegacyLinkFallback() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
-                "profile-7", "hydragon:dragons", 8L, "Nimbus",
+                "profile-7", "hydragon:dragons",
+                "Bonded_Miniwyvern_Storm", 8L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern", Map.of(), Map.of(),
                 new BondedCompanionStatusPresentation(
                         BondedCompanionState.DEAD,
@@ -75,10 +100,15 @@ class BondedCompanionPanelFeatureBinderTest {
     }
 
     private static LinkedNpcPanelCardBinder.CardBindingConfig bindingConfig() {
+        return bindingConfig(false);
+    }
+
+    private static LinkedNpcPanelCardBinder.CardBindingConfig bindingConfig(
+            boolean ownerCommandFamilyRoster) {
         return new LinkedNpcPanelCardBinder.CardBindingConfig(
                 "card.ui", "Command", "link:", "unlink:", "group:",
                 "active:", "breed:", "release:", "cull:", "respawn:",
                 "summon:", "dismiss:", "locate:", "recall:", "home:",
-                "return:", "talents:", true, false);
+                "return:", "talents:", true, ownerCommandFamilyRoster);
     }
 }

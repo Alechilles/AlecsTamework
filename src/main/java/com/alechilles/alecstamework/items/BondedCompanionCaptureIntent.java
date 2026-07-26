@@ -17,6 +17,7 @@ public record BondedCompanionCaptureIntent(
         @Nonnull String sourceFingerprint,
         @Nonnull UUID sourceNpcUuid,
         @Nonnull String roleId,
+        @Nullable String species,
         @Nonnull String rosterId,
         long rosterRevision,
         @Nullable BondedCompanionSnapshot snapshot,
@@ -36,10 +37,27 @@ public record BondedCompanionCaptureIntent(
         sourceFingerprint = text(sourceFingerprint, "sourceFingerprint");
         sourceNpcUuid = Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
         roleId = text(roleId, "roleId");
+        species = optional(species);
         rosterId = text(rosterId, "rosterId");
         if (hotbarSlot < 0 || rosterRevision < 0L) {
             throw new IllegalArgumentException("invalid bonded capture fence");
         }
+    }
+
+    public BondedCompanionCaptureIntent(
+            String callerNamespace, String idempotencyKey, UUID actorUuid,
+            String worldKey, int hotbarSlot, String sourceFingerprint,
+            UUID sourceNpcUuid, String roleId, String rosterId,
+            long rosterRevision, BondedCompanionSnapshot snapshot,
+            SpawnerPublishedEffect completionEffect, boolean targetValid,
+            boolean chanceSuccessful, boolean tranquilized, boolean toolAccess,
+            boolean ownerAllowed, boolean roleAllowed
+    ) {
+        this(callerNamespace, idempotencyKey, actorUuid, worldKey, hotbarSlot,
+                sourceFingerprint, sourceNpcUuid, roleId, null, rosterId,
+                rosterRevision, snapshot, completionEffect, targetValid,
+                chanceSuccessful, tranquilized, toolAccess, ownerAllowed,
+                roleAllowed);
     }
 
     /** Stable profile identity shared by retries of this exact source capture. */
@@ -56,5 +74,9 @@ public record BondedCompanionCaptureIntent(
             throw new IllegalArgumentException(field + " is required");
         }
         return normalized;
+    }
+
+    private static String optional(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

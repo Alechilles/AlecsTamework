@@ -57,7 +57,8 @@ public final class BondedCompanionProjectionService {
                         lease.profileId(), lease.leaseToken()
                 );
         SpawnResult spawned = safeSpawn(new SpawnPlan(
-                lease, request.roleId(), request.snapshot(), marker
+                lease, request.roleId(), request.snapshot(), marker,
+                request.placement()
         ));
         if (spawned.status() != SpawnStatus.SPAWNED
                 || !npcUuid.equals(spawned.npcUuid())) {
@@ -337,9 +338,21 @@ public final class BondedCompanionProjectionService {
             @Nonnull String roleId,
             @Nonnull BondedCompanionSnapshot snapshot,
             @Nonnull String worldKey,
+            @Nullable com.alechilles.alecstamework.companion.placement
+                    .CompanionSpawnPlacement placement,
             long nowMs,
             long expiresAtMs
     ) {
+        public SummonRequest(
+                UUID ownerUuid, String rosterId, String profileId,
+                long expectedRevision, String roleId,
+                BondedCompanionSnapshot snapshot, String worldKey,
+                long nowMs, long expiresAtMs
+        ) {
+            this(ownerUuid, rosterId, profileId, expectedRevision, roleId,
+                    snapshot, worldKey, null, nowMs, expiresAtMs);
+        }
+
         public SummonRequest {
             ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
             rosterId = text(rosterId, "rosterId");
@@ -370,8 +383,18 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             @Nonnull String roleId,
             @Nonnull BondedCompanionSnapshot snapshot,
-            @Nonnull TameworkProjectionIdentityComponent marker
+            @Nonnull TameworkProjectionIdentityComponent marker,
+            @Nullable com.alechilles.alecstamework.companion.placement
+                    .CompanionSpawnPlacement placement
     ) {
+        public SpawnPlan(
+                BondedCompanionProjectionValidator.LeaseExpectation lease,
+                String roleId, BondedCompanionSnapshot snapshot,
+                TameworkProjectionIdentityComponent marker
+        ) {
+            this(lease, roleId, snapshot, marker, null);
+        }
+
         public SpawnPlan {
             lease = Objects.requireNonNull(lease, "lease");
             roleId = text(roleId, "roleId");

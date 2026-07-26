@@ -97,9 +97,12 @@ public final class BondedCompanionCoreApiOperations {
     BondedCompanionResult<BondedCompanionProfileView> summon(
             BondedCompanionActionRequest request
     ) {
-        if (request.worldKey() == null) {
+        var context = request.actionContext();
+        var placement = context == null ? null : context.summonPlacement();
+        if (request.worldKey() == null || placement == null
+                || !request.worldKey().equals(placement.worldKey())) {
             return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
-                    "bonded-world-context-required");
+                    "bonded-placement-context-required");
         }
         BondedCompanionRecord.Profile profile = profile(request);
         if (profile == null) return notFound();
@@ -120,7 +123,7 @@ public final class BondedCompanionCoreApiOperations {
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 request.ownerUuid(), request.rosterId(), request.profileId(),
                 request.expectedRevision(), profile.roleId(), snapshot,
-                request.worldKey(), now, lease.expiresAtMs()
+                request.worldKey(), placement, now, lease.expiresAtMs()
         ));
         BondedCompanionRecord.Profile refreshed = profile(request);
         if (result.status() == BondedCompanionProjectionService.SummonStatus.ACTIVE
@@ -183,10 +186,13 @@ public final class BondedCompanionCoreApiOperations {
         BondedCompanionPolicy policy = resolved.policy();
         BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
         long remaining = cooldownRemaining(profile.reviveCooldownUntilMs(), clock.getAsLong());
+        boolean affordable = price != null && hasPayment(
+                request.actionContext(), price);
         return success(new BondedCompanionReviveQuote(
                 profile.profileId(), policy.features().revive(),
                 price == null ? null : price.itemId(),
-                price == null ? 0 : price.quantity(), false, remaining, revision
+                price == null ? 0 : price.quantity(), affordable, remaining,
+                revision
         ));
     }
 
@@ -200,8 +206,76 @@ public final class BondedCompanionCoreApiOperations {
             return failure(BondedCompanionResultCode.REVISION_CONFLICT,
                     "bonded-revive-quote-stale");
         }
-        return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
-                "bonded-revive-payment-context-unavailable");
+        BondedCompanionPolicyResolver.Resolution resolved = policies.resolve(
+                profile.rosterId(), request.quoteRevision());
+        BondedCompanionPolicy policy = resolved.policy();
+        if (policy == null || policy.revivePrice() == null) {
+            return policyDenied();
+        }
+        if (cooldownRemaining(profile.reviveCooldownUntilMs(),
+                clock.getAsLong()) > 0L) {
+            return failure(BondedCompanionResultCode.POLICY_DENIED,
+                    "bonded-revive-cooldown-active");
+        }
+        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        BondedCompanionSnapshot snapshot = decode(profile);
+        if (snapshot == null) return internal("bonded-snapshot-invalid");
+        var validation = transitions.revive(
+                mutation(action, clock.getAsLong()), domain(profile, snapshot),
+                new BondedCompanionTransitionService.RevivePayment(
+                        price.itemId(), price.quantity()));
+        if (!validation.applied()) {
+            return transitionFailure(validation.code());
+        }
+        BondedCompanionActionContext.Inventory inventory =
+                inventory(action.actionContext());
+        if (inventory == null || !safeConsume(
+                inventory, price.itemId(), price.quantity())) {
+            return failure(BondedCompanionResultCode.POLICY_DENIED,
+                    "bonded-revive-payment-unavailable");
+        }
+        long now = clock.getAsLong();
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved =
+                store.reviveProfile(operation(
+                        action.callerNamespace(), action.idempotencyKey(),
+                        action.ownerUuid(), action.rosterId(), action.profileId(),
+                        BondedCompanionOperation.Type.REVIVE,
+                        price.itemId() + ":" + price.quantity(), now),
+                        action.expectedRevision(), now);
+        if (saved.code() != BondedCompanionStoreResult.Code.APPLIED
+                || saved.value() == null) {
+            return storeFailure(saved);
+        }
+        if (!saved.replayed()) {
+            publish(saved.value(), BondedCompanionState.DEAD,
+                    BondedCompanionState.STORED, "revived",
+                    BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED);
+        }
+        return success(view(saved.value()));
+    }
+
+    BondedCompanionProfileView view(
+            BondedCompanionRecord.Profile profile,
+            BondedCompanionRecord.Lease lease,
+            List<BondedCompanionRecord.Profile> rosterProfiles
+    ) {
+        BondedCompanionPolicyResolver.Resolution resolved = policies.resolve(
+                profile.rosterId(), rosters.snapshot().revision());
+        BondedCompanionPolicy policy = resolved.policy();
+        boolean matches = policy != null
+                && policy.rosterId().equals(profile.rosterId())
+                && policy.familyId().equals(profile.familyId())
+                && policy.allowedRoles().contains(profile.roleId());
+        int active = (int) rosterProfiles.stream().filter(candidate ->
+                candidate.state() == BondedCompanionState.ACTIVE).count();
+        return views.view(profile, lease,
+                matches && profile.state() == BondedCompanionState.STORED
+                        && policy.features().summon()
+                        && active < policy.maximumActive(),
+                matches && profile.state() == BondedCompanionState.ACTIVE
+                        && policy.features().dismiss(),
+                matches && profile.state() == BondedCompanionState.DEAD
+                        && policy.features().revive());
     }
 
     BondedCompanionResult<BondedCompanionExtensionData> extension(
@@ -347,7 +421,41 @@ public final class BondedCompanionCoreApiOperations {
     }
 
     private BondedCompanionProfileView view(BondedCompanionRecord.Profile profile) {
-        return views.view(profile, lease(profile.ownerUuid(), profile.rosterId(), profile.profileId()));
+        return view(profile,
+                lease(profile.ownerUuid(), profile.rosterId(), profile.profileId()),
+                store.listProfiles(profile.ownerUuid(), profile.rosterId()));
+    }
+
+    private boolean hasPayment(
+            BondedCompanionActionContext context,
+            BondedCompanionPolicy.RevivePrice price
+    ) {
+        BondedCompanionActionContext.Inventory inventory = inventory(context);
+        if (inventory == null) return false;
+        try {
+            return inventory.availableQuantity(price.itemId())
+                    >= price.quantity();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private BondedCompanionActionContext.Inventory inventory(
+            BondedCompanionActionContext context
+    ) {
+        return context == null ? null : context.inventory();
+    }
+
+    private boolean safeConsume(
+            BondedCompanionActionContext.Inventory inventory,
+            String itemId,
+            int quantity
+    ) {
+        try {
+            return inventory.consumeExact(itemId, quantity);
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
     }
 
     private String stableProfileId(BondedCompanionProvisionRequest request) {

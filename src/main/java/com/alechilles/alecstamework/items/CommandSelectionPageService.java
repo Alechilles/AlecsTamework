@@ -95,7 +95,7 @@ final class CommandSelectionPageService {
             return false;
         }
         TameworkCommandSelectionPage page = createPage(
-                player, uiPlayerRef, config, working, toolId, actions
+                player, store, uiPlayerRef, config, working, toolId, actions
         );
         return openPage(player, playerRef, store, page);
     }
@@ -114,6 +114,7 @@ final class CommandSelectionPageService {
     }
 
     private TameworkCommandSelectionPage createPage(Player player,
+                                                    Store<EntityStore> store,
                                                     PlayerRef uiPlayerRef,
                                                     TwCommandItemConfig config,
                                                     ItemStack working,
@@ -156,15 +157,15 @@ final class CommandSelectionPageService {
                 actions.cull(),
                 actions.respawn(),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.SUMMON,
+                        player, store, config, npcUuid, FeatureAction.SUMMON,
                         panelSnapshot
                 ),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.DISMISS,
+                        player, store, config, npcUuid, FeatureAction.DISMISS,
                         panelSnapshot
                 ),
                 npcUuid -> applyFeatureAction(
-                        player, config, npcUuid, FeatureAction.REVIVE,
+                        player, store, config, npcUuid, FeatureAction.REVIVE,
                         panelSnapshot
                 ),
                 actions.locate(),
@@ -233,6 +234,7 @@ final class CommandSelectionPageService {
 
     private void applyFeatureAction(
             Player player,
+            Store<EntityStore> store,
             TwCommandItemConfig config,
             UUID presentationUuid,
             FeatureAction action,
@@ -242,11 +244,12 @@ final class CommandSelectionPageService {
                 ? null : snapshot.presentation(presentationUuid);
         if (config != null && config.usesBondedCompanionRoster()) {
             if (bondedActions != null) {
-                bondedActions.route(player, config, feature, switch (action) {
+                bondedActions.route(player, store, config, feature,
+                        switch (action) {
                     case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
                     case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
                     case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
-                });
+                        });
             }
             return;
         }

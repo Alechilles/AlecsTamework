@@ -38,8 +38,6 @@ public final class BondedCompanionApiFacade
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
     private final BondedCompanionCoreApiOperations operations;
-    private final BondedCompanionViewFactory views =
-            new BondedCompanionViewFactory();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public BondedCompanionApiFacade(
@@ -81,11 +79,12 @@ public final class BondedCompanionApiFacade
             store.findActiveLeases(ownerUuid, rosterId).forEach(
                     lease -> leases.put(lease.profileId(), lease)
             );
-            List<BondedCompanionProfileView> profileViews = store.listProfiles(
-                    ownerUuid, rosterId
-            ).stream().map(profile -> views.view(profile, leases.get(
-                    profile.profileId()
-            ))).toList();
+            List<BondedCompanionRecord.Profile> profiles = store.listProfiles(
+                    ownerUuid, rosterId);
+            List<BondedCompanionProfileView> profileViews = profiles.stream()
+                    .map(profile -> operations.view(
+                            profile, leases.get(profile.profileId()), profiles))
+                    .toList();
             return completed(profileViews);
         } catch (RuntimeException failure) {
             diagnostics.recordFailure(

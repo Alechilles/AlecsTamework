@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.items.BondedCompanionProjectionSpawnBoundary;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.persistence
         .TameworkFullStateSnapshotReader;
@@ -39,26 +40,77 @@ public final class HytaleBondedCompanionWorldGateway implements
         BondedCompanionProjectionCleanupService.WorldGateway,
         BondedCompanionProjectionService.World {
     private final TameworkFullStateSnapshotReader snapshots;
+    private final BondedCompanionProjectionSpawnBoundary spawns;
 
     public HytaleBondedCompanionWorldGateway() {
         this(new TameworkFullStateSnapshotReader(
                 new CoopResidentStateSnapshotService()
-        ));
+        ), new BondedCompanionProjectionSpawnBoundary());
     }
 
     HytaleBondedCompanionWorldGateway(
             TameworkFullStateSnapshotReader snapshots
     ) {
-        this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
+        this(snapshots, new BondedCompanionProjectionSpawnBoundary());
     }
 
-    /** Placement is not present at this layer, so spawning remains fail-closed. */
+    HytaleBondedCompanionWorldGateway(
+            TameworkFullStateSnapshotReader snapshots,
+            BondedCompanionProjectionSpawnBoundary spawns
+    ) {
+        this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
+        this.spawns = Objects.requireNonNull(spawns, "spawns");
+    }
+
+    /** Spawns the exact planned UUID at the caller-frozen world placement. */
     @Override
     public BondedCompanionProjectionService.SpawnResult spawn(
             @Nonnull BondedCompanionProjectionService.SpawnPlan plan
     ) {
         Objects.requireNonNull(plan, "plan");
-        return BondedCompanionProjectionService.SpawnResult.retryRequired();
+        if (plan.placement() == null
+                || !plan.lease().worldKey().equals(
+                        plan.placement().worldKey())) {
+            return BondedCompanionProjectionService.SpawnResult.retryRequired();
+        }
+        try {
+            World world = Universe.get().getWorld(plan.placement().worldKey());
+            if (world == null) {
+                return BondedCompanionProjectionService.SpawnResult
+                        .retryRequired();
+            }
+            return world.isInThread()
+                    ? spawnOnWorldThread(world, plan)
+                    : CompletableFuture.supplyAsync(
+                            () -> spawnOnWorldThread(world, plan), world).join();
+        } catch (RuntimeException | LinkageError failure) {
+            return BondedCompanionProjectionService.SpawnResult.failed();
+        }
+    }
+
+    private BondedCompanionProjectionService.SpawnResult spawnOnWorldThread(
+            World world,
+            BondedCompanionProjectionService.SpawnPlan plan
+    ) {
+        if (!world.isInThread() || world.getEntityStore() == null
+                || !world.getName().equals(plan.placement().worldKey())) {
+            return BondedCompanionProjectionService.SpawnResult.retryRequired();
+        }
+        UUID plannedUuid = plan.lease().liveNpcUuid();
+        var result = spawns.spawn(
+                world, world.getEntityStore().getStore(),
+                plan.lease().profileId(), plan.lease().leaseToken(),
+                plannedUuid,
+                plan.snapshot().fullState().npcUuid(),
+                plan.placement(), plan.snapshot());
+        return switch (result) {
+            case CONFIRMED -> BondedCompanionProjectionService.SpawnResult
+                    .spawned(plannedUuid);
+            case RETRYABLE -> BondedCompanionProjectionService.SpawnResult
+                    .retryRequired();
+            case FAILED -> BondedCompanionProjectionService
+                    .SpawnResult.failed();
+        };
     }
 
     @Override

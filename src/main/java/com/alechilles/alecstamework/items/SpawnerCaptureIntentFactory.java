@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -33,6 +34,7 @@ final class SpawnerCaptureIntentFactory {
     private final SpawnerNpcStateService npcState;
     private final SpawnerNpcIdentityService npcIdentity;
     private final SpawnerTameAndLinkIntentFactory tameAndLinkIntents;
+    private final CommandNpcNameResolver npcNames = new CommandNpcNameResolver();
     private final TameworkFullStateSnapshotReader bondedSnapshots =
             new TameworkFullStateSnapshotReader(
                     new CoopResidentStateSnapshotService());
@@ -175,12 +177,17 @@ final class SpawnerCaptureIntentFactory {
         String particle = particleSystemOverride == null
                 || particleSystemOverride.isBlank()
                 ? config.getCaptureParticleSystem() : particleSystemOverride;
+        NPCEntity npc = store.getComponent(
+                targetRef, NPCEntity.getComponentType());
+        String species = npcNames.resolveRoleDisplayName(
+                null, npcNames.resolveNpcNameKey(npc));
         return freezeBonded(new FrozenBondedCapture(
                 "spawner-bonded-capture:v1",
                 player.getUuid() + ":" + config.getCaptureMechanics()
                         .bondedRosterId() + ":" + roll.targetUuid(),
                 player.getUuid(), world.getName(), attempt.hotbarSlot(),
                 attempt.sourceFingerprint(), roll.targetUuid(), roll.roleId(),
+                species,
                 config.getCaptureMechanics().bondedRosterId(), rosterRevision,
                 snapshot, publishedEffect(targetRef, store, particle,
                 config.getCaptureSoundEvent()), targetRef.isValid(),
@@ -196,7 +203,8 @@ final class SpawnerCaptureIntentFactory {
                 frozen.callerNamespace(), frozen.idempotencyKey(),
                 frozen.actorUuid(), frozen.worldKey(), frozen.hotbarSlot(),
                 frozen.sourceFingerprint(), frozen.sourceNpcUuid(),
-                frozen.roleId(), frozen.rosterId(), frozen.rosterRevision(),
+                frozen.roleId(), frozen.species(), frozen.rosterId(),
+                frozen.rosterRevision(),
                 frozen.snapshot(), frozen.completionEffect(),
                 frozen.targetValid(), frozen.chanceSuccessful(),
                 frozen.tranquilized(), frozen.toolAccess(),
@@ -207,7 +215,7 @@ final class SpawnerCaptureIntentFactory {
     record FrozenBondedCapture(
             String callerNamespace, String idempotencyKey, UUID actorUuid,
             String worldKey, int hotbarSlot, String sourceFingerprint,
-            UUID sourceNpcUuid, String roleId, String rosterId,
+            UUID sourceNpcUuid, String roleId, String species, String rosterId,
             long rosterRevision,
             com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot
                     snapshot,
@@ -215,7 +223,26 @@ final class SpawnerCaptureIntentFactory {
             boolean targetValid, boolean chanceSuccessful,
             boolean tranquilized, boolean toolAccess,
             boolean ownerAllowed, boolean roleAllowed
-    ) {}
+    ) {
+        FrozenBondedCapture(
+                String callerNamespace, String idempotencyKey, UUID actorUuid,
+                String worldKey, int hotbarSlot, String sourceFingerprint,
+                UUID sourceNpcUuid, String roleId, String rosterId,
+                long rosterRevision,
+                com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionSnapshot snapshot,
+                SpawnerPublishedEffect completionEffect,
+                boolean targetValid, boolean chanceSuccessful,
+                boolean tranquilized, boolean toolAccess,
+                boolean ownerAllowed, boolean roleAllowed
+        ) {
+            this(callerNamespace, idempotencyKey, actorUuid, worldKey,
+                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId, null,
+                    rosterId, rosterRevision, snapshot, completionEffect,
+                    targetValid, chanceSuccessful, tranquilized, toolAccess,
+                    ownerAllowed, roleAllowed);
+        }
+    }
 
     private SpawnerCaptureIntent tameAndLinkIntent(
             Player player,

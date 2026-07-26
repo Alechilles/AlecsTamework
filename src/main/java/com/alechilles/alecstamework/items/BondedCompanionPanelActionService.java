@@ -21,6 +21,14 @@ final class BondedCompanionPanelActionService {
     Outcome perform(@Nonnull Action action, @Nonnull UUID ownerUuid,
                     @Nullable String worldKey,
                     @Nonnull BondedCompanionPanelPresentation row) {
+        return perform(action, ownerUuid, worldKey, null, row);
+    }
+
+    @Nonnull
+    Outcome perform(@Nonnull Action action, @Nonnull UUID ownerUuid,
+                    @Nullable String worldKey,
+                    @Nullable BondedCompanionActionContext context,
+                    @Nonnull BondedCompanionPanelPresentation row) {
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(row, "row");
@@ -32,7 +40,8 @@ final class BondedCompanionPanelActionService {
                 CALLER,
                 action.name().toLowerCase(java.util.Locale.ROOT) + ":"
                         + row.profileId() + ":" + row.revision(),
-                ownerUuid, row.rosterId(), row.profileId(), row.revision(), worldKey);
+                ownerUuid, row.rosterId(), row.profileId(), row.revision(),
+                worldKey, context);
         try {
             BondedCompanionResult<?> result = switch (action) {
                 case SUMMON -> currentApi().summon(request).join();

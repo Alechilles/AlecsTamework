@@ -114,10 +114,8 @@ final class CommandPanelEntrySourceService {
         if (player != null && config != null
                 && config.usesBondedCompanionRoster()
                 && bondedEntrySource != null) {
-            String worldName = player.getWorld() == null
-                    ? null : player.getWorld().getName();
             return bondedEntrySource.buildSnapshot(
-                    player.getUuid(), config.getBondedRosterId(), worldName);
+                    player, store, config.getBondedRosterId());
         }
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);

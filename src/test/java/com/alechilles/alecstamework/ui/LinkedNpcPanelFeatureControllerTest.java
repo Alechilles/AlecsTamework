@@ -143,7 +143,8 @@ class LinkedNpcPanelFeatureControllerTest {
         AtomicInteger summons = new AtomicInteger();
         BondedCompanionPanelPresentation active =
                 new BondedCompanionPanelPresentation(
-                        "profile-1", "hydragon:dragons", 5L, "Nimbus",
+                        "profile-1", "hydragon:dragons",
+                        "Bonded_Miniwyvern_Storm", 5L, "Nimbus",
                         "Miniwyvern", "Male", "Storm Miniwyvern",
                         Map.of(), Map.of(),
                         new BondedCompanionStatusPresentation(

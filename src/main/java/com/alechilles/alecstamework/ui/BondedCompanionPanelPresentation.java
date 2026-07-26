@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 public record BondedCompanionPanelPresentation(
         @Nonnull String profileId,
         @Nonnull String rosterId,
+        @Nonnull String roleId,
         long revision,
         @Nullable String displayName,
         @Nullable String species,
@@ -23,6 +24,7 @@ public record BondedCompanionPanelPresentation(
     public BondedCompanionPanelPresentation {
         profileId = required(profileId, "profileId");
         rosterId = required(rosterId, "rosterId");
+        roleId = required(roleId, "roleId");
         displayName = normalize(displayName);
         species = normalize(species);
         gender = normalize(gender);

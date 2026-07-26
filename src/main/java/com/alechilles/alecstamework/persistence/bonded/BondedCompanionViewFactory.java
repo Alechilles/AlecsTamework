@@ -19,6 +19,19 @@ final class BondedCompanionViewFactory {
             BondedCompanionRecord.Profile profile,
             BondedCompanionRecord.Lease lease
     ) {
+        return view(profile, lease,
+                profile.state() == BondedCompanionState.STORED,
+                profile.state() == BondedCompanionState.ACTIVE,
+                profile.state() == BondedCompanionState.DEAD);
+    }
+
+    BondedCompanionProfileView view(
+            BondedCompanionRecord.Profile profile,
+            BondedCompanionRecord.Lease lease,
+            boolean summonAvailable,
+            boolean storeAvailable,
+            boolean reviveAvailable
+    ) {
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         profile.policy().entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith("presentation:"))
@@ -39,9 +52,8 @@ final class BondedCompanionViewFactory {
                 first(profile.species(), durable == null ? null : durable.species()),
                 first(profile.gender(), durable == null ? null : durable.gender()),
                 profile.revision(),
-                profile.state(), profile.state() == BondedCompanionState.STORED,
-                profile.state() == BondedCompanionState.ACTIVE,
-                profile.state() == BondedCompanionState.DEAD,
+                profile.state(), summonAvailable, storeAvailable,
+                reviveAvailable,
                 presentation, active, profile.reviveCooldownUntilMs(), null
         );
     }
@@ -56,7 +68,7 @@ final class BondedCompanionViewFactory {
         BondedCompanionSnapshotPresentationMapper mapper =
                 new BondedCompanionSnapshotPresentationMapper(ignored ->
                         new BondedCompanionSnapshotPresentationMapper.RolePresentation(
-                                null, rolePresentation, null,
+                                null, null, null,
                                 Map.of("rolePresentation", rolePresentation)));
         var mapped = mapper.map(snapshot);
         LinkedHashMap<String, String> data = new LinkedHashMap<>(mapped.data());

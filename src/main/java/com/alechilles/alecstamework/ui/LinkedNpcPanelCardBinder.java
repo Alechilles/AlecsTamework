@@ -97,7 +97,8 @@ final class LinkedNpcPanelCardBinder {
         boolean isLinked = entry.linked();
         // Feature-managed roster membership is canonical. Its synthetic card
         // identity must never fall through to legacy per-item link actions.
-        boolean managedRoster = feature != null && feature.managesRosterRow();
+        boolean managedRoster = config.ownerCommandFamilyRoster()
+                || feature != null && feature.managesRosterRow();
         boolean legacyLinked = isLinked && !managedRoster;
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();

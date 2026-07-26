@@ -193,7 +193,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
                 profile.familyId(), profile.roleId(), BondedCompanionState.STORED,
                 0L, BondedCompanionPayload.of(snapshots.encode(profile.snapshot())
                         .getBytes(StandardCharsets.UTF_8)), nowMs, nowMs, policy,
-                displayName, null, gender, null, 0L, 0L, null, null
+                displayName, intent.species(), gender, null,
+                0L, 0L, null, null
         );
     }
 

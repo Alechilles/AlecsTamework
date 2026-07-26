@@ -29,6 +29,14 @@ final class BondedCompanionPanelFeaturePresentationSource {
     Map<UUID, CommandPanelFeaturePresentation> snapshot(
             UUID owner, @Nullable String worldKey,
             BondedCompanionPanelRecordSource.PanelSnapshot snapshot) {
+        return snapshot(owner, worldKey, snapshot, ignored -> null);
+    }
+
+    Map<UUID, CommandPanelFeaturePresentation> snapshot(
+            UUID owner, @Nullable String worldKey,
+            BondedCompanionPanelRecordSource.PanelSnapshot snapshot,
+            java.util.function.Function<BondedCompanionProfileView,
+                    BondedCompanionActionContext> contexts) {
         if (owner == null || snapshot == null || snapshot.records().isEmpty()) {
             return Map.of();
         }
@@ -38,10 +46,13 @@ final class BondedCompanionPanelFeaturePresentationSource {
         LinkedHashMap<UUID, CommandPanelFeaturePresentation> result =
                 new LinkedHashMap<>();
         for (var record : snapshot.records()) {
+            BondedCompanionActionContext context = contexts.apply(
+                    record.profile());
             BondedCompanionReviveQuote quote = quote(
-                    current, owner, worldKey, record.profile());
+                    current, owner, worldKey, record.profile(), context);
             BondedCompanionPanelPresentation row = presentation(
-                    record.profile(), clock.getAsLong(), quote, readiness, worldKey);
+                    record.profile(), clock.getAsLong(), quote, context,
+                    readiness, worldKey);
             result.put(record.presentationUuid(),
                     CommandPanelFeaturePresentation.bonded(row));
         }
@@ -51,13 +62,26 @@ final class BondedCompanionPanelFeaturePresentationSource {
     static BondedCompanionPanelPresentation presentation(
             BondedCompanionProfileView profile, long nowMs,
             BondedCompanionReviveQuote quote) {
-        return presentation(profile, nowMs, quote, null,
-                profile.state() == BondedCompanionState.STORED ? "world" : null);
+        BondedCompanionActionContext context = new BondedCompanionActionContext(
+                new com.alechilles.alecstamework.companion.placement
+                        .CompanionSpawnPlacement(
+                        "world", 0D, 0D, 0D, 0F, 0F, 0F), null);
+        return presentation(profile, nowMs, quote, context, null,
+                profile.state() == BondedCompanionState.ACTIVE
+                        ? profile.activeLease().worldKey() : "world");
+    }
+
+    static BondedCompanionPanelPresentation presentation(
+            BondedCompanionProfileView profile, long nowMs,
+            BondedCompanionReviveQuote quote,
+            BondedCompanionActionContext context, String worldKey) {
+        return presentation(profile, nowMs, quote, context, null, worldKey);
     }
 
     private static BondedCompanionPanelPresentation presentation(
             BondedCompanionProfileView profile, long nowMs,
-            BondedCompanionReviveQuote quote, String readinessReason,
+            BondedCompanionReviveQuote quote,
+            BondedCompanionActionContext context, String readinessReason,
             String worldKey) {
         Map<String, String> source = profile.snapshotPresentationData();
         LinkedHashMap<String, String> attributes = new LinkedHashMap<>();
@@ -77,16 +101,19 @@ final class BondedCompanionPanelFeaturePresentationSource {
         };
         boolean enabled = readinessReason == null && switch (profile.state()) {
             case STORED -> profile.summonAvailable() && cooldown == 0L
-                    && worldKey != null && !worldKey.isBlank();
-            case ACTIVE -> profile.storeAvailable();
+                    && validPlacement(context, worldKey);
+            case ACTIVE -> profile.storeAvailable()
+                    && profile.activeLease() != null
+                    && profile.activeLease().worldKey().equals(worldKey);
             case DEAD -> profile.reviveAvailable() && quote != null
                     && quote.enabled() && quote.affordable()
                     && quote.cooldownRemainingSeconds() == 0L;
         };
         String reason = enabled ? null : unavailableReason(
-                profile, quote, readinessReason, worldKey, cooldown);
+                profile, quote, context, readinessReason, worldKey, cooldown);
         return new BondedCompanionPanelPresentation(
-                profile.profileId(), profile.rosterId(), profile.revision(),
+                profile.profileId(), profile.rosterId(), profile.roleId(),
+                profile.revision(),
                 profile.displayName(), profile.species(), profile.gender(),
                 source.get("rolePresentation"), attributes, extensions,
                 new BondedCompanionStatusPresentation(
@@ -95,12 +122,14 @@ final class BondedCompanionPanelFeaturePresentationSource {
 
     private BondedCompanionReviveQuote quote(
             BondedCompanionApi current, UUID owner, String worldKey,
-            BondedCompanionProfileView profile) {
+            BondedCompanionProfileView profile,
+            BondedCompanionActionContext context) {
         if (profile.state() != BondedCompanionState.DEAD) return profile.reviveQuote();
         if (profile.reviveQuote() != null) return profile.reviveQuote();
         try {
             BondedCompanionResult<BondedCompanionReviveQuote> result =
-                    current.quoteRevive(action(owner, worldKey, profile, "quote")).join();
+                    current.quoteRevive(action(
+                            owner, worldKey, profile, "quote", context)).join();
             return result != null && result.successful() ? result.value() : null;
         } catch (RuntimeException | LinkageError ignored) {
             return null;
@@ -110,27 +139,45 @@ final class BondedCompanionPanelFeaturePresentationSource {
     static BondedCompanionActionRequest action(
             UUID owner, String worldKey, BondedCompanionProfileView profile,
             String operation) {
+        return action(owner, worldKey, profile, operation, null);
+    }
+
+    static BondedCompanionActionRequest action(
+            UUID owner, String worldKey, BondedCompanionProfileView profile,
+            String operation, BondedCompanionActionContext context) {
         return new BondedCompanionActionRequest(
                 CALLER, operation + ":" + profile.profileId() + ":" + profile.revision(),
                 owner, profile.rosterId(), profile.profileId(),
-                profile.revision(), worldKey);
+                profile.revision(), worldKey, context);
     }
 
     private static String unavailableReason(BondedCompanionProfileView profile,
-            BondedCompanionReviveQuote quote, String readiness, String world,
-            long cooldown) {
+            BondedCompanionReviveQuote quote,
+            BondedCompanionActionContext context, String readiness,
+            String world, long cooldown) {
         if (readiness != null) return readiness;
         if (profile.state() == BondedCompanionState.STORED && cooldown > 0L)
             return "Summon cooldown is still active.";
         if (profile.state() == BondedCompanionState.STORED
-                && (world == null || world.isBlank()))
-            return "A destination world is required to summon.";
+                && !validPlacement(context, world))
+            return "A safe summon placement is unavailable.";
+        if (profile.state() == BondedCompanionState.ACTIVE
+                && profile.activeLease() != null
+                && !profile.activeLease().worldKey().equals(world))
+            return "Dismiss this companion from its active world.";
         if (profile.state() == BondedCompanionState.DEAD && quote == null)
             return "Revive quote is unavailable.";
         if (quote != null && quote.cooldownRemainingSeconds() > 0L)
             return "Revive cooldown is still active.";
         if (quote != null && !quote.affordable()) return "Revive cost is not available.";
         return "Bonded roster policy or capacity does not permit this action.";
+    }
+
+    private static boolean validPlacement(
+            BondedCompanionActionContext context, String worldKey) {
+        return context != null && context.summonPlacement() != null
+                && worldKey != null
+                && worldKey.equals(context.summonPlacement().worldKey());
     }
 
     private static long remaining(long until, long now) {

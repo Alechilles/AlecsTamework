@@ -41,19 +41,20 @@ class BondedCompanionViewFactoryTest {
                 "profile-7", owner, "hydragon:dragons", "hydragon:dragon",
                 "Bonded_Miniwyvern_Storm", BondedCompanionState.STORED, 4L,
                 BondedCompanionPayload.of(encoded.getBytes(StandardCharsets.UTF_8)),
-                1L, 1L, Map.of(), "Nimbus", null, "Female",
+                1L, 1L, Map.of(), "Nimbus", "Miniwyvern", "Female",
                 null, 0L, 0L, null, null);
 
         var view = new BondedCompanionViewFactory().view(profile, null);
 
         assertEquals("Nimbus", view.displayName());
-        assertEquals("Miniwyvern Storm", view.species());
+        assertEquals("Miniwyvern", view.species());
         assertEquals("Female", view.gender());
         assertEquals("63.25", view.snapshotPresentationData().get("healthPercent"));
         assertEquals("7", view.snapshotPresentationData().get("level"));
         assertEquals(
                 "{\"archetype\":\"storm\",\"ability\":\"dash\"}",
                 view.snapshotPresentationData().get("extension:hydragon:bond"));
-        assertTrue(view.snapshotPresentationData().containsKey("rolePresentation"));
+        assertEquals("Miniwyvern Storm",
+                view.snapshotPresentationData().get("rolePresentation"));
     }
 }

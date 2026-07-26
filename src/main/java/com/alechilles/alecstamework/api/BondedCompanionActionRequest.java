@@ -13,8 +13,18 @@ public record BondedCompanionActionRequest(
         @Nonnull String rosterId,
         @Nonnull String profileId,
         long expectedRevision,
-        @Nullable String worldKey
+        @Nullable String worldKey,
+        @Nullable BondedCompanionActionContext actionContext
 ) {
+    public BondedCompanionActionRequest(
+            String callerNamespace, String idempotencyKey, UUID ownerUuid,
+            String rosterId, String profileId, long expectedRevision,
+            String worldKey
+    ) {
+        this(callerNamespace, idempotencyKey, ownerUuid, rosterId, profileId,
+                expectedRevision, worldKey, null);
+    }
+
     public BondedCompanionActionRequest {
         callerNamespace = requireText(callerNamespace, "callerNamespace");
         idempotencyKey = requireText(idempotencyKey, "idempotencyKey");

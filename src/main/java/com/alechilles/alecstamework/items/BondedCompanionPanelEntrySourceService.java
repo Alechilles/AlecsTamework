@@ -5,6 +5,9 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +18,8 @@ import javax.annotation.Nullable;
 final class BondedCompanionPanelEntrySourceService {
     private final BondedCompanionPanelRecordSource records;
     private final BondedCompanionPanelFeaturePresentationSource presentations;
+    private final HytaleBondedCompanionActionContextFactory contexts =
+            new HytaleBondedCompanionActionContextFactory();
 
     BondedCompanionPanelEntrySourceService(
             @Nonnull BondedCompanionPanelRecordSource records,
@@ -38,6 +43,23 @@ final class BondedCompanionPanelEntrySourceService {
             @Nullable String worldKey) {
         return buildSnapshot(ownerUuid, worldKey,
                 records.snapshotFor(ownerUuid, rosterId));
+    }
+
+    CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
+            @Nonnull Player player, @Nonnull Store<EntityStore> store,
+            @Nonnull String rosterId) {
+        String worldKey = player.getWorld() == null
+                ? null : player.getWorld().getName();
+        BondedCompanionPanelRecordSource.PanelSnapshot snapshot =
+                records.snapshotFor(player.getUuid(), rosterId);
+        ArrayList<LinkedNpcEntry> entries = new ArrayList<>(
+                snapshot.records().size());
+        for (var record : snapshot.records()) entries.add(entry(record));
+        return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                List.copyOf(entries), presentations.snapshot(
+                        player.getUuid(), worldKey, snapshot,
+                        profile -> contexts.create(player, store,
+                                profile.roleId())));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
