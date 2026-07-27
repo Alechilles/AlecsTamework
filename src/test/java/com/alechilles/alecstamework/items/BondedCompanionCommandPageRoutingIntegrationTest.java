@@ -16,6 +16,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import com.alechilles.alecstamework.ui.CommandSelectionEventData;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.Ref;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -85,7 +87,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             service.routeFeatureAction(
                                     player, store, config, presentationUuid,
                                     feature,
-                                    CommandSelectionPageService.FeatureAction.DISMISS)));
+                                    CommandSelectionPageService.FeatureAction.DISMISS)),
+                    ignored -> { });
             refresh(page);
 
             page.handleDataEvent(actor, store, event(
@@ -103,10 +106,39 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         }
     }
 
+    /** Regression: a forged legacy recall event cannot escape a bonded roster page. */
+    @Test
+    void bondedPageRejectsForgedGenericRecallWhileGenericPageStillDispatches()
+            throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            AtomicInteger recalls = new AtomicInteger();
+            java.util.function.Consumer<UUID> recall = ignored ->
+                    recalls.incrementAndGet();
+
+            TameworkCommandSelectionPage bonded = page(
+                    playerRef(), bondedConfig(), bondedDismissFeature(),
+                    ignored -> { }, recall);
+            bonded.handleDataEvent(actor, store, event("__recall__:" + CARD));
+            assertEquals(0, recalls.get());
+
+            TameworkCommandSelectionPage generic = page(
+                    playerRef(), genericConfig(), bondedDismissFeature(),
+                    ignored -> { }, recall);
+            generic.handleDataEvent(actor, store, event("__recall__:" + CARD));
+            assertEquals(1, recalls.get());
+        }
+    }
+
     private TameworkCommandSelectionPage page(
             PlayerRef playerRef, TwCommandItemConfig config,
             CommandPanelFeaturePresentation feature,
-            java.util.function.Consumer<UUID> dismiss) {
+            java.util.function.Consumer<UUID> dismiss,
+            java.util.function.Consumer<UUID> recall) {
         java.util.function.Consumer<UUID> noUuid = ignored -> { };
         java.util.function.Consumer<String> noString = ignored -> { };
         Runnable noRun = () -> { };
@@ -117,7 +149,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 () -> "Default", () -> "None", () -> "",
                 List::of, () -> "", List::of, ignored -> true, true,
                 noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
-                noUuid, dismiss, noUuid, noUuid, noUuid, noUuid, noUuid,
+                noUuid, dismiss, noUuid, noUuid, recall, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
                 noString, noString, noString, noRun, noString,
                 (uuid, group) -> { }, noString);
@@ -142,6 +174,11 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                   "BondedRosterId": "hydragon:dragons"
                 }
                 """), new ExtraInfo());
+    }
+
+    private TwCommandItemConfig genericConfig() {
+        return TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse("{}"), new ExtraInfo());
     }
 
     private BondedCompanionApi recordingApi(
@@ -180,11 +217,11 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         method.invoke(page);
     }
 
-    private TameworkCommandSelectionPage.CommandSelectionEventData event(
+    private CommandSelectionEventData event(
             String commandId) throws Exception {
-        var event = new TameworkCommandSelectionPage.CommandSelectionEventData();
+        var event = new CommandSelectionEventData();
         putObject(event,
-                TameworkCommandSelectionPage.CommandSelectionEventData.class,
+                CommandSelectionEventData.class,
                 "commandId", commandId);
         return event;
     }

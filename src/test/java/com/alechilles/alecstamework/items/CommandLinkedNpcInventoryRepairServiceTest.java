@@ -1,11 +1,19 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
+import com.hypixel.hytale.codec.ExtraInfo;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.joml.Vector3d;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -272,11 +280,52 @@ class CommandLinkedNpcInventoryRepairServiceTest {
         assertSame(original, inventory.get(0));
     }
 
+    /** Regression: generic inventory repair must not even decode a bonded Horn stack. */
+    @Test
+    void registryEligibilityExcludesBondedCommandItemsButKeepsGenericItems()
+            throws Exception {
+        BondedCompanionRosterRegistry rosters = new BondedCompanionRosterRegistry();
+        TwBondedCompanionRosterConfig policy = TwBondedCompanionRosterConfig.CODEC
+                .decode(BsonDocument.parse("""
+                        {
+                          "RosterId":"hydragon:horn",
+                          "FamilyId":"hydragon:dragons",
+                          "AllowedRoles":["Tamed_NordicDrake"]
+                        }
+                        """), new ExtraInfo());
+        Field id = TwBondedCompanionRosterConfig.class.getDeclaredField("id");
+        id.setAccessible(true);
+        id.set(policy, "TestDragons");
+        assertTrue(rosters.replace(List.of(policy), 1L).applied());
+        CommandItemRegistry registry = new CommandItemRegistry(rosters);
+        registry.register("BondedHorn", commandConfig("""
+                {
+                  "Enabled":true,
+                  "RosterStorage":"BondedCompanions",
+                  "BondedRosterId":"hydragon:horn"
+                }
+                """));
+        registry.register("GenericHorn", commandConfig("{\"Enabled\":true}"));
+        CommandLinkedNpcInventoryRepairService guarded =
+                new CommandLinkedNpcInventoryRepairService(registry);
+        Method eligible = CommandLinkedNpcInventoryRepairService.class
+                .getDeclaredMethod("isEnabledCommandItem", String.class);
+        eligible.setAccessible(true);
+
+        assertFalse((boolean) eligible.invoke(guarded, "BondedHorn"));
+        assertTrue((boolean) eligible.invoke(guarded, "GenericHorn"));
+    }
+
     private CommandLinkedNpcInventoryRepairService.RepairRequest request(String profileId,
                                                                          UUID current,
                                                                          Set<UUID> aliases) {
         return new CommandLinkedNpcInventoryRepairService.RepairRequest(
                 profileId, current, aliases, null, null, null, null, null, null, null);
+    }
+
+    private TwCommandItemConfig commandConfig(String json) {
+        return TwCommandItemConfig.CODEC.decode(
+                BsonDocument.parse(json), new ExtraInfo());
     }
 
     private void assertRepaired(LinkedNpcRecord record, UUID current) {

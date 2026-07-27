@@ -9,7 +9,11 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -81,20 +85,33 @@ final class BondedCompanionCommandRecipientSource {
                 context.player.getUuid(), rosterId, worldKey,
                 context.config, playerPosition, radiusSq,
                 Math.max(1, context.config.getMaxTargets()));
-        return select(request, uuid -> readProjection(context, world, uuid));
+        return select(
+                request,
+                uuid -> readProjection(context, world, uuid),
+                physicalMarkerMultiplicity(context.store));
     }
 
     @Nonnull
     List<Candidate> select(
             @Nonnull Request request,
             @Nonnull ProjectionReader projectionReader) {
+        return select(request, projectionReader, ProjectionMultiplicity.trusted());
+    }
+
+    @Nonnull
+    List<Candidate> select(
+            @Nonnull Request request,
+            @Nonnull ProjectionReader projectionReader,
+            @Nonnull ProjectionMultiplicity projectionMultiplicity) {
+        Objects.requireNonNull(projectionMultiplicity, "projectionMultiplicity");
         Map<UUID, Authority> authorities = activeAuthorities(request);
         if (authorities.isEmpty()) return List.of();
         ArrayList<Selected> selected = new ArrayList<>(authorities.size());
         for (Map.Entry<UUID, Authority> entry : authorities.entrySet()) {
+            Authority authority = entry.getValue();
+            if (!isUnique(projectionMultiplicity, authority)) continue;
             LoadedProjection projection = readSafely(
                     projectionReader, entry.getKey());
-            Authority authority = entry.getValue();
             if (!matches(authority, projection)
                     || !rolePolicy.isRoleAllowed(projection.roleId(), request.config())) {
                 continue;
@@ -132,6 +149,44 @@ final class BondedCompanionCommandRecipientSource {
         } catch (RuntimeException | LinkageError failure) {
             return null;
         }
+    }
+
+    private boolean isUnique(
+            ProjectionMultiplicity multiplicity, Authority authority) {
+        try {
+            return multiplicity.isUnique(
+                    authority.profileId(), authority.leaseToken());
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private ProjectionMultiplicity physicalMarkerMultiplicity(
+            Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        if (store == null || markerType == null) {
+            return ProjectionMultiplicity.unavailable();
+        }
+        HashMap<MarkerIdentity, Integer> counts = new HashMap<>();
+        try {
+            store.forEachChunk(
+                    Query.and(markerType),
+                    (ArchetypeChunk<EntityStore> chunk,
+                            CommandBuffer<EntityStore> commandBuffer) -> {
+                        for (int index = 0; index < chunk.size(); index++) {
+                            TameworkProjectionIdentityComponent marker =
+                                    chunk.getComponent(index, markerType);
+                            MarkerIdentity identity = MarkerIdentity.from(marker);
+                            if (identity != null) counts.merge(identity, 1, Integer::sum);
+                        }
+                    });
+        } catch (RuntimeException | LinkageError failure) {
+            return ProjectionMultiplicity.unavailable();
+        }
+        Map<MarkerIdentity, Integer> snapshot = Map.copyOf(counts);
+        return (profileId, leaseToken) -> snapshot.getOrDefault(
+                new MarkerIdentity(profileId, leaseToken), 0) == 1;
     }
 
     private Map<UUID, Authority> activeAuthorities(Request request) {
@@ -239,6 +294,19 @@ final class BondedCompanionCommandRecipientSource {
         @Nullable LoadedProjection read(UUID liveNpcUuid);
     }
 
+    @FunctionalInterface
+    interface ProjectionMultiplicity {
+        boolean isUnique(String profileId, String leaseToken);
+
+        static ProjectionMultiplicity trusted() {
+            return (profileId, leaseToken) -> true;
+        }
+
+        static ProjectionMultiplicity unavailable() {
+            return (profileId, leaseToken) -> false;
+        }
+    }
+
     record Request(
             @Nonnull UUID ownerUuid,
             @Nonnull String rosterId,
@@ -274,6 +342,18 @@ final class BondedCompanionCommandRecipientSource {
 
     private record Authority(String profileId, String leaseToken,
                              UUID liveNpcUuid) { }
+
+    private record MarkerIdentity(String profileId, String leaseToken) {
+        @Nullable
+        private static MarkerIdentity from(
+                @Nullable TameworkProjectionIdentityComponent marker) {
+            if (marker == null || !marker.isBondedCompanion()
+                    || marker.getProfileId() == null
+                    || marker.getBondedLeaseToken() == null) return null;
+            return new MarkerIdentity(
+                    marker.getProfileId(), marker.getBondedLeaseToken());
+        }
+    }
 
     private record Selected(String profileId, LoadedProjection projection,
                             double distanceSq) { }

@@ -5,9 +5,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEnt
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
-import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.codec.KeyedCodec;
-import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
@@ -43,7 +40,7 @@ import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.*;
  * Presents a radial-style set of clickable command buttons and returns the selected command id.
  */
 public final class TameworkCommandSelectionPage
-        extends InteractiveCustomUIPage<TameworkCommandSelectionPage.CommandSelectionEventData> {
+        extends InteractiveCustomUIPage<CommandSelectionEventData> {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
@@ -59,6 +56,7 @@ public final class TameworkCommandSelectionPage
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandSelectionOptionSource.Option[] options;
     private final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
+    private final CommandSelectionRosterEventBoundary rosterEventBoundary;
     private final boolean requireUnlinkConfirm;
     private final UUID playerUuid;
     private final long linkedPanelGeneration;
@@ -172,6 +170,7 @@ public final class TameworkCommandSelectionPage
                 recallActionEnabled,
                 config != null && config.usesOwnerCommandFamilyRoster()
         );
+        this.rosterEventBoundary = new CommandSelectionRosterEventBoundary(config);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
         this.linkedNpcBaseEntriesSupplier = linkedNpcBaseEntriesSupplier;
@@ -303,9 +302,6 @@ public final class TameworkCommandSelectionPage
         if (!isCurrentLinkedPanelOwner()) {
             return;
         }
-        if (data.panelGroupAssignValue != null) {
-            groupAssignOverlay.updateSelectedValue(data.panelGroupAssignValue);
-        }
         String commandId = data.commandId == null ? "" : data.commandId.trim();
         LinkedNpcPanelFeatureController.Outcome featureOutcome =
                 featureController.handle(
@@ -321,6 +317,12 @@ public final class TameworkCommandSelectionPage
         if (featureOutcome
                 == LinkedNpcPanelFeatureController.Outcome.HANDLED) {
             return;
+        }
+        if (rosterEventBoundary.blocks(data, commandId)) {
+            return;
+        }
+        if (data.panelGroupAssignValue != null) {
+            groupAssignOverlay.updateSelectedValue(data.panelGroupAssignValue);
         }
         if (!commandId.isBlank() && commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_GROUP_PICKER_COMMAND_PREFIX);
@@ -1205,69 +1207,4 @@ public final class TameworkCommandSelectionPage
         return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
     }
 
-    /** Event payload emitted by command-button clicks in the command selection page. */
-    public static final class CommandSelectionEventData {
-        public static final BuilderCodec<CommandSelectionEventData> CODEC = BuilderCodec.builder(
-                CommandSelectionEventData.class,
-                CommandSelectionEventData::new
-        )
-            .<String>append(
-                new KeyedCodec<>(EVENT_COMMAND_ID, Codec.STRING),
-                (event, value) -> event.commandId = value,
-                event -> event.commandId
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_MODE_VALUE, Codec.STRING),
-                (event, value) -> event.panelModeValue = value,
-                event -> event.panelModeValue
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_AUTO_LINK_ENABLED, Codec.BOOLEAN),
-                (event, value) -> event.panelAutoLinkEnabled = value,
-                event -> event.panelAutoLinkEnabled
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_SORT_VALUE, Codec.STRING),
-                (event, value) -> event.panelSortValue = value,
-                event -> event.panelSortValue
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_FILTER_MODE_VALUE, Codec.STRING),
-                (event, value) -> event.panelFilterModeValue = value,
-                event -> event.panelFilterModeValue
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_FILTER_TEXT_INPUT, Codec.STRING),
-                (event, value) -> event.panelFilterTextInput = value,
-                event -> event.panelFilterTextInput
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_GROUP_ACTIVE_VALUE, Codec.STRING),
-                (event, value) -> event.panelGroupActiveValue = value,
-                event -> event.panelGroupActiveValue
-            )
-            .add()
-            .append(
-                new KeyedCodec<>(KEY_PANEL_GROUP_ASSIGN_VALUE, Codec.STRING),
-                (event, value) -> event.panelGroupAssignValue = value,
-                event -> event.panelGroupAssignValue
-            )
-            .add()
-            .build();
-
-        private String commandId;
-        private String panelModeValue;
-        private Boolean panelAutoLinkEnabled;
-        private String panelSortValue;
-        private String panelFilterModeValue;
-        private String panelFilterTextInput;
-        private String panelGroupActiveValue;
-        private String panelGroupAssignValue;
-    }
 }

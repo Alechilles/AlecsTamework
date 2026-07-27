@@ -375,7 +375,7 @@ public final class CommandLinkedNpcInventoryRepairService {
 
     private boolean isEnabledCommandItem(@Nullable String itemId) {
         TwCommandItemConfig config = registry != null ? registry.get(itemId) : null;
-        return config != null && config.isEnabled();
+        return CommandRosterStorageBoundary.allowsGenericRosterActions(config);
     }
 
     @Nullable

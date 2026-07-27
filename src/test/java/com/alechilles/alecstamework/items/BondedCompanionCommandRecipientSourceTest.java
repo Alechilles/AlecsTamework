@@ -135,6 +135,31 @@ class BondedCompanionCommandRecipientSourceTest {
                 request(config(), -1D, 25), ignored -> wrongUuid).isEmpty());
     }
 
+    /** Regression: one durable lease must never authorize two physical projections. */
+    @Test
+    void rejectsExpectedProjectionWhenAnotherEntityCarriesTheSameExactMarker() {
+        BondedCompanionProfileView profile = active(
+                "profile-duplicate", OWNER, ROSTER, LIVE, WORLD,
+                "lease-duplicate", 0L);
+        var expected = projection(profile, new Vector3d(), "NordicDrake");
+        var duplicate = projection(profile, new Vector3d(2, 0, 0), "NordicDrake");
+        duplicate.npc().setLegacyUUID(OTHER_LIVE);
+        List<BondedCompanionCommandRecipientSource.LoadedProjection> physical =
+                List.of(expected, duplicate);
+
+        List<Candidate> recipients = source(List.of(profile)).select(
+                request(config(), -1D, 25),
+                uuid -> LIVE.equals(uuid) ? expected : null,
+                (profileId, leaseToken) -> physical.stream()
+                        .filter(projection -> projection.marker().matches(
+                                TameworkProjectionIdentityComponent
+                                        .KIND_BONDED_COMPANION,
+                                leaseToken, profileId))
+                        .count() == 1L);
+
+        assertTrue(recipients.isEmpty());
+    }
+
     @Test
     void appliesRoleRadiusMaxTargetsAndStableOrderingAfterAuthority() {
         BondedCompanionProfileView near = active(

@@ -16,21 +16,23 @@ class CommandProfileAwareRelocationWiringTest {
     @Test
     void commandAndWorldChangeRelocationResolveProfileBeforeQueueing() throws Exception {
         String handler = read(ITEMS.resolve("CommandItemFeatureHandler.java"));
+        String travel = read(ITEMS.resolve(
+                "CommandWorldChangeTravelCoordinator.java"));
         String useOrchestrator = read(ITEMS.resolve("CommandItemUseOrchestrator.java"));
         String recipients = read(ITEMS.resolve("CommandRecipientService.java"));
         String menu = read(ITEMS.resolve("CommandMenuMoveService.java"));
         String inventory = read(ITEMS.resolve("CommandToolInventoryService.java"));
 
         assertTrue(handler.contains("new CommandNpcProfileActionResolver(npcIdentityService)"));
-        assertTrue(handler.contains("resolveRelocationRecord(cachedRecord)"));
-        assertTrue(handler.contains("linkMutationService.writeLinkedNpcRecords(stack, linkedRecords)"));
+        assertTrue(travel.contains("resolveRelocationRecord(cachedRecord)"));
+        assertTrue(travel.contains("linkMutationService.writeLinkedNpcRecords("));
         assertTrue(recipients.contains("resolveRelocationRecord(cachedRecord)"));
         assertTrue(recipients.contains(
                 "linkedNpcRecordStore.write(context.workingItem, canonical.records())"));
         assertTrue(menu.contains("resolveRelocationTarget(record)"));
         assertTrue(menu.contains("replaceResolvedSelection("));
         assertTrue(menu.contains("linkMutationService.writeLinkedNpcRecords(stack, repairedRecords)"));
-        assertTrue(handler.contains("transaction != null && transaction.succeeded()"));
+        assertTrue(travel.contains("transaction != null && transaction.succeeded()"));
         assertTrue(menu.contains("transaction != null && transaction.succeeded()"));
         assertTrue(inventory.contains("transaction != null && transaction.succeeded()"));
 

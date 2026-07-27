@@ -125,6 +125,12 @@ final class CommandSelectionPageService {
                 : null;
         boolean requireUnlinkConfirm = resolveRequireUnlinkConfirm();
         boolean recallTeleportingEnabled = CommandTravelSettings.isRecallTeleportingEnabled();
+        boolean genericRosterActions =
+                CommandRosterStorageBoundary.allowsGenericRosterActions(config);
+        Consumer<UUID> ignoreUuid = ignored -> { };
+        Consumer<Boolean> ignoreBoolean = ignored -> { };
+        Consumer<String> ignoreString = ignored -> { };
+        Runnable ignoreAction = () -> { };
         CoherentPanelSnapshot panelSnapshot = new CoherentPanelSnapshot(
                 () -> toolInventoryService.buildLinkedPanelSnapshotForTool(
                         player, toolId, config
@@ -139,23 +145,37 @@ final class CommandSelectionPageService {
                 panelSnapshot::refreshEntries,
                 panelSnapshot::featurePresentations,
                 () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId),
+                genericRosterActions
+                        ? () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId)
+                        : () -> false,
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
-                () -> groupAssignPageService.resolveGroupActivationDropdownEntries(player, toolId),
-                () -> groupAssignPageService.resolveGroupActivationValue(player, toolId),
-                () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
+                genericRosterActions
+                        ? () -> groupAssignPageService.resolveGroupActivationDropdownEntries(player, toolId)
+                        : java.util.List::of,
+                genericRosterActions
+                        ? () -> groupAssignPageService.resolveGroupActivationValue(player, toolId)
+                        : () -> "",
+                genericRosterActions
+                        ? () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId)
+                        : java.util.List::of,
                 command -> recallTeleportingEnabled || !resolutionService.isRecallCommand(command),
                 recallTeleportingEnabled,
-                npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
-                actions.unlink(),
-                npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
-                npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
-                actions.release(),
-                actions.cull(),
-                actions.respawn(),
+                genericRosterActions
+                        ? npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid)
+                        : ignoreUuid,
+                genericRosterActions ? actions.unlink() : ignoreUuid,
+                genericRosterActions
+                        ? npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid)
+                        : ignoreUuid,
+                genericRosterActions
+                        ? npcUuid -> panelActionService.applyToggleBreeding(player, toolId, config, npcUuid)
+                        : ignoreUuid,
+                genericRosterActions ? actions.release() : ignoreUuid,
+                genericRosterActions ? actions.cull() : ignoreUuid,
+                genericRosterActions ? actions.respawn() : ignoreUuid,
                 npcUuid -> applyFeatureAction(
                         player, store, config, npcUuid, FeatureAction.SUMMON,
                         panelSnapshot
@@ -168,24 +188,34 @@ final class CommandSelectionPageService {
                         player, store, config, npcUuid, FeatureAction.REVIVE,
                         panelSnapshot
                 ),
-                actions.locate(),
-                actions.recall(),
-                actions.setHome(),
-                actions.returnHome(),
-                npcUuid -> talentPageService.openTalentPage(
-                        player, toolId, npcUuid, actions.reopenMenu()),
+                genericRosterActions ? actions.locate() : ignoreUuid,
+                genericRosterActions ? actions.recall() : ignoreUuid,
+                genericRosterActions ? actions.setHome() : ignoreUuid,
+                genericRosterActions ? actions.returnHome() : ignoreUuid,
+                genericRosterActions
+                        ? npcUuid -> talentPageService.openTalentPage(
+                                player, toolId, npcUuid, actions.reopenMenu())
+                        : ignoreUuid,
                 value -> panelActionService.applySetPanelMode(player, toolId, value),
-                enabled -> panelActionService.applySetAutoLinkEnabled(player, toolId, enabled),
+                genericRosterActions
+                        ? enabled -> panelActionService.applySetAutoLinkEnabled(
+                                player, toolId, config, enabled)
+                        : ignoreBoolean,
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
-                actions.manageGroups(),
+                genericRosterActions ? actions.manageGroups() : ignoreAction,
                 value -> panelActionService.applySetSort(player, toolId, value),
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
-                value -> groupAssignPageService.applyGroupActivation(player, toolId, value),
-                (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
-                        player, toolId, config, npcUuid, groupId),
+                genericRosterActions
+                        ? value -> groupAssignPageService.applyGroupActivation(
+                                player, toolId, config, value)
+                        : ignoreString,
+                genericRosterActions
+                        ? (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
+                                player, toolId, config, npcUuid, groupId)
+                        : (ignoredUuid, ignoredGroup) -> { },
                 actions.selectCommand()
         );
     }
