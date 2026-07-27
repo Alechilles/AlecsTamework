@@ -103,6 +103,35 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
+    void reviveReplacesZeroHealthSnapshotWithFullHealth() {
+        BondedCompanionSnapshot deathSnapshot = snapshotWithHealth(
+                ROLE, "Ember", 0.0D, 400.0D, 0.0D);
+        BondedCompanionProfile stored = service.createCaptured(
+                new BondedCompanionTransitionService.CreationRequest(
+                        "capture-death-health", OWNER, ROSTER,
+                        "dragon-death-health", ROLE, deathSnapshot,
+                        1L, -30_000L),
+                counts(0, 0)).profile();
+        BondedCompanionProfile active = service.summon(
+                mutation("summon-death-health", stored, -20_000L), stored,
+                counts(1, 0), "lease-death-health", "world:alpha"
+        ).profile();
+        BondedCompanionProfile dead = service.confirmDeath(
+                mutation("confirm-death-health", active, -19_000L), active
+        ).profile();
+
+        BondedCompanionProfile revived = service.revive(
+                mutation("revive-death-health", dead, -18_000L), dead,
+                new BondedCompanionTransitionService.RevivePayment(
+                        "Ingredient_Life_Essence", 2)
+        ).profile();
+
+        assertEquals(100.0D, revived.snapshot().fullState().healthPercent());
+        assertEquals(400.0D, revived.snapshot().fullState().currentHealth());
+        assertEquals(400.0D, revived.snapshot().fullState().maximumHealth());
+    }
+
+    @Test
     void rejectsEveryOtherStateTransition() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionProfile active = service.summon(
@@ -518,6 +547,33 @@ class BondedCompanionStateMachineTest {
                         ),
                         null, null, null, null, null, null, null, null,
                         100.0D, -200L
+                ),
+                Map.of()
+        );
+    }
+
+    private BondedCompanionSnapshot snapshotWithHealth(
+            String roleId,
+            String name,
+            double currentHealth,
+            double maximumHealth,
+            double healthPercent
+    ) {
+        return BondedCompanionSnapshot.of(
+                new com.alechilles.alecstamework.items
+                        .CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
+                        UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                        null, -1, roleId, null,
+                        new com.alechilles.alecstamework.npc.components
+                                .TameworkOwnerComponent(OWNER, "Owner"), null,
+                        new com.alechilles.alecstamework.npc.components
+                                .TameworkNpcNameComponent(
+                                name, OWNER, -100L,
+                                com.alechilles.alecstamework.npc.components
+                                        .TameworkNpcNameComponent.NameSource.Player
+                        ),
+                        null, null, null, null, null, null, null, null,
+                        currentHealth, maximumHealth, healthPercent, -200L
                 ),
                 Map.of()
         );

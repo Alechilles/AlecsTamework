@@ -75,8 +75,8 @@ final class BondedCompanionPanelEntrySourceService {
 
     private LinkedNpcEntry entry(BondedCompanionPanelRecordSource.PanelRecord record) {
         var profile = record.profile();
-        int maxHealth = integer(profile.snapshotPresentationData(), "maxHealth", 100);
-        int currentHealth = integer(profile.snapshotPresentationData(), "currentHealth", -1);
+        int maxHealth = healthValue(profile.snapshotPresentationData(), "maxHealth", 100);
+        int currentHealth = healthValue(profile.snapshotPresentationData(), "currentHealth", -1);
         if (currentHealth < 0) currentHealth = percentValue(
                 profile.snapshotPresentationData().get("healthPercent"), maxHealth);
         int happiness = percentValue(
@@ -99,9 +99,14 @@ final class BondedCompanionPanelEntrySourceService {
                 false, 0L, 0D, false, false, 0L);
     }
 
-    private static int integer(java.util.Map<String, String> data,
-                               String key, int fallback) {
-        try { return Math.max(0, Integer.parseInt(data.get(key))); }
+    private static int healthValue(java.util.Map<String, String> data,
+                                   String key, int fallback) {
+        try {
+            double value = Double.parseDouble(data.get(key));
+            if (!Double.isFinite(value)) return fallback;
+            return (int) Math.min(Integer.MAX_VALUE,
+                    Math.max(0L, Math.round(value)));
+        }
         catch (RuntimeException ignored) { return fallback; }
     }
 

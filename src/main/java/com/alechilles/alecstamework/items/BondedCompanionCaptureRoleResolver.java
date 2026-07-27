@@ -73,6 +73,7 @@ final class BondedCompanionCaptureRoleResolver {
                 state.npcName(), state.happiness(), state.needs(),
                 state.breeding(), state.leveling(), state.traits(),
                 state.talents(), state.lifeStage(), state.attachments(),
+                state.currentHealth(), state.maximumHealth(),
                 state.healthPercent(), state.capturedAtMs()
         ), snapshot.extensionData());
     }

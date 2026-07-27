@@ -71,6 +71,31 @@ public final class BondedCompanionSnapshot {
         return new BondedCompanionSnapshot(merged, extensions);
     }
 
+    /**
+     * Returns a summon-safe snapshot after a paid revive without creating a
+     * live projection. Exact health is restored to its saved maximum when
+     * known; older percentage-only snapshots retain their 100% fallback.
+     */
+    @Nonnull
+    public BondedCompanionSnapshot restoredAfterRevive() {
+        Double maximum = fullState.maximumHealth();
+        boolean exactMaximum = maximum != null && Double.isFinite(maximum)
+                && maximum > 0.0D;
+        Double restoredPercent = exactMaximum || fullState.healthPercent() != null
+                ? 100.0D : null;
+        CoopResidentStateSnapshot restored = new CoopResidentStateSnapshot(
+                fullState.npcUuid(), fullState.coopId(),
+                fullState.residentSlot(), fullState.roleId(),
+                fullState.commandLinks(), fullState.owner(), fullState.tamed(),
+                fullState.npcName(), fullState.happiness(), fullState.needs(),
+                fullState.breeding(), fullState.leveling(), fullState.traits(),
+                fullState.talents(), fullState.lifeStage(),
+                fullState.attachments(), exactMaximum ? maximum : null,
+                exactMaximum ? maximum : null, restoredPercent,
+                fullState.capturedAtMs());
+        return new BondedCompanionSnapshot(restored, extensionData);
+    }
+
     CoopResidentStateSnapshot fullStateInternal() {
         return fullState;
     }

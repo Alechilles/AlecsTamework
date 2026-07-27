@@ -229,7 +229,8 @@ public final class BondedCompanionTransitionService {
         }
         try {
             return applied(copy(
-                    profile, BondedCompanionState.STORED, profile.snapshot(),
+                    profile, BondedCompanionState.STORED,
+                    profile.snapshot().restoredAfterRevive(),
                     null, 0L, null, Math.incrementExact(profile.reviveCount()),
                     receipt
             ));

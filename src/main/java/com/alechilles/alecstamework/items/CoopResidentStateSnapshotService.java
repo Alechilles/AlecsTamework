@@ -155,6 +155,8 @@ public final class CoopResidentStateSnapshotService {
                 sourceSnapshot.talents(),
                 sourceSnapshot.lifeStage(),
                 sourceSnapshot.attachments(),
+                sourceSnapshot.currentHealth(),
+                sourceSnapshot.maximumHealth(),
                 sourceSnapshot.healthPercent(),
                 System.currentTimeMillis()
         ));
@@ -256,6 +258,7 @@ public final class CoopResidentStateSnapshotService {
             commandBuffer.run(bufferStore -> applyRestoredHealth(
                     reference,
                     bufferStore,
+                    postAddWork.currentHealth(), postAddWork.maximumHealth(),
                     postAddWork.healthPercent()
             ));
         }
@@ -263,12 +266,15 @@ public final class CoopResidentStateSnapshotService {
 
     void applyRestoredHealth(@Nullable Ref<EntityStore> reference,
                              @Nullable Store<EntityStore> store,
+                             @Nullable Double currentHealth,
+                             @Nullable Double maximumHealth,
                              @Nullable Double healthPercent) {
-        if (reference == null || !reference.isValid() || store == null || healthPercent == null) {
+        if (reference == null || !reference.isValid() || store == null) {
             return;
         }
         CompanionStatModifierService.applyTraitModifiers(reference, store);
-        CompanionHealthStateService.applyStoredHealthPercent(reference, store, healthPercent);
+        CompanionHealthStateService.applyStoredHealth(
+                reference, store, currentHealth, maximumHealth, healthPercent);
     }
 
     private void applyDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
@@ -342,7 +348,8 @@ public final class CoopResidentStateSnapshotService {
         TameworkHappinessComponent happiness = resolveHappinessSnapshot(reference, store);
         TameworkNeedsComponent needs = store.getComponent(reference, TameworkNeedsComponent.getComponentType());
         TameworkAttachmentsComponent attachments = resolveAttachmentSnapshot(reference, store);
-        Double healthPercent = CompanionHealthStateService.captureHealthPercent(reference, store);
+        CompanionHealthStateService.HealthSnapshot health =
+                CompanionHealthStateService.captureHealth(reference, store);
         return snapshotCodec.copy(new CoopResidentStateSnapshot(
                 npcUuid,
                 normalizeCoopId(coopId),
@@ -360,7 +367,9 @@ public final class CoopResidentStateSnapshotService {
                 store.getComponent(reference, TameworkTalentsComponent.getComponentType()),
                 store.getComponent(reference, TameworkLifeStageComponent.getComponentType()),
                 attachments,
-                healthPercent,
+                health == null ? null : health.currentHealth(),
+                health == null ? null : health.maximumHealth(),
+                health == null ? null : health.healthPercent(),
                 System.currentTimeMillis()
         ));
     }
@@ -422,8 +431,32 @@ public final class CoopResidentStateSnapshotService {
                                             @Nullable TameworkTalentsComponent talents,
                                             @Nullable TameworkLifeStageComponent lifeStage,
                                             @Nullable TameworkAttachmentsComponent attachments,
+                                            @Nullable Double currentHealth,
+                                            @Nullable Double maximumHealth,
                                             @Nullable Double healthPercent,
                                             long capturedAtMs) {
+        /** Preserves the original percentage-only snapshot contract. */
+        public CoopResidentStateSnapshot(UUID npcUuid, @Nullable String coopId,
+                                         int residentSlot, @Nullable String roleId,
+                                         @Nullable TameworkCommandLinksComponent commandLinks,
+                                         @Nullable TameworkOwnerComponent owner,
+                                         @Nullable TameworkTamedComponent tamed,
+                                         @Nullable TameworkNpcNameComponent npcName,
+                                         @Nullable TameworkHappinessComponent happiness,
+                                         @Nullable TameworkNeedsComponent needs,
+                                         @Nullable TameworkBreedingComponent breeding,
+                                         @Nullable TameworkLevelingComponent leveling,
+                                         @Nullable TameworkTraitsComponent traits,
+                                         @Nullable TameworkTalentsComponent talents,
+                                         @Nullable TameworkLifeStageComponent lifeStage,
+                                         @Nullable TameworkAttachmentsComponent attachments,
+                                         @Nullable Double healthPercent,
+                                         long capturedAtMs) {
+            this(npcUuid, coopId, residentSlot, roleId, commandLinks, owner,
+                    tamed, npcName, happiness, needs, breeding, leveling,
+                    traits, talents, lifeStage, attachments, null, null,
+                    healthPercent, capturedAtMs);
+        }
     }
 
 }
