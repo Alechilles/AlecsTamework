@@ -23,6 +23,18 @@ final class BondedCompanionProvisioningSupport {
     private static final long RETENTION_MS = 30L * 24L * 60L * 60L * 1000L;
     private final BondedCompanionSnapshotCodec snapshots =
             new BondedCompanionSnapshotCodec();
+    private final BondedCompanionRoleHealthResolver roleHealths;
+
+    BondedCompanionProvisioningSupport() {
+        this(new HytaleBondedCompanionRoleHealthResolver());
+    }
+
+    BondedCompanionProvisioningSupport(
+            BondedCompanionRoleHealthResolver roleHealths
+    ) {
+        this.roleHealths = java.util.Objects.requireNonNull(
+                roleHealths, "roleHealths");
+    }
 
     Prepared prepare(BondedCompanionProvisionRequest request, long now) {
         String profileId = stableProfileId(request);
@@ -59,11 +71,20 @@ final class BondedCompanionProvisioningSupport {
                 : new TameworkNpcNameComponent(
                         request.displayName(), request.ownerUuid(), now,
                         TameworkNpcNameComponent.NameSource.System);
+        Double maximumHealth = configuredMaximumHealth(request.roleId());
         return BondedCompanionSnapshot.of(new CoopResidentStateSnapshot(
                 source, null, -1, request.roleId(), null,
                 new TameworkOwnerComponent(request.ownerUuid(), null),
                 new TameworkTamedComponent(true), name, null, null, null,
-                null, null, null, null, null, null, now), Map.of());
+                null, null, null, null, null, maximumHealth, maximumHealth,
+                maximumHealth == null ? null : 100.0D, now), Map.of());
+    }
+
+    @Nullable
+    private Double configuredMaximumHealth(String roleId) {
+        Double maximum = roleHealths.resolveMaximumHealth(roleId);
+        return maximum != null && Double.isFinite(maximum) && maximum > 0.0D
+                ? maximum : null;
     }
 
     private BondedCompanionPayload payload(BondedCompanionSnapshot snapshot) {
