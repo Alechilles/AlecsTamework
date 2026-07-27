@@ -4,14 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotPresentationMapper;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderModifier;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
+import com.hypixel.hytale.server.npc.asset.builder.StateMappingHelper;
 import com.hypixel.hytale.server.npc.asset.builder.holder.IntHolder;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.builders.BuilderRole;
 import com.hypixel.hytale.server.npc.role.builders.BuilderRoleVariant;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
-import com.hypixel.hytale.server.npc.util.expression.Scope;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -35,16 +39,17 @@ class BondedCompanionProvisionedHealthTest {
     void productionResolverUsesVariantModifierScopeWithoutBuildingLiveRole()
             throws Exception {
         sun.misc.Unsafe unsafe = unsafe();
-        BuilderRole base = roleWithMaxHealth(unsafe, 80);
-        VariantFixture variant = VariantFixture.class.cast(
-                unsafe.allocateInstance(VariantFixture.class));
-        variant.scope = new StdScope(null);
-        variant.referenceIndex = 42;
+        BuilderParameters parameters = parametersWithMaxHealth(100);
+        BuilderRole base = roleWithComputedMaxHealth(unsafe, parameters);
+        RoleBuilderFixtureManager manager = new RoleBuilderFixtureManager(base);
+        BuilderRoleVariant variant = new BuilderRoleVariant();
+        setField(variant, "referenceIndex", 42);
+        setField(variant, "modifier", maxHealthModifier(parameters, 80));
+        setField(variant, "builderManager", manager);
 
         assertEquals(80.0D,
                 HytaleBondedCompanionRoleHealthResolver.resolveLoadedRole(
-                        variant, new RoleBuilderFixtureManager(base)));
-        assertEquals(1, variant.scopeCalls);
+                        variant, manager));
     }
 
     @Test
@@ -90,27 +95,68 @@ class BondedCompanionProvisionedHealthTest {
         return role;
     }
 
-    private static Field field(Class<?> type, String name) throws Exception {
-        Field field = type.getDeclaredField(name);
-        field.setAccessible(true);
-        return field;
+    private static BuilderRole roleWithComputedMaxHealth(
+            sun.misc.Unsafe unsafe, BuilderParameters parameters
+    ) throws Exception {
+        IntHolder maxHealth = new IntHolder();
+        JsonObject expression = new JsonObject();
+        expression.addProperty("Compute", "MaxHealth");
+        maxHealth.readJSON(expression, null, "MaxHealth", parameters);
+        BuilderRole role = BuilderRole.class.cast(
+                unsafe.allocateInstance(BuilderRole.class));
+        unsafe.putObject(role, unsafe.objectFieldOffset(
+                field(BuilderRole.class, "maxHealth")), maxHealth);
+        setField(role, "builderParameters", parameters);
+        return role;
     }
 
-    private static final class VariantFixture extends BuilderRoleVariant {
-        private Scope scope;
-        private int referenceIndex;
-        private int scopeCalls;
+    private static BuilderParameters parametersWithMaxHealth(int health)
+            throws Exception {
+        var constructor = BuilderParameters.class.getDeclaredConstructor(
+                StdScope.class, String.class, String.class);
+        constructor.setAccessible(true);
+        BuilderParameters parameters = constructor.newInstance(
+                new StdScope(null), "test", null);
+        JsonObject root = new JsonObject();
+        JsonObject entries = new JsonObject();
+        JsonObject maxHealth = new JsonObject();
+        maxHealth.addProperty("Value", health);
+        entries.add("MaxHealth", maxHealth);
+        root.add("Parameters", entries);
+        parameters.readJSON(root, new StateMappingHelper());
+        parameters.addParametersToScope();
+        return parameters;
+    }
 
-        @Override
-        public Scope createModifierScope(ExecutionContext context) {
-            scopeCalls++;
-            return scope;
-        }
+    private static BuilderModifier maxHealthModifier(
+            BuilderParameters parameters, int health
+    ) {
+        JsonObject root = new JsonObject();
+        JsonObject modify = new JsonObject();
+        modify.addProperty("MaxHealth", health);
+        root.add("Modify", modify);
+        return BuilderModifier.fromJSON(root, parameters,
+                new StateMappingHelper(), new ExtraInfo());
+    }
 
-        @Override
-        public int getReferenceIndex() {
-            return referenceIndex;
+    private static Field field(Class<?> type, String name) throws Exception {
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            }
         }
+        throw new NoSuchFieldException(name);
+    }
+
+    private static void setField(Object target, String name, Object value)
+            throws Exception {
+        Field field = field(target.getClass(), name);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private static final class RoleBuilderFixtureManager extends BuilderManager {
