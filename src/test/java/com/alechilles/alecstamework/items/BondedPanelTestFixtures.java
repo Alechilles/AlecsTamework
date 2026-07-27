@@ -16,8 +16,15 @@ final class BondedPanelTestFixtures {
     static BondedCompanionProfileView profile(
             String id, long revision, BondedCompanionStateView state,
             UUID liveUuid, Map<String, String> data) {
+        return profile(id, revision, state, liveUuid, data,
+                "hydragon:dragon");
+    }
+
+    static BondedCompanionProfileView profile(
+            String id, long revision, BondedCompanionStateView state,
+            UUID liveUuid, Map<String, String> data, String familyId) {
         return new BondedCompanionProfileView(
-                id, OWNER, "hydragon:dragons", "hydragon:dragon",
+                id, OWNER, "hydragon:dragons", familyId,
                 "Bonded_Miniwyvern_Storm", "Nimbus", "Miniwyvern", "Male",
                 revision, state, state == BondedCompanionStateView.STORED,
                 state == BondedCompanionStateView.ACTIVE,

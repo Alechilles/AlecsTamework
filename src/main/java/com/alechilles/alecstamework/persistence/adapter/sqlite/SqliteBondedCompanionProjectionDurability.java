@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,13 +23,14 @@ import javax.annotation.Nullable;
 /** Atomic SQLite implementation of the Task 4 bonded projection durability port. */
 public final class SqliteBondedCompanionProjectionDurability implements
         BondedCompanionProjectionService.Durability {
-    private static final long RETRY_DELAY_MS = 1_000L;
-
     private final SqliteConnectionFactory connections;
+    private final SqliteBondedCompanionCleanupQueue cleanupQueue;
     private final SqliteBondedCompanionMapper mapper =
             new SqliteBondedCompanionMapper();
     private final BondedCompanionSnapshotCodec snapshots =
             new BondedCompanionSnapshotCodec();
+    private final SqliteBondedCompanionSummonWriter summons =
+            new SqliteBondedCompanionSummonWriter();
 
     public SqliteBondedCompanionProjectionDurability(
             @Nonnull Path databasePath
@@ -36,6 +38,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
         connections = new SqliteConnectionFactory(
                 Objects.requireNonNull(databasePath, "databasePath")
         );
+        cleanupQueue = new SqliteBondedCompanionCleanupQueue(connections);
     }
 
     @Override
@@ -45,18 +48,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
             BondedCompanionProjectionCleanupService.CleanupIntent recovery
     ) {
         return transaction(connection -> {
-            try (PreparedStatement update = connection.prepareStatement("""
-                    UPDATE bonded_companion_profile
-                    SET state = 'ACTIVE', revision = revision + 1,
-                        updated_at_ms = ?
-                    WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
-                      AND revision = ? AND state = 'STORED'
-                    """)) {
-                update.setLong(1, request.nowMs());
-                scope(update, 2, lease);
-                update.setLong(5, request.expectedRevision());
-                if (update.executeUpdate() != 1) return false;
-            }
+            if (!summons.activate(connection, request, lease)) return false;
             insertLease(connection, lease, "PENDING");
             insertCleanup(connection, recovery);
             return true;
@@ -92,7 +84,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
             String reason
     ) {
         return returnToStored(
-                lease, null, null, cleanups, lease.startedAtMs(), false
+                lease, null, null, null, cleanups,
+                lease.startedAtMs(), false
         );
     }
 
@@ -104,7 +97,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
     ) {
         return returnToStored(
                 request.lease(), snapshot, request.expectedRevision(),
-                List.of(cleanup), request.nowMs(), true
+                request.summonCooldownUntilMs(), List.of(cleanup),
+                request.nowMs(), true
         );
     }
 
@@ -112,13 +106,15 @@ public final class SqliteBondedCompanionProjectionDurability implements
     public boolean reconcileStored(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
             BondedCompanionSnapshot snapshot,
+            long summonCooldownUntilMs,
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
             String reason
     ) {
         long updatedAt = cleanups.isEmpty()
                 ? lease.startedAtMs() : cleanups.getFirst().createdAtMs();
         return returnToStored(
-                lease, snapshot, null, cleanups, updatedAt, false
+                lease, snapshot, null, summonCooldownUntilMs,
+                cleanups, updatedAt, false
         );
     }
 
@@ -166,7 +162,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
         Objects.requireNonNull(cleanup, "cleanup");
         if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
         List<BondedCompanionProjectionCleanupService.CleanupIntent> pending =
-                pending(nowMs, limit);
+                cleanupQueue.pending(nowMs, limit);
         int attempted = 0;
         for (var intent : pending) {
             BondedCompanionProjectionCleanupService.Outcome outcome =
@@ -176,7 +172,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                             ? BondedCompanionProjectionCleanupService.Outcome
                             .IDENTITY_MISMATCH
                             : cleanup.recover(intent);
-            recordOutcome(intent.cleanupId(), outcome, nowMs);
+            cleanupQueue.recordOutcome(intent.cleanupId(), outcome, nowMs);
             attempted++;
         }
         return attempted;
@@ -191,7 +187,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
     ) {
         BondedCompanionProjectionCleanupService.Outcome outcome =
                 cleanup.recover(intent);
-        recordOutcome(intent.cleanupId(), outcome, nowMs);
+        cleanupQueue.recordOutcome(intent.cleanupId(), outcome, nowMs);
         return outcome;
     }
 
@@ -259,6 +255,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
             BondedCompanionProjectionValidator.LeaseExpectation lease,
             @Nullable BondedCompanionSnapshot snapshot,
             @Nullable Long expectedRevision,
+            @Nullable Long summonCooldownUntilMs,
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
             long updatedAtMs,
             boolean requireRevision
@@ -270,6 +267,9 @@ public final class SqliteBondedCompanionProjectionDurability implements
                     UPDATE bonded_companion_profile
                     SET state = 'STORED', revision = revision + 1,
                         snapshot_json = COALESCE(?, snapshot_json),
+                        revive_cooldown_until_ms = COALESCE(
+                            ?, revive_cooldown_until_ms
+                        ),
                         died_at_ms = NULL, updated_at_ms = ?
                     WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
                       AND state = 'ACTIVE'
@@ -281,12 +281,17 @@ public final class SqliteBondedCompanionProjectionDurability implements
                       )
                     """ + revisionClause)) {
                 update.setString(1, snapshot == null ? null : encoded(snapshot));
-                update.setLong(2, updatedAtMs);
-                scope(update, 3, lease);
-                update.setString(6, lease.leaseToken());
-                update.setString(7, lease.liveNpcUuid().toString());
-                update.setString(8, lease.worldKey());
-                if (requireRevision) update.setLong(9, expectedRevision);
+                if (summonCooldownUntilMs == null) {
+                    update.setNull(2, Types.BIGINT);
+                } else {
+                    update.setLong(2, summonCooldownUntilMs);
+                }
+                update.setLong(3, updatedAtMs);
+                scope(update, 4, lease);
+                update.setString(7, lease.leaseToken());
+                update.setString(8, lease.liveNpcUuid().toString());
+                update.setString(9, lease.worldKey());
+                if (requireRevision) update.setLong(10, expectedRevision);
                 if (update.executeUpdate() != 1) return false;
             }
             if (deleteLease(connection, lease) != 1) return false;
@@ -343,70 +348,6 @@ public final class SqliteBondedCompanionProjectionDurability implements
             insert.setLong(11, intent.createdAtMs());
             insert.setLong(12, intent.retainedUntilMs());
             insert.executeUpdate();
-        }
-    }
-
-    private List<BondedCompanionProjectionCleanupService.CleanupIntent>
-    pending(long nowMs, int limit) {
-        try (Connection connection = connections.openReadConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT cleanup_id, owner_uuid, roster_id, profile_id,
-                            lease_token, target_kind, target_npc_uuid,
-                            world_key, cleanup_reason, created_at_ms,
-                            retained_until_ms
-                     FROM bonded_companion_cleanup
-                     WHERE cleanup_state = 'PENDING' AND next_attempt_at_ms <= ?
-                     ORDER BY next_attempt_at_ms, cleanup_id LIMIT ?
-                     """)) {
-            statement.setLong(1, nowMs);
-            statement.setInt(2, limit);
-            try (ResultSet rows = statement.executeQuery()) {
-                ArrayList<BondedCompanionProjectionCleanupService.CleanupIntent>
-                        result = new ArrayList<>();
-                while (rows.next()) {
-                    result.add(new BondedCompanionProjectionCleanupService
-                            .CleanupIntent(
-                            rows.getString(1), UUID.fromString(rows.getString(2)),
-                            rows.getString(3), rows.getString(4), rows.getString(5),
-                            BondedCompanionProjectionCleanupService.Target
-                                    .valueOf(rows.getString(6)),
-                            UUID.fromString(rows.getString(7)), rows.getString(8),
-                            rows.getString(9), rows.getLong(10),
-                            rows.getLong(11)
-                    ));
-                }
-                return List.copyOf(result);
-            }
-        } catch (Exception failure) {
-            return List.of();
-        }
-    }
-
-    private void recordOutcome(
-            String cleanupId,
-            BondedCompanionProjectionCleanupService.Outcome outcome,
-            long nowMs
-    ) {
-        String state = switch (outcome) {
-            case REMOVED, ALREADY_MISSING -> "COMPLETED";
-            case IDENTITY_MISMATCH -> "ABANDONED";
-            case RETRY_REQUIRED -> "PENDING";
-        };
-        long next = outcome == BondedCompanionProjectionCleanupService.Outcome
-                .RETRY_REQUIRED ? safeAdd(nowMs, RETRY_DELAY_MS) : nowMs;
-        try (Connection connection = connections.openWriterConnection();
-             PreparedStatement update = connection.prepareStatement("""
-                     UPDATE bonded_companion_cleanup
-                     SET cleanup_state = ?, attempt_count = attempt_count + 1,
-                         next_attempt_at_ms = ?
-                     WHERE cleanup_id = ? AND cleanup_state = 'PENDING'
-                     """)) {
-            update.setString(1, state);
-            update.setLong(2, next);
-            update.setString(3, cleanupId);
-            update.executeUpdate();
-        } catch (Exception ignored) {
-            // The pending row remains durable for a later replay.
         }
     }
 
@@ -482,14 +423,6 @@ public final class SqliteBondedCompanionProjectionDurability implements
             if (connection != null) {
                 try { connection.close(); } catch (Exception ignored) { }
             }
-        }
-    }
-
-    private long safeAdd(long value, long increment) {
-        try {
-            return Math.addExact(value, increment);
-        } catch (ArithmeticException overflow) {
-            return Long.MAX_VALUE;
         }
     }
 

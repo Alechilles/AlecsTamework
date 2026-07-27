@@ -12,6 +12,15 @@ public interface BondedCompanionStore {
             @Nonnull BondedCompanionOperation operation,
             @Nonnull BondedCompanionRecord.Profile profile);
 
+    /** Creates a profile while atomically enforcing its exact family limit. */
+    @Nonnull
+    BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            createProfile(
+                    @Nonnull BondedCompanionOperation operation,
+                    @Nonnull BondedCompanionRecord.Profile profile,
+                    int maximumOwned
+            );
+
     /** Lists profiles within one exact owner and roster scope. */
     @Nonnull List<BondedCompanionRecord.Profile> listProfiles(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId);
@@ -20,6 +29,10 @@ public interface BondedCompanionStore {
     @Nonnull Optional<BondedCompanionRecord.Profile> findProfile(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId,
             @Nonnull String profileId);
+
+    /** Finds one owned profile by its globally stable profile ID. */
+    @Nonnull Optional<BondedCompanionRecord.Profile> findProfile(
+            @Nonnull UUID ownerUuid, @Nonnull String profileId);
 
     /**
      * Probes an existing profile-operation result without claiming or mutating.

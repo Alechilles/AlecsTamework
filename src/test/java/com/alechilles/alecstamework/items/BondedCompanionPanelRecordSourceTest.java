@@ -62,6 +62,29 @@ class BondedCompanionPanelRecordSourceTest {
     }
 
     @Test
+    void oneRosterAggregatesDragonAndMiniwyvernFamilies() {
+        BondedCompanionProfileView dragon = BondedPanelTestFixtures.profile(
+                "dragon-1", 1L, BondedCompanionStateView.STORED, null,
+                Map.of(), "hydragon:full-dragon");
+        BondedCompanionProfileView miniwyvern = BondedPanelTestFixtures.profile(
+                "mini-1", 2L, BondedCompanionStateView.STORED, null,
+                Map.of(), "hydragon:miniwyvern");
+        BondedCompanionPanelRecordSource source =
+                new BondedCompanionPanelRecordSource(() ->
+                        BondedPanelTestFixtures.api(List.of(
+                                miniwyvern, dragon
+                        )));
+
+        var records = source.snapshotFor(OWNER, "hydragon:dragons").records();
+
+        assertEquals(List.of("dragon-1", "mini-1"), records.stream()
+                .map(record -> record.profile().profileId()).toList());
+        assertEquals(List.of("hydragon:full-dragon", "hydragon:miniwyvern"),
+                records.stream().map(record -> record.profile().familyId())
+                        .toList());
+    }
+
+    @Test
     void captureSummonStoreAndReviveKeepOneProfileKeyedDetailedCard() {
         AtomicReference<BondedCompanionProfileView> current =
                 new AtomicReference<>();

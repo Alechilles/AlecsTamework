@@ -19,6 +19,7 @@ import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.bson.BsonDocument;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
@@ -182,6 +183,138 @@ class BondedCompanionCompositionTest {
         }
     }
 
+    @Test
+    void sharedRosterProvisionsAndListsFamiliesWithIndependentOwnedLimits()
+            throws Exception {
+        BondedCompanionRosterRegistry rosters = sharedRosterRegistry(false);
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory, rosters, null, () -> 5_000L
+                );
+        try {
+            var dragon = composition.api().provision(provision(
+                    "dragon-1", "Tamed_Dragon_Fire", "hydragon:dragon"
+            )).join();
+            var miniwyvern = composition.api().provision(provision(
+                    "mini-1", "Bonded_Miniwyvern", "hydragon:miniwyvern"
+            )).join();
+            var secondDragon = composition.api().provision(provision(
+                    "dragon-2", "Tamed_Dragon_Fire", "hydragon:dragon"
+            )).join();
+            var secondMiniwyvern = composition.api().provision(provision(
+                    "mini-2", "Bonded_Miniwyvern", "hydragon:miniwyvern"
+            )).join();
+
+            assertEquals(BondedCompanionResultCode.SUCCESS, dragon.code());
+            assertEquals(BondedCompanionResultCode.SUCCESS, miniwyvern.code());
+            assertEquals(BondedCompanionResultCode.POLICY_DENIED,
+                    secondDragon.code());
+            assertEquals(BondedCompanionResultCode.POLICY_DENIED,
+                    secondMiniwyvern.code());
+            var listed = composition.api().list(OWNER, "hydragon:horn").join();
+            assertEquals(BondedCompanionResultCode.SUCCESS, listed.code());
+            assertEquals(2, listed.value().size());
+            assertEquals(
+                    Set.of("hydragon:dragon", "hydragon:miniwyvern"),
+                    listed.value().stream()
+                            .map(view -> view.familyId())
+                            .collect(java.util.stream.Collectors.toSet())
+            );
+            String miniProfileId = listed.value().stream()
+                    .filter(view -> "hydragon:miniwyvern".equals(view.familyId()))
+                    .findFirst().orElseThrow().profileId();
+            BondedCompanionExtensionDataKey extensionKey =
+                    new BondedCompanionExtensionDataKey(
+                            OWNER, miniProfileId, "hydragon.abilities");
+            var updated = composition.api().compareAndSetExtensionData(
+                    new BondedCompanionExtensionDataUpdate(
+                            "test", "mini-extension", extensionKey,
+                            "{\"attuned\":true}",
+                            BondedCompanionExtensionDataUpdate.MISSING_REVISION
+                    )).join();
+            assertEquals(BondedCompanionResultCode.SUCCESS, updated.code());
+            assertEquals(updated.value(), composition.api()
+                    .getExtensionData(extensionKey).join().value());
+            assertTrue(rosters.replace(
+                    List.of(), rosters.snapshot().revision() + 1L
+            ).applied());
+            assertEquals(updated.value(), composition.api()
+                    .getExtensionData(extensionKey).join().value());
+            var otherOwner = composition.api().getExtensionData(
+                    new BondedCompanionExtensionDataKey(
+                            UUID.fromString(
+                                    "10000000-0000-0000-0000-000000000099"),
+                            miniProfileId, "hydragon.abilities"
+                    )
+            ).join();
+            assertEquals(BondedCompanionResultCode.NOT_FOUND, otherOwner.code());
+        } finally {
+            composition.close();
+        }
+    }
+
+    /** Regression: adding optional family selection must not strand old replays. */
+    @Test
+    void noFamilyProvisionReplaysThePreFamilyRequestHash() throws Exception {
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory, rosters, null, () -> 5_000L
+                );
+        BondedCompanionProvisionRequest request =
+                new BondedCompanionProvisionRequest(
+                        "test", "legacy-provision", OWNER,
+                        "hydragon:dragons", "Tamed_Dragon_Fire",
+                        "Ember", "Dragon", "Female",
+                        Map.of("variant", "ember")
+                );
+        try {
+            var created = composition.api().provision(request).join();
+            assertEquals(BondedCompanionResultCode.SUCCESS, created.code());
+            rewriteOperationHash(
+                    temporaryDirectory.resolve(BondedCompanionDataPath.FILE_NAME),
+                    request.callerNamespace(), request.idempotencyKey(),
+                    legacyProvisionHash(request)
+            );
+
+            var replay = composition.api().provision(request).join();
+
+            assertEquals(BondedCompanionResultCode.SUCCESS, replay.code());
+            assertEquals(created.value().profileId(), replay.value().profileId());
+        } finally {
+            composition.close();
+        }
+    }
+
+    @Test
+    void ambiguousProvisionRoleFailsClosedUntilFamilyIsExplicit()
+            throws Exception {
+        BondedCompanionRosterRegistry rosters = sharedRosterRegistry(true);
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory, rosters, null, () -> 5_000L
+                );
+        try {
+            var ambiguous = composition.api().provision(
+                    new BondedCompanionProvisionRequest(
+                            "test", "ambiguous", OWNER, "hydragon:horn",
+                            "Shared_Role", "Ambiguous", "Companion", null,
+                            Map.of()
+                    )
+            ).join();
+            var explicit = composition.api().provision(provision(
+                    "explicit", "Shared_Role", "hydragon:miniwyvern"
+            )).join();
+
+            assertEquals(BondedCompanionResultCode.POLICY_DENIED,
+                    ambiguous.code());
+            assertEquals(BondedCompanionResultCode.SUCCESS, explicit.code());
+            assertEquals("hydragon:miniwyvern", explicit.value().familyId());
+        } finally {
+            composition.close();
+        }
+    }
+
     private void insertTerminalOperation(
             Path database, String key, String state, long expiresAt)
             throws Exception {
@@ -224,6 +357,55 @@ class BondedCompanionCompositionTest {
                 assertTrue(row.next());
                 return row.getLong(1);
             }
+        }
+    }
+
+    private void rewriteOperationHash(
+            Path database,
+            String namespace,
+            String key,
+            String requestHash
+    ) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE bonded_companion_operation
+                     SET request_hash = ?
+                     WHERE caller_namespace = ? AND idempotency_key = ?
+                     """)) {
+            statement.setString(1, requestHash);
+            statement.setString(2, namespace);
+            statement.setString(3, key);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private String legacyProvisionHash(BondedCompanionProvisionRequest request)
+            throws Exception {
+        StringBuilder payload = new StringBuilder();
+        appendLegacyField(payload, request.ownerUuid().toString());
+        appendLegacyField(payload, request.rosterId());
+        appendLegacyField(payload, request.roleId());
+        appendLegacyField(payload, request.displayName());
+        appendLegacyField(payload, request.species());
+        appendLegacyField(payload, request.gender());
+        new java.util.TreeMap<>(request.snapshotPresentationData())
+                .forEach((key, value) -> {
+                    appendLegacyField(payload, key);
+                    appendLegacyField(payload, value);
+                });
+        return java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(payload.toString().getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8))
+        );
+    }
+
+    private void appendLegacyField(StringBuilder target, String value) {
+        if (value == null) {
+            target.append("-1:");
+        } else {
+            target.append(value.length()).append(':').append(value);
         }
     }
 
@@ -437,5 +619,58 @@ class BondedCompanionCompositionTest {
                 new BondedCompanionRosterRegistry();
         assertTrue(registry.replace(List.of(config), 1L).applied());
         return registry;
+    }
+
+    private BondedCompanionProvisionRequest provision(
+            String key,
+            String roleId,
+            String familyId
+    ) {
+        return new BondedCompanionProvisionRequest(
+                "test", key, OWNER, "hydragon:horn", roleId,
+                key, "Companion", null, Map.of(), familyId
+        );
+    }
+
+    private BondedCompanionRosterRegistry sharedRosterRegistry(
+            boolean sharedRole
+    ) throws Exception {
+        String dragonRole = sharedRole ? "Shared_Role" : "Tamed_Dragon_Fire";
+        String miniRole = sharedRole ? "Shared_Role" : "Bonded_Miniwyvern";
+        TwBondedCompanionRosterConfig dragons = policy(
+                "Dragons", "hydragon:dragon", dragonRole
+        );
+        TwBondedCompanionRosterConfig minis = policy(
+                "Miniwyverns", "hydragon:miniwyvern", miniRole
+        );
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(dragons, minis), 2L).applied());
+        return registry;
+    }
+
+    private TwBondedCompanionRosterConfig policy(
+            String id,
+            String familyId,
+            String roleId
+    ) throws Exception {
+        TwBondedCompanionRosterConfig config =
+                TwBondedCompanionRosterConfig.CODEC.decode(
+                        BsonDocument.parse("""
+                                {
+                                  "RosterId": "hydragon:horn",
+                                  "FamilyId": "%s",
+                                  "AllowedRoles": ["%s"],
+                                  "MaximumOwned": 1,
+                                  "MaximumActive": 1,
+                                  "Features": {"Provision": true}
+                                }
+                                """.formatted(familyId, roleId)),
+                        new ExtraInfo()
+                );
+        Field configId = config.getClass().getDeclaredField("id");
+        configId.setAccessible(true);
+        configId.set(config, id);
+        return config;
     }
 }

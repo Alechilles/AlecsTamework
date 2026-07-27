@@ -138,11 +138,11 @@ class TwBondedCompanionRosterConfigTest {
                 }
                 """
         );
-        TwBondedCompanionRosterConfig duplicateRosterA = roster(
+        TwBondedCompanionRosterConfig duplicateFamilyA = roster(
                 "Alpha",
                 minimalRosterJson("hydragon:same")
         );
-        TwBondedCompanionRosterConfig duplicateRosterB = roster(
+        TwBondedCompanionRosterConfig duplicateFamilyB = roster(
                 "Beta",
                 minimalRosterJson("hydragon:same")
         );
@@ -151,10 +151,160 @@ class TwBondedCompanionRosterConfigTest {
 
         assertThrows(IllegalArgumentException.class, negative::validateOrThrow);
         assertThrows(IllegalArgumentException.class, duplicateRole::validateOrThrow);
-        assertFalse(registry.replace(
-                List.of(duplicateRosterA, duplicateRosterB),
+        BondedCompanionRosterRegistry.ReloadResult forward = registry.replace(
+                List.of(duplicateFamilyA, duplicateFamilyB),
                 1L
-        ).applied());
+        );
+        BondedCompanionRosterRegistry.ReloadResult reverse = registry.replace(
+                List.of(duplicateFamilyB, duplicateFamilyA),
+                1L
+        );
+        assertFalse(forward.applied());
+        assertFalse(reverse.applied());
+        assertEquals(forward.error(), reverse.error());
+    }
+
+    @Test
+    void sharedRosterCompilesIndependentFamiliesAndKeepsExactLookup()
+            throws Exception {
+        TwBondedCompanionRosterConfig dragons = roster(
+                "Dragons",
+                familyRosterJson(
+                        "hydragon:horn",
+                        "hydragon:dragon",
+                        "Tamed_Dragon_Fire",
+                        3,
+                        1,
+                        600,
+                        30,
+                        2
+                )
+        );
+        TwBondedCompanionRosterConfig miniwyverns = roster(
+                "Miniwyverns",
+                familyRosterJson(
+                        "hydragon:horn",
+                        "hydragon:miniwyvern",
+                        "Tamed_Miniwyvern",
+                        1,
+                        1,
+                        0,
+                        0,
+                        5
+                )
+        );
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+
+        BondedCompanionRosterRegistry.ReloadResult result = registry.replace(
+                List.of(miniwyverns, dragons),
+                9L
+        );
+
+        assertTrue(result.applied(), result.error());
+        assertTrue(registry.snapshot().byRosterId().isEmpty());
+        assertEquals(2, registry.snapshot().families("hydragon:horn").size());
+        assertEquals(
+                3,
+                registry.resolve("hydragon:horn", "hydragon:dragon")
+                        .orElseThrow()
+                        .maximumOwned()
+        );
+        assertEquals(
+                5,
+                registry.resolve("hydragon:horn", "hydragon:miniwyvern")
+                        .orElseThrow()
+                        .revivePrice()
+                        .quantity()
+        );
+        assertTrue(registry.resolve("hydragon:horn").isEmpty());
+        assertEquals(
+                "hydragon:dragon",
+                registry.resolveForRole(
+                                "hydragon:horn",
+                                "Tamed_Dragon_Fire"
+                        )
+                        .definition()
+                        .familyId()
+        );
+        CommandItemRegistry commands = new CommandItemRegistry(registry);
+        TwCommandItemConfig horn = command("""
+                {
+                  "Enabled": true,
+                  "ItemIds": ["HyDragon_Dragon_Horn"],
+                  "RosterStorage": "BondedCompanions",
+                  "BondedRosterId": "hydragon:horn"
+                }
+                """);
+        commands.register("HyDragon_Dragon_Horn", horn);
+        assertEquals(horn, commands.get("HyDragon_Dragon_Horn"));
+
+        BondedCompanionConfigReloadService.ReloadResult reloaded =
+                new BondedCompanionConfigReloadService(registry, commands)
+                        .reload(List.of(dragons, miniwyverns), List.of(horn));
+        assertTrue(reloaded.applied(), () -> String.join(",", reloaded.errors()));
+        assertEquals(1, reloaded.rosterCount());
+        assertEquals(1, reloaded.commandCount());
+        assertEquals(horn, commands.get("HyDragon_Dragon_Horn"));
+    }
+
+    @Test
+    void roleLookupRejectsAmbiguousFamiliesAndReloadReplacesWholeRoster()
+            throws Exception {
+        TwBondedCompanionRosterConfig dragons = roster(
+                "Dragons",
+                familyRosterJson(
+                        "hydragon:horn",
+                        "hydragon:dragon",
+                        "Shared_Role",
+                        3,
+                        1,
+                        600,
+                        30,
+                        2
+                )
+        );
+        TwBondedCompanionRosterConfig miniwyverns = roster(
+                "Miniwyverns",
+                familyRosterJson(
+                        "hydragon:horn",
+                        "hydragon:miniwyvern",
+                        "Shared_Role",
+                        1,
+                        1,
+                        0,
+                        0,
+                        5
+                )
+        );
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+
+        assertTrue(registry.replace(List.of(dragons, miniwyverns), 4L).applied());
+        assertEquals(
+                BondedCompanionRosterRegistry.FamilyResolutionStatus.AMBIGUOUS,
+                registry.resolveForRole("hydragon:horn", "Shared_Role").status()
+        );
+        assertEquals(
+                "hydragon:miniwyvern",
+                registry.resolve(
+                                "hydragon:horn",
+                                "hydragon:miniwyvern"
+                        )
+                        .orElseThrow()
+                        .familyId()
+        );
+
+        assertTrue(registry.replace(List.of(dragons), 5L).applied());
+        assertEquals(1, registry.snapshot().families("hydragon:horn").size());
+        assertTrue(registry.resolve(
+                "hydragon:horn",
+                "hydragon:miniwyvern"
+        ).isEmpty());
+        assertEquals(
+                "hydragon:dragon",
+                registry.resolve("hydragon:horn").orElseThrow().familyId()
+        );
     }
 
     @Test
@@ -317,6 +467,58 @@ class TwBondedCompanionRosterConfigTest {
     }
 
     @Test
+    void commandReplacementRejectsDuplicateItemAndConfigIds() throws Exception {
+        TwBondedCompanionRosterConfig roster = roster(
+                "Roster",
+                minimalRosterJson("hydragon:dragons")
+        );
+        BondedCompanionRosterRegistry rosters = registryWith(roster);
+        CommandItemRegistry commands = new CommandItemRegistry(rosters);
+        TwCommandItemConfig first = command("""
+                {
+                  "Enabled": true,
+                  "ItemIds": ["HyDragon_Shared_Horn"],
+                  "RosterStorage": "BondedCompanions",
+                  "BondedRosterId": "hydragon:dragons"
+                }
+                """);
+        TwCommandItemConfig duplicateItem = command("""
+                {
+                  "Enabled": true,
+                  "ItemIds": ["HyDragon_Shared_Horn"],
+                  "RosterStorage": "BondedCompanions",
+                  "BondedRosterId": "hydragon:dragons"
+                }
+                """);
+        set(first, "id", "DragonHorn");
+        set(duplicateItem, "id", "MiniwyvernHorn");
+
+        IllegalArgumentException itemFailure = assertThrows(
+                IllegalArgumentException.class,
+                () -> commands.prepareReplacement(
+                        List.of(first, duplicateItem), rosters.snapshot()
+                )
+        );
+        assertEquals(
+                "Duplicate command item id: HyDragon_Shared_Horn",
+                itemFailure.getMessage()
+        );
+
+        set(duplicateItem, "id", "DragonHorn");
+        set(duplicateItem, "itemIds", new String[]{"HyDragon_Other_Horn"});
+        IllegalArgumentException configFailure = assertThrows(
+                IllegalArgumentException.class,
+                () -> commands.prepareReplacement(
+                        List.of(first, duplicateItem), rosters.snapshot()
+                )
+        );
+        assertEquals(
+                "Duplicate command config id: DragonHorn",
+                configFailure.getMessage()
+        );
+    }
+
+    @Test
     void bondedCaptureRequiresRosterAndItemAccessWithoutGenericFamily()
             throws Exception {
         ItemFeatureConfig.CaptureItemMechanics valid = capture("""
@@ -417,6 +619,42 @@ class TwBondedCompanionRosterConfigTest {
                   "AllowedRoles": ["Tamed_Dragon_Fire"]
                 }
                 """.formatted(rosterId);
+    }
+
+    private static String familyRosterJson(
+            String rosterId,
+            String familyId,
+            String roleId,
+            int maximumOwned,
+            int maximumActive,
+            long sessionDurationSeconds,
+            long summonCooldownSeconds,
+            int reviveQuantity
+    ) {
+        return """
+                {
+                  "RosterId": "%s",
+                  "FamilyId": "%s",
+                  "AllowedRoles": ["%s"],
+                  "MaximumOwned": %d,
+                  "MaximumActive": %d,
+                  "SessionDurationSeconds": %d,
+                  "SummonCooldownSeconds": %d,
+                  "RevivePrice": {
+                    "ItemId": "Ingredient_Life_Essence",
+                    "Quantity": %d
+                  }
+                }
+                """.formatted(
+                        rosterId,
+                        familyId,
+                        roleId,
+                        maximumOwned,
+                        maximumActive,
+                        sessionDurationSeconds,
+                        summonCooldownSeconds,
+                        reviveQuantity
+                );
     }
 
     private static void set(Object target, String name, Object value)

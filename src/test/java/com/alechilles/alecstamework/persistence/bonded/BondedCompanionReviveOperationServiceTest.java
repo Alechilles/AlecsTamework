@@ -784,7 +784,9 @@ class BondedCompanionReviveOperationServiceTest {
                 BondedCompanionRecord.Profile profile,
                 BondedCompanionSnapshot snapshot) { return domain; }
         @Override public BondedCompanionTransitionService.MutationRequest mutation(
-                BondedCompanionActionRequest action, long now) {
+                BondedCompanionActionRequest action,
+                long now,
+                long policyRevision) {
             return new BondedCompanionTransitionService.MutationRequest(
                     action.callerNamespace() + ":" + action.idempotencyKey(),
                     action.ownerUuid(), action.expectedRevision(),

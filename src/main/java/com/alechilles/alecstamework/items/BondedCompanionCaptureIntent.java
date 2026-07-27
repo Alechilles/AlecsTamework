@@ -28,7 +28,9 @@ public record BondedCompanionCaptureIntent(
         boolean tranquilized,
         boolean toolAccess,
         boolean ownerAllowed,
-        boolean roleAllowed
+        boolean roleAllowed,
+        @Nullable String familyId,
+        @Nonnull FamilySelection familySelection
 ) {
     public BondedCompanionCaptureIntent {
         callerNamespace = text(callerNamespace, "callerNamespace");
@@ -42,6 +44,13 @@ public record BondedCompanionCaptureIntent(
         roleId = text(roleId, "roleId");
         species = optional(species);
         rosterId = text(rosterId, "rosterId");
+        familyId = optional(familyId);
+        familySelection = Objects.requireNonNull(
+                familySelection, "familySelection");
+        if (familySelection == FamilySelection.EXPLICIT && familyId == null) {
+            throw new IllegalArgumentException(
+                    "explicit family selection requires familyId");
+        }
         if (hotbarSlot < 0 || rosterRevision < 0L) {
             throw new IllegalArgumentException("invalid bonded capture fence");
         }
@@ -52,6 +61,25 @@ public record BondedCompanionCaptureIntent(
             throw new IllegalArgumentException(
                     "bonded chance and outcome evidence must agree");
         }
+    }
+
+    /** Source-compatible full constructor predating explicit family selection. */
+    public BondedCompanionCaptureIntent(
+            String callerNamespace, String idempotencyKey, UUID actorUuid,
+            String worldKey, int hotbarSlot, String sourceFingerprint,
+            UUID sourceNpcUuid,
+            BondedCompanionCaptureAttemptEvidence attemptEvidence,
+            String roleId, String species, String rosterId,
+            long rosterRevision, BondedCompanionSnapshot snapshot,
+            SpawnerPublishedEffect completionEffect, boolean targetValid,
+            boolean chanceSuccessful, boolean tranquilized, boolean toolAccess,
+            boolean ownerAllowed, boolean roleAllowed
+    ) {
+        this(callerNamespace, idempotencyKey, actorUuid, worldKey, hotbarSlot,
+                sourceFingerprint, sourceNpcUuid, attemptEvidence, roleId,
+                species, rosterId, rosterRevision, snapshot, completionEffect,
+                targetValid, chanceSuccessful, tranquilized, toolAccess,
+                ownerAllowed, roleAllowed, null, FamilySelection.ROLE_INFERRED);
     }
 
     /** Source-compatible constructor for callers predating completion evidence. */
@@ -69,7 +97,7 @@ public record BondedCompanionCaptureIntent(
                 legacyEvidence(idempotencyKey, chanceSuccessful), roleId,
                 species, rosterId, rosterRevision, snapshot, completionEffect,
                 targetValid, chanceSuccessful, tranquilized, toolAccess,
-                ownerAllowed, roleAllowed);
+                ownerAllowed, roleAllowed, null, FamilySelection.ROLE_INFERRED);
     }
 
     public BondedCompanionCaptureIntent(
@@ -87,8 +115,30 @@ public record BondedCompanionCaptureIntent(
                 rosterId,
                 rosterRevision, snapshot, completionEffect, targetValid,
                 chanceSuccessful, tranquilized, toolAccess, ownerAllowed,
-                roleAllowed);
+                roleAllowed, null, FamilySelection.ROLE_INFERRED);
     }
+
+    /** Freezes an exact family selected from the live target role. */
+    public BondedCompanionCaptureIntent(
+            String callerNamespace, String idempotencyKey, UUID actorUuid,
+            String worldKey, int hotbarSlot, String sourceFingerprint,
+            UUID sourceNpcUuid, String roleId, String rosterId,
+            long rosterRevision, BondedCompanionSnapshot snapshot,
+            SpawnerPublishedEffect completionEffect, boolean targetValid,
+            boolean chanceSuccessful, boolean tranquilized, boolean toolAccess,
+            boolean ownerAllowed, boolean roleAllowed, String familyId
+    ) {
+        this(callerNamespace, idempotencyKey, actorUuid, worldKey, hotbarSlot,
+                sourceFingerprint, sourceNpcUuid,
+                legacyEvidence(idempotencyKey, chanceSuccessful), roleId, null,
+                rosterId, rosterRevision, snapshot, completionEffect,
+                targetValid, chanceSuccessful, tranquilized, toolAccess,
+                ownerAllowed, roleAllowed, familyId,
+                FamilySelection.ROLE_INFERRED);
+    }
+
+    /** Records whether family identity was caller-selected or role-derived. */
+    public enum FamilySelection { ROLE_INFERRED, EXPLICIT }
 
     /** Stable profile identity shared by retries of this exact source capture. */
     @Nonnull

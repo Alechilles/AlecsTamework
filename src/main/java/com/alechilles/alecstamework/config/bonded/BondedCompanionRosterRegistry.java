@@ -4,12 +4,15 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,11 +29,25 @@ public final class BondedCompanionRosterRegistry {
 
     @Nonnull
     public Optional<RosterDefinition> resolve(@Nullable String rosterId) {
-        return rosterId == null
-                ? Optional.empty()
-                : Optional.ofNullable(
-                        current.get().rosters().byRosterId().get(rosterId.trim())
-                );
+        return current.get().rosters().resolveUnique(rosterId);
+    }
+
+    /** Resolves one exact policy family within a player-facing roster. */
+    @Nonnull
+    public Optional<RosterDefinition> resolve(
+            @Nullable String rosterId,
+            @Nullable String familyId
+    ) {
+        return current.get().rosters().resolve(rosterId, familyId);
+    }
+
+    /** Resolves a role only when exactly one family in the roster allows it. */
+    @Nonnull
+    public FamilyResolution resolveForRole(
+            @Nullable String rosterId,
+            @Nullable String roleId
+    ) {
+        return current.get().rosters().resolveForRole(rosterId, roleId);
     }
 
     /** Captures roster and dependent-command lookups from one publication. */
@@ -114,8 +131,8 @@ public final class BondedCompanionRosterRegistry {
                     "Bonded-roster revision cannot be negative."
             );
         }
-        LinkedHashMap<String, RosterDefinition> definitions =
-                new LinkedHashMap<>();
+        TreeMap<String, TreeMap<String, RosterDefinition>> definitions =
+                new TreeMap<>();
         LinkedHashSet<String> assetIds = new LinkedHashSet<>();
         for (TwBondedCompanionRosterConfig config : configs) {
             if (config == null) {
@@ -128,17 +145,41 @@ public final class BondedCompanionRosterRegistry {
                 );
             }
             RosterDefinition definition = definition(config);
-            if (definitions.putIfAbsent(
+            Map<String, RosterDefinition> families = definitions.computeIfAbsent(
                     definition.rosterId(),
-                    definition
-            ) != null) {
+                    ignored -> new TreeMap<>()
+            );
+            if (families.putIfAbsent(definition.familyId(), definition) != null) {
                 throw new IllegalArgumentException(
-                        "Duplicate bonded RosterId: "
-                                + definition.rosterId()
+                        "Duplicate bonded roster family: "
+                                + definition.rosterId() + "/"
+                                + definition.familyId()
                 );
             }
         }
-        return new Snapshot(revision, definitions);
+        return snapshot(revision, definitions);
+    }
+
+    private static Snapshot snapshot(
+            long revision,
+            Map<String, ? extends Map<String, RosterDefinition>> definitions
+    ) {
+        LinkedHashMap<String, RosterDefinition> representatives =
+                new LinkedHashMap<>();
+        LinkedHashMap<String, Map<String, RosterDefinition>> families =
+                new LinkedHashMap<>();
+        for (Map.Entry<String, ? extends Map<String, RosterDefinition>> entry
+                : definitions.entrySet()) {
+            LinkedHashMap<String, RosterDefinition> ordered =
+                    new LinkedHashMap<>(entry.getValue());
+            families.put(entry.getKey(), ordered);
+            if (ordered.size() == 1) {
+                representatives.put(
+                        entry.getKey(), ordered.values().iterator().next()
+                );
+            }
+        }
+        return new Snapshot(revision, representatives, families);
     }
 
     private static RosterDefinition definition(
@@ -185,9 +226,7 @@ public final class BondedCompanionRosterRegistry {
     ) {
         for (TwCommandItemConfig config : commands.byItemId().values()) {
             if (config != null && config.usesBondedCompanionRoster()
-                    && !rosters.byRosterId().containsKey(
-                            config.getBondedRosterId()
-                    )) {
+                    && !rosters.containsRoster(config.getBondedRosterId())) {
                 throw new IllegalArgumentException(
                         "Unknown bonded roster: " + config.getBondedRosterId()
                 );
@@ -198,7 +237,9 @@ public final class BondedCompanionRosterRegistry {
     /** Immutable resolver snapshot for one accepted asset revision. */
     public record Snapshot(
             long revision,
-            @Nonnull Map<String, RosterDefinition> byRosterId
+            /** Legacy fail-closed view containing only single-family rosters. */
+            @Nonnull Map<String, RosterDefinition> byRosterId,
+            @Nonnull Map<String, Map<String, RosterDefinition>> familiesByRosterId
     ) {
         public Snapshot {
             if (revision < 0L) {
@@ -206,15 +247,165 @@ public final class BondedCompanionRosterRegistry {
                         "Bonded-roster revision cannot be negative."
                 );
             }
-            byRosterId = Map.copyOf(Objects.requireNonNull(
-                    byRosterId,
-                    "byRosterId"
+            byRosterId = immutableOrderedMap(byRosterId, "byRosterId");
+            familiesByRosterId = immutableFamilies(familiesByRosterId);
+        }
+
+        /** Preserves the source contract for snapshots constructed by tests. */
+        public Snapshot(
+                long revision,
+                @Nonnull Map<String, RosterDefinition> byRosterId
+        ) {
+            this(revision, byRosterId, singletonFamilies(byRosterId));
+        }
+
+        /** Returns all independently configured families for one roster. */
+        @Nonnull
+        public List<RosterDefinition> families(@Nullable String rosterId) {
+            if (rosterId == null) {
+                return List.of();
+            }
+            Map<String, RosterDefinition> families =
+                    familiesByRosterId.get(rosterId.trim());
+            return families == null ? List.of() : List.copyOf(families.values());
+        }
+
+        public boolean containsRoster(@Nullable String rosterId) {
+            return rosterId != null
+                    && familiesByRosterId.containsKey(rosterId.trim());
+        }
+
+        /** Returns every roster ID, including multi-family rosters. */
+        @Nonnull public Set<String> rosterIds() {
+            return familiesByRosterId.keySet();
+        }
+
+        /** Returns the number of logical rosters, not configured families. */
+        public int rosterCount() { return familiesByRosterId.size(); }
+
+        @Nonnull
+        public Optional<RosterDefinition> resolveUnique(@Nullable String rosterId) {
+            List<RosterDefinition> families = families(rosterId);
+            return families.size() == 1
+                    ? Optional.of(families.getFirst())
+                    : Optional.empty();
+        }
+
+        @Nonnull
+        public Optional<RosterDefinition> resolve(
+                @Nullable String rosterId,
+                @Nullable String familyId
+        ) {
+            if (rosterId == null || familyId == null) {
+                return Optional.empty();
+            }
+            Map<String, RosterDefinition> families =
+                    familiesByRosterId.get(rosterId.trim());
+            return families == null
+                    ? Optional.empty()
+                    : Optional.ofNullable(families.get(familyId.trim()));
+        }
+
+        @Nonnull
+        public FamilyResolution resolveForRole(
+                @Nullable String rosterId,
+                @Nullable String roleId
+        ) {
+            if (roleId == null || roleId.isBlank()) {
+                return FamilyResolution.notFound();
+            }
+            RosterDefinition match = null;
+            for (RosterDefinition family : families(rosterId)) {
+                if (!family.allowedRoles().contains(roleId.trim())) {
+                    continue;
+                }
+                if (match != null) {
+                    return FamilyResolution.ambiguous();
+                }
+                match = family;
+            }
+            return match == null
+                    ? FamilyResolution.notFound()
+                    : FamilyResolution.found(match);
+        }
+
+        private static Map<String, Map<String, RosterDefinition>>
+                singletonFamilies(Map<String, RosterDefinition> definitions) {
+            LinkedHashMap<String, Map<String, RosterDefinition>> families =
+                    new LinkedHashMap<>();
+            for (Map.Entry<String, RosterDefinition> entry
+                    : definitions.entrySet()) {
+                families.put(
+                        entry.getKey(),
+                        Map.of(entry.getValue().familyId(), entry.getValue())
+                );
+            }
+            return families;
+        }
+
+        private static Map<String, Map<String, RosterDefinition>>
+                immutableFamilies(
+                        Map<String, Map<String, RosterDefinition>> source
+                ) {
+            Objects.requireNonNull(source, "familiesByRosterId");
+            LinkedHashMap<String, Map<String, RosterDefinition>> copy =
+                    new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, RosterDefinition>> entry
+                    : source.entrySet()) {
+                copy.put(
+                        entry.getKey(),
+                        immutableOrderedMap(entry.getValue(), "families")
+                );
+            }
+            return Collections.unmodifiableMap(copy);
+        }
+
+        private static <V> Map<String, V> immutableOrderedMap(
+                Map<String, V> source,
+                String name
+        ) {
+            return Collections.unmodifiableMap(new LinkedHashMap<>(
+                    Objects.requireNonNull(source, name)
             ));
         }
 
         static Snapshot empty() {
-            return new Snapshot(0L, Map.of());
+            return new Snapshot(0L, Map.of(), Map.of());
         }
+    }
+
+    /** Outcome of selecting a family from a role when no family was supplied. */
+    public record FamilyResolution(
+            @Nonnull FamilyResolutionStatus status,
+            @Nullable RosterDefinition definition
+    ) {
+        public FamilyResolution {
+            status = Objects.requireNonNull(status, "status");
+            if ((status == FamilyResolutionStatus.FOUND) != (definition != null)) {
+                throw new IllegalArgumentException(
+                        "Only a found family resolution carries a definition."
+                );
+            }
+        }
+
+        static FamilyResolution found(RosterDefinition definition) {
+            return new FamilyResolution(FamilyResolutionStatus.FOUND, definition);
+        }
+
+        static FamilyResolution notFound() {
+            return new FamilyResolution(FamilyResolutionStatus.NOT_FOUND, null);
+        }
+
+        static FamilyResolution ambiguous() {
+            return new FamilyResolution(FamilyResolutionStatus.AMBIGUOUS, null);
+        }
+    }
+
+    /** Stable role-to-family selection result. */
+    public enum FamilyResolutionStatus {
+        FOUND,
+        NOT_FOUND,
+        AMBIGUOUS
     }
 
     /** Immutable compiled definition consumed by bonded runtime code. */

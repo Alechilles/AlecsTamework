@@ -68,7 +68,7 @@ public final class BondedCompanionConfigReloadService {
             }
             return new ReloadResult(
                     true,
-                    rosterCandidate.candidate().byRosterId().size(),
+                    rosterCandidate.candidate().rosterCount(),
                     commandCandidate.loadedCount(),
                     rosters.snapshot().revision(),
                     commands.revision(),
@@ -77,7 +77,7 @@ public final class BondedCompanionConfigReloadService {
         } catch (RuntimeException | LinkageError invalid) {
             return new ReloadResult(
                     false,
-                    rosters.snapshot().byRosterId().size(),
+                    rosters.snapshot().rosterCount(),
                     commands.snapshot().size(),
                     rosters.snapshot().revision(),
                     commands.revision(),

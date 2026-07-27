@@ -8,14 +8,14 @@ import javax.annotation.Nullable;
 
 /** Pure policy-gated transition authority for the three-state bonded lifecycle. */
 public final class BondedCompanionTransitionService {
-    private final BondedCompanionPolicyResolver policies;
+    private final BondedCompanionPolicyGate policies;
     private final BondedCompanionOperationFactory operations =
             new BondedCompanionOperationFactory();
-
     public BondedCompanionTransitionService(
             @Nonnull BondedCompanionPolicyResolver policies
     ) {
-        this.policies = Objects.requireNonNull(policies, "policies");
+        this.policies = new BondedCompanionPolicyGate(
+                Objects.requireNonNull(policies, "policies"));
     }
 
     /** Creates one captured profile directly in durable stored state. */
@@ -50,8 +50,7 @@ public final class BondedCompanionTransitionService {
     ) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(counts, "counts");
-        PolicyCheck checked = policy(request.rosterId(),
-                request.expectedPolicyRevision());
+        BondedCompanionPolicyGate.Check checked = policies.forCreation(request);
         if (!checked.allowed()) {
             return rejected(checked.code(), null);
         }
@@ -61,7 +60,7 @@ public final class BondedCompanionTransitionService {
             return rejected(denial, null);
         }
         BondedCompanionOperationReceipt receipt = operations.creation(
-                request, action
+                request, action, policy.familyId()
         );
         return applied(new BondedCompanionProfile(
                 request.profileId(), request.ownerUuid(), request.rosterId(),
@@ -90,7 +89,7 @@ public final class BondedCompanionTransitionService {
         if (prerequisite != null) {
             return prerequisite;
         }
-        PolicyCheck checked = policy(profile.rosterId(),
+        BondedCompanionPolicyGate.Check checked = policies.forProfile(profile,
                 request.expectedPolicyRevision());
         ResultCode denial = validateSummon(
                 checked, request, profile, counts
@@ -132,7 +131,7 @@ public final class BondedCompanionTransitionService {
         if (prerequisite != null) {
             return prerequisite;
         }
-        PolicyCheck checked = policy(profile.rosterId(),
+        BondedCompanionPolicyGate.Check checked = policies.forProfile(profile,
                 request.expectedPolicyRevision());
         ResultCode denial = validateExistingPolicy(
                 checked, profile, policy -> policy.features().dismiss()
@@ -178,7 +177,7 @@ public final class BondedCompanionTransitionService {
         if (prerequisite != null) {
             return prerequisite;
         }
-        PolicyCheck checked = policy(profile.rosterId(),
+        BondedCompanionPolicyGate.Check checked = policies.forProfile(profile,
                 request.expectedPolicyRevision());
         ResultCode denial = validateExistingPolicy(checked, profile, policy -> true);
         if (denial != null) {
@@ -211,7 +210,7 @@ public final class BondedCompanionTransitionService {
         if (prerequisite != null) {
             return prerequisite;
         }
-        PolicyCheck checked = policy(profile.rosterId(),
+        BondedCompanionPolicyGate.Check checked = policies.forProfile(profile,
                 request.expectedPolicyRevision());
         ResultCode denial = validateExistingPolicy(
                 checked, profile, policy -> policy.features().revive()
@@ -278,14 +277,14 @@ public final class BondedCompanionTransitionService {
         if (identityDenial != null) {
             return identityDenial;
         }
-        if (counts.owned() >= policy.maximumOwned()) {
+        if (atCapacity(counts.owned(), policy.maximumOwned())) {
             return ResultCode.OWNED_CAPACITY_REACHED;
         }
         return null;
     }
 
     private ResultCode validateSummon(
-            PolicyCheck checked,
+            BondedCompanionPolicyGate.Check checked,
             MutationRequest request,
             BondedCompanionProfile profile,
             RosterCounts counts
@@ -299,7 +298,7 @@ public final class BondedCompanionTransitionService {
         if (profile.state() != BondedCompanionState.STORED) {
             return ResultCode.INVALID_STATE;
         }
-        if (counts.active() >= checked.policy().maximumActive()) {
+        if (atCapacity(counts.active(), checked.policy().maximumActive())) {
             return ResultCode.ACTIVE_CAPACITY_REACHED;
         }
         long cooldown = profile.summonCooldownUntilMs();
@@ -308,7 +307,7 @@ public final class BondedCompanionTransitionService {
     }
 
     private ResultCode validateExistingPolicy(
-            PolicyCheck checked,
+            BondedCompanionPolicyGate.Check checked,
             BondedCompanionProfile profile,
             Predicate<BondedCompanionPolicy> enabled
     ) {
@@ -326,18 +325,8 @@ public final class BondedCompanionTransitionService {
         return enabled.test(policy) ? null : ResultCode.FEATURE_DISABLED;
     }
 
-    private PolicyCheck policy(String rosterId, long expectedRevision) {
-        BondedCompanionPolicyResolver.Resolution resolved =
-                policies.resolve(rosterId, expectedRevision);
-        return switch (resolved.status()) {
-            case FOUND -> new PolicyCheck(null, resolved.policy());
-            case NOT_FOUND -> new PolicyCheck(
-                    ResultCode.POLICY_NOT_FOUND, null
-            );
-            case REVISION_CONFLICT -> new PolicyCheck(
-                    ResultCode.POLICY_REVISION_CONFLICT, null
-            );
-        };
+    private static boolean atCapacity(int count, int configuredLimit) {
+        return configuredLimit != 0 && count >= configuredLimit;
     }
 
     private BondedCompanionProfile copy(
@@ -385,6 +374,7 @@ public final class BondedCompanionTransitionService {
         IDEMPOTENT_REPLAY,
         IDEMPOTENCY_CONFLICT,
         POLICY_NOT_FOUND,
+        POLICY_AMBIGUOUS,
         POLICY_REVISION_CONFLICT,
         POLICY_MISMATCH,
         FEATURE_DISABLED,
@@ -410,7 +400,8 @@ public final class BondedCompanionTransitionService {
             @Nonnull String roleId,
             @Nonnull BondedCompanionSnapshot snapshot,
             long expectedPolicyRevision,
-            long nowMs
+            long nowMs,
+            @Nullable String familyId
     ) {
         public CreationRequest {
             operationId = text(operationId, "operationId");
@@ -419,9 +410,27 @@ public final class BondedCompanionTransitionService {
             profileId = text(profileId, "profileId");
             roleId = text(roleId, "roleId");
             snapshot = Objects.requireNonNull(snapshot, "snapshot");
+            familyId = optionalText(familyId);
             if (expectedPolicyRevision < 0L) {
                 throw new IllegalArgumentException("negative policy revision");
             }
+        }
+
+        /** Preserves the role-selected one-family creation contract. */
+        public CreationRequest(
+                String operationId,
+                UUID ownerUuid,
+                String rosterId,
+                String profileId,
+                String roleId,
+                BondedCompanionSnapshot snapshot,
+                long expectedPolicyRevision,
+                long nowMs
+        ) {
+            this(
+                    operationId, ownerUuid, rosterId, profileId, roleId,
+                    snapshot, expectedPolicyRevision, nowMs, null
+            );
         }
     }
 
@@ -477,20 +486,15 @@ public final class BondedCompanionTransitionService {
         }
     }
 
-    private record PolicyCheck(
-            @Nullable ResultCode code,
-            @Nullable BondedCompanionPolicy policy
-    ) {
-        private boolean allowed() {
-            return policy != null;
-        }
-    }
-
     private static String text(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(field + " is required");
         }
         return normalized;
+    }
+
+    private static String optionalText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

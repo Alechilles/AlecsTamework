@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
+import java.util.Optional;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -19,21 +20,109 @@ public final class BondedCompanionPolicyResolver {
     @Nonnull
     public Resolution resolve(String rosterId, long expectedRevision) {
         BondedCompanionRosterRegistry.Snapshot snapshot = registry.snapshot();
-        if (expectedRevision != snapshot.revision()) {
-            return new Resolution(
-                    Status.REVISION_CONFLICT, null, snapshot.revision()
+        Resolution fenced = revisionFence(snapshot, expectedRevision);
+        if (fenced != null) {
+            return fenced;
+        }
+        Optional<BondedCompanionRosterRegistry.RosterDefinition> definition =
+                snapshot.resolveUnique(normalize(rosterId));
+        if (definition.isPresent()) {
+            return found(snapshot, definition.orElseThrow());
+        }
+        Status status = snapshot.containsRoster(rosterId)
+                ? Status.AMBIGUOUS : Status.NOT_FOUND;
+        return new Resolution(status, null, snapshot.revision());
+    }
+
+    /** Resolves one exact family and optionally fences its asset generation. */
+    @Nonnull
+    public Resolution resolve(
+            String rosterId,
+            String familyId,
+            long expectedRevision
+    ) {
+        BondedCompanionRosterRegistry.Snapshot snapshot = registry.snapshot();
+        Resolution fenced = revisionFence(snapshot, expectedRevision);
+        if (fenced != null) {
+            return fenced;
+        }
+        return resolution(
+                snapshot,
+                snapshot.resolve(normalize(rosterId), normalize(familyId))
+        );
+    }
+
+    /** Selects an explicit family or the sole family allowing a role. */
+    @Nonnull
+    public Resolution resolveForRole(
+            String rosterId,
+            @Nullable String familyId,
+            String roleId,
+            long expectedRevision
+    ) {
+        BondedCompanionRosterRegistry.Snapshot snapshot = registry.snapshot();
+        Resolution fenced = revisionFence(snapshot, expectedRevision);
+        if (fenced != null) {
+            return fenced;
+        }
+        if (familyId != null && !familyId.isBlank()) {
+            Optional<BondedCompanionRosterRegistry.RosterDefinition> exact =
+                    snapshot.resolve(
+                            normalize(rosterId), normalize(familyId));
+            if (exact.isEmpty()) {
+                return new Resolution(
+                        Status.NOT_FOUND, null, snapshot.revision());
+            }
+            BondedCompanionRosterRegistry.RosterDefinition definition =
+                    exact.orElseThrow();
+            return definition.allowedRoles().contains(normalize(roleId))
+                    ? found(snapshot, definition)
+                    : new Resolution(
+                            Status.ROLE_NOT_ALLOWED, null, snapshot.revision());
+        }
+        BondedCompanionRosterRegistry.FamilyResolution selected =
+                snapshot.resolveForRole(normalize(rosterId), normalize(roleId));
+        return switch (selected.status()) {
+            case FOUND -> found(snapshot, selected.definition());
+            case NOT_FOUND -> new Resolution(
+                    snapshot.containsRoster(rosterId)
+                            ? Status.ROLE_NOT_ALLOWED : Status.NOT_FOUND,
+                    null, snapshot.revision());
+            case AMBIGUOUS -> new Resolution(
+                    Status.AMBIGUOUS, null, snapshot.revision()
             );
-        }
-        BondedCompanionRosterRegistry.RosterDefinition definition =
-                snapshot.byRosterId().get(normalize(rosterId));
-        if (definition == null) {
-            return new Resolution(Status.NOT_FOUND, null, snapshot.revision());
-        }
+        };
+    }
+
+    private static Resolution resolution(
+            BondedCompanionRosterRegistry.Snapshot snapshot,
+            Optional<BondedCompanionRosterRegistry.RosterDefinition> definition
+    ) {
+        return definition.isPresent()
+                ? found(snapshot, definition.orElseThrow())
+                : new Resolution(Status.NOT_FOUND, null, snapshot.revision());
+    }
+
+    private static Resolution found(
+            BondedCompanionRosterRegistry.Snapshot snapshot,
+            BondedCompanionRosterRegistry.RosterDefinition definition
+    ) {
         return new Resolution(
                 Status.FOUND,
                 map(snapshot.revision(), definition),
                 snapshot.revision()
         );
+    }
+
+    private static Resolution revisionFence(
+            BondedCompanionRosterRegistry.Snapshot snapshot,
+            long expectedRevision
+    ) {
+        return expectedRevision == snapshot.revision()
+                ? null
+                : new Resolution(
+                        Status.REVISION_CONFLICT, null, snapshot.revision()
+                );
     }
 
     private static BondedCompanionPolicy map(
@@ -65,6 +154,8 @@ public final class BondedCompanionPolicyResolver {
     public enum Status {
         FOUND,
         NOT_FOUND,
+        ROLE_NOT_ALLOWED,
+        AMBIGUOUS,
         REVISION_CONFLICT
     }
 

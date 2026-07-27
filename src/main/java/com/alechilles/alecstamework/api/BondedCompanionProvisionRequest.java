@@ -16,7 +16,8 @@ public record BondedCompanionProvisionRequest(
         @Nullable String displayName,
         @Nullable String species,
         @Nullable String gender,
-        @Nonnull Map<String, String> snapshotPresentationData
+        @Nonnull Map<String, String> snapshotPresentationData,
+        @Nullable String familyId
 ) {
     public BondedCompanionProvisionRequest {
         callerNamespace = requireText(callerNamespace, "callerNamespace");
@@ -31,6 +32,25 @@ public record BondedCompanionProvisionRequest(
                 snapshotPresentationData,
                 "snapshotPresentationData"
         ));
+        familyId = normalize(familyId);
+    }
+
+    /** Preserves role-selected provisioning for existing one-family callers. */
+    public BondedCompanionProvisionRequest(
+            String callerNamespace,
+            String idempotencyKey,
+            UUID ownerUuid,
+            String rosterId,
+            String roleId,
+            String displayName,
+            String species,
+            String gender,
+            Map<String, String> snapshotPresentationData
+    ) {
+        this(
+                callerNamespace, idempotencyKey, ownerUuid, rosterId, roleId,
+                displayName, species, gender, snapshotPresentationData, null
+        );
     }
 
     private static String requireText(String value, String field) {

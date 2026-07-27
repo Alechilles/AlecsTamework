@@ -43,6 +43,8 @@ import com.alechilles.alecstamework.persistence.bonded
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPaymentRecoveryService;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionReconciliationCooldownResolver;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionSchemaManager;
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
@@ -201,6 +203,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                 .map(world::readExact)
                                 .filter(Objects::nonNull)
                                 .toList(),
+                        new BondedCompanionReconciliationCooldownResolver(
+                                store, rosters),
                         (lease, cause, result) -> publishLifecycleChange(
                                 store, changes, lease, result
                         )

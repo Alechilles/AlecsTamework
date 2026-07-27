@@ -86,7 +86,8 @@ final class BondedCompanionReviveOperationService {
                     "bonded-revive-quote-stale"));
         }
         BondedCompanionPolicyResolver.Resolution resolved = policies.resolve(
-                profile.rosterId(), request.quoteRevision());
+                profile.rosterId(), profile.familyId(),
+                request.quoteRevision());
         BondedCompanionPolicy policy = resolved.policy();
         if (policy == null || policy.revivePrice() == null) {
             return completed(support.policyDenied());
@@ -95,7 +96,7 @@ final class BondedCompanionReviveOperationService {
         long now = clock.getAsLong();
         BondedCompanionOperation operation = support.operation(action, price, now);
         BondedCompanionResult<BondedCompanionProfileView> denied =
-                validate(action, profile, price);
+                validate(action, profile, price, request.quoteRevision());
         if (denied != null) return completed(denied);
         BondedCompanionActionContext.Inventory inventory = inventory(action);
         if (inventory == null) {
@@ -111,21 +112,17 @@ final class BondedCompanionReviveOperationService {
     private BondedCompanionResult<BondedCompanionProfileView> validate(
             BondedCompanionActionRequest action,
             BondedCompanionRecord.Profile profile,
-            BondedCompanionPolicy.RevivePrice price
+            BondedCompanionPolicy.RevivePrice price,
+            long policyRevision
     ) {
         long now = clock.getAsLong();
-        if (support.cooldownRemaining(
-                profile.reviveCooldownUntilMs(), now) > 0L) {
-            return support.failure(BondedCompanionResultCode.POLICY_DENIED,
-                    "bonded-revive-cooldown-active");
-        }
         BondedCompanionSnapshot snapshot = support.decode(profile);
         if (snapshot == null) {
             return support.internal("bonded-snapshot-invalid");
         }
         BondedCompanionProfile domain = support.domain(profile, snapshot);
         var validation = transitions.revive(
-                support.mutation(action, now), domain,
+                support.mutation(action, now, policyRevision), domain,
                 new BondedCompanionTransitionService.RevivePayment(
                         price.itemId(), price.quantity()));
         return validation.applied()
@@ -410,7 +407,9 @@ final class BondedCompanionReviveOperationService {
                 BondedCompanionSnapshot snapshot);
 
         BondedCompanionTransitionService.MutationRequest mutation(
-                BondedCompanionActionRequest action, long now);
+                BondedCompanionActionRequest action,
+                long now,
+                long policyRevision);
 
         BondedCompanionOperation operation(
                 BondedCompanionActionRequest action,

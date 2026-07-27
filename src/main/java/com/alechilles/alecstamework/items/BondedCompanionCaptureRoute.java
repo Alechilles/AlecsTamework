@@ -106,10 +106,11 @@ final class BondedCompanionCaptureRoute {
         if (rosters == null) return false;
         BondedCompanionCaptureIntent intent = intents.createBonded(
                 player, targetRef, source, config, attempt, roll,
-                rosters.snapshot().revision(),
+                admission.rosterRevision(),
                 this.admission.hasToolAccess(player, config),
                 this.admission.isTranquilized(player, targetRef),
                 admission.ownerAllowed(), admission.roleAllowed(),
+                admission.familyId(),
                 particleOverride);
         if (intent == null) {
             author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,

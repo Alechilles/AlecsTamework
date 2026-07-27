@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
@@ -228,28 +229,38 @@ public final class SpawnerCapturePolicyService {
             Ref<EntityStore> targetRef,
             ItemFeatureConfig config,
             ItemStack itemStack,
-            BondedCompanionRosterRegistry.RosterDefinition roster
+            List<BondedCompanionRosterRegistry.RosterDefinition> families,
+            long rosterRevision
     ) {
+        if (rosterRevision < 0L) {
+            throw new IllegalArgumentException("negative rosterRevision");
+        }
         if (player == null || targetRef == null || !targetRef.isValid()
-                || config == null || itemStack == null || roster == null) {
+                || config == null || itemStack == null || families == null
+                || families.isEmpty()) {
             return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID);
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
+                    rosterRevision);
         }
         World world = player.getWorld();
         if (world == null || world.getEntityStore() == null) {
             return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED);
+                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
+                    rosterRevision);
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         NPCEntity npc = store.getComponent(
                 targetRef, NPCEntity.getComponentType());
         if (npc == null) {
             return BondedAdmissionEvidence.denied(
-                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID);
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
+                    rosterRevision);
         }
         String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
+        BondedCompanionRosterRegistry.RosterDefinition family =
+                uniqueFamily(families, roleId);
         boolean roleAllowed = rolePolicyService.isRoleAllowed(roleId, config)
-                && roster.allowedRoles().contains(roleId);
+                && family != null;
         UUID owner = npcStateService.resolveOwnerFromComponent(
                 targetRef, world);
         boolean ownerAllowed = ownershipPolicyService.isCaptureAllowed(
@@ -257,7 +268,21 @@ public final class SpawnerCapturePolicyService {
         BondedCompanionCaptureAuthor.Status denial = bondedPolicyDenial(
                 player, targetRef, config, itemStack, world, store, owner, roleId);
         return new BondedAdmissionEvidence(
-                denial, ownerAllowed, roleAllowed);
+                denial, ownerAllowed, roleAllowed,
+                family == null ? null : family.familyId(), rosterRevision);
+    }
+
+    private BondedCompanionRosterRegistry.RosterDefinition uniqueFamily(
+            List<BondedCompanionRosterRegistry.RosterDefinition> families,
+            String roleId
+    ) {
+        BondedCompanionRosterRegistry.RosterDefinition match = null;
+        for (var family : families) {
+            if (!family.allowedRoles().contains(roleId)) continue;
+            if (match != null) return null;
+            match = family;
+        }
+        return match;
     }
 
     private BondedCompanionCaptureAuthor.Status bondedPolicyDenial(
@@ -292,12 +317,39 @@ public final class SpawnerCapturePolicyService {
     record BondedAdmissionEvidence(
             BondedCompanionCaptureAuthor.Status denial,
             boolean ownerAllowed,
-            boolean roleAllowed
+            boolean roleAllowed,
+            String familyId,
+            long rosterRevision
     ) {
-        static BondedAdmissionEvidence denied(
-                BondedCompanionCaptureAuthor.Status denial
+        BondedAdmissionEvidence {
+            if (rosterRevision < 0L) {
+                throw new IllegalArgumentException("negative rosterRevision");
+            }
+        }
+
+        BondedAdmissionEvidence(
+                BondedCompanionCaptureAuthor.Status denial,
+                boolean ownerAllowed,
+                boolean roleAllowed
         ) {
-            return new BondedAdmissionEvidence(denial, false, false);
+            this(denial, ownerAllowed, roleAllowed, null, 0L);
+        }
+
+        BondedAdmissionEvidence(
+                BondedCompanionCaptureAuthor.Status denial,
+                boolean ownerAllowed,
+                boolean roleAllowed,
+                String familyId
+        ) {
+            this(denial, ownerAllowed, roleAllowed, familyId, 0L);
+        }
+
+        static BondedAdmissionEvidence denied(
+                BondedCompanionCaptureAuthor.Status denial,
+                long rosterRevision
+        ) {
+            return new BondedAdmissionEvidence(
+                    denial, false, false, null, rosterRevision);
         }
     }
 

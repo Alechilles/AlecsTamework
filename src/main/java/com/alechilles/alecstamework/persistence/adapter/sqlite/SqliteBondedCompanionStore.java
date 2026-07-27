@@ -5,7 +5,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -26,12 +25,14 @@ final class SqliteBondedCompanionStore {
     private final SqliteBondedCompanionRetentionStore retention;
     private final SqliteBondedCompanionExtensionStore extensions;
     private final SqliteBondedCompanionLeaseStore leases;
+    private final SqliteBondedCompanionProfileReader profiles;
 
     SqliteBondedCompanionStore(@Nonnull Connection connection) {
         this.connection = Objects.requireNonNull(connection, "connection");
         retention = new SqliteBondedCompanionRetentionStore(connection);
         extensions = new SqliteBondedCompanionExtensionStore(connection);
         leases = new SqliteBondedCompanionLeaseStore(connection);
+        profiles = new SqliteBondedCompanionProfileReader(connection);
     }
 
     SqliteBondedCompanionRetentionStore retention() { return retention; }
@@ -93,6 +94,17 @@ final class SqliteBondedCompanionStore {
         });
     }
 
+    /** Inserts a stored profile if its exact owner/roster/family has capacity. */
+    @Nonnull
+    public MutationResult<SqliteBondedCompanionProfileRow> createProfile(
+            @Nonnull SqliteBondedCompanionProfileRow row,
+            int maximumOwned
+    ) {
+        MutationResult<SqliteBondedCompanionProfileRow> denial =
+                familyCapacityDenial(row, maximumOwned);
+        return denial == null ? createProfile(row) : denial;
+    }
+
     /** Inserts a stored capture and its exact source cleanup in one transaction. */
     @Nonnull
     public MutationResult<SqliteBondedCompanionProfileRow> createCapturedProfile(
@@ -100,15 +112,9 @@ final class SqliteBondedCompanionStore {
             @Nonnull SqliteBondedCompanionCleanupRow cleanup,
             int maximumOwned
     ) {
-        if (maximumOwned < 0) {
-            return result(MutationCode.VALIDATION_FAILED, null,
-                    "bonded-capacity-invalid");
-        }
-        long owned = listProfiles(profile.ownerUuid(), profile.rosterId()).size();
-        if (owned >= maximumOwned) {
-            return result(MutationCode.CONFLICT, null,
-                    "bonded-roster-capacity-reached");
-        }
+        MutationResult<SqliteBondedCompanionProfileRow> denial =
+                familyCapacityDenial(profile, maximumOwned);
+        if (denial != null) return denial;
         MutationResult<SqliteBondedCompanionProfileRow> created =
                 createProfile(profile);
         if (!created.applied()) return created;
@@ -119,31 +125,31 @@ final class SqliteBondedCompanionStore {
                 "bonded-capture-cleanup-not-enqueued");
     }
 
+    private MutationResult<SqliteBondedCompanionProfileRow>
+            familyCapacityDenial(
+                    SqliteBondedCompanionProfileRow profile,
+                    int maximumOwned
+            ) {
+        if (maximumOwned < 0) {
+            return result(MutationCode.VALIDATION_FAILED, null,
+                    "bonded-capacity-invalid");
+        }
+        if (maximumOwned == 0) return null;
+        long owned = profiles.countFamily(
+                profile.ownerUuid(), profile.rosterId(), profile.familyId());
+        return owned >= maximumOwned
+                ? result(MutationCode.CONFLICT, null,
+                        "bonded-family-capacity-reached")
+                : null;
+    }
+
     /** Lists profiles in deterministic order for exactly one owner roster. */
     @Nonnull
     public List<SqliteBondedCompanionProfileRow> listProfiles(
             @Nonnull UUID ownerUuid,
             @Nonnull String rosterId
     ) {
-        Objects.requireNonNull(ownerUuid, "ownerUuid");
-        String roster = requireText(rosterId, "rosterId");
-        try (PreparedStatement statement = connection.prepareStatement(
-                     PROFILE_SELECT + " WHERE owner_uuid = ? AND roster_id = ?"
-                             + " ORDER BY profile_id"
-             )) {
-            statement.setString(1, ownerUuid.toString());
-            statement.setString(2, roster);
-            try (ResultSet rows = statement.executeQuery()) {
-                ArrayList<SqliteBondedCompanionProfileRow> result =
-                        new ArrayList<>();
-                while (rows.next()) {
-                    result.add(SqliteBondedCompanionRows.readProfile(rows));
-                }
-                return List.copyOf(result);
-            }
-        } catch (SQLException failure) {
-            throw storageFailure("list-bonded-profiles", failure);
-        }
+        return profiles.list(ownerUuid, rosterId);
     }
 
     /** Finds a profile only within the supplied owner and roster scope. */
@@ -153,24 +159,16 @@ final class SqliteBondedCompanionStore {
             @Nonnull String rosterId,
             @Nonnull String profileId
     ) {
-        Objects.requireNonNull(ownerUuid, "ownerUuid");
-        String roster = requireText(rosterId, "rosterId");
-        String profile = requireText(profileId, "profileId");
-        try (PreparedStatement statement = connection.prepareStatement(
-                     PROFILE_SELECT + " WHERE profile_id = ?"
-                             + " AND owner_uuid = ? AND roster_id = ?"
-             )) {
-            statement.setString(1, profile);
-            statement.setString(2, ownerUuid.toString());
-            statement.setString(3, roster);
-            try (ResultSet row = statement.executeQuery()) {
-                return row.next()
-                        ? Optional.of(SqliteBondedCompanionRows.readProfile(row))
-                        : Optional.empty();
-            }
-        } catch (SQLException failure) {
-            throw storageFailure("find-bonded-profile", failure);
-        }
+        return profiles.find(ownerUuid, rosterId, profileId);
+    }
+
+    /** Finds a profile by its stable ID while retaining the owner fence. */
+    @Nonnull
+    public Optional<SqliteBondedCompanionProfileRow> findProfile(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String profileId
+    ) {
+        return profiles.find(ownerUuid, profileId);
     }
 
     /** Replaces the complete snapshot under an optimistic profile revision. */
@@ -440,17 +438,7 @@ final class SqliteBondedCompanionStore {
             Connection connection,
             String profileId
     ) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                PROFILE_SELECT + " WHERE profile_id = ?"
-        )) {
-            statement.setString(1, requireText(profileId, "profileId"));
-            try (ResultSet row = statement.executeQuery()) {
-                if (!row.next()) {
-                    throw new SQLException("bonded_profile_disappeared");
-                }
-                return SqliteBondedCompanionRows.readProfile(row);
-            }
-        }
+        return profiles.require(profileId);
     }
 
     private <T> MutationResult<T> denied(Scope scope) {
@@ -507,12 +495,4 @@ final class SqliteBondedCompanionStore {
         MutationResult<T> execute(Connection connection) throws SQLException;
     }
 
-    private static final String PROFILE_SELECT = """
-            SELECT profile_id, owner_uuid, roster_id, family_id, role_id,
-                   state, revision, snapshot_json, created_at_ms, updated_at_ms,
-                   policy_json, display_name, species, gender, died_at_ms,
-                   revive_cooldown_until_ms, revive_count, quarantine_reason,
-                   quarantined_at_ms
-            FROM bonded_companion_profile
-            """;
 }

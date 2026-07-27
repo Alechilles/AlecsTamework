@@ -176,6 +176,45 @@ class BondedCompanionStoreReviewFixTest {
     }
 
     @Test
+    void concurrentProfileCreatesCannotBothCrossOneFamilyOwnedLimit()
+            throws Exception {
+        CyclicBarrier start = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<BondedCompanionStoreResult<BondedCompanionRecord.Profile>> one =
+                    executor.submit(() -> {
+                        start.await();
+                        return store.createProfile(
+                                operation(
+                                        "family-create-a", "7".repeat(64),
+                                        "profile-family-a",
+                                        BondedCompanionOperation.Type.PROVISION,
+                                        -10_000L, 10_000L),
+                                profile("profile-family-a"), 1
+                        );
+                    });
+            Future<BondedCompanionStoreResult<BondedCompanionRecord.Profile>> two =
+                    executor.submit(() -> {
+                        start.await();
+                        return store.createProfile(
+                                operation(
+                                        "family-create-b", "8".repeat(64),
+                                        "profile-family-b",
+                                        BondedCompanionOperation.Type.PROVISION,
+                                        -10_000L, 10_000L),
+                                profile("profile-family-b"), 1
+                        );
+                    });
+
+            var results = java.util.List.of(one.get(), two.get());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.APPLIED).count());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.CONFLICT).count());
+        }
+        assertEquals(1, store.listProfiles(OWNER, "roster-a").size());
+    }
+
+    @Test
     void concurrentReviveRequiresExactlyOneRevisionFencedUpdate()
             throws Exception {
         store.createProfile(

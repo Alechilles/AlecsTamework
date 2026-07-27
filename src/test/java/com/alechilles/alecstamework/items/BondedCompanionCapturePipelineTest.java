@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionDatabase;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionCapturePersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
+import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEventPublisher;
@@ -30,6 +31,8 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaMana
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -275,6 +278,15 @@ class BondedCompanionCapturePipelineTest {
     }
 
     @Test
+    void admissionEvidenceCarriesTheFamilyAndRosterGenerationTogether() {
+        var evidence = new SpawnerCapturePolicyService.BondedAdmissionEvidence(
+                null, true, true, "hydragon:dragon", 4L);
+
+        assertEquals("hydragon:dragon", evidence.familyId());
+        assertEquals(4L, evidence.rosterRevision());
+    }
+
+    @Test
     void failedRequiredEffectIsDurableAndNeverReportedApplied() {
         Harness harness = new Harness();
         harness.effectSuccessful = false;
@@ -370,12 +382,32 @@ class BondedCompanionCapturePipelineTest {
 
         assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
                 adapter.store(first));
+        rewriteOperationHash(path, first, legacyCaptureHash(first));
         assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED,
                 adapter.store(retry));
         assertEquals(1, database.listProfiles(
                 OWNER, "hydragon:companions").size());
         assertEquals(1, database.listCleanup(
                 OWNER, "hydragon:companions", 10).size());
+    }
+
+    @Test
+    void explicitFamilySelectionAddsRequestIdentityProvenance()
+            throws Exception {
+        Path path = tempDir.resolve("explicit-family-hash.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        var adapter = adapter(path, rosters, database);
+        BondedCompanionCaptureIntent inferred = frozenIntentAt(10L);
+        BondedCompanionCaptureIntent explicit = explicitFamily(inferred);
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                adapter.store(inferred));
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED,
+                adapter.store(explicit));
     }
 
     @Test
@@ -479,6 +511,60 @@ class BondedCompanionCapturePipelineTest {
                 adapter.validate(missingPolicy));
     }
 
+    @Test
+    void realAdapterScopesCaptureCapacityToTheSelectedFamily()
+            throws Exception {
+        Path path = tempDir.resolve("multi-family-capture.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = sharedRosterRegistry(false);
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        var adapter = adapter(path, rosters, database);
+
+        var dragon = familyIntent(
+                UUID.fromString("20000000-0000-0000-0000-000000000011"),
+                "dragon-1", "Shared_Role", "hydragon:dragon"
+        );
+        var mini = familyIntent(
+                UUID.fromString("20000000-0000-0000-0000-000000000012"),
+                "mini-1", "Mini_Role", "hydragon:miniwyvern"
+        );
+        var secondDragon = familyIntent(
+                UUID.fromString("20000000-0000-0000-0000-000000000013"),
+                "dragon-2", "Shared_Role", "hydragon:dragon"
+        );
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                adapter.store(dragon));
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                adapter.store(mini));
+        assertEquals(BondedCompanionCaptureAuthor.PolicyDecision.CAPACITY_REJECTED,
+                adapter.validate(secondDragon));
+        assertEquals(2, database.listProfiles(OWNER, "hydragon:companions").size());
+    }
+
+    @Test
+    void realAdapterRejectsAmbiguousRoleWithoutFrozenFamily()
+            throws Exception {
+        Path path = tempDir.resolve("ambiguous-family-capture.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = sharedRosterRegistry(true);
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        var adapter = adapter(path, rosters, database);
+        var ambiguous = familyIntent(SOURCE, "ambiguous", "Shared_Role", null);
+        var explicit = familyIntent(
+                SOURCE, "explicit", "Shared_Role", "hydragon:miniwyvern"
+        );
+
+        assertEquals(BondedCompanionCaptureAuthor.PolicyDecision.REJECTED,
+                adapter.validate(ambiguous));
+        assertEquals(BondedCompanionCaptureAuthor.PolicyDecision.ALLOWED,
+                adapter.validate(explicit));
+    }
+
     private void assertRejected(BondedCompanionCaptureIntent intent,
                                 BondedCompanionCaptureAuthor.Status status) {
         Harness harness = new Harness();
@@ -509,9 +595,12 @@ class BondedCompanionCapturePipelineTest {
                 new SpawnerCaptureIntentFactory.FrozenBondedCapture(
                         "spawner-bonded-capture:v1", "source:" + SOURCE,
                         OWNER, "world", 2, "fingerprint", SOURCE,
-                        "Dragon_Fire", "hydragon:companions", 4L,
-                        snapshotAt(capturedAtMs), null,
-                        true, true, true, true, true, true
+                        "Dragon_Fire",
+                        BondedCompanionCaptureIntent.legacyEvidence(
+                                "source:" + SOURCE, true),
+                        null, "hydragon:companions", 4L,
+                        snapshotAt(capturedAtMs), null, true, true, true,
+                        true, true, true, "hydragon:dragon"
                 ));
     }
 
@@ -526,13 +615,53 @@ class BondedCompanionCapturePipelineTest {
                 true, chance, tranquilized, tool, owner, role);
     }
 
+    private static BondedCompanionCaptureIntent familyIntent(
+            UUID sourceUuid,
+            String key,
+            String roleId,
+            String familyId
+    ) {
+        return new BondedCompanionCaptureIntent(
+                "spawner-bonded-capture:v1", key, OWNER,
+                "world", 2, "fingerprint-" + key, sourceUuid, roleId,
+                "hydragon:companions", 4L,
+                snapshot(sourceUuid, roleId, 10L), null,
+                true, true, true, true, true, true, familyId
+        );
+    }
+
+    private static BondedCompanionCaptureIntent explicitFamily(
+            BondedCompanionCaptureIntent intent
+    ) {
+        return new BondedCompanionCaptureIntent(
+                intent.callerNamespace(), intent.idempotencyKey(),
+                intent.actorUuid(), intent.worldKey(), intent.hotbarSlot(),
+                intent.sourceFingerprint(), intent.sourceNpcUuid(),
+                intent.attemptEvidence(), intent.roleId(), intent.species(),
+                intent.rosterId(), intent.rosterRevision(), intent.snapshot(),
+                intent.completionEffect(), intent.targetValid(),
+                intent.chanceSuccessful(), intent.tranquilized(),
+                intent.toolAccess(), intent.ownerAllowed(), intent.roleAllowed(),
+                intent.familyId(),
+                BondedCompanionCaptureIntent.FamilySelection.EXPLICIT
+        );
+    }
+
     private static BondedCompanionSnapshot snapshot() {
         return snapshotAt(10L);
     }
 
     private static BondedCompanionSnapshot snapshotAt(long capturedAtMs) {
+        return snapshot(SOURCE, "Dragon_Fire", capturedAtMs);
+    }
+
+    private static BondedCompanionSnapshot snapshot(
+            UUID sourceUuid,
+            String roleId,
+            long capturedAtMs
+    ) {
         return BondedCompanionSnapshot.of(new CoopResidentStateSnapshot(
-                SOURCE, null, -1, "Dragon_Fire", null, null, null, null,
+                sourceUuid, null, -1, roleId, null, null, null, null,
                 null, null, null, null, null, null, null, null, 0.75D,
                 capturedAtMs),
                 Map.of());
@@ -561,6 +690,125 @@ class BondedCompanionCapturePipelineTest {
                 new BondedCompanionRosterRegistry();
         assertTrue(registry.replace(List.of(config), 4L).applied());
         return registry;
+    }
+
+    private static BondedCompanionRosterRegistry sharedRosterRegistry(
+            boolean sharedRole
+    ) throws Exception {
+        String dragonRole = "Shared_Role";
+        String miniRole = sharedRole ? "Shared_Role" : "Mini_Role";
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(
+                rosterPolicy("Dragons", "hydragon:dragon", dragonRole),
+                rosterPolicy("Minis", "hydragon:miniwyvern", miniRole)
+        ), 4L).applied());
+        return registry;
+    }
+
+    private static TwBondedCompanionRosterConfig rosterPolicy(
+            String id,
+            String familyId,
+            String roleId
+    ) throws Exception {
+        TwBondedCompanionRosterConfig config =
+                TwBondedCompanionRosterConfig.CODEC.decode(
+                        BsonDocument.parse("""
+                                {
+                                  "RosterId": "hydragon:companions",
+                                  "FamilyId": "%s",
+                                  "AllowedRoles": ["%s"],
+                                  "MaximumOwned": 1,
+                                  "MaximumActive": 1,
+                                  "Features": {"Capture": true}
+                                }
+                                """.formatted(familyId, roleId)),
+                        new ExtraInfo()
+                );
+        Field configId = config.getClass().getDeclaredField("id");
+        configId.setAccessible(true);
+        configId.set(config, id);
+        return config;
+    }
+
+    private static SqliteBondedCompanionCapturePersistenceAdapter adapter(
+            Path path,
+            BondedCompanionRosterRegistry rosters,
+            SqliteBondedCompanionDatabase database
+    ) {
+        return new SqliteBondedCompanionCapturePersistenceAdapter(
+                rosters,
+                new BondedCompanionTransitionService(
+                        new BondedCompanionPolicyResolver(rosters)),
+                database, database,
+                new SqliteBondedCompanionProjectionDurability(path),
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService
+                                .Outcome.RETRY_REQUIRED)
+        );
+    }
+
+    private static void rewriteOperationHash(
+            Path database,
+            BondedCompanionCaptureIntent intent,
+            String hash
+    ) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE bonded_companion_operation
+                     SET request_hash = ?
+                     WHERE caller_namespace = ? AND idempotency_key = ?
+                     """)) {
+            statement.setString(1, hash);
+            statement.setString(2, intent.callerNamespace());
+            statement.setString(3, intent.idempotencyKey());
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private static String legacyCaptureHash(
+            BondedCompanionCaptureIntent intent
+    ) throws Exception {
+        BondedCompanionCaptureAttemptEvidence attempt = intent.attemptEvidence();
+        String canonical = intent.actorUuid() + "\0" + intent.rosterId()
+                + "\0" + intent.roleId() + "\0" + intent.sourceNpcUuid()
+                + "\0" + attempt.attemptId()
+                + "\0" + attempt.sourceItemId()
+                + "\0" + attempt.spawnerConfigId()
+                + "\0" + attempt.spawnerConfigRevision()
+                + "\0" + attempt.capturePolicyConfigId()
+                + "\0" + attempt.capturePolicyConfigRevision()
+                + "\0" + attempt.sourceConsumption()
+                + "\0" + attempt.successDisposition()
+                + "\0" + attempt.outcome()
+                + "\0" + attempt.reason()
+                + "\0" + new BondedCompanionSnapshotCodec().encode(
+                        legacyIdentitySnapshot(intent));
+        return java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(canonical.getBytes(StandardCharsets.UTF_8))
+        );
+    }
+
+    private static BondedCompanionSnapshot legacyIdentitySnapshot(
+            BondedCompanionCaptureIntent intent
+    ) {
+        CoopResidentStateSnapshot source = intent.snapshot().fullState();
+        CoopResidentStateSnapshot claimed = new CoopResidentStateSnapshot(
+                source.npcUuid(), source.coopId(), source.residentSlot(),
+                source.roleId(), source.commandLinks(),
+                new com.alechilles.alecstamework.npc.components
+                        .TameworkOwnerComponent(intent.actorUuid(), null),
+                new com.alechilles.alecstamework.npc.components
+                        .TameworkTamedComponent(true),
+                source.npcName(), source.happiness(), source.needs(),
+                source.breeding(), source.leveling(), source.traits(),
+                source.talents(), source.lifeStage(), source.attachments(),
+                source.healthPercent(), 0L
+        );
+        return BondedCompanionSnapshot.of(
+                claimed, intent.snapshot().extensionData());
     }
 
     private static final class Harness {

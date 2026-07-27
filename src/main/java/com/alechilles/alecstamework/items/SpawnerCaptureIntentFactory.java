@@ -160,6 +160,7 @@ final class SpawnerCaptureIntentFactory {
             boolean tranquilized,
             boolean ownerAllowed,
             boolean roleAllowed,
+            @Nullable String familyId,
             @Nullable String particleSystemOverride
     ) {
         World world = player == null ? null : player.getWorld();
@@ -193,7 +194,7 @@ final class SpawnerCaptureIntentFactory {
                 snapshot, publishedEffect(targetRef, store, particle,
                 config.getCaptureSoundEvent()), targetRef.isValid(),
                 roll.terminal().successful(), tranquilized, toolAccess,
-                ownerAllowed, roleAllowed));
+                ownerAllowed, roleAllowed, familyId));
     }
 
     /** Maps already-frozen live evidence without replacing denial bits. */
@@ -210,7 +211,8 @@ final class SpawnerCaptureIntentFactory {
                 frozen.snapshot(), frozen.completionEffect(),
                 frozen.targetValid(), frozen.chanceSuccessful(),
                 frozen.tranquilized(), frozen.toolAccess(),
-                frozen.ownerAllowed(), frozen.roleAllowed()
+                frozen.ownerAllowed(), frozen.roleAllowed(), frozen.familyId(),
+                BondedCompanionCaptureIntent.FamilySelection.ROLE_INFERRED
         );
     }
 
@@ -226,7 +228,8 @@ final class SpawnerCaptureIntentFactory {
             SpawnerPublishedEffect completionEffect,
             boolean targetValid, boolean chanceSuccessful,
             boolean tranquilized, boolean toolAccess,
-            boolean ownerAllowed, boolean roleAllowed
+            boolean ownerAllowed, boolean roleAllowed,
+            String familyId
     ) {
         FrozenBondedCapture(
                 String callerNamespace, String idempotencyKey, UUID actorUuid,
@@ -246,7 +249,7 @@ final class SpawnerCaptureIntentFactory {
                             idempotencyKey, chanceSuccessful),
                     species, rosterId, rosterRevision, snapshot,
                     completionEffect, targetValid, chanceSuccessful,
-                    tranquilized, toolAccess, ownerAllowed, roleAllowed);
+                    tranquilized, toolAccess, ownerAllowed, roleAllowed, null);
         }
 
         FrozenBondedCapture(
@@ -267,7 +270,7 @@ final class SpawnerCaptureIntentFactory {
                             idempotencyKey, chanceSuccessful), null,
                     rosterId, rosterRevision, snapshot, completionEffect,
                     targetValid, chanceSuccessful, tranquilized, toolAccess,
-                    ownerAllowed, roleAllowed);
+                    ownerAllowed, roleAllowed, null);
         }
     }
 

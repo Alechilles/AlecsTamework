@@ -41,7 +41,8 @@ class BondedCompanionRecoveryTest {
         durability.events = world.events;
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
-                snapshot(uuid(20)), "world-a", -5_000L, -3_000L
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
         ));
 
         assertEquals(BondedCompanionProjectionService.SummonStatus.ACTIVE,
@@ -60,7 +61,8 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
-                snapshot(uuid(20)), "world-a", -5_000L, -3_000L
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
         ));
 
         assertEquals(BondedCompanionProjectionService.SummonStatus.SPAWN_FAILED_STORED,
@@ -84,7 +86,8 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
-                snapshot(uuid(20)), "world-a", -5_000L, -3_000L
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
         ));
 
         assertEquals(BondedCompanionProjectionService.SummonStatus.SPAWN_FAILED_STORED,
@@ -108,7 +111,8 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
-                snapshot(uuid(20)), "world-a", -5_000L, -3_000L
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
         ));
 
         assertEquals(BondedCompanionProjectionService.SummonStatus.SPAWN_FAILED_STORED,
@@ -127,7 +131,8 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
-                snapshot(uuid(20)), "world-a", -5_000L, -3_000L
+                snapshot(uuid(20)), "world-a", null, -5_000L, -3_000L,
+                new BondedCompanionActiveCapacity("family-a", 1)
         ));
 
         assertEquals(BondedCompanionProjectionService.SummonStatus.SPAWN_ROLLBACK_PENDING,
@@ -162,7 +167,7 @@ class BondedCompanionRecoveryTest {
         world.projections.add(live);
 
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
-                lease, 5L, -900L
+                lease, 5L, -900L, snapshot(uuid(20)), 0L
         ));
 
         assertEquals(BondedCompanionProjectionService.StoreStatus.STORED,
@@ -172,6 +177,33 @@ class BondedCompanionRecoveryTest {
                 "remove-if-exact:world-a:00000000-0000-0000-0000-000000000028"),
                 world.events);
         assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
+    }
+
+    @Test
+    void storePreservesSnapshotStateAbsentFromTheLiveProjection() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease);
+        world.projections.add(projection(
+                uuid(40), "world-a", snapshot(uuid(40))));
+        BondedCompanionSnapshot stored = BondedCompanionSnapshot.of(
+                snapshot(uuid(20)).fullState(),
+                Map.of("hydragon.abilities", "{\"attuned\":true}")
+        );
+
+        var result = projections.store(
+                new BondedCompanionProjectionService.StoreRequest(
+                        lease, 5L, -900L, stored, 0L
+                )
+        );
+
+        assertEquals(BondedCompanionProjectionService.StoreStatus.STORED,
+                result.status());
+        assertEquals(
+                "{\"attuned\":true}",
+                durability.lastStoredSnapshot.extensionData()
+                        .get("hydragon.abilities")
+        );
     }
 
     @Test
@@ -383,6 +415,7 @@ class BondedCompanionRecoveryTest {
         private final List<Long> cleanupRetentions = new ArrayList<>();
         private final List<BondedCompanionProjectionCleanupService.CleanupIntent>
                 spawnFailureCleanups = new ArrayList<>();
+        private BondedCompanionSnapshot lastStoredSnapshot;
         private String lastReason;
         private boolean rollbackSucceeds = true;
 
@@ -439,6 +472,7 @@ class BondedCompanionRecoveryTest {
                 BondedCompanionProjectionCleanupService.CleanupIntent cleanup
         ) {
             events.add("store:" + request.lease().profileId());
+            lastStoredSnapshot = snapshot;
             states.put(request.lease().profileId(), BondedCompanionState.STORED);
             return true;
         }
@@ -447,6 +481,7 @@ class BondedCompanionRecoveryTest {
         public boolean reconcileStored(
                 BondedCompanionProjectionValidator.LeaseExpectation lease,
                 BondedCompanionSnapshot snapshot,
+                long summonCooldownUntilMs,
                 List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
                 String reason
         ) {

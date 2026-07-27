@@ -41,8 +41,10 @@ final class BondedCompanionCoreReviveSupport
 
     @Override
     public BondedCompanionTransitionService.MutationRequest mutation(
-            BondedCompanionActionRequest action, long now) {
-        return core.mutation(action, now);
+            BondedCompanionActionRequest action,
+            long now,
+            long policyRevision) {
+        return core.mutation(action, now, policyRevision);
     }
 
     @Override

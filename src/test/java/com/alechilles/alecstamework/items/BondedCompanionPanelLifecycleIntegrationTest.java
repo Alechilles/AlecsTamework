@@ -123,6 +123,53 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         runtime.close();
     }
 
+    /** Regression: the API store path must apply the exact family's cooldown. */
+    @Test
+    void manualStoreAppliesConfiguredSummonCooldownBeforeAnotherProjection()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("store-cooldown.db");
+        BondedCompanionRosterRegistry rosters = registry(30L);
+        AtomicLong clock = new AtomicLong(10_000L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        try {
+            runtime.capture.store(captureIntent(
+                    UUID.fromString(
+                            "73000000-0000-0000-0000-000000000020"),
+                    "Nimbus", "Miniwyvern"));
+            BondedCompanionProfileView stored = runtime.api.list(OWNER, ROSTER)
+                    .join().value().getFirst();
+            BondedCompanionActionContext context = new BondedCompanionActionContext(
+                    new BondedCompanionPlacement(
+                            "world-a", 10D, 64D, 12D, 0F, 1F, 0F),
+                    new TestInventory(Map.of()));
+
+            assertTrue(runtime.api.summon(action("summon", stored, context))
+                    .join().successful());
+            BondedCompanionProfileView active = runtime.api.list(OWNER, ROSTER)
+                    .join().value().getFirst();
+            assertTrue(runtime.api.store(action("store", active, context))
+                    .join().successful());
+
+            BondedCompanionProfileView coolingDown = runtime.api
+                    .list(OWNER, ROSTER).join().value().getFirst();
+            assertEquals(40_000L, coolingDown.summonCooldownUntilMs());
+            assertFalse(coolingDown.summonAvailable());
+            clock.set(39_999L);
+            assertEquals(BondedCompanionResultCode.POLICY_DENIED,
+                    runtime.api.summon(action(
+                            "too-early", coolingDown, context)).join().code());
+
+            clock.set(40_000L);
+            BondedCompanionProfileView ready = runtime.api.list(OWNER, ROSTER)
+                    .join().value().getFirst();
+            assertTrue(runtime.api.summon(action("ready", ready, context))
+                    .join().successful());
+        } finally {
+            runtime.close();
+        }
+    }
+
     @Test
     void retainedExactReservationKeepsPanelReviveActionEnabled()
             throws Exception {
@@ -465,6 +512,11 @@ class BondedCompanionPanelLifecycleIntegrationTest {
     }
 
     private BondedCompanionRosterRegistry registry() throws Exception {
+        return registry(0L);
+    }
+
+    private BondedCompanionRosterRegistry registry(long cooldownSeconds)
+            throws Exception {
         TwBondedCompanionRosterConfig config =
                 TwBondedCompanionRosterConfig.CODEC.decode(
                         BsonDocument.parse("""
@@ -475,7 +527,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                                   "MaximumOwned": 4,
                                   "MaximumActive": 1,
                                   "SessionDurationSeconds": 600,
-                                  "SummonCooldownSeconds": 0,
+                                  "SummonCooldownSeconds": %d,
                                   "RevivePrice": {
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": 2
@@ -488,7 +540,8 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                                     "Revive": true
                                   }
                                 }
-                                """), new ExtraInfo());
+                                """.formatted(cooldownSeconds)),
+                        new ExtraInfo());
         Field id = config.getClass().getDeclaredField("id");
         id.setAccessible(true);
         id.set(config, "HydragonDragons");

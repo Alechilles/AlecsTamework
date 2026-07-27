@@ -399,7 +399,7 @@ class BondedCompanionStateMachineTest {
                         mutation("stranger", stored, 1L, STRANGER, 1_000L),
                         stored, counts(1, 0), "lease", "world:alpha"
                 ).code());
-        assertEquals(BondedCompanionTransitionService.ResultCode.ROLE_NOT_ALLOWED,
+        assertEquals(BondedCompanionTransitionService.ResultCode.POLICY_NOT_FOUND,
                 service.createCaptured(
                         creation("bad-role", "bad", "Tamed_Dragon_Ice"),
                         counts(0, 0)

@@ -86,11 +86,13 @@ public final class BondedCompanionProjectionService {
                 || projection.snapshot() == null) {
             return new StoreResult(StoreStatus.PROJECTION_NOT_FOUND, null);
         }
+        BondedCompanionSnapshot merged = request.storedSnapshot()
+                .mergeForStore(projection.snapshot());
         var intent = cleanupIntents.projection(
                 request.lease(), "store", request.nowMs()
         );
         if (!durability.storeAndEnqueueCleanup(
-                request, projection.snapshot(), intent)) {
+                request, merged, intent)) {
             return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
         }
         BondedCompanionProjectionCleanupService.Outcome outcome = cleanup.recover(intent);
@@ -106,7 +108,8 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             @Nonnull List<BondedCompanionProjectionValidator.Projection> observed,
             @Nonnull RecoveryCause cause,
-            long observedAtMs
+            long observedAtMs,
+            long summonCooldownUntilMs
     ) {
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(cause, "cause");
@@ -131,7 +134,8 @@ public final class BondedCompanionProjectionService {
                 cleanupIntents.projections(
                         lease, validation.exactMatches(), reason, observedAtMs
                 );
-        if (!durability.reconcileStored(lease, snapshot, intents, reason)) {
+        if (!durability.reconcileStored(
+                lease, snapshot, summonCooldownUntilMs, intents, reason)) {
             return new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, intents);
         }
         for (var intent : intents) {
@@ -309,6 +313,7 @@ public final class BondedCompanionProjectionService {
         boolean reconcileStored(
                 @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
                 @Nullable BondedCompanionSnapshot snapshot,
+                long summonCooldownUntilMs,
                 @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
                 @Nonnull String reason
         );
@@ -341,18 +346,9 @@ public final class BondedCompanionProjectionService {
             @Nullable com.alechilles.alecstamework.companion.placement
                     .CompanionSpawnPlacement placement,
             long nowMs,
-            long expiresAtMs
+            long expiresAtMs,
+            @Nonnull BondedCompanionActiveCapacity activeCapacity
     ) {
-        public SummonRequest(
-                UUID ownerUuid, String rosterId, String profileId,
-                long expectedRevision, String roleId,
-                BondedCompanionSnapshot snapshot, String worldKey,
-                long nowMs, long expiresAtMs
-        ) {
-            this(ownerUuid, rosterId, profileId, expectedRevision, roleId,
-                    snapshot, worldKey, null, nowMs, expiresAtMs);
-        }
-
         public SummonRequest {
             ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
             rosterId = text(rosterId, "rosterId");
@@ -360,6 +356,8 @@ public final class BondedCompanionProjectionService {
             roleId = text(roleId, "roleId");
             snapshot = Objects.requireNonNull(snapshot, "snapshot");
             worldKey = text(worldKey, "worldKey");
+            activeCapacity = Objects.requireNonNull(
+                    activeCapacity, "activeCapacity");
             if (expectedRevision < 0L) {
                 throw new IllegalArgumentException("negative expectedRevision");
             }
@@ -369,10 +367,14 @@ public final class BondedCompanionProjectionService {
     public record StoreRequest(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long expectedRevision,
-            long nowMs
+            long nowMs,
+            @Nonnull BondedCompanionSnapshot storedSnapshot,
+            long summonCooldownUntilMs
     ) {
         public StoreRequest {
             lease = Objects.requireNonNull(lease, "lease");
+            storedSnapshot = Objects.requireNonNull(
+                    storedSnapshot, "storedSnapshot");
             if (expectedRevision < 0L) {
                 throw new IllegalArgumentException("negative expectedRevision");
             }

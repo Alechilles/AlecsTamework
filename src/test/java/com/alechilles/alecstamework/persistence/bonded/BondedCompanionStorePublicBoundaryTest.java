@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Exercises the complete adapter-neutral public bonded storage boundary. */
@@ -113,6 +114,17 @@ class BondedCompanionStorePublicBoundaryTest {
     void operationPruningIsBoundedWithoutDeletingDomainRecords() {
         assertEquals(1, store.pruneOperations(20_000L, 1));
         assertTrue(store.findProfile(OWNER, "roster-a", "profile-a").isPresent());
+    }
+
+    @Test
+    void finiteFamilyCapacityCannotFallBackToAnUncheckedDefaultMutation()
+            throws Exception {
+        assertFalse(BondedCompanionStore.class.getMethod(
+                "createProfile",
+                BondedCompanionOperation.class,
+                BondedCompanionRecord.Profile.class,
+                int.class
+        ).isDefault());
     }
 
     private BondedCompanionRecord.Profile profile() {

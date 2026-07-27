@@ -110,9 +110,9 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
     public BondedCompanionCaptureAuthor.PersistenceOutcome store(
             @Nonnull BondedCompanionCaptureIntent intent
     ) {
-        BondedCompanionRosterRegistry.RosterDefinition roster =
-                rosters.resolve(intent.rosterId()).orElse(null);
-        if (roster == null || intent.snapshot() == null) {
+        BondedCompanionRosterRegistry.RosterDefinition family =
+                family(intent);
+        if (family == null || intent.snapshot() == null) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
         }
         long nowMs = intent.snapshot().fullState().capturedAtMs();
@@ -126,7 +126,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
                 database.createCapturedProfile(
                         operation, profile, cleanupRecord(intent, nowMs),
-                        roster.maximumOwned(),
+                        family.maximumOwned(),
                         captureEvidence(intent, profile, operation, nowMs)
                 );
         if (result.code() != BondedCompanionStoreResult.Code.APPLIED) {
@@ -177,18 +177,35 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
             BondedCompanionCaptureIntent intent
     ) {
         BondedCompanionSnapshot snapshot = claimed(intent);
-        int owned = profiles.listProfiles(
-                intent.actorUuid(), intent.rosterId()
-        ).size();
+        BondedCompanionRosterRegistry.RosterDefinition family = family(intent);
+        int owned = family == null ? 0 : (int) profiles.listProfiles(
+                intent.actorUuid(), intent.rosterId()).stream()
+                .filter(profile -> family.familyId().equals(profile.familyId()))
+                .count();
         return transitions.createCaptured(
                 new BondedCompanionTransitionService.CreationRequest(
                         intent.callerNamespace() + ":" + intent.idempotencyKey(),
                         intent.actorUuid(), intent.rosterId(), intent.profileId(),
                         intent.roleId(), snapshot, intent.rosterRevision(),
-                        snapshot.fullState().capturedAtMs()
+                        snapshot.fullState().capturedAtMs(), intent.familyId()
                 ),
                 new BondedCompanionTransitionService.RosterCounts(owned, 0)
         );
+    }
+
+    @Nullable
+    private BondedCompanionRosterRegistry.RosterDefinition family(
+            BondedCompanionCaptureIntent intent
+    ) {
+        if (intent.familyId() != null) {
+            return rosters.resolve(intent.rosterId(), intent.familyId())
+                    .orElse(null);
+        }
+        BondedCompanionRosterRegistry.FamilyResolution selected =
+                rosters.resolveForRole(intent.rosterId(), intent.roleId());
+        return selected.status()
+                == BondedCompanionRosterRegistry.FamilyResolutionStatus.FOUND
+                ? selected.definition() : null;
     }
 
     private BondedCompanionSnapshot claimed(BondedCompanionCaptureIntent intent) {
@@ -316,6 +333,10 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
                 + "\0" + attempt.outcome()
                 + "\0" + attempt.reason()
                 + "\0" + snapshots.encode(requestIdentitySnapshot(intent));
+        if (intent.familySelection()
+                == BondedCompanionCaptureIntent.FamilySelection.EXPLICIT) {
+            canonical += "\0family:" + intent.familyId();
+        }
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonical.getBytes(StandardCharsets.UTF_8)));

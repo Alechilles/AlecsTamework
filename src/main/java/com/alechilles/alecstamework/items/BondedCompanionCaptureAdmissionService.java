@@ -64,9 +64,11 @@ final class BondedCompanionCaptureAdmissionService {
             ItemFeatureConfig config
     ) {
         if (config == null || rosters == null) return null;
-        var roster = rosters.resolve(
-                config.getCaptureMechanics().bondedRosterId()).orElse(null);
-        return roster == null ? null : capturePolicy.assessBonded(
-                player, targetRef, config, source, roster);
+        BondedCompanionRosterRegistry.Snapshot generation = rosters.snapshot();
+        var families = generation.families(
+                config.getCaptureMechanics().bondedRosterId());
+        return families.isEmpty() ? null : capturePolicy.assessBonded(
+                player, targetRef, config, source, families,
+                generation.revision());
     }
 }

@@ -41,10 +41,8 @@ public final class CommandItemRegistry {
                 new HashMap<>(active.byConfigId());
         validateOwnerFamily(itemId, config, byItem);
         validateBondedRoster(config, null);
-        byItem.put(itemId, config);
-        if (configId != null && !configId.isBlank()) {
-            byId.put(configId.trim(), config);
-        }
+        putUniqueConfig(byId, configId, config);
+        putUniqueItem(byItem, itemId, config);
         publishOrThrow(active, new Snapshot(
                 byItem,
                 byId,
@@ -157,17 +155,18 @@ public final class CommandItemRegistry {
             if (itemIds == null) {
                 continue;
             }
+            boolean configIndexed = false;
             for (String itemId : itemIds) {
                 if (itemId == null || itemId.isBlank()) {
                     continue;
                 }
                 validateOwnerFamily(itemId, config, byItem);
                 validateBondedRoster(config, bondedSnapshot);
-                byItem.put(itemId, config);
-                String configId = config.getId();
-                if (configId != null && !configId.isBlank()) {
-                    byId.put(configId.trim(), config);
+                if (!configIndexed) {
+                    putUniqueConfig(byId, config.getId(), config);
+                    configIndexed = true;
                 }
+                putUniqueItem(byItem, itemId, config);
                 loaded++;
             }
         }
@@ -180,6 +179,34 @@ public final class CommandItemRegistry {
                 ),
                 loaded
         );
+    }
+
+    private static void putUniqueItem(
+            Map<String, TwCommandItemConfig> byItem,
+            String itemId,
+            TwCommandItemConfig config
+    ) {
+        if (byItem.putIfAbsent(itemId, config) != null) {
+            throw new IllegalArgumentException(
+                    "Duplicate command item id: " + itemId
+            );
+        }
+    }
+
+    private static void putUniqueConfig(
+            Map<String, TwCommandItemConfig> byId,
+            String configId,
+            TwCommandItemConfig config
+    ) {
+        if (configId == null || configId.isBlank()) {
+            return;
+        }
+        String normalized = configId.trim();
+        if (byId.putIfAbsent(normalized, config) != null) {
+            throw new IllegalArgumentException(
+                    "Duplicate command config id: " + normalized
+            );
+        }
     }
 
     /** Publishes a previously validated command generation in one map swap. */
@@ -247,12 +274,9 @@ public final class CommandItemRegistry {
         }
         boolean exists = candidate == null
                 ? bondedRosters != null
-                        && bondedRosters.resolve(
-                                config.getBondedRosterId()
-                        ).isPresent()
-                : candidate.byRosterId().containsKey(
-                        config.getBondedRosterId()
-                );
+                        && bondedRosters.snapshot().containsRoster(
+                                config.getBondedRosterId())
+                : candidate.containsRoster(config.getBondedRosterId());
         if (!exists) {
             throw new IllegalArgumentException(
                     "Unknown bonded roster: " + config.getBondedRosterId()

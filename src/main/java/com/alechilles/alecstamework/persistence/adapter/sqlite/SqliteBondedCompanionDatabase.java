@@ -13,9 +13,6 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreDiagn
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionLegacyPaymentSettlementGroup;
-import com.alechilles.alecstamework.persistence.adapter.sqlite
-        .SqliteBondedCompanionOperationClaims.Claim;
-import com.google.gson.Gson;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -31,16 +28,18 @@ import javax.annotation.Nonnull;
 /** Public connection-owning SQLite implementation of the bonded domain store. */
 public final class SqliteBondedCompanionDatabase implements BondedCompanionStore,
         BondedCompanionCaptureEvidenceStore {
-    private static final Gson GSON = new Gson();
     private final SqliteConnectionFactory connections;
     private final SqliteBondedCompanionMapper mapper = new SqliteBondedCompanionMapper();
-    private final SqliteBondedCompanionOperationClaims claims =
-            new SqliteBondedCompanionOperationClaims();
+    private final SqliteBondedCompanionOperationExecutor operations;
+    private final SqliteBondedCompanionCaptureEvidenceAccess captureEvents;
 
     /** Creates a safe store that owns every connection and transaction. */
     public SqliteBondedCompanionDatabase(@Nonnull Path databasePath) {
         connections = new SqliteConnectionFactory(
                 Objects.requireNonNull(databasePath, "databasePath"));
+        operations = new SqliteBondedCompanionOperationExecutor(connections);
+        captureEvents = new SqliteBondedCompanionCaptureEvidenceAccess(
+                connections, operations);
     }
 
     @Override public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
@@ -49,6 +48,21 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         requireScope(operation, profile.ownerUuid(), profile.rosterId(), profile.profileId());
         return mutate(operation, SqliteBondedCompanionProfileRow.class,
                 store -> store.createProfile(mapper.toRow(profile)), mapper::toDomain);
+    }
+
+    @Override
+    public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            createProfile(
+                    BondedCompanionOperation operation,
+                    BondedCompanionRecord.Profile profile,
+                    int maximumOwned
+            ) {
+        requireScope(operation, profile.ownerUuid(), profile.rosterId(),
+                profile.profileId());
+        return mutate(operation, SqliteBondedCompanionProfileRow.class,
+                store -> store.createProfile(
+                        mapper.toRow(profile), maximumOwned),
+                mapper::toDomain);
     }
 
     /** Atomically creates one captured profile and its exact cleanup intent. */
@@ -76,7 +90,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         requireScope(operation, profile.ownerUuid(), profile.rosterId(),
                 profile.profileId());
         if (captureEvidence != null) {
-            requireCaptureEvidence(operation, profile, captureEvidence);
+            captureEvents.requireMatches(operation, profile, captureEvidence);
         }
         return mutate(operation, null, false,
                 SqliteBondedCompanionProfileRow.class,
@@ -91,73 +105,14 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             String rosterId,
             UUID sourceNpcUuid
     ) {
-        Objects.requireNonNull(ownerUuid, "ownerUuid");
-        String roster = requireText(rosterId, "rosterId");
-        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
-        try (Connection connection = connections.openReadConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT result_json
-                     FROM bonded_companion_operation
-                     WHERE owner_uuid = ? AND roster_id = ?
-                       AND operation_type = 'CAPTURE'
-                       AND operation_state = 'SUCCEEDED'
-                       AND json_extract(
-                           result_json,
-                           '$.captureEvidence.sourceNpcUuid'
-                       ) = ?
-                     ORDER BY created_at_ms DESC, caller_namespace,
-                              idempotency_key
-                     LIMIT 1
-                     """)) {
-            statement.setString(1, ownerUuid.toString());
-            statement.setString(2, roster);
-            statement.setString(3, sourceNpcUuid.toString());
-            try (ResultSet row = statement.executeQuery()) {
-                return row.next()
-                        ? Optional.of(captureEvidence(row.getString(1)))
-                        : Optional.empty();
-            }
-        } catch (SQLException failure) {
-            throw new IllegalStateException(
-                    "bonded-capture-evidence-read-failed", failure);
-        }
+        return captureEvents.find(ownerUuid, rosterId, sourceNpcUuid);
     }
 
     @Override
     public List<BondedCompanionCaptureEvidence> listUnpublishedCaptureEvidence(
             int limit
     ) {
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be positive");
-        }
-        try (Connection connection = connections.openReadConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT result_json
-                     FROM bonded_companion_operation
-                     WHERE operation_type = 'CAPTURE'
-                       AND operation_state = 'SUCCEEDED'
-                       AND json_type(
-                           result_json, '$.captureEvidence'
-                       ) = 'object'
-                       AND json_type(
-                           result_json, '$.captureEventPublishedAtMs'
-                       ) IS NULL
-                     ORDER BY created_at_ms, caller_namespace, idempotency_key
-                     LIMIT ?
-                     """)) {
-            statement.setInt(1, limit);
-            try (ResultSet rows = statement.executeQuery()) {
-                ArrayList<BondedCompanionCaptureEvidence> result =
-                        new ArrayList<>();
-                while (rows.next()) {
-                    result.add(captureEvidence(rows.getString(1)));
-                }
-                return List.copyOf(result);
-            }
-        } catch (SQLException failure) {
-            throw new IllegalStateException(
-                    "bonded-capture-evidence-read-failed", failure);
-        }
+        return captureEvents.listUnpublished(limit);
     }
 
     @Override
@@ -165,34 +120,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             BondedCompanionCaptureEvidence evidence,
             long publishedAtMs
     ) {
-        Objects.requireNonNull(evidence, "evidence");
-        try (Connection connection = connections.openWriterConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     UPDATE bonded_companion_operation
-                     SET result_json = json_set(
-                             result_json,
-                             '$.captureEventPublishedAtMs', ?
-                         ),
-                         updated_at_ms = ?
-                     WHERE caller_namespace = ? AND idempotency_key = ?
-                       AND operation_state = 'SUCCEEDED'
-                       AND json_extract(
-                           result_json, '$.captureEvidence.operationId'
-                       ) = ?
-                       AND json_type(
-                           result_json, '$.captureEventPublishedAtMs'
-                       ) IS NULL
-                     """)) {
-            statement.setLong(1, publishedAtMs);
-            statement.setLong(2, publishedAtMs);
-            statement.setString(3, evidence.callerNamespace());
-            statement.setString(4, evidence.idempotencyKey());
-            statement.setString(5, evidence.operationId().toString());
-            return statement.executeUpdate() == 1;
-        } catch (SQLException failure) {
-            throw new IllegalStateException(
-                    "bonded-capture-evidence-checkpoint-failed", failure);
-        }
+        return captureEvents.markPublished(evidence, publishedAtMs);
     }
 
     @Override public List<BondedCompanionRecord.Profile> listProfiles(
@@ -207,18 +135,18 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 .map(mapper::toDomain));
     }
 
+    @Override public Optional<BondedCompanionRecord.Profile> findProfile(
+            UUID ownerUuid, String profileId) {
+        return read(store -> store.findProfile(ownerUuid, profileId)
+                .map(mapper::toDomain));
+    }
+
     @Override
     public Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
             findProfileOperationByIdentity(BondedCompanionOperationProbe operation) {
         Objects.requireNonNull(operation, "operation");
-        try (Connection connection = connections.openReadConnection()) {
-            Optional<Claim> existing = claims.existing(connection, operation);
-            return existing.map(claim -> replay(
-                    claim, SqliteBondedCompanionProfileRow.class,
-                    mapper::toDomain));
-        } catch (SQLException failure) {
-            throw new IllegalStateException("bonded-operation-read-failed", failure);
-        }
+        return operations.find(operation,
+                SqliteBondedCompanionProfileRow.class, mapper::toDomain);
     }
 
     @Override
@@ -226,14 +154,8 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             findProfileOperationByExactRequest(
                     BondedCompanionOperation operation) {
         Objects.requireNonNull(operation, "operation");
-        try (Connection connection = connections.openReadConnection()) {
-            Optional<Claim> existing = claims.existing(connection, operation);
-            return existing.map(claim -> replay(
-                    claim, SqliteBondedCompanionProfileRow.class,
-                    mapper::toDomain));
-        } catch (SQLException failure) {
-            throw new IllegalStateException("bonded-operation-read-failed", failure);
-        }
+        return operations.find(operation,
+                SqliteBondedCompanionProfileRow.class, mapper::toDomain);
     }
 
     @Override
@@ -416,129 +338,41 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
 
     private <R, D> BondedCompanionStoreResult<D> mutate(
             BondedCompanionOperation operation, Class<R> storedType,
-            Mutation<R> mutation, Translation<R, D> translation) {
-        return mutate(operation, null, storedType, mutation, translation);
+            SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
+            SqliteBondedCompanionOperationExecutor.Translation<R, D> translation) {
+        return operations.mutate(
+                operation, storedType, mutation, translation);
     }
 
     private <R, D> BondedCompanionStoreResult<D> mutate(
             BondedCompanionOperation operation, Long expectedRevision,
-            Class<R> storedType, Mutation<R> mutation,
-            Translation<R, D> translation) {
-        return mutate(operation, expectedRevision, false,
-                storedType, mutation, translation);
-    }
-
-    private <R, D> BondedCompanionStoreResult<D> mutate(
-            BondedCompanionOperation operation, Long expectedRevision,
-            boolean resumeMatchingPending,
-            Class<R> storedType, Mutation<R> mutation,
-            Translation<R, D> translation) {
-        return mutate(operation, expectedRevision, resumeMatchingPending,
-                storedType, mutation, translation, null);
+            Class<R> storedType,
+            SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
+            SqliteBondedCompanionOperationExecutor.Translation<R, D> translation) {
+        return operations.mutate(operation, expectedRevision, storedType,
+                mutation, translation);
     }
 
     private <R, D> BondedCompanionStoreResult<D> mutate(
             BondedCompanionOperation operation, Long expectedRevision,
             boolean resumeMatchingPending,
-            Class<R> storedType, Mutation<R> mutation,
-            Translation<R, D> translation,
+            Class<R> storedType,
+            SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
+            SqliteBondedCompanionOperationExecutor.Translation<R, D> translation) {
+        return operations.mutate(operation, expectedRevision,
+                resumeMatchingPending, storedType, mutation, translation);
+    }
+
+    private <R, D> BondedCompanionStoreResult<D> mutate(
+            BondedCompanionOperation operation, Long expectedRevision,
+            boolean resumeMatchingPending,
+            Class<R> storedType,
+            SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
+            SqliteBondedCompanionOperationExecutor.Translation<R, D> translation,
             BondedCompanionCaptureEvidence captureEvidence) {
-        Connection connection = null;
-        try {
-            connection = connections.openWriterConnection();
-            connection.setAutoCommit(false);
-            Claim claim = claims.claim(
-                    connection, operation, expectedRevision);
-            boolean resumable = resumeMatchingPending
-                    && claim.matches()
-                    && "PENDING".equals(claim.state())
-                    && claim.resultJson() == null;
-            if (!claim.created() && !resumable) {
-                BondedCompanionStoreResult<D> replay = replay(claim, storedType, translation);
-                connection.commit();
-                return replay;
-            }
-            var lowLevel = mutation.apply(new SqliteBondedCompanionStore(connection));
-            BondedCompanionStoreResult<D> result = domainResult(lowLevel, translation);
-            if (result.code() == BondedCompanionStoreResult.Code.STORAGE_FAILURE) {
-                connection.rollback();
-                return result;
-            }
-            terminalize(
-                    connection, operation, lowLevel, storedType,
-                    captureEvidence
-            );
-            connection.commit();
-            return result;
-        } catch (Exception failure) {
-            rollback(connection, failure);
-            return new BondedCompanionStoreResult<>(
-                    BondedCompanionStoreResult.Code.STORAGE_FAILURE, null,
-                    "bonded-transaction-failed", false);
-        } finally {
-            close(connection);
-        }
-    }
-
-    private <R, D> BondedCompanionStoreResult<D> replay(
-            Claim claim, Class<R> storedType, Translation<R, D> translation) {
-        if (!claim.matches()) return new BondedCompanionStoreResult<>(
-                BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT, null,
-                "idempotency-key-request-mismatch", false);
-        if (claim.resultJson() == null || "PENDING".equals(claim.state()))
-            return new BondedCompanionStoreResult<>(BondedCompanionStoreResult.Code.CONFLICT,
-                    null, "operation-still-pending", false);
-        StoredResult envelope = GSON.fromJson(claim.resultJson(), StoredResult.class);
-        String expectedType = storedTypeName(storedType);
-        if (!expectedType.equals(envelope.valueType)) {
-            return new BondedCompanionStoreResult<>(
-                    BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT, null,
-                    "idempotency-key-result-type-mismatch", false);
-        }
-        R row = envelope.value == null ? null : GSON.fromJson(envelope.value, storedType);
-        D value = row == null ? null : translation.apply(row);
-        return new BondedCompanionStoreResult<>(
-                BondedCompanionStoreResult.Code.valueOf(envelope.code), value,
-                envelope.reason, true);
-    }
-
-    private void terminalize(Connection connection, BondedCompanionOperation operation,
-                             SqliteBondedCompanionStore.MutationResult<?> result,
-                             Class<?> storedType,
-                             BondedCompanionCaptureEvidence captureEvidence)
-            throws SQLException {
-        String state = result.code() == SqliteBondedCompanionStore.MutationCode.APPLIED
-                ? "SUCCEEDED" : "REJECTED";
-        StoredResult stored = new StoredResult(mapCode(result.code()).name(),
-                result.reason(), storedTypeName(storedType),
-                result.value() == null ? null : GSON.toJson(result.value()),
-                result.code() == SqliteBondedCompanionStore.MutationCode.APPLIED
-                        ? captureEvidence : null,
-                null);
-        try (PreparedStatement update = connection.prepareStatement("""
-                UPDATE bonded_companion_operation
-                SET operation_state = ?, result_json = ?, updated_at_ms = ?,
-                    expires_at_ms = ?
-                WHERE caller_namespace = ? AND idempotency_key = ?
-                  AND operation_state = 'PENDING'
-                """)) {
-            update.setString(1, state); update.setString(2, GSON.toJson(stored));
-            update.setLong(3, operation.attemptedAtMs());
-            update.setLong(4, operation.type()
-                    == BondedCompanionOperation.Type.REVIVE
-                    ? Long.MAX_VALUE : operation.retainedUntilMs());
-            update.setString(5, operation.callerNamespace());
-            update.setString(6, operation.idempotencyKey());
-            if (update.executeUpdate() != 1) throw new SQLException("bonded_operation_terminalize_race");
-        }
-    }
-
-    private String storedTypeName(Class<?> storedType) {
-        if (storedType == SqliteBondedCompanionProfileRow.class) return "PROFILE";
-        if (storedType == SqliteBondedCompanionLeaseRow.class) return "LEASE";
-        if (storedType == SqliteBondedCompanionExtensionDataRow.class) return "EXTENSION";
-        if (storedType == SqliteBondedCompanionCleanupRow.class) return "CLEANUP";
-        throw new IllegalArgumentException("unsupported bonded result type");
+        return operations.mutate(operation, expectedRevision,
+                resumeMatchingPending, storedType, mutation, translation,
+                captureEvidence);
     }
 
     private List<BondedCompanionRecord.Lease> queryActiveLeases(UUID owner, String roster) {
@@ -562,27 +396,6 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         } catch (SQLException failure) {
             throw new IllegalStateException("bonded-read-failed", failure);
         }
-    }
-
-    private <R, D> BondedCompanionStoreResult<D> domainResult(
-            SqliteBondedCompanionStore.MutationResult<R> result,
-            Translation<R, D> translation) {
-        D value = result.value() == null ? null : translation.apply(result.value());
-        return new BondedCompanionStoreResult<>(mapCode(result.code()), value,
-                result.reason(), result.code() == SqliteBondedCompanionStore.MutationCode.IDEMPOTENT_REPLAY);
-    }
-
-    private BondedCompanionStoreResult.Code mapCode(SqliteBondedCompanionStore.MutationCode code) {
-        return switch (code) {
-            case APPLIED, IDEMPOTENT_REPLAY -> BondedCompanionStoreResult.Code.APPLIED;
-            case NOT_FOUND -> BondedCompanionStoreResult.Code.NOT_FOUND;
-            case NOT_OWNER -> BondedCompanionStoreResult.Code.NOT_OWNER;
-            case REVISION_CONFLICT -> BondedCompanionStoreResult.Code.REVISION_CONFLICT;
-            case INVALID_STATE -> BondedCompanionStoreResult.Code.INVALID_STATE;
-            case CONFLICT -> BondedCompanionStoreResult.Code.CONFLICT;
-            case VALIDATION_FAILED -> BondedCompanionStoreResult.Code.VALIDATION_FAILED;
-            case STORAGE_FAILURE -> BondedCompanionStoreResult.Code.STORAGE_FAILURE;
-        };
     }
 
     private <T> T read(Read<T> work) {
@@ -617,35 +430,6 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             throw new IllegalArgumentException("operation scope does not match mutation");
     }
 
-    private void requireCaptureEvidence(
-            BondedCompanionOperation operation,
-            BondedCompanionRecord.Profile profile,
-            BondedCompanionCaptureEvidence evidence
-    ) {
-        if (operation.type() != BondedCompanionOperation.Type.CAPTURE
-                || !operation.callerNamespace().equals(
-                        evidence.callerNamespace())
-                || !operation.idempotencyKey().equals(
-                        evidence.idempotencyKey())
-                || !profile.ownerUuid().equals(evidence.ownerUuid())
-                || !profile.rosterId().equals(evidence.rosterId())
-                || !profile.familyId().equals(evidence.familyId())
-                || !profile.profileId().equals(evidence.profileId())
-                || !profile.roleId().equals(evidence.roleId())) {
-            throw new IllegalArgumentException(
-                    "capture evidence does not match operation/profile");
-        }
-    }
-
-    private BondedCompanionCaptureEvidence captureEvidence(String resultJson) {
-        StoredResult stored = GSON.fromJson(resultJson, StoredResult.class);
-        if (stored == null || stored.captureEvidence == null) {
-            throw new IllegalStateException(
-                    "bonded-capture-evidence-missing");
-        }
-        return stored.captureEvidence;
-    }
-
     private String requireText(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required");
@@ -662,25 +446,6 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         try { connection.close(); } catch (SQLException ignored) { }
     }
 
-    private record StoredResult(
-            String code,
-            String reason,
-            String valueType,
-            String value,
-            BondedCompanionCaptureEvidence captureEvidence,
-            Long captureEventPublishedAtMs
-    ) {
-        StoredResult(
-                String code,
-                String reason,
-                String valueType,
-                String value
-        ) {
-            this(code, reason, valueType, value, null, null);
-        }
-    }
-    @FunctionalInterface private interface Mutation<T> { SqliteBondedCompanionStore.MutationResult<T> apply(SqliteBondedCompanionStore store); }
-    @FunctionalInterface private interface Translation<S, T> { T apply(S source); }
     @FunctionalInterface private interface Read<T> { T apply(SqliteBondedCompanionStore store); }
     @FunctionalInterface private interface IntegerMutation { int apply(SqliteBondedCompanionStore store); }
 }
