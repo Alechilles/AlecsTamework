@@ -120,7 +120,7 @@ class CaptureChannelVfxSystemTest {
     void channelSupportsLegacyParticlesAndHomingMoteCadence() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
-        ));
+        )).replace("\r\n", "\n");
 
         assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
         assertEquals(120L, CaptureChannelVfxSystem.homingEmissionIntervalMsForTests(

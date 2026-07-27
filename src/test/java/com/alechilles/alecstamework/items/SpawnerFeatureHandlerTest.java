@@ -67,7 +67,7 @@ class SpawnerFeatureHandlerTest {
         ));
         String intents = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerCaptureIntentFactory.java"
-        ));
+        )).replace("\r\n", "\n");
 
         int quantityGuard = handler.indexOf("source.getQuantity() != 1");
         int capturedMetadata = intents.indexOf(

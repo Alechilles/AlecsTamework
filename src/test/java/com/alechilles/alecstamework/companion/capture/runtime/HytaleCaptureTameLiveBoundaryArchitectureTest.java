@@ -22,7 +22,7 @@ class HytaleCaptureTameLiveBoundaryArchitectureTest {
     @Test
     void targetMutationDetachesSpawnAuthorityAndRequestsDetachedRoleChange()
             throws Exception {
-        String source = Files.readString(TARGET);
+        String source = Files.readString(TARGET).replace("\r\n", "\n");
 
         assertTrue(source.contains(
                 "removeIfPresent(target.reference(), target.markerType())"
@@ -53,7 +53,7 @@ class HytaleCaptureTameLiveBoundaryArchitectureTest {
     @Test
     void deferredContinuationsResolveLiveStateOnlyOnTheWorldThread()
             throws Exception {
-        String source = Files.readString(ATTEMPT);
+        String source = Files.readString(ATTEMPT).replace("\r\n", "\n");
 
         assertTrue(source.contains(
                 "world.execute(() -> resumeInto(continuation, completion))"
