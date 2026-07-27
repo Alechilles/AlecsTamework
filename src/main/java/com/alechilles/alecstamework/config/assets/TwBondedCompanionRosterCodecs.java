@@ -14,24 +14,17 @@ public final class TwBondedCompanionRosterCodecs {
                     TwBondedCompanionRosterConfig.RevivePriceDefinition.class,
                     TwBondedCompanionRosterConfig.RevivePriceDefinition::new
             )
-            .<String>append(
-                    new KeyedCodec<>("ItemId", Codec.STRING),
-                    (price, value) -> price.itemId = value,
-                    price -> price.itemId
+            .<TwItemCostComponent[]>append(
+                    new KeyedCodec<>("Costs", TwItemCostComponent.ARRAY_CODEC),
+                    (price, value) -> price.costs =
+                            TwItemCostComponent.validateAndCopy(value),
+                    price -> price.getCosts()
             )
             .documentation(
-                    "Item charged for revival. Within explicit RevivePrice, "
-                            + "omission inherits from the parent."
-            )
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("Quantity", Codec.INTEGER),
-                    (price, value) -> price.quantity = value == null ? 0 : value,
-                    price -> price.quantity
-            )
-            .documentation(
-                    "Positive item quantity charged for revival. Within "
-                            + "explicit RevivePrice, omission inherits."
+                    "Ordered AND item recipe charged for revival. Every cost "
+                            + "line is required. Within explicit RevivePrice, "
+                            + "an omitted Costs field inherits and an explicit "
+                            + "array replaces the parent recipe."
             )
             .add()
             .build();

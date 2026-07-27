@@ -540,10 +540,10 @@ class BondedCompanionStateMachineTest {
                                   "MaximumActive": %d,
                                   "SessionDurationSeconds": %d,
                                   "SummonCooldownSeconds": %d,
-                                  "RevivePrice": {
+                                  "RevivePrice": {"Costs": [{
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": 2
-                                  },
+                                  }]},
                                   "Features": {
                                     "Capture": %s,
                                     "Provision": %s,

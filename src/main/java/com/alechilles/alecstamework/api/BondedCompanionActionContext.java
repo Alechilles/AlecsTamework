@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.api;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -78,6 +79,19 @@ public record BondedCompanionActionContext(
                 int quantity) {
             return CompletableFuture.completedFuture(
                     consumeExact(operationId, itemId, quantity));
+        }
+
+        /**
+         * Reserves one complete ordered revive recipe under one operation ID.
+         * Implementations must never split this into independent operations.
+         */
+        default CompletionStage<ChargeReceipt> consumeExactAsync(
+                @Nonnull String operationId,
+                @Nonnull List<BondedCompanionReviveCost> costs
+        ) {
+            if (costs.size() != 1) return CompletableFuture.completedFuture(null);
+            BondedCompanionReviveCost cost = costs.getFirst();
+            return consumeExactAsync(operationId, cost.itemId(), cost.quantity());
         }
     }
 

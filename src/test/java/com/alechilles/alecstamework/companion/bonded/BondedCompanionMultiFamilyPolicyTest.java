@@ -327,10 +327,10 @@ class BondedCompanionMultiFamilyPolicyTest {
                                   "MaximumActive": %d,
                                   "SessionDurationSeconds": %d,
                                   "SummonCooldownSeconds": %d,
-                                  "RevivePrice": {
+                                  "RevivePrice": {"Costs": [{
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": %d
-                                  }
+                                  }]}
                                 }
                                 """.formatted(
                                 ROSTER, familyId, roleId,

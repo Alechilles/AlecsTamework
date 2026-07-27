@@ -1,33 +1,49 @@
 package com.alechilles.alecstamework.api;
 
 import java.util.Objects;
+import java.util.List;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /** Immutable server-authored price and cooldown summary for bonded revival. */
 public record BondedCompanionReviveQuote(
         @Nonnull String profileId,
         boolean enabled,
-        @Nullable String itemId,
-        int quantity,
-        boolean affordable,
+        @Nonnull List<CostLine> costs,
         long cooldownRemainingSeconds,
         long policyRevision
 ) {
     public BondedCompanionReviveQuote {
         profileId = requireText(profileId, "profileId");
-        itemId = itemId == null || itemId.isBlank() ? null : itemId.trim();
-        if (quantity < 0 || cooldownRemainingSeconds < 0L
+        costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
+        if (cooldownRemainingSeconds < 0L
                 || policyRevision < 0L) {
             throw new IllegalArgumentException(
                     "Revive quote values cannot be negative."
             );
         }
-        if ((itemId == null) != (quantity == 0)) {
-            throw new IllegalArgumentException(
-                    "Revive price item and quantity must be present together."
-            );
+    }
+
+    /** One ordered revive cost with server-observed owned quantity. */
+    public record CostLine(
+            @Nonnull String itemId,
+            int requiredQuantity,
+            int ownedQuantity
+    ) {
+        public CostLine {
+            itemId = requireText(itemId, "itemId");
+            if (requiredQuantity <= 0 || ownedQuantity < 0) {
+                throw new IllegalArgumentException("invalid revive cost line");
+            }
         }
+
+        public boolean affordable() {
+            return ownedQuantity >= requiredQuantity;
+        }
+    }
+
+    /** True only when every declared cost line is affordable. */
+    public boolean affordable() {
+        return !costs.isEmpty() && costs.stream().allMatch(CostLine::affordable);
     }
 
     private static String requireText(String value, String field) {

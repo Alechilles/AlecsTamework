@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
+import com.alechilles.alecstamework.config.assets.TwItemCostComponent;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -22,6 +23,35 @@ import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 class TwBondedCompanionRosterConfigTest {
+    @Test
+    void bondedRevivePriceUsesOneOrderedCostsRecipe() throws Exception {
+        TwBondedCompanionRosterConfig config = roster(
+                "MultiCost",
+                """
+                {
+                  "RosterId": "hydragon:dragons",
+                  "FamilyId": "hydragon:dragon",
+                  "AllowedRoles": ["Tamed_Dragon_Fire"],
+                  "RevivePrice": {
+                    "Costs": [
+                      {"ItemId": "Revitalizing_Essence", "Quantity": 2},
+                      {"ItemId": "Draconic_Essence", "Quantity": 4}
+                    ]
+                  }
+                }
+                """
+        );
+
+        config.validateOrThrow();
+
+        TwItemCostComponent[] costs = config.getRevivePrice().getCosts();
+        assertEquals(2, costs.length);
+        assertEquals("Revitalizing_Essence", costs[0].getItemId());
+        assertEquals(2, costs[0].getQuantity());
+        assertEquals("Draconic_Essence", costs[1].getItemId());
+        assertEquals(4, costs[1].getQuantity());
+    }
+
     @Test
     void validPolicyAssetDecodesAndCompilesIntoImmutableRegistry() throws Exception {
         TwBondedCompanionRosterConfig config = roster(
@@ -36,7 +66,7 @@ class TwBondedCompanionRosterConfigTest {
                   "MaximumActive": 1,
                   "SessionDurationSeconds": 600,
                   "SummonCooldownSeconds": 30,
-                  "RevivePrice": {"ItemId": "Ingredient_Life_Essence", "Quantity": 2},
+                  "RevivePrice": {"Costs": [{"ItemId": "Ingredient_Life_Essence", "Quantity": 2}]},
                   "Features": {
                     "Capture": true,
                     "Provision": true,
@@ -62,7 +92,7 @@ class TwBondedCompanionRosterConfigTest {
         assertEquals(1, definition.maximumActive());
         assertEquals(600L, definition.sessionDurationSeconds());
         assertEquals(30L, definition.summonCooldownSeconds());
-        assertEquals(2, definition.revivePrice().quantity());
+        assertEquals(2, definition.revivePrice().costs().getFirst().quantity());
         assertTrue(definition.features().capture());
         assertThrows(
                 UnsupportedOperationException.class,
@@ -80,7 +110,7 @@ class TwBondedCompanionRosterConfigTest {
                   "FamilyId": "hydragon:dragon",
                   "AllowedRoles": ["Tamed_Dragon_Fire", "Tamed_Dragon_Ice"],
                   "MaximumOwned": 4,
-                  "RevivePrice": {"ItemId": "Ingredient_Life_Essence", "Quantity": 3},
+                  "RevivePrice": {"Costs": [{"ItemId": "Ingredient_Life_Essence", "Quantity": 3}]},
                   "Features": {"Capture": true, "Revive": true}
                 }
                 """
@@ -90,7 +120,7 @@ class TwBondedCompanionRosterConfigTest {
                 """
                 {
                   "AllowedRoles": ["Tamed_Dragon_Storm"],
-                  "RevivePrice": {"Quantity": 5},
+                  "RevivePrice": {"Costs": [{"ItemId": "Child_Essence", "Quantity": 5}]},
                   "Features": {"Capture": false}
                 }
                 """
@@ -100,7 +130,7 @@ class TwBondedCompanionRosterConfigTest {
                 parent,
                 Set.of("AllowedRoles", "RevivePrice", "Features"),
                 Map.of(
-                        "RevivePrice", Set.of("Quantity"),
+                        "RevivePrice", Set.of("Costs"),
                         "Features", Set.of("Capture")
                 )
         );
@@ -109,8 +139,8 @@ class TwBondedCompanionRosterConfigTest {
                 new String[] {"Tamed_Dragon_Storm"},
                 child.getAllowedRoles()
         );
-        assertEquals("Ingredient_Life_Essence", child.getRevivePrice().getItemId());
-        assertEquals(5, child.getRevivePrice().getQuantity());
+        assertEquals("Child_Essence", child.getRevivePrice().getCosts()[0].getItemId());
+        assertEquals(5, child.getRevivePrice().getCosts()[0].getQuantity());
         assertFalse(child.getFeatures().isCapture());
         assertTrue(child.getFeatures().isRevive());
     }
@@ -294,7 +324,7 @@ class TwBondedCompanionRosterConfigTest {
                 registry.resolve("hydragon:horn", "hydragon:miniwyvern")
                         .orElseThrow()
                         .revivePrice()
-                        .quantity()
+                        .costs().getFirst().quantity()
         );
         assertTrue(registry.resolve("hydragon:horn").isEmpty());
         assertEquals(
@@ -720,8 +750,10 @@ class TwBondedCompanionRosterConfigTest {
                   "SessionDurationSeconds": %d,
                   "SummonCooldownSeconds": %d,
                   "RevivePrice": {
-                    "ItemId": "Ingredient_Life_Essence",
-                    "Quantity": %d
+                    "Costs": [{
+                      "ItemId": "Ingredient_Life_Essence",
+                      "Quantity": %d
+                    }]
                   }
                 }
                 """.formatted(

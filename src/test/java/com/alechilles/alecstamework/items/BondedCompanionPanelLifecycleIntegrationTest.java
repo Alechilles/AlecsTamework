@@ -529,10 +529,10 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                                   "MaximumActive": 1,
                                   "SessionDurationSeconds": 600,
                                   "SummonCooldownSeconds": %d,
-                                  "RevivePrice": {
+                                  "RevivePrice": {"Costs": [{
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": 2
-                                  },
+                                  }]},
                                   "Features": {
                                     "Capture": true,
                                     "Provision": true,

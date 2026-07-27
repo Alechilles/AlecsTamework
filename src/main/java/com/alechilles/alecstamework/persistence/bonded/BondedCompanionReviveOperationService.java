@@ -124,7 +124,7 @@ final class BondedCompanionReviveOperationService {
         var validation = transitions.revive(
                 support.mutation(action, now, policyRevision), domain,
                 new BondedCompanionTransitionService.RevivePayment(
-                        price.itemId(), price.quantity()));
+                        price.costs()));
         return validation.applied()
                 ? null : support.transitionFailure(validation.code());
     }
@@ -136,8 +136,7 @@ final class BondedCompanionReviveOperationService {
     ) {
         try {
             CompletionStage<BondedCompanionActionContext.ChargeReceipt> stage =
-                    inventory.consumeExactAsync(
-                            operationId, price.itemId(), price.quantity());
+                    inventory.consumeExactAsync(operationId, price.costs());
             return stage == null ? completed(null) : stage;
         } catch (RuntimeException | LinkageError failure) {
             return completed(null);
