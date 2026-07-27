@@ -148,8 +148,8 @@ class LinkedNpcPanelFeatureControllerTest {
                         "Miniwyvern", "Male", "Storm Miniwyvern",
                         Map.of(), Map.of(),
                         new BondedCompanionStatusPresentation(
-                                com.alechilles.alecstamework.companion.bonded
-                                        .BondedCompanionState.ACTIVE,
+                                com.alechilles.alecstamework.api
+                                        .BondedCompanionStateView.ACTIVE,
                                 BondedCompanionStatusPresentation.Action.DISMISS,
                                 true, null, 0L), null);
         LinkedNpcPanelFeatureController controller =

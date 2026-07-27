@@ -2,6 +2,7 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpirySystem;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
@@ -200,8 +201,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                                 profile.profileId(),
                                                 profile.ownerUuid(),
                                                 profile.rosterId(),
-                                                BondedCompanionState.DEAD,
-                                                BondedCompanionState.STORED,
+                                                BondedCompanionStateView.DEAD,
+                                                BondedCompanionStateView.STORED,
                                                 profile.revision(), "revived"),
                                         BondedCompanionChangePublisher
                                                 .WorldEffectOutcome
@@ -385,9 +386,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                         new BondedCompanionChangedEvent(
                                 profile.profileId(), profile.ownerUuid(),
                                 profile.rosterId(),
-                                com.alechilles.alecstamework.companion.bonded
-                                        .BondedCompanionState.ACTIVE,
-                                profile.state(), profile.revision(),
+                                BondedCompanionStateView.ACTIVE,
+                                BondedCompanionStateView.valueOf(
+                                        profile.state().name()),
+                                profile.revision(),
                                 result.status().name().toLowerCase(
                                         java.util.Locale.ROOT)
                         ),

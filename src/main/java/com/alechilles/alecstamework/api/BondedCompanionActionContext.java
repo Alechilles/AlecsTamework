@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.api;
 
-import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
@@ -8,7 +7,7 @@ import javax.annotation.Nullable;
 
 /** Live, caller-supplied placement and payment authority for one panel action. */
 public record BondedCompanionActionContext(
-        @Nullable CompanionSpawnPlacement summonPlacement,
+        @Nullable BondedCompanionPlacement summonPlacement,
         @Nullable Inventory inventory
 ) {
     /** Exact live inventory boundary; implementations must consume atomically. */

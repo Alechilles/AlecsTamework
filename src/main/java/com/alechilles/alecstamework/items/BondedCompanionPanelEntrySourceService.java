@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Store;
@@ -60,8 +60,7 @@ final class BondedCompanionPanelEntrySourceService {
                         player.getUuid(), worldKey, snapshot,
                         profile -> contexts.create(player, store,
                                 profile.roleId(), profile.state()
-                                        == com.alechilles.alecstamework.companion
-                                        .bonded.BondedCompanionState.STORED)));
+                                        == BondedCompanionStateView.STORED)));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
@@ -86,7 +85,7 @@ final class BondedCompanionPanelEntrySourceService {
                 profile.snapshotPresentationData().get("hunger"), 100);
         int thirst = percentValue(
                 profile.snapshotPresentationData().get("thirst"), 100);
-        boolean dead = profile.state() == BondedCompanionState.DEAD;
+        boolean dead = profile.state() == BondedCompanionStateView.DEAD;
         return new LinkedNpcEntry(
                 record.presentationUuid(), fallback(profile.displayName(), profile.species()),
                 profile.gender(), currentHealth, maxHealth, happiness, 100,
@@ -94,7 +93,7 @@ final class BondedCompanionPanelEntrySourceService {
                 !dead && maxHealth > 0, false, dead, false, false, false,
                 0L, null, null, null, new LinkedNpcTraitIndicator[0],
                 false, false, false, false,
-                false, profile.state() == BondedCompanionState.ACTIVE,
+                false, profile.state() == BondedCompanionStateView.ACTIVE,
                 null, profile.species(), null, null, null,
                 false, false, false, 0L, 0D, false,
                 false, 0L, 0D, false, false, 0L);

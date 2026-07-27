@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.api;
 
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -18,7 +17,7 @@ public record BondedCompanionProfileView(
         @Nullable String species,
         @Nullable String gender,
         long revision,
-        @Nonnull BondedCompanionState state,
+        @Nonnull BondedCompanionStateView state,
         boolean summonAvailable,
         boolean storeAvailable,
         boolean reviveAvailable,
@@ -44,7 +43,7 @@ public record BondedCompanionProfileView(
         if (revision < 0L) {
             throw new IllegalArgumentException("revision cannot be negative.");
         }
-        if ((state == BondedCompanionState.ACTIVE) != (activeLease != null)) {
+        if ((state == BondedCompanionStateView.ACTIVE) != (activeLease != null)) {
             throw new IllegalArgumentException(
                     "Only active bonded companions carry an active lease."
             );

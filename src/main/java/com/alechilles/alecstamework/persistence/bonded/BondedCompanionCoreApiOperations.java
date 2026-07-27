@@ -63,6 +63,18 @@ public final class BondedCompanionCoreApiOperations {
     ) {
         long now = clock.getAsLong();
         String profileId = stableProfileId(request);
+        BondedCompanionOperation operation = operation(request, profileId, now);
+        Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
+                prior = store.findProfileOperationByExactRequest(operation);
+        if (prior.isPresent()) {
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> replay =
+                    prior.get();
+            return replay.code() == BondedCompanionStoreResult.Code.APPLIED
+                    && replay.value() != null
+                    ? success(view(replay.value()))
+                    : storeFailure(replay);
+        }
+        long policyRevision = rosters.snapshot().revision();
         BondedCompanionSnapshot snapshot = provisionedSnapshot(
                 request, profileId, now
         );
@@ -74,7 +86,7 @@ public final class BondedCompanionCoreApiOperations {
                         operationId(request.callerNamespace(), request.idempotencyKey()),
                         request.ownerUuid(), request.rosterId(), profileId,
                         request.roleId(), snapshot,
-                        request.expectedRosterRevision(), now
+                        policyRevision, now
                 ),
                 counts(current)
         );
@@ -82,13 +94,14 @@ public final class BondedCompanionCoreApiOperations {
             return transitionFailure(transition.code());
         }
         BondedCompanionPolicy policy = policies.resolve(
-                request.rosterId(), request.expectedRosterRevision()
+                request.rosterId(), policyRevision
         ).policy();
+        if (policy == null) return policyDenied();
         BondedCompanionRecord.Profile profile = storedProfile(
                 request, transition.profile(), policy, now
         );
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved =
-                store.createProfile(operation(request, profileId, now), profile);
+                store.createProfile(operation, profile);
         if (saved.code() != BondedCompanionStoreResult.Code.APPLIED
                 || saved.value() == null) {
             return storeFailure(saved);
@@ -98,7 +111,7 @@ public final class BondedCompanionCoreApiOperations {
                     "provisioned",
                     BondedCompanionChangePublisher.WorldEffectOutcome.NOT_REQUIRED);
         }
-        return success(views.view(saved.value(), null));
+        return success(view(saved.value()));
     }
 
     BondedCompanionResult<BondedCompanionProfileView> summon(
@@ -130,7 +143,7 @@ public final class BondedCompanionCoreApiOperations {
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 request.ownerUuid(), request.rosterId(), request.profileId(),
                 request.expectedRevision(), profile.roleId(), snapshot,
-                request.worldKey(), placement, now, lease.expiresAtMs()
+                request.worldKey(), placement(placement), now, lease.expiresAtMs()
         ));
         BondedCompanionRecord.Profile refreshed = profile(request);
         if (result.status() == BondedCompanionProjectionService.SummonStatus.ACTIVE
@@ -172,7 +185,7 @@ public final class BondedCompanionCoreApiOperations {
                     result.status() == BondedCompanionProjectionService.StoreStatus.STORED
                             ? BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED
                             : BondedCompanionChangePublisher.WorldEffectOutcome.DEFERRED);
-            return success(views.view(refreshed, null));
+            return success(view(refreshed));
         }
         return failure(result.status() == BondedCompanionProjectionService.StoreStatus.PROJECTION_NOT_FOUND
                 ? BondedCompanionResultCode.WORLD_UNAVAILABLE
@@ -223,6 +236,17 @@ public final class BondedCompanionCoreApiOperations {
                 && policy.allowedRoles().contains(profile.roleId());
         int active = (int) rosterProfiles.stream().filter(candidate ->
                 candidate.state() == BondedCompanionState.ACTIVE).count();
+        Map<String, String> extensions = new LinkedHashMap<>();
+        List<BondedCompanionRecord.ExtensionData> storedExtensions =
+                store.listExtensionData(
+                        profile.ownerUuid(), profile.rosterId(),
+                        profile.profileId());
+        if (storedExtensions != null) {
+            storedExtensions.forEach(extension -> extensions.put(
+                    extension.namespace(),
+                    new String(extension.payload().bytes(),
+                            StandardCharsets.UTF_8)));
+        }
         return views.view(profile, lease,
                 matches && profile.state() == BondedCompanionState.STORED
                         && policy.features().summon()
@@ -230,7 +254,7 @@ public final class BondedCompanionCoreApiOperations {
                 matches && profile.state() == BondedCompanionState.ACTIVE
                         && policy.features().dismiss(),
                 matches && profile.state() == BondedCompanionState.DEAD
-                        && policy.features().revive());
+                        && policy.features().revive(), extensions);
     }
 
     BondedCompanionResult<BondedCompanionExtensionData> extension(
@@ -252,12 +276,9 @@ public final class BondedCompanionCoreApiOperations {
                 update.key().ownerUuid(), update.key().profileId()
         );
         if (profile == null) return notFound();
-        Optional<BondedCompanionRecord.ExtensionData> current =
-                store.findExtensionData(update.key().ownerUuid(), profile.rosterId(),
-                        profile.profileId(), update.key().namespace());
-        long expected = current.isEmpty() && update.expectedRevision() == 0L
-                ? -1L : update.expectedRevision();
-        long revision = current.isEmpty() ? 0L : expected + 1L;
+        long expected = update.expectedRevision();
+        long revision = expected == BondedCompanionExtensionDataUpdate.MISSING_REVISION
+                ? 0L : Math.addExact(expected, 1L);
         long now = clock.getAsLong();
         BondedCompanionRecord.ExtensionData extension = new BondedCompanionRecord.ExtensionData(
                 profile.profileId(), update.key().namespace(),
@@ -266,9 +287,10 @@ public final class BondedCompanionCoreApiOperations {
         );
         BondedCompanionStoreResult<BondedCompanionRecord.ExtensionData> saved =
                 store.compareAndSetExtensionData(operation(
-                        "extension", update.key().namespace() + ":" + revision,
+                        update.callerNamespace(), update.idempotencyKey(),
                         update.key().ownerUuid(), profile.rosterId(), profile.profileId(),
-                        BondedCompanionOperation.Type.STORE, update.jsonPayload(), now
+                        BondedCompanionOperation.Type.STORE,
+                        extensionPayload(update), now
                 ), extension, expected);
         return saved.code() == BondedCompanionStoreResult.Code.APPLIED
                 && saved.value() != null ? success(extensionView(
@@ -441,11 +463,20 @@ public final class BondedCompanionCoreApiOperations {
         appendField(payload, request.displayName());
         appendField(payload, request.species());
         appendField(payload, request.gender());
-        appendField(payload, Long.toString(request.expectedRosterRevision()));
         new TreeMap<>(request.snapshotPresentationData()).forEach((key, value) -> {
             appendField(payload, key);
             appendField(payload, value);
         });
+        return payload.toString();
+    }
+
+    private String extensionPayload(BondedCompanionExtensionDataUpdate update) {
+        StringBuilder payload = new StringBuilder();
+        appendField(payload, update.key().ownerUuid().toString());
+        appendField(payload, update.key().profileId());
+        appendField(payload, update.key().namespace());
+        appendField(payload, update.jsonPayload());
+        appendField(payload, Long.toString(update.expectedRevision()));
         return payload.toString();
     }
 
@@ -500,8 +531,25 @@ public final class BondedCompanionCoreApiOperations {
             @Nullable BondedCompanionState oldState, BondedCompanionState newState,
             String reason, BondedCompanionChangePublisher.WorldEffectOutcome outcome) {
         changes.publishCommitted(new BondedCompanionChangedEvent(profile.profileId(),
-                profile.ownerUuid(), profile.rosterId(), oldState, newState,
+                profile.ownerUuid(), profile.rosterId(), state(oldState),
+                state(newState),
                 profile.revision(), reason), outcome);
+    }
+
+    private com.alechilles.alecstamework.companion.placement
+            .CompanionSpawnPlacement placement(
+                    BondedCompanionPlacement placement) {
+        return new com.alechilles.alecstamework.companion.placement
+                .CompanionSpawnPlacement(
+                placement.worldKey(), placement.x(), placement.y(), placement.z(),
+                placement.pitchRadians(), placement.yawRadians(),
+                placement.rollRadians());
+    }
+
+    private BondedCompanionStateView state(
+            @Nullable BondedCompanionState state) {
+        return state == null ? null : BondedCompanionStateView.valueOf(
+                state.name());
     }
 
     <T> BondedCompanionResult<T> success(T value) {

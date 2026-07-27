@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
 import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded.runtime
@@ -141,7 +141,7 @@ class BondedCompanionCompositionTest {
                             "test", "provision-1", OWNER,
                             "hydragon:dragons", "Tamed_Dragon_Fire",
                             "Ember", "Dragon", "Female",
-                            Map.of("variant", "ember"), 1L
+                            Map.of("variant", "ember")
                     );
 
             var created = composition.api().provision(request).join();
@@ -151,7 +151,7 @@ class BondedCompanionCompositionTest {
                             "test", "provision-1", OWNER,
                             "hydragon:dragons", "Tamed_Dragon_Fire",
                             "Not Ember", "Dragon", "Female",
-                            Map.of("variant", "ember"), 1L
+                            Map.of("variant", "ember")
                     )
             ).join();
 
@@ -168,7 +168,9 @@ class BondedCompanionCompositionTest {
                     );
             var extension = composition.api().compareAndSetExtensionData(
                     new BondedCompanionExtensionDataUpdate(
-                            key, "{\"stance\":\"guard\"}", 0L
+                            "test", "extension-1", key,
+                            "{\"stance\":\"guard\"}",
+                            BondedCompanionExtensionDataUpdate.MISSING_REVISION
                     )
             ).join();
             assertEquals(BondedCompanionResultCode.SUCCESS, extension.code());
@@ -237,7 +239,8 @@ class BondedCompanionCompositionTest {
         publisher.subscribe(ignored -> delivered.incrementAndGet());
         BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(
                 "profile-canary", OWNER, "hydragon:dragons",
-                BondedCompanionState.STORED, BondedCompanionState.ACTIVE,
+                BondedCompanionStateView.STORED,
+                BondedCompanionStateView.ACTIVE,
                 4L, "summoned"
         );
 
@@ -310,7 +313,8 @@ class BondedCompanionCompositionTest {
         publisher.subscribe(ignored -> laterDeliveries.incrementAndGet());
         BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(
                 "profile-close-race", OWNER, "hydragon:dragons",
-                BondedCompanionState.STORED, BondedCompanionState.ACTIVE,
+                BondedCompanionStateView.STORED,
+                BondedCompanionStateView.ACTIVE,
                 5L, "summoned"
         );
 
@@ -350,7 +354,8 @@ class BondedCompanionCompositionTest {
         publisher.subscribe(ignored -> laterDeliveries.incrementAndGet());
         BondedCompanionChangedEvent event = new BondedCompanionChangedEvent(
                 "profile-reentrant-close", OWNER, "hydragon:dragons",
-                BondedCompanionState.STORED, BondedCompanionState.ACTIVE,
+                BondedCompanionStateView.STORED,
+                BondedCompanionStateView.ACTIVE,
                 6L, "summoned"
         );
 

@@ -16,8 +16,7 @@ public record BondedCompanionProvisionRequest(
         @Nullable String displayName,
         @Nullable String species,
         @Nullable String gender,
-        @Nonnull Map<String, String> snapshotPresentationData,
-        long expectedRosterRevision
+        @Nonnull Map<String, String> snapshotPresentationData
 ) {
     public BondedCompanionProvisionRequest {
         callerNamespace = requireText(callerNamespace, "callerNamespace");
@@ -32,11 +31,6 @@ public record BondedCompanionProvisionRequest(
                 snapshotPresentationData,
                 "snapshotPresentationData"
         ));
-        if (expectedRosterRevision < 0L) {
-            throw new IllegalArgumentException(
-                    "expectedRosterRevision cannot be negative."
-            );
-        }
     }
 
     private static String requireText(String value, String field) {

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionPlacement;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -73,7 +74,11 @@ final class HytaleBondedCompanionActionContextFactory {
                 : null;
         String worldKey = world.getName();
         return new BondedCompanionActionContext(
-                placement, new HytaleBondedCompanionEscrowInventory(
+                placement == null ? null : new BondedCompanionPlacement(
+                        placement.worldKey(), placement.x(), placement.y(),
+                        placement.z(), placement.pitchRadians(),
+                        placement.yawRadians(), placement.rollRadians()),
+                new HytaleBondedCompanionEscrowInventory(
                 world, store, player.getUuid(), worldKey, escrowType,
                 receiptTypes.get()));
     }

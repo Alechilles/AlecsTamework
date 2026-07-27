@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotPresentationMapper;
@@ -22,7 +23,7 @@ final class BondedCompanionViewFactory {
         return view(profile, lease,
                 profile.state() == BondedCompanionState.STORED,
                 profile.state() == BondedCompanionState.ACTIVE,
-                profile.state() == BondedCompanionState.DEAD);
+                profile.state() == BondedCompanionState.DEAD, Map.of());
     }
 
     BondedCompanionProfileView view(
@@ -30,7 +31,8 @@ final class BondedCompanionViewFactory {
             BondedCompanionRecord.Lease lease,
             boolean summonAvailable,
             boolean storeAvailable,
-            boolean reviveAvailable
+            boolean reviveAvailable,
+            Map<String, String> extensionData
     ) {
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         profile.policy().entrySet().stream()
@@ -40,6 +42,8 @@ final class BondedCompanionViewFactory {
                         entry.getValue()));
         SnapshotFields durable = durable(profile);
         if (durable != null) presentation.putAll(durable.data());
+        extensionData.forEach((namespace, json) ->
+                presentation.put("extension:" + namespace, json));
         BondedCompanionLeaseView active = lease == null ? null
                 : new BondedCompanionLeaseView(
                         lease.leaseToken(), lease.liveNpcUuid(), lease.worldKey(),
@@ -52,7 +56,8 @@ final class BondedCompanionViewFactory {
                 first(profile.species(), durable == null ? null : durable.species()),
                 first(profile.gender(), durable == null ? null : durable.gender()),
                 profile.revision(),
-                profile.state(), summonAvailable, storeAvailable,
+                BondedCompanionStateView.valueOf(profile.state().name()),
+                summonAvailable, storeAvailable,
                 reviveAvailable,
                 presentation, active, profile.reviveCooldownUntilMs(), null
         );

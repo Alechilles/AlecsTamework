@@ -89,6 +89,21 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
     }
 
     @Override
+    public Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
+            findProfileOperationByExactRequest(
+                    BondedCompanionOperation operation) {
+        Objects.requireNonNull(operation, "operation");
+        try (Connection connection = connections.openReadConnection()) {
+            Optional<Claim> existing = claims.existing(connection, operation);
+            return existing.map(claim -> replay(
+                    claim, SqliteBondedCompanionProfileRow.class,
+                    mapper::toDomain));
+        } catch (SQLException failure) {
+            throw new IllegalStateException("bonded-operation-read-failed", failure);
+        }
+    }
+
+    @Override
     public boolean markProfileOperationPaymentSettled(
             BondedCompanionOperationProbe operation,
             boolean terminalApplied,
@@ -184,6 +199,13 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 ownerUuid, rosterId, profileId, namespace).map(mapper::toDomain));
     }
 
+    @Override public List<BondedCompanionRecord.ExtensionData> listExtensionData(
+            UUID ownerUuid, String rosterId, String profileId) {
+        return read(store -> store.listExtensionData(
+                        ownerUuid, rosterId, profileId).stream()
+                .map(mapper::toDomain).toList());
+    }
+
     @Override public BondedCompanionStoreResult<BondedCompanionRecord.ExtensionData>
             compareAndSetExtensionData(
                     BondedCompanionOperation operation,
@@ -191,7 +213,10 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                     long expectedRevision) {
         requireScope(operation, operation.ownerUuid(), operation.rosterId(),
                 extension.profileId());
-        return mutate(operation, SqliteBondedCompanionExtensionDataRow.class,
+        Long claimedRevision = expectedRevision < 0L
+                ? null : expectedRevision;
+        return mutate(operation, claimedRevision,
+                SqliteBondedCompanionExtensionDataRow.class,
                 store -> store.compareAndSetExtensionData(
                         operation.ownerUuid(), operation.rosterId(),
                         mapper.toRow(extension), expectedRevision), mapper::toDomain);

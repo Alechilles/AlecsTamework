@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +27,32 @@ final class SqliteBondedCompanionExtensionStore {
             return Optional.empty();
         }
         return findExact(profileId, namespace);
+    }
+
+    List<SqliteBondedCompanionExtensionDataRow> list(
+            UUID ownerUuid,
+            String rosterId,
+            String profileId
+    ) throws SQLException {
+        if (!owned(profileId, ownerUuid, rosterId)) {
+            return List.of();
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT profile_id, namespace, json_payload, revision, updated_at_ms
+                FROM bonded_companion_extension_data
+                WHERE profile_id = ?
+                ORDER BY namespace
+                """)) {
+            statement.setString(1, profileId);
+            try (ResultSet rows = statement.executeQuery()) {
+                ArrayList<SqliteBondedCompanionExtensionDataRow> result =
+                        new ArrayList<>();
+                while (rows.next()) {
+                    result.add(SqliteBondedCompanionRows.readExtension(rows));
+                }
+                return List.copyOf(result);
+            }
+        }
     }
 
     SqliteBondedCompanionStore.MutationResult<SqliteBondedCompanionExtensionDataRow>

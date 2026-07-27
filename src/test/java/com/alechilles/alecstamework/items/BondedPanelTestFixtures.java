@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.*;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,20 +14,20 @@ final class BondedPanelTestFixtures {
     private BondedPanelTestFixtures() {}
 
     static BondedCompanionProfileView profile(
-            String id, long revision, BondedCompanionState state,
+            String id, long revision, BondedCompanionStateView state,
             UUID liveUuid, Map<String, String> data) {
         return new BondedCompanionProfileView(
                 id, OWNER, "hydragon:dragons", "hydragon:dragon",
                 "Bonded_Miniwyvern_Storm", "Nimbus", "Miniwyvern", "Male",
-                revision, state, state == BondedCompanionState.STORED,
-                state == BondedCompanionState.ACTIVE,
-                state == BondedCompanionState.DEAD, data,
-                state == BondedCompanionState.ACTIVE
+                revision, state, state == BondedCompanionStateView.STORED,
+                state == BondedCompanionStateView.ACTIVE,
+                state == BondedCompanionStateView.DEAD, data,
+                state == BondedCompanionStateView.ACTIVE
                         ? new BondedCompanionLeaseView(
                                 "lease-1", liveUuid, "world-a", 10L, 0L)
                         : null,
                 0L,
-                state == BondedCompanionState.DEAD
+                state == BondedCompanionStateView.DEAD
                         ? new BondedCompanionReviveQuote(
                                 id, true, "Ingredient_Life_Essence", 2,
                                 true, 0L, 9L)

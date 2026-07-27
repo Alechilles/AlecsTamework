@@ -45,7 +45,8 @@ public final class CommandPanelFeaturePresentation {
     public boolean managesPaidRevival() {
         return bonded != null
                 ? bonded.status().state()
-                        == com.alechilles.alecstamework.companion.bonded.BondedCompanionState.DEAD
+                        == com.alechilles.alecstamework.api
+                        .BondedCompanionStateView.DEAD
                 : roster != null && roster.paidRevivalState();
     }
 

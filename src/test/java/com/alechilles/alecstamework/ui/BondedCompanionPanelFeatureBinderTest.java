@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import java.util.Map;
 import java.util.UUID;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -21,7 +21,7 @@ class BondedCompanionPanelFeatureBinderTest {
                 "Bonded_Miniwyvern_Storm", 4L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern", Map.of(), Map.of(),
                 new BondedCompanionStatusPresentation(
-                        BondedCompanionState.STORED,
+                        BondedCompanionStateView.STORED,
                         BondedCompanionStatusPresentation.Action.SUMMON,
                         true, null, 0L), null);
         UICommandBuilder commands = new UICommandBuilder();
@@ -65,7 +65,7 @@ class BondedCompanionPanelFeatureBinderTest {
                 Map.of("hydragon:bond",
                         "{\"archetype\":\"storm\",\"ability\":\"dash\"}"),
                 new BondedCompanionStatusPresentation(
-                        BondedCompanionState.STORED,
+                        BondedCompanionStateView.STORED,
                         BondedCompanionStatusPresentation.Action.SUMMON,
                         true, null, 0L), null);
 
@@ -85,7 +85,7 @@ class BondedCompanionPanelFeatureBinderTest {
                 "Bonded_Miniwyvern_Storm", 8L, "Nimbus",
                 "Miniwyvern", "Male", "Storm Miniwyvern", Map.of(), Map.of(),
                 new BondedCompanionStatusPresentation(
-                        BondedCompanionState.DEAD,
+                        BondedCompanionStateView.DEAD,
                         BondedCompanionStatusPresentation.Action.REVIVE,
                         true, null, 0L),
                 new BondedCompanionReviveQuote(

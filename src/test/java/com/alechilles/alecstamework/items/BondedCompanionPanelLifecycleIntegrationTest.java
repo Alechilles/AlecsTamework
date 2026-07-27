@@ -70,7 +70,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         TestInventory inventory = new TestInventory(
                 Map.of("Ingredient_Life_Essence", 2));
         BondedCompanionActionContext context = new BondedCompanionActionContext(
-                new CompanionSpawnPlacement(
+                new BondedCompanionPlacement(
                         "world-a", 10D, 64D, 12D, 0F, 1F, 0F), inventory);
         BondedCompanionPanelActionService actions =
                 new BondedCompanionPanelActionService(() -> runtime.api);
@@ -80,7 +80,9 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         assertTrue(actions.perform(
                 BondedCompanionPanelActionService.Action.SUMMON, OWNER,
                 "world-a", context, storedRow).applied());
-        assertEquals(context.summonPlacement(), world.lastPlacement);
+        assertEquals(new CompanionSpawnPlacement(
+                "world-a", 10D, 64D, 12D, 0F, 1F, 0F),
+                world.lastPlacement);
 
         BondedCompanionProfileView active = runtime.api.list(OWNER, ROSTER)
                 .join().value().getFirst();
@@ -116,7 +118,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 "world-a", context, deadRow).applied());
         assertEquals(0, inventory.availableQuantity(
                 "Ingredient_Life_Essence"));
-        assertEquals(BondedCompanionState.STORED,
+        assertEquals(BondedCompanionStateView.STORED,
                 runtime.api.list(OWNER, ROSTER).join().value().getFirst().state());
         runtime.close();
     }
@@ -177,7 +179,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         List<BondedCompanionProfileView> profiles = runtime.api
                 .list(OWNER, ROSTER).join().value();
         BondedCompanionActionContext context = new BondedCompanionActionContext(
-                new CompanionSpawnPlacement(
+                new BondedCompanionPlacement(
                         "world-a", 1D, 2D, 3D, 0F, 0F, 0F),
                 new TestInventory(Map.of()));
         BondedCompanionProfileView first = profiles.getFirst();
@@ -187,10 +189,10 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         List<BondedCompanionProfileView> after = runtime.api
                 .list(OWNER, ROSTER).join().value();
         BondedCompanionProfileView stillStored = after.stream()
-                .filter(value -> value.state() == BondedCompanionState.STORED)
+                .filter(value -> value.state() == BondedCompanionStateView.STORED)
                 .findFirst().orElseThrow();
         BondedCompanionProfileView active = after.stream()
-                .filter(value -> value.state() == BondedCompanionState.ACTIVE)
+                .filter(value -> value.state() == BondedCompanionStateView.ACTIVE)
                 .findFirst().orElseThrow();
         assertFalse(stillStored.summonAvailable());
         assertFalse(BondedCompanionPanelFeaturePresentationSource.presentation(
@@ -214,7 +216,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         BondedCompanionProfileView stored = firstRuntime.api.list(OWNER, ROSTER)
                 .join().value().getFirst();
         BondedCompanionActionContext setupContext = new BondedCompanionActionContext(
-                new CompanionSpawnPlacement(
+                new BondedCompanionPlacement(
                         "world-a", 4D, 64D, 7D, 0F, 1F, 0F),
                 new TestInventory(Map.of()));
         assertTrue(firstRuntime.api.summon(action(
@@ -258,7 +260,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                             "Ingredient_Life_Essence")
                     + secondInventory.availableQuantity(
                             "Ingredient_Life_Essence"));
-            assertEquals(BondedCompanionState.STORED,
+            assertEquals(BondedCompanionStateView.STORED,
                     firstRuntime.api.list(OWNER, ROSTER).join().value()
                             .getFirst().state());
 
@@ -311,14 +313,14 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                     reviveRequest("durable-order", dead, inventory, rosters));
 
             assertFalse(result.isDone());
-            assertEquals(BondedCompanionState.DEAD,
+            assertEquals(BondedCompanionStateView.DEAD,
                     runtime.api.list(OWNER, ROSTER).join().value()
                             .getFirst().state());
 
             inventory.completeDurableReservation();
 
             assertFalse(result.isDone());
-            assertEquals(BondedCompanionState.STORED,
+            assertEquals(BondedCompanionStateView.STORED,
                     runtime.api.list(OWNER, ROSTER).join().value()
                             .getFirst().state());
             inventory.completeDurableCleanup();
@@ -358,7 +360,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
             assertEquals(2, inventory.availableQuantity(
                     "Ingredient_Life_Essence"));
             assertEquals(0, inventory.refundApplications);
-            assertEquals(BondedCompanionState.DEAD,
+            assertEquals(BondedCompanionStateView.DEAD,
                     runtime.api.list(OWNER, ROSTER).join().value()
                             .getFirst().state());
         } finally {
@@ -376,7 +378,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         BondedCompanionProfileView stored = runtime.api.list(OWNER, ROSTER)
                 .join().value().getFirst();
         BondedCompanionActionContext context = new BondedCompanionActionContext(
-                new CompanionSpawnPlacement(
+                new BondedCompanionPlacement(
                         "world-a", 4D, 64D, 7D, 0F, 1F, 0F),
                 new TestInventory(Map.of()));
         assertTrue(runtime.api.summon(action(

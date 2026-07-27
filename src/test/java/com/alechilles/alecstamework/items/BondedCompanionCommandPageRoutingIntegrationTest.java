@@ -8,7 +8,7 @@ import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -130,7 +130,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                         "Bonded_Miniwyvern_Storm", 7L, "Nimbus",
                         "Miniwyvern", "Female", "Miniwyvern Storm",
                         Map.of(), Map.of(), new BondedCompanionStatusPresentation(
-                                BondedCompanionState.ACTIVE,
+                                BondedCompanionStateView.ACTIVE,
                                 BondedCompanionStatusPresentation.Action.DISMISS,
                                 true, null, 0L), null));
     }

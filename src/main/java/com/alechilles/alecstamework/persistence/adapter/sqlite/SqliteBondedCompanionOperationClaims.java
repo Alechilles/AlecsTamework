@@ -69,6 +69,13 @@ final class SqliteBondedCompanionOperationClaims {
 
     Optional<Claim> existing(
             Connection connection,
+            BondedCompanionOperation operation
+    ) throws SQLException {
+        return existing(connection, operation, null);
+    }
+
+    Optional<Claim> existing(
+            Connection connection,
             BondedCompanionOperationProbe operation
     ) throws SQLException {
         try (PreparedStatement select = connection.prepareStatement("""

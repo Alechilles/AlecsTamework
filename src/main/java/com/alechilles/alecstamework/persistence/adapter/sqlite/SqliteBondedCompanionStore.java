@@ -315,6 +315,24 @@ final class SqliteBondedCompanionStore {
         }
     }
 
+    /** Lists namespaced payloads in the exact owner roster scope. */
+    @Nonnull
+    public List<SqliteBondedCompanionExtensionDataRow> listExtensionData(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String rosterId,
+            @Nonnull String profileId
+    ) {
+        try {
+            return extensions.list(
+                    ownerUuid,
+                    requireText(rosterId, "rosterId"),
+                    requireText(profileId, "profileId")
+            );
+        } catch (SQLException failure) {
+            throw storageFailure("list-bonded-extensions", failure);
+        }
+    }
+
     /** Inserts or updates extension data under compare-and-set semantics. */
     @Nonnull
     public MutationResult<SqliteBondedCompanionExtensionDataRow>

@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionReviveRequest;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ class BondedCompanionPanelActionServiceTest {
     @Test
     void staleRenderedRevisionIsSentAsTheMutationFence() {
         var profile = BondedPanelTestFixtures.profile(
-                "profile-7", 11L, BondedCompanionState.STORED, null, Map.of());
+                "profile-7", 11L, BondedCompanionStateView.STORED, null, Map.of());
         var api = new BondedPanelTestFixtures.StubApi(List.of(profile));
         var service = new BondedCompanionPanelActionService(() -> api);
         BondedCompanionPanelPresentation row =
@@ -37,7 +37,7 @@ class BondedCompanionPanelActionServiceTest {
     @Test
     void reviveCommitsTheExactRenderedQuoteRevision() {
         var profile = BondedPanelTestFixtures.profile(
-                "profile-7", 12L, BondedCompanionState.DEAD, null, Map.of());
+                "profile-7", 12L, BondedCompanionStateView.DEAD, null, Map.of());
         var api = new BondedPanelTestFixtures.StubApi(List.of(profile));
         var service = new BondedCompanionPanelActionService(() -> api);
         BondedCompanionPanelPresentation row =
@@ -55,7 +55,7 @@ class BondedCompanionPanelActionServiceTest {
     @Test
     void asyncReviveDoesNotBlockWhileDurablePaymentIsPending() {
         var profile = BondedPanelTestFixtures.profile(
-                "profile-7", 12L, BondedCompanionState.DEAD, null, Map.of());
+                "profile-7", 12L, BondedCompanionStateView.DEAD, null, Map.of());
         CompletableFuture<BondedCompanionResult<
                 com.alechilles.alecstamework.api.BondedCompanionProfileView>>
                 durablePayment = new CompletableFuture<>();

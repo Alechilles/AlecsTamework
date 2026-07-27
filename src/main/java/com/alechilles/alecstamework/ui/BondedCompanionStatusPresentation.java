@@ -1,13 +1,13 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Immutable bonded lifecycle and primary-action presentation for one card. */
 public record BondedCompanionStatusPresentation(
-        @Nonnull BondedCompanionState state,
+        @Nonnull BondedCompanionStateView state,
         @Nonnull Action action,
         boolean actionEnabled,
         @Nullable String unavailableReason,

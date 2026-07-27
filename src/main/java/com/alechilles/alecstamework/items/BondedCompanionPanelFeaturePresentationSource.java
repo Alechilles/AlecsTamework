@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.*;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -62,11 +61,10 @@ final class BondedCompanionPanelFeaturePresentationSource {
             BondedCompanionProfileView profile, long nowMs,
             BondedCompanionReviveQuote quote) {
         BondedCompanionActionContext context = new BondedCompanionActionContext(
-                new com.alechilles.alecstamework.companion.placement
-                        .CompanionSpawnPlacement(
+                new BondedCompanionPlacement(
                         "world", 0D, 0D, 0D, 0F, 0F, 0F), null);
         return presentation(profile, nowMs, quote, context, null,
-                profile.state() == BondedCompanionState.ACTIVE
+                profile.state() == BondedCompanionStateView.ACTIVE
                         ? profile.activeLease().worldKey() : "world");
     }
 
@@ -123,7 +121,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
             BondedCompanionApi current, UUID owner, String worldKey,
             BondedCompanionProfileView profile,
             BondedCompanionActionContext context) {
-        if (profile.state() != BondedCompanionState.DEAD) return profile.reviveQuote();
+        if (profile.state() != BondedCompanionStateView.DEAD) return profile.reviveQuote();
         if (profile.reviveQuote() != null) return profile.reviveQuote();
         try {
             BondedCompanionResult<BondedCompanionReviveQuote> result =
@@ -157,16 +155,16 @@ final class BondedCompanionPanelFeaturePresentationSource {
             BondedCompanionActionContext context, String readiness,
             String world, long cooldown) {
         if (readiness != null) return readiness;
-        if (profile.state() == BondedCompanionState.STORED && cooldown > 0L)
+        if (profile.state() == BondedCompanionStateView.STORED && cooldown > 0L)
             return "Summon cooldown is still active.";
-        if (profile.state() == BondedCompanionState.STORED
+        if (profile.state() == BondedCompanionStateView.STORED
                 && !validPlacement(context, world))
             return "A safe summon placement is unavailable.";
-        if (profile.state() == BondedCompanionState.ACTIVE
+        if (profile.state() == BondedCompanionStateView.ACTIVE
                 && profile.activeLease() != null
                 && !profile.activeLease().worldKey().equals(world))
             return "Dismiss this companion from its active world.";
-        if (profile.state() == BondedCompanionState.DEAD && quote == null)
+        if (profile.state() == BondedCompanionStateView.DEAD && quote == null)
             return "Revive quote is unavailable.";
         if (quote != null && quote.cooldownRemainingSeconds() > 0L)
             return "Revive cooldown is still active.";

@@ -34,6 +34,14 @@ public interface BondedCompanionStore {
         return Optional.empty();
     }
 
+    /** Probes a profile mutation using its complete request hash and scope. */
+    @Nonnull
+    default Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
+            findProfileOperationByExactRequest(
+                    @Nonnull BondedCompanionOperation operation) {
+        return Optional.empty();
+    }
+
     /** Returns a terminal revive operation to bounded retention after payment. */
     default boolean markProfileOperationPaymentSettled(
             @Nonnull BondedCompanionOperationProbe operation,
@@ -94,6 +102,13 @@ public interface BondedCompanionStore {
     @Nonnull Optional<BondedCompanionRecord.ExtensionData> findExtensionData(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId,
             @Nonnull String profileId, @Nonnull String namespace);
+
+    /** Lists current namespaced extensions for one exact owned profile. */
+    @Nonnull default List<BondedCompanionRecord.ExtensionData> listExtensionData(
+            @Nonnull UUID ownerUuid, @Nonnull String rosterId,
+            @Nonnull String profileId) {
+        return List.of();
+    }
 
     /** Creates or replaces extension data under compare-and-set semantics. */
     @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.ExtensionData>
