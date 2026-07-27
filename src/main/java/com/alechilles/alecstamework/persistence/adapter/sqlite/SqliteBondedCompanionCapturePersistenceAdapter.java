@@ -355,7 +355,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
                 new TameworkTamedComponent(true), source.npcName(),
                 source.happiness(), source.needs(), source.breeding(),
                 source.leveling(), source.traits(), source.talents(),
-                source.lifeStage(), source.attachments(), source.healthPercent(),
+                source.lifeStage(), source.attachments(), source.currentHealth(),
+                source.maximumHealth(), source.healthPercent(),
                 source.capturedAtMs()
         );
         return BondedCompanionSnapshot.of(

@@ -67,6 +67,11 @@ public final class CoopResidentStateSnapshotCodec {
         putComponent(payload, "talents", snapshot.talents(), TameworkTalentsComponent.class);
         putComponent(payload, "lifeStage", snapshot.lifeStage(), TameworkLifeStageComponent.class);
         putComponent(payload, "attachments", snapshot.attachments(), TameworkAttachmentsComponent.class);
+        validateHealthPair(snapshot.currentHealth(), snapshot.maximumHealth());
+        if (snapshot.currentHealth() != null) {
+            payload.addProperty("currentHealth", snapshot.currentHealth());
+            payload.addProperty("maximumHealth", snapshot.maximumHealth());
+        }
         if (snapshot.healthPercent() != null) {
             if (!Double.isFinite(snapshot.healthPercent())) {
                 throw new IllegalArgumentException("Snapshot healthPercent must be finite");
@@ -123,6 +128,12 @@ public final class CoopResidentStateSnapshotCodec {
                     payload, "lifeStage", TameworkLifeStageComponent.class);
             TameworkAttachmentsComponent attachments = component(
                     payload, "attachments", TameworkAttachmentsComponent.class);
+            Double currentHealth = optionalFiniteDouble(payload, "currentHealth");
+            Double maximumHealth = optionalFiniteDouble(payload, "maximumHealth");
+            if (!isHealthPairValid(currentHealth, maximumHealth)) {
+                throw failure(Failure.INVALID_FIELD, "currentHealth",
+                        "currentHealth and maximumHealth must be a valid pair");
+            }
             Double healthPercent = optionalFiniteDouble(payload, "healthPercent");
             return DecodeResult.found(new CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
                     npcUuid,
@@ -141,6 +152,8 @@ public final class CoopResidentStateSnapshotCodec {
                     talents,
                     lifeStage,
                     attachments,
+                    currentHealth,
+                    maximumHealth,
                     healthPercent,
                     capturedAtMs
             ));
@@ -193,6 +206,8 @@ public final class CoopResidentStateSnapshotCodec {
                         prefer(captured.talents(), existing.talents()),
                         prefer(captured.lifeStage(), existing.lifeStage()),
                         prefer(captured.attachments(), existing.attachments()),
+                        preferredCurrentHealth(existing, captured),
+                        preferredMaximumHealth(existing, captured),
                         prefer(captured.healthPercent(), existing.healthPercent()),
                         captured.capturedAtMs()
                 );
@@ -201,6 +216,39 @@ public final class CoopResidentStateSnapshotCodec {
 
     private static <T> T prefer(@Nullable T captured, @Nullable T existing) {
         return captured != null ? captured : existing;
+    }
+
+    @Nullable
+    private static Double preferredCurrentHealth(
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot existing,
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot captured) {
+        return captured.currentHealth() != null && captured.maximumHealth() != null
+                ? captured.currentHealth() : existing.currentHealth();
+    }
+
+    @Nullable
+    private static Double preferredMaximumHealth(
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot existing,
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot captured) {
+        return captured.currentHealth() != null && captured.maximumHealth() != null
+                ? captured.maximumHealth() : existing.maximumHealth();
+    }
+
+    private static void validateHealthPair(@Nullable Double currentHealth,
+                                           @Nullable Double maximumHealth) {
+        if (!isHealthPairValid(currentHealth, maximumHealth)) {
+            throw new IllegalArgumentException("Snapshot health pair is invalid");
+        }
+    }
+
+    private static boolean isHealthPairValid(@Nullable Double currentHealth,
+                                             @Nullable Double maximumHealth) {
+        return (currentHealth == null && maximumHealth == null)
+                || (currentHealth != null && maximumHealth != null
+                && Double.isFinite(currentHealth)
+                && Double.isFinite(maximumHealth)
+                && maximumHealth > 0.0D && currentHealth >= 0.0D
+                && currentHealth <= maximumHealth);
     }
 
     private <T> void putComponent(@Nonnull JsonObject payload,

@@ -1,6 +1,12 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
+import java.nio.charset.StandardCharsets;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaManager;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -205,6 +211,49 @@ class SqliteBondedCompanionStoreTest {
         assertEquals(BondedCompanionState.STORED, store.findProfile(
                 OWNER_A, "roster-a", "profile-a"
         ).orElseThrow().state());
+    }
+
+    @Test
+    void paidReviveAtomicallyPersistsTheSummonSafeHealthSnapshot() {
+        BondedCompanionSnapshotCodec snapshots = new BondedCompanionSnapshotCodec();
+        BondedCompanionSnapshot deathSnapshot = BondedCompanionSnapshot.of(
+                new CoopResidentStateSnapshot(NPC_A, null, -1,
+                        "role:companion", null,
+                        new TameworkOwnerComponent(OWNER_A, null), null, null,
+                        null, null, null, null, null, null, null, null,
+                        0.0D, 400.0D, 0.0D, -10_000L), java.util.Map.of());
+        SqliteBondedCompanionMapper mapper = new SqliteBondedCompanionMapper();
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.createProfile(new SqliteBondedCompanionProfileRow(
+                "dead-health", OWNER_A, "roster-a", "family:wolf",
+                "role:companion", BondedCompanionState.STORED, 0L,
+                mapper.payloadJson(BondedCompanionPayload.of(snapshots.encode(
+                        deathSnapshot).getBytes(StandardCharsets.UTF_8))),
+                -10_000L, -10_000L, "{}", null, null, null, null,
+                0L, 0L, null, null)).code());
+        try (var statement = connection.prepareStatement("""
+                UPDATE bonded_companion_profile
+                SET state = 'DEAD', revision = 7, died_at_ms = -10_000
+                WHERE profile_id = 'dead-health'
+                """)) {
+            assertEquals(1, statement.executeUpdate());
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        }
+
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.reviveProfile(OWNER_A, "roster-a", "dead-health", 7L,
+                        -9_000L).code());
+
+        SqliteBondedCompanionProfileRow revived = store.findProfile(
+                OWNER_A, "roster-a", "dead-health").orElseThrow();
+        BondedCompanionSnapshot restored = snapshots.decode(new String(
+                mapper.payload(revived.snapshotJson()).bytes(),
+                StandardCharsets.UTF_8)).snapshot();
+        assertEquals(BondedCompanionState.STORED, revived.state());
+        assertEquals(400.0D, restored.fullState().currentHealth());
+        assertEquals(400.0D, restored.fullState().maximumHealth());
+        assertEquals(100.0D, restored.fullState().healthPercent());
     }
 
     @Test

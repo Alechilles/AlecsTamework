@@ -36,6 +36,10 @@ public final class BondedCompanionSnapshotPresentationMapper {
                 ? null : Integer.toString(state.leveling().getLevel()));
         put(data, "healthPercent", state.healthPercent() == null
                 ? null : Double.toString(state.healthPercent()));
+        put(data, "currentHealth", state.currentHealth() == null
+                ? null : Double.toString(state.currentHealth()));
+        put(data, "maxHealth", state.maximumHealth() == null
+                ? null : Double.toString(state.maximumHealth()));
         put(data, "happiness", state.happiness() == null
                 ? null : Double.toString(state.happiness().getValue()));
         put(data, "hunger", state.needs() == null

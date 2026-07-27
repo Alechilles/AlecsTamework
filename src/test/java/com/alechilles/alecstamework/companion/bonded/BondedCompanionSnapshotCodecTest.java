@@ -45,6 +45,8 @@ class BondedCompanionSnapshotCodecTest {
 
         assertEquals("Ember", state.npcName().getName());
         assertEquals(63.25D, state.healthPercent());
+        assertEquals(253.0D, state.currentHealth());
+        assertEquals(400.0D, state.maximumHealth());
         assertEquals("horns", state.attachments().getAttachmentIds().get("head"));
         assertEquals("brave", state.traits().getTraitValues()[0].getId());
         assertEquals("flame-breath", state.talents().getPurchasedTalentIds()[0]);
@@ -120,7 +122,7 @@ class BondedCompanionSnapshotCodecTest {
                 new TameworkAttachmentsComponent(
                         "attachments", Map.of("head", "new-horns")
                 ),
-                42.0D, -3_000L
+                168.0D, 400.0D, 42.0D, -3_000L
         );
         BondedCompanionSnapshot newer = BondedCompanionSnapshot.of(
                 newerState, Map.of("hydragon:appearance", "{\"skin\":\"ash\"}")
@@ -137,6 +139,8 @@ class BondedCompanionSnapshotCodecTest {
         assertEquals("New_Horn",
                 decoded.fullState().commandLinks().getToolIds()[0]);
         assertEquals(42.0D, decoded.fullState().healthPercent());
+        assertEquals(168.0D, decoded.fullState().currentHealth());
+        assertEquals(400.0D, decoded.fullState().maximumHealth());
         assertEquals("{\"ability\":\"flame\",\"charge\":2}",
                 decoded.extensionData().get("hydragon:bond"));
         assertEquals("{\"skin\":\"ash\"}",
@@ -167,6 +171,8 @@ class BondedCompanionSnapshotCodecTest {
         assertEquals("storm", presentation.data().get("variant"));
         assertEquals("7", presentation.data().get("level"));
         assertEquals("63.25", presentation.data().get("healthPercent"));
+        assertEquals("253.0", presentation.data().get("currentHealth"));
+        assertEquals("400.0", presentation.data().get("maxHealth"));
     }
 
     @Test
@@ -244,6 +250,8 @@ class BondedCompanionSnapshotCodecTest {
                 new TameworkAttachmentsComponent(
                         "attachments", Map.of("head", attachment)
                 ),
+                253.0D,
+                400.0D,
                 63.25D,
                 -4_100L
         );

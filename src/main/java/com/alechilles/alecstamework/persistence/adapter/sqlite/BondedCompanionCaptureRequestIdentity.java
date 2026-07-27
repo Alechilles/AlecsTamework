@@ -73,7 +73,8 @@ final class BondedCompanionCaptureRequestIdentity {
                 state.roleId(), state.commandLinks(), state.owner(), state.tamed(),
                 state.npcName(), state.happiness(), state.needs(), state.breeding(),
                 state.leveling(), state.traits(), state.talents(), state.lifeStage(),
-                state.attachments(), state.healthPercent(), 0L);
+                state.attachments(), state.currentHealth(), state.maximumHealth(),
+                state.healthPercent(), 0L);
         return BondedCompanionSnapshot.of(stable, claimed.extensionData());
     }
 
