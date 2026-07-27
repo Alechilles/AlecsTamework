@@ -136,6 +136,51 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
+    void productionReorderedEscrowReceiptQuarantinesBeforeRecoveryRevive()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSourceSlot((short) 0, ITEM, 2);
+            fixture.setSourceSlot((short) 1, OTHER, 4);
+            List<BondedCompanionReviveCost> costs = List.of(
+                    new BondedCompanionReviveCost(ITEM, 2),
+                    new BondedCompanionReviveCost(OTHER, 4));
+            String operation = operation(904);
+            fixture.inventory.consumeExactAsync(operation, costs)
+                    .toCompletableFuture().join();
+            BondedCompanionActionContext.ChargeReceipt reordered = fixture.inventory
+                    .consumeExactAsync(operation, List.of(
+                            costs.get(1), costs.getFirst()))
+                    .toCompletableFuture().join();
+            RecoveryStore store = new RecoveryStore(RecoveryResult.MISSING,
+                    false, 904);
+            BondedCompanionActionContext.Inventory recoveredInventory =
+                    new BondedCompanionActionContext.Inventory() {
+                        @Override public int availableQuantity(String itemId) {
+                            return 0;
+                        }
+                        @Override public BondedCompanionActionContext.ChargeReceipt
+                                findCharge(String operationId) {
+                            return reordered;
+                        }
+                        @Override public BondedCompanionActionContext.ChargeReceipt
+                                consumeExact(String operationId, String itemId,
+                                             int quantity) { return null; }
+                    };
+
+            BondedCompanionPaymentRecoveryService.Outcome outcome =
+                    new BondedCompanionPaymentRecoveryService(store.store,
+                            () -> -5_000L).recover(
+                            BondedCompanionPaymentOperationId.parse(operation)
+                                    .orElseThrow(), recoveredInventory)
+                            .toCompletableFuture().join();
+
+            assertEquals(BondedCompanionPaymentRecoveryService.Outcome.QUARANTINED,
+                    outcome);
+            assertEquals(0, store.revives);
+        }
+    }
+
+    @Test
     void insufficientSecondRecipeLineRestoresTheFirstWithoutAReceipt()
             throws Exception {
         try (Fixture fixture = new Fixture()) {
