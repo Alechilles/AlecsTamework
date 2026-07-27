@@ -5,7 +5,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nonnull;
 
 /** Drives bounded bonded cleanup, retention pruning, and lease expiry. */
@@ -13,7 +14,7 @@ public final class BondedCompanionMaintenanceSystem
         extends TickingSystem<EntityStore> {
     private static final long INTERVAL_NANOS = 1_000_000_000L;
     private final TameworkBondedCompanionComposition composition;
-    private final AtomicLong nextRun = new AtomicLong();
+    private final ConcurrentMap<String, Long> nextRuns = new ConcurrentHashMap<>();
 
     public BondedCompanionMaintenanceSystem(
             @Nonnull TameworkBondedCompanionComposition composition
@@ -23,11 +24,16 @@ public final class BondedCompanionMaintenanceSystem
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        EntityStore external = store.getExternalData();
+        com.hypixel.hytale.server.core.universe.world.World world =
+                external == null ? null : external.getWorld();
+        if (world == null || world.getName() == null) return;
+        String worldKey = world.getName();
         long now = System.nanoTime();
-        long next = nextRun.get();
-        if (now < next || !nextRun.compareAndSet(next, now + INTERVAL_NANOS)) {
-            return;
+        Long next = nextRuns.compute(worldKey, (ignored, prior) ->
+                prior == null || now >= prior ? now + INTERVAL_NANOS : prior);
+        if (next != null && next == now + INTERVAL_NANOS) {
+            composition.maintenanceTick(worldKey);
         }
-        composition.maintenanceTick();
     }
 }

@@ -51,7 +51,8 @@ public final class BondedCompanionDeathSystem extends DeathSystems.OnDeathSystem
                 || uuid == null || uuid.getUuid() == null || world == null) {
             return;
         }
-        composition.onConfirmedDeath(world.getName(), uuid.getUuid());
+        composition.onConfirmedDeath(
+                world.getName(), uuid.getUuid(), marker, reference, store);
     }
 
     @Nonnull @Override public Query<EntityStore> getQuery() {

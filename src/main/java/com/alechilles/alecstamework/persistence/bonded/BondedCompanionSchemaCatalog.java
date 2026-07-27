@@ -7,7 +7,7 @@ import java.util.HexFormat;
 
 /** Loads immutable bonded schema migrations and their exact SHA-256 hashes. */
 final class BondedCompanionSchemaCatalog {
-    static final int VERSION = 8;
+    static final int VERSION = 7;
     private static final String RESOURCE_PREFIX = "/persistence/bonded/v";
     private final String[] scripts = new String[VERSION + 1];
     private final String[] hashes = new String[VERSION + 1];

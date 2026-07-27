@@ -38,6 +38,14 @@ public final class BondedCompanionPersistenceRuntime implements AutoCloseable {
         return readiness;
     }
 
+    /** Fails only the bonded authority when post-schema startup settlement fails. */
+    public synchronized void fail(@Nonnull String diagnosticCode) {
+        if (!closed.get()) {
+            readiness = BondedCompanionPersistenceReadiness.failed(
+                    Objects.requireNonNull(diagnosticCode, "diagnosticCode"));
+        }
+    }
+
     /** Closes idempotently; connections are operation-scoped and need no shared shutdown. */
     @Override
     public synchronized void close() {

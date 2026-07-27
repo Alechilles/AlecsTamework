@@ -20,7 +20,8 @@ final class SqliteBondedCompanionCleanupQueue {
         this.connections = connections;
     }
 
-    List<BondedCompanionProjectionCleanupService.CleanupIntent> pending(
+    List<BondedCompanionProjectionCleanupService.CleanupIntent> pendingForWorld(
+            String worldKey,
             long nowMs,
             int limit
     ) {
@@ -32,10 +33,12 @@ final class SqliteBondedCompanionCleanupQueue {
                             retained_until_ms
                      FROM bonded_companion_cleanup
                      WHERE cleanup_state = 'PENDING' AND next_attempt_at_ms <= ?
+                       AND world_key = ?
                      ORDER BY next_attempt_at_ms, cleanup_id LIMIT ?
                      """)) {
             statement.setLong(1, nowMs);
-            statement.setInt(2, limit);
+            statement.setString(2, worldKey);
+            statement.setInt(3, limit);
             try (ResultSet rows = statement.executeQuery()) {
                 return readPending(rows);
             }

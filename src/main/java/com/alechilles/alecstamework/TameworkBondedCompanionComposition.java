@@ -4,19 +4,12 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionCaptureResolvedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpirySystem;
 import com.alechilles.alecstamework.companion.bonded
-        .BondedCompanionAsyncProjectionReconciler;
-import com.alechilles.alecstamework.companion.bonded
-        .BondedCompanionLifecycleLeaseResolver;
+        .BondedCompanionLocalProjectionLifecycle;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
-import com.alechilles.alecstamework.companion.bonded
-        .BondedCompanionProjectionRecoverySystem;
-import com.alechilles.alecstamework.companion.bonded
-        .BondedCompanionStartupPendingRecovery;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded
@@ -86,11 +79,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionTransitionService transitions;
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
-    private final BondedCompanionAsyncProjectionReconciler lifecycleReconciliation;
-    private final BondedCompanionLifecycleLeaseResolver lifecycleLeases;
-    private final BondedCompanionExpirySystem expiry;
-    private final BondedCompanionProjectionRecoverySystem projectionRecovery;
-    private final BondedCompanionStartupPendingRecovery startupPendingRecovery;
+    private final BondedCompanionLocalProjectionLifecycle localLifecycle;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final SqliteBondedCompanionProjectionDurability durability;
     private final HytaleBondedCompanionWorldGateway world;
@@ -112,11 +101,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionTransitionService transitions,
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
-            BondedCompanionAsyncProjectionReconciler lifecycleReconciliation,
-            BondedCompanionLifecycleLeaseResolver lifecycleLeases,
-            BondedCompanionExpirySystem expiry,
-            BondedCompanionProjectionRecoverySystem projectionRecovery,
-            BondedCompanionStartupPendingRecovery startupPendingRecovery,
+            BondedCompanionLocalProjectionLifecycle localLifecycle,
             BondedCompanionProjectionCleanupService cleanup,
             SqliteBondedCompanionProjectionDurability durability,
             HytaleBondedCompanionWorldGateway world,
@@ -134,11 +119,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.transitions = transitions;
         this.projections = projections;
         this.observer = observer;
-        this.lifecycleReconciliation = lifecycleReconciliation;
-        this.lifecycleLeases = lifecycleLeases;
-        this.expiry = expiry;
-        this.projectionRecovery = projectionRecovery;
-        this.startupPendingRecovery = startupPendingRecovery;
+        this.localLifecycle = localLifecycle;
         this.cleanup = cleanup;
         this.durability = durability;
         this.world = world;
@@ -223,29 +204,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                 store, changes, lease, result
                         )
                 );
-        BondedCompanionExpirySystem expiry = new BondedCompanionExpirySystem(
-                observer, durability::findExpired,
-                world::scanBoundedRecoveryAsync, 64, 128
-        );
-        BondedCompanionAsyncProjectionReconciler lifecycleReconciliation =
-                new BondedCompanionAsyncProjectionReconciler(
-                        observer, world::scanBoundedRecoveryAsync, 128
-                );
-        BondedCompanionLifecycleLeaseResolver lifecycleLeases =
-                new BondedCompanionLifecycleLeaseResolver(durability::activeLeases, 256);
-        BondedCompanionProjectionRecoverySystem projectionRecovery =
-                new BondedCompanionProjectionRecoverySystem(
-                        observer, durability::liveLeasesAfter,
-                        world::scanBoundedRecoveryAsync,
-                        64, 128
-                );
-        long startupCutoff = clock.getAsLong();
-        long startupLeaseHighWater = durability.pendingLeaseHighWaterMark();
-        BondedCompanionStartupPendingRecovery startupPendingRecovery =
-                new BondedCompanionStartupPendingRecovery(
-                        observer, durability::pendingLeasesBefore,
-                        startupLeaseHighWater, 64
-                );
+        BondedCompanionLocalProjectionLifecycle localLifecycle =
+                new BondedCompanionLocalProjectionLifecycle(
+                        observer, durability, world, 64, 128);
         BondedCompanionCoreApiOperations operations =
                 new BondedCompanionCoreApiOperations(
                         store, rosters, policies, transitions, projections,
@@ -288,16 +249,17 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         if (started.availability().available()) {
             publishPendingCaptureEvents(captureEvents, diagnostics, 128);
-            durability.replayPendingCleanup(
-                    cleanup, startupCutoff, 128
-            );
-            startupPendingRecovery.tick(startupCutoff);
+            try {
+                durability.settleResidualLeases(clock.getAsLong());
+            } catch (RuntimeException failure) {
+                runtime.fail("bonded-startup-residual-settlement-failed");
+                diagnostics.recordFailure(
+                        BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE);
+            }
         }
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
-                transitions, projections, observer, lifecycleReconciliation, lifecycleLeases,
-                expiry, projectionRecovery,
-                startupPendingRecovery,
+                transitions, projections, observer, localLifecycle,
                 cleanup, durability, world, store, clock, captureAuthor,
                 captureEvents, paymentRecovery
         );
@@ -322,10 +284,13 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     /** Reconciles one started world using only exact persisted leases. */
     public void onWorldLoad(@Nonnull String worldKey) {
         if (!operational()) return;
-        lifecycleReconciliation.reconcileAsync(
-                lifecycleLeases.inWorld(worldKey),
+        long now = clock.getAsLong();
+        durability.replayPendingCleanupForWorld(
+                cleanup, worldKey, now, 128);
+        localLifecycle.reconcileCurrentWorld(
+                worldKey,
                 BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD,
-                clock.getAsLong());
+                now);
     }
 
     /** Hytale event adapter retaining no world object after this call. */
@@ -340,16 +305,11 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     public void onPlayerAdded(@Nonnull UUID ownerUuid, @Nonnull String worldKey) {
         if (!operational()) return;
         String previous = ownerWorlds.put(ownerUuid, worldKey);
-        long now = clock.getAsLong();
-        if (previous == null || previous.equals(worldKey)) {
-            lifecycleReconciliation.reconcileAsync(
-                    lifecycleLeases.forOwner(ownerUuid),
-                    BondedCompanionProjectionService.RecoveryCause.PLAYER_JOIN, now);
-        } else {
-            lifecycleReconciliation.reconcileAsync(
-                    lifecycleLeases.forOwnerInWorld(ownerUuid, previous),
+        if (previous != null && !previous.equals(worldKey)) {
+            localLifecycle.storeOwnerInWorld(
+                    ownerUuid, previous,
                     BondedCompanionProjectionService.RecoveryCause.WORLD_TRANSFER,
-                    now);
+                    clock.getAsLong());
         }
     }
 
@@ -380,11 +340,18 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     /** Stores exact active projections when their owner disconnects. */
     public void onPlayerLogout(@Nonnull UUID ownerUuid) {
         if (!operational()) return;
-        ownerWorlds.remove(ownerUuid);
-        lifecycleReconciliation.reconcileAsync(
-                lifecycleLeases.forOwner(ownerUuid),
-                BondedCompanionProjectionService.RecoveryCause.LOGOUT,
-                clock.getAsLong());
+        String recordedWorld = ownerWorlds.remove(ownerUuid);
+        if (recordedWorld == null) {
+            localLifecycle.storeOwner(
+                    ownerUuid,
+                    BondedCompanionProjectionService.RecoveryCause.LOGOUT,
+                    clock.getAsLong());
+        } else {
+            localLifecycle.storeOwnerInWorld(
+                    ownerUuid, recordedWorld,
+                    BondedCompanionProjectionService.RecoveryCause.LOGOUT,
+                    clock.getAsLong());
+        }
     }
 
     /** Hytale disconnect adapter retaining no Player component. */
@@ -399,31 +366,48 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     }
 
     /** Converts only an exact marked projection death to durable DEAD. */
-    public void onConfirmedDeath(@Nonnull String worldKey, @Nonnull UUID npcUuid) {
+    public void onConfirmedDeath(
+            @Nonnull String worldKey,
+            @Nonnull UUID npcUuid,
+            @Nonnull com.alechilles.alecstamework.npc.components
+                    .TameworkProjectionIdentityComponent marker,
+            @Nonnull com.hypixel.hytale.component.Ref<
+                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore>
+                    reference,
+            @Nonnull com.hypixel.hytale.component.Store<
+                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entityStore
+    ) {
         if (!operational()) return;
-        for (var lease : durability.activeLeases(256)) {
-            if (!worldKey.equals(lease.worldKey())
-                    || !npcUuid.equals(lease.liveNpcUuid())) continue;
-            var projection = world.readExact(lease);
-            if (projection != null) {
-                observer.onConfirmedDeath(lease, projection, clock.getAsLong());
-            }
-            return;
+        var projection = world.readCurrent(
+                reference, entityStore, worldKey, npcUuid, marker);
+        if (projection != null) {
+            localLifecycle.onConfirmedDeath(projection, clock.getAsLong());
         }
     }
 
-    /** Drives bounded cleanup, operation pruning, and lease expiry. */
-    public void maintenanceTick() {
+    /** Drives exact cleanup and recovery for only the current ticking world. */
+    public void maintenanceTick(@Nonnull String worldKey) {
         if (!operational()) return;
         long now = clock.getAsLong();
-        durability.replayPendingCleanup(cleanup, now, 64);
+        durability.replayPendingCleanupForWorld(
+                cleanup, worldKey, now, 64);
+        localLifecycle.reconcileCurrentWorld(
+                worldKey,
+                BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                now);
+        databaseMaintenance(now);
+    }
+
+    /** Runs bounded database retention work without consulting any world. */
+    public void maintenanceTick() {
+        if (!operational()) return;
+        databaseMaintenance(clock.getAsLong());
+    }
+
+    private void databaseMaintenance(long now) {
         publishPendingCaptureEvents(captureEvents, diagnostics, 64);
         store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
-        startupPendingRecovery.tick(now);
-        expiry.tick(now);
-        lifecycleReconciliation.tick();
-        projectionRecovery.tick(now);
     }
 
     private boolean operational() {

@@ -87,7 +87,6 @@ final class SqliteBondedCompanionLeaseStore {
                         current, "lease-token-conflict");
             }
         }
-        deleteAdmission(current.profileId(), leaseToken);
         try (PreparedStatement statement = connection.prepareStatement("""
                 UPDATE bonded_companion_profile
                 SET state = 'STORED', revision = revision + 1, updated_at_ms = ?
@@ -129,7 +128,6 @@ final class SqliteBondedCompanionLeaseStore {
     }
 
     private void insert(SqliteBondedCompanionLeaseRow row) throws SQLException {
-        insertAdmission(row);
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO bonded_companion_lease(
                     profile_id, lease_token, live_npc_uuid, world_key,
@@ -144,34 +142,6 @@ final class SqliteBondedCompanionLeaseStore {
             statement.setLong(6, row.expiresAtMs());
             statement.setString(7, row.projectionState());
             statement.executeUpdate();
-        }
-    }
-
-    private void insertAdmission(SqliteBondedCompanionLeaseRow row)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO bonded_companion_lease_admission(
-                    profile_id, lease_token, admitted_at_ms
-                ) VALUES (?, ?, ?)
-                """)) {
-            statement.setString(1, row.profileId());
-            statement.setString(2, row.leaseToken());
-            statement.setLong(3, row.startedAtMs());
-            statement.executeUpdate();
-        }
-    }
-
-    private void deleteAdmission(String profileId, String leaseToken)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                DELETE FROM bonded_companion_lease_admission
-                WHERE profile_id = ? AND lease_token = ?
-                """)) {
-            statement.setString(1, profileId);
-            statement.setString(2, leaseToken);
-            if (statement.executeUpdate() != 1) {
-                throw new SQLException("bonded_lease_admission_missing");
-            }
         }
     }
 

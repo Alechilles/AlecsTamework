@@ -23,7 +23,6 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompa
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.sql.DriverManager;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,7 +34,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Guards atomic Task 4 durability and restart-safe exact cleanup routing. */
@@ -86,11 +84,12 @@ class BondedCompanionProjectionDurabilityTest {
 
         SqliteBondedCompanionProjectionDurability restarted =
                 new SqliteBondedCompanionProjectionDurability(database);
-        int recovered = restarted.replayPendingCleanup(
+        int recovered = restarted.replayPendingCleanupForWorld(
                 new BondedCompanionProjectionCleanupService(
                         ignored -> BondedCompanionProjectionCleanupService
                                 .Outcome.REMOVED
                 ),
+                "world-a",
                 -80L,
                 10
         );
@@ -147,21 +146,23 @@ class BondedCompanionProjectionDurabilityTest {
                                 .RETRY_REQUIRED
                 );
 
-        assertEquals(1, durability.replayPendingCleanup(retry, 0L, 1));
+        assertEquals(1, durability.replayPendingCleanupForWorld(
+                retry, "world-a", 0L, 1));
         var first = store.listCleanup(OWNER, "roster-a", 1).getFirst();
         assertEquals(BondedCompanionRecord.CleanupState.PENDING, first.state());
         assertEquals(1, first.attemptCount());
         assertTrue(first.nextAttemptAtMs() > 0L);
 
-        assertEquals(1, durability.replayPendingCleanup(
-                retry, first.nextAttemptAtMs(), 1
+        assertEquals(1, durability.replayPendingCleanupForWorld(
+                retry, "world-a", first.nextAttemptAtMs(), 1
         ));
         var second = store.listCleanup(OWNER, "roster-a", 1).getFirst();
         assertEquals(2, second.attemptCount());
         assertTrue(second.nextAttemptAtMs() - first.nextAttemptAtMs()
                 > first.nextAttemptAtMs());
 
-        assertEquals(1, durability.replayPendingCleanup(retry, 10_000L, 1));
+        assertEquals(1, durability.replayPendingCleanupForWorld(
+                retry, "world-a", 10_000L, 1));
         assertEquals(BondedCompanionRecord.CleanupState.ABANDONED,
                 store.listCleanup(OWNER, "roster-a", 1).getFirst().state());
         assertEquals(1, store.pruneCleanup(10_000L, 1));
@@ -206,18 +207,18 @@ class BondedCompanionProjectionDurabilityTest {
         var pending = store.listCleanup(OWNER, "roster-a", 1).getFirst();
         assertEquals(BondedCompanionRecord.CleanupState.PENDING, pending.state());
 
-        assertEquals(1, durability.replayPendingCleanup(
+        assertEquals(1, durability.replayPendingCleanupForWorld(
                 new BondedCompanionProjectionCleanupService(
                         ignored -> BondedCompanionProjectionCleanupService.Outcome
                                 .REMOVED
-                ), pending.nextAttemptAtMs(), 1
+                ), "world-a", pending.nextAttemptAtMs(), 1
         ));
         assertEquals(BondedCompanionRecord.CleanupState.COMPLETED,
                 store.listCleanup(OWNER, "roster-a", 1).getFirst().state());
     }
 
     @Test
-    void liveLeaseMaintenanceReadIsNotStarvedByEarlierPendingSummons() {
+    void worldLocalLeaseReadIncludesLiveAlongsideEarlierPendingSummons() {
         Path database = temporaryDirectory.resolve("live-lease-window.sqlite");
         assertTrue(new BondedCompanionSchemaManager(database, () -> -100L)
                 .initialize().availability().available());
@@ -239,7 +240,11 @@ class BondedCompanionProjectionDurabilityTest {
         assertTrue(durability.confirmSpawn(pendingLive, pendingLive.liveNpcUuid()));
 
         List<BondedCompanionProjectionValidator.LeaseExpectation> live =
-                durability.liveLeases(1);
+                durability.inWorld("world-a", 128).stream()
+                        .filter(lease -> lease.phase()
+                                == BondedCompanionProjectionValidator
+                                .LeasePhase.LIVE)
+                        .toList();
 
         assertEquals(1, live.size());
         assertEquals("z-live", live.getFirst().profileId());
@@ -248,89 +253,56 @@ class BondedCompanionProjectionDurabilityTest {
     }
 
     @Test
-    void pendingStartupHighWaterExcludesSameTimestampLeaseCreatedAfterStartup() {
-        Path database = temporaryDirectory.resolve("pending-high-water.sqlite");
+    void startupSettlementHasNoRowCeilingAndAuthorsExactCleanupWithoutWorldAccess()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("startup-settlement.sqlite");
         assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
                 .initialize().availability().available());
         SqliteBondedCompanionDatabase store =
                 new SqliteBondedCompanionDatabase(database);
         SqliteBondedCompanionProjectionDurability durability =
                 new SqliteBondedCompanionProjectionDurability(database);
-        create(store, "before-kept", "family:before-kept");
-        create(store, "before-deleted", "family:before-deleted");
-        assertTrue(begin(durability, "before-kept", "family:before-kept", 1));
-        assertTrue(begin(durability, "before-deleted", "family:before-deleted", 2));
+        for (int index = 0; index < 257; index++) {
+            String profileId = "profile-%03d".formatted(index);
+            String familyId = "family:" + profileId;
+            create(store, profileId, familyId);
+            assertTrue(begin(durability, profileId, familyId, index + 1));
+        }
 
-        long highWater = durability.pendingLeaseHighWaterMark();
-        var deleted = durability.activeLeases(8).stream()
-                .filter(lease -> lease.profileId().equals("before-deleted"))
-                .findFirst().orElseThrow();
-        assertTrue(durability.reconcileStored(deleted,
-                new BondedCompanionProjectionStorePlanner.StorePlan(1L, snapshot(), 0L),
-                List.of(), "TEST_STORE"));
-        assertEquals(highWater, durability.pendingLeaseHighWaterMark());
-
-        create(store, "after", "family:after");
-        assertTrue(begin(durability, "after", "family:after", 3));
-        List<BondedCompanionProjectionValidator.LeaseExpectation> recovered =
-                durability.pendingLeasesBefore(highWater, null, 8);
-
-        assertEquals(List.of("before-kept"), recovered.stream()
-                .map(BondedCompanionProjectionValidator.LeaseExpectation::profileId)
-                .toList());
+        assertEquals(257, durability.settleResidualLeases(-80L));
+        assertEquals(0, durability.settleResidualLeases(-70L));
+        assertEquals(0L, queryCount(database, "bonded_companion_lease"));
+        assertEquals(257L, queryCount(database, "bonded_companion_cleanup"));
+        assertEquals(0L, queryCount(database,
+                "bonded_companion_profile WHERE state <> 'STORED'"));
+        assertFalse(BondedCompanionSchemaManager.requiredTables()
+                .contains("bonded_companion_lease_admission"));
     }
 
     @Test
-    void repeatedLeaseCyclesRetainNoAdmissionHistory() throws Exception {
-        Path database = temporaryDirectory.resolve("bounded-admissions.sqlite");
+    void startupSettlementRetainsTheLastSnapshotAndExactWorldIdentity() throws Exception {
+        Path database = temporaryDirectory.resolve("startup-snapshot.sqlite");
         assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
                 .initialize().availability().available());
-        SqliteBondedCompanionDatabase store = new SqliteBondedCompanionDatabase(database);
+        SqliteBondedCompanionDatabase store =
+                new SqliteBondedCompanionDatabase(database);
         SqliteBondedCompanionProjectionDurability durability =
                 new SqliteBondedCompanionProjectionDurability(database);
-        create(store, "cycle", "family:cycle");
-        long revision = 0L;
-        for (int index = 0; index < 3; index++) {
-            var lease = new BondedCompanionProjectionValidator.LeaseExpectation(
-                    OWNER, "roster-a", "cycle", "lease-cycle-" + index,
-                    new UUID(0L, 300L + index), "world-a", -100L, 0L,
-                    BondedCompanionProjectionValidator.LeasePhase.PENDING);
-            var request = new BondedCompanionProjectionService.SummonRequest(
-                    OWNER, "roster-a", "cycle", revision, "role:wolf", snapshot(),
-                    "world-a", null, -100L, 0L,
-                    new BondedCompanionActiveCapacity("family:cycle", 1));
-            assertTrue(durability.beginSummon(request, lease,
-                    BondedCompanionProjectionCleanupService.CleanupIntent.projection(
-                            "cleanup-cycle-" + index, OWNER, "roster-a", "cycle",
-                            lease.leaseToken(), lease.liveNpcUuid(), "world-a",
-                            "spawn-recovery", -100L)));
-            assertTrue(durability.reconcileStored(lease,
-                    new BondedCompanionProjectionStorePlanner.StorePlan(
-                            revision + 1L, snapshot(), 0L), List.of(), "TEST_STORE"));
-            revision += 2L;
-        }
+        create(store, "profile-startup", "family:startup");
+        assertTrue(begin(durability, "profile-startup", "family:startup", 500));
+        var before = store.findProfile(OWNER, "roster-a", "profile-startup")
+                .orElseThrow();
 
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
-             var statement = connection.prepareStatement(
-                     "SELECT COUNT(*) FROM bonded_companion_lease_admission");
-             var rows = statement.executeQuery()) {
-            assertTrue(rows.next());
-            assertEquals(0L, rows.getLong(1));
-        }
-    }
+        assertEquals(1, durability.settleResidualLeases(-80L));
 
-    @Test
-    void startupLeaseReadsFailClosedWhenTheDatabaseEvidenceIsUnavailable() throws Exception {
-        Path database = temporaryDirectory.resolve("pending-read-failure.sqlite");
-        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
-                .initialize().availability().available());
-        SqliteBondedCompanionProjectionDurability durability =
-                new SqliteBondedCompanionProjectionDurability(database);
-        java.nio.file.Files.delete(database);
-
-        assertThrows(IllegalStateException.class, durability::pendingLeaseHighWaterMark);
-        assertThrows(IllegalStateException.class,
-                () -> durability.pendingLeasesBefore(1L, null, 8));
+        var after = store.findProfile(OWNER, "roster-a", "profile-startup")
+                .orElseThrow();
+        assertEquals(before.snapshot(), after.snapshot());
+        var cleanup = store.listCleanup(OWNER, "roster-a", 8).getFirst();
+        assertEquals("world-a", cleanup.worldKey());
+        assertEquals("lease-profile-startup", cleanup.leaseToken());
+        assertEquals(UUID.fromString(
+                "20000000-0000-0000-0000-000000000500"), cleanup.targetNpcUuid());
     }
 
     @Test
@@ -636,6 +608,18 @@ class BondedCompanionProjectionDurabilityTest {
 
         assertEquals(1L, results.stream().filter(Boolean::booleanValue).count());
         assertEquals(1, store.findActiveLeases(OWNER, "roster-a").size());
+    }
+
+    private long queryCount(Path database, String fromClause) throws Exception {
+        try (var connection = new com.alechilles.alecstamework.persistence
+                .adapter.sqlite.SqliteConnectionFactory(database)
+                .openReadConnection();
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery(
+                     "SELECT COUNT(*) FROM " + fromClause)) {
+            assertTrue(rows.next());
+            return rows.getLong(1);
+        }
     }
 
     private void create(

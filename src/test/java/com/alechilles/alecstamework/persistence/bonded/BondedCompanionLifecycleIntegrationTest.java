@@ -30,26 +30,37 @@ class BondedCompanionLifecycleIntegrationTest {
     }
 
     @Test
-    void lifecycleBridgeDrivesCleanupExpiryAndEveryObserverPath()
+    void lifecycleBridgeUsesOnlyLocalRecoveryAndDirectMarkerDeath()
             throws Exception {
         String source = Files.readString(
                 MAIN.resolve("TameworkBondedCompanionComposition.java"),
                 StandardCharsets.UTF_8
         );
 
-        assertTrue(source.contains("replayPendingCleanup("));
-        assertTrue(source.contains("expiry.tick("));
-        assertTrue(source.contains("lifecycleReconciliation.reconcileAsync("));
+        assertTrue(source.contains("replayPendingCleanupForWorld("));
+        assertTrue(source.contains("localLifecycle.reconcileCurrentWorld("));
+        assertTrue(source.contains("localLifecycle.storeOwnerInWorld("));
         assertTrue(source.contains("RecoveryCause.WORLD_LOAD"));
-        assertTrue(source.contains("RecoveryCause.PLAYER_JOIN"));
         assertTrue(source.contains("RecoveryCause.WORLD_TRANSFER"));
         assertTrue(source.contains("RecoveryCause.LOGOUT"));
-        assertTrue(source.contains("observer.onConfirmedDeath("));
-        assertTrue(source.contains("projectionRecovery.tick(now)"));
-        assertTrue(source.contains("lifecycleReconciliation.tick()"));
-        assertTrue(source.contains("durability::liveLeasesAfter"));
-        assertTrue(source.contains("world::scanBoundedRecoveryAsync"));
+        assertTrue(source.contains("localLifecycle.onConfirmedDeath("));
+        assertTrue(source.contains("durability.settleResidualLeases("));
         assertTrue(source.contains("store.pruneCleanup(now, 64)"));
-        assertTrue(!source.contains("world.readBounded("));
+        assertTrue(!source.contains("scanBoundedRecoveryAsync"));
+        assertTrue(!source.contains("activeLeases(256)"));
+    }
+
+    @Test
+    void worldGatewayNeverEnumeratesWorldsOrWaitsSynchronously()
+            throws Exception {
+        String source = Files.readString(MAIN.resolve(
+                        "companion/bonded/runtime/"
+                                + "HytaleBondedCompanionWorldGateway.java"),
+                StandardCharsets.UTF_8);
+
+        assertTrue(!source.contains("getWorlds()"));
+        assertTrue(!source.contains(".join()"));
+        assertTrue(source.contains("Universe.get().getWorld(worldKey)"));
+        assertTrue(source.contains("world.execute(read)"));
     }
 }

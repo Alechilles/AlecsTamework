@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.companion.bonded
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
 import com.alechilles.alecstamework.companion.bonded
-        .BondedCompanionProjectionRecoverySystem;
+        .BondedCompanionLocalProjectionLifecycle;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
@@ -28,17 +28,17 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Hytale 0.5.7 world-thread gateway for exact bonded projection cleanup.
@@ -49,7 +49,8 @@ import javax.annotation.Nonnull;
  */
 public final class HytaleBondedCompanionWorldGateway implements
         BondedCompanionProjectionCleanupService.WorldGateway,
-        BondedCompanionProjectionService.World {
+        BondedCompanionProjectionService.World,
+        BondedCompanionLocalProjectionLifecycle.ObservationSource {
     private final TameworkFullStateSnapshotReader snapshots;
     private final BondedCompanionProjectionSpawnBoundary spawns;
 
@@ -90,10 +91,11 @@ public final class HytaleBondedCompanionWorldGateway implements
                 return BondedCompanionProjectionService.SpawnResult
                         .retryRequired();
             }
-            return world.isInThread()
-                    ? spawnOnWorldThread(world, plan)
-                    : CompletableFuture.supplyAsync(
-                            () -> spawnOnWorldThread(world, plan), world).join();
+            if (!world.isInThread()) {
+                return BondedCompanionProjectionService.SpawnResult
+                        .retryRequired();
+            }
+            return spawnOnWorldThread(world, plan);
         } catch (RuntimeException | LinkageError failure) {
             return BondedCompanionProjectionService.SpawnResult.failed();
         }
@@ -132,76 +134,68 @@ public final class HytaleBondedCompanionWorldGateway implements
         try {
             World world = Universe.get().getWorld(lease.worldKey());
             if (world == null) return null;
-            return world.isInThread()
-                    ? readOnWorldThread(world, lease)
-                    : CompletableFuture.supplyAsync(
-                            () -> readOnWorldThread(world, lease), world
-                    ).join();
+            return world.isInThread() ? readOnWorldThread(world, lease) : null;
         } catch (RuntimeException | LinkageError failure) {
             return null;
         }
     }
 
-    /**
-     * Schedules bounded marker reads on their owning worlds. Maintenance never joins another
-     * world's executor; a later tick consumes the completed immutable observation batch.
-     */
+    /** Schedules one bounded inspection on only the supplied recorded world. */
+    @Override
     @Nonnull
-    public CompletionStage<BondedCompanionProjectionRecoverySystem.ScanResult>
-    scanBoundedRecoveryAsync(
+    public CompletionStage<BondedCompanionLocalProjectionLifecycle.WorldObservation>
+    inspect(
+            @Nonnull String worldKey,
             @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
             int maximumResults
     ) {
+        Objects.requireNonNull(worldKey, "worldKey");
         Objects.requireNonNull(leases, "leases");
-        if (maximumResults < 1 || leases.isEmpty()) return CompletableFuture.completedFuture(
-                new BondedCompanionProjectionRecoverySystem.ScanResult(List.of(), List.of()));
-        Set<LeaseMarker> markers = markersFor(leases);
-        TreeMap<String, World> worlds;
+        if (maximumResults < 1 || leases.isEmpty()) {
+            return CompletableFuture.completedFuture(
+                    new BondedCompanionLocalProjectionLifecycle.WorldObservation(
+                            List.of(), true));
+        }
+        World world;
         try {
-            worlds = new TreeMap<>(Universe.get().getWorlds());
+            world = Universe.get().getWorld(worldKey);
         } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(incompleteRecovery());
+            return CompletableFuture.completedFuture(
+                    BondedCompanionLocalProjectionLifecycle.WorldObservation
+                            .inconclusive());
         }
-        if (worlds.isEmpty()) {
-            return CompletableFuture.completedFuture(incompleteRecovery());
+        if (world == null || !worldKey.equals(world.getName())) {
+            return CompletableFuture.completedFuture(
+                    BondedCompanionLocalProjectionLifecycle.WorldObservation
+                            .inconclusive());
         }
-        List<BondedCompanionScheduledRecoveryScan> futures = new ArrayList<>();
-        worlds.forEach((name, world) -> futures.add(scheduleRecoveryScan(
-                name, world, markers, maximumResults
-        )));
-        return CompletableFuture.allOf(futures.stream().map(
-                        BondedCompanionScheduledRecoveryScan::future
-                )
-                        .toArray(CompletableFuture[]::new))
-                .thenApply(ignored -> combineRecoveryScans(
-                        leases, futures, maximumResults
-                ));
+        Set<LeaseMarker> markers = markersFor(leases);
+        CompletableFuture<BondedCompanionLocalProjectionLifecycle.WorldObservation>
+                result = new CompletableFuture<>();
+        Runnable read = () -> completeInspection(
+                result, world, markers, maximumResults);
+        try {
+            if (world.isInThread()) read.run(); else world.execute(read);
+        } catch (RuntimeException | LinkageError failure) {
+            result.complete(BondedCompanionLocalProjectionLifecycle
+                    .WorldObservation.inconclusive());
+        }
+        return result;
     }
 
-    private BondedCompanionScheduledRecoveryScan scheduleRecoveryScan(
-            String worldKey, World world, Set<LeaseMarker> markers, int maximumResults
+    private void completeInspection(
+            CompletableFuture<BondedCompanionLocalProjectionLifecycle.WorldObservation>
+                    result,
+            World world,
+            Set<LeaseMarker> markers,
+            int maximumResults
     ) {
-        CompletableFuture<BondedCompanionRecoveryScanResult> future =
-                new CompletableFuture<>();
-        Runnable read = () -> {
-            try {
-                future.complete(scanOnWorldThread(world, markers, maximumResults));
-            } catch (RuntimeException | LinkageError failure) {
-                future.complete(BondedCompanionRecoveryScanResult.incomplete());
-            }
-        };
         try {
-            if (world == null) {
-                future.complete(BondedCompanionRecoveryScanResult.incomplete());
-            } else if (world.isInThread()) {
-                read.run();
-            } else {
-                world.execute(read);
-            }
+            result.complete(scanOnWorldThread(world, markers, maximumResults));
         } catch (RuntimeException | LinkageError failure) {
-            future.complete(BondedCompanionRecoveryScanResult.incomplete());
+            result.complete(BondedCompanionLocalProjectionLifecycle
+                    .WorldObservation.inconclusive());
         }
-        return new BondedCompanionScheduledRecoveryScan(worldKey, future);
     }
 
     private Set<LeaseMarker> markersFor(
@@ -216,38 +210,6 @@ public final class HytaleBondedCompanionWorldGateway implements
         return result;
     }
 
-    private BondedCompanionProjectionRecoverySystem.ScanResult combineRecoveryScans(
-            List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
-            List<BondedCompanionScheduledRecoveryScan> scans, int maximumResults
-    ) {
-        ArrayList<BondedCompanionProjectionValidator.Projection> found = new ArrayList<>();
-        Set<String> completedWorlds = new HashSet<>();
-        boolean complete = true;
-        for (var scan : scans) {
-            BondedCompanionRecoveryScanResult result = scan.future().getNow(
-                    BondedCompanionRecoveryScanResult.incomplete()
-            );
-            complete &= result.complete();
-            if (result.complete()) {
-                completedWorlds.add(scan.worldKey());
-            }
-            for (var projection : result.projections()) {
-                if (found.size() >= maximumResults) { complete = false; break; }
-                found.add(projection);
-            }
-        }
-        return new BondedCompanionProjectionRecoverySystem.ScanResult(
-                found, complete ? leases.stream().filter(lease ->
-                        completedWorlds.contains(lease.worldKey())
-                ).toList() : List.of());
-    }
-
-    private BondedCompanionProjectionRecoverySystem.ScanResult incompleteRecovery() {
-        return new BondedCompanionProjectionRecoverySystem.ScanResult(
-                List.of(), List.of()
-        );
-    }
-
     @Override
     @Nonnull
     public BondedCompanionProjectionCleanupService.Outcome removeIfExact(
@@ -260,13 +222,11 @@ public final class HytaleBondedCompanionWorldGateway implements
                 return BondedCompanionProjectionCleanupService.Outcome
                         .RETRY_REQUIRED;
             }
-            if (world.isInThread()) {
-                return removeOnWorldThread(world, intent);
+            if (!world.isInThread()) {
+                return BondedCompanionProjectionCleanupService.Outcome
+                        .RETRY_REQUIRED;
             }
-            return CompletableFuture.supplyAsync(
-                    () -> removeOnWorldThread(world, intent),
-                    world
-            ).join();
+            return removeOnWorldThread(world, intent);
         } catch (RuntimeException | LinkageError failure) {
             return BondedCompanionProjectionCleanupService.Outcome
                     .RETRY_REQUIRED;
@@ -330,13 +290,14 @@ public final class HytaleBondedCompanionWorldGateway implements
         return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
     }
 
-    private BondedCompanionRecoveryScanResult
+    private BondedCompanionLocalProjectionLifecycle.WorldObservation
     scanOnWorldThread(
             World world, Set<LeaseMarker> expectedMarkers, int maximumResults
     ) {
         if (!world.isInThread() || world.getEntityStore() == null
                 || maximumResults < 1 || expectedMarkers.isEmpty()) {
-            return BondedCompanionRecoveryScanResult.incomplete();
+            return BondedCompanionLocalProjectionLifecycle.WorldObservation
+                    .inconclusive();
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         ComponentType<EntityStore, UUIDComponent> uuidType =
@@ -344,8 +305,11 @@ public final class HytaleBondedCompanionWorldGateway implements
         ComponentType<EntityStore, TameworkProjectionIdentityComponent>
                 markerType = TameworkProjectionIdentityComponent
                         .getComponentType();
+        ComponentType<EntityStore, NPCEntity> npcType =
+                NPCEntity.getComponentType();
         if (store == null || uuidType == null || markerType == null) {
-            return BondedCompanionRecoveryScanResult.incomplete();
+            return BondedCompanionLocalProjectionLifecycle.WorldObservation
+                    .inconclusive();
         }
         ArrayList<BondedCompanionProjectionValidator.Projection> found =
                 new ArrayList<>();
@@ -371,14 +335,66 @@ public final class HytaleBondedCompanionWorldGateway implements
                         if (found.size() >= maximumResults) {
                             complete[0] = false;
                         } else {
+                            Ref<EntityStore> reference = chunk.getReferenceTo(index);
+                            NPCEntity npc = npcType == null ? null
+                                    : chunk.getComponent(index, npcType);
+                            BondedCompanionSnapshot snapshot = snapshot(
+                                    reference, store, uuid.getUuid(), npc);
                             found.add(new BondedCompanionProjectionValidator.Projection(
-                                    uuid.getUuid(), world.getName(), marker, null
+                                    uuid.getUuid(), world.getName(), marker, snapshot
                             ));
                         }
                     }
                 }
         );
-        return new BondedCompanionRecoveryScanResult(found, complete[0]);
+        return new BondedCompanionLocalProjectionLifecycle.WorldObservation(
+                found, complete[0]);
+    }
+
+    @Nullable
+    private BondedCompanionSnapshot snapshot(
+            Ref<EntityStore> reference,
+            Store<EntityStore> store,
+            UUID npcUuid,
+            NPCEntity npc
+    ) {
+        if (reference == null || !reference.isValid() || npc == null) return null;
+        var captured = snapshots.readSourceNeutral(
+                reference, store, new NpcAlias(npcUuid), npc.getRoleName());
+        return captured.successful()
+                ? BondedCompanionSnapshot.of(captured.snapshot(), Map.of())
+                : null;
+    }
+
+    /** Captures direct current-world death evidence without a durable lease page. */
+    @Nullable
+    public BondedCompanionProjectionValidator.Projection readCurrent(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull String worldKey,
+            @Nonnull UUID npcUuid,
+            @Nonnull TameworkProjectionIdentityComponent suppliedMarker
+    ) {
+        if (!reference.isValid() || reference.getStore() != store) return null;
+        ComponentType<EntityStore, UUIDComponent> uuidType =
+                UUIDComponent.getComponentType();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        if (uuidType == null || markerType == null || npcType == null) return null;
+        UUIDComponent actualUuid = store.getComponent(reference, uuidType);
+        TameworkProjectionIdentityComponent actualMarker =
+                store.getComponent(reference, markerType);
+        NPCEntity npc = store.getComponent(reference, npcType);
+        if (actualUuid == null || !npcUuid.equals(actualUuid.getUuid())
+                || actualMarker == null || !actualMarker.isBondedCompanion()
+                || !Objects.equals(suppliedMarker.getProfileId(),
+                actualMarker.getProfileId())
+                || !Objects.equals(suppliedMarker.getBondedLeaseToken(),
+                actualMarker.getBondedLeaseToken())) return null;
+        return new BondedCompanionProjectionValidator.Projection(
+                npcUuid, worldKey, actualMarker,
+                snapshot(reference, store, npcUuid, npc));
     }
 
     private BondedCompanionProjectionValidator.Projection readOnWorldThread(

@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionVa
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLocalProjectionLifecycle;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionStorePlanner;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
@@ -13,21 +15,23 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Atomic SQLite implementation of the Task 4 bonded projection durability port. */
 public final class SqliteBondedCompanionProjectionDurability implements
-        BondedCompanionProjectionService.Durability {
+        BondedCompanionProjectionService.Durability,
+        BondedCompanionLocalProjectionLifecycle.LeaseSource {
     private final SqliteConnectionFactory connections;
     private final SqliteBondedCompanionLeaseReader leaseReader;
     private final SqliteBondedCompanionCleanupQueue cleanupQueue;
+    private final SqliteBondedCompanionStartupSettlement startupSettlement;
     private final SqliteBondedCompanionMapper mapper =
             new SqliteBondedCompanionMapper();
     private final BondedCompanionSnapshotCodec snapshots =
@@ -43,6 +47,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
         );
         leaseReader = new SqliteBondedCompanionLeaseReader(connections);
         cleanupQueue = new SqliteBondedCompanionCleanupQueue(connections);
+        startupSettlement = new SqliteBondedCompanionStartupSettlement(
+                connections);
     }
 
     @Override
@@ -156,15 +162,17 @@ public final class SqliteBondedCompanionProjectionDurability implements
     }
 
     /** Replays due exact cleanups and records their bounded terminal/retry state. */
-    public int replayPendingCleanup(
+    public int replayPendingCleanupForWorld(
             @Nonnull BondedCompanionProjectionCleanupService cleanup,
+            @Nonnull String worldKey,
             long nowMs,
             int limit
     ) {
         Objects.requireNonNull(cleanup, "cleanup");
+        Objects.requireNonNull(worldKey, "worldKey");
         if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
         List<BondedCompanionProjectionCleanupService.CleanupIntent> pending =
-                cleanupQueue.pending(nowMs, limit);
+                cleanupQueue.pendingForWorld(worldKey, nowMs, limit);
         int attempted = 0;
         for (var intent : pending) {
             BondedCompanionProjectionCleanupService.Outcome outcome =
@@ -219,45 +227,45 @@ public final class SqliteBondedCompanionProjectionDurability implements
         return leaseReader.activeLeases(limit);
     }
 
-    /**
-     * Returns only committed LIVE leases for recurring maintenance so pending summons cannot
-     * consume the bounded scan window.
-     */
+    @Override
     @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    liveLeases(int limit) {
-        return liveLeasesAfter(null, limit);
-    }
-
-    /** Returns one cursor page of LIVE leases for fair recurring maintenance. */
-    @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    liveLeasesAfter(@Nullable String afterProfileId, int limit) {
-        return leaseReader.liveLeasesAfter(afterProfileId, limit);
-    }
-
-    /** Returns only leases that were already pending at the immutable startup cutoff. */
-    @Nonnull public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    pendingLeasesBefore(
-            long maximumLeaseRowId,
-            @Nullable String afterProfileId,
-            int limit
+    public List<BondedCompanionProjectionValidator.LeaseExpectation> inWorld(
+            @Nonnull String worldKey, int limit
     ) {
-        return leaseReader.pendingLeasesBefore(
-                maximumLeaseRowId, afterProfileId, limit
-        );
+        return leaseReader.inWorld(worldKey, limit);
     }
 
-    /** Captures the durable lease-row boundary before startup recovery begins. */
-    public long pendingLeaseHighWaterMark() {
-        return leaseReader.pendingLeaseHighWaterMark();
+    @Override
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation> forOwner(
+            @Nonnull UUID ownerUuid, int limit
+    ) {
+        return leaseReader.forOwner(ownerUuid, limit);
     }
 
-    /** Returns finite expired leases without rejecting negative world time. */
+    @Override
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    findExpired(long nowMs, int limit) {
-        return leaseReader.findExpired(nowMs, limit);
+    forOwnerInWorld(
+            @Nonnull UUID ownerUuid, @Nonnull String worldKey, int limit
+    ) {
+        return leaseReader.forOwnerInWorld(ownerUuid, worldKey, limit);
+    }
+
+    @Override
+    @Nonnull
+    public Optional<BondedCompanionProjectionValidator.LeaseExpectation> exact(
+            @Nonnull String profileId, @Nonnull String leaseToken
+    ) {
+        return leaseReader.exact(profileId, leaseToken);
+    }
+
+    /**
+     * Atomically settles every residual pre-start lease without consulting a
+     * world or imposing a row-count/high-water admission limit.
+     */
+    public int settleResidualLeases(long nowMs) {
+        return startupSettlement.settle(nowMs);
     }
 
     private boolean returnToStored(
@@ -316,7 +324,6 @@ public final class SqliteBondedCompanionProjectionDurability implements
             BondedCompanionProjectionValidator.LeaseExpectation lease,
             String phase
     ) throws Exception {
-        insertLeaseAdmission(connection, lease);
         try (PreparedStatement insert = connection.prepareStatement("""
                 INSERT INTO bonded_companion_lease(
                     profile_id, lease_token, live_npc_uuid, world_key,
@@ -330,22 +337,6 @@ public final class SqliteBondedCompanionProjectionDurability implements
             insert.setLong(5, lease.startedAtMs());
             insert.setLong(6, lease.expiresAtMs());
             insert.setString(7, phase);
-            insert.executeUpdate();
-        }
-    }
-
-    private void insertLeaseAdmission(
-            Connection connection,
-            BondedCompanionProjectionValidator.LeaseExpectation lease
-    ) throws Exception {
-        try (PreparedStatement insert = connection.prepareStatement("""
-                INSERT INTO bonded_companion_lease_admission(
-                    profile_id, lease_token, admitted_at_ms
-                ) VALUES (?, ?, ?)
-                """)) {
-            insert.setString(1, lease.profileId());
-            insert.setString(2, lease.leaseToken());
-            insert.setLong(3, lease.startedAtMs());
             insert.executeUpdate();
         }
     }
@@ -390,25 +381,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 """)) {
             bindLeaseIdentity(delete, lease);
             delete.setString(5, lease.phase().name());
-            if (delete.executeUpdate() != 1) return 0;
-        }
-        deleteLeaseAdmission(connection, lease);
-        return 1;
-    }
-
-    private void deleteLeaseAdmission(
-            Connection connection,
-            BondedCompanionProjectionValidator.LeaseExpectation lease
-    ) throws Exception {
-        try (PreparedStatement delete = connection.prepareStatement("""
-                DELETE FROM bonded_companion_lease_admission
-                WHERE profile_id = ? AND lease_token = ?
-                """)) {
-            delete.setString(1, lease.profileId());
-            delete.setString(2, lease.leaseToken());
-            if (delete.executeUpdate() != 1) {
-                throw new IllegalStateException("bonded_lease_admission_missing");
-            }
+            return delete.executeUpdate();
         }
     }
 
