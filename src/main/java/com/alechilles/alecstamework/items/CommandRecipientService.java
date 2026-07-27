@@ -100,6 +100,10 @@ final class CommandRecipientService {
                 if (npcRef == null || !npcRef.isValid()) {
                     continue;
                 }
+                if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                        npcRef, context.store)) {
+                    continue;
+                }
                 UUID npcUuid = npc.getUuid();
                 if (!linkPolicyService.matchesMembership(
                         recipientMembershipMode,

@@ -234,7 +234,8 @@ class BondedCompanionCommandRoutingIsolationTest {
     private void assertCallbackAuthorityBefore(String source, String method,
                                                String callback) {
         int methodStart = source.indexOf(method);
-        int guard = source.indexOf("allowsCurrentGenericCallback(", methodStart);
+        int guard = source.indexOf(
+                "callbackAuthority.allowsGeneric(", methodStart);
         int callbackIndex = source.indexOf(callback, methodStart);
 
         assertTrue(methodStart >= 0, "Missing method: " + method);

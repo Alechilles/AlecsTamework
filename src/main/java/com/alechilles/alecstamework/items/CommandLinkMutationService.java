@@ -65,6 +65,10 @@ final class CommandLinkMutationService {
         if (config == null || config.usesBondedCompanionRoster()) {
             return LinkToggleResult.notToggled();
         }
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                targetRef, store)) {
+            return LinkToggleResult.notToggled();
+        }
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc == null) {
             return LinkToggleResult.notToggled();
@@ -227,6 +231,10 @@ final class CommandLinkMutationService {
         ItemStack updated = stack;
         for (Candidate candidate : recipients) {
             if (candidate == null || candidate.ref == null || candidate.npc == null || candidate.npc.getUuid() == null) {
+                continue;
+            }
+            if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                    candidate.ref, store)) {
                 continue;
             }
             TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());

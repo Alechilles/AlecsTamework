@@ -65,6 +65,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandPanelEntrySourceService panelEntrySourceService;
     private final CommandToolInventoryService toolInventoryService;
+    private final CommandPanelCallbackAuthority callbackAuthority;
     private final CommandResolutionService resolutionService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandCompanionPlacementService companionPlacementService;
@@ -76,6 +77,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedNpcInventoryRepairService inventoryRepairService;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
+    private final CommandLinkedRecordCanonicalizer recordCanonicalizer;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandFreeRestorationActionService freeRestorationActions;
     private final CommandOwnerReleaseService ownerReleaseService;
@@ -205,6 +207,8 @@ public final class CommandItemFeatureHandler {
         this.profileActionResolver = npcIdentityService != null
                 ? new CommandNpcProfileActionResolver(npcIdentityService)
                 : null;
+        this.recordCanonicalizer = new CommandLinkedRecordCanonicalizer(
+                linkedNpcRecordStore, profileActionResolver);
         this.panelEntryService = new CommandLinkedPanelEntryService(
                 linkedNpcRecordStore,
                 relocationService,
@@ -238,6 +242,8 @@ public final class CommandItemFeatureHandler {
                 panelPreferenceService,
                 this.groupService
         );
+        this.callbackAuthority = new CommandPanelCallbackAuthority(
+                registry, toolInventoryService);
         this.talentPageService = new CommandTalentPageService(
                 linkMutationService,
                 toolInventoryService,
@@ -378,7 +384,7 @@ public final class CommandItemFeatureHandler {
                 canonicalRecordCommitGate,
                 relocationDispatchService,
                 stepExecutionService,
-                this::canonicalizeLinkedNpcRecords,
+                recordCanonicalizer::canonicalize,
                 this::openSelectionMenu,
                 deferredLinks::handle,
                 this::resolveCommandLabel,
@@ -439,6 +445,7 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       ItemStack working,
                                       String toolId) {
+        long openedRegistryRevision = callbackAuthority.revision();
         CommandSelectionPageService.Actions actions = new CommandSelectionPageService.Actions(
                 npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
@@ -448,34 +455,47 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRecall(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, config, npcUuid),
-                () -> openGroupManagerFromSelection(player, config, toolId),
-                () -> reopenSelectionMenu(player, config, toolId),
+                () -> openGroupManagerFromSelection(
+                        player, config, toolId, openedRegistryRevision),
+                () -> reopenSelectionMenu(
+                        player, config, toolId, openedRegistryRevision),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         return selectionPageService.open(
                 player, store, config, working, toolId, actions,
-                () -> allowsCurrentGenericCallback(player, toolId, config)
+                () -> callbackAuthority.allowsGeneric(
+                        player, toolId, config, openedRegistryRevision),
+                () -> callbackAuthority.allowsBonded(
+                        player, toolId,
+                        working == null ? null : working.getItemId(),
+                        config, openedRegistryRevision)
         );
     }
 
     private void openGroupManagerFromSelection(Player player,
                                                TwCommandItemConfig config,
-                                               String toolId) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+                                               String toolId,
+                                               long openedRegistryRevision) {
+        if (!callbackAuthority.allowsGeneric(
+                player, toolId, config, openedRegistryRevision)) {
             return;
         }
         groupManagerPageService.openGroupManagerPage(
                 player,
                 toolId,
-                () -> reopenSelectionMenu(player, config, toolId),
-                () -> allowsCurrentGenericCallback(player, toolId, config)
+                () -> reopenSelectionMenu(
+                        player, config, toolId, openedRegistryRevision),
+                () -> callbackAuthority.allowsGeneric(
+                        player, toolId, config, openedRegistryRevision)
         );
     }
 
     private void reopenSelectionMenu(Player player,
                                      TwCommandItemConfig config,
-                                     String toolId) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+                                     String toolId,
+                                     long openedRegistryRevision) {
+        if (!callbackAuthority.allowsGeneric(
+                player, toolId, config, openedRegistryRevision)) {
             return;
         }
         World world = player.getWorld();
@@ -504,7 +524,7 @@ public final class CommandItemFeatureHandler {
                                     String toolId,
                                     TwCommandItemConfig config,
                                     String commandId) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)
                 || commandId == null || commandId.isBlank()) {
             return;
         }
@@ -526,7 +546,7 @@ public final class CommandItemFeatureHandler {
                                  String toolId,
                                  TwCommandItemConfig config,
                                  UUID npcUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)
                 || player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
             return;
@@ -565,7 +585,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID presentationUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
         ownerReleaseService.release(
@@ -577,7 +597,7 @@ public final class CommandItemFeatureHandler {
                                String toolId,
                                TwCommandItemConfig config,
                                UUID presentationUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
         ownerCullService.cull(
@@ -589,7 +609,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID npcUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
         freeRestorationActions.request(player, toolId, npcUuid);
@@ -605,7 +625,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID npcUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)
                 || player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
             return;
@@ -704,7 +724,7 @@ public final class CommandItemFeatureHandler {
                                  String toolId,
                                  TwCommandItemConfig config,
                                  UUID npcUuid) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
         locateService.locate(player, toolId, npcUuid);
@@ -722,7 +742,7 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        if (!allowsCurrentGenericCallback(player, toolId, config)) {
+        if (!callbackAuthority.allowsGeneric(player, toolId, config)) {
             return;
         }
         menuMoveService.applyMenuMoveCommand(
@@ -732,26 +752,6 @@ public final class CommandItemFeatureHandler {
                 returnHome,
                 cmdEntry -> resolveCommandLabel(player, cmdEntry)
         );
-    }
-
-    private ItemStack canonicalizeLinkedNpcRecords(
-            Player player,
-            Store<EntityStore> store,
-            TwCommandItemConfig config,
-            ItemStack stack,
-            String toolId
-    ) {
-        if (stack == null || stack.isEmpty()
-                || profileActionResolver == null) {
-            return stack;
-        }
-        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
-        CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                profileActionResolver.canonicalizeRecords(records);
-        if (!canonical.safeToPersist() || !canonical.identityChanged()) {
-            return stack;
-        }
-        return linkedNpcRecordStore.write(stack, canonical.records());
     }
 
     private String resolveCommandLabel(Player player, CommandEntry command) {
@@ -765,14 +765,6 @@ public final class CommandItemFeatureHandler {
                 ? player.getPlayerRef().getLanguage()
                 : null;
         return LocalizedText.resolveConfigValue(language, command.getDisplayName(), fallback);
-    }
-
-    /** Revalidates the physical generic tool before a delayed page callback. */
-    private boolean allowsCurrentGenericCallback(
-            Player player, String toolId, TwCommandItemConfig config
-    ) {
-        return CommandGenericTargetAuthority.allowsCurrentGenericCallback(
-                player, toolId, config, toolInventoryService, registry);
     }
 
     private Vector3d readStoredHomePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {

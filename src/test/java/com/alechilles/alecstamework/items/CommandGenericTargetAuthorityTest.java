@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
@@ -22,6 +24,7 @@ import com.hypixel.hytale.server.core.io.PacketHandler;
 import com.hypixel.hytale.server.core.io.ProtocolVersion;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.protocol.ToClientPacket;
@@ -31,6 +34,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
@@ -111,6 +115,73 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void forgedGenericLinkCannotPersistBondedProjectionUuid()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveBondedTarget(false);
+            CommandLinkMutationService links = new CommandLinkMutationService(
+                    null, new CommandLinkPolicyService(), null, null);
+            ItemStack unchanged = metadataStack("test:generic-whistle");
+
+            LinkToggleResult result = links.tryToggleLink(
+                    target.player, scope.store, target.reference,
+                    "generic-tool", genericConfig(), unchanged);
+
+            assertFalse(result.toggled);
+            assertFalse(scope.store.getComponent(target.reference,
+                    scope.linksType).containsToolId("generic-tool"));
+            assertEquals(null, result.updatedItem);
+            assertTrue(new CommandLinkedNpcRecordStore().read(unchanged)
+                    .isEmpty());
+        }
+    }
+
+    @Test
+    void genericRecipientQueryExcludesBondedProjectionButKeepsOrdinaryNpc()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget bonded = scope.liveBondedTarget(true);
+            LiveTarget ordinary = scope.liveOrdinaryTarget(true);
+            Ref<EntityStore> playerRef = scope.store.createReference();
+            scope.store.put(playerRef, scope.transformType,
+                    new TransformComponent());
+            Context context = new Context(
+                    bonded.player, playerRef, scope.store, genericConfig(),
+                    null, "test:generic-whistle", "generic-tool", null,
+                    null, metadataStack("test:generic-whistle"), false,
+                    false, 0D, 0D, 0L, 0D, 0D);
+
+            List<Candidate> recipients = new CommandRecipientService(
+                    null, null, null).queryRecipients(context);
+
+            assertEquals(List.of(ordinary.uuid), recipients.stream()
+                    .map(candidate -> candidate.npc.getUuid()).toList());
+        }
+    }
+
+    @Test
+    void genericPositionRefreshNeverWritesBondedProjectionRecord()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget bonded = scope.liveBondedTarget(true);
+            LiveTarget ordinary = scope.liveOrdinaryTarget(true);
+            CommandLinkedNpcRecordStore records =
+                    new CommandLinkedNpcRecordStore();
+            CommandLinkMutationService links = new CommandLinkMutationService(
+                    records, new CommandLinkPolicyService(), null, null);
+
+            ItemStack refreshed = links.refreshLinkedNpcPositions(
+                    metadataStack("test:generic-whistle"),
+                    List.of(new Candidate(bonded.reference, bonded.npc, 0D),
+                            new Candidate(ordinary.reference, ordinary.npc, 1D)),
+                    scope.store);
+
+            assertEquals(List.of(ordinary.uuid), records.read(refreshed).stream()
+                    .map(record -> record.npcUuid).toList());
+        }
+    }
+
+    @Test
     void genericNearbyPresentationRejectsBondedLiveMarker()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
@@ -140,6 +211,32 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void corruptProjectionMarkerKindsFailClosedButKnownGenericAndUnmarkedPass()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            Ref<EntityStore> unmarked = scope.store.createReference();
+            Ref<EntityStore> knownGeneric = scope.store.createReference();
+            Ref<EntityStore> blankKind = scope.store.createReference();
+            Ref<EntityStore> unknownKind = scope.store.createReference();
+            scope.store.put(knownGeneric, scope.markerType,
+                    new TameworkProjectionIdentityComponent("p", "o",
+                            TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
+                            null, null, 0L));
+            scope.store.put(blankKind, scope.markerType,
+                    new TameworkProjectionIdentityComponent("p", "o", "",
+                            null, null, 0L));
+            scope.store.put(unknownKind, scope.markerType,
+                    new TameworkProjectionIdentityComponent("p", "o",
+                            "UNKNOWN_FUTURE_KIND", null, null, 0L));
+
+            assertTrue(allowsGenericTargetMutation(unmarked, scope.store));
+            assertTrue(allowsGenericTargetMutation(knownGeneric, scope.store));
+            assertFalse(allowsGenericTargetMutation(blankKind, scope.store));
+            assertFalse(allowsGenericTargetMutation(unknownKind, scope.store));
+        }
+    }
+
+    @Test
     void staleGenericCallbackRejectsCurrentBondedToolConfiguration()
             throws Exception {
         ItemStack physicalBondedHorn = testStack("test:bonded-horn");
@@ -149,6 +246,86 @@ class CommandGenericTargetAuthorityTest {
         assertFalse(allowsGenericCallback(
                 physicalBondedHorn, pageConfig, currentConfig
         ));
+    }
+
+    @Test
+    void staleGenericPageRevisionRejectsReloadedGenericPolicy()
+            throws Exception {
+        ItemStack physicalGenericTool = testStack("test:generic-whistle");
+        TwCommandItemConfig openedConfig = genericConfig();
+        TwCommandItemConfig reloadedGenericConfig = TwCommandItemConfig.CODEC
+                .decode(BsonDocument.parse("{\"RequireTamed\":true}"),
+                        new ExtraInfo());
+        CommandItemRegistry registry = new CommandItemRegistry();
+        registry.register("test:generic-whistle", openedConfig);
+        long openedRevision = registry.revision();
+
+        assertTrue(allowsGenericCallbackAtRevision(
+                physicalGenericTool, openedConfig, openedRevision, registry));
+        registry.clear();
+        registry.register("test:generic-whistle", reloadedGenericConfig);
+
+        assertFalse(allowsGenericCallbackAtRevision(
+                physicalGenericTool, openedConfig, openedRevision, registry));
+    }
+
+    @Test
+    void bondedLifecycleAuthorityRequiresCurrentPhysicalConfigAndRoster()
+            throws Exception {
+        ItemStack horn = testStack("test:horn-a");
+        TwCommandItemConfig opened = bondedConfig("test:roster-a", true);
+
+        assertTrue(allowsBondedCallback(
+                horn, "test:horn-a", opened,
+                bondedConfig("test:roster-a", true)));
+        assertFalse(allowsBondedCallback(
+                horn, "test:horn-a", opened,
+                bondedConfig("test:roster-b", true)));
+        assertFalse(allowsBondedCallback(
+                horn, "test:horn-a", opened, genericConfig()));
+        assertFalse(allowsBondedCallback(
+                horn, "test:horn-a", opened,
+                bondedConfig("test:roster-a", false)));
+        assertFalse(allowsBondedCallback(
+                testStack("test:substituted-item"), "test:horn-a", opened,
+                bondedConfig("test:roster-a", true)));
+    }
+
+    @Test
+    void bondedLifecycleAuthorityRejectsRemovalAndAnyRegistryReload()
+            throws Exception {
+        ItemStack horn = testStack("test:horn-a");
+        TwCommandItemConfig opened = bondedConfig("test:roster-a", true);
+        CommandItemRegistry registry = bondedCommandRegistry(
+                "test:roster-a", "test:horn-a", "horn-config",
+                bondedConfig("test:roster-a", true));
+        long openedRevision = registry.revision();
+
+        assertTrue(allowsBondedCallbackAtRevision(
+                horn, "test:horn-a", opened, openedRevision, registry));
+        registry.clear();
+        assertFalse(allowsBondedCallbackAtRevision(
+                horn, "test:horn-a", opened, openedRevision, registry));
+
+        registry.register("horn-config", "test:horn-a",
+                bondedConfig("test:roster-a", true));
+        assertFalse(allowsBondedCallbackAtRevision(
+                horn, "test:horn-a", opened, openedRevision, registry));
+    }
+
+    @Test
+    void bondedLifecycleAuthorityRetainsValidConfigIdOverride()
+            throws Exception {
+        ItemStack physicalOverrideItem = testStack("test:override-item");
+        TwCommandItemConfig opened = bondedConfig("test:roster-a", true);
+        setField(opened, TwCommandItemConfig.class, "id", "override-config");
+        CommandItemRegistry registry = bondedCommandRegistry(
+                "test:roster-a", "test:configured-item", "override-config",
+                bondedConfig("test:roster-a", true));
+
+        assertTrue(allowsBondedCallbackAtRevision(
+                physicalOverrideItem, "test:override-item", opened,
+                registry.revision(), registry));
     }
 
     @Test
@@ -198,12 +375,18 @@ class CommandGenericTargetAuthorityTest {
     }
 
     private static TwCommandItemConfig bondedConfig() {
+        return bondedConfig("test:bonded", true);
+    }
+
+    private static TwCommandItemConfig bondedConfig(
+            String rosterId, boolean enabled) {
         return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("""
                 {
+                  "Enabled":%s,
                   "RosterStorage":"BondedCompanions",
-                  "BondedRosterId":"test:bonded"
+                  "BondedRosterId":"%s"
                 }
-                """), new ExtraInfo());
+                """.formatted(enabled, rosterId)), new ExtraInfo());
     }
 
     private static TwCommandItemConfig disabledGenericConfig() {
@@ -232,6 +415,62 @@ class CommandGenericTargetAuthorityTest {
                 currentPhysicalConfig);
     }
 
+    private static boolean allowsGenericCallbackAtRevision(
+            ItemStack stack,
+            TwCommandItemConfig openTimeConfig,
+            long openedRevision,
+            CommandItemRegistry registry
+    ) throws Exception {
+        return invokeBoolean("allowsCurrentGenericCallback", stack,
+                openTimeConfig, openedRevision, registry);
+    }
+
+    private static boolean allowsBondedCallback(
+            ItemStack stack,
+            String openedItemId,
+            TwCommandItemConfig openTimeConfig,
+            TwCommandItemConfig currentPhysicalConfig
+    ) throws Exception {
+        return invokeBoolean("allowsCurrentBondedCallback", stack,
+                openedItemId, openTimeConfig, currentPhysicalConfig);
+    }
+
+    private static boolean allowsBondedCallbackAtRevision(
+            ItemStack stack,
+            String openedItemId,
+            TwCommandItemConfig openTimeConfig,
+            long openedRevision,
+            CommandItemRegistry registry
+    ) throws Exception {
+        return invokeBoolean("allowsCurrentBondedCallback", stack,
+                openedItemId, openTimeConfig, openedRevision, registry);
+    }
+
+    private static CommandItemRegistry bondedCommandRegistry(
+            String rosterId,
+            String itemId,
+            String configId,
+            TwCommandItemConfig config
+    ) throws Exception {
+        TwBondedCompanionRosterConfig roster =
+                TwBondedCompanionRosterConfig.CODEC.decode(
+                        BsonDocument.parse("""
+                                {
+                                  "RosterId":"%s",
+                                  "FamilyId":"test:family",
+                                  "AllowedRoles":["test:role"]
+                                }
+                                """.formatted(rosterId)), new ExtraInfo());
+        setField(roster, TwBondedCompanionRosterConfig.class,
+                "id", "roster-policy");
+        BondedCompanionRosterRegistry rosters =
+                new BondedCompanionRosterRegistry();
+        assertTrue(rosters.replace(List.of(roster), 1L).applied());
+        CommandItemRegistry registry = new CommandItemRegistry(rosters);
+        registry.register(configId, itemId, config);
+        return registry;
+    }
+
     private static boolean allowsGenericTargetMutation(
             Ref<EntityStore> reference, TestEntityComponentStore store
     ) throws Exception {
@@ -255,6 +494,8 @@ class CommandGenericTargetAuthorityTest {
                         ? com.hypixel.hytale.component.Store.class
                         : argument instanceof Ref<?>
                         ? Ref.class
+                        : argument instanceof Long
+                        ? long.class
                         : argument.getClass())
                 .toArray(Class<?>[]::new);
         Method method = authority.getDeclaredMethod(methodName, types);
@@ -270,6 +511,31 @@ class CommandGenericTargetAuthorityTest {
         return stack;
     }
 
+    private static ItemStack metadataStack(String itemId) {
+        return new MetadataItemStack(itemId, null);
+    }
+
+    /** Asset-store-free stack that keeps real BSON metadata semantics. */
+    private static final class MetadataItemStack extends ItemStack {
+        private MetadataItemStack(String itemId, BsonDocument metadata) {
+            super();
+            this.itemId = itemId;
+            this.quantity = 1;
+            this.metadata = metadata;
+        }
+
+        @Override
+        public <T> ItemStack withMetadata(
+                String key, com.hypixel.hytale.codec.Codec<T> codec, T value) {
+            BsonDocument next = metadata == null
+                    ? new BsonDocument() : metadata.clone();
+            if (value == null) next.remove(key);
+            else next.put(key, codec.encode(value));
+            return new MetadataItemStack(itemId,
+                    next.isEmpty() ? null : next);
+        }
+    }
+
     private static final class ProjectionScope implements AutoCloseable {
         private final Object oldTamework;
         private final Object oldEntityModule;
@@ -282,6 +548,8 @@ class CommandGenericTargetAuthorityTest {
                 ownerType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkCommandLinksComponent>
                 linksType = new ComponentType<>();
+        private final ComponentType<EntityStore, TransformComponent>
+                transformType = new ComponentType<>();
         private final TestWorld world;
         private final TestEntityStore entityStore;
         private final TestEntityComponentStore store;
@@ -306,6 +574,7 @@ class CommandGenericTargetAuthorityTest {
                     EntityModule.class);
             Map<Class<?>, ComponentType<EntityStore, ?>> types = new HashMap<>();
             types.put(NPCEntity.class, scope.npcType);
+            types.put(TransformComponent.class, scope.transformType);
             setField(module, EntityModule.class, "classToComponentType", types);
             entityModule.set(null, module);
             Tamework tamework = (Tamework) unsafe().allocateInstance(
@@ -329,29 +598,49 @@ class CommandGenericTargetAuthorityTest {
         }
 
         private LiveTarget liveBondedTarget() throws Exception {
+            return liveBondedTarget(true);
+        }
+
+        private LiveTarget liveBondedTarget(boolean linked) throws Exception {
+            return liveTarget(true, linked,
+                    UUID.fromString("73000000-0000-0000-0000-000000000002"));
+        }
+
+        private LiveTarget liveOrdinaryTarget(boolean linked) throws Exception {
+            return liveTarget(false, linked,
+                    UUID.fromString("73000000-0000-0000-0000-000000000003"));
+        }
+
+        private LiveTarget liveTarget(boolean bonded, boolean linked, UUID uuid)
+                throws Exception {
             UUID owner = UUID.fromString("73000000-0000-0000-0000-000000000001");
-            UUID uuid = UUID.fromString("73000000-0000-0000-0000-000000000002");
             Ref<EntityStore> reference = store.createReference();
             NPCEntity npc = new NPCEntity();
             npc.setLegacyUUID(uuid);
             store.put(reference, npcType, npc);
-            store.put(reference, markerType,
-                    TameworkProjectionIdentityComponent.bondedCompanion(
-                            "profile", "lease"));
+            store.put(reference, markerType, bonded
+                    ? TameworkProjectionIdentityComponent.bondedCompanion(
+                            "profile", "lease")
+                    : new TameworkProjectionIdentityComponent(
+                            "profile", "operation",
+                            TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER,
+                            null, null, 0L));
+            store.put(reference, transformType, new TransformComponent());
             TameworkOwnerComponent ownership = new TameworkOwnerComponent();
             ownership.setOwnerId(owner);
             store.put(reference, ownerType, ownership);
             TameworkCommandLinksComponent links =
                     new TameworkCommandLinksComponent();
             links.setOwnerId(owner);
-            links.setToolIds(new String[] {"generic-tool"});
+            links.setToolIds(linked
+                    ? new String[] {"generic-tool"} : new String[0]);
             store.put(reference, linksType, links);
             entityStore.testWorld.initialize(uuid, reference);
             Player player = (Player) unsafe().allocateInstance(Player.class);
             player.setLegacyUUID(owner);
             setField(player, Player.class, "playerRef", playerRef(owner));
             player.loadIntoWorld(entityStore.testWorld);
-            return new LiveTarget(player, reference, owner, uuid);
+            return new LiveTarget(player, reference, owner, uuid, npc);
         }
     }
 
@@ -402,7 +691,7 @@ class CommandGenericTargetAuthorityTest {
     }
 
     private record LiveTarget(Player player, Ref<EntityStore> reference,
-                              UUID owner, UUID uuid) {
+                              UUID owner, UUID uuid, NPCEntity npc) {
     }
 
     private static PlayerRef playerRef(UUID owner) throws Exception {

@@ -9,6 +9,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /** Routes only explicitly bonded command-item rows to bonded mutations. */
 final class BondedCompanionPanelActionRouter {
@@ -57,6 +58,16 @@ final class BondedCompanionPanelActionRouter {
                TwCommandItemConfig config,
                CommandPanelFeaturePresentation feature,
                BondedCompanionPanelActionService.Action action) {
+        route(player, store, config, feature, action, () -> true);
+    }
+
+    /** Applies a bonded lifecycle action only while its physical authority holds. */
+    void route(Player player, Store<EntityStore> store,
+               TwCommandItemConfig config,
+               CommandPanelFeaturePresentation feature,
+               BondedCompanionPanelActionService.Action action,
+               BooleanSupplier lifecycleAuthority) {
+        if (lifecycleAuthority == null || !lifecycleAuthority.getAsBoolean()) return;
         if (player == null || config == null || !config.usesBondedCompanionRoster()
                 || feature == null || feature.bonded() == null) return;
         String world = player.getWorld() == null ? null : player.getWorld().getName();

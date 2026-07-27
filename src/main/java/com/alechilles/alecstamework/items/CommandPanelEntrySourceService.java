@@ -114,8 +114,11 @@ final class CommandPanelEntrySourceService {
         if (player != null && config != null
                 && config.usesBondedCompanionRoster()
                 && bondedEntrySource != null) {
-            return bondedEntrySource.buildSnapshot(
+            CommandPanelSnapshot durable = bondedEntrySource.buildSnapshot(
                     player, store, config.getBondedRosterId());
+            return new CommandPanelSnapshot(
+                    applyFiltersAndSort(durable.entries(), stack),
+                    durable.featurePresentations());
         }
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);

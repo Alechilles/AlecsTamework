@@ -91,7 +91,8 @@ final class CommandSelectionPageService {
                  ItemStack working,
                  String toolId,
                  Actions actions,
-                 BooleanSupplier genericCallbackAuthority) {
+                 BooleanSupplier genericCallbackAuthority,
+                 BooleanSupplier bondedLifecycleAuthority) {
         if (!canOpen(player, store, config, toolId, actions)) {
             return false;
         }
@@ -104,7 +105,9 @@ final class CommandSelectionPageService {
         TameworkCommandSelectionPage page = createPage(
                 player, store, uiPlayerRef, config, working, toolId, actions,
                 genericCallbackAuthority != null
-                        ? genericCallbackAuthority : () -> false
+                        ? genericCallbackAuthority : () -> false,
+                bondedLifecycleAuthority != null
+                        ? bondedLifecycleAuthority : () -> false
         );
         return openPage(player, playerRef, store, page);
     }
@@ -129,7 +132,8 @@ final class CommandSelectionPageService {
                                                     ItemStack working,
                                                     String toolId,
                                                     Actions actions,
-                                                    BooleanSupplier genericCallbackAuthority) {
+                                                    BooleanSupplier genericCallbackAuthority,
+                                                    BooleanSupplier bondedLifecycleAuthority) {
         String selectedId = working != null
                 ? working.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING)
                 : null;
@@ -205,15 +209,15 @@ final class CommandSelectionPageService {
                         actions.respawn()) : ignoreUuid,
                 npcUuid -> applyFeatureAction(
                         player, store, config, npcUuid, FeatureAction.SUMMON,
-                        panelSnapshot
+                        panelSnapshot, bondedLifecycleAuthority
                 ),
                 npcUuid -> applyFeatureAction(
                         player, store, config, npcUuid, FeatureAction.DISMISS,
-                        panelSnapshot
+                        panelSnapshot, bondedLifecycleAuthority
                 ),
                 npcUuid -> applyFeatureAction(
                         player, store, config, npcUuid, FeatureAction.REVIVE,
-                        panelSnapshot
+                        panelSnapshot, bondedLifecycleAuthority
                 ),
                 genericRosterActions ? guardedUuid(guardedGenericCallbacks,
                         actions.locate()) : ignoreUuid,
@@ -364,12 +368,13 @@ final class CommandSelectionPageService {
             TwCommandItemConfig config,
             UUID presentationUuid,
             FeatureAction action,
-            CoherentPanelSnapshot snapshot
+            CoherentPanelSnapshot snapshot,
+            BooleanSupplier bondedLifecycleAuthority
     ) {
         CommandPanelFeaturePresentation feature = snapshot == null
                 ? null : snapshot.presentation(presentationUuid);
         routeFeatureAction(player, store, config, presentationUuid,
-                feature, action);
+                feature, action, bondedLifecycleAuthority);
     }
 
     FeatureRoute routeFeatureAction(
@@ -380,6 +385,19 @@ final class CommandSelectionPageService {
             CommandPanelFeaturePresentation feature,
             FeatureAction action
     ) {
+        return routeFeatureAction(player, store, config, presentationUuid,
+                feature, action, () -> true);
+    }
+
+    private FeatureRoute routeFeatureAction(
+            Player player,
+            Store<EntityStore> store,
+            TwCommandItemConfig config,
+            UUID presentationUuid,
+            CommandPanelFeaturePresentation feature,
+            FeatureAction action,
+            BooleanSupplier bondedLifecycleAuthority
+    ) {
         if (config != null && config.usesBondedCompanionRoster()) {
             if (bondedActions != null) {
                 bondedActions.route(player, store, config, feature,
@@ -387,7 +405,7 @@ final class CommandSelectionPageService {
                     case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
                     case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
                     case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
-                        });
+                        }, bondedLifecycleAuthority);
             }
             return FeatureRoute.BONDED;
         }
