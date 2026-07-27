@@ -2,15 +2,17 @@ package com.alechilles.alecstamework.persistence.bonded;
 
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
-import com.hypixel.hytale.server.npc.asset.builder.BuilderInfo;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.builders.BuilderRole;
+import com.hypixel.hytale.server.npc.role.builders.BuilderRoleVariant;
 import com.hypixel.hytale.server.npc.role.support.RoleStats;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
+import com.hypixel.hytale.server.npc.util.expression.Scope;
 import javax.annotation.Nullable;
 
-/** Reads the resolved health from Hytale's fully built NPC role asset. */
+/** Reads resolved health from the loaded NPC role builder without creating a live role. */
 final class HytaleBondedCompanionRoleHealthResolver
         implements BondedCompanionRoleHealthResolver {
 
@@ -30,8 +32,7 @@ final class HytaleBondedCompanionRoleHealthResolver
                 return null;
             }
             return resolveLoadedRole(plugin.tryGetCachedValidRole(roleIndex),
-                    plugin.getRoleBuilderInfo(roleIndex),
-                    plugin.getBuilderManager(), roleIndex);
+                    plugin.getBuilderManager());
         } catch (RuntimeException | LinkageError ignored) {
             return null;
         }
@@ -40,27 +41,64 @@ final class HytaleBondedCompanionRoleHealthResolver
     @Nullable
     static Double resolveLoadedRole(
             @Nullable Builder<Role> builder,
-            @Nullable BuilderInfo builderInfo,
-            @Nullable BuilderManager builders,
-            int roleIndex
+            @Nullable BuilderManager builders
     ) {
-        if (builder == null || builderInfo == null || builders == null
-                || roleIndex < 0) {
+        if (builder == null || builders == null) {
             return null;
         }
         try {
-            // Variant roles carry their concrete MaxHealth in Modify, so build
-            // the resolved role rather than inspecting template parameters.
-            BuilderSupport support = new BuilderSupport(
-                    builders, null, null, new ExecutionContext(), builder,
-                    new RoleStats());
-            Role role = NPCPlugin.buildRole(builder, builderInfo, support,
-                    roleIndex);
-            double maximum = role.getInitialMaxHealth();
-            return Double.isFinite(maximum) && maximum > 0.0D
-                    ? maximum : null;
+            ExecutionContext context = new ExecutionContext();
+            Scope scope = resolveScope(builder, builders, context);
+            Builder<Role> concrete = resolveConcreteRole(builder, builders);
+            if (!(concrete instanceof BuilderRole role) || scope == null) {
+                return null;
+            }
+            context.setScope(scope);
+            return readMaximumHealth(role, builders, context);
         } catch (RuntimeException | LinkageError ignored) {
             return null;
         }
+    }
+
+    @Nullable
+    static Double readMaximumHealth(
+            BuilderRole role,
+            BuilderManager builders,
+            ExecutionContext context
+    ) {
+        BuilderSupport support = new BuilderSupport(
+                builders, null, null, context, role, new RoleStats());
+        double maximum = role.getMaxHealth(support);
+        return Double.isFinite(maximum) && maximum > 0.0D
+                ? maximum : null;
+    }
+
+    @Nullable
+    private static Scope resolveScope(
+            Builder<Role> builder,
+            BuilderManager builders,
+            ExecutionContext context
+    ) {
+        if (builder instanceof BuilderRoleVariant variant) {
+            return variant.createModifierScope(context);
+        }
+        return builder.getBuilderParameters() == null
+                ? null : builder.getBuilderParameters().createScope();
+    }
+
+    @Nullable
+    private static Builder<Role> resolveConcreteRole(
+            Builder<Role> builder,
+            BuilderManager builders
+    ) {
+        Builder<Role> current = builder;
+        while (current instanceof BuilderRoleVariant variant) {
+            current = builders.getCachedBuilder(
+                    variant.getReferenceIndex(), Role.class);
+            if (current == null) {
+                return null;
+            }
+        }
+        return current;
     }
 }
