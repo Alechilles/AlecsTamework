@@ -29,7 +29,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -144,60 +143,6 @@ public final class HytaleBondedCompanionWorldGateway implements
     }
 
     /**
-     * Reads only marker-bearing projections for the supplied durable leases.
-     * The scan is capped by both lease count at the caller and result count
-     * here; it never enumerates players or generic runtime systems.
-     */
-    @Nonnull
-    public List<BondedCompanionProjectionValidator.Projection> readBounded(
-            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation>
-                    leases,
-            int maximumResults
-    ) {
-        Objects.requireNonNull(leases, "leases");
-        if (maximumResults < 1 || leases.isEmpty()) return List.of();
-        Map<String, Set<LeaseMarker>> markersByWorld = markersByWorld(leases);
-        if (markersByWorld.isEmpty()) return List.of();
-
-        ArrayList<BondedCompanionProjectionValidator.Projection> found =
-                new ArrayList<>();
-        try {
-            for (var entry : markersByWorld.entrySet()) {
-                if (found.size() >= maximumResults) break;
-                World world = Universe.get().getWorld(entry.getKey());
-                if (world == null) continue;
-                int remaining = maximumResults - found.size();
-                List<BondedCompanionProjectionValidator.Projection> scanned =
-                        world.isInThread()
-                                ? scanOnWorldThread(
-                                        world, entry.getValue(), remaining
-                                ).projections()
-                                : CompletableFuture.supplyAsync(
-                                        () -> scanOnWorldThread(
-                                                world, entry.getValue(), remaining
-                                        ), world
-                                ).join().projections();
-                found.addAll(scanned);
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            return List.copyOf(found);
-        }
-        return List.copyOf(found);
-    }
-
-    private Map<String, Set<LeaseMarker>> markersByWorld(
-            List<BondedCompanionProjectionValidator.LeaseExpectation> leases
-    ) {
-        Map<String, Set<LeaseMarker>> result = new HashMap<>();
-        for (var lease : leases) {
-            if (lease == null) continue;
-            result.computeIfAbsent(lease.worldKey(), ignored -> new HashSet<>())
-                    .add(new LeaseMarker(lease.profileId(), lease.leaseToken()));
-        }
-        return result;
-    }
-
-    /**
      * Schedules bounded marker reads on their owning worlds. Maintenance never joins another
      * world's executor; a later tick consumes the completed immutable observation batch.
      */
@@ -210,8 +155,7 @@ public final class HytaleBondedCompanionWorldGateway implements
         Objects.requireNonNull(leases, "leases");
         if (maximumResults < 1 || leases.isEmpty()) return CompletableFuture.completedFuture(
                 new BondedCompanionProjectionRecoverySystem.ScanResult(List.of(), List.of()));
-        Set<LeaseMarker> markers = new HashSet<>();
-        markersByWorld(leases).values().forEach(markers::addAll);
+        Set<LeaseMarker> markers = markersFor(leases);
         TreeMap<String, World> worlds;
         try {
             worlds = new TreeMap<>(Universe.get().getWorlds());
@@ -258,6 +202,18 @@ public final class HytaleBondedCompanionWorldGateway implements
             future.complete(BondedCompanionRecoveryScanResult.incomplete());
         }
         return new BondedCompanionScheduledRecoveryScan(worldKey, future);
+    }
+
+    private Set<LeaseMarker> markersFor(
+            List<BondedCompanionProjectionValidator.LeaseExpectation> leases
+    ) {
+        Set<LeaseMarker> result = new HashSet<>();
+        for (var lease : leases) {
+            if (lease != null) {
+                result.add(new LeaseMarker(lease.profileId(), lease.leaseToken()));
+            }
+        }
+        return result;
     }
 
     private BondedCompanionProjectionRecoverySystem.ScanResult combineRecoveryScans(

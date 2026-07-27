@@ -6,6 +6,10 @@ import com.alechilles.alecstamework.api.BondedCompanionCaptureResolvedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpirySystem;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionAsyncProjectionReconciler;
+import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionLifecycleLeaseResolver;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
@@ -56,7 +60,6 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticSnapshot;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureFeedbackDispatcher;
-import com.alechilles.alecstamework.items.BondedCompanionCaptureIntent;
 import com.alechilles.alecstamework.items
         .HytaleBondedCompanionPaymentRecovery;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -68,7 +71,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -84,6 +86,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionTransitionService transitions;
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
+    private final BondedCompanionAsyncProjectionReconciler lifecycleReconciliation;
+    private final BondedCompanionLifecycleLeaseResolver lifecycleLeases;
     private final BondedCompanionExpirySystem expiry;
     private final BondedCompanionProjectionRecoverySystem projectionRecovery;
     private final BondedCompanionStartupPendingRecovery startupPendingRecovery;
@@ -108,6 +112,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionTransitionService transitions,
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
+            BondedCompanionAsyncProjectionReconciler lifecycleReconciliation,
+            BondedCompanionLifecycleLeaseResolver lifecycleLeases,
             BondedCompanionExpirySystem expiry,
             BondedCompanionProjectionRecoverySystem projectionRecovery,
             BondedCompanionStartupPendingRecovery startupPendingRecovery,
@@ -128,6 +134,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.transitions = transitions;
         this.projections = projections;
         this.observer = observer;
+        this.lifecycleReconciliation = lifecycleReconciliation;
+        this.lifecycleLeases = lifecycleLeases;
         this.expiry = expiry;
         this.projectionRecovery = projectionRecovery;
         this.startupPendingRecovery = startupPendingRecovery;
@@ -210,16 +218,21 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         BondedCompanionWorldLifecycleObserver observer =
                 new BondedCompanionWorldLifecycleObserver(
                         projections,
-                        () -> world.readBounded(
-                                durability.activeLeases(64), 128
-                        ),
+                        java.util.List::of,
                         (lease, cause, result) -> publishLifecycleChange(
                                 store, changes, lease, result
                         )
                 );
         BondedCompanionExpirySystem expiry = new BondedCompanionExpirySystem(
-                observer, durability::findExpired, 64
+                observer, durability::findExpired,
+                world::scanBoundedRecoveryAsync, 64, 128
         );
+        BondedCompanionAsyncProjectionReconciler lifecycleReconciliation =
+                new BondedCompanionAsyncProjectionReconciler(
+                        observer, world::scanBoundedRecoveryAsync, 128
+                );
+        BondedCompanionLifecycleLeaseResolver lifecycleLeases =
+                new BondedCompanionLifecycleLeaseResolver(durability::activeLeases, 256);
         BondedCompanionProjectionRecoverySystem projectionRecovery =
                 new BondedCompanionProjectionRecoverySystem(
                         observer, durability::liveLeasesAfter,
@@ -227,10 +240,11 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                         64, 128
                 );
         long startupCutoff = clock.getAsLong();
+        long startupLeaseHighWater = durability.pendingLeaseHighWaterMark();
         BondedCompanionStartupPendingRecovery startupPendingRecovery =
                 new BondedCompanionStartupPendingRecovery(
                         observer, durability::pendingLeasesBefore,
-                        startupCutoff, 64
+                        startupLeaseHighWater, 64
                 );
         BondedCompanionCoreApiOperations operations =
                 new BondedCompanionCoreApiOperations(
@@ -269,7 +283,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                         capturePersistence::cleanup,
                         BondedCompanionCaptureFeedbackDispatcher.production(
                                 logger),
-                        (intent, failure) -> logCapturePolicyFailure(
+                        (intent, failure) -> BondedCompanionCapturePolicyFailureLogger.log(
                                 logger, intent, failure)
                 );
         if (started.availability().available()) {
@@ -281,7 +295,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
-                transitions, projections, observer, expiry, projectionRecovery,
+                transitions, projections, observer, lifecycleReconciliation, lifecycleLeases,
+                expiry, projectionRecovery,
                 startupPendingRecovery,
                 cleanup, durability, world, store, clock, captureAuthor,
                 captureEvents, paymentRecovery
@@ -299,19 +314,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return captureAuthor;
     }
 
-    private static void logCapturePolicyFailure(
-            HytaleLogger logger,
-            BondedCompanionCaptureIntent intent,
-            RuntimeException failure
-    ) {
-        if (logger == null) return;
-        var entry = logger.at(Level.WARNING);
-        if (failure != null) entry = entry.withCause(failure);
-        entry.log("Bonded capture policy unavailable (roster="
-                + (intent == null ? null : intent.rosterId()) + ", role="
-                + (intent == null ? null : intent.roleId()) + ").");
-    }
-
     @Nonnull
     public BondedCompanionDiagnosticContributor diagnostics() {
         return diagnostics;
@@ -320,7 +322,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     /** Reconciles one started world using only exact persisted leases. */
     public void onWorldLoad(@Nonnull String worldKey) {
         if (!operational()) return;
-        observer.onWorldLoad(worldKey, durability.activeLeases(256),
+        lifecycleReconciliation.reconcileAsync(
+                lifecycleLeases.inWorld(worldKey),
+                BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD,
                 clock.getAsLong());
     }
 
@@ -338,10 +342,14 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         String previous = ownerWorlds.put(ownerUuid, worldKey);
         long now = clock.getAsLong();
         if (previous == null || previous.equals(worldKey)) {
-            observer.onPlayerJoin(ownerUuid, durability.activeLeases(256), now);
+            lifecycleReconciliation.reconcileAsync(
+                    lifecycleLeases.forOwner(ownerUuid),
+                    BondedCompanionProjectionService.RecoveryCause.PLAYER_JOIN, now);
         } else {
-            observer.onPlayerWorldTransfer(ownerUuid, previous, worldKey,
-                    durability.activeLeases(256), now);
+            lifecycleReconciliation.reconcileAsync(
+                    lifecycleLeases.forOwnerInWorld(ownerUuid, previous),
+                    BondedCompanionProjectionService.RecoveryCause.WORLD_TRANSFER,
+                    now);
         }
     }
 
@@ -373,7 +381,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     public void onPlayerLogout(@Nonnull UUID ownerUuid) {
         if (!operational()) return;
         ownerWorlds.remove(ownerUuid);
-        observer.onPlayerLogout(ownerUuid, durability.activeLeases(256),
+        lifecycleReconciliation.reconcileAsync(
+                lifecycleLeases.forOwner(ownerUuid),
+                BondedCompanionProjectionService.RecoveryCause.LOGOUT,
                 clock.getAsLong());
     }
 
@@ -411,8 +421,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
         startupPendingRecovery.tick(now);
-        projectionRecovery.tick(now);
         expiry.tick(now);
+        lifecycleReconciliation.tick();
+        projectionRecovery.tick(now);
     }
 
     private boolean operational() {

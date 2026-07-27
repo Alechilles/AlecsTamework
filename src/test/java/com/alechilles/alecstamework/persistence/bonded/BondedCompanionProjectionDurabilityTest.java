@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompa
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.DriverManager;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Guards atomic Task 4 durability and restart-safe exact cleanup routing. */
@@ -243,6 +245,92 @@ class BondedCompanionProjectionDurabilityTest {
         assertEquals("z-live", live.getFirst().profileId());
         assertEquals(BondedCompanionProjectionValidator.LeasePhase.LIVE,
                 live.getFirst().phase());
+    }
+
+    @Test
+    void pendingStartupHighWaterExcludesSameTimestampLeaseCreatedAfterStartup() {
+        Path database = temporaryDirectory.resolve("pending-high-water.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
+                .initialize().availability().available());
+        SqliteBondedCompanionDatabase store =
+                new SqliteBondedCompanionDatabase(database);
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        create(store, "before-kept", "family:before-kept");
+        create(store, "before-deleted", "family:before-deleted");
+        assertTrue(begin(durability, "before-kept", "family:before-kept", 1));
+        assertTrue(begin(durability, "before-deleted", "family:before-deleted", 2));
+
+        long highWater = durability.pendingLeaseHighWaterMark();
+        var deleted = durability.activeLeases(8).stream()
+                .filter(lease -> lease.profileId().equals("before-deleted"))
+                .findFirst().orElseThrow();
+        assertTrue(durability.reconcileStored(deleted,
+                new BondedCompanionProjectionStorePlanner.StorePlan(1L, snapshot(), 0L),
+                List.of(), "TEST_STORE"));
+        assertEquals(highWater, durability.pendingLeaseHighWaterMark());
+
+        create(store, "after", "family:after");
+        assertTrue(begin(durability, "after", "family:after", 3));
+        List<BondedCompanionProjectionValidator.LeaseExpectation> recovered =
+                durability.pendingLeasesBefore(highWater, null, 8);
+
+        assertEquals(List.of("before-kept"), recovered.stream()
+                .map(BondedCompanionProjectionValidator.LeaseExpectation::profileId)
+                .toList());
+    }
+
+    @Test
+    void repeatedLeaseCyclesRetainNoAdmissionHistory() throws Exception {
+        Path database = temporaryDirectory.resolve("bounded-admissions.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
+                .initialize().availability().available());
+        SqliteBondedCompanionDatabase store = new SqliteBondedCompanionDatabase(database);
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        create(store, "cycle", "family:cycle");
+        long revision = 0L;
+        for (int index = 0; index < 3; index++) {
+            var lease = new BondedCompanionProjectionValidator.LeaseExpectation(
+                    OWNER, "roster-a", "cycle", "lease-cycle-" + index,
+                    new UUID(0L, 300L + index), "world-a", -100L, 0L,
+                    BondedCompanionProjectionValidator.LeasePhase.PENDING);
+            var request = new BondedCompanionProjectionService.SummonRequest(
+                    OWNER, "roster-a", "cycle", revision, "role:wolf", snapshot(),
+                    "world-a", null, -100L, 0L,
+                    new BondedCompanionActiveCapacity("family:cycle", 1));
+            assertTrue(durability.beginSummon(request, lease,
+                    BondedCompanionProjectionCleanupService.CleanupIntent.projection(
+                            "cleanup-cycle-" + index, OWNER, "roster-a", "cycle",
+                            lease.leaseToken(), lease.liveNpcUuid(), "world-a",
+                            "spawn-recovery", -100L)));
+            assertTrue(durability.reconcileStored(lease,
+                    new BondedCompanionProjectionStorePlanner.StorePlan(
+                            revision + 1L, snapshot(), 0L), List.of(), "TEST_STORE"));
+            revision += 2L;
+        }
+
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             var statement = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM bonded_companion_lease_admission");
+             var rows = statement.executeQuery()) {
+            assertTrue(rows.next());
+            assertEquals(0L, rows.getLong(1));
+        }
+    }
+
+    @Test
+    void startupLeaseReadsFailClosedWhenTheDatabaseEvidenceIsUnavailable() throws Exception {
+        Path database = temporaryDirectory.resolve("pending-read-failure.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
+                .initialize().availability().available());
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        java.nio.file.Files.delete(database);
+
+        assertThrows(IllegalStateException.class, durability::pendingLeaseHighWaterMark);
+        assertThrows(IllegalStateException.class,
+                () -> durability.pendingLeasesBefore(1L, null, 8));
     }
 
     @Test

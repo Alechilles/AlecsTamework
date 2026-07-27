@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.bonded;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -41,12 +42,29 @@ public final class BondedCompanionWorldLifecycleObserver {
      * spawn is interrupted by definition; its exact cleanup remains durable if the world is
      * not currently available.
      */
-    public void onStartupPending(
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation> onStartupPending(
             @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
             long observedAtMs
     ) {
-        reconcile(leases, List.of(),
-                BondedCompanionProjectionService.RecoveryCause.STARTUP, observedAtMs);
+        ArrayList<BondedCompanionProjectionValidator.LeaseExpectation> failed =
+                new ArrayList<>();
+        for (var lease : leases) {
+            if (lease == null) {
+                continue;
+            }
+            BondedCompanionProjectionService.ReconcileResult result = reconcile(
+                    lease, List.of(),
+                    BondedCompanionProjectionService.RecoveryCause.STARTUP, observedAtMs
+            );
+            listener.onReconciled(lease,
+                    BondedCompanionProjectionService.RecoveryCause.STARTUP, result);
+            if (result.status()
+                    != BondedCompanionProjectionService.ReconcileStatus.STORED) {
+                failed.add(lease);
+            }
+        }
+        return List.copyOf(failed);
     }
 
     public void onWorldLoad(
@@ -120,12 +138,31 @@ public final class BondedCompanionWorldLifecycleObserver {
                 observedAtMs);
     }
 
+    /** Applies one completed asynchronous world-fan-out observation batch. */
+    public void onScanned(
+            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            @Nonnull List<BondedCompanionProjectionValidator.Projection> observed,
+            @Nonnull BondedCompanionProjectionService.RecoveryCause cause,
+            long observedAtMs
+    ) {
+        reconcile(leases, observed, cause, observedAtMs);
+    }
+
     public void onLeaseExpired(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long observedAtMs
     ) {
+        onLeaseExpired(lease, source.projections(), observedAtMs);
+    }
+
+    /** Reconciles one expiry only after its bounded all-world scan completed conclusively. */
+    public void onLeaseExpired(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
+            @Nonnull List<BondedCompanionProjectionValidator.Projection> observed,
+            long observedAtMs
+    ) {
         BondedCompanionProjectionService.ReconcileResult result = reconcile(
-                lease, source.projections(),
+                lease, observed,
                 BondedCompanionProjectionService.RecoveryCause.EXPIRED,
                 observedAtMs);
         listener.onReconciled(lease,

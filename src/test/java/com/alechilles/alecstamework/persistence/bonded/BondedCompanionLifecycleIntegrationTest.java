@@ -39,14 +39,17 @@ class BondedCompanionLifecycleIntegrationTest {
 
         assertTrue(source.contains("replayPendingCleanup("));
         assertTrue(source.contains("expiry.tick("));
-        assertTrue(source.contains("observer.onWorldLoad("));
-        assertTrue(source.contains("observer.onPlayerJoin("));
-        assertTrue(source.contains("observer.onPlayerWorldTransfer("));
-        assertTrue(source.contains("observer.onPlayerLogout("));
+        assertTrue(source.contains("lifecycleReconciliation.reconcileAsync("));
+        assertTrue(source.contains("RecoveryCause.WORLD_LOAD"));
+        assertTrue(source.contains("RecoveryCause.PLAYER_JOIN"));
+        assertTrue(source.contains("RecoveryCause.WORLD_TRANSFER"));
+        assertTrue(source.contains("RecoveryCause.LOGOUT"));
         assertTrue(source.contains("observer.onConfirmedDeath("));
         assertTrue(source.contains("projectionRecovery.tick(now)"));
+        assertTrue(source.contains("lifecycleReconciliation.tick()"));
         assertTrue(source.contains("durability::liveLeasesAfter"));
         assertTrue(source.contains("world::scanBoundedRecoveryAsync"));
         assertTrue(source.contains("store.pruneCleanup(now, 64)"));
+        assertTrue(!source.contains("world.readBounded("));
     }
 }

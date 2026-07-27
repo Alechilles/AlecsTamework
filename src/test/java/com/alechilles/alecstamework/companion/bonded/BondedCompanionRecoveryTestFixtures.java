@@ -28,6 +28,7 @@ final class RecordingBondedDurability
     BondedCompanionSnapshot lastStoredSnapshot;
     String lastReason;
     boolean rollbackSucceeds = true;
+    boolean reconcileSucceeds = true;
 
     void activate(BondedCompanionProjectionValidator.LeaseExpectation lease) {
         states.put(lease.profileId(), BondedCompanionState.ACTIVE);
@@ -103,6 +104,7 @@ final class RecordingBondedDurability
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
             String reason
     ) {
+        if (!reconcileSucceeds) return false;
         snapshots.put(lease.profileId(), plan.snapshot());
         states.put(lease.profileId(), BondedCompanionState.STORED);
         spawnRecovery.remove(lease.profileId());

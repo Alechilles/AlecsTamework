@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -349,6 +350,55 @@ class BondedCompanionRecoveryTest {
         assertEquals(1, expired);
         assertTrue(BondedCompanionExpirySystem.isExpired(-1_000L, -900L));
         assertFalse(BondedCompanionExpirySystem.isExpired(0L, Long.MAX_VALUE));
+        assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
+    }
+
+    @Test
+    void asyncExpiryFailsClosedWithoutCallingTheSynchronousProjectionSource() {
+        var expired = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(expired);
+        BondedCompanionWorldLifecycleObserver noSynchronousRead =
+                new BondedCompanionWorldLifecycleObserver(
+                projections, () -> {
+                    throw new AssertionError("expiry must not synchronously read worlds");
+                }
+        );
+        var expiry = new BondedCompanionExpirySystem(
+                noSynchronousRead, (now, limit) -> List.of(expired),
+                (leases, observations) -> CompletableFuture.completedFuture(
+                        new BondedCompanionProjectionRecoverySystem.ScanResult(
+                                List.of(), List.of()
+                        )
+                ), 8, 16
+        );
+
+        assertEquals(0, expiry.tick(-900L));
+        assertEquals(BondedCompanionState.ACTIVE, durability.states.get("profile-a"));
+    }
+
+    @Test
+    void asyncExpiryUsesConclusiveObservationsWithoutSynchronousWorldReads() {
+        var expired = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(expired);
+        var observed = projection(uuid(40), "world-a", snapshot(uuid(40)));
+        BondedCompanionWorldLifecycleObserver noSynchronousRead =
+                new BondedCompanionWorldLifecycleObserver(
+                projections, () -> {
+                    throw new AssertionError("expiry must not synchronously read worlds");
+                }
+        );
+        var expiry = new BondedCompanionExpirySystem(
+                noSynchronousRead, (now, limit) -> List.of(expired),
+                (leases, observations) -> CompletableFuture.completedFuture(
+                        new BondedCompanionProjectionRecoverySystem.ScanResult(
+                                List.of(observed), leases
+                        )
+                ), 8, 16
+        );
+
+        assertEquals(1, expiry.tick(-900L));
         assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
     }
 

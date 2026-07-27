@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 public final class SqliteBondedCompanionProjectionDurability implements
         BondedCompanionProjectionService.Durability {
     private final SqliteConnectionFactory connections;
+    private final SqliteBondedCompanionLeaseReader leaseReader;
     private final SqliteBondedCompanionCleanupQueue cleanupQueue;
     private final SqliteBondedCompanionMapper mapper =
             new SqliteBondedCompanionMapper();
@@ -40,6 +41,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
         connections = new SqliteConnectionFactory(
                 Objects.requireNonNull(databasePath, "databasePath")
         );
+        leaseReader = new SqliteBondedCompanionLeaseReader(connections);
         cleanupQueue = new SqliteBondedCompanionCleanupQueue(connections);
     }
 
@@ -214,7 +216,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     activeLeases(int limit) {
-        return leases(null, null, null, null, limit);
+        return leaseReader.activeLeases(limit);
     }
 
     /**
@@ -231,78 +233,31 @@ public final class SqliteBondedCompanionProjectionDurability implements
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     liveLeasesAfter(@Nullable String afterProfileId, int limit) {
-        return leases(null,
-                BondedCompanionProjectionValidator.LeasePhase.LIVE,
-                null, afterProfileId, limit);
+        return leaseReader.liveLeasesAfter(afterProfileId, limit);
     }
 
     /** Returns only leases that were already pending at the immutable startup cutoff. */
     @Nonnull public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    pendingLeasesBefore(long startupCutoffMs, @Nullable String afterProfileId, int limit) {
-        return leases(null, BondedCompanionProjectionValidator.LeasePhase.PENDING,
-                startupCutoffMs, afterProfileId, limit);
+    pendingLeasesBefore(
+            long maximumLeaseRowId,
+            @Nullable String afterProfileId,
+            int limit
+    ) {
+        return leaseReader.pendingLeasesBefore(
+                maximumLeaseRowId, afterProfileId, limit
+        );
+    }
+
+    /** Captures the durable lease-row boundary before startup recovery begins. */
+    public long pendingLeaseHighWaterMark() {
+        return leaseReader.pendingLeaseHighWaterMark();
     }
 
     /** Returns finite expired leases without rejecting negative world time. */
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     findExpired(long nowMs, int limit) {
-        return leases(nowMs, null, null, null, limit);
-    }
-
-    private List<BondedCompanionProjectionValidator.LeaseExpectation> leases(
-            @Nullable Long expiredAt,
-            @Nullable BondedCompanionProjectionValidator.LeasePhase phase,
-            @Nullable Long startedAtOrBefore,
-            @Nullable String afterProfileId,
-            int limit
-    ) {
-        if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
-        String expiry = expiredAt == null ? """
-                WHERE p.state = 'ACTIVE'
-                """ : """
-                WHERE p.state = 'ACTIVE' AND l.expires_at_ms != 0
-                  AND l.expires_at_ms <= ?
-                """;
-        String phaseClause = phase == null ? "" : " AND l.projection_state = ?";
-        String startupClause = startedAtOrBefore == null ? "" : " AND l.started_at_ms <= ?";
-        String cursorClause = afterProfileId == null ? "" : " AND l.profile_id > ?";
-        try (Connection connection = connections.openReadConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT p.owner_uuid, p.roster_id, l.profile_id,
-                            l.lease_token, l.live_npc_uuid, l.world_key,
-                            l.started_at_ms, l.expires_at_ms, l.projection_state
-                     FROM bonded_companion_lease l
-                     JOIN bonded_companion_profile p
-                       ON p.profile_id = l.profile_id
-                     """ + expiry + phaseClause + startupClause + cursorClause + """
-                     ORDER BY l.profile_id LIMIT ?
-                     """)) {
-            int index = 1;
-            if (expiredAt != null) statement.setLong(index++, expiredAt);
-            if (phase != null) statement.setString(index++, phase.name());
-            if (startedAtOrBefore != null) statement.setLong(index++, startedAtOrBefore);
-            if (afterProfileId != null) statement.setString(index++, afterProfileId);
-            statement.setInt(index, limit);
-            try (ResultSet rows = statement.executeQuery()) {
-                ArrayList<BondedCompanionProjectionValidator.LeaseExpectation>
-                        result = new ArrayList<>();
-                while (rows.next()) {
-                    result.add(new BondedCompanionProjectionValidator
-                            .LeaseExpectation(
-                            UUID.fromString(rows.getString(1)), rows.getString(2),
-                            rows.getString(3), rows.getString(4),
-                            UUID.fromString(rows.getString(5)), rows.getString(6),
-                            rows.getLong(7), rows.getLong(8),
-                            BondedCompanionProjectionValidator.LeasePhase
-                                    .valueOf(rows.getString(9))
-                    ));
-                }
-                return List.copyOf(result);
-            }
-        } catch (Exception failure) {
-            return List.of();
-        }
+        return leaseReader.findExpired(nowMs, limit);
     }
 
     private boolean returnToStored(
@@ -361,6 +316,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
             BondedCompanionProjectionValidator.LeaseExpectation lease,
             String phase
     ) throws Exception {
+        insertLeaseAdmission(connection, lease);
         try (PreparedStatement insert = connection.prepareStatement("""
                 INSERT INTO bonded_companion_lease(
                     profile_id, lease_token, live_npc_uuid, world_key,
@@ -374,6 +330,22 @@ public final class SqliteBondedCompanionProjectionDurability implements
             insert.setLong(5, lease.startedAtMs());
             insert.setLong(6, lease.expiresAtMs());
             insert.setString(7, phase);
+            insert.executeUpdate();
+        }
+    }
+
+    private void insertLeaseAdmission(
+            Connection connection,
+            BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) throws Exception {
+        try (PreparedStatement insert = connection.prepareStatement("""
+                INSERT INTO bonded_companion_lease_admission(
+                    profile_id, lease_token, admitted_at_ms
+                ) VALUES (?, ?, ?)
+                """)) {
+            insert.setString(1, lease.profileId());
+            insert.setString(2, lease.leaseToken());
+            insert.setLong(3, lease.startedAtMs());
             insert.executeUpdate();
         }
     }
@@ -418,7 +390,25 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 """)) {
             bindLeaseIdentity(delete, lease);
             delete.setString(5, lease.phase().name());
-            return delete.executeUpdate();
+            if (delete.executeUpdate() != 1) return 0;
+        }
+        deleteLeaseAdmission(connection, lease);
+        return 1;
+    }
+
+    private void deleteLeaseAdmission(
+            Connection connection,
+            BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) throws Exception {
+        try (PreparedStatement delete = connection.prepareStatement("""
+                DELETE FROM bonded_companion_lease_admission
+                WHERE profile_id = ? AND lease_token = ?
+                """)) {
+            delete.setString(1, lease.profileId());
+            delete.setString(2, lease.leaseToken());
+            if (delete.executeUpdate() != 1) {
+                throw new IllegalStateException("bonded_lease_admission_missing");
+            }
         }
     }
 
