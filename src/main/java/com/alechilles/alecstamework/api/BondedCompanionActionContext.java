@@ -106,9 +106,17 @@ public record BondedCompanionActionContext(
         /** Exact item quantity authenticating this escrow request, if known. */
         default int quantity() { return 0; }
 
+        /** Exact immutable frozen recipe retained by the durable receipt. */
+        default @Nonnull List<BondedCompanionReviveCost> costs() {
+            String itemId = itemId();
+            int quantity = quantity();
+            return itemId == null || quantity <= 0 ? List.of()
+                    : List.of(new BondedCompanionReviveCost(itemId, quantity));
+        }
+
         /** Whether exact escrow evidence may create or resume a missing claim. */
         default boolean preparedClaimProof() {
-            return itemId() != null && quantity() > 0;
+            return !costs().isEmpty();
         }
 
         /** Whether this receipt was recovered instead of newly charged. */

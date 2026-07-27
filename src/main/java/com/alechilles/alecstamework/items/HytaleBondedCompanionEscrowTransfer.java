@@ -30,7 +30,16 @@ final class HytaleBondedCompanionEscrowTransfer
             CombinedItemContainer source,
             TameworkBondedReviveEscrowComponent escrow,
             int remaining) {
-        ItemStack query = new ItemStack(escrow.itemId(), 1);
+        reserveRemaining(source, escrow, escrow.itemId(), remaining);
+    }
+
+    @Override
+    public void reserveRemaining(
+            CombinedItemContainer source,
+            TameworkBondedReviveEscrowComponent escrow,
+            String itemId,
+            int remaining) {
+        ItemStack query = new ItemStack(itemId, 1);
         for (short slot = 0; slot < source.getCapacity() && remaining > 0;
              slot++) {
             ItemStack stack = source.getItemStack(slot);

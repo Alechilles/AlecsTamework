@@ -209,10 +209,10 @@ public final class BondedCompanionPaymentRecoveryService {
                     ? Outcome.SETTLED_UNCLAIMED_REFUND
                     : Outcome.RETRY_REQUIRED);
         }
-        String itemId = safeItemId(receipt);
-        int quantity = safeQuantity(receipt);
+        java.util.List<com.alechilles.alecstamework.api.BondedCompanionReviveCost>
+                costs = safeCosts(receipt);
         if (!safePreparedClaimProof(receipt)
-                || itemId == null || itemId.isBlank() || quantity <= 0) {
+                || costs.isEmpty()) {
             return completed(Outcome.QUARANTINED);
         }
         long attemptedAtMs = clock.getAsLong();
@@ -221,7 +221,7 @@ public final class BondedCompanionPaymentRecoveryService {
             operation = BondedCompanionRevivePaymentProof.operation(
                     identity.callerNamespace(), identity.idempotencyKey(),
                     identity.ownerUuid(), identity.rosterId(),
-                    identity.profileId(), itemId, quantity,
+                    identity.profileId(), costs,
                     attemptedAtMs, retainedUntil());
         } catch (RuntimeException | LinkageError invalid) {
             return completed(Outcome.QUARANTINED);
@@ -369,21 +369,12 @@ public final class BondedCompanionPaymentRecoveryService {
         }
     }
 
-    private String safeItemId(
-            BondedCompanionActionContext.ChargeReceipt receipt) {
+    private java.util.List<com.alechilles.alecstamework.api.BondedCompanionReviveCost>
+            safeCosts(BondedCompanionActionContext.ChargeReceipt receipt) {
         try {
-            return receipt.itemId();
+            return java.util.List.copyOf(receipt.costs());
         } catch (RuntimeException | LinkageError failure) {
-            return null;
-        }
-    }
-
-    private int safeQuantity(
-            BondedCompanionActionContext.ChargeReceipt receipt) {
-        try {
-            return receipt.quantity();
-        } catch (RuntimeException | LinkageError failure) {
-            return 0;
+            return java.util.List.of();
         }
     }
 

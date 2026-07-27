@@ -21,6 +21,16 @@ interface BondedCompanionEscrowTransfer {
             TameworkBondedReviveEscrowComponent escrow,
             int remaining);
 
+    /** Moves the remaining quantity for one ordered frozen recipe line. */
+    default void reserveRemaining(
+            CombinedItemContainer source,
+            TameworkBondedReviveEscrowComponent escrow,
+            String itemId,
+            int remaining
+    ) {
+        reserveRemaining(source, escrow, remaining);
+    }
+
     RestoreResult restoreNext(
             CombinedItemContainer source,
             TameworkBondedReviveEscrowComponent escrow);

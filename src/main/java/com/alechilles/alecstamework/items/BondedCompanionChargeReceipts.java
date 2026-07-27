@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
@@ -12,8 +14,7 @@ final class BondedCompanionChargeReceipts {
 
     static BondedCompanionActionContext.ChargeReceipt escrow(
             String operationId,
-            String itemId,
-            int quantity,
+            List<BondedCompanionReviveCost> costs,
             boolean claimPrepared,
             boolean compensationPending,
             boolean replayed,
@@ -21,7 +22,7 @@ final class BondedCompanionChargeReceipts {
             Supplier<CompletionStage<Boolean>> complete
     ) {
         return new EscrowReceipt(
-                operationId, itemId, quantity, claimPrepared,
+                operationId, costs, claimPrepared,
                 compensationPending, replayed, refund, complete);
     }
 
@@ -40,8 +41,7 @@ final class BondedCompanionChargeReceipts {
 
     private record EscrowReceipt(
             String operationId,
-            String settlementItemId,
-            int settlementQuantity,
+            List<BondedCompanionReviveCost> costs,
             boolean claimPrepared,
             boolean compensationPending,
             boolean replayed,
@@ -50,20 +50,20 @@ final class BondedCompanionChargeReceipts {
     ) implements BondedCompanionActionContext.ChargeReceipt {
         private EscrowReceipt {
             Objects.requireNonNull(operationId, "operationId");
-            Objects.requireNonNull(settlementItemId, "itemId");
-            if (settlementQuantity <= 0) {
-                throw new IllegalArgumentException("quantity must be positive");
-            }
+            costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
+            if (costs.isEmpty()) throw new IllegalArgumentException(
+                    "costs are required");
             Objects.requireNonNull(refundAction, "refundAction");
             Objects.requireNonNull(completeAction, "completeAction");
         }
 
         @Override public String itemId() {
-            return settlementItemId;
+            return costs.getFirst().itemId();
         }
         @Override public int quantity() {
-            return settlementQuantity;
+            return costs.getFirst().quantity();
         }
+        @Override public List<BondedCompanionReviveCost> costs() { return costs; }
         @Override public boolean preparedClaimProof() { return claimPrepared; }
         @Override public boolean refund() { return false; }
         @Override public boolean complete() { return false; }

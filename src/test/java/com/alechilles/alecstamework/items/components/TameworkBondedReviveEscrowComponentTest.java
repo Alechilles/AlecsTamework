@@ -4,17 +4,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import java.lang.reflect.Field;
+import java.util.List;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 /** Regression coverage for operation-specific bonded revival payment evidence. */
 class TameworkBondedReviveEscrowComponentTest {
+    @Test
+    void frozenOrderedRecipeAcceptsExactMultiStackEvidence() throws Exception {
+        List<BondedCompanionReviveCost> recipe = List.of(
+                new BondedCompanionReviveCost("Ingredient_Life_Essence", 2),
+                new BondedCompanionReviveCost("Ingredient_Dragon_Essence", 4));
+        TameworkBondedReviveEscrowComponent escrow =
+                TameworkBondedReviveEscrowComponent.create(
+                        (short) 4, "panel:revive-multi", recipe, -5_000L);
+        escrow.getInventory().setItemStackForSlot(
+                (short) 0, itemStack("Ingredient_Life_Essence", 2));
+        escrow.getInventory().setItemStackForSlot(
+                (short) 1, itemStack("Ingredient_Dragon_Essence", 4));
+
+        assertEquals(recipe, escrow.costs());
+        assertTrue(escrow.matches("panel:revive-multi", recipe));
+        assertTrue(escrow.hasExactReservedCharge());
+    }
+
     @Test
     void exactEscrowEvidenceSurvivesAComponentClone() throws Exception {
         TameworkBondedReviveEscrowComponent escrow =

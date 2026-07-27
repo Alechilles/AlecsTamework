@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent.Phase;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.items.BondedCompanionEscrowSettlementFlights
         .Action;
 import com.hypixel.hytale.component.ComponentType;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
@@ -55,12 +57,18 @@ final class BondedCompanionEscrowSettlementCoordinator {
     /** Serializes an exact refund even while another save hides the escrow. */
     CompletionStage<Boolean> refund(
             String operationId, String itemId, int quantity) {
+        return refund(operationId, List.of(new BondedCompanionReviveCost(
+                itemId, quantity)));
+    }
+
+    CompletionStage<Boolean> refund(
+            String operationId, List<BondedCompanionReviveCost> costs) {
         return flights.coordinate(
                 escrowType, ownerUuid, operationId, Action.REFUND,
                 true,
                 () -> durability.resumeOnWorldThread(
                         () -> refundIdentityInCurrentFlight(
-                                operationId, itemId, quantity),
+                                operationId, costs),
                         () -> false),
                 () -> false);
     }
@@ -93,11 +101,17 @@ final class BondedCompanionEscrowSettlementCoordinator {
     /** Consumes and removes one exact escrow under the shared actor queue. */
     CompletionStage<Boolean> consume(
             String operationId, String itemId, int quantity) {
+        return consume(operationId, List.of(new BondedCompanionReviveCost(
+                itemId, quantity)));
+    }
+
+    CompletionStage<Boolean> consume(
+            String operationId, List<BondedCompanionReviveCost> costs) {
         return flights.coordinate(
                 escrowType, ownerUuid, operationId, Action.COMMIT, true,
                 () -> durability.resumeOnWorldThread(
                         () -> consumeInCurrentFlight(
-                                operationId, itemId, quantity),
+                                operationId, costs),
                         () -> false),
                 () -> false);
     }
@@ -140,10 +154,10 @@ final class BondedCompanionEscrowSettlementCoordinator {
     }
 
     private CompletionStage<Boolean> consumeInCurrentFlight(
-            String operationId, String itemId, int quantity) {
+            String operationId, List<BondedCompanionReviveCost> costs) {
         TameworkBondedReviveEscrowComponent escrow = current();
         if (escrow == null) return completed(true);
-        if (!escrow.matches(operationId, itemId, quantity)) {
+        if (!escrow.matches(operationId, costs)) {
             return completed(false);
         }
         if (escrow.phase() == Phase.REFUNDED
@@ -165,10 +179,10 @@ final class BondedCompanionEscrowSettlementCoordinator {
     }
 
     private CompletionStage<Boolean> refundIdentityInCurrentFlight(
-            String operationId, String itemId, int quantity) {
+            String operationId, List<BondedCompanionReviveCost> costs) {
         TameworkBondedReviveEscrowComponent escrow = current();
         if (escrow == null) return completed(true);
-        if (!escrow.matches(operationId, itemId, quantity)) {
+        if (!escrow.matches(operationId, costs)) {
             return completed(false);
         }
         if (escrow.phase() == Phase.COMMITTED
@@ -215,8 +229,8 @@ final class BondedCompanionEscrowSettlementCoordinator {
         if (!matches(current, expected) || current.phase() != Phase.REFUNDING) {
             return completed(false);
         }
-        int reserved = current.reservedQuantity();
-        if (reserved < 0 || reserved > current.quantity()) {
+        if (current.reservedState()
+                == TameworkBondedReviveEscrowComponent.ReservedState.INVALID) {
             return quarantine(current);
         }
         CombinedItemContainer source = sourceInventory.get();
@@ -249,7 +263,7 @@ final class BondedCompanionEscrowSettlementCoordinator {
             TameworkBondedReviveEscrowComponent current,
             TameworkBondedReviveEscrowComponent expected) {
         return current != null && current.matches(
-                expected.operationId(), expected.itemId(), expected.quantity());
+                expected.operationId(), expected.costs());
     }
 
     private static <T> CompletionStage<T> completed(T value) {
