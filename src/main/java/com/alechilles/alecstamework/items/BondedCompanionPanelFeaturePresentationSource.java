@@ -4,23 +4,23 @@ import com.alechilles.alecstamework.api.*;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import com.alechilles.alecstamework.persistence.operation
+        .BondedCompanionPaymentOperationId;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Builds bonded status/actions from the same immutable profiles as card data. */
 final class BondedCompanionPanelFeaturePresentationSource {
-    private final Supplier<BondedCompanionApi> api;
     private final java.util.function.LongSupplier clock;
 
     BondedCompanionPanelFeaturePresentationSource(
-            Supplier<BondedCompanionApi> api,
             java.util.function.LongSupplier clock) {
-        this.api = Objects.requireNonNull(api, "api");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -38,19 +38,22 @@ final class BondedCompanionPanelFeaturePresentationSource {
         if (owner == null || snapshot == null || snapshot.records().isEmpty()) {
             return Map.of();
         }
-        BondedCompanionApi current = currentApi();
-        String readiness = current.availability().available()
-                ? null : current.availability().reason();
+        BondedCompanionActionBlockReason snapshotBlock = snapshot.trusted()
+                ? null : snapshot.state()
+                == BondedCompanionPanelSnapshotCache.State.FAILED
+                ? BondedCompanionActionBlockReason.REFRESH_FAILED
+                : BondedCompanionActionBlockReason.REFRESHING;
         LinkedHashMap<UUID, CommandPanelFeaturePresentation> result =
                 new LinkedHashMap<>();
         for (var record : snapshot.records()) {
             BondedCompanionActionContext context = contexts.apply(
                     record.profile());
-            BondedCompanionReviveQuote quote = quote(
-                    current, owner, worldKey, record.profile(), context);
+            QuoteResolution resolved = quote(
+                    owner, record.profile(), context);
             BondedCompanionPanelPresentation row = presentation(
-                    record.profile(), clock.getAsLong(), quote, context,
-                    readiness, worldKey);
+                    record.profile(), clock.getAsLong(), resolved.quote(),
+                    context, snapshotBlock, resolved.inventoryTrusted(),
+                    worldKey);
             result.put(record.presentationUuid(),
                     CommandPanelFeaturePresentation.bonded(row));
         }
@@ -64,7 +67,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 new BondedCompanionPlacement(
                         "world", 0D, 0D, 0D, 0F, 0F, 0F), null);
         return presentation(profile, nowMs, quote, context, null,
-                profile.state() == BondedCompanionStateView.ACTIVE
+                true, profile.state() == BondedCompanionStateView.ACTIVE
                         ? profile.activeLease().worldKey() : "world");
     }
 
@@ -79,6 +82,20 @@ final class BondedCompanionPanelFeaturePresentationSource {
             BondedCompanionProfileView profile, long nowMs,
             BondedCompanionReviveQuote quote,
             BondedCompanionActionContext context, String readinessReason,
+            String worldKey) {
+        BondedCompanionActionBlockReason readiness = readinessReason == null
+                ? null
+                : BondedCompanionActionBlockReason.AUTHORITY_UNAVAILABLE;
+        return presentation(profile, nowMs, quote, context, readiness,
+                true, worldKey);
+    }
+
+    private static BondedCompanionPanelPresentation presentation(
+            BondedCompanionProfileView profile, long nowMs,
+            BondedCompanionReviveQuote quote,
+            BondedCompanionActionContext context,
+            BondedCompanionActionBlockReason snapshotBlock,
+            boolean inventoryTrusted,
             String worldKey) {
         Map<String, String> source = profile.snapshotPresentationData();
         LinkedHashMap<String, String> attributes = new LinkedHashMap<>();
@@ -96,7 +113,10 @@ final class BondedCompanionPanelFeaturePresentationSource {
             case ACTIVE -> BondedCompanionStatusPresentation.Action.DISMISS;
             case DEAD -> BondedCompanionStatusPresentation.Action.REVIVE;
         };
-        boolean enabled = readinessReason == null && switch (profile.state()) {
+        BondedCompanionActionBlockReason block = snapshotBlock == null
+                ? unavailableReason(profile, quote, context, worldKey,
+                cooldown, inventoryTrusted) : snapshotBlock;
+        boolean enabled = block == null && switch (profile.state()) {
             case STORED -> profile.summonAvailable() && cooldown == 0L
                     && validPlacement(context, worldKey);
             case ACTIVE -> profile.storeAvailable()
@@ -106,30 +126,59 @@ final class BondedCompanionPanelFeaturePresentationSource {
                     && quote.enabled() && quote.affordable()
                     && quote.cooldownRemainingSeconds() == 0L;
         };
-        String reason = enabled ? null : unavailableReason(
-                profile, quote, context, readinessReason, worldKey, cooldown);
+        if (!enabled && block == null) {
+            block = BondedCompanionActionBlockReason.GENERIC_FAILURE;
+        }
         return new BondedCompanionPanelPresentation(
                 profile.profileId(), profile.rosterId(), profile.roleId(),
                 profile.revision(),
                 profile.displayName(), profile.species(), profile.gender(),
                 source.get("rolePresentation"), attributes, extensions,
                 new BondedCompanionStatusPresentation(
-                        profile.state(), action, enabled, reason, cooldown), quote);
+                        profile.state(), action, enabled, block, null,
+                        cooldown), quote);
     }
 
-    private BondedCompanionReviveQuote quote(
-            BondedCompanionApi current, UUID owner, String worldKey,
+    private QuoteResolution quote(
+            UUID owner,
             BondedCompanionProfileView profile,
             BondedCompanionActionContext context) {
-        if (profile.state() != BondedCompanionStateView.DEAD) return profile.reviveQuote();
-        if (profile.reviveQuote() != null) return profile.reviveQuote();
+        BondedCompanionReviveQuote template = profile.reviveQuote();
+        if (profile.state() != BondedCompanionStateView.DEAD) {
+            return new QuoteResolution(template, true);
+        }
+        if (template == null || context == null
+                || context.inventory() == null) {
+            return new QuoteResolution(template, false);
+        }
         try {
-            BondedCompanionResult<BondedCompanionReviveQuote> result =
-                    current.quoteRevive(action(
-                            owner, worldKey, profile, "revive", context)).join();
-            return result != null && result.successful() ? result.value() : null;
+            List<BondedCompanionReviveCost> costs = template.costs().stream()
+                    .map(line -> new BondedCompanionReviveCost(
+                            line.itemId(), line.requiredQuantity())).toList();
+            String key = BondedCompanionPanelActionService.operationKey(
+                    "revive", profile.profileId(), profile.revision());
+            String operationId = BondedCompanionPaymentOperationId.create(
+                    BondedCompanionPanelActionService.CALLER, key, owner,
+                    profile.rosterId(), profile.profileId(), profile.revision());
+            List<Integer> owned = context.inventory().availableQuantities(
+                    operationId, costs);
+            if (owned == null || owned.size() != costs.size()) {
+                return new QuoteResolution(template, false);
+            }
+            ArrayList<BondedCompanionReviveQuote.CostLine> lines =
+                    new ArrayList<>(costs.size());
+            for (int index = 0; index < costs.size(); index++) {
+                lines.add(new BondedCompanionReviveQuote.CostLine(
+                        costs.get(index).itemId(),
+                        costs.get(index).quantity(),
+                        Math.max(0, owned.get(index))));
+            }
+            return new QuoteResolution(new BondedCompanionReviveQuote(
+                    template.profileId(), template.enabled(), lines,
+                    template.cooldownRemainingSeconds(),
+                    template.policyRevision()), true);
         } catch (RuntimeException | LinkageError ignored) {
-            return null;
+            return new QuoteResolution(template, false);
         }
     }
 
@@ -150,26 +199,48 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 profile.revision(), worldKey, context);
     }
 
-    private static String unavailableReason(BondedCompanionProfileView profile,
+    private static BondedCompanionActionBlockReason unavailableReason(
+            BondedCompanionProfileView profile,
             BondedCompanionReviveQuote quote,
             BondedCompanionActionContext context, String readiness,
             String world, long cooldown) {
-        if (readiness != null) return readiness;
+        return unavailableReason(profile, quote, context, world, cooldown,
+                true);
+    }
+
+    private static BondedCompanionActionBlockReason unavailableReason(
+            BondedCompanionProfileView profile,
+            BondedCompanionReviveQuote quote,
+            BondedCompanionActionContext context,
+            String world,
+            long cooldown,
+            boolean inventoryTrusted) {
         if (profile.state() == BondedCompanionStateView.STORED && cooldown > 0L)
-            return "Summon cooldown is still active.";
+            return BondedCompanionActionBlockReason.COOLDOWN_ACTIVE;
         if (profile.state() == BondedCompanionStateView.STORED
                 && !validPlacement(context, world))
-            return "A safe summon placement is unavailable.";
+            return BondedCompanionActionBlockReason.PLACEMENT_UNAVAILABLE;
+        if (profile.state() == BondedCompanionStateView.STORED
+                && !profile.summonAvailable())
+            return BondedCompanionActionBlockReason.POLICY_DENIED;
         if (profile.state() == BondedCompanionStateView.ACTIVE
                 && profile.activeLease() != null
                 && !profile.activeLease().worldKey().equals(world))
-            return "Dismiss this companion from its active world.";
+            return BondedCompanionActionBlockReason.WORLD_UNAVAILABLE;
+        if (profile.state() == BondedCompanionStateView.ACTIVE
+                && (!profile.storeAvailable() || profile.activeLease() == null))
+            return BondedCompanionActionBlockReason.INVALID_STATE;
         if (profile.state() == BondedCompanionStateView.DEAD && quote == null)
-            return "Revive quote is unavailable.";
+            return BondedCompanionActionBlockReason.POLICY_DENIED;
+        if (quote != null && !quote.enabled())
+            return BondedCompanionActionBlockReason.FEATURE_DISABLED;
         if (quote != null && quote.cooldownRemainingSeconds() > 0L)
-            return "Revive cooldown is still active.";
-        if (quote != null && !quote.affordable()) return "Revive cost is not available.";
-        return "Bonded roster policy or capacity does not permit this action.";
+            return BondedCompanionActionBlockReason.COOLDOWN_ACTIVE;
+        if (profile.state() == BondedCompanionStateView.DEAD
+                && (!profile.reviveAvailable() || !inventoryTrusted
+                || !quote.affordable()))
+            return BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE;
+        return null;
     }
 
     private static boolean validPlacement(
@@ -185,12 +256,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
         catch (ArithmeticException overflow) { return Long.MAX_VALUE; }
     }
 
-    private BondedCompanionApi currentApi() {
-        try {
-            BondedCompanionApi current = api.get();
-            return current == null ? BondedCompanionApi.unavailable() : current;
-        } catch (RuntimeException | LinkageError ignored) {
-            return BondedCompanionApi.unavailable();
-        }
-    }
+    private record QuoteResolution(
+            @Nullable BondedCompanionReviveQuote quote,
+            boolean inventoryTrusted) {}
 }

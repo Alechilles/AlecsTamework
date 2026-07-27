@@ -18,14 +18,15 @@ class BondedCompanionPanelHealthFidelityTest {
                         "healthPercent", "62.5"));
         var api = BondedPanelTestFixtures.api(List.of(profile));
         var source = new BondedCompanionPanelEntrySourceService(
-                new BondedCompanionPanelRecordSource(() -> api),
+                BondedPanelTestFixtures.cache(api),
+                new BondedCompanionPanelRecordSource(),
                 new BondedCompanionPanelFeaturePresentationSource(
-                        () -> api, () -> 0L));
+                        () -> 0L));
 
         var entries = source.buildSnapshot(BondedPanelTestFixtures.OWNER,
-                "world", new BondedCompanionPanelRecordSource(() -> api)
-                        .snapshotFor(BondedPanelTestFixtures.OWNER,
-                                "hydragon:dragons")).entries();
+                "world", new BondedCompanionPanelRecordSource().ready(
+                        BondedPanelTestFixtures.OWNER, "hydragon:dragons",
+                        List.of(profile))).entries();
 
         assertEquals(250, entries.getFirst().currentHealth());
         assertEquals(400, entries.getFirst().maxHealth());

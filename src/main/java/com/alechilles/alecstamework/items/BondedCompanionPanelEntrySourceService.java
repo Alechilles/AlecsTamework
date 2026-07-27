@@ -15,34 +15,38 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Converts durable bonded profiles into existing card view models and bonded features. */
-final class BondedCompanionPanelEntrySourceService {
+final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
+    private final BondedCompanionPanelSnapshotCache cache;
     private final BondedCompanionPanelRecordSource records;
     private final BondedCompanionPanelFeaturePresentationSource presentations;
     private final HytaleBondedCompanionActionContextFactory contexts =
             new HytaleBondedCompanionActionContextFactory();
 
     BondedCompanionPanelEntrySourceService(
+            @Nonnull BondedCompanionPanelSnapshotCache cache,
             @Nonnull BondedCompanionPanelRecordSource records,
             @Nonnull BondedCompanionPanelFeaturePresentationSource presentations) {
+        this.cache = java.util.Objects.requireNonNull(cache, "cache");
         this.records = java.util.Objects.requireNonNull(records, "records");
         this.presentations = java.util.Objects.requireNonNull(
                 presentations, "presentations");
     }
 
-    static BondedCompanionPanelEntrySourceService production() {
-        java.util.function.Supplier<BondedCompanionApi> api =
-                BondedCompanionPanelEntrySourceService::currentApi;
+    static BondedCompanionPanelEntrySourceService production(
+            @Nullable java.util.function.Supplier<BondedCompanionApi> api) {
         return new BondedCompanionPanelEntrySourceService(
-                new BondedCompanionPanelRecordSource(api),
+                BondedCompanionPanelSnapshotCache.production(api == null
+                        ? BondedCompanionApi::unavailable : api),
+                new BondedCompanionPanelRecordSource(),
                 new BondedCompanionPanelFeaturePresentationSource(
-                        api, System::currentTimeMillis));
+                        System::currentTimeMillis));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId,
             @Nullable String worldKey) {
-        return buildSnapshot(ownerUuid, worldKey,
-                records.snapshotFor(ownerUuid, rosterId));
+        return buildSnapshot(ownerUuid, worldKey, records.snapshotFor(
+                ownerUuid, rosterId, cache.peek(ownerUuid, rosterId)));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
@@ -51,7 +55,8 @@ final class BondedCompanionPanelEntrySourceService {
         String worldKey = player.getWorld() == null
                 ? null : player.getWorld().getName();
         BondedCompanionPanelRecordSource.PanelSnapshot snapshot =
-                records.snapshotFor(player.getUuid(), rosterId);
+                records.snapshotFor(player.getUuid(), rosterId,
+                        cache.peek(player.getUuid(), rosterId));
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(
                 snapshot.records().size());
         for (var record : snapshot.records()) entries.add(entry(record));
@@ -60,7 +65,8 @@ final class BondedCompanionPanelEntrySourceService {
                         player.getUuid(), worldKey, snapshot,
                         profile -> contexts.create(player, store,
                                 profile.roleId(), profile.state()
-                                        == BondedCompanionStateView.STORED)));
+                                        == BondedCompanionStateView.STORED)),
+                emptyStateKey(snapshot));
     }
 
     CommandPanelEntrySourceService.CommandPanelSnapshot buildSnapshot(
@@ -70,7 +76,8 @@ final class BondedCompanionPanelEntrySourceService {
         for (var record : snapshot.records()) entries.add(entry(record));
         return new CommandPanelEntrySourceService.CommandPanelSnapshot(
                 List.copyOf(entries),
-                presentations.snapshot(ownerUuid, worldKey, snapshot));
+                presentations.snapshot(ownerUuid, worldKey, snapshot),
+                emptyStateKey(snapshot));
     }
 
     private LinkedNpcEntry entry(BondedCompanionPanelRecordSource.PanelRecord record) {
@@ -126,14 +133,41 @@ final class BondedCompanionPanelEntrySourceService {
         return "Bonded Companion";
     }
 
-    private static BondedCompanionApi currentApi() {
-        try {
-            Tamework plugin = Tamework.getInstance();
-            return plugin == null || plugin.getApi() == null
-                    ? BondedCompanionApi.unavailable()
-                    : plugin.getApi().bondedCompanions();
-        } catch (RuntimeException | LinkageError ignored) {
-            return BondedCompanionApi.unavailable();
+    void evictOwner(@Nullable UUID ownerUuid) {
+        cache.evictOwner(ownerUuid);
+    }
+
+    void warm(@Nullable UUID ownerUuid, @Nullable String rosterId) {
+        if (ownerUuid != null && rosterId != null && !rosterId.isBlank()) {
+            cache.warm(ownerUuid, rosterId);
         }
     }
+
+    /** Refreshes the immutable profile generation after a rejected mutation. */
+    void refresh(@Nullable UUID ownerUuid, @Nullable String rosterId) {
+        if (ownerUuid != null && rosterId != null && !rosterId.isBlank()) {
+            cache.refresh(ownerUuid, rosterId);
+        }
+    }
+
+    void refreshBoundApi() {
+        cache.refreshBoundApi();
+    }
+
+    @Nullable
+    private static String emptyStateKey(
+            BondedCompanionPanelRecordSource.PanelSnapshot snapshot) {
+        if (!snapshot.records().isEmpty()) return null;
+        return switch (snapshot.state()) {
+            case REFRESHING -> "tamework.ui.linkedPanel.bonded.loading";
+            case FAILED, CLOSED -> "tamework.ui.linkedPanel.bonded.unavailable";
+            case READY -> null;
+        };
+    }
+
+    @Override
+    public void close() {
+        cache.close();
+    }
+
 }

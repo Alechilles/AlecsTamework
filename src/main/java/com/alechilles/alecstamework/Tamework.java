@@ -1360,6 +1360,10 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
+        if (commandItemFeatureHandler != null) {
+            commandItemFeatureHandler.close();
+            commandItemFeatureHandler = null;
+        }
         if (apiComposition != null) {
             apiComposition.close();
             apiComposition = null;

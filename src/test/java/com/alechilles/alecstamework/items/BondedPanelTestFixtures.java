@@ -47,6 +47,13 @@ final class BondedPanelTestFixtures {
         return new StubApi(profiles);
     }
 
+    static BondedCompanionPanelSnapshotCache cache(BondedCompanionApi api) {
+        return new BondedCompanionPanelSnapshotCache(
+                () -> api, Runnable::run, System::nanoTime,
+                new BondedCompanionPanelSnapshotCache.Settings(
+                        8, Long.MAX_VALUE, Long.MAX_VALUE, 1L, 8L));
+    }
+
     static class StubApi implements BondedCompanionApi {
         final List<BondedCompanionProfileView> profiles;
         BondedCompanionActionRequest lastAction;

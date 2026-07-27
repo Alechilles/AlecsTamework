@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
@@ -13,6 +14,8 @@ import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.CommandTimedSummoningState;
+import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -20,10 +23,16 @@ import com.hypixel.hytale.component.ComponentType;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
+import com.alechilles.alecstamework.ui.CommandReviveCostPresentation;
+import com.alechilles.alecstamework.ui.CommandRosterStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandSelectionEventData;
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
+import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.ToServerPacket;
@@ -88,7 +97,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                             new HytaleBondedCompanionActionContextFactory(
                                     new ComponentType<EntityStore,
                                             TameworkBondedReviveEscrowComponent>(),
-                                    null));
+                                    null), (owner, roster) -> { },
+                            (owner, currentRef, currentStore) -> player);
             CommandSelectionPageService service = new CommandSelectionPageService(
                     null, null, null, null, null, null, null, bonded);
             AtomicReference<CommandSelectionPageService.FeatureRoute> route =
@@ -156,6 +166,140 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         assertNull(dispatchPageDismiss(() -> true, () -> false));
     }
 
+    /** Generic roster buttons must retain their public-page feature dispatch. */
+    @Test
+    void genericRosterFeatureEventsUseLivePublicPageContext() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            AtomicReference<String> action = new AtomicReference<>();
+            AtomicReference<Ref<EntityStore>> eventRef = new AtomicReference<>();
+            AtomicReference<Store<EntityStore>> eventStore = new AtomicReference<>();
+            for (GenericFeatureEvent expected : GenericFeatureEvent.values()) {
+                TameworkCommandSelectionPage page = genericFeaturePage(
+                        expected, action, eventRef, eventStore);
+                refresh(page);
+                page.handleDataEvent(actor, store, event(expected.command()));
+                if (expected == GenericFeatureEvent.REVIVE) {
+                    page.handleDataEvent(actor, store, event("__revive_confirm__"));
+                }
+                assertEquals(expected.name(), action.get());
+                assertSame(actor, eventRef.get());
+                assertSame(store, eventStore.get());
+            }
+        }
+    }
+
+    /**
+     * A page callback may survive a transfer, but its mutation must use the
+     * event's destination player/store rather than the opening world's pair.
+     */
+    @Test
+    void transferredPageCallbackUsesDestinationEventContextOnly() throws Exception {
+        TestWorld sourceWorld = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestWorld destinationWorld = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore sourceEntityStore = new TestEntityStore(sourceWorld);
+        TestEntityStore destinationEntityStore = new TestEntityStore(destinationWorld);
+        try (TestEntityComponentStore sourceStore = new TestEntityComponentStore(sourceEntityStore);
+             TestEntityComponentStore destinationStore = new TestEntityComponentStore(
+                     destinationEntityStore)) {
+            sourceEntityStore.store = sourceStore;
+            destinationEntityStore.store = destinationStore;
+            Ref<EntityStore> sourceRef = sourceStore.createReference();
+            Ref<EntityStore> destinationRef = destinationStore.createReference();
+            Player sourcePlayer = (Player) unsafe().allocateInstance(Player.class);
+            sourcePlayer.setLegacyUUID(OWNER);
+            putObject(sourcePlayer, Player.class, "playerRef", playerRef());
+            sourcePlayer.loadIntoWorld(sourceWorld);
+            sourcePlayer.setReference(sourceRef);
+            Player destinationPlayer = (Player) unsafe().allocateInstance(Player.class);
+            destinationPlayer.setLegacyUUID(OWNER);
+            destinationPlayer.loadIntoWorld(destinationWorld);
+            destinationPlayer.setReference(destinationRef);
+
+            AtomicReference<BondedCompanionActionRequest> captured = new AtomicReference<>();
+            AtomicReference<Store<EntityStore>> resolvedStore = new AtomicReference<>();
+            AtomicReference<Player> authorityPlayer = new AtomicReference<>();
+            BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
+                    new BondedCompanionPanelActionService(() -> recordingApi(captured)),
+                    new CommandFeedbackService(null),
+                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    (owner, roster) -> { },
+                    (owner, eventRef, eventStore) -> {
+                        resolvedStore.set(eventStore);
+                        return eventRef == destinationRef ? destinationPlayer : null;
+                    });
+
+            ItemStack horn = commandStack("test:horn", "horn-tool");
+            installInventory(sourcePlayer, horn);
+            BondedCompanionApi api = recordingApi(captured);
+            BondedCompanionPanelEntrySourceService bondedSource =
+                    new BondedCompanionPanelEntrySourceService(
+                            BondedPanelTestFixtures.cache(api),
+                            new BondedCompanionPanelRecordSource(),
+                            new BondedCompanionPanelFeaturePresentationSource(() -> 10L));
+            CommandPanelEntrySourceService panelSource =
+                    new CommandPanelEntrySourceService(
+                            null, new CommandPanelPreferenceService(), null,
+                            null, null, null, bondedSource);
+            panelSource.warmBondedRoster(OWNER, "hydragon:dragons");
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    new CommandToolInventoryService(null, panelSource,
+                            new CommandPanelPreferenceService(), null),
+                    null, null, null, null, null, null, router);
+            TameworkCommandSelectionPage page = createBoundPage(service,
+                    sourcePlayer, sourceStore, bondedConfig(), horn,
+                    () -> true, currentPlayer -> {
+                        authorityPlayer.set(currentPlayer);
+                        return currentPlayer == destinationPlayer;
+                    });
+            refresh(page);
+
+            page.handleDataEvent(destinationRef, destinationStore, event(
+                    "__roster_dismiss__:" +
+                            BondedCompanionPanelRecordSource.presentationUuid(
+                                    "profile-7")));
+
+            assertSame(destinationStore, resolvedStore.get());
+            assertNotSame(sourceStore, resolvedStore.get());
+            assertSame(destinationPlayer, authorityPlayer.get());
+            assertNotSame(sourcePlayer, authorityPlayer.get());
+            assertNotNull(captured.get());
+            assertEquals(destinationWorld.getName(), captured.get().worldKey());
+            assertNotSame(sourceRef, destinationPlayer.getReference());
+        }
+    }
+
+    /** A stale rendered revision refreshes exactly its owner/roster generation. */
+    @Test
+    void rejectedBondedActionRefreshesTheExactRenderedRoster() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            player.loadIntoWorld(world);
+            player.setReference(actor);
+            AtomicReference<String> refreshed = new AtomicReference<>();
+            BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
+                    new BondedCompanionPanelActionService(
+                            () -> rejectingApi(BondedCompanionResultCode.REVISION_CONFLICT)),
+                    new CommandFeedbackService(null),
+                    new HytaleBondedCompanionActionContextFactory(null, null),
+                    (owner, roster) -> refreshed.set(owner + ":" + roster),
+                    (owner, eventRef, eventStore) -> player);
+
+            router.route(OWNER, actor, store, bondedConfig(), bondedDismissFeature(),
+                    BondedCompanionPanelActionService.Action.STORE, ignored -> true);
+
+            assertEquals(OWNER + ":hydragon:dragons", refreshed.get());
+        }
+    }
+
     private BondedCompanionActionRequest dispatchPageDismiss(
             BooleanSupplier genericAuthority,
             BooleanSupplier bondedAuthority) throws Exception {
@@ -173,25 +317,32 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionApi api = recordingApi(captured);
             BondedCompanionPanelActionRouter router = new BondedCompanionPanelActionRouter(
                     new BondedCompanionPanelActionService(() -> api),
-                    new CommandFeedbackService(null));
+                    new CommandFeedbackService(null),
+                    new HytaleBondedCompanionActionContextFactory(
+                            new ComponentType<EntityStore,
+                                    TameworkBondedReviveEscrowComponent>(),
+                            null), (owner, roster) -> { },
+                    (owner, currentRef, currentStore) -> player);
             ItemStack horn = commandStack("test:horn", "horn-tool");
             installInventory(player, horn);
             BondedCompanionPanelEntrySourceService bondedSource =
                     new BondedCompanionPanelEntrySourceService(
-                            new BondedCompanionPanelRecordSource(() -> api),
+                            BondedPanelTestFixtures.cache(api),
+                            new BondedCompanionPanelRecordSource(),
                             new BondedCompanionPanelFeaturePresentationSource(
-                                    () -> api, () -> 10L));
+                                    () -> 10L));
             CommandPanelEntrySourceService panelSource =
                     new CommandPanelEntrySourceService(
                             null, new CommandPanelPreferenceService(), null,
                             null, null, null, bondedSource);
+            panelSource.warmBondedRoster(OWNER, "hydragon:dragons");
             CommandToolInventoryService tools = new CommandToolInventoryService(
                     null, panelSource, new CommandPanelPreferenceService(), null);
             CommandSelectionPageService service = new CommandSelectionPageService(
                     tools, null, null, null, null, null, null, router);
             TameworkCommandSelectionPage page = createBoundPage(
                     service, player, store, bondedConfig(), horn,
-                    genericAuthority, bondedAuthority);
+                    genericAuthority, ignored -> bondedAuthority.getAsBoolean());
             refresh(page);
 
             page.handleDataEvent(actor, store, event(
@@ -210,7 +361,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             TwCommandItemConfig config,
             ItemStack working,
             BooleanSupplier genericAuthority,
-            BooleanSupplier bondedAuthority) throws Exception {
+            CommandSelectionPageService.BondedLifecycleAuthority bondedAuthority)
+            throws Exception {
         var createPage = java.util.Arrays.stream(
                         CommandSelectionPageService.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("createPage"))
@@ -230,7 +382,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 ? fixed
                 : java.util.Arrays.copyOf(fixed, fixed.length + 1);
         if (arguments.length > fixed.length) {
-            arguments[arguments.length - 1] = bondedAuthority;
+            arguments[arguments.length - 1] =
+                    bondedAuthority;
         }
         return (TameworkCommandSelectionPage) createPage.invoke(
                 service, arguments);
@@ -269,14 +422,67 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         return new TameworkCommandSelectionPage(
                 playerRef, config, null, true,
                 List::of, List::of, () -> Map.of(CARD, feature),
+                () -> null,
                 () -> "LinkedMode", () -> false, () -> "16",
                 () -> "Default", () -> "None", () -> "",
                 List::of, () -> "", List::of, ignored -> true, true,
                 noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
-                noUuid, dismiss, noUuid, noUuid, recall, noUuid, noUuid,
+                (ignored, ignoredRef, ignoredStore) -> { },
+                (uuid, ignoredRef, ignoredStore) -> dismiss.accept(uuid),
+                (ignored, ignoredRef, ignoredStore) -> { }, noUuid,
+                recall, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
                 noString, noString, noString, noRun, noString,
                 (uuid, group) -> { }, noString);
+    }
+
+    private TameworkCommandSelectionPage genericFeaturePage(
+            GenericFeatureEvent expected,
+            AtomicReference<String> action,
+            AtomicReference<Ref<EntityStore>> eventRef,
+            AtomicReference<Store<EntityStore>> eventStore) throws Exception {
+        CommandPanelFeaturePresentation feature = genericFeature(expected);
+        LinkedNpcPanelFeatureAction capture = (uuid, ref, store) -> {
+            action.set(expected.name());
+            eventRef.set(ref);
+            eventStore.set(store);
+        };
+        java.util.function.Consumer<UUID> noUuid = ignored -> { };
+        java.util.function.Consumer<String> noString = ignored -> { };
+        Runnable noRun = () -> { };
+        return new TameworkCommandSelectionPage(
+                playerRef(), genericRosterConfig(), null, true,
+                () -> List.of(genericEntry()), () -> List.of(genericEntry()),
+                () -> Map.of(CARD, feature), () -> null,
+                () -> "LinkedMode", () -> false, () -> "16",
+                () -> "Default", () -> "None", () -> "",
+                List::of, () -> "", List::of, ignored -> true, true,
+                noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
+                capture, capture, capture, noUuid, noUuid, noUuid, noUuid,
+                noUuid, noString, ignored -> { }, noRun, noRun, noRun,
+                noString, noString, noString, noRun, noString,
+                (uuid, group) -> { }, noString);
+    }
+
+    private CommandPanelFeaturePresentation genericFeature(
+            GenericFeatureEvent event) {
+        CommandTimedSummoningState state = event == GenericFeatureEvent.SUMMON
+                ? CommandTimedSummoningState.ROSTER_STORED
+                : event == GenericFeatureEvent.DISMISS
+                        ? CommandTimedSummoningState.ACTIVE
+                        : CommandTimedSummoningState.DEAD_REVIVABLE;
+        CommandRosterStatusPresentation roster = new CommandRosterStatusPresentation(
+                "profile-7", "test:family", state, 1L, null, 0L,
+                false, 0L, 0, 0, null, null);
+        CommandReviveCostPresentation revival = new CommandReviveCostPresentation(
+                PaidCommandRevivalQuote.Status.READY, 0L, List.of(), "1", null, null);
+        return new CommandPanelFeaturePresentation(roster, revival);
+    }
+
+    private LinkedNpcEntry genericEntry() {
+        return new LinkedNpcEntry(CARD, "Nimbus", 1, 1, 1, 1, "", 1,
+                1, 1, 1, true, false, true, false, false, false, 0L,
+                new LinkedNpcTraitIndicator[0]);
     }
 
     private CommandPanelFeaturePresentation bondedDismissFeature() {
@@ -308,6 +514,32 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 BsonDocument.parse("{}"), new ExtraInfo());
     }
 
+    private TwCommandItemConfig genericRosterConfig() {
+        return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("""
+                {
+                  "RosterStorage": "OwnerCommandFamily",
+                  "CommandFamilyId": "test:family",
+                  "CommandList": [{"Id":"Follow", "DisplayName":"Follow", "Steps":[]}]
+                }
+                """), new ExtraInfo());
+    }
+
+    private enum GenericFeatureEvent {
+        SUMMON("__roster_summon__:" + CARD),
+        DISMISS("__roster_dismiss__:" + CARD),
+        REVIVE("__respawn__:" + CARD);
+
+        private final String command;
+
+        GenericFeatureEvent(String command) {
+            this.command = command;
+        }
+
+        private String command() {
+            return command;
+        }
+    }
+
     private BondedCompanionApi recordingApi(
             AtomicReference<BondedCompanionActionRequest> captured) {
         return (BondedCompanionApi) Proxy.newProxyInstance(
@@ -331,6 +563,24 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                                         null, null));
                     }
                     if ("subscribe".equals(method.getName())) return (AutoCloseable) () -> { };
+                    throw new AssertionError("Unexpected bonded API call: "
+                            + method.getName());
+                });
+    }
+
+    private BondedCompanionApi rejectingApi(BondedCompanionResultCode code) {
+        return (BondedCompanionApi) Proxy.newProxyInstance(
+                BondedCompanionApi.class.getClassLoader(),
+                new Class<?>[]{BondedCompanionApi.class},
+                (proxy, method, arguments) -> {
+                    if ("store".equals(method.getName())) {
+                        return CompletableFuture.completedFuture(
+                                new BondedCompanionResult<>(code, null,
+                                        "stale rendered revision"));
+                    }
+                    if ("availability".equals(method.getName())) {
+                        return BondedCompanionAvailability.availableNow();
+                    }
                     throw new AssertionError("Unexpected bonded API call: "
                             + method.getName());
                 });

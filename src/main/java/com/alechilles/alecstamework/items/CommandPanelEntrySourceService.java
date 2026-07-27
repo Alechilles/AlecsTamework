@@ -19,7 +19,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -118,7 +117,7 @@ final class CommandPanelEntrySourceService {
                     player, store, config.getBondedRosterId());
             return new CommandPanelSnapshot(
                     applyFiltersAndSort(durable.entries(), stack),
-                    durable.featurePresentations());
+                    durable.featurePresentations(), durable.emptyStateKey());
         }
         CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
                 resolveRosterSnapshot(player, config);
@@ -145,8 +144,17 @@ final class CommandPanelEntrySourceService {
                         rosterSnapshot.members()
                 );
         return new CommandPanelSnapshot(
-                entries, remapFeatures(features, rosterEntries)
+                entries, CommandPanelFeatureRemapper.remap(features, rosterEntries)
         );
+    }
+
+    @Nullable
+    BondedCompanionPanelEntrySourceService bondedReadModel() {
+        return bondedEntrySource;
+    }
+
+    void warmBondedRoster(@Nullable UUID ownerUuid, @Nullable String rosterId) {
+        if (bondedEntrySource != null) bondedEntrySource.warm(ownerUuid, rosterId);
     }
 
     private List<LinkedNpcEntry> buildEntries(Player player,
@@ -331,35 +339,22 @@ final class CommandPanelEntrySourceService {
         );
     }
 
-    private Map<UUID, CommandPanelFeaturePresentation> remapFeatures(
-            Map<UUID, CommandPanelFeaturePresentation> features,
-            @Nullable CommandLinkedPanelEntryService.ResolvedEntries entries
-    ) {
-        if (features == null || features.isEmpty() || entries == null
-                || entries.renderedIds().isEmpty()) {
-            return features == null ? Map.of() : features;
-        }
-        LinkedHashMap<UUID, CommandPanelFeaturePresentation> remapped =
-                new LinkedHashMap<>(features);
-        for (Map.Entry<UUID, UUID> identity : entries.renderedIds().entrySet()) {
-            CommandPanelFeaturePresentation feature = features.get(
-                    identity.getKey()
-            );
-            if (feature != null && identity.getValue() != null) {
-                remapped.put(identity.getValue(), feature);
-            }
-        }
-        return Map.copyOf(remapped);
-    }
-
     /** Immutable card and action-presentation result for one panel refresh. */
     record CommandPanelSnapshot(
             List<LinkedNpcEntry> entries,
-            Map<UUID, CommandPanelFeaturePresentation> featurePresentations
+            Map<UUID, CommandPanelFeaturePresentation> featurePresentations,
+            @Nullable String emptyStateKey
     ) {
         CommandPanelSnapshot {
             entries = List.copyOf(entries);
             featurePresentations = Map.copyOf(featurePresentations);
+        }
+
+        CommandPanelSnapshot(
+                List<LinkedNpcEntry> entries,
+                Map<UUID, CommandPanelFeaturePresentation> featurePresentations
+        ) {
+            this(entries, featurePresentations, null);
         }
     }
 

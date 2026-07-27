@@ -31,8 +31,10 @@ public final class CommandWorldChangeTravelEventHandler {
     }
 
     public void onPlayerConnect(@Nullable PlayerConnectEvent event) {
-        sessions.onConnected(event == null || event.getPlayerRef() == null
-                ? null : event.getPlayerRef().getUuid());
+        UUID ownerUuid = event == null || event.getPlayerRef() == null
+                ? null : event.getPlayerRef().getUuid();
+        sessions.onConnected(ownerUuid);
+        commandItems.onPlayerConnect(ownerUuid);
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
@@ -40,6 +42,7 @@ public final class CommandWorldChangeTravelEventHandler {
                 ? null : event.getPlayerRef().getUuid();
         sessions.onDisconnected(playerUuid);
         arrivals.clear(playerUuid);
+        commandItems.onPlayerDisconnect(playerUuid);
     }
 
     public void onAddPlayerToWorld(@Nullable AddPlayerToWorldEvent event) {

@@ -74,13 +74,15 @@ class BondedCompanionPanelVisiblePreferencesTest {
                 profile("b-profile", "Alpha")));
         BondedCompanionPanelEntrySourceService bonded =
                 new BondedCompanionPanelEntrySourceService(
-                        new BondedCompanionPanelRecordSource(() -> api),
+                        BondedPanelTestFixtures.cache(api),
+                        new BondedCompanionPanelRecordSource(),
                         new BondedCompanionPanelFeaturePresentationSource(
-                                () -> api, () -> 10L));
+                                () -> 10L));
         CommandPanelEntrySourceService source =
                 new CommandPanelEntrySourceService(
                         null, new CommandPanelPreferenceService(), null,
                         null, null, null, bonded);
+        source.warmBondedRoster(OWNER, "hydragon:dragons");
         return new Fixture(player, store, source);
     }
 

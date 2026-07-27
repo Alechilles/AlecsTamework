@@ -64,6 +64,7 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandPanelEntrySourceService panelEntrySourceService;
+    private final BondedCompanionPanelLifecycle bondedPanelLifecycle;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandPanelCallbackAuthority callbackAuthority;
     private final CommandResolutionService resolutionService;
@@ -75,6 +76,7 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcExistenceService npcExistenceService;
     private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
     private final CommandLinkedNpcInventoryRepairService inventoryRepairService;
+    private final CommandPlayerInventoryCanonicalizer inventoryCanonicalizer;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final CommandLinkedRecordCanonicalizer recordCanonicalizer;
@@ -228,8 +230,10 @@ public final class CommandItemFeatureHandler {
                 npcNameResolver,
                 rosterPanelRecordSource,
                 featurePresentations,
-                BondedCompanionPanelEntrySourceService.production()
+                BondedCompanionPanelEntrySourceService.production(bondedCompanions)
         );
+        this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
+                registry, panelEntrySourceService.bondedReadModel());
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
                 linkPolicyService,
@@ -268,6 +272,8 @@ public final class CommandItemFeatureHandler {
         );
         this.inventoryRepairService =
                 new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
+        this.inventoryCanonicalizer = new CommandPlayerInventoryCanonicalizer(
+                inventoryRepairService);
         this.recipientService = new CommandRecipientService(
                 linkPolicyService,
                 linkedNpcRecordStore,
@@ -373,7 +379,9 @@ public final class CommandItemFeatureHandler {
                 talentPageService,
                 featurePresentations,
                 featureActions,
-                BondedCompanionPanelActionRouter.production(feedbackService)
+                BondedCompanionPanelActionRouter.production(
+                        feedbackService, bondedCompanions,
+                        panelEntrySourceService.bondedReadModel())
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,
@@ -397,38 +405,16 @@ public final class CommandItemFeatureHandler {
                 )
         );
     }
-
     public void queueWorldChangeTravelRelocationsForPlayerUuid(World destinationWorld, UUID playerUuid) {
         worldChangeTravel.queueForPlayerUuid(destinationWorld, playerUuid);
     }
-
-    /**
-     * Resolves the live player on their current world thread and lazily repairs every command-item
-     * copy in hotbar, storage, and backpack. Callers must queue this method through that world.
-     */
+    /** Resolves the live player before repairing their command-item copies. */
     public void canonicalizePlayerCommandInventory(@Nullable World world, @Nullable UUID playerUuid) {
-        if (world == null || playerUuid == null) {
-            return;
-        }
-        Store<EntityStore> store =
-                world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
-        if (store == null) {
-            return;
-        }
-        Ref<EntityStore> playerRef = world.getEntityRef(playerUuid);
-        if (playerRef == null || !playerRef.isValid()) {
-            return;
-        }
-        Player player = store.getComponent(playerRef, Player.getComponentType());
-        if (player != null && player.getWorld() == world) {
-            inventoryRepairService.canonicalize(player);
-        }
+        inventoryCanonicalizer.canonicalize(world, playerUuid);
     }
-
     void dismountPlayerAfterWorldJoin(World world, UUID playerUuid) {
         worldChangeTravel.dismountAfterWorldJoin(world, playerUuid);
     }
-
     // Handles a single command-item use.
     public boolean handleUse(Player player,
                              ItemStack itemStack,
@@ -439,12 +425,28 @@ public final class CommandItemFeatureHandler {
                 player, itemStack, targetRef, configIdOverride, commandIdOverride
         );
     }
-
+    /** Clears only presentation snapshots when the owner disconnects. */
+    public void onPlayerDisconnect(@Nullable UUID ownerUuid) {
+        bondedPanelLifecycle.evictOwner(ownerUuid);
+    }
+    /** Schedules all configured bonded rosters before the owner opens a Horn. */
+    public void onPlayerConnect(@Nullable UUID ownerUuid) {
+        bondedPanelLifecycle.warmForOwner(ownerUuid);
+    }
+    /** Stops the owned bonded panel loader before durable persistence closes. */
+    public void close() {
+        bondedPanelLifecycle.close();
+    }
     private boolean openSelectionMenu(Player player,
                                       Store<EntityStore> store,
                                       TwCommandItemConfig config,
                                       ItemStack working,
                                       String toolId) {
+        if (player != null && config != null
+                && config.usesBondedCompanionRoster()) {
+            bondedPanelLifecycle.warm(
+                    player.getUuid(), config.getBondedRosterId());
+        }
         CommandPanelCallbackAuthority.GenericBinding genericBinding =
                 callbackAuthority.bindGeneric(working, config);
         if (CommandRosterStorageBoundary.allowsGenericRosterActions(config)
@@ -471,8 +473,8 @@ public final class CommandItemFeatureHandler {
                 player, store, config, working, toolId, actions,
                 () -> callbackAuthority.allowsGeneric(
                         player, toolId, genericBinding),
-                () -> callbackAuthority.allowsBonded(
-                        player, toolId,
+                currentPlayer -> callbackAuthority.allowsBonded(
+                        currentPlayer, toolId,
                         working == null ? null : working.getItemId(),
                         config, openedRegistryRevision)
         );

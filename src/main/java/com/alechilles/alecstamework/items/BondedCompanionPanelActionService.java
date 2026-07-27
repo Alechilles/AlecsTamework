@@ -51,7 +51,7 @@ final class BondedCompanionPanelActionService {
         if (row.status().action() != mapped(action)
                 || !row.status().actionEnabled()) {
             return CompletableFuture.completedFuture(
-                    Outcome.denied(row.status().unavailableReason()));
+                    Outcome.denied(row.status().blockReason()));
         }
         BondedCompanionActionRequest request = new BondedCompanionActionRequest(
                 CALLER,
@@ -69,17 +69,20 @@ final class BondedCompanionPanelActionService {
             };
             if (result == null) {
                 return CompletableFuture.completedFuture(
-                        Outcome.failed("Bonded action returned no result."));
+                        Outcome.failed(BondedCompanionActionBlockReason.GENERIC_FAILURE));
             }
             return result.handle((resolved, failure) -> {
-                if (failure != null) return Outcome.failed("Bonded action failed.");
+                if (failure != null) return Outcome.failed(
+                        BondedCompanionActionBlockReason.GENERIC_FAILURE);
                 return resolved != null && resolved.successful()
                         ? Outcome.success() : Outcome.failed(resolved == null
-                        ? "Bonded action returned no result." : resolved.reason());
+                        ? BondedCompanionActionBlockReason.GENERIC_FAILURE
+                        : BondedCompanionActionFeedbackMapper.from(
+                                resolved.code(), resolved.reason()));
             });
         } catch (RuntimeException | LinkageError failure) {
             return CompletableFuture.completedFuture(
-                    Outcome.failed("Bonded action failed."));
+                    Outcome.failed(BondedCompanionActionBlockReason.GENERIC_FAILURE));
         }
     }
 
@@ -112,11 +115,15 @@ final class BondedCompanionPanelActionService {
 
     enum Action { SUMMON, STORE, REVIVE }
 
-    record Outcome(boolean applied, @Nullable String reason) {
+    record Outcome(boolean applied,
+                   @Nullable BondedCompanionActionBlockReason blockReason) {
         static Outcome success() { return new Outcome(true, null); }
-        static Outcome denied(String reason) { return new Outcome(false,
-                reason == null ? "Bonded action is unavailable." : reason); }
-        static Outcome failed(String reason) { return new Outcome(false,
-                reason == null ? "Bonded action failed." : reason); }
+        static Outcome denied(BondedCompanionActionBlockReason reason) {
+            return new Outcome(false, reason == null
+                    ? BondedCompanionActionBlockReason.GENERIC_FAILURE : reason);
+        }
+        static Outcome failed(BondedCompanionActionBlockReason reason) {
+            return denied(reason);
+        }
     }
 }

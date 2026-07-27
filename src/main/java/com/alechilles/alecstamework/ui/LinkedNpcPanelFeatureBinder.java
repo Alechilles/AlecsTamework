@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
+import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
@@ -41,7 +42,7 @@ final class LinkedNpcPanelFeatureBinder {
         if (row.bonded() != null) {
             bindBonded(builder, events, npcUuid, row.bonded(), config,
                     stateSelector, timerSelector, capacitySelector,
-                    summonSelector, dismissSelector);
+                    summonSelector, dismissSelector, language);
             return;
         }
         CommandRosterStatusPresentation roster = row.roster();
@@ -95,7 +96,7 @@ final class LinkedNpcPanelFeatureBinder {
             BondedCompanionPanelPresentation row,
             LinkedNpcPanelCardBinder.CardBindingConfig config,
             String stateSelector, String detailSelector, String reasonSelector,
-            String summonSelector, String dismissSelector) {
+            String summonSelector, String dismissSelector, String language) {
         BondedCompanionStatusPresentation status = row.status();
         builder.set(stateSelector + ".Text", switch (status.state()) {
             case STORED -> "Stored";
@@ -103,8 +104,9 @@ final class LinkedNpcPanelFeatureBinder {
             case DEAD -> "Dead";
         });
         builder.set(detailSelector + ".Text", bondedDetailText(row));
-        builder.set(reasonSelector + ".Text",
-                status.unavailableReason() == null ? "" : status.unavailableReason());
+        builder.set(reasonSelector + ".Text", status.blockReason() == null
+                ? "" : BondedCompanionActionFeedbackMapper.resolve(
+                        language, status.blockReason()));
         boolean summon = status.action()
                 == BondedCompanionStatusPresentation.Action.SUMMON;
         boolean dismiss = status.action()

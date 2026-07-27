@@ -30,11 +30,10 @@ class BondedCompanionPanelRecordSourceTest {
                         "extension:hydragon:bond",
                         "{\"archetype\":\"storm\",\"ability\":\"dash\"}"));
         BondedCompanionPanelRecordSource source =
-                new BondedCompanionPanelRecordSource(() ->
-                        BondedPanelTestFixtures.api(List.of(active)));
+                new BondedCompanionPanelRecordSource();
 
         BondedCompanionPanelRecordSource.PanelRecord record =
-                source.snapshotFor(OWNER, "hydragon:dragons")
+                source.ready(OWNER, "hydragon:dragons", List.of(active))
                         .records().getFirst();
 
         assertEquals("profile-7", record.profile().profileId());
@@ -52,10 +51,10 @@ class BondedCompanionPanelRecordSourceTest {
         BondedCompanionProfileView current = BondedPanelTestFixtures.profile(
                 "profile-7", 4L, BondedCompanionStateView.STORED, null, Map.of());
         BondedCompanionPanelRecordSource source =
-                new BondedCompanionPanelRecordSource(() ->
-                        BondedPanelTestFixtures.api(List.of(old, current)));
+                new BondedCompanionPanelRecordSource();
 
-        var snapshot = source.snapshotFor(OWNER, "hydragon:dragons");
+        var snapshot = source.ready(
+                OWNER, "hydragon:dragons", List.of(old, current));
 
         assertEquals(1, snapshot.records().size());
         assertEquals(4L, snapshot.records().getFirst().profile().revision());
@@ -70,12 +69,10 @@ class BondedCompanionPanelRecordSourceTest {
                 "mini-1", 2L, BondedCompanionStateView.STORED, null,
                 Map.of(), "hydragon:miniwyvern");
         BondedCompanionPanelRecordSource source =
-                new BondedCompanionPanelRecordSource(() ->
-                        BondedPanelTestFixtures.api(List.of(
-                                miniwyvern, dragon
-                        )));
+                new BondedCompanionPanelRecordSource();
 
-        var records = source.snapshotFor(OWNER, "hydragon:dragons").records();
+        var records = source.ready(OWNER, "hydragon:dragons", List.of(
+                miniwyvern, dragon)).records();
 
         assertEquals(List.of("dragon-1", "mini-1"), records.stream()
                 .map(record -> record.profile().profileId()).toList());
@@ -89,8 +86,7 @@ class BondedCompanionPanelRecordSourceTest {
         AtomicReference<BondedCompanionProfileView> current =
                 new AtomicReference<>();
         BondedCompanionPanelRecordSource source =
-                new BondedCompanionPanelRecordSource(() ->
-                        BondedPanelTestFixtures.api(List.of(current.get())));
+                new BondedCompanionPanelRecordSource();
         UUID expected = BondedCompanionPanelRecordSource
                 .presentationUuid("profile-lifecycle");
         BondedCompanionStateView[] states = {
@@ -107,7 +103,8 @@ class BondedCompanionPanelRecordSourceTest {
                     Map.of("healthPercent", "63.25", "level", "7",
                             "extension:hydragon:bond", "{\"ability\":\"dash\"}")));
 
-            var record = source.snapshotFor(OWNER, "hydragon:dragons")
+            var record = source.ready(OWNER, "hydragon:dragons",
+                            List.of(current.get()))
                     .records().getFirst();
 
             assertEquals(expected, record.presentationUuid());
