@@ -168,8 +168,6 @@ import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionMaintenanceSystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
-        .BondedCompanionPaymentRecoverySystem;
-import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionDeathSystem;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
@@ -890,11 +888,6 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new BondedCompanionMaintenanceSystem(
-                        bondedCompanionComposition
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new BondedCompanionPaymentRecoverySystem(
                         bondedCompanionComposition
                 )
         );

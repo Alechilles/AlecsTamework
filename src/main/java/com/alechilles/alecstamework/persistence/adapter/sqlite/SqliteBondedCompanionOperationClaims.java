@@ -18,7 +18,8 @@ final class SqliteBondedCompanionOperationClaims {
     Claim claim(
             Connection connection,
             BondedCompanionOperation operation,
-            @Nullable Long expectedRevision
+            @Nullable Long expectedRevision,
+            String placeholderResult
     ) throws SQLException {
         try (PreparedStatement insert = connection.prepareStatement("""
                 INSERT OR IGNORE INTO bonded_companion_operation(
@@ -26,9 +27,9 @@ final class SqliteBondedCompanionOperationClaims {
                     profile_id, operation_type, request_hash, operation_state,
                     result_json, created_at_ms, updated_at_ms, expires_at_ms,
                     expected_revision
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'REJECTED', ?, ?, ?, ?, ?)
                 """)) {
-            bind(insert, operation, expectedRevision);
+            bind(insert, operation, expectedRevision, placeholderResult);
             if (insert.executeUpdate() == 1) return new Claim(true, null);
         }
         return existing(connection, operation, expectedRevision).orElseThrow(
@@ -58,8 +59,8 @@ final class SqliteBondedCompanionOperationClaims {
                         operation.profileId(), row.getString(3))
                         && operation.type().name().equals(row.getString(4))
                         && operation.requestHash().equals(row.getString(5))
-                        && revisionMatches(
-                        expectedRevision, nullableLong(row, 6));
+                        && (expectedRevision == null || revisionMatches(
+                        expectedRevision, nullableLong(row, 6)));
                 return Optional.of(new Claim(
                         false, matches ? row.getString(8) : null,
                         matches, row.getString(7)));
@@ -106,7 +107,8 @@ final class SqliteBondedCompanionOperationClaims {
     private void bind(
             PreparedStatement statement,
             BondedCompanionOperation operation,
-            @Nullable Long expectedRevision
+            @Nullable Long expectedRevision,
+            String placeholderResult
     ) throws SQLException {
         statement.setString(1, operation.callerNamespace());
         statement.setString(2, operation.idempotencyKey());
@@ -115,13 +117,14 @@ final class SqliteBondedCompanionOperationClaims {
         statement.setString(5, operation.profileId());
         statement.setString(6, operation.type().name());
         statement.setString(7, operation.requestHash());
-        statement.setLong(8, operation.attemptedAtMs());
+        statement.setString(8, placeholderResult);
         statement.setLong(9, operation.attemptedAtMs());
-        statement.setLong(10, operation.retainedUntilMs());
+        statement.setLong(10, operation.attemptedAtMs());
+        statement.setLong(11, operation.retainedUntilMs());
         if (expectedRevision == null) {
-            statement.setNull(11, Types.BIGINT);
+            statement.setNull(12, Types.BIGINT);
         } else {
-            statement.setLong(11, expectedRevision);
+            statement.setLong(12, expectedRevision);
         }
     }
 
@@ -144,7 +147,7 @@ final class SqliteBondedCompanionOperationClaims {
             String state
     ) {
         Claim(boolean created, String resultJson) {
-            this(created, resultJson, true, "PENDING");
+            this(created, resultJson, true, "REJECTED");
         }
     }
 }

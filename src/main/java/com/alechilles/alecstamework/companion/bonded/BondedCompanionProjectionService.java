@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -81,6 +82,14 @@ public final class BondedCompanionProjectionService {
     @Nonnull
     public StoreResult store(@Nonnull StoreRequest request) {
         Objects.requireNonNull(request, "request");
+        StoreDurabilityResult prior = durability.findStoreResult(
+                request.operation());
+        if (prior.status() == StoreDurabilityStatus.REPLAYED) {
+            return new StoreResult(StoreStatus.STORED, null);
+        }
+        if (prior.status() != StoreDurabilityStatus.ABSENT) {
+            return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
+        }
         BondedCompanionProjectionValidator.Projection projection =
                 world.readExact(request.lease());
         var validation = validator.validate(
@@ -103,8 +112,12 @@ public final class BondedCompanionProjectionService {
         var intent = cleanupIntents.projection(
                 request.lease(), "store", request.nowMs()
         );
-        if (!durability.storeAndEnqueueCleanup(
-                request, planned.plan(), intent)) {
+        StoreDurabilityResult committed = durability.storeAndEnqueueCleanup(
+                request, planned.plan(), intent);
+        if (committed.status() == StoreDurabilityStatus.REPLAYED) {
+            return new StoreResult(StoreStatus.STORED, null);
+        }
+        if (committed.status() != StoreDurabilityStatus.APPLIED) {
             return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
         }
         BondedCompanionProjectionCleanupService.Outcome outcome = cleanup.recover(intent);
@@ -315,8 +328,12 @@ public final class BondedCompanionProjectionService {
                 @Nonnull String reason
         );
 
+        /** Returns a terminal exact-store result before any projection access. */
+        @Nonnull StoreDurabilityResult findStoreResult(
+                @Nonnull BondedCompanionOperation operation);
+
         /** Atomically replaces the snapshot, invalidates the lease, stores, and enqueues cleanup. */
-        boolean storeAndEnqueueCleanup(
+        @Nonnull StoreDurabilityResult storeAndEnqueueCleanup(
                 @Nonnull StoreRequest request,
                 @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
                 @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent cleanup
@@ -379,12 +396,21 @@ public final class BondedCompanionProjectionService {
     public record StoreRequest(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long expectedRevision,
-            long nowMs
+            long nowMs,
+            @Nonnull BondedCompanionOperation operation
     ) {
         public StoreRequest {
             lease = Objects.requireNonNull(lease, "lease");
+            operation = Objects.requireNonNull(operation, "operation");
             if (expectedRevision < 0L) {
                 throw new IllegalArgumentException("negative expectedRevision");
+            }
+            if (operation.type() != BondedCompanionOperation.Type.STORE
+                    || !operation.ownerUuid().equals(lease.ownerUuid())
+                    || !operation.rosterId().equals(lease.rosterId())
+                    || !Objects.equals(operation.profileId(), lease.profileId())) {
+                throw new IllegalArgumentException(
+                        "store operation scope does not match lease");
             }
         }
     }
@@ -457,6 +483,9 @@ public final class BondedCompanionProjectionService {
     public enum StoreStatus {
         STORED, STORED_CLEANUP_PENDING, PROJECTION_NOT_FOUND, DURABILITY_REJECTED
     }
+    public enum StoreDurabilityStatus {
+        ABSENT, APPLIED, REPLAYED, CONFLICT, REJECTED, STORAGE_FAILURE
+    }
     public enum ReconcileStatus {
         ACTIVE_VALID, STORED, DEAD, IDENTITY_MISMATCH, DURABILITY_REJECTED
     }
@@ -474,6 +503,14 @@ public final class BondedCompanionProjectionService {
             @Nonnull StoreStatus status,
             @Nullable BondedCompanionProjectionCleanupService.CleanupIntent cleanup
     ) { }
+
+    public record StoreDurabilityResult(
+            @Nonnull StoreDurabilityStatus status
+    ) {
+        public StoreDurabilityResult {
+            status = Objects.requireNonNull(status, "status");
+        }
+    }
 
     public record ReconcileResult(
             @Nonnull ReconcileStatus status,

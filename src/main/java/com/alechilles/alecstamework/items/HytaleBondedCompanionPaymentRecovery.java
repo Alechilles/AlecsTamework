@@ -94,11 +94,7 @@ public final class HytaleBondedCompanionPaymentRecovery {
                     .Inventory inventory = inventories.create(
                     world, store, ownerUuid, world.getName(), escrowType,
                     receiptTypes.get());
-            if (escrow == null) {
-                recovery.recoverAwaitingWithoutEscrow(
-                        ownerUuid, 64, inventory);
-                return;
-            }
+            if (escrow == null) return;
             BondedCompanionPaymentOperationId.parse(escrow.operationId())
                     .filter(identity -> ownerUuid.equals(identity.ownerUuid()))
                     .ifPresent(identity -> recovery.recover(

@@ -127,6 +127,15 @@ public final class BondedCompanionCoreApiOperations {
         }
         BondedCompanionRecord.Profile profile = profile(request);
         if (profile == null) return notFound();
+        BondedCompanionRecord.Lease existingLease = lease(request);
+        if (profile.state() == BondedCompanionState.ACTIVE
+                && existingLease != null) {
+            String reason = existingLease.projectionState()
+                    == BondedCompanionRecord.ProjectionState.PENDING
+                    ? "bonded-summon-in-progress"
+                    : "bonded-summon-already-live";
+            return failure(BondedCompanionResultCode.INVALID_STATE, reason);
+        }
         BondedCompanionSnapshot snapshot = decode(profile);
         if (snapshot == null) return internal("bonded-snapshot-invalid");
         long now = clock.getAsLong();
@@ -172,17 +181,38 @@ public final class BondedCompanionCoreApiOperations {
     BondedCompanionResult<BondedCompanionProfileView> store(
             BondedCompanionActionRequest request
     ) {
-        BondedCompanionRecord.Profile profile = profile(request);
-        if (profile == null) return notFound();
-        BondedCompanionRecord.Lease lease = lease(request);
-        if (lease == null || request.worldKey() == null
-                || !request.worldKey().equals(lease.worldKey())) {
+        if (request.worldKey() == null) {
             return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
                     "bonded-world-context-unavailable");
         }
         long now = clock.getAsLong();
+        BondedCompanionOperation operation = BondedCompanionStoreOperationFactory
+                .create(
+                        request.callerNamespace(), request.idempotencyKey(),
+                        request.ownerUuid(), request.rosterId(),
+                        request.profileId(), request.expectedRevision(),
+                        request.worldKey(), now,
+                        safeAdd(now, OPERATION_RETENTION_MS));
+        Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>> prior =
+                store.findProfileOperationByExactRequest(operation);
+        if (prior.isPresent()) {
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> replay =
+                    prior.get();
+            return replay.code() == BondedCompanionStoreResult.Code.APPLIED
+                    && replay.value() != null
+                    ? success(view(replay.value()))
+                    : storeFailure(replay);
+        }
+        BondedCompanionRecord.Profile profile = profile(request);
+        if (profile == null) return notFound();
+        BondedCompanionRecord.Lease lease = lease(request);
+        if (lease == null || !request.worldKey().equals(lease.worldKey())) {
+            return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
+                    "bonded-world-context-unavailable");
+        }
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
-                expectation(profile, lease), request.expectedRevision(), now
+                expectation(profile, lease), request.expectedRevision(), now,
+                operation
         ));
         BondedCompanionRecord.Profile refreshed = profile(request);
         if ((result.status() == BondedCompanionProjectionService.StoreStatus.STORED
@@ -298,7 +328,7 @@ public final class BondedCompanionCoreApiOperations {
         return new BondedCompanionProfile(profile.profileId(), profile.ownerUuid(),
                 profile.rosterId(), profile.familyId(), profile.roleId(), profile.state(),
                 profile.revision(), snapshot, active, profile.summonCooldownUntilMs(),
-                profile.diedAtMs(), profile.reviveCount(), BondedCompanionOperationLedger.empty());
+                profile.diedAtMs(), profile.reviveCount());
     }
 
     private BondedCompanionProjectionValidator.LeaseExpectation expectation(

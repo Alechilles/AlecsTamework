@@ -29,6 +29,9 @@ final class RecordingBondedDurability
     String lastReason;
     boolean rollbackSucceeds = true;
     boolean reconcileSucceeds = true;
+    BondedCompanionProjectionService.StoreDurabilityResult storeProbe =
+            new BondedCompanionProjectionService.StoreDurabilityResult(
+                    BondedCompanionProjectionService.StoreDurabilityStatus.ABSENT);
 
     void activate(BondedCompanionProjectionValidator.LeaseExpectation lease) {
         states.put(lease.profileId(), BondedCompanionState.ACTIVE);
@@ -85,7 +88,17 @@ final class RecordingBondedDurability
     }
 
     @Override
-    public boolean storeAndEnqueueCleanup(
+    public BondedCompanionProjectionService.StoreDurabilityResult
+    findStoreResult(
+            com.alechilles.alecstamework.persistence.bonded
+                    .BondedCompanionOperation operation
+    ) {
+        return storeProbe;
+    }
+
+    @Override
+    public BondedCompanionProjectionService.StoreDurabilityResult
+    storeAndEnqueueCleanup(
             BondedCompanionProjectionService.StoreRequest request,
             BondedCompanionProjectionStorePlanner.StorePlan plan,
             BondedCompanionProjectionCleanupService.CleanupIntent cleanup
@@ -94,7 +107,8 @@ final class RecordingBondedDurability
         lastStoredSnapshot = plan.snapshot();
         snapshots.put(request.lease().profileId(), plan.snapshot());
         states.put(request.lease().profileId(), BondedCompanionState.STORED);
-        return true;
+        return new BondedCompanionProjectionService.StoreDurabilityResult(
+                BondedCompanionProjectionService.StoreDurabilityStatus.APPLIED);
     }
 
     @Override

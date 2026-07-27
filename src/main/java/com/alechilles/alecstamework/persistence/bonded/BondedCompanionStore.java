@@ -63,35 +63,6 @@ public interface BondedCompanionStore {
         return false;
     }
 
-    /** Lists bounded terminal revive rows retained for player-payment repair. */
-    @Nonnull
-    default List<BondedCompanionOperationProbe>
-            listAwaitingProfilePaymentSettlements(
-                    @Nonnull UUID ownerUuid, int limit) {
-        return List.of();
-    }
-
-    /** Lists complete historical groups before consulting flattened receipts. */
-    @Nonnull
-    default List<BondedCompanionLegacyPaymentSettlementGroup>
-            listAwaitingLegacyPaymentSettlementGroups(
-                    @Nonnull UUID ownerUuid, int limit) {
-        return List.of();
-    }
-
-    /** Moves every pinned member of one ambiguous historical group to GC. */
-    default int quarantineLegacyPaymentSettlementGroup(
-            @Nonnull UUID ownerUuid,
-            @Nonnull String operationId,
-            long retainedUntilMs) {
-        return 0;
-    }
-
-    /** Acquires the sole live lease under an optimistic profile revision. */
-    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Lease> acquireLease(
-            @Nonnull BondedCompanionOperation operation, long expectedRevision,
-            @Nonnull BondedCompanionRecord.Lease lease);
-
     /** Lists active leases within one exact owner and roster scope. */
     @Nonnull List<BondedCompanionRecord.Lease> findActiveLeases(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId);
@@ -100,16 +71,6 @@ public interface BondedCompanionStore {
     @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> reviveProfile(
             @Nonnull BondedCompanionOperation operation, long expectedRevision,
             long updatedAtMs);
-
-    /** Replaces a complete profile snapshot under an optimistic revision. */
-    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> updateSnapshot(
-            @Nonnull BondedCompanionOperation operation, long expectedRevision,
-            @Nonnull BondedCompanionPayload snapshot, long updatedAtMs);
-
-    /** Releases the exact lease and returns its active profile to stored state. */
-    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile> releaseLease(
-            @Nonnull BondedCompanionOperation operation, long expectedRevision,
-            @Nonnull String leaseToken, long updatedAtMs);
 
     /** Finds one namespaced extension within the exact owner roster scope. */
     @Nonnull Optional<BondedCompanionRecord.ExtensionData> findExtensionData(
@@ -133,11 +94,6 @@ public interface BondedCompanionStore {
     /** Lists finite leases expired at the supplied signed world timestamp. */
     @Nonnull List<BondedCompanionRecord.Lease> findExpiredLeases(
             long nowMs, int limit);
-
-    /** Enqueues one owner-scoped physical cleanup intent atomically. */
-    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Cleanup> enqueueCleanup(
-            @Nonnull BondedCompanionOperation operation,
-            @Nonnull BondedCompanionRecord.Cleanup cleanup);
 
     /** Lists bounded cleanup intents in one exact owner roster scope. */
     @Nonnull List<BondedCompanionRecord.Cleanup> listCleanup(

@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionStorePlanner;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -32,6 +34,9 @@ public final class SqliteBondedCompanionProjectionDurability implements
     private final SqliteBondedCompanionLeaseReader leaseReader;
     private final SqliteBondedCompanionCleanupQueue cleanupQueue;
     private final SqliteBondedCompanionStartupSettlement startupSettlement;
+    private final SqliteBondedCompanionOperationExecutor operations;
+    private final SqliteBondedCompanionExplicitStore explicitStore =
+            new SqliteBondedCompanionExplicitStore();
     private final SqliteBondedCompanionMapper mapper =
             new SqliteBondedCompanionMapper();
     private final BondedCompanionSnapshotCodec snapshots =
@@ -49,6 +54,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
         cleanupQueue = new SqliteBondedCompanionCleanupQueue(connections);
         startupSettlement = new SqliteBondedCompanionStartupSettlement(
                 connections);
+        operations = new SqliteBondedCompanionOperationExecutor(connections);
     }
 
     @Override
@@ -99,14 +105,35 @@ public final class SqliteBondedCompanionProjectionDurability implements
     }
 
     @Override
-    public boolean storeAndEnqueueCleanup(
+    @Nonnull
+    public BondedCompanionProjectionService.StoreDurabilityResult
+    findStoreResult(@Nonnull BondedCompanionOperation operation) {
+        return operations.find(operation, SqliteBondedCompanionProfileRow.class,
+                        mapper::toDomain)
+                .map(this::storeResult)
+                .orElseGet(() -> new BondedCompanionProjectionService
+                        .StoreDurabilityResult(
+                        BondedCompanionProjectionService.StoreDurabilityStatus
+                                .ABSENT));
+    }
+
+    @Override
+    @Nonnull
+    public BondedCompanionProjectionService.StoreDurabilityResult
+    storeAndEnqueueCleanup(
             BondedCompanionProjectionService.StoreRequest request,
             BondedCompanionProjectionStorePlanner.StorePlan plan,
             BondedCompanionProjectionCleanupService.CleanupIntent cleanup
     ) {
-        return returnToStored(
-                request.lease(), plan, List.of(cleanup), request.nowMs()
-        );
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
+                operations.mutateConnection(
+                        request.operation(), request.expectedRevision(),
+                        SqliteBondedCompanionProfileRow.class,
+                        connection -> explicitStore.apply(
+                                connection, request, plan, cleanup,
+                                encoded(plan.snapshot())),
+                        mapper::toDomain, null);
+        return storeResult(result);
     }
 
     @Override
@@ -268,12 +295,29 @@ public final class SqliteBondedCompanionProjectionDurability implements
         return leaseReader.exact(profileId, leaseToken);
     }
 
-    /**
-     * Atomically settles every residual pre-start lease without consulting a
-     * world or imposing a row-count/high-water admission limit.
-     */
+    /** Rolls back only incomplete summon admissions; confirmed live leases survive restart. */
     public int settleResidualLeases(long nowMs) {
         return startupSettlement.settle(nowMs);
+    }
+
+    private BondedCompanionProjectionService.StoreDurabilityResult storeResult(
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> result
+    ) {
+        BondedCompanionProjectionService.StoreDurabilityStatus status =
+                switch (result.code()) {
+                    case APPLIED -> result.replayed()
+                            ? BondedCompanionProjectionService
+                            .StoreDurabilityStatus.REPLAYED
+                            : BondedCompanionProjectionService
+                            .StoreDurabilityStatus.APPLIED;
+                    case IDEMPOTENCY_CONFLICT -> BondedCompanionProjectionService
+                            .StoreDurabilityStatus.CONFLICT;
+                    case STORAGE_FAILURE -> BondedCompanionProjectionService
+                            .StoreDurabilityStatus.STORAGE_FAILURE;
+                    default -> BondedCompanionProjectionService
+                            .StoreDurabilityStatus.REJECTED;
+                };
+        return new BondedCompanionProjectionService.StoreDurabilityResult(status);
     }
 
     private boolean returnToStored(

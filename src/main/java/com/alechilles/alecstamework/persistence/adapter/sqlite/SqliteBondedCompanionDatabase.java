@@ -11,8 +11,6 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreDiagnostics;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
-import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionLegacyPaymentSettlementGroup;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -83,7 +81,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         SqliteBondedCompanionCaptureSourceRow sourceRow =
                 new SqliteBondedCompanionCaptureSourceRow(
                         captureEvidence, profileRow, operation.requestHash(), null);
-        return mutate(operation, null, false,
+        return mutate(operation, null,
                 SqliteBondedCompanionProfileRow.class,
                 store -> store.createCapturedProfile(
                         profileRow, mapper.toRow(cleanup), sourceRow,
@@ -178,39 +176,6 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 operation, terminalApplied, retainedUntilMs)) == 1;
     }
 
-    @Override
-    public List<BondedCompanionOperationProbe>
-            listAwaitingProfilePaymentSettlements(
-                    UUID ownerUuid, int limit) {
-        return read(store -> store.retention().listAwaitingProfilePaymentSettlements(
-                ownerUuid, limit));
-    }
-
-    @Override
-    public List<BondedCompanionLegacyPaymentSettlementGroup>
-            listAwaitingLegacyPaymentSettlementGroups(
-                    UUID ownerUuid, int limit) {
-        return read(store -> store.retention()
-                .listAwaitingLegacyPaymentSettlementGroups(ownerUuid, limit));
-    }
-
-    @Override
-    public int quarantineLegacyPaymentSettlementGroup(
-            UUID ownerUuid, String operationId, long retainedUntilMs) {
-        return integerWrite(store -> store.retention()
-                .quarantineLegacyPaymentSettlementGroup(
-                        ownerUuid, operationId, retainedUntilMs));
-    }
-
-    @Override public BondedCompanionStoreResult<BondedCompanionRecord.Lease>
-            acquireLease(BondedCompanionOperation operation, long expectedRevision,
-                         BondedCompanionRecord.Lease lease) {
-        requireScope(operation, operation.ownerUuid(), operation.rosterId(), lease.profileId());
-        return mutate(operation, SqliteBondedCompanionLeaseRow.class,
-                store -> store.acquireLease(operation.ownerUuid(), operation.rosterId(),
-                        expectedRevision, mapper.toRow(lease)), mapper::toDomain);
-    }
-
     @Override public List<BondedCompanionRecord.Lease> findActiveLeases(
             UUID ownerUuid, String rosterId) {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
@@ -221,36 +186,10 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             reviveProfile(BondedCompanionOperation operation,
                           long expectedRevision, long updatedAtMs) {
         String profileId = Objects.requireNonNull(operation.profileId(), "operation.profileId");
-        return mutate(operation, expectedRevision, true,
+        return mutate(operation, expectedRevision,
                 SqliteBondedCompanionProfileRow.class,
                 store -> store.reviveProfile(operation.ownerUuid(), operation.rosterId(),
                         profileId, expectedRevision, updatedAtMs), mapper::toDomain);
-    }
-
-    @Override public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
-            updateSnapshot(BondedCompanionOperation operation,
-                           long expectedRevision,
-                           BondedCompanionPayload snapshot,
-                           long updatedAtMs) {
-        String profileId = Objects.requireNonNull(
-                operation.profileId(), "operation.profileId");
-        return mutate(operation, SqliteBondedCompanionProfileRow.class,
-                store -> store.updateSnapshot(
-                        operation.ownerUuid(), operation.rosterId(), profileId,
-                        expectedRevision, mapper.payloadJson(snapshot), updatedAtMs),
-                mapper::toDomain);
-    }
-
-    @Override public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
-            releaseLease(BondedCompanionOperation operation,
-                         long expectedRevision, String leaseToken,
-                         long updatedAtMs) {
-        String profileId = Objects.requireNonNull(
-                operation.profileId(), "operation.profileId");
-        return mutate(operation, SqliteBondedCompanionProfileRow.class,
-                store -> store.releaseLease(
-                        operation.ownerUuid(), operation.rosterId(), profileId,
-                        leaseToken, expectedRevision, updatedAtMs), mapper::toDomain);
     }
 
     @Override public Optional<BondedCompanionRecord.ExtensionData>
@@ -287,17 +226,6 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             long nowMs, int limit) {
         return read(store -> store.findExpiredLeases(nowMs, limit).stream()
                 .map(mapper::toDomain).toList());
-    }
-
-    @Override public BondedCompanionStoreResult<BondedCompanionRecord.Cleanup>
-            enqueueCleanup(BondedCompanionOperation operation,
-                           BondedCompanionRecord.Cleanup cleanup) {
-        requireScope(operation, cleanup.ownerUuid(), cleanup.rosterId(),
-                cleanup.profileId());
-        return mutate(operation, SqliteBondedCompanionCleanupRow.class,
-                store -> store.enqueueCleanup(
-                        operation.ownerUuid(), operation.rosterId(),
-                        mapper.toRow(cleanup)), mapper::toDomain);
     }
 
     @Override public List<BondedCompanionRecord.Cleanup> listCleanup(
@@ -361,23 +289,12 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
 
     private <R, D> BondedCompanionStoreResult<D> mutate(
             BondedCompanionOperation operation, Long expectedRevision,
-            boolean resumeMatchingPending,
-            Class<R> storedType,
-            SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
-            SqliteBondedCompanionOperationExecutor.Translation<R, D> translation) {
-        return operations.mutate(operation, expectedRevision,
-                resumeMatchingPending, storedType, mutation, translation);
-    }
-
-    private <R, D> BondedCompanionStoreResult<D> mutate(
-            BondedCompanionOperation operation, Long expectedRevision,
-            boolean resumeMatchingPending,
             Class<R> storedType,
             SqliteBondedCompanionOperationExecutor.Mutation<R> mutation,
             SqliteBondedCompanionOperationExecutor.Translation<R, D> translation,
             BondedCompanionCaptureEvidence captureEvidence) {
         return operations.mutate(operation, expectedRevision,
-                resumeMatchingPending, storedType, mutation, translation,
+                storedType, mutation, translation,
                 captureEvidence);
     }
 

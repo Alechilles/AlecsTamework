@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -168,7 +169,7 @@ class BondedCompanionRecoveryTest {
         world.projections.add(live);
 
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
-                lease, 5L, -900L
+                lease, 5L, -900L, storeOperation("store-order")
         ));
 
         assertEquals(BondedCompanionProjectionService.StoreStatus.STORED,
@@ -178,6 +179,25 @@ class BondedCompanionRecoveryTest {
                 "remove-if-exact:world-a:00000000-0000-0000-0000-000000000028"),
                 world.events);
         assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
+    }
+
+    @Test
+    void matchingStoreReplayReturnsBeforeWorldSnapshotReadOrCleanup() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, snapshot(uuid(20)));
+        durability.storeProbe = new BondedCompanionProjectionService
+                .StoreDurabilityResult(
+                BondedCompanionProjectionService.StoreDurabilityStatus.REPLAYED);
+
+        var result = projections.store(
+                new BondedCompanionProjectionService.StoreRequest(
+                        lease, 5L, -900L, storeOperation("store-replay")));
+
+        assertEquals(BondedCompanionProjectionService.StoreStatus.STORED,
+                result.status());
+        assertTrue(world.events.isEmpty());
+        assertTrue(world.removed.isEmpty());
     }
 
     @Test
@@ -194,7 +214,7 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.store(
                 new BondedCompanionProjectionService.StoreRequest(
-                        lease, 5L, -900L
+                        lease, 5L, -900L, storeOperation("store-preserve")
                 )
         );
 
@@ -218,7 +238,7 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.store(
                 new BondedCompanionProjectionService.StoreRequest(
-                        lease, 5L, -900L
+                        lease, 5L, -900L, storeOperation("store-owner")
                 )
         );
 
@@ -242,7 +262,7 @@ class BondedCompanionRecoveryTest {
 
         var result = projections.store(
                 new BondedCompanionProjectionService.StoreRequest(
-                        lease, 5L, -900L
+                        lease, 5L, -900L, storeOperation("store-role")
                 )
         );
 
@@ -585,5 +605,12 @@ class BondedCompanionRecoveryTest {
 
     private static UUID uuid(long value) {
         return new UUID(0L, value);
+    }
+
+    private BondedCompanionOperation storeOperation(String key) {
+        return new BondedCompanionOperation(
+                "test", key, "a".repeat(64), uuid(1), "roster-a",
+                "profile-a", BondedCompanionOperation.Type.STORE,
+                -900L, 10_000L);
     }
 }

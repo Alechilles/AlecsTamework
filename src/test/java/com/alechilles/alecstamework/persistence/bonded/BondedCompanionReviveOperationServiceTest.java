@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.api.BondedCompanionReviveRequest;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionOperationLedger;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProfile;
@@ -294,7 +293,7 @@ class BondedCompanionReviveOperationServiceTest {
         BondedCompanionProfile domain = new BondedCompanionProfile(
                 PROFILE, OWNER, ROSTER, "hydragon:dragon", ROLE,
                 BondedCompanionState.DEAD, 4L, snapshot, null,
-                0L, 1L, 0L, BondedCompanionOperationLedger.empty());
+                0L, 1L, 0L);
         Support support = new Support(profile, domain, snapshot,
                 rosters.snapshot().revision());
         BondedCompanionReviveOperationService service =
@@ -392,8 +391,6 @@ class BondedCompanionReviveOperationServiceTest {
                             acknowledgments++;
                             yield true;
                         }
-                        case "listAwaitingProfilePaymentSettlements" ->
-                                List.of();
                         case "toString" -> "BondedCompanionStoreDouble";
                         default -> throw new AssertionError(
                                 "Unexpected store call: " + method.getName());

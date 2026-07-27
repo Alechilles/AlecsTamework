@@ -42,8 +42,6 @@ import com.alechilles.alecstamework.persistence.bonded
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPersistenceReadiness;
 import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionPaymentRecoveryService;
-import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionStorePlanner;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionSchemaManager;
@@ -53,8 +51,6 @@ import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticSnapshot;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureFeedbackDispatcher;
-import com.alechilles.alecstamework.items
-        .HytaleBondedCompanionPaymentRecovery;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -89,7 +85,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionCaptureAuthor captureAuthor;
     @Nullable
     private final BondedCompanionCaptureEventPublisher captureEvents;
-    private final HytaleBondedCompanionPaymentRecovery paymentRecovery;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -109,8 +104,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                     .BondedCompanionStore store,
             LongSupplier clock,
             BondedCompanionCaptureAuthor captureAuthor,
-            BondedCompanionCaptureEventPublisher captureEvents,
-            HytaleBondedCompanionPaymentRecovery paymentRecovery
+            BondedCompanionCaptureEventPublisher captureEvents
     ) {
         this.persistence = persistence;
         this.api = api;
@@ -127,7 +121,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.clock = clock;
         this.captureAuthor = captureAuthor;
         this.captureEvents = captureEvents;
-        this.paymentRecovery = paymentRecovery;
     }
 
     /** Opens the bonded authority without accepting generic persistence state. */
@@ -216,21 +209,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 runtime::readiness,
                 store, changes, diagnostics, operations
         );
-        HytaleBondedCompanionPaymentRecovery paymentRecovery =
-                new HytaleBondedCompanionPaymentRecovery(
-                        new BondedCompanionPaymentRecoveryService(
-                                store, clock,
-                                profile -> changes.publishCommitted(
-                                        new BondedCompanionChangedEvent(
-                                                profile.profileId(),
-                                                profile.ownerUuid(),
-                                                profile.rosterId(),
-                                                BondedCompanionStateView.DEAD,
-                                                BondedCompanionStateView.STORED,
-                                                profile.revision(), "revived"),
-                                        BondedCompanionChangePublisher
-                                                .WorldEffectOutcome
-                                                .CONFIRMED)));
         SqliteBondedCompanionCapturePersistenceAdapter capturePersistence =
                 new SqliteBondedCompanionCapturePersistenceAdapter(
                         rosters, transitions, store, store, durability, cleanup,
@@ -261,7 +239,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, localLifecycle,
                 cleanup, durability, world, store, clock, captureAuthor,
-                captureEvents, paymentRecovery
+                captureEvents
         );
     }
 
@@ -327,14 +305,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (player != null && player.getUuid() != null) {
             onPlayerAdded(player.getUuid(), event.getWorld().getName());
         }
-    }
-
-    /** Defers retained-payment repair until a Player is live in its store. */
-    public void onPlayerPaymentReady(
-            @Nonnull com.hypixel.hytale.server.core.universe.world.World world,
-            @Nonnull UUID ownerUuid
-    ) {
-        if (operational()) paymentRecovery.onPlayerAdded(world, ownerUuid);
     }
 
     /** Stores exact active projections when their owner disconnects. */

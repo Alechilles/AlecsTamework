@@ -62,7 +62,9 @@ final class SqliteBondedCompanionOperationExecutor {
             Mutation<R> mutation,
             Translation<R, D> translation
     ) {
-        return mutate(operation, null, false, storedType, mutation,
+        return execute(operation, null, storedType,
+                connection -> mutation.apply(
+                        new SqliteBondedCompanionStore(connection)),
                 translation, null);
     }
 
@@ -73,28 +75,43 @@ final class SqliteBondedCompanionOperationExecutor {
             Mutation<R> mutation,
             Translation<R, D> translation
     ) {
-        return mutate(operation, expectedRevision, false, storedType,
-                mutation, translation, null);
+        return execute(operation, expectedRevision, storedType,
+                connection -> mutation.apply(
+                        new SqliteBondedCompanionStore(connection)),
+                translation, null);
     }
 
     <R, D> BondedCompanionStoreResult<D> mutate(
             BondedCompanionOperation operation,
             Long expectedRevision,
-            boolean resumeMatchingPending,
             Class<R> storedType,
             Mutation<R> mutation,
-            Translation<R, D> translation
+            Translation<R, D> translation,
+            BondedCompanionCaptureEvidence captureEvidence
     ) {
-        return mutate(operation, expectedRevision, resumeMatchingPending,
-                storedType, mutation, translation, null);
+        return execute(operation, expectedRevision, storedType,
+                connection -> mutation.apply(
+                        new SqliteBondedCompanionStore(connection)),
+                translation, captureEvidence);
     }
 
-    <R, D> BondedCompanionStoreResult<D> mutate(
+    <R, D> BondedCompanionStoreResult<D> mutateConnection(
             BondedCompanionOperation operation,
             Long expectedRevision,
-            boolean resumeMatchingPending,
             Class<R> storedType,
-            Mutation<R> mutation,
+            ConnectionMutation<R> mutation,
+            Translation<R, D> translation,
+            BondedCompanionCaptureEvidence captureEvidence
+    ) {
+        return execute(operation, expectedRevision, storedType, mutation,
+                translation, captureEvidence);
+    }
+
+    private <R, D> BondedCompanionStoreResult<D> execute(
+            BondedCompanionOperation operation,
+            Long expectedRevision,
+            Class<R> storedType,
+            ConnectionMutation<R> mutation,
             Translation<R, D> translation,
             BondedCompanionCaptureEvidence captureEvidence
     ) {
@@ -102,18 +119,15 @@ final class SqliteBondedCompanionOperationExecutor {
         try {
             connection = connections.openWriterConnection();
             connection.setAutoCommit(false);
-            Claim claim = claims.claim(connection, operation, expectedRevision);
-            boolean resumable = resumeMatchingPending && claim.matches()
-                    && "PENDING".equals(claim.state())
-                    && claim.resultJson() == null;
-            if (!claim.created() && !resumable) {
+            Claim claim = claims.claim(connection, operation, expectedRevision,
+                    placeholder(storedType));
+            if (!claim.created()) {
                 BondedCompanionStoreResult<D> replay = replay(
                         claim, storedType, translation);
                 connection.commit();
                 return replay;
             }
-            var lowLevel = mutation.apply(
-                    new SqliteBondedCompanionStore(connection));
+            var lowLevel = mutation.apply(connection);
             BondedCompanionStoreResult<D> result = domainResult(
                     lowLevel, translation);
             if (result.code()
@@ -151,10 +165,10 @@ final class SqliteBondedCompanionOperationExecutor {
         if (!claim.matches()) return new BondedCompanionStoreResult<>(
                 BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT, null,
                 "idempotency-key-request-mismatch", false);
-        if (claim.resultJson() == null || "PENDING".equals(claim.state())) {
+        if (claim.resultJson() == null) {
             return new BondedCompanionStoreResult<>(
-                    BondedCompanionStoreResult.Code.CONFLICT, null,
-                    "operation-still-pending", false);
+                    BondedCompanionStoreResult.Code.STORAGE_FAILURE, null,
+                    "terminal-operation-result-missing", false);
         }
         StoredResult envelope = GSON.fromJson(
                 claim.resultJson(), StoredResult.class);
@@ -193,16 +207,16 @@ final class SqliteBondedCompanionOperationExecutor {
                 SET operation_state = ?, result_json = ?, updated_at_ms = ?,
                     expires_at_ms = ?
                 WHERE caller_namespace = ? AND idempotency_key = ?
-                  AND operation_state = 'PENDING'
+                  AND operation_type = ? AND request_hash = ?
                 """)) {
             update.setString(1, state);
             update.setString(2, GSON.toJson(stored));
             update.setLong(3, operation.attemptedAtMs());
-            update.setLong(4, operation.type()
-                    == BondedCompanionOperation.Type.REVIVE
-                    ? Long.MAX_VALUE : operation.retainedUntilMs());
+            update.setLong(4, operation.retainedUntilMs());
             update.setString(5, operation.callerNamespace());
             update.setString(6, operation.idempotencyKey());
+            update.setString(7, operation.type().name());
+            update.setString(8, operation.requestHash());
             if (update.executeUpdate() != 1) {
                 throw new SQLException("bonded_operation_terminalize_race");
             }
@@ -249,6 +263,13 @@ final class SqliteBondedCompanionOperationExecutor {
         throw new IllegalArgumentException("unsupported bonded result type");
     }
 
+    private String placeholder(Class<?> storedType) {
+        return GSON.toJson(new StoredResult(
+                BondedCompanionStoreResult.Code.CONFLICT.name(),
+                "transaction-not-terminal", storedTypeName(storedType), null,
+                null, null));
+    }
+
     private void rollback(Connection connection, Exception original) {
         if (connection == null) return;
         try {
@@ -280,6 +301,12 @@ final class SqliteBondedCompanionOperationExecutor {
     interface Mutation<T> {
         SqliteBondedCompanionStore.MutationResult<T> apply(
                 SqliteBondedCompanionStore store);
+    }
+
+    @FunctionalInterface
+    interface ConnectionMutation<T> {
+        SqliteBondedCompanionStore.MutationResult<T> apply(
+                Connection connection);
     }
 
     @FunctionalInterface

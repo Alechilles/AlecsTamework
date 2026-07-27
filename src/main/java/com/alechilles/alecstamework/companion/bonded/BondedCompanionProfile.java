@@ -18,8 +18,7 @@ public record BondedCompanionProfile(
         @Nullable BondedCompanionLease activeLease,
         long summonCooldownUntilMs,
         @Nullable Long diedAtMs,
-        long reviveCount,
-        @Nonnull BondedCompanionOperationLedger operationLedger
+        long reviveCount
 ) {
     public BondedCompanionProfile {
         profileId = text(profileId, "profileId");
@@ -29,9 +28,6 @@ public record BondedCompanionProfile(
         roleId = text(roleId, "roleId");
         state = Objects.requireNonNull(state, "state");
         snapshot = Objects.requireNonNull(snapshot, "snapshot");
-        operationLedger = Objects.requireNonNull(
-                operationLedger, "operationLedger"
-        );
         if (revision < 0L || reviveCount < 0L) {
             throw new IllegalArgumentException("profile counters cannot be negative");
         }

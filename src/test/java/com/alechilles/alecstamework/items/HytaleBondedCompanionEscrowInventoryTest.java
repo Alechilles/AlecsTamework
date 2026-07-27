@@ -13,8 +13,6 @@ import com.alechilles.alecstamework.items.components
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionLegacyPaymentSettlementGroup;
-import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPaymentRecoveryService;
@@ -259,10 +257,9 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
-    void missingOrPendingClaimResumesFromReloadedExactReservedEscrow()
+    void missingClaimResumesFromReloadedExactReservedEscrow()
             throws Exception {
-        for (RecoveryResult result : List.of(
-                RecoveryResult.MISSING, RecoveryResult.PENDING)) {
+        for (RecoveryResult result : List.of(RecoveryResult.MISSING)) {
             try (Fixture fixture = new Fixture()) {
                 fixture.setSource(ITEM, 2);
                 fixture.inventory.consumeExactAsync(operation(33), ITEM, 2)
@@ -1156,7 +1153,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
     }
 
-    enum RecoveryResult { APPLIED, REJECTED, MISSING, PENDING }
+    enum RecoveryResult { APPLIED, REJECTED, MISSING }
 
     static final class RecoveryStore {
         private final RecoveryResult result;
@@ -1201,19 +1198,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
                                                     null,
                                                     "profile-is-not-dead",
                                                     true);
-                                    case MISSING, PENDING -> terminal();
+                                    case MISSING -> terminal();
                                 };
-                            }
-                            case "listAwaitingProfilePaymentSettlements" ->
-                                    awaiting ? List.of(probe(ordinal))
-                                            : List.<BondedCompanionOperationProbe>of();
-                            case "listAwaitingLegacyPaymentSettlementGroups" ->
-                                    awaiting ? List.of(
-                                            legacyGroup(probe(ordinal)))
-                                            : List.<BondedCompanionLegacyPaymentSettlementGroup>of();
-                            case "quarantineLegacyPaymentSettlementGroup" -> {
-                                quarantines++;
-                                yield 1;
                             }
                             case "toString" -> "RecoveryStore";
                             default -> throw new AssertionError(
@@ -1226,14 +1212,6 @@ class HytaleBondedCompanionEscrowInventoryTest {
             acknowledgmentResults.add(false);
         }
 
-        private BondedCompanionLegacyPaymentSettlementGroup legacyGroup(
-                BondedCompanionOperationProbe probe) {
-            return new BondedCompanionLegacyPaymentSettlementGroup(
-                    BondedCompanionPaymentOperationId.legacyOperationKey(
-                            probe.callerNamespace(), probe.idempotencyKey()),
-                    List.of(probe));
-        }
-
         private Optional<BondedCompanionStoreResult<
                 BondedCompanionRecord.Profile>> find() {
             return switch (result) {
@@ -1242,9 +1220,6 @@ class HytaleBondedCompanionEscrowInventoryTest {
                         BondedCompanionStoreResult.Code.INVALID_STATE,
                         null, "profile-is-not-dead", true));
                 case MISSING -> Optional.empty();
-                case PENDING -> Optional.of(new BondedCompanionStoreResult<>(
-                        BondedCompanionStoreResult.Code.CONFLICT,
-                        null, "operation-still-pending", false));
             };
         }
 

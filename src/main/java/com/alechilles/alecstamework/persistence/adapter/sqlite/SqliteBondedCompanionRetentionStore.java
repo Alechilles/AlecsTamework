@@ -4,8 +4,6 @@ import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionOperationProbe;
-import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionLegacyPaymentSettlementGroup;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -20,12 +18,9 @@ import java.util.UUID;
 /** Owns bounded bonded cleanup intents and idempotency-record retention. */
 final class SqliteBondedCompanionRetentionStore {
     private final Connection connection;
-    private final SqliteBondedCompanionLegacyPaymentStore legacyPayments;
 
     SqliteBondedCompanionRetentionStore(Connection connection) {
         this.connection = connection;
-        this.legacyPayments =
-                new SqliteBondedCompanionLegacyPaymentStore(connection);
     }
 
     SqliteBondedCompanionStore.MutationResult<SqliteBondedCompanionCleanupRow>
@@ -186,21 +181,6 @@ final class SqliteBondedCompanionRetentionStore {
         }
     }
 
-    List<BondedCompanionLegacyPaymentSettlementGroup>
-            listAwaitingLegacyPaymentSettlementGroups(
-                    UUID ownerUuid, int limit) {
-        return legacyPayments.listAwaiting(ownerUuid, limit);
-    }
-
-    int quarantineLegacyPaymentSettlementGroup(
-            UUID ownerUuid,
-            String operationId,
-            long retainedUntilMs
-    ) {
-        return legacyPayments.quarantine(
-                ownerUuid, operationId, retainedUntilMs);
-    }
-
     private boolean paymentSettlementAlreadyFinite(
             BondedCompanionOperationProbe operation,
             boolean terminalApplied
@@ -239,48 +219,6 @@ final class SqliteBondedCompanionRetentionStore {
         } else {
             statement.setLong(parameter, value);
         }
-    }
-
-    List<BondedCompanionOperationProbe> listAwaitingProfilePaymentSettlements(
-            UUID ownerUuid,
-            int limit
-    ) {
-        Objects.requireNonNull(ownerUuid, "ownerUuid");
-        requirePositiveLimit(limit);
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT caller_namespace, idempotency_key, roster_id, profile_id,
-                       expected_revision
-                FROM bonded_companion_operation
-                WHERE owner_uuid = ? AND operation_type = 'REVIVE'
-                  AND operation_state IN ('SUCCEEDED', 'REJECTED')
-                  AND result_json IS NOT NULL AND expires_at_ms = ?
-                ORDER BY updated_at_ms, caller_namespace, idempotency_key
-                LIMIT ?
-                """)) {
-            statement.setString(1, ownerUuid.toString());
-            statement.setLong(2, Long.MAX_VALUE);
-            statement.setInt(3, limit);
-            try (ResultSet rows = statement.executeQuery()) {
-                ArrayList<BondedCompanionOperationProbe> result =
-                        new ArrayList<>();
-                while (rows.next()) {
-                    result.add(new BondedCompanionOperationProbe(
-                            rows.getString(1), rows.getString(2), ownerUuid,
-                            rows.getString(3), rows.getString(4),
-                            BondedCompanionOperation.Type.REVIVE,
-                            nullableLong(rows, 5)));
-                }
-                return List.copyOf(result);
-            }
-        } catch (SQLException failure) {
-            throw storageFailure("list-bonded-revive-payment-settlements",
-                    failure);
-        }
-    }
-
-    private Long nullableLong(ResultSet rows, int column) throws SQLException {
-        long value = rows.getLong(column);
-        return rows.wasNull() ? null : value;
     }
 
     private Optional<SqliteBondedCompanionOperationRow> operation(

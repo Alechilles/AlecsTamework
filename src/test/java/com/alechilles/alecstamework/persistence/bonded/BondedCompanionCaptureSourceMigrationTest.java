@@ -165,8 +165,9 @@ class BondedCompanionCaptureSourceMigrationTest {
                         4, evidence()).code());
         mutateCurrentProfile(path);
 
-        int removedV7 = simulateV6(path);
-        assertEquals(1, removedV7, "current schema must contain v7 authority");
+        int removedHistory = simulateV6(path);
+        assertEquals(2, removedHistory,
+                "current schema must contain v7 and v8 authority");
         assertTrue(manager.initialize().availability().available());
 
         String capturedPayload = queryString(path, """
@@ -197,7 +198,7 @@ class BondedCompanionCaptureSourceMigrationTest {
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
             int deleted = statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version = 7");
+                    "DELETE FROM bonded_schema_history WHERE version IN (7, 8)");
             statement.execute("DROP TABLE bonded_companion_capture_source");
             statement.execute("""
                     CREATE UNIQUE INDEX bonded_capture_source_once_idx

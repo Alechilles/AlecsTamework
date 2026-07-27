@@ -44,15 +44,15 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(first.availability().available());
         assertTrue(second.availability().available());
         assertEquals(BondedCompanionSchemaManager.requiredTables(), tables(database));
-        assertEquals(7, BondedCompanionSchemaManager.VERSION);
-        assertEquals(7L, queryLong(database,
+        assertEquals(8, BondedCompanionSchemaManager.VERSION);
+        assertEquals(8L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(7L, queryLong(database,
+        assertEquals(8L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(-5_000L, queryLong(database,
-                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 7"));
+                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 8"));
         assertEquals(manager.schemaHash(), queryString(database,
-                "SELECT schema_hash FROM bonded_schema_history WHERE version = 7"));
+                "SELECT schema_hash FROM bonded_schema_history WHERE version = 8"));
         assertEquals(1L, queryLong(database, """
                 SELECT COUNT(*) FROM pragma_table_info(
                     'bonded_companion_cleanup'
@@ -97,7 +97,7 @@ class BondedCompanionSchemaManagerTest {
     }
 
     @Test
-    void v4UpgradePinsHistoricalTerminalRevivesForPaymentRepair()
+    void v4UpgradePinsHistoricalTerminalRevivesForExactPaymentRepair()
             throws Exception {
         Path database = tempDir.resolve("historical-v4-revive.sqlite");
         BondedCompanionSchemaManager manager = manager(database, -8_000L);
@@ -105,8 +105,8 @@ class BondedCompanionSchemaManagerTest {
         try (Connection connection = new SqliteConnectionFactory(database)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            assertEquals(3, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version IN (5, 6, 7)"));
+            assertEquals(4, statement.executeUpdate(
+                    "DELETE FROM bonded_schema_history WHERE version IN (5, 6, 7, 8)"));
             statement.execute("DROP TABLE bonded_companion_capture_source");
             statement.executeUpdate("""
                     ALTER TABLE bonded_companion_operation
@@ -134,7 +134,7 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(manager(database, -7_000L).initialize()
                 .availability().available());
 
-        assertEquals(7L, queryLong(database,
+        assertEquals(8L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(Long.MAX_VALUE, queryLong(database, """
                 SELECT expires_at_ms FROM bonded_companion_operation
@@ -147,43 +147,6 @@ class BondedCompanionSchemaManagerTest {
                 ) WHERE name = 'expected_revision'
                 """));
 
-        BondedCompanionStore store =
-                new com.alechilles.alecstamework.persistence.adapter.sqlite
-                        .SqliteBondedCompanionDatabase(database);
-        int recovered = new BondedCompanionPaymentRecoveryService(
-                store, () -> -6_000L).recoverAwaitingWithoutEscrow(
-                UUID.fromString(
-                        "10000000-0000-0000-0000-000000000001"),
-                8, absentInventory()).toCompletableFuture().join();
-
-        assertEquals(1, recovered);
-        assertTrue(store.listAwaitingProfilePaymentSettlements(
-                UUID.fromString(
-                        "10000000-0000-0000-0000-000000000001"),
-                8).isEmpty());
-        assertFalse(queryLong(database, """
-                SELECT expires_at_ms FROM bonded_companion_operation
-                WHERE caller_namespace = 'legacy-panel'
-                  AND idempotency_key = 'revive-v4'
-                """) == Long.MAX_VALUE);
-    }
-
-    private BondedCompanionActionContext.Inventory absentInventory() {
-        return new BondedCompanionActionContext.Inventory() {
-            @Override public int availableQuantity(String itemId) { return 0; }
-
-            @Override public CompletionStage<
-                    BondedCompanionActionContext.ChargeReceipt>
-                    findChargeAsync(String operationId) {
-                return CompletableFuture.completedFuture(null);
-            }
-
-            @Override public BondedCompanionActionContext.ChargeReceipt
-                    consumeExact(String operationId, String itemId,
-                                 int quantity) {
-                throw new AssertionError("Recovery must not charge");
-            }
-        };
     }
 
     @Test
@@ -263,9 +226,9 @@ class BondedCompanionSchemaManagerTest {
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertTrue(readiness.availability().available());
-        assertEquals(7L, queryLong(database,
+        assertEquals(8L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(7L, queryLong(database,
+        assertEquals(8L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         BondedCompanionStore store =
                 new com.alechilles.alecstamework.persistence.adapter.sqlite

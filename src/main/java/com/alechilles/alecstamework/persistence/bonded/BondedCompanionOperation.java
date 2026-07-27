@@ -19,7 +19,7 @@ public record BondedCompanionOperation(
         long retainedUntilMs
 ) {
     /** Finite bonded mutation vocabulary persisted by the adapter. */
-    public enum Type { CAPTURE, PROVISION, SUMMON, STORE, REVIVE, CLEANUP }
+    public enum Type { CAPTURE, PROVISION, STORE, REVIVE }
 
     public BondedCompanionOperation {
         callerNamespace = text(callerNamespace, "callerNamespace");

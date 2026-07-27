@@ -139,6 +139,7 @@ public final class BondedCompanionSchemaManager {
             case 4 -> { verifyV4(connection); applyV5(connection); }
             case 5 -> { verifyV5(connection); applyV6(connection); }
             case 6 -> { verifyV6(connection); applyV7(connection); }
+            case 7 -> { verifyV7(connection); applyV8(connection); }
             case VERSION -> verify(connection);
             default -> throw historyMismatch();
         }
@@ -207,6 +208,12 @@ public final class BondedCompanionSchemaManager {
     private void applyV7(Connection connection) throws Exception {
         executeScript(connection, catalog.script(7));
         insertHistory(connection, 7, catalog.hash(7));
+        applyV8(connection);
+    }
+
+    private void applyV8(Connection connection) throws Exception {
+        executeScript(connection, catalog.script(8));
+        insertHistory(connection, 8, catalog.hash(8));
         verify(connection);
     }
 
@@ -331,6 +338,19 @@ public final class BondedCompanionSchemaManager {
         verifyHistory(connection, catalog.hashesThrough(6));
         if (!BondedCompanionSchemaAuthorityVerifier
                 .hasLegacyCaptureSourceFence(connection)) {
+            throw new VerificationFailure("bonded-capture-source-fence-missing");
+        }
+        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
+                "bonded-integrity-check-failed");
+    }
+
+    private void verifyV7(Connection connection) throws Exception {
+        if (!tables(connection).equals(REQUIRED_TABLES)) {
+            throw new VerificationFailure("bonded-schema-table-mismatch");
+        }
+        verifyHistory(connection, catalog.hashesThrough(7));
+        if (!BondedCompanionSchemaAuthorityVerifier
+                .hasDurableCaptureSourceFence(connection)) {
             throw new VerificationFailure("bonded-capture-source-fence-missing");
         }
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",

@@ -181,11 +181,22 @@ class BondedCompanionApiFacadeCoherentListTest {
         }
 
         @Override
-        public boolean storeAndEnqueueCleanup(
+        public BondedCompanionProjectionService.StoreDurabilityResult
+                findStoreResult(BondedCompanionOperation operation) {
+            return new BondedCompanionProjectionService.StoreDurabilityResult(
+                    BondedCompanionProjectionService.StoreDurabilityStatus
+                            .ABSENT);
+        }
+
+        @Override
+        public BondedCompanionProjectionService.StoreDurabilityResult
+                storeAndEnqueueCleanup(
                 BondedCompanionProjectionService.StoreRequest request,
                 BondedCompanionProjectionStorePlanner.StorePlan plan,
                 BondedCompanionProjectionCleanupService.CleanupIntent cleanup) {
-            return false;
+            return new BondedCompanionProjectionService.StoreDurabilityResult(
+                    BondedCompanionProjectionService.StoreDurabilityStatus
+                            .REJECTED);
         }
 
         @Override

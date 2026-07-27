@@ -60,8 +60,8 @@ class BondedCompanionSchemaAuthorityTamperTest {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            assertEquals(1, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version = 7"));
+            assertEquals(2, statement.executeUpdate(
+                    "DELETE FROM bonded_schema_history WHERE version IN (7, 8)"));
             statement.execute("DROP TABLE bonded_companion_capture_source");
             statement.execute(replacementSql);
         }

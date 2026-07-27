@@ -81,11 +81,9 @@ class BondedCompanionOperationProbeSqliteTest {
                 wrongRevision.code());
         assertFalse(wrongRevision.replayed());
 
-        assertEquals(1, store.listAwaitingProfilePaymentSettlements(
-                OWNER, 8).size());
+        assertEquals(Long.MAX_VALUE, operationExpiry());
         assertEquals(1, store.pruneOperations(Long.MAX_VALUE, 8));
-        assertEquals(1, store.listAwaitingProfilePaymentSettlements(
-                OWNER, 8).size());
+        assertEquals(Long.MAX_VALUE, operationExpiry());
         assertThrows(IllegalArgumentException.class,
                 () -> store.markProfileOperationPaymentSettled(
                         probe(OWNER), false, Long.MAX_VALUE));
@@ -98,9 +96,34 @@ class BondedCompanionOperationProbeSqliteTest {
         assertTrue(store.markProfileOperationPaymentSettled(
                 probe(OWNER), false, 20_000L));
         assertEquals(10_000L, operationExpiry());
-        assertTrue(store.listAwaitingProfilePaymentSettlements(
-                OWNER, 8).isEmpty());
         assertEquals(1, store.pruneOperations(Long.MAX_VALUE, 8));
+    }
+
+    @Test
+    void schemaRejectsCommittedPendingOperationRows() throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement insert = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_operation(
+                         caller_namespace, idempotency_key, owner_uuid,
+                         roster_id, profile_id, operation_type, request_hash,
+                         operation_state, result_json, created_at_ms,
+                         updated_at_ms, expires_at_ms, expected_revision
+                     ) VALUES (?, ?, ?, ?, ?, 'STORE', ?, 'PENDING', NULL,
+                               ?, ?, ?, ?)
+                     """)) {
+            insert.setString(1, CALLER);
+            insert.setString(2, "forbidden-pending");
+            insert.setString(3, OWNER.toString());
+            insert.setString(4, "roster-a");
+            insert.setString(5, "profile-a");
+            insert.setString(6, "c".repeat(64));
+            insert.setLong(7, -10_000L);
+            insert.setLong(8, -10_000L);
+            insert.setLong(9, 10_000L);
+            insert.setLong(10, 0L);
+            assertThrows(java.sql.SQLException.class, insert::executeUpdate);
+        }
     }
 
     private void replaceCurrentPolicy(String policyJson) throws Exception {
@@ -140,7 +163,9 @@ class BondedCompanionOperationProbeSqliteTest {
     ) {
         return new BondedCompanionOperation(
                 CALLER, key, String.valueOf(hash).repeat(64), OWNER,
-                "roster-a", "profile-a", type, -10_000L, 10_000L);
+                "roster-a", "profile-a", type, -10_000L,
+                type == BondedCompanionOperation.Type.REVIVE
+                        ? Long.MAX_VALUE : 10_000L);
     }
 
     private BondedCompanionRecord.Profile profile() {

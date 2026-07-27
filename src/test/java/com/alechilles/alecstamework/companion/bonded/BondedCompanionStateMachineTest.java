@@ -284,7 +284,7 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
-    void exactDuplicateOperationReturnsTheCurrentProfileWithoutAnotherMutation() {
+    void repeatedDomainOperationIdDoesNotBypassRevisionAndStateFences() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionTransitionService.MutationRequest request =
                 mutation("summon-once", stored, 1_000L);
@@ -296,7 +296,7 @@ class BondedCompanionStateMachineTest {
                 "lease-once", "world:alpha"
         );
 
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENT_REPLAY,
+        assertEquals(BondedCompanionTransitionService.ResultCode.REVISION_CONFLICT,
                 replay.code());
         assertSame(first.profile(), replay.profile());
         assertEquals(first.profile().revision(), replay.profile().revision());
@@ -304,7 +304,7 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
-    void operationIdConflictsAcrossActionsPayloadsAndRevisionIdentity() {
+    void operationIdsAreNotASecondInMemoryIdempotencyAuthority() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionTransitionService.MutationRequest request =
                 mutation("summon-once", stored, 1_000L);
@@ -312,7 +312,7 @@ class BondedCompanionStateMachineTest {
                 request, stored, counts(1, 0), "lease-once", "world:alpha"
         ).profile();
 
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+        assertEquals(BondedCompanionTransitionService.ResultCode.REVISION_CONFLICT,
                 service.store(
                         new BondedCompanionTransitionService.MutationRequest(
                                 "summon-once", OWNER, request.expectedRevision(),
@@ -320,19 +320,19 @@ class BondedCompanionStateMachineTest {
                         ),
                         active, snapshot(ROLE, "Ember")
                 ).code());
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+        assertEquals(BondedCompanionTransitionService.ResultCode.REVISION_CONFLICT,
                 service.summon(
                         request, active, counts(1, 0),
                         "lease-different", "world:alpha"
                 ).code());
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+        assertEquals(BondedCompanionTransitionService.ResultCode.INVALID_STATE,
                 service.summon(
                         new BondedCompanionTransitionService.MutationRequest(
                                 "summon-once", OWNER, active.revision(), 1L, 1_000L
                         ),
                         active, counts(1, 0), "lease-once", "world:alpha"
                 ).code());
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENCY_CONFLICT,
+        assertEquals(BondedCompanionTransitionService.ResultCode.APPLIED,
                 service.summon(
                         mutation("capture-base", stored, 1_000L),
                         stored, counts(1, 0), "lease-new", "world:alpha"
@@ -340,7 +340,7 @@ class BondedCompanionStateMachineTest {
     }
 
     @Test
-    void staleExactDuplicateSurvivesInterveningMutationButStillChecksOwner() {
+    void staleOperationIdCannotReplayAcrossAnInterveningMutation() {
         BondedCompanionProfile stored = createStored();
         BondedCompanionTransitionService.MutationRequest summonRequest =
                 mutation("summon-durable", stored, -20_000L);
@@ -365,7 +365,7 @@ class BondedCompanionStateMachineTest {
                 storedAgain, counts(1, 0), "lease-durable", "world:alpha"
         );
 
-        assertEquals(BondedCompanionTransitionService.ResultCode.IDEMPOTENT_REPLAY,
+        assertEquals(BondedCompanionTransitionService.ResultCode.REVISION_CONFLICT,
                 replay.code());
         assertSame(storedAgain, replay.profile());
         assertEquals(BondedCompanionState.STORED, replay.profile().state());

@@ -37,31 +37,6 @@ class BondedCompanionStorePublicBoundaryTest {
     }
 
     @Test
-    void snapshotUpdateAndLeaseReleaseRemainAtomicPublicOperations() {
-        BondedCompanionPayload updated = payload("updated-snapshot");
-        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
-                store.updateSnapshot(operation("snapshot", '2',
-                        BondedCompanionOperation.Type.STORE, "profile-a", 10_000L),
-                        0, updated, -9_000L).code());
-        assertEquals(updated, store.findProfile(OWNER, "roster-a", "profile-a")
-                .orElseThrow().snapshot());
-
-        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
-                store.acquireLease(operation("summon", '3',
-                        BondedCompanionOperation.Type.SUMMON, "profile-a", 10_000L),
-                        1, lease(0L)).code());
-        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
-                store.releaseLease(operation("release", '4',
-                        BondedCompanionOperation.Type.STORE, "profile-a", 10_000L),
-                        2, "lease-a", -8_000L).code());
-
-        assertTrue(store.findActiveLeases(OWNER, "roster-a").isEmpty());
-        assertEquals(BondedCompanionState.STORED,
-                store.findProfile(OWNER, "roster-a", "profile-a")
-                        .orElseThrow().state());
-    }
-
-    @Test
     void extensionCompareAndSetUsesOpaquePayloadAndTypedRevision() {
         var initial = new BondedCompanionRecord.ExtensionData(
                 "profile-a", "example:stats", payload("xp=1"), 0, -9_000L);
@@ -79,35 +54,6 @@ class BondedCompanionStorePublicBoundaryTest {
 
         assertEquals(changed, store.findExtensionData(
                 OWNER, "roster-a", "profile-a", "example:stats").orElseThrow());
-    }
-
-    @Test
-    void finiteLeaseExpiryQueryPreservesSignedWorldTime() {
-        store.acquireLease(operation("summon", '7',
-                        BondedCompanionOperation.Type.SUMMON, "profile-a", 10_000L),
-                0, lease(-8_000L));
-
-        assertEquals(1, store.findExpiredLeases(-7_000L, 10).size());
-        assertTrue(store.findExpiredLeases(-9_000L, 10).isEmpty());
-    }
-
-    @Test
-    void cleanupEnqueueListAndPruneStayOwnerScopedAndBounded() {
-        BondedCompanionRecord.Cleanup cleanup = new BondedCompanionRecord.Cleanup(
-                "cleanup-a", OWNER, "roster-a", "profile-a", null,
-                BondedCompanionRecord.CleanupTarget.PROJECTION, NPC,
-                "world-a", "stale-projection",
-                BondedCompanionRecord.CleanupState.COMPLETED,
-                1, -8_000L, -9_000L, -1L);
-
-        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
-                store.enqueueCleanup(operation("cleanup", '8',
-                        BondedCompanionOperation.Type.CLEANUP, "profile-a", 10_000L),
-                        cleanup).code());
-        assertEquals(java.util.List.of(cleanup),
-                store.listCleanup(OWNER, "roster-a", 10));
-        assertEquals(1, store.pruneCleanup(0L, 10));
-        assertTrue(store.listCleanup(OWNER, "roster-a", 10).isEmpty());
     }
 
     @Test

@@ -162,8 +162,7 @@ final class BondedCompanionReviveOperationService {
         long now = clock.getAsLong();
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved =
                 store.reviveProfile(operation, action.expectedRevision(), now);
-        if (saved.code() == BondedCompanionStoreResult.Code.STORAGE_FAILURE
-                || isUnresolvedClaim(saved)) {
+        if (saved.code() == BondedCompanionStoreResult.Code.STORAGE_FAILURE) {
             return completed(support.storeFailure(saved));
         }
         if (saved.code() == BondedCompanionStoreResult.Code.APPLIED
@@ -281,12 +280,6 @@ final class BondedCompanionReviveOperationService {
         } catch (RuntimeException | LinkageError ignored) {
             // Listener failures cannot invalidate the unique durable commit.
         }
-    }
-
-    private boolean isUnresolvedClaim(BondedCompanionStoreResult<?> result) {
-        return result.code() == BondedCompanionStoreResult.Code.CONFLICT
-                && !result.replayed()
-                && "operation-still-pending".equals(result.reason());
     }
 
     private BondedCompanionResult<BondedCompanionProfileView>

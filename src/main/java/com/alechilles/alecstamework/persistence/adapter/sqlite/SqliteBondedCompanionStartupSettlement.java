@@ -6,7 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
-/** Database-only startup settlement for every residual bonded lease. */
+/** Database-only startup rollback for summon admissions that never became live. */
 final class SqliteBondedCompanionStartupSettlement {
     private final SqliteConnectionFactory connections;
 
@@ -31,7 +31,8 @@ final class SqliteBondedCompanionStartupSettlement {
                 throw new IllegalStateException("residual lease/profile mismatch");
             }
             try (PreparedStatement delete = connection.prepareStatement(
-                    "DELETE FROM bonded_companion_lease")) {
+                    "DELETE FROM bonded_companion_lease "
+                            + "WHERE projection_state = 'PENDING'")) {
                 if (delete.executeUpdate() != residual) {
                     throw new IllegalStateException("residual lease delete mismatch");
                 }
@@ -49,7 +50,8 @@ final class SqliteBondedCompanionStartupSettlement {
 
     private int count(Connection connection) throws Exception {
         try (PreparedStatement query = connection.prepareStatement(
-                "SELECT COUNT(*) FROM bonded_companion_lease");
+                "SELECT COUNT(*) FROM bonded_companion_lease "
+                        + "WHERE projection_state = 'PENDING'");
              ResultSet row = query.executeQuery()) {
             return row.next() ? row.getInt(1) : 0;
         }
@@ -74,7 +76,8 @@ final class SqliteBondedCompanionStartupSettlement {
                        l.world_key, 'PENDING', 0, ?, ?, ?
                 FROM bonded_companion_lease l
                 JOIN bonded_companion_profile p ON p.profile_id = l.profile_id
-                WHERE NOT EXISTS (
+                WHERE l.projection_state = 'PENDING'
+                  AND NOT EXISTS (
                     SELECT 1 FROM bonded_companion_cleanup c
                     WHERE c.profile_id = l.profile_id
                       AND c.lease_token = l.lease_token
@@ -100,6 +103,7 @@ final class SqliteBondedCompanionStartupSettlement {
                 WHERE state = 'ACTIVE' AND EXISTS (
                     SELECT 1 FROM bonded_companion_lease l
                     WHERE l.profile_id = bonded_companion_profile.profile_id
+                      AND l.projection_state = 'PENDING'
                 )
                 """)) {
             update.setLong(1, nowMs);

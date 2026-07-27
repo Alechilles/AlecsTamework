@@ -87,9 +87,9 @@ final class BondedCompanionStoredRowValidator {
                      """)) {
             while (rows.next()) {
                 requireUuid(rows.getString(1));
-                if (!Set.of("CAPTURE", "PROVISION", "SUMMON", "STORE",
-                                "REVIVE", "CLEANUP").contains(rows.getString(2))
-                        || !Set.of("PENDING", "SUCCEEDED", "REJECTED", "FAILED")
+                if (!Set.of("CAPTURE", "PROVISION", "STORE", "REVIVE")
+                        .contains(rows.getString(2))
+                        || !Set.of("SUCCEEDED", "REJECTED")
                         .contains(rows.getString(3))
                         || !rows.getString(4).matches("[0-9a-f]{64}")
                         || rows.getLong(5) == 0) {
@@ -138,10 +138,6 @@ final class BondedCompanionStoredRowValidator {
 
     private void requireOperationResult(String state, String json)
             throws InvalidRecordException {
-        if ("PENDING".equals(state)) {
-            if (json != null) throw invalid();
-            return;
-        }
         if (json == null) throw invalid();
         try {
             JsonObject result = JsonParser.parseString(json).getAsJsonObject();
