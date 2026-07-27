@@ -96,7 +96,7 @@ class BondedCompanionCompositionTest {
     }
 
     @Test
-    void maintenancePrunesFiniteOperationsButRetainsPinnedPayments()
+    void maintenancePrunesFiniteTerminalOperationsButRetainsPinnedPayments()
             throws Exception {
         long now = 10_000L;
         TameworkBondedCompanionComposition composition =
@@ -110,7 +110,7 @@ class BondedCompanionCompositionTest {
                 .resolve(BondedCompanionDataPath.FILE_NAME);
         try {
             insertTerminalOperation(
-                    database, "expired-operation", "FAILED", now - 1L);
+                    database, "expired-operation", "SUCCEEDED", now - 1L);
             insertTerminalOperation(
                     database, "pinned-payment", "REJECTED", Long.MAX_VALUE);
 

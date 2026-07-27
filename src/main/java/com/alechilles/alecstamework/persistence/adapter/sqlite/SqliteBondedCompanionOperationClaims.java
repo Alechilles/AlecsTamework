@@ -81,7 +81,11 @@ final class SqliteBondedCompanionOperationClaims {
     ) throws SQLException {
         try (PreparedStatement select = connection.prepareStatement("""
                 SELECT owner_uuid, roster_id, profile_id, operation_type,
-                       expected_revision, operation_state, result_json
+                       expected_revision, operation_state, result_json,
+                       json_extract(
+                           result_json,
+                           '$.storeLeaseIdentity.worldKey'
+                       )
                 FROM bonded_companion_operation
                 WHERE caller_namespace = ? AND idempotency_key = ?
                 """)) {
@@ -96,7 +100,9 @@ final class SqliteBondedCompanionOperationClaims {
                         operation.profileId(), row.getString(3))
                         && operation.type().name().equals(row.getString(4))
                         && revisionMatches(operation.expectedRevision(),
-                        nullableLong(row, 5));
+                        nullableLong(row, 5))
+                        && (operation.worldKey() == null || Objects.equals(
+                        operation.worldKey(), row.getString(8)));
                 return Optional.of(new Claim(
                         false, matches ? row.getString(7) : null,
                         matches, row.getString(6)));

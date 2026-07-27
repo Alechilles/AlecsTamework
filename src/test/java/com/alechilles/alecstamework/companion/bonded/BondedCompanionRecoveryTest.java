@@ -146,15 +146,24 @@ class BondedCompanionRecoveryTest {
     }
 
     @Test
-    void startupRecoversInterruptionAfterLeaseCreationBeforeSpawn() {
+    void runtimeReconciliationPreservesPendingSummonForStartupSettlement() {
         var pending = lease(uuid(40), "world-a",
                 BondedCompanionProjectionValidator.LeasePhase.PENDING, 0L);
         durability.activate(pending);
 
-        observer.onStartup(List.of(pending), -900L);
+        var result = projections.reconcile(
+                pending, List.of(),
+                BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                -900L);
 
-        assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
-        assertEquals("SPAWN_INTERRUPTED", durability.lastReason);
+        assertEquals(
+                BondedCompanionProjectionService.ReconcileStatus
+                        .PENDING_IN_PROGRESS,
+                result.status());
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-a"));
+        assertTrue(durability.reconciledCleanups.isEmpty());
+        assertTrue(durability.spawnRecovery.containsKey("profile-a"));
         assertEquals(List.of(), durability.cleanupRetentions);
         assertTrue(world.removed.isEmpty());
     }
@@ -611,6 +620,8 @@ class BondedCompanionRecoveryTest {
         return new BondedCompanionOperation(
                 "test", key, "a".repeat(64), uuid(1), "roster-a",
                 "profile-a", BondedCompanionOperation.Type.STORE,
-                -900L, 10_000L);
+                -900L, 10_000L,
+                new BondedCompanionOperation.StoreLeaseIdentity(
+                        "lease-a", uuid(40), "world-a"));
     }
 }

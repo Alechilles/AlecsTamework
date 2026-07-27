@@ -120,7 +120,7 @@ final class SqliteBondedCompanionOperationExecutor {
             connection = connections.openWriterConnection();
             connection.setAutoCommit(false);
             Claim claim = claims.claim(connection, operation, expectedRevision,
-                    placeholder(storedType));
+                    placeholder(storedType, operation.storeLeaseIdentity()));
             if (!claim.created()) {
                 BondedCompanionStoreResult<D> replay = replay(
                         claim, storedType, translation);
@@ -201,7 +201,7 @@ final class SqliteBondedCompanionOperationExecutor {
                 result.value() == null ? null : GSON.toJson(result.value()),
                 result.code() == SqliteBondedCompanionStore.MutationCode.APPLIED
                         ? captureEvidence : null,
-                null);
+                null, operation.storeLeaseIdentity());
         try (PreparedStatement update = connection.prepareStatement("""
                 UPDATE bonded_companion_operation
                 SET operation_state = ?, result_json = ?, updated_at_ms = ?,
@@ -263,11 +263,14 @@ final class SqliteBondedCompanionOperationExecutor {
         throw new IllegalArgumentException("unsupported bonded result type");
     }
 
-    private String placeholder(Class<?> storedType) {
+    private String placeholder(
+            Class<?> storedType,
+            BondedCompanionOperation.StoreLeaseIdentity storeLeaseIdentity
+    ) {
         return GSON.toJson(new StoredResult(
                 BondedCompanionStoreResult.Code.CONFLICT.name(),
                 "transaction-not-terminal", storedTypeName(storedType), null,
-                null, null));
+                null, null, storeLeaseIdentity));
     }
 
     private void rollback(Connection connection, Exception original) {
@@ -293,7 +296,8 @@ final class SqliteBondedCompanionOperationExecutor {
             String valueType,
             String value,
             BondedCompanionCaptureEvidence captureEvidence,
-            Long captureEventPublishedAtMs
+            Long captureEventPublishedAtMs,
+            BondedCompanionOperation.StoreLeaseIdentity storeLeaseIdentity
     ) {
     }
 

@@ -134,9 +134,7 @@ final class SqliteBondedCompanionRetentionStore {
                 WHERE (caller_namespace, idempotency_key) IN (
                     SELECT caller_namespace, idempotency_key
                     FROM bonded_companion_operation
-                    WHERE operation_state IN (
-                        'SUCCEEDED', 'REJECTED', 'FAILED'
-                    )
+                    WHERE operation_state IN ('SUCCEEDED', 'REJECTED')
                       AND expires_at_ms <> 9223372036854775807
                       AND expires_at_ms <= ?
                     ORDER BY expires_at_ms, caller_namespace, idempotency_key

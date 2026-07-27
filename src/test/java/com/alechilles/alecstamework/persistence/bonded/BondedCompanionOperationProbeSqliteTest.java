@@ -100,7 +100,17 @@ class BondedCompanionOperationProbeSqliteTest {
     }
 
     @Test
-    void schemaRejectsCommittedPendingOperationRows() throws Exception {
+    void schemaRejectsNonTerminalOperationVocabulary() throws Exception {
+        assertOperationRowRejected("SUMMON", "SUCCEEDED", "terminal");
+        assertOperationRowRejected("STORE", "PENDING", "terminal");
+        assertOperationRowRejected("STORE", "FAILED", "terminal");
+    }
+
+    private void assertOperationRowRejected(
+            String operationType,
+            String operationState,
+            String suffix
+    ) throws Exception {
         try (Connection connection = new SqliteConnectionFactory(database)
                 .openWriterConnection();
              PreparedStatement insert = connection.prepareStatement("""
@@ -109,19 +119,26 @@ class BondedCompanionOperationProbeSqliteTest {
                          roster_id, profile_id, operation_type, request_hash,
                          operation_state, result_json, created_at_ms,
                          updated_at_ms, expires_at_ms, expected_revision
-                     ) VALUES (?, ?, ?, ?, ?, 'STORE', ?, 'PENDING', NULL,
+                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
                                ?, ?, ?, ?)
                      """)) {
             insert.setString(1, CALLER);
-            insert.setString(2, "forbidden-pending");
+            insert.setString(2, "forbidden-" + operationType.toLowerCase()
+                    + "-" + operationState.toLowerCase() + "-" + suffix);
             insert.setString(3, OWNER.toString());
             insert.setString(4, "roster-a");
             insert.setString(5, "profile-a");
-            insert.setString(6, "c".repeat(64));
-            insert.setLong(7, -10_000L);
-            insert.setLong(8, -10_000L);
-            insert.setLong(9, 10_000L);
-            insert.setLong(10, 0L);
+            insert.setString(6, operationType);
+            insert.setString(7, "c".repeat(64));
+            insert.setString(8, operationState);
+            insert.setString(9, """
+                    {"code":"CONFLICT","reason":"forbidden",\
+                    "valueType":"PROFILE","value":null}
+                    """.replace("\\\n", ""));
+            insert.setLong(10, -10_000L);
+            insert.setLong(11, -10_000L);
+            insert.setLong(12, 10_000L);
+            insert.setLong(13, 0L);
             assertThrows(java.sql.SQLException.class, insert::executeUpdate);
         }
     }

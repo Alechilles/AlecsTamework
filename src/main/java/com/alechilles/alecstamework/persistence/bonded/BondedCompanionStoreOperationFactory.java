@@ -18,16 +18,20 @@ final class BondedCompanionStoreOperationFactory {
             String rosterId,
             String profileId,
             long expectedRevision,
+            String leaseToken,
+            UUID liveNpcUuid,
             String worldKey,
             long attemptedAtMs,
             long retainedUntilMs
     ) {
         String canonical = canonical(ownerUuid, rosterId, profileId,
-                expectedRevision, worldKey);
+                expectedRevision, leaseToken, liveNpcUuid, worldKey);
+        var leaseIdentity = new BondedCompanionOperation.StoreLeaseIdentity(
+                leaseToken, liveNpcUuid, worldKey);
         return new BondedCompanionOperation(
                 callerNamespace, idempotencyKey, sha256(canonical), ownerUuid,
                 rosterId, profileId, BondedCompanionOperation.Type.STORE,
-                attemptedAtMs, retainedUntilMs);
+                attemptedAtMs, retainedUntilMs, leaseIdentity);
     }
 
     private static String canonical(
@@ -35,13 +39,18 @@ final class BondedCompanionStoreOperationFactory {
             String rosterId,
             String profileId,
             long expectedRevision,
+            String leaseToken,
+            UUID liveNpcUuid,
             String worldKey
     ) {
-        StringBuilder result = new StringBuilder("store-v1|");
+        StringBuilder result = new StringBuilder("store-v2|");
         append(result, Objects.requireNonNull(ownerUuid, "ownerUuid").toString());
         append(result, rosterId);
         append(result, profileId);
         append(result, Long.toString(expectedRevision));
+        append(result, leaseToken);
+        append(result, Objects.requireNonNull(
+                liveNpcUuid, "liveNpcUuid").toString());
         append(result, worldKey);
         return result.toString();
     }

@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,6 +15,7 @@ public final class BondedCompanionProjectionService {
     private final Durability durability;
     private final World world;
     private final BondedCompanionProjectionCleanupService cleanup;
+    private final BondedCompanionSpawnFailureHandler spawnFailures;
     private final BondedCompanionProjectionValidator validator =
             new BondedCompanionProjectionValidator();
     private final BondedCompanionCleanupIntentFactory cleanupIntents =
@@ -36,6 +36,8 @@ public final class BondedCompanionProjectionService {
         this.durability = Objects.requireNonNull(durability, "durability");
         this.world = Objects.requireNonNull(world, "world");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
+        this.spawnFailures = new BondedCompanionSpawnFailureHandler(
+                durability, cleanup);
         this.leaseTokens = Objects.requireNonNull(leaseTokens, "leaseTokens");
         this.npcUuids = Objects.requireNonNull(npcUuids, "npcUuids");
     }
@@ -68,10 +70,11 @@ public final class BondedCompanionProjectionService {
         if (spawned.status() != SpawnStatus.SPAWNED
                 || !npcUuid.equals(spawned.npcUuid())) {
             String reason = spawnFailureReason(spawned, npcUuid);
-            return rollbackFailedSpawn(lease, spawned, reason, request.nowMs());
+            return spawnFailures.rollback(
+                    lease, spawned, reason, request.nowMs());
         }
         if (!safeConfirmSpawn(lease, spawned.npcUuid())) {
-            return rollbackFailedSpawn(
+            return spawnFailures.rollback(
                     lease, spawned, "SPAWN_CONFIRM_FAILED", request.nowMs()
             );
         }
@@ -137,6 +140,11 @@ public final class BondedCompanionProjectionService {
     ) {
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(cause, "cause");
+        if (lease.phase()
+                == BondedCompanionProjectionValidator.LeasePhase.PENDING) {
+            return new ReconcileResult(
+                    ReconcileStatus.PENDING_IN_PROGRESS, List.of());
+        }
         var validation = validator.validate(lease, observed);
         boolean expired = BondedCompanionExpirySystem.isExpired(
                 lease.expiresAtMs(), observedAtMs
@@ -144,14 +152,11 @@ public final class BondedCompanionProjectionService {
         boolean forced = expired || cause == RecoveryCause.EXPIRED
                 || cause == RecoveryCause.WORLD_TRANSFER
                 || cause == RecoveryCause.LOGOUT;
-        boolean interrupted = lease.phase()
-                == BondedCompanionProjectionValidator.LeasePhase.PENDING;
-        if (!forced && !interrupted
+        if (!forced
                 && validation.status() == BondedCompanionProjectionValidator.Status.VALID) {
             return new ReconcileResult(ReconcileStatus.ACTIVE_VALID, List.of());
         }
         String reason = expired ? "LEASE_EXPIRED"
-                : interrupted ? "SPAWN_INTERRUPTED"
                 : BondedCompanionProjectionRecoveryEvidence.reason(
                         cause, validation.status());
         BondedCompanionSnapshot snapshot =
@@ -233,54 +238,6 @@ public final class BondedCompanionProjectionService {
         } catch (RuntimeException failure) {
             return false;
         }
-    }
-
-    private SummonResult rollbackFailedSpawn(
-            BondedCompanionProjectionValidator.LeaseExpectation lease,
-            SpawnResult spawned,
-            String reason,
-            long nowMs
-    ) {
-        List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups =
-                spawnFailureCleanups(lease, spawned, reason, nowMs);
-        boolean stored;
-        try {
-            stored = durability.failSpawnAndEnqueueCleanup(
-                    lease, cleanups, reason
-            );
-        } catch (RuntimeException failure) {
-            stored = false;
-        }
-        if (!stored) {
-            return new SummonResult(SummonStatus.SPAWN_ROLLBACK_PENDING, lease);
-        }
-        for (var intent : cleanups) {
-            cleanup.recover(intent);
-        }
-        return new SummonResult(SummonStatus.SPAWN_FAILED_STORED, lease);
-    }
-
-    private List<BondedCompanionProjectionCleanupService.CleanupIntent>
-            spawnFailureCleanups(
-                    BondedCompanionProjectionValidator.LeaseExpectation lease,
-                    SpawnResult spawned,
-                    String reason,
-                    long nowMs
-            ) {
-        ArrayList<BondedCompanionProjectionCleanupService.CleanupIntent> result =
-                new ArrayList<>();
-        UUID observedUuid = spawned == null ? null : spawned.npcUuid();
-        if (observedUuid != null) {
-            result.add(cleanupIntents.projection(
-                    lease, observedUuid, lease.worldKey(), reason, nowMs
-            ));
-        }
-        if (!lease.liveNpcUuid().equals(observedUuid)) {
-            result.add(cleanupIntents.projection(
-                    lease, lease.liveNpcUuid(), lease.worldKey(), reason, nowMs
-            ));
-        }
-        return List.copyOf(result);
     }
 
     private String spawnFailureReason(SpawnResult spawned, UUID plannedNpcUuid) {
@@ -408,7 +365,10 @@ public final class BondedCompanionProjectionService {
             if (operation.type() != BondedCompanionOperation.Type.STORE
                     || !operation.ownerUuid().equals(lease.ownerUuid())
                     || !operation.rosterId().equals(lease.rosterId())
-                    || !Objects.equals(operation.profileId(), lease.profileId())) {
+                    || !Objects.equals(operation.profileId(), lease.profileId())
+                    || !new BondedCompanionOperation.StoreLeaseIdentity(
+                    lease.leaseToken(), lease.liveNpcUuid(), lease.worldKey())
+                    .equals(operation.storeLeaseIdentity())) {
                 throw new IllegalArgumentException(
                         "store operation scope does not match lease");
             }
@@ -487,7 +447,8 @@ public final class BondedCompanionProjectionService {
         ABSENT, APPLIED, REPLAYED, CONFLICT, REJECTED, STORAGE_FAILURE
     }
     public enum ReconcileStatus {
-        ACTIVE_VALID, STORED, DEAD, IDENTITY_MISMATCH, DURABILITY_REJECTED
+        ACTIVE_VALID, PENDING_IN_PROGRESS, STORED, DEAD, IDENTITY_MISMATCH,
+        DURABILITY_REJECTED
     }
     public enum RecoveryCause {
         STARTUP, WORLD_LOAD, PLAYER_JOIN, WORLD_TRANSFER, LOGOUT, EXPIRED,

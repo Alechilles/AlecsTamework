@@ -51,7 +51,7 @@ class BondedCompanionProjectionDurabilityTest {
     Path temporaryDirectory;
 
     @Test
-    void summonAndCleanupWorldRouteSurviveAdapterRestart() {
+    void startupSettlementOwnsPendingLeaseAfterRestartCleanupReplay() {
         Path database = temporaryDirectory.resolve("bonded.sqlite");
         assertTrue(new BondedCompanionSchemaManager(database, () -> -100L)
                 .initialize().availability().available());
@@ -98,17 +98,11 @@ class BondedCompanionProjectionDurabilityTest {
         assertEquals(BondedCompanionRecord.CleanupState.COMPLETED,
                 store.listCleanup(OWNER, "roster-a", 10)
                         .getFirst().state());
-        assertTrue(restarted.reconcileStored(
-                lease,
-                new BondedCompanionProjectionStorePlanner.StorePlan(
-                                1L, snapshot(), -20L
-                        ),
-                java.util.List.of(), "SPAWN_INTERRUPTED"
-        ));
+        assertEquals(1, restarted.settleResidualLeases(-70L));
         assertEquals(BondedCompanionState.STORED,
                 store.findProfile(OWNER, "roster-a", "profile-a")
                         .orElseThrow().state());
-        assertEquals(-20L, store.findProfile(OWNER, "roster-a", "profile-a")
+        assertEquals(0L, store.findProfile(OWNER, "roster-a", "profile-a")
                 .orElseThrow().summonCooldownUntilMs());
         assertTrue(store.findActiveLeases(OWNER, "roster-a").isEmpty());
     }
@@ -404,6 +398,24 @@ class BondedCompanionProjectionDurabilityTest {
     }
 
     @Test
+    void runtimeReconciliationCannotDemotePendingLease() {
+        ActiveFixture fixture = activeFixture("runtime-pending.sqlite");
+        var plan = new BondedCompanionProjectionStorePlanner.StorePlan(
+                1L, snapshot(), 0L);
+
+        assertFalse(fixture.durability().reconcileStored(
+                fixture.lease(), plan, List.of(), "RUNTIME_SCAN"));
+
+        assertEquals(BondedCompanionState.ACTIVE,
+                fixture.store().findProfile(
+                        OWNER, POLICY_ROSTER, "profile-a")
+                        .orElseThrow().state());
+        assertEquals(BondedCompanionRecord.ProjectionState.PENDING,
+                fixture.store().findActiveLeases(OWNER, POLICY_ROSTER)
+                        .getFirst().projectionState());
+    }
+
+    @Test
     void removedFamilyFallsBackToZeroCooldownInsteadOfStrandingActiveProfile() {
         ActiveFixture fixture = activeFixture("removed-family.sqlite");
         var planner = new BondedCompanionStorePlanner(
@@ -539,10 +551,23 @@ class BondedCompanionProjectionDurabilityTest {
                 request, planned.plan(), cleanup);
         var replay = fixture.durability().storeAndEnqueueCleanup(
                 request, planned.plan(), cleanup);
+        var absentLeaseReplay = fixture.store()
+                .findProfileOperationByIdentity(new BondedCompanionOperationProbe(
+                        "test", "store-once", OWNER, POLICY_ROSTER,
+                        "profile-a", BondedCompanionOperation.Type.STORE,
+                        1L, "world-a"))
+                .orElseThrow();
+        var wrongWorld = fixture.store()
+                .findProfileOperationByIdentity(new BondedCompanionOperationProbe(
+                        "test", "store-once", OWNER, POLICY_ROSTER,
+                        "profile-a", BondedCompanionOperation.Type.STORE,
+                        1L, "world-b"))
+                .orElseThrow();
         BondedCompanionOperation conflict = new BondedCompanionOperation(
                 operation.callerNamespace(), operation.idempotencyKey(),
                 "f".repeat(64), operation.ownerUuid(), operation.rosterId(),
-                operation.profileId(), operation.type(), -70L, 10_000L);
+                operation.profileId(), operation.type(), -70L, 10_000L,
+                operation.storeLeaseIdentity());
         var changed = fixture.durability().storeAndEnqueueCleanup(
                 new BondedCompanionProjectionService.StoreRequest(
                         fixture.lease(), 1L, -70L, conflict),
@@ -552,12 +577,55 @@ class BondedCompanionProjectionDurabilityTest {
                 first.status());
         assertEquals(BondedCompanionProjectionService.StoreDurabilityStatus.REPLAYED,
                 replay.status());
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                absentLeaseReplay.code());
+        assertTrue(absentLeaseReplay.replayed());
+        assertEquals(BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT,
+                wrongWorld.code());
+        assertFalse(wrongWorld.replayed());
         assertEquals(BondedCompanionProjectionService.StoreDurabilityStatus.CONFLICT,
                 changed.status());
         assertEquals(2L, fixture.store().findProfile(
                 OWNER, POLICY_ROSTER, "profile-a").orElseThrow().revision());
         assertEquals(1, fixture.store().listCleanup(
                 OWNER, POLICY_ROSTER, 8).size());
+    }
+
+    @Test
+    void explicitStoreSameKeyWithDifferentExactLeaseIdentityConflicts()
+            throws Exception {
+        ActiveFixture fixture = liveFixture("store-lease-identity.sqlite");
+        var planner = new BondedCompanionStorePlanner(
+                fixture.store(), rosterRegistry("role:wolf", 5L));
+        BondedCompanionOperation operation = storeOperation(
+                "store-exact-lease", fixture.lease(), 1L);
+        var request = new BondedCompanionProjectionService.StoreRequest(
+                fixture.lease(), 1L, -80L, operation);
+        var planned = planner.plan(
+                new BondedCompanionProjectionStorePlanner.PlanningRequest(
+                        fixture.lease(), 1L, -80L, snapshot(),
+                        BondedCompanionProjectionStorePlanner.Cause.EXPLICIT));
+        var cleanup = BondedCompanionProjectionCleanupService.CleanupIntent
+                .projection(
+                        "cleanup-store-exact", OWNER, POLICY_ROSTER,
+                        "profile-a", "lease-a", NPC, "world-a", "store", -80L);
+
+        assertEquals(BondedCompanionProjectionService.StoreDurabilityStatus.APPLIED,
+                fixture.durability().storeAndEnqueueCleanup(
+                        request, planned.plan(), cleanup).status());
+
+        var differentLease = new BondedCompanionProjectionValidator
+                .LeaseExpectation(
+                OWNER, POLICY_ROSTER, "profile-a", "lease-b",
+                UUID.fromString("20000000-0000-0000-0000-000000000099"),
+                "world-b", -90L, -1L,
+                BondedCompanionProjectionValidator.LeasePhase.LIVE);
+        BondedCompanionOperation changed = storeOperation(
+                "store-exact-lease", differentLease, 1L);
+
+        assertEquals(BondedCompanionProjectionService.StoreDurabilityStatus.CONFLICT,
+                fixture.durability().findStoreResult(changed).status());
+        assertFalse(operation.requestHash().equals(changed.requestHash()));
     }
 
     @Test
@@ -863,9 +931,22 @@ class BondedCompanionProjectionDurabilityTest {
             String worldKey,
             long expectedRevision
     ) {
+        var lease = new BondedCompanionProjectionValidator.LeaseExpectation(
+                OWNER, POLICY_ROSTER, "profile-a", "lease-a", NPC,
+                worldKey, -100L, -1L,
+                BondedCompanionProjectionValidator.LeasePhase.LIVE);
+        return storeOperation(key, lease, expectedRevision);
+    }
+
+    private BondedCompanionOperation storeOperation(
+            String key,
+            BondedCompanionProjectionValidator.LeaseExpectation lease,
+            long expectedRevision
+    ) {
         return BondedCompanionStoreOperationFactory.create(
                 "test", key, OWNER, POLICY_ROSTER, "profile-a",
-                expectedRevision, worldKey, -80L, 10_000L);
+                expectedRevision, lease.leaseToken(), lease.liveNpcUuid(),
+                lease.worldKey(), -80L, 10_000L);
     }
 
     private BondedCompanionOperation operation(String profileId) {

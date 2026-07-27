@@ -5,8 +5,6 @@ import com.alechilles.alecstamework.companion.bonded.*;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticSnapshot;
-import com.alechilles.alecstamework.persistence.operation
-        .BondedCompanionPaymentOperationId;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletionStage;
@@ -28,6 +26,8 @@ public final class BondedCompanionCoreApiOperations {
     private final BondedCompanionReviveOperationService revives;
     private final BondedCompanionProvisioningSupport provisioning =
             new BondedCompanionProvisioningSupport();
+    private final BondedCompanionReviveQuoteSupport reviveQuotes =
+            new BondedCompanionReviveQuoteSupport();
     private final BondedCompanionExtensionOperations extensions;
     private final BondedCompanionSnapshotCodec snapshots = new BondedCompanionSnapshotCodec();
     private final BondedCompanionViewFactory views = new BondedCompanionViewFactory();
@@ -186,29 +186,40 @@ public final class BondedCompanionCoreApiOperations {
                     "bonded-world-context-unavailable");
         }
         long now = clock.getAsLong();
+        BondedCompanionRecord.Profile profile = profile(request);
+        if (profile == null) return notFound();
+        BondedCompanionRecord.Lease lease = lease(request);
+        if (lease == null) {
+            Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
+                    terminal = store.findProfileOperationByIdentity(
+                    new BondedCompanionOperationProbe(
+                            request.callerNamespace(), request.idempotencyKey(),
+                            request.ownerUuid(), request.rosterId(),
+                            request.profileId(),
+                            BondedCompanionOperation.Type.STORE,
+                            request.expectedRevision(), request.worldKey()));
+            if (terminal.isPresent()) {
+                return terminalProfileResult(terminal.get());
+            }
+            return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
+                    "bonded-world-context-unavailable");
+        }
+        if (!request.worldKey().equals(lease.worldKey())) {
+            return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
+                    "bonded-world-context-unavailable");
+        }
         BondedCompanionOperation operation = BondedCompanionStoreOperationFactory
                 .create(
                         request.callerNamespace(), request.idempotencyKey(),
                         request.ownerUuid(), request.rosterId(),
                         request.profileId(), request.expectedRevision(),
-                        request.worldKey(), now,
+                        lease.leaseToken(), lease.liveNpcUuid(),
+                        lease.worldKey(), now,
                         safeAdd(now, OPERATION_RETENTION_MS));
         Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>> prior =
                 store.findProfileOperationByExactRequest(operation);
         if (prior.isPresent()) {
-            BondedCompanionStoreResult<BondedCompanionRecord.Profile> replay =
-                    prior.get();
-            return replay.code() == BondedCompanionStoreResult.Code.APPLIED
-                    && replay.value() != null
-                    ? success(view(replay.value()))
-                    : storeFailure(replay);
-        }
-        BondedCompanionRecord.Profile profile = profile(request);
-        if (profile == null) return notFound();
-        BondedCompanionRecord.Lease lease = lease(request);
-        if (lease == null || !request.worldKey().equals(lease.worldKey())) {
-            return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
-                    "bonded-world-context-unavailable");
+            return terminalProfileResult(prior.get());
         }
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
                 expectation(profile, lease), request.expectedRevision(), now,
@@ -231,6 +242,16 @@ public final class BondedCompanionCoreApiOperations {
                 "bonded-store-not-committed");
     }
 
+    private BondedCompanionResult<BondedCompanionProfileView>
+    terminalProfileResult(
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> result
+    ) {
+        return result.code() == BondedCompanionStoreResult.Code.APPLIED
+                && result.value() != null
+                ? success(view(result.value()))
+                : storeFailure(result);
+    }
+
     BondedCompanionResult<BondedCompanionReviveQuote> quoteRevive(
             BondedCompanionActionRequest request
     ) {
@@ -244,7 +265,7 @@ public final class BondedCompanionCoreApiOperations {
         BondedCompanionPolicy policy = resolved.policy();
         BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
         List<BondedCompanionReviveQuote.CostLine> costs = price == null
-                ? List.of() : quoteCosts(request, price);
+                ? List.of() : reviveQuotes.costs(request, price);
         return success(new BondedCompanionReviveQuote(
                 profile.profileId(), policy.features().revive(),
                 costs, 0L,
@@ -377,47 +398,6 @@ public final class BondedCompanionCoreApiOperations {
         return view(profile,
                 lease(profile.ownerUuid(), profile.rosterId(), profile.profileId()),
                 store.listProfiles(profile.ownerUuid(), profile.rosterId()));
-    }
-
-    private List<BondedCompanionReviveQuote.CostLine> quoteCosts(
-            BondedCompanionActionRequest request,
-            BondedCompanionPolicy.RevivePrice price
-    ) {
-        BondedCompanionActionContext.Inventory inventory = inventory(
-                request.actionContext());
-        if (inventory == null) return unavailableCosts(price);
-        ArrayList<BondedCompanionReviveQuote.CostLine> lines = new ArrayList<>();
-        try {
-            String operationId = BondedCompanionPaymentOperationId.create(
-                    request.callerNamespace(), request.idempotencyKey(),
-                    request.ownerUuid(), request.rosterId(), request.profileId(),
-                    request.expectedRevision());
-            List<Integer> owned = inventory.availableQuantities(operationId,
-                    price.costs());
-            for (int index = 0; index < price.costs().size(); index++) {
-                BondedCompanionReviveCost cost = price.costs().get(index);
-                lines.add(new BondedCompanionReviveQuote.CostLine(
-                        cost.itemId(), cost.quantity(), Math.max(0,
-                        owned.get(index))));
-            }
-            return List.copyOf(lines);
-        } catch (RuntimeException | LinkageError failure) {
-            return unavailableCosts(price);
-        }
-    }
-
-    private List<BondedCompanionReviveQuote.CostLine> unavailableCosts(
-            BondedCompanionPolicy.RevivePrice price
-    ) {
-        return price.costs().stream().map(cost ->
-                new BondedCompanionReviveQuote.CostLine(
-                        cost.itemId(), cost.quantity(), 0)).toList();
-    }
-
-    private BondedCompanionActionContext.Inventory inventory(
-            BondedCompanionActionContext context
-    ) {
-        return context == null ? null : context.inventory();
     }
 
     BondedCompanionOperation reviveOperation(

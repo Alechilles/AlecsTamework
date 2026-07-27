@@ -16,10 +16,26 @@ public record BondedCompanionOperation(
         @Nullable String profileId,
         @Nonnull Type type,
         long attemptedAtMs,
-        long retainedUntilMs
+        long retainedUntilMs,
+        @Nullable StoreLeaseIdentity storeLeaseIdentity
 ) {
     /** Finite bonded mutation vocabulary persisted by the adapter. */
     public enum Type { CAPTURE, PROVISION, STORE, REVIVE }
+
+    public BondedCompanionOperation(
+            String callerNamespace,
+            String idempotencyKey,
+            String requestHash,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId,
+            Type type,
+            long attemptedAtMs,
+            long retainedUntilMs
+    ) {
+        this(callerNamespace, idempotencyKey, requestHash, ownerUuid, rosterId,
+                profileId, type, attemptedAtMs, retainedUntilMs, null);
+    }
 
     public BondedCompanionOperation {
         callerNamespace = text(callerNamespace, "callerNamespace");
@@ -34,6 +50,23 @@ public record BondedCompanionOperation(
         }
         if (retainedUntilMs == 0) {
             throw new IllegalArgumentException("retainedUntilMs must be bounded");
+        }
+        if (storeLeaseIdentity != null && type != Type.STORE) {
+            throw new IllegalArgumentException(
+                    "only STORE operations carry exact lease identity");
+        }
+    }
+
+    /** Stable DB-authored projection identity bound into one STORE request. */
+    public record StoreLeaseIdentity(
+            @Nonnull String leaseToken,
+            @Nonnull UUID liveNpcUuid,
+            @Nonnull String worldKey
+    ) {
+        public StoreLeaseIdentity {
+            leaseToken = text(leaseToken, "leaseToken");
+            liveNpcUuid = Objects.requireNonNull(liveNpcUuid, "liveNpcUuid");
+            worldKey = text(worldKey, "worldKey");
         }
     }
 

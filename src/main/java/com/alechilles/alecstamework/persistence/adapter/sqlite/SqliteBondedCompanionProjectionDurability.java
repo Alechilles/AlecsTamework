@@ -32,7 +32,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
         BondedCompanionLocalProjectionLifecycle.LeaseSource {
     private final SqliteConnectionFactory connections;
     private final SqliteBondedCompanionLeaseReader leaseReader;
-    private final SqliteBondedCompanionCleanupQueue cleanupQueue;
+    private final SqliteBondedCompanionCleanupReplay cleanupReplay;
     private final SqliteBondedCompanionStartupSettlement startupSettlement;
     private final SqliteBondedCompanionOperationExecutor operations;
     private final SqliteBondedCompanionExplicitStore explicitStore =
@@ -51,7 +51,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 Objects.requireNonNull(databasePath, "databasePath")
         );
         leaseReader = new SqliteBondedCompanionLeaseReader(connections);
-        cleanupQueue = new SqliteBondedCompanionCleanupQueue(connections);
+        cleanupReplay = new SqliteBondedCompanionCleanupReplay(connections);
         startupSettlement = new SqliteBondedCompanionStartupSettlement(
                 connections);
         operations = new SqliteBondedCompanionOperationExecutor(connections);
@@ -143,6 +143,10 @@ public final class SqliteBondedCompanionProjectionDurability implements
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
             String reason
     ) {
+        if (lease.phase()
+                == BondedCompanionProjectionValidator.LeasePhase.PENDING) {
+            return false;
+        }
         long updatedAt = cleanups.isEmpty()
                 ? lease.startedAtMs() : cleanups.getFirst().createdAtMs();
         return returnToStored(
@@ -195,25 +199,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
             long nowMs,
             int limit
     ) {
-        Objects.requireNonNull(cleanup, "cleanup");
-        Objects.requireNonNull(worldKey, "worldKey");
-        if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
-        List<BondedCompanionProjectionCleanupService.CleanupIntent> pending =
-                cleanupQueue.pendingForWorld(worldKey, nowMs, limit);
-        int attempted = 0;
-        for (var intent : pending) {
-            BondedCompanionProjectionCleanupService.Outcome outcome =
-                    BondedCompanionRecord.Cleanup.LEGACY_UNKNOWN_WORLD.equals(
-                            intent.worldKey()
-                    )
-                            ? BondedCompanionProjectionCleanupService.Outcome
-                            .IDENTITY_MISMATCH
-                            : cleanup.recover(intent);
-            outcome = retryUnconfirmedProjectionAbsence(intent, outcome);
-            cleanupQueue.recordOutcome(intent, outcome, nowMs);
-            attempted++;
-        }
-        return attempted;
+        return cleanupReplay.pendingForWorld(
+                cleanup, worldKey, nowMs, limit);
     }
 
     /** Attempts one newly committed capture cleanup and records its outcome. */
@@ -223,28 +210,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
             @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent intent,
             long nowMs
     ) {
-        BondedCompanionProjectionCleanupService.Outcome outcome =
-                retryUnconfirmedProjectionAbsence(intent, cleanup.recover(intent));
-        cleanupQueue.recordOutcome(intent, outcome, nowMs);
-        return outcome;
-    }
-
-    /**
-     * An exact projection can be absent from a loaded world's currently materialized chunks.
-     * Keep its marker cleanup durable until removal is positively confirmed or retention expires.
-     */
-    private BondedCompanionProjectionCleanupService.Outcome
-    retryUnconfirmedProjectionAbsence(
-            BondedCompanionProjectionCleanupService.CleanupIntent intent,
-            BondedCompanionProjectionCleanupService.Outcome outcome
-    ) {
-        if (intent.target()
-                == BondedCompanionProjectionCleanupService.Target.PROJECTION
-                && outcome == BondedCompanionProjectionCleanupService.Outcome
-                .ALREADY_MISSING) {
-            return BondedCompanionProjectionCleanupService.Outcome.RETRY_REQUIRED;
-        }
-        return outcome;
+        return cleanupReplay.attempt(cleanup, intent, nowMs);
     }
 
     /** Returns a bounded exact lease view for observer reconciliation. */

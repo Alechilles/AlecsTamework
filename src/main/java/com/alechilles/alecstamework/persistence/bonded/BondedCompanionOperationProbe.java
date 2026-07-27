@@ -13,7 +13,8 @@ public record BondedCompanionOperationProbe(
         @Nonnull String rosterId,
         @Nullable String profileId,
         @Nonnull BondedCompanionOperation.Type type,
-        @Nullable Long expectedRevision
+        @Nullable Long expectedRevision,
+        @Nullable String worldKey
 ) {
     public BondedCompanionOperationProbe(
             String callerNamespace,
@@ -24,7 +25,20 @@ public record BondedCompanionOperationProbe(
             BondedCompanionOperation.Type type
     ) {
         this(callerNamespace, idempotencyKey, ownerUuid, rosterId, profileId,
-                type, null);
+                type, null, null);
+    }
+
+    public BondedCompanionOperationProbe(
+            String callerNamespace,
+            String idempotencyKey,
+            UUID ownerUuid,
+            String rosterId,
+            String profileId,
+            BondedCompanionOperation.Type type,
+            Long expectedRevision
+    ) {
+        this(callerNamespace, idempotencyKey, ownerUuid, rosterId, profileId,
+                type, expectedRevision, null);
     }
 
     public BondedCompanionOperationProbe {
@@ -34,9 +48,14 @@ public record BondedCompanionOperationProbe(
         rosterId = text(rosterId, "rosterId");
         profileId = profileId == null ? null : text(profileId, "profileId");
         type = Objects.requireNonNull(type, "type");
+        worldKey = worldKey == null ? null : text(worldKey, "worldKey");
         if (expectedRevision != null && expectedRevision < 0L) {
             throw new IllegalArgumentException(
                     "expectedRevision cannot be negative");
+        }
+        if (worldKey != null && type != BondedCompanionOperation.Type.STORE) {
+            throw new IllegalArgumentException(
+                    "worldKey is only valid for STORE probes");
         }
     }
 

@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.companion.bonded;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -35,36 +34,6 @@ public final class BondedCompanionWorldLifecycleObserver {
     ) {
         reconcile(leases, BondedCompanionProjectionService.RecoveryCause.STARTUP,
                 observedAtMs);
-    }
-
-    /**
-     * Settles durable pre-startup PENDING leases without waiting for a world scan. A pending
-     * spawn is interrupted by definition; its exact cleanup remains durable if the world is
-     * not currently available.
-     */
-    @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation> onStartupPending(
-            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
-            long observedAtMs
-    ) {
-        ArrayList<BondedCompanionProjectionValidator.LeaseExpectation> failed =
-                new ArrayList<>();
-        for (var lease : leases) {
-            if (lease == null) {
-                continue;
-            }
-            BondedCompanionProjectionService.ReconcileResult result = reconcile(
-                    lease, List.of(),
-                    BondedCompanionProjectionService.RecoveryCause.STARTUP, observedAtMs
-            );
-            listener.onReconciled(lease,
-                    BondedCompanionProjectionService.RecoveryCause.STARTUP, result);
-            if (result.status()
-                    != BondedCompanionProjectionService.ReconcileStatus.STORED) {
-                failed.add(lease);
-            }
-        }
-        return List.copyOf(failed);
     }
 
     public void onWorldLoad(
