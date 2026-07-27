@@ -167,6 +167,54 @@ class BondedCompanionProjectionDurabilityTest {
     }
 
     @Test
+    void projectionCleanupMissingFromAnUnloadedChunkRemainsDurableUntilConfirmed() {
+        Path database = temporaryDirectory.resolve("projection-cleanup-retry.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
+                .initialize().availability().available());
+        SqliteBondedCompanionDatabase store =
+                new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(), profile()).code());
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        var lease = new BondedCompanionProjectionValidator.LeaseExpectation(
+                OWNER, "roster-a", "profile-a", "lease-a", NPC,
+                "world-a", 0L, 0L,
+                BondedCompanionProjectionValidator.LeasePhase.PENDING
+        );
+        var request = new BondedCompanionProjectionService.SummonRequest(
+                OWNER, "roster-a", "profile-a", 0L, "role:wolf",
+                snapshot(), "world-a", null, 0L, 0L,
+                new BondedCompanionActiveCapacity("family:wolf", 1)
+        );
+        var cleanup = new BondedCompanionProjectionCleanupService.CleanupIntent(
+                "cleanup-unloaded", OWNER, "roster-a", "profile-a", "lease-a",
+                BondedCompanionProjectionCleanupService.Target.PROJECTION,
+                NPC, "world-a", "projection-cleanup", 0L, 10_000L
+        );
+        assertTrue(durability.beginSummon(request, lease, cleanup));
+        BondedCompanionProjectionCleanupService initiallyUnavailable =
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService.Outcome
+                                .ALREADY_MISSING
+                );
+
+        assertEquals(BondedCompanionProjectionCleanupService.Outcome.RETRY_REQUIRED,
+                durability.attemptCleanup(initiallyUnavailable, cleanup, 0L));
+        var pending = store.listCleanup(OWNER, "roster-a", 1).getFirst();
+        assertEquals(BondedCompanionRecord.CleanupState.PENDING, pending.state());
+
+        assertEquals(1, durability.replayPendingCleanup(
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService.Outcome
+                                .REMOVED
+                ), pending.nextAttemptAtMs(), 1
+        ));
+        assertEquals(BondedCompanionRecord.CleanupState.COMPLETED,
+                store.listCleanup(OWNER, "roster-a", 1).getFirst().state());
+    }
+
+    @Test
     void liveLeaseMaintenanceReadIsNotStarvedByEarlierPendingSummons() {
         Path database = temporaryDirectory.resolve("live-lease-window.sqlite");
         assertTrue(new BondedCompanionSchemaManager(database, () -> -100L)

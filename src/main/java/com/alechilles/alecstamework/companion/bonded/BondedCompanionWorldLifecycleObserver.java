@@ -36,6 +36,19 @@ public final class BondedCompanionWorldLifecycleObserver {
                 observedAtMs);
     }
 
+    /**
+     * Settles durable pre-startup PENDING leases without waiting for a world scan. A pending
+     * spawn is interrupted by definition; its exact cleanup remains durable if the world is
+     * not currently available.
+     */
+    public void onStartupPending(
+            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            long observedAtMs
+    ) {
+        reconcile(leases, List.of(),
+                BondedCompanionProjectionService.RecoveryCause.STARTUP, observedAtMs);
+    }
+
     public void onWorldLoad(
             @Nonnull String worldKey,
             @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
@@ -93,6 +106,20 @@ public final class BondedCompanionWorldLifecycleObserver {
                 observedAtMs);
     }
 
+    /**
+     * Reconciles a maintenance batch from one completed, bounded world scan. The caller must
+     * omit every lease whose expected world could not be scanned conclusively.
+     */
+    public void onProjectionMissingScan(
+            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            @Nonnull List<BondedCompanionProjectionValidator.Projection> observed,
+            long observedAtMs
+    ) {
+        reconcile(leases, observed,
+                BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                observedAtMs);
+    }
+
     public void onLeaseExpired(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long observedAtMs
@@ -123,6 +150,16 @@ public final class BondedCompanionWorldLifecycleObserver {
         Objects.requireNonNull(leases, "leases");
         List<BondedCompanionProjectionValidator.Projection> observed =
                 source.projections();
+        reconcile(leases, observed, cause, observedAtMs);
+    }
+
+    private void reconcile(
+            List<BondedCompanionProjectionValidator.LeaseExpectation> leases,
+            List<BondedCompanionProjectionValidator.Projection> observed,
+            BondedCompanionProjectionService.RecoveryCause cause,
+            long observedAtMs
+    ) {
+        Objects.requireNonNull(observed, "observed");
         for (var lease : leases) {
             if (lease != null) {
                 BondedCompanionProjectionService.ReconcileResult result =

@@ -172,6 +172,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                             ? BondedCompanionProjectionCleanupService.Outcome
                             .IDENTITY_MISMATCH
                             : cleanup.recover(intent);
+            outcome = retryUnconfirmedProjectionAbsence(intent, outcome);
             cleanupQueue.recordOutcome(intent, outcome, nowMs);
             attempted++;
         }
@@ -186,8 +187,26 @@ public final class SqliteBondedCompanionProjectionDurability implements
             long nowMs
     ) {
         BondedCompanionProjectionCleanupService.Outcome outcome =
-                cleanup.recover(intent);
+                retryUnconfirmedProjectionAbsence(intent, cleanup.recover(intent));
         cleanupQueue.recordOutcome(intent, outcome, nowMs);
+        return outcome;
+    }
+
+    /**
+     * An exact projection can be absent from a loaded world's currently materialized chunks.
+     * Keep its marker cleanup durable until removal is positively confirmed or retention expires.
+     */
+    private BondedCompanionProjectionCleanupService.Outcome
+    retryUnconfirmedProjectionAbsence(
+            BondedCompanionProjectionCleanupService.CleanupIntent intent,
+            BondedCompanionProjectionCleanupService.Outcome outcome
+    ) {
+        if (intent.target()
+                == BondedCompanionProjectionCleanupService.Target.PROJECTION
+                && outcome == BondedCompanionProjectionCleanupService.Outcome
+                .ALREADY_MISSING) {
+            return BondedCompanionProjectionCleanupService.Outcome.RETRY_REQUIRED;
+        }
         return outcome;
     }
 
@@ -195,7 +214,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     activeLeases(int limit) {
-        return leases(null, null, limit);
+        return leases(null, null, null, null, limit);
     }
 
     /**
@@ -205,20 +224,37 @@ public final class SqliteBondedCompanionProjectionDurability implements
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     liveLeases(int limit) {
+        return liveLeasesAfter(null, limit);
+    }
+
+    /** Returns one cursor page of LIVE leases for fair recurring maintenance. */
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation>
+    liveLeasesAfter(@Nullable String afterProfileId, int limit) {
         return leases(null,
-                BondedCompanionProjectionValidator.LeasePhase.LIVE, limit);
+                BondedCompanionProjectionValidator.LeasePhase.LIVE,
+                null, afterProfileId, limit);
+    }
+
+    /** Returns only leases that were already pending at the immutable startup cutoff. */
+    @Nonnull public List<BondedCompanionProjectionValidator.LeaseExpectation>
+    pendingLeasesBefore(long startupCutoffMs, @Nullable String afterProfileId, int limit) {
+        return leases(null, BondedCompanionProjectionValidator.LeasePhase.PENDING,
+                startupCutoffMs, afterProfileId, limit);
     }
 
     /** Returns finite expired leases without rejecting negative world time. */
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     findExpired(long nowMs, int limit) {
-        return leases(nowMs, null, limit);
+        return leases(nowMs, null, null, null, limit);
     }
 
     private List<BondedCompanionProjectionValidator.LeaseExpectation> leases(
             @Nullable Long expiredAt,
             @Nullable BondedCompanionProjectionValidator.LeasePhase phase,
+            @Nullable Long startedAtOrBefore,
+            @Nullable String afterProfileId,
             int limit
     ) {
         if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
@@ -229,6 +265,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
                   AND l.expires_at_ms <= ?
                 """;
         String phaseClause = phase == null ? "" : " AND l.projection_state = ?";
+        String startupClause = startedAtOrBefore == null ? "" : " AND l.started_at_ms <= ?";
+        String cursorClause = afterProfileId == null ? "" : " AND l.profile_id > ?";
         try (Connection connection = connections.openReadConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT p.owner_uuid, p.roster_id, l.profile_id,
@@ -237,12 +275,14 @@ public final class SqliteBondedCompanionProjectionDurability implements
                      FROM bonded_companion_lease l
                      JOIN bonded_companion_profile p
                        ON p.profile_id = l.profile_id
-                     """ + expiry + phaseClause + """
+                     """ + expiry + phaseClause + startupClause + cursorClause + """
                      ORDER BY l.profile_id LIMIT ?
                      """)) {
             int index = 1;
             if (expiredAt != null) statement.setLong(index++, expiredAt);
             if (phase != null) statement.setString(index++, phase.name());
+            if (startedAtOrBefore != null) statement.setLong(index++, startedAtOrBefore);
+            if (afterProfileId != null) statement.setString(index++, afterProfileId);
             statement.setInt(index, limit);
             try (ResultSet rows = statement.executeQuery()) {
                 ArrayList<BondedCompanionProjectionValidator.LeaseExpectation>

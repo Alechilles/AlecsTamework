@@ -12,6 +12,8 @@ import com.alechilles.alecstamework.companion.bonded
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionRecoverySystem;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionStartupPendingRecovery;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionPolicyResolver;
@@ -84,6 +86,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionWorldLifecycleObserver observer;
     private final BondedCompanionExpirySystem expiry;
     private final BondedCompanionProjectionRecoverySystem projectionRecovery;
+    private final BondedCompanionStartupPendingRecovery startupPendingRecovery;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final SqliteBondedCompanionProjectionDurability durability;
     private final HytaleBondedCompanionWorldGateway world;
@@ -107,6 +110,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionWorldLifecycleObserver observer,
             BondedCompanionExpirySystem expiry,
             BondedCompanionProjectionRecoverySystem projectionRecovery,
+            BondedCompanionStartupPendingRecovery startupPendingRecovery,
             BondedCompanionProjectionCleanupService cleanup,
             SqliteBondedCompanionProjectionDurability durability,
             HytaleBondedCompanionWorldGateway world,
@@ -126,6 +130,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.observer = observer;
         this.expiry = expiry;
         this.projectionRecovery = projectionRecovery;
+        this.startupPendingRecovery = startupPendingRecovery;
         this.cleanup = cleanup;
         this.durability = durability;
         this.world = world;
@@ -217,7 +222,15 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         );
         BondedCompanionProjectionRecoverySystem projectionRecovery =
                 new BondedCompanionProjectionRecoverySystem(
-                        observer, durability::liveLeases, 64
+                        observer, durability::liveLeasesAfter,
+                        world::scanBoundedRecoveryAsync,
+                        64, 128
+                );
+        long startupCutoff = clock.getAsLong();
+        BondedCompanionStartupPendingRecovery startupPendingRecovery =
+                new BondedCompanionStartupPendingRecovery(
+                        observer, durability::pendingLeasesBefore,
+                        startupCutoff, 64
                 );
         BondedCompanionCoreApiOperations operations =
                 new BondedCompanionCoreApiOperations(
@@ -260,23 +273,16 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                 logger, intent, failure)
                 );
         if (started.availability().available()) {
-            long startupTime = clock.getAsLong();
             publishPendingCaptureEvents(captureEvents, diagnostics, 128);
             durability.replayPendingCleanup(
-                    cleanup, startupTime, 128
+                    cleanup, startupCutoff, 128
             );
-            observer.onStartup(
-                    durability.activeLeases(256).stream()
-                            .filter(lease -> lease.phase()
-                                    == BondedCompanionProjectionValidator
-                                    .LeasePhase.PENDING)
-                            .toList(),
-                    startupTime
-            );
+            startupPendingRecovery.tick(startupCutoff);
         }
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, expiry, projectionRecovery,
+                startupPendingRecovery,
                 cleanup, durability, world, store, clock, captureAuthor,
                 captureEvents, paymentRecovery
         );
@@ -404,6 +410,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         publishPendingCaptureEvents(captureEvents, diagnostics, 64);
         store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
+        startupPendingRecovery.tick(now);
         projectionRecovery.tick(now);
         expiry.tick(now);
     }
