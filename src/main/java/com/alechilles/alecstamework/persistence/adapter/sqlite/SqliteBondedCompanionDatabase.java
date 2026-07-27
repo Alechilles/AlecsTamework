@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreDiagnostics;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionLegacyPaymentSettlementGroup;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteBondedCompanionOperationClaims.Claim;
 import com.google.gson.Gson;
@@ -108,6 +110,22 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 ownerUuid, limit));
     }
 
+    @Override
+    public List<BondedCompanionLegacyPaymentSettlementGroup>
+            listAwaitingLegacyPaymentSettlementGroups(
+                    UUID ownerUuid, int limit) {
+        return read(store -> store.retention()
+                .listAwaitingLegacyPaymentSettlementGroups(ownerUuid, limit));
+    }
+
+    @Override
+    public int quarantineLegacyPaymentSettlementGroup(
+            UUID ownerUuid, String operationId, long retainedUntilMs) {
+        return integerWrite(store -> store.retention()
+                .quarantineLegacyPaymentSettlementGroup(
+                        ownerUuid, operationId, retainedUntilMs));
+    }
+
     @Override public BondedCompanionStoreResult<BondedCompanionRecord.Lease>
             acquireLease(BondedCompanionOperation operation, long expectedRevision,
                          BondedCompanionRecord.Lease lease) {
@@ -127,7 +145,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             reviveProfile(BondedCompanionOperation operation,
                           long expectedRevision, long updatedAtMs) {
         String profileId = Objects.requireNonNull(operation.profileId(), "operation.profileId");
-        return mutate(operation, expectedRevision,
+        return mutate(operation, expectedRevision, true,
                 SqliteBondedCompanionProfileRow.class,
                 store -> store.reviveProfile(operation.ownerUuid(), operation.rosterId(),
                         profileId, expectedRevision, updatedAtMs), mapper::toDomain);
@@ -248,13 +266,26 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             BondedCompanionOperation operation, Long expectedRevision,
             Class<R> storedType, Mutation<R> mutation,
             Translation<R, D> translation) {
+        return mutate(operation, expectedRevision, false,
+                storedType, mutation, translation);
+    }
+
+    private <R, D> BondedCompanionStoreResult<D> mutate(
+            BondedCompanionOperation operation, Long expectedRevision,
+            boolean resumeMatchingPending,
+            Class<R> storedType, Mutation<R> mutation,
+            Translation<R, D> translation) {
         Connection connection = null;
         try {
             connection = connections.openWriterConnection();
             connection.setAutoCommit(false);
             Claim claim = claims.claim(
                     connection, operation, expectedRevision);
-            if (!claim.created()) {
+            boolean resumable = resumeMatchingPending
+                    && claim.matches()
+                    && "PENDING".equals(claim.state())
+                    && claim.resultJson() == null;
+            if (!claim.created() && !resumable) {
                 BondedCompanionStoreResult<D> replay = replay(claim, storedType, translation);
                 connection.commit();
                 return replay;

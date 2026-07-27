@@ -42,7 +42,7 @@ class TameworkBondedReviveEscrowComponentTest {
                 TameworkBondedReviveEscrowComponent.create(
                         (short) 4, "panel:revive-codec",
                         "Ingredient_Life_Essence", 3, -9_001L);
-        escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.RESERVED);
+        escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.REFUNDING);
         escrow.getInventory().setItemStackForSlot(
                 (short) 1, itemStack("Ingredient_Life_Essence", 3));
         ensureSimpleContainerCodec();
@@ -55,7 +55,7 @@ class TameworkBondedReviveEscrowComponentTest {
 
         assertTrue(decoded.matches(
                 "panel:revive-codec", "Ingredient_Life_Essence", 3));
-        assertEquals(TameworkBondedReviveEscrowComponent.Phase.RESERVED,
+        assertEquals(TameworkBondedReviveEscrowComponent.Phase.REFUNDING,
                 decoded.phase());
         assertEquals(3, decoded.reservedQuantity());
         assertEquals(-9_001L, decoded.createdAtMs());

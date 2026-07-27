@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.items.components
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionLegacyPaymentSettlementGroup;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPaymentRecoveryService;
@@ -114,6 +116,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     .consumeExactAsync(operation, ITEM, 2)
                     .toCompletableFuture().join();
             fixture.durability.enqueue(SaveResult.success());
+            fixture.durability.enqueue(SaveResult.success());
+            fixture.durability.enqueue(SaveResult.success());
             fixture.durability.enqueue(SaveResult.retryable(null));
 
             assertFalse(charged.refundAsync().toCompletableFuture().join());
@@ -182,21 +186,25 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
-    void missingOrPendingProofNeverTouchesReservedEscrow() throws Exception {
+    void missingOrPendingClaimResumesFromReloadedExactReservedEscrow()
+            throws Exception {
         for (RecoveryResult result : List.of(
                 RecoveryResult.MISSING, RecoveryResult.PENDING)) {
             try (Fixture fixture = new Fixture()) {
                 fixture.setSource(ITEM, 2);
                 fixture.inventory.consumeExactAsync(operation(33), ITEM, 2)
                         .toCompletableFuture().join();
+                fixture.store.put(fixture.actor, fixture.escrowType,
+                        fixture.durability.persistedEscrow.clone());
                 RecoveryStore terminal = new RecoveryStore(result, false, 33);
 
                 recovery(fixture, terminal).onPlayerAdded(
                         fixture.world, OWNER);
 
                 assertEquals(0, fixture.sourceQuantity(ITEM));
-                assertEquals(2, fixture.escrow().reservedQuantity());
-                assertEquals(0, terminal.acknowledgments);
+                assertNull(fixture.escrow());
+                assertEquals(1, terminal.revives);
+                assertEquals(1, terminal.acknowledgments);
             }
         }
     }
@@ -245,7 +253,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
-    void rejectedLegacyPendingRemainsPinnedAndQuarantined() throws Exception {
+    void rejectedLegacyPendingIsQuarantinedWithoutDeletingEvidence()
+            throws Exception {
         try (Fixture fixture = new Fixture()) {
             InventoryOperationReceipt pending = legacyReceipt(
                     operation(36), ITEM, 2, ":pending");
@@ -261,6 +270,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     fixture.actor, fixture.legacyType)
                     .receiptFor(pending.receiptKey()));
             assertEquals(0, terminal.acknowledgments);
+            assertEquals(1, terminal.quarantines);
         }
     }
 
@@ -519,6 +529,125 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
     }
 
+    @Test
+    void onlyFullReservedEscrowExposesMissingClaimProof() throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            String operation = operation(3001);
+            TameworkBondedReviveEscrowComponent escrow =
+                    TameworkBondedReviveEscrowComponent.create(
+                            (short) 2, operation, ITEM, 2, -1L);
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 0, itemStack(ITEM, 2));
+            escrow.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.RESERVED);
+            fixture.store.put(fixture.actor, fixture.escrowType, escrow);
+
+            BondedCompanionActionContext.ChargeReceipt reserved =
+                    fixture.inventory.findCharge(operation);
+            assertEquals(ITEM, reserved.itemId());
+            assertEquals(2, reserved.quantity());
+
+            escrow.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.REFUNDING);
+            BondedCompanionActionContext.ChargeReceipt refunding =
+                    fixture.inventory.findCharge(operation);
+            assertNull(refunding.itemId());
+            assertEquals(0, refunding.quantity());
+
+            escrow.getInventory().clear();
+            for (TameworkBondedReviveEscrowComponent.Phase terminal
+                    : List.of(
+                    TameworkBondedReviveEscrowComponent.Phase.REFUNDED,
+                    TameworkBondedReviveEscrowComponent.Phase.COMMITTED)) {
+                escrow.setPhase(terminal);
+                BondedCompanionActionContext.ChargeReceipt receipt =
+                        fixture.inventory.findCharge(operation);
+                assertNull(receipt.itemId());
+                assertEquals(0, receipt.quantity());
+            }
+        }
+    }
+
+    @Test
+    void partialInsufficientRefundPersistsProgressAndResumesRemainingSlot()
+            throws Exception {
+        try (Fixture fixture = new Fixture(new OneSlotRestoreTransfer())) {
+            String operation = operation(301);
+            TameworkBondedReviveEscrowComponent escrow =
+                    TameworkBondedReviveEscrowComponent.create(
+                            (short) 2, operation, ITEM, 3, -1L);
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 0, itemStack(ITEM, 1));
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 1, itemStack(ITEM, 1));
+            fixture.store.put(fixture.actor, fixture.escrowType, escrow);
+
+            BondedCompanionActionContext.ChargeReceipt insufficient =
+                    fixture.inventory.consumeExactAsync(operation, ITEM, 3)
+                            .toCompletableFuture().join();
+
+            assertNull(insufficient);
+            assertEquals(1, fixture.sourceQuantity(ITEM));
+            assertEquals(1, fixture.escrow().reservedQuantity());
+            assertEquals(TameworkBondedReviveEscrowComponent.Phase.REFUNDING,
+                    fixture.escrow().phase());
+            assertEquals(TameworkBondedReviveEscrowComponent.Phase.REFUNDING,
+                    fixture.durability.persistedEscrow.phase());
+            assertEquals(1,
+                    fixture.durability.persistedEscrow.reservedQuantity());
+
+            fixture.store.put(fixture.actor, fixture.escrowType,
+                    fixture.durability.persistedEscrow.clone());
+
+            BondedCompanionActionContext.ChargeReceipt replay =
+                    fixture.inventory.findCharge(operation);
+            assertNotNull(replay);
+            assertFalse(replay.quarantined());
+            assertTrue(replay.refundAsync().toCompletableFuture().join());
+
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertNull(fixture.escrow());
+        }
+    }
+
+    @Test
+    void refundSavesEachReturnedSlotBeforeAdvancingToTheNext()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            String operation = operation(302);
+            TameworkBondedReviveEscrowComponent escrow =
+                    TameworkBondedReviveEscrowComponent.create(
+                            (short) 2, operation, ITEM, 2, -1L);
+            escrow.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.RESERVED);
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 0, itemStack(ITEM, 1));
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 1, itemStack(ITEM, 1));
+            fixture.store.put(fixture.actor, fixture.escrowType, escrow);
+            fixture.durability.enqueue(SaveResult.success());
+            CompletableFuture<SaveResult> firstSlotSave =
+                    fixture.durability.deferNext();
+
+            CompletionStage<Boolean> refund = fixture.inventory
+                    .findCharge(operation).refundAsync();
+            CompletionStage<Boolean> duplicate = fixture.inventory
+                    .findCharge(operation).refundAsync();
+
+            assertEquals(1, fixture.sourceQuantity(ITEM));
+            assertEquals(1, fixture.escrow().reservedQuantity());
+            assertFalse(refund.toCompletableFuture().isDone());
+            assertFalse(duplicate.toCompletableFuture().isDone());
+
+            firstSlotSave.complete(SaveResult.success());
+
+            assertTrue(refund.toCompletableFuture().join());
+            assertTrue(duplicate.toCompletableFuture().join());
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertNull(fixture.escrow());
+        }
+    }
+
     private void assertTerminalReplayRemoves(
             TameworkBondedReviveEscrowComponent.Phase phase,
             boolean committed
@@ -640,6 +769,11 @@ class HytaleBondedCompanionEscrowInventoryTest {
         private final HytaleBondedCompanionEscrowInventory inventory;
 
         private Fixture() throws Exception {
+            this(new DirectTransfer());
+        }
+
+        private Fixture(BondedCompanionEscrowTransfer transfer)
+                throws Exception {
             world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
             store = new TestEntityComponentStore(new TestEntityStore(world));
             actor = store.createReference();
@@ -653,7 +787,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
             durability = new RecordingDurability(this::escrow);
             inventory = new HytaleBondedCompanionEscrowInventory(
                     world, store, OWNER, "world-a", escrowType, legacyType,
-                    durability, () -> combined, new DirectTransfer());
+                    durability, () -> combined, transfer);
         }
 
         private void installTerminal(
@@ -756,6 +890,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
                 new ArrayDeque<>();
         private int lookups;
         private int acknowledgments;
+        private int quarantines;
+        private int revives;
         private Boolean acknowledgedApplied;
         private final BondedCompanionStore store;
 
@@ -778,9 +914,21 @@ class HytaleBondedCompanionEscrowInventoryTest {
                                 yield acknowledgmentResults.isEmpty()
                                         || acknowledgmentResults.remove();
                             }
+                            case "reviveProfile" -> {
+                                revives++;
+                                yield terminal();
+                            }
                             case "listAwaitingProfilePaymentSettlements" ->
                                     awaiting ? List.of(probe(ordinal))
                                             : List.<BondedCompanionOperationProbe>of();
+                            case "listAwaitingLegacyPaymentSettlementGroups" ->
+                                    awaiting ? List.of(
+                                            legacyGroup(probe(ordinal)))
+                                            : List.<BondedCompanionLegacyPaymentSettlementGroup>of();
+                            case "quarantineLegacyPaymentSettlementGroup" -> {
+                                quarantines++;
+                                yield 1;
+                            }
                             case "toString" -> "RecoveryStore";
                             default -> throw new AssertionError(
                                     "Unexpected store call: "
@@ -790,6 +938,14 @@ class HytaleBondedCompanionEscrowInventoryTest {
 
         private void failNextAcknowledgment() {
             acknowledgmentResults.add(false);
+        }
+
+        private BondedCompanionLegacyPaymentSettlementGroup legacyGroup(
+                BondedCompanionOperationProbe probe) {
+            return new BondedCompanionLegacyPaymentSettlementGroup(
+                    BondedCompanionPaymentOperationId.legacyOperationKey(
+                            probe.callerNamespace(), probe.idempotencyKey()),
+                    List.of(probe));
         }
 
         private Optional<BondedCompanionStoreResult<
@@ -870,13 +1026,17 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
 
         @Override
-        public boolean restore(
+        public RestoreResult restoreNext(
                 CombinedItemContainer source,
                 TameworkBondedReviveEscrowComponent escrow) {
-            int reserved = escrow.reservedQuantity();
-            if (reserved < 0) return false;
+            if (escrow.reservedQuantity() < 0) return RestoreResult.INVALID;
             try {
-                if (reserved > 0) {
+                for (short escrowSlot = 0;
+                     escrowSlot < escrow.getInventory().getCapacity();
+                     escrowSlot++) {
+                    ItemStack reserved = escrow.getInventory()
+                            .getItemStack(escrowSlot);
+                    if (ItemStack.isEmpty(reserved)) continue;
                     short destination = -1;
                     int existing = 0;
                     for (short slot = 0; slot < source.getCapacity(); slot++) {
@@ -891,15 +1051,47 @@ class HytaleBondedCompanionEscrowInventoryTest {
                             destination = slot;
                         }
                     }
-                    if (destination < 0) return false;
+                    if (destination < 0) return RestoreResult.BLOCKED;
                     source.setItemStackForSlot(destination, itemStack(
-                            escrow.itemId(), existing + reserved));
+                            escrow.itemId(), existing + reserved.getQuantity()));
+                    escrow.getInventory().setItemStackForSlot(
+                            escrowSlot, ItemStack.EMPTY);
+                    return RestoreResult.MOVED;
                 }
-                escrow.getInventory().clear();
-                return escrow.reservedQuantity() == 0;
+                return escrow.reservedQuantity() == 0
+                        ? RestoreResult.COMPLETE : RestoreResult.INVALID;
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
             }
+        }
+    }
+
+    private static final class OneSlotRestoreTransfer
+            implements BondedCompanionEscrowTransfer {
+        private final DirectTransfer delegate = new DirectTransfer();
+        private int restoreCalls;
+
+        @Override
+        public int availableQuantity(
+                CombinedItemContainer source, String itemId) {
+            return delegate.availableQuantity(source, itemId);
+        }
+
+        @Override
+        public void reserveRemaining(
+                CombinedItemContainer source,
+                TameworkBondedReviveEscrowComponent escrow,
+                int remaining) {
+            delegate.reserveRemaining(source, escrow, remaining);
+        }
+
+        @Override
+        public RestoreResult restoreNext(
+                CombinedItemContainer source,
+                TameworkBondedReviveEscrowComponent escrow) {
+            restoreCalls++;
+            return restoreCalls == 2 ? RestoreResult.BLOCKED
+                    : delegate.restoreNext(source, escrow);
         }
     }
 

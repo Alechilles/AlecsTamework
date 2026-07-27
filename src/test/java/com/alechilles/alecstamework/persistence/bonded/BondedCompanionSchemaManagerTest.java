@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
+import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.persistence.TameworkDataPathLayout;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
@@ -17,6 +18,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -134,6 +137,44 @@ class BondedCompanionSchemaManagerTest {
                     'bonded_companion_operation'
                 ) WHERE name = 'expected_revision'
                 """));
+
+        BondedCompanionStore store =
+                new com.alechilles.alecstamework.persistence.adapter.sqlite
+                        .SqliteBondedCompanionDatabase(database);
+        int recovered = new BondedCompanionPaymentRecoveryService(
+                store, () -> -6_000L).recoverAwaitingWithoutEscrow(
+                UUID.fromString(
+                        "10000000-0000-0000-0000-000000000001"),
+                8, absentInventory()).toCompletableFuture().join();
+
+        assertEquals(1, recovered);
+        assertTrue(store.listAwaitingProfilePaymentSettlements(
+                UUID.fromString(
+                        "10000000-0000-0000-0000-000000000001"),
+                8).isEmpty());
+        assertFalse(queryLong(database, """
+                SELECT expires_at_ms FROM bonded_companion_operation
+                WHERE caller_namespace = 'legacy-panel'
+                  AND idempotency_key = 'revive-v4'
+                """) == Long.MAX_VALUE);
+    }
+
+    private BondedCompanionActionContext.Inventory absentInventory() {
+        return new BondedCompanionActionContext.Inventory() {
+            @Override public int availableQuantity(String itemId) { return 0; }
+
+            @Override public CompletionStage<
+                    BondedCompanionActionContext.ChargeReceipt>
+                    findChargeAsync(String operationId) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override public BondedCompanionActionContext.ChargeReceipt
+                    consumeExact(String operationId, String itemId,
+                                 int quantity) {
+                throw new AssertionError("Recovery must not charge");
+            }
+        };
     }
 
     @Test

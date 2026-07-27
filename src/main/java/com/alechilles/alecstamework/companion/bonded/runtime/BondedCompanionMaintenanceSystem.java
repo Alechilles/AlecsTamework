@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 
-/** Drives bounded bonded cleanup and lease expiry without a private executor. */
+/** Drives bounded bonded cleanup, retention pruning, and lease expiry. */
 public final class BondedCompanionMaintenanceSystem
         extends TickingSystem<EntityStore> {
     private static final long INTERVAL_NANOS = 1_000_000_000L;

@@ -45,18 +45,23 @@ final class HytaleBondedCompanionEscrowTransfer
     }
 
     @Override
-    public boolean restore(
+    public RestoreResult restoreNext(
             CombinedItemContainer source,
             TameworkBondedReviveEscrowComponent escrow) {
         ItemContainer reserved = escrow.getInventory();
+        if (escrow.reservedQuantity() < 0) return RestoreResult.INVALID;
         for (short slot = 0; slot < reserved.getCapacity(); slot++) {
             ItemStack stack = reserved.getItemStack(slot);
             if (ItemStack.isEmpty(stack)) continue;
             MoveTransaction<ItemStackTransaction> transaction =
                     reserved.moveItemStackFromSlot(
                             slot, source, true, false);
-            if (transaction == null || !transaction.succeeded()) return false;
+            if (transaction == null || !transaction.succeeded()) {
+                return RestoreResult.BLOCKED;
+            }
+            return RestoreResult.MOVED;
         }
-        return escrow.reservedQuantity() == 0;
+        return escrow.reservedQuantity() == 0
+                ? RestoreResult.COMPLETE : RestoreResult.INVALID;
     }
 }

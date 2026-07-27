@@ -31,6 +31,7 @@ final class HytaleBondedCompanionEscrowInventory
     private final BondedCompanionEscrowDurability durability;
     private final Supplier<CombinedItemContainer> sourceOverride;
     private final BondedCompanionEscrowTransfer transfer;
+    private final BondedCompanionEscrowSettlementCoordinator settlements;
     private final HytaleBondedCompanionLegacyPaymentAdapter legacyPayments;
 
     HytaleBondedCompanionEscrowInventory(
@@ -101,6 +102,9 @@ final class HytaleBondedCompanionEscrowInventory
         this.durability = Objects.requireNonNull(durability, "durability");
         this.sourceOverride = sourceOverride;
         this.transfer = Objects.requireNonNull(transfer, "transfer");
+        this.settlements = new BondedCompanionEscrowSettlementCoordinator(
+                store, escrowType, durability, transfer,
+                this::actorRef, this::sourceInventory);
         this.legacyPayments = new HytaleBondedCompanionLegacyPaymentAdapter(
                 store, legacyType, durability, this::actorRef);
     }
@@ -159,11 +163,16 @@ final class HytaleBondedCompanionEscrowInventory
             boolean reserved = escrow.phase()
                     == TameworkBondedReviveEscrowComponent.Phase.RESERVED
                     && escrow.hasExactReservedCharge();
-            if (!reserved && !escrow.isEmptyTerminal()) {
+            boolean refunding = escrow.phase()
+                    == TameworkBondedReviveEscrowComponent.Phase.REFUNDING
+                    && escrow.reservedQuantity() >= 0
+                    && escrow.reservedQuantity() <= escrow.quantity();
+            if (!reserved && !refunding && !escrow.isEmptyTerminal()) {
                 return quarantineReceipt(escrow.operationId());
             }
             return escrowReceipt(
-                    operationId, escrow.itemId(), escrow.quantity(), true);
+                    operationId, escrow.itemId(), escrow.quantity(),
+                    reserved, true);
         } catch (RuntimeException | LinkageError failure) {
             return quarantineReceipt(operationId);
         }
@@ -199,9 +208,13 @@ final class HytaleBondedCompanionEscrowInventory
                         || escrow.phase()
                         == TameworkBondedReviveEscrowComponent.Phase.REFUNDED)
                         && escrow.reservedQuantity() == 0;
-                if (reserved || terminal) {
+                boolean refunding = escrow.phase()
+                        == TameworkBondedReviveEscrowComponent.Phase.REFUNDING
+                        && escrow.reservedQuantity() >= 0
+                        && escrow.reservedQuantity() <= escrow.quantity();
+                if (reserved || refunding || terminal) {
                     return escrowReceipt(
-                            operationId, itemId, quantity, true);
+                            operationId, itemId, quantity, reserved, true);
                 }
             }
             return quarantineReceipt(operationId);
@@ -253,7 +266,7 @@ final class HytaleBondedCompanionEscrowInventory
             if (!escrow.matches(operationId, itemId, quantity)
                     && escrow.isEmptyTerminal()) {
                 String staleOperationId = escrow.operationId();
-                return removeTerminalEscrow(escrow).thenCompose(removed ->
+                return settlements.removeTerminal(escrow).thenCompose(removed ->
                         removed ? durability.resumeOnWorldThread(
                                 () -> consumeExactAsync(
                                         operationId, itemId, quantity),
@@ -284,7 +297,11 @@ final class HytaleBondedCompanionEscrowInventory
         }
         if (escrow.phase()
                 == TameworkBondedReviveEscrowComponent.Phase.REFUNDED) {
-            return removeTerminalEscrow(escrow).thenApply(ignored -> null);
+            return settlements.removeTerminal(escrow).thenApply(ignored -> null);
+        }
+        if (escrow.phase()
+                == TameworkBondedReviveEscrowComponent.Phase.REFUNDING) {
+            return refundEscrow(escrow).thenApply(ignored -> null);
         }
         int reserved = escrow.reservedQuantity();
         if (reserved < 0 || reserved > escrow.quantity()) {
@@ -296,28 +313,22 @@ final class HytaleBondedCompanionEscrowInventory
             reserved = escrow.reservedQuantity();
         }
         if (reserved != escrow.quantity()) {
-            return restoreInsufficient(source, escrow);
+            return restoreInsufficient(escrow);
         }
         escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.RESERVED);
         store.putComponent(actorRef(), escrowType, escrow);
         BondedCompanionActionContext.ChargeReceipt receipt = escrowReceipt(
                 escrow.operationId(), escrow.itemId(), escrow.quantity(),
-                replayed);
+                true, replayed);
         return durability.saveActor().thenApply(saved -> saved.saved()
                 ? receipt : quarantineReceipt(escrow.operationId()));
     }
 
     private CompletionStage<BondedCompanionActionContext.ChargeReceipt>
             restoreInsufficient(
-                    CombinedItemContainer source,
                     TameworkBondedReviveEscrowComponent escrow
             ) {
-        if (!transfer.restore(source, escrow)) {
-            return quarantine(escrow);
-        }
-        escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.REFUNDED);
-        store.putComponent(actorRef(), escrowType, escrow);
-        return removeTerminalEscrow(escrow).thenApply(ignored -> null);
+        return refundEscrow(escrow).thenApply(ignored -> null);
     }
 
     private CompletionStage<BondedCompanionActionContext.ChargeReceipt>
@@ -371,49 +382,17 @@ final class HytaleBondedCompanionEscrowInventory
                 }
                 if (escrow.phase()
                         == TameworkBondedReviveEscrowComponent.Phase.REFUNDED) {
-                    return removeTerminalEscrow(escrow);
+                    return settlements.removeTerminal(escrow);
                 }
-                CombinedItemContainer source = sourceInventory();
-                if (source == null || !transfer.restore(source, escrow)) {
-                    return completed(false);
-                }
-                escrow.setPhase(
-                        TameworkBondedReviveEscrowComponent.Phase.REFUNDED);
-                store.putComponent(actorRef(), escrowType, escrow);
+                return refundEscrow(escrow);
             }
-            return removeTerminalEscrow(escrow);
+            return settlements.removeTerminal(escrow);
         }, () -> false);
     }
 
-    private CompletionStage<Boolean> removeTerminalEscrow(
-            TameworkBondedReviveEscrowComponent expected
-    ) {
-        return durability.saveActor().thenCompose(saved -> {
-            if (!saved.saved()) return completed(false);
-            return durability.resumeOnWorldThread(() -> {
-                TameworkBondedReviveEscrowComponent current = currentEscrow();
-                if (current == null) return completed(true);
-                if (!current.matches(expected.operationId(), expected.itemId(),
-                        expected.quantity())
-                        || current.reservedQuantity() != 0
-                        || (current.phase()
-                        != TameworkBondedReviveEscrowComponent.Phase.REFUNDED
-                        && current.phase()
-                        != TameworkBondedReviveEscrowComponent.Phase.COMMITTED)) {
-                    return completed(false);
-                }
-                TameworkBondedReviveEscrowComponent tombstone = current.clone();
-                store.removeComponent(actorRef(), escrowType);
-                return durability.saveActor().thenCompose(removed -> {
-                    if (removed.saved()) return completed(true);
-                    return durability.resumeOnWorldThread(() -> {
-                        if (currentEscrow() != null) return completed(false);
-                        store.putComponent(actorRef(), escrowType, tombstone);
-                        return completed(false);
-                    }, () -> false);
-                });
-            }, () -> false);
-        });
+    private CompletionStage<Boolean> refundEscrow(
+            TameworkBondedReviveEscrowComponent escrow) {
+        return settlements.refund(escrow);
     }
 
     private CombinedItemContainer sourceInventory() {
@@ -448,10 +427,14 @@ final class HytaleBondedCompanionEscrowInventory
             String operationId,
             String itemId,
             int quantity,
+            boolean claimPrepared,
             boolean replayed
     ) {
         return BondedCompanionChargeReceipts.escrow(
                 operationId,
+                itemId,
+                quantity,
+                claimPrepared,
                 replayed,
                 () -> settle(operationId, itemId, quantity, false),
                 () -> settle(operationId, itemId, quantity, true));

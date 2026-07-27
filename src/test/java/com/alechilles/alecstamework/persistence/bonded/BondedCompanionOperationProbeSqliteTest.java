@@ -90,9 +90,14 @@ class BondedCompanionOperationProbeSqliteTest {
                 () -> store.markProfileOperationPaymentSettled(
                         probe(OWNER), false, Long.MAX_VALUE));
         assertFalse(store.markProfileOperationPaymentSettled(
+                probeWithoutRevision(), false, 10_000L));
+        assertFalse(store.markProfileOperationPaymentSettled(
                 probe(OWNER), true, 10_000L));
         assertTrue(store.markProfileOperationPaymentSettled(
                 probe(OWNER), false, 10_000L));
+        assertTrue(store.markProfileOperationPaymentSettled(
+                probe(OWNER), false, 20_000L));
+        assertEquals(10_000L, operationExpiry());
         assertTrue(store.listAwaitingProfilePaymentSettlements(
                 OWNER, 8).isEmpty());
         assertEquals(1, store.pruneOperations(Long.MAX_VALUE, 8));
@@ -113,6 +118,12 @@ class BondedCompanionOperationProbeSqliteTest {
 
     private BondedCompanionOperationProbe probe(UUID ownerUuid) {
         return probe(ownerUuid, 0L);
+    }
+
+    private BondedCompanionOperationProbe probeWithoutRevision() {
+        return new BondedCompanionOperationProbe(
+                CALLER, KEY, OWNER, "roster-a", "profile-a",
+                BondedCompanionOperation.Type.REVIVE);
     }
 
     private BondedCompanionOperationProbe probe(
@@ -141,5 +152,21 @@ class BondedCompanionOperationProbeSqliteTest {
                 -10_000L, -10_000L, Map.of("revive", "enabled"),
                 "Wolf", "Wolf", "Female", null, 0L, 0L,
                 null, null);
+    }
+
+    private long operationExpiry() throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT expires_at_ms FROM bonded_companion_operation
+                     WHERE caller_namespace = ? AND idempotency_key = ?
+                     """)) {
+            statement.setString(1, CALLER);
+            statement.setString(2, KEY);
+            try (java.sql.ResultSet row = statement.executeQuery()) {
+                assertTrue(row.next());
+                return row.getLong(1);
+            }
+        }
     }
 }

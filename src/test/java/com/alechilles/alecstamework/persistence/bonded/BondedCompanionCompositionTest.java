@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .HytaleBondedCompanionWorldGateway;
+import com.alechilles.alecstamework.persistence.adapter.sqlite
+        .SqliteConnectionFactory;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -21,6 +23,9 @@ import org.bson.BsonDocument;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -90,6 +95,35 @@ class BondedCompanionCompositionTest {
     }
 
     @Test
+    void maintenancePrunesFiniteOperationsButRetainsPinnedPayments()
+            throws Exception {
+        long now = 10_000L;
+        TameworkBondedCompanionComposition composition =
+                TameworkBondedCompanionComposition.open(
+                        temporaryDirectory,
+                        new BondedCompanionRosterRegistry(),
+                        null,
+                        () -> now
+                );
+        Path database = temporaryDirectory.toAbsolutePath().normalize()
+                .resolve(BondedCompanionDataPath.FILE_NAME);
+        try {
+            insertTerminalOperation(
+                    database, "expired-operation", "FAILED", now - 1L);
+            insertTerminalOperation(
+                    database, "pinned-payment", "REJECTED", Long.MAX_VALUE);
+
+            composition.maintenanceTick();
+
+            assertEquals(0L, operationCount(
+                    database, "expired-operation"));
+            assertEquals(1L, operationCount(database, "pinned-payment"));
+        } finally {
+            composition.close();
+        }
+    }
+
+    @Test
     void provisionAndExtensionMutationsAreRealIdempotentAndPublished()
             throws Exception {
         BondedCompanionRosterRegistry rosters = rosterRegistry();
@@ -143,6 +177,51 @@ class BondedCompanionCompositionTest {
         } finally {
             subscription.close();
             composition.close();
+        }
+    }
+
+    private void insertTerminalOperation(
+            Path database, String key, String state, long expiresAt)
+            throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_operation(
+                         caller_namespace, idempotency_key, owner_uuid,
+                         roster_id, profile_id, operation_type, request_hash,
+                         operation_state, result_json, created_at_ms,
+                         updated_at_ms, expires_at_ms, expected_revision
+                     ) VALUES ('maintenance-test', ?, ?, 'roster-a', NULL,
+                         'REVIVE', ?, ?, ?, ?, ?, ?, NULL)
+                     """)) {
+            statement.setString(1, key);
+            statement.setString(2, OWNER.toString());
+            statement.setString(3, "e".repeat(64));
+            statement.setString(4, state);
+            statement.setString(5, """
+                    {"code":"CONFLICT","reason":"maintenance-test",\
+                    "valueType":"PROFILE","value":null}
+                    """.replace("\\\n", ""));
+            statement.setLong(6, expiresAt - 1L);
+            statement.setLong(7, expiresAt - 1L);
+            statement.setLong(8, expiresAt);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private long operationCount(Path database, String key) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT COUNT(*) FROM bonded_companion_operation
+                     WHERE caller_namespace = 'maintenance-test'
+                       AND idempotency_key = ?
+                     """)) {
+            statement.setString(1, key);
+            try (ResultSet row = statement.executeQuery()) {
+                assertTrue(row.next());
+                return row.getLong(1);
+            }
         }
     }
 

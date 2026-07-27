@@ -153,3 +153,41 @@ No live in-game inventory contention session was run. The atomicity contract is 
 ### Remaining validation
 
 No live in-game crash/rejoin session was run. Deterministic tests cover bounded player-add recovery, SQLite terminal retention, same-item concurrent mutation, shared 32-receipt capacity, 40 gateway cycles, component codec/save round trips, and legacy pending zero/partial/full quarantine behavior.
+
+## Review fix round 6
+
+### Root causes
+
+- A player escrow could become durable before the first SQLite revival claim, but reconnect recovery only settled an already terminal claim. That crash window stranded paid reservations, and retrying through the current quote policy was not reliable when policy changed while the player was offline.
+- Refund recovery moved the whole escrow in one pass. It had no durable per-slot cursor and concurrent refund callers could overlap save barriers, so a crash could replay already returned slots or observe out-of-order saves.
+- Historical operation IDs flattened owner, profile, and request values into a non-injective key. Pagination could split a collision group, while null-profile/null-revision rows could neither acknowledge exactly nor leave the pinned retention sentinel. Unsafe singleton evidence therefore retried forever.
+- Terminal operation pruning existed in the store but was not scheduled by bonded-companion maintenance.
+
+### Corrections
+
+- Full `RESERVED` escrow now exposes exact item and quantity proof. Recovery reconstructs the canonical request hash from that immutable proof and can atomically create or resume the exact SQLite revival claim without consulting current payment policy. `REFUNDING`, terminal, partial, and mismatched evidence cannot become claim proof.
+- Refunds now transition through a durable `REFUNDING` phase, return at most one escrow slot, save the actor, and only then advance to the next slot. A per-actor single-flight coordinator serializes settlement and resumes the persisted cursor after reconnect.
+- Legacy settlement loads complete flattened-key groups, including finite partners, before applying the page limit. Colliding or otherwise unsafe groups move only their pinned database evidence to finite quarantine; recovery never looks up, refunds, consumes, or deletes player escrow by the ambiguous key.
+- Acknowledgement now uses exact null-safe profile and revision identity and changes only the pinned sentinel to the first finite retention deadline. Duplicate acknowledgements verify the already-finite row without extending its lifetime, and operation revision checks no longer treat null as a wildcard.
+- Bonded maintenance now prunes finite terminal operations on its normal schedule. Historical schema-v5 null-profile rows can be acknowledged or finitely quarantined and eventually garbage-collected.
+- Settlement and legacy-SQL responsibilities were extracted into focused collaborators. Changed production classes remain within the 500-line target (`HytaleBondedCompanionEscrowInventory` 481 lines, retention store 425, recovery service 371, settlement coordinator 190, legacy payment store 134).
+
+### TDD evidence
+
+- RED: crash recovery, refund cursor, and claim-proof tests initially failed compilation on the missing `REFUNDING` phase and exact receipt metadata.
+- GREEN: deterministic tests now cover a reloaded full reservation before the first claim, an exact matching pending claim, a mismatched pending claim, policy changes, persisted partial-refund resume, concurrent refund callers, component codec round trips, collision groups crossing the page limit, finite collision partners, historical null-profile rows, exact acknowledgement CAS, duplicate acknowledgement, unsafe legacy singleton quarantine, and scheduled pruning.
+- Review found and tests reproduced two additional defects before completion: non-reserved phases could be mistaken for paid claim proof, and concurrent refunds could overlap the per-slot durability fence. Both paths now fail closed or serialize respectively.
+
+### Review-fix verification
+
+- Final focused escrow, recovery, retention, schema, and maintenance suite: 60 tests, 0 failures, 0 errors.
+- Size guards plus escrow/recovery rerun after collaborator extraction: 49 tests, 0 failures, 0 errors.
+- Expanded changed-area and ECS/thread-safety suite: 90 tests, 0 failures, 0 errors.
+- Required ECS/player-access grep: no matches. `git diff --check`: PASS.
+- Generated agent index rebuilt for the four added production collaborators.
+- `check-agent-docs.ps1` reproduced the known linked-worktree limitation and stopped because this worktree does not contain the externally supplied root `AGENTS.md`.
+- Full `./mvnw test`: 3,221 tests executed, 3,216 passed, 1 skipped, with only the same four unrelated baseline failures in capture architecture, channel VFX, relocation recovery, and stacked spawner validation. Every bonded/payment/schema/retention/changed-area test passed.
+
+### Remaining validation
+
+No live in-game crash/rejoin or inventory-contention session was run. Deterministic restart, reconnect, partial-refund, collision, exact-CAS, and pruning tests cover the remediated crash windows; normal release smoke testing remains appropriate.

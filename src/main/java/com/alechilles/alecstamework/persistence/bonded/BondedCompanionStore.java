@@ -50,6 +50,22 @@ public interface BondedCompanionStore {
         return List.of();
     }
 
+    /** Lists complete historical groups before consulting flattened receipts. */
+    @Nonnull
+    default List<BondedCompanionLegacyPaymentSettlementGroup>
+            listAwaitingLegacyPaymentSettlementGroups(
+                    @Nonnull UUID ownerUuid, int limit) {
+        return List.of();
+    }
+
+    /** Moves every pinned member of one ambiguous historical group to GC. */
+    default int quarantineLegacyPaymentSettlementGroup(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String operationId,
+            long retainedUntilMs) {
+        return 0;
+    }
+
     /** Acquires the sole live lease under an optimistic profile revision. */
     @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Lease> acquireLease(
             @Nonnull BondedCompanionOperation operation, long expectedRevision,

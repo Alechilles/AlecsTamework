@@ -34,8 +34,7 @@ public final class BondedCompanionPaymentRecoveryService {
     ) {
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(inventory, "inventory");
-        BondedCompanionOperationProbe probe = probe(identity);
-        return recover(probe, identity.operationId(), inventory);
+        return recoverCanonical(identity, inventory);
     }
 
     /** Reconciles migrated terminal rows without bypassing legacy evidence. */
@@ -48,20 +47,45 @@ public final class BondedCompanionPaymentRecoveryService {
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(inventory, "inventory");
         java.util.List<BondedCompanionOperationProbe> awaiting;
+        java.util.List<BondedCompanionLegacyPaymentSettlementGroup>
+                legacyGroups;
         try {
             awaiting = store.listAwaitingProfilePaymentSettlements(
+                    ownerUuid, limit);
+            legacyGroups = store.listAwaitingLegacyPaymentSettlementGroups(
                     ownerUuid, limit);
         } catch (RuntimeException | LinkageError failure) {
             return completed(0);
         }
         CompletionStage<Integer> recovered = completed(0);
         for (BondedCompanionOperationProbe probe : awaiting) {
-            String operationId = BondedCompanionPaymentOperationId
-                    .legacyOperationKey(probe.callerNamespace(),
-                            probe.idempotencyKey());
+            if (probe.expectedRevision() == null
+                    || probe.profileId() == null) continue;
+            String operationId = BondedCompanionPaymentOperationId.create(
+                    probe.callerNamespace(), probe.idempotencyKey(),
+                    probe.ownerUuid(), probe.rosterId(), probe.profileId(),
+                    probe.expectedRevision());
             recovered = recovered.thenCompose(count -> recover(
                     probe, operationId, inventory).thenApply(outcome ->
                     acknowledged(outcome) ? count + 1 : count));
+        }
+        for (BondedCompanionLegacyPaymentSettlementGroup group
+                : legacyGroups) {
+            if (group.ambiguous()) {
+                recovered = recovered.thenApply(count -> {
+                    quarantineLegacy(ownerUuid, group);
+                    return count;
+                });
+                continue;
+            }
+            BondedCompanionOperationProbe probe = group.operations().getFirst();
+            recovered = recovered.thenCompose(count -> recover(
+                    probe, group.operationId(), inventory).thenApply(outcome -> {
+                        if (outcome == Outcome.QUARANTINED) {
+                            quarantineLegacy(ownerUuid, group);
+                        }
+                        return acknowledged(outcome) ? count + 1 : count;
+                    }));
         }
         return recovered.exceptionally(ignored -> 0);
     }
@@ -81,6 +105,15 @@ public final class BondedCompanionPaymentRecoveryService {
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal =
                 prior.get();
         if (!terminal.replayed()) return completed(Outcome.NO_TERMINAL_PROOF);
+        return recoverTerminal(probe, operationId, terminal, inventory);
+    }
+
+    private CompletionStage<Outcome> recoverTerminal(
+            BondedCompanionOperationProbe probe,
+            String operationId,
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal,
+            BondedCompanionActionContext.Inventory inventory
+    ) {
         CompletionStage<BondedCompanionActionContext.ChargeReceipt> found;
         try {
             found = inventory.findChargeAsync(operationId);
@@ -91,6 +124,82 @@ public final class BondedCompanionPaymentRecoveryService {
         return found.thenCompose(receipt -> recover(
                 operationId, probe, terminal, receipt))
                 .exceptionally(ignored -> Outcome.RETRY_REQUIRED);
+    }
+
+    private CompletionStage<Outcome> recoverCanonical(
+            BondedCompanionPaymentOperationId.Identity identity,
+            BondedCompanionActionContext.Inventory inventory
+    ) {
+        BondedCompanionOperationProbe probe = probe(identity);
+        Optional<BondedCompanionStoreResult<
+                BondedCompanionRecord.Profile>> prior;
+        try {
+            prior = store.findProfileOperationByIdentity(probe);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(Outcome.RETRY_REQUIRED);
+        }
+        if (prior.isPresent() && prior.get().replayed()) {
+            return recoverTerminal(
+                    probe, identity.operationId(), prior.get(), inventory);
+        }
+        CompletionStage<BondedCompanionActionContext.ChargeReceipt> found;
+        try {
+            found = inventory.findChargeAsync(identity.operationId());
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(Outcome.RETRY_REQUIRED);
+        }
+        if (found == null) return completed(Outcome.RETRY_REQUIRED);
+        boolean operationPresent = prior.isPresent();
+        return found.thenCompose(receipt -> resumePrepared(
+                identity, probe, receipt, operationPresent))
+                .exceptionally(ignored -> Outcome.RETRY_REQUIRED);
+    }
+
+    private CompletionStage<Outcome> resumePrepared(
+            BondedCompanionPaymentOperationId.Identity identity,
+            BondedCompanionOperationProbe probe,
+            BondedCompanionActionContext.ChargeReceipt receipt,
+            boolean operationPresent
+    ) {
+        if (receipt == null) return completed(operationPresent
+                ? Outcome.RETRY_REQUIRED : Outcome.NO_TERMINAL_PROOF);
+        String operationId = identity.operationId();
+        if (!operationId.equals(safeOperationId(receipt))
+                || safeQuarantined(receipt)) {
+            return completed(Outcome.QUARANTINED);
+        }
+        String itemId = safeItemId(receipt);
+        int quantity = safeQuantity(receipt);
+        if (itemId == null || itemId.isBlank() || quantity <= 0) {
+            return completed(Outcome.QUARANTINED);
+        }
+        long attemptedAtMs = clock.getAsLong();
+        BondedCompanionOperation operation;
+        try {
+            operation = BondedCompanionRevivePaymentProof.operation(
+                    identity.callerNamespace(), identity.idempotencyKey(),
+                    identity.ownerUuid(), identity.rosterId(),
+                    identity.profileId(), itemId, quantity,
+                    attemptedAtMs, retainedUntil());
+        } catch (RuntimeException | LinkageError invalid) {
+            return completed(Outcome.QUARANTINED);
+        }
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved;
+        try {
+            saved = store.reviveProfile(
+                    operation, identity.expectedRevision(), attemptedAtMs);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(Outcome.RETRY_REQUIRED);
+        }
+        if (saved.code() == BondedCompanionStoreResult.Code.STORAGE_FAILURE
+                || isUnresolvedClaim(saved)) {
+            return completed(Outcome.RETRY_REQUIRED);
+        }
+        if (saved.code()
+                == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
+            return completed(Outcome.QUARANTINED);
+        }
+        return recover(operationId, probe, saved, receipt);
     }
 
     private CompletionStage<Outcome> recover(
@@ -161,6 +270,24 @@ public final class BondedCompanionPaymentRecoveryService {
                 || outcome == Outcome.SETTLED_REJECTED;
     }
 
+    private void quarantineLegacy(
+            UUID ownerUuid,
+            BondedCompanionLegacyPaymentSettlementGroup group) {
+        try {
+            store.quarantineLegacyPaymentSettlementGroup(
+                    ownerUuid, group.operationId(), retainedUntil());
+        } catch (RuntimeException | LinkageError ignored) {
+            // Leave the complete group pinned for a later retry.
+        }
+    }
+
+    private boolean isUnresolvedClaim(
+            BondedCompanionStoreResult<?> result) {
+        return result.code() == BondedCompanionStoreResult.Code.CONFLICT
+                && !result.replayed()
+                && "operation-still-pending".equals(result.reason());
+    }
+
     private BondedCompanionOperationProbe probe(
             BondedCompanionPaymentOperationId.Identity identity) {
         return new BondedCompanionOperationProbe(
@@ -185,6 +312,24 @@ public final class BondedCompanionPaymentRecoveryService {
             return receipt.quarantined();
         } catch (RuntimeException | LinkageError failure) {
             return true;
+        }
+    }
+
+    private String safeItemId(
+            BondedCompanionActionContext.ChargeReceipt receipt) {
+        try {
+            return receipt.itemId();
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
+    private int safeQuantity(
+            BondedCompanionActionContext.ChargeReceipt receipt) {
+        try {
+            return receipt.quantity();
+        } catch (RuntimeException | LinkageError failure) {
+            return 0;
         }
     }
 

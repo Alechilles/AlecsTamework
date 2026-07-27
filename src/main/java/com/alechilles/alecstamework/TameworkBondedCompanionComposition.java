@@ -344,11 +344,12 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
     }
 
-    /** Drives bounded cleanup retry and expiry without owning an executor. */
+    /** Drives bounded cleanup, operation pruning, and lease expiry. */
     public void maintenanceTick() {
         if (!operational()) return;
         long now = clock.getAsLong();
         durability.replayPendingCleanup(cleanup, now, 64);
+        store.pruneOperations(now, 64);
         expiry.tick(now);
     }
 

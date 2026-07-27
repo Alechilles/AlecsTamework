@@ -12,11 +12,16 @@ final class BondedCompanionChargeReceipts {
 
     static BondedCompanionActionContext.ChargeReceipt escrow(
             String operationId,
+            String itemId,
+            int quantity,
+            boolean claimPrepared,
             boolean replayed,
             Supplier<CompletionStage<Boolean>> refund,
             Supplier<CompletionStage<Boolean>> complete
     ) {
-        return new EscrowReceipt(operationId, replayed, refund, complete);
+        return new EscrowReceipt(
+                operationId, itemId, quantity, claimPrepared, replayed,
+                refund, complete);
     }
 
     static BondedCompanionActionContext.ChargeReceipt legacy(
@@ -34,16 +39,29 @@ final class BondedCompanionChargeReceipts {
 
     private record EscrowReceipt(
             String operationId,
+            String settlementItemId,
+            int settlementQuantity,
+            boolean claimPrepared,
             boolean replayed,
             Supplier<CompletionStage<Boolean>> refundAction,
             Supplier<CompletionStage<Boolean>> completeAction
     ) implements BondedCompanionActionContext.ChargeReceipt {
         private EscrowReceipt {
             Objects.requireNonNull(operationId, "operationId");
+            Objects.requireNonNull(settlementItemId, "itemId");
+            if (settlementQuantity <= 0) {
+                throw new IllegalArgumentException("quantity must be positive");
+            }
             Objects.requireNonNull(refundAction, "refundAction");
             Objects.requireNonNull(completeAction, "completeAction");
         }
 
+        @Override public String itemId() {
+            return claimPrepared ? settlementItemId : null;
+        }
+        @Override public int quantity() {
+            return claimPrepared ? settlementQuantity : 0;
+        }
         @Override public boolean refund() { return false; }
         @Override public boolean complete() { return false; }
         @Override public CompletionStage<Boolean> refundAsync() {

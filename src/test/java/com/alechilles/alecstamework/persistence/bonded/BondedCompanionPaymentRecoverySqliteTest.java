@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.persistence.operation
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Map;
 import java.util.UUID;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Restart integration coverage for terminal SQLite/payment reconciliation. */
@@ -28,6 +31,7 @@ class BondedCompanionPaymentRecoverySqliteTest {
             "10000000-0000-0000-0000-000000000001");
     private static final String CALLER = "test:panel";
     private static final String KEY = "revive:restart";
+    private static final String ITEM = "Ingredient_Life_Essence";
 
     @TempDir
     Path tempDir;
@@ -86,6 +90,229 @@ class BondedCompanionPaymentRecoverySqliteTest {
                 OWNER, 8).isEmpty());
     }
 
+    @Test
+    void savedEscrowBeforeFirstClaimIsClaimedAfterRestartWithoutPolicy()
+            throws Exception {
+        Path database = tempDir.resolve("prepared-revive.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore beforeRestart =
+                new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                beforeRestart.createProfile(operation(
+                                "prepared-profile", BondedCompanionOperation.Type.PROVISION,
+                                "c"), profile()).code());
+        markDead(database);
+        String key = "revive:prepared-crash";
+        BondedCompanionOperationProbe probe = new BondedCompanionOperationProbe(
+                CALLER, key, OWNER, "roster-a", "profile-a",
+                BondedCompanionOperation.Type.REVIVE, 1L);
+        assertTrue(beforeRestart.findProfileOperationByIdentity(probe).isEmpty());
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            assertEquals(1, statement.executeUpdate("""
+                    UPDATE bonded_companion_profile
+                    SET policy_json = '{"revive":"disabled"}'
+                    WHERE profile_id = 'profile-a'
+                    """));
+        }
+
+        BondedCompanionStore afterRestart =
+                new SqliteBondedCompanionDatabase(database);
+        String paymentId = BondedCompanionPaymentOperationId.create(
+                CALLER, key, OWNER, "roster-a", "profile-a", 1L);
+        AtomicInteger completions = new AtomicInteger();
+        AtomicInteger refunds = new AtomicInteger();
+        BondedCompanionPaymentRecoveryService.Outcome outcome =
+                new BondedCompanionPaymentRecoveryService(
+                        afterRestart, () -> -7_000L)
+                        .recover(BondedCompanionPaymentOperationId
+                                        .parse(paymentId).orElseThrow(),
+                                preparedInventory(
+                                        paymentId, completions, refunds))
+                        .toCompletableFuture().join();
+
+        assertEquals(BondedCompanionPaymentRecoveryService.Outcome
+                .SETTLED_COMMITTED, outcome);
+        assertEquals(BondedCompanionState.STORED,
+                afterRestart.findProfile(OWNER, "roster-a", "profile-a")
+                        .orElseThrow().state());
+        assertEquals(1, completions.get());
+        assertEquals(0, refunds.get());
+        assertTrue(afterRestart.listAwaitingProfilePaymentSettlements(
+                OWNER, 8).isEmpty());
+    }
+
+    @Test
+    void delimiterCollidingLegacyRowsAreQuarantinedAsOneCompleteGroup()
+            throws Exception {
+        Path database = tempDir.resolve("legacy-collision.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        long priorFiniteDeadline = -6_500L;
+        insertLegacyTerminal(database, "panel:revive", "request", -10_000L,
+                priorFiniteDeadline);
+        insertLegacyTerminal(database, "panel", "revive:request", -9_000L);
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        AtomicInteger receiptLookups = new AtomicInteger();
+        BondedCompanionActionContext.Inventory inventory =
+                new BondedCompanionActionContext.Inventory() {
+                    @Override public int availableQuantity(String itemId) {
+                        return 0;
+                    }
+
+                    @Override public CompletionStage<
+                            BondedCompanionActionContext.ChargeReceipt>
+                            findChargeAsync(String operationId) {
+                        receiptLookups.incrementAndGet();
+                        return java.util.concurrent.CompletableFuture
+                                .completedFuture(null);
+                    }
+
+                    @Override public BondedCompanionActionContext.ChargeReceipt
+                            consumeExact(String operationId, String itemId,
+                                         int quantity) {
+                        throw new AssertionError(
+                                "Legacy recovery must never charge");
+                    }
+                };
+
+        int recovered = new BondedCompanionPaymentRecoveryService(
+                store, () -> -7_000L).recoverAwaitingWithoutEscrow(
+                OWNER, 1, inventory).toCompletableFuture().join();
+
+        assertEquals(0, recovered);
+        assertEquals(0, receiptLookups.get());
+        assertEquals(priorFiniteDeadline, expiry(
+                database, "panel:revive", "request"));
+        assertNotEquals(Long.MAX_VALUE, expiry(
+                database, "panel", "revive:request"));
+    }
+
+    @Test
+    void exactMatchingPendingClaimResumesAndTerminalizesOnce()
+            throws Exception {
+        Path database = tempDir.resolve("matching-pending.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(
+                        "pending-profile", BondedCompanionOperation.Type.PROVISION,
+                        "e"), profile()).code());
+        markDead(database);
+        String key = "revive:matching-pending";
+        insertPending(database, key,
+                BondedCompanionRevivePaymentProof.requestHash(ITEM, 2));
+        String paymentId = BondedCompanionPaymentOperationId.create(
+                CALLER, key, OWNER, "roster-a", "profile-a", 1L);
+        AtomicInteger completions = new AtomicInteger();
+        AtomicInteger refunds = new AtomicInteger();
+
+        BondedCompanionPaymentRecoveryService.Outcome outcome =
+                new BondedCompanionPaymentRecoveryService(store, () -> -7_000L)
+                        .recover(BondedCompanionPaymentOperationId.parse(
+                                        paymentId).orElseThrow(),
+                                preparedInventory(
+                                        paymentId, completions, refunds))
+                        .toCompletableFuture().join();
+
+        assertEquals(BondedCompanionPaymentRecoveryService.Outcome
+                .SETTLED_COMMITTED, outcome);
+        assertEquals(BondedCompanionState.STORED,
+                store.findProfile(OWNER, "roster-a", "profile-a")
+                        .orElseThrow().state());
+        assertEquals(1, completions.get());
+        assertEquals(0, refunds.get());
+    }
+
+    @Test
+    void mismatchedPendingClaimQuarantinesWithoutSettlingInventory()
+            throws Exception {
+        Path database = tempDir.resolve("mismatched-pending.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(
+                        "mismatch-profile", BondedCompanionOperation.Type.PROVISION,
+                        "f"), profile()).code());
+        markDead(database);
+        String key = "revive:mismatched-pending";
+        insertPending(database, key, "a".repeat(64));
+        String paymentId = BondedCompanionPaymentOperationId.create(
+                CALLER, key, OWNER, "roster-a", "profile-a", 1L);
+        AtomicInteger completions = new AtomicInteger();
+        AtomicInteger refunds = new AtomicInteger();
+
+        BondedCompanionPaymentRecoveryService.Outcome outcome =
+                new BondedCompanionPaymentRecoveryService(store, () -> -7_000L)
+                        .recover(BondedCompanionPaymentOperationId.parse(
+                                        paymentId).orElseThrow(),
+                                preparedInventory(
+                                        paymentId, completions, refunds))
+                        .toCompletableFuture().join();
+
+        assertEquals(BondedCompanionPaymentRecoveryService.Outcome.QUARANTINED,
+                outcome);
+        assertEquals(BondedCompanionState.DEAD,
+                store.findProfile(OWNER, "roster-a", "profile-a")
+                        .orElseThrow().state());
+        assertEquals(0, completions.get());
+        assertEquals(0, refunds.get());
+    }
+
+    @Test
+    void unsafeSingletonLegacyEvidenceIsQuarantinedToFiniteRetention()
+            throws Exception {
+        Path database = tempDir.resolve("legacy-unsafe-singleton.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        insertLegacyTerminal(database, "legacy", "unsafe", -10_000L);
+        AtomicInteger receiptLookups = new AtomicInteger();
+        BondedCompanionActionContext.Inventory inventory =
+                new BondedCompanionActionContext.Inventory() {
+                    @Override public int availableQuantity(String itemId) {
+                        return 0;
+                    }
+
+                    @Override public BondedCompanionActionContext.ChargeReceipt
+                            findCharge(String operationId) {
+                        receiptLookups.incrementAndGet();
+                        return new BondedCompanionActionContext.ChargeReceipt() {
+                            @Override public String operationId() {
+                                return "legacy:unsafe";
+                            }
+
+                            @Override public boolean quarantined() {
+                                return true;
+                            }
+
+                            @Override public boolean refund() { return false; }
+                        };
+                    }
+
+                    @Override public BondedCompanionActionContext.ChargeReceipt
+                            consumeExact(String operationId, String itemId,
+                                         int quantity) {
+                        throw new AssertionError(
+                                "Legacy recovery must never charge");
+                    }
+                };
+        BondedCompanionStore store =
+                new SqliteBondedCompanionDatabase(database);
+
+        int recovered = new BondedCompanionPaymentRecoveryService(
+                store, () -> -7_000L).recoverAwaitingWithoutEscrow(
+                OWNER, 1, inventory).toCompletableFuture().join();
+
+        assertEquals(0, recovered);
+        assertEquals(1, receiptLookups.get());
+        assertNotEquals(Long.MAX_VALUE,
+                expiry(database, "legacy", "unsafe"));
+    }
+
     private BondedCompanionActionContext.Inventory nullStageInventory() {
         return new BondedCompanionActionContext.Inventory() {
             @Override public int availableQuantity(String itemId) { return 0; }
@@ -139,6 +366,39 @@ class BondedCompanionPaymentRecoverySqliteTest {
         };
     }
 
+    private BondedCompanionActionContext.Inventory preparedInventory(
+            String paymentId,
+            AtomicInteger completions,
+            AtomicInteger refunds
+    ) {
+        return new BondedCompanionActionContext.Inventory() {
+            @Override public int availableQuantity(String itemId) { return 0; }
+
+            @Override public BondedCompanionActionContext.ChargeReceipt
+                    findCharge(String operationId) {
+                return new BondedCompanionActionContext.ChargeReceipt() {
+                    @Override public String operationId() { return paymentId; }
+                    @Override public String itemId() { return ITEM; }
+                    @Override public int quantity() { return 2; }
+                    @Override public boolean refund() {
+                        refunds.incrementAndGet();
+                        return true;
+                    }
+                    @Override public boolean complete() {
+                        completions.incrementAndGet();
+                        return true;
+                    }
+                };
+            }
+
+            @Override public BondedCompanionActionContext.ChargeReceipt
+                    consumeExact(String operationId, String itemId,
+                                 int quantity) {
+                throw new AssertionError("Recovery must not charge again");
+            }
+        };
+    }
+
     private void markDead(Path database) throws Exception {
         try (Connection connection = new SqliteConnectionFactory(database)
                 .openWriterConnection();
@@ -148,6 +408,80 @@ class BondedCompanionPaymentRecoverySqliteTest {
                     SET state = 'DEAD', revision = 1, died_at_ms = -9000
                     WHERE profile_id = 'profile-a'
                     """));
+        }
+    }
+
+    private void insertLegacyTerminal(
+            Path database, String caller, String key, long updatedAt)
+            throws Exception {
+        insertLegacyTerminal(
+                database, caller, key, updatedAt, Long.MAX_VALUE);
+    }
+
+    private void insertLegacyTerminal(
+            Path database, String caller, String key, long updatedAt,
+            long expiresAt) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_operation(
+                         caller_namespace, idempotency_key, owner_uuid,
+                         roster_id, profile_id, operation_type, request_hash,
+                         operation_state, result_json, created_at_ms,
+                         updated_at_ms, expires_at_ms, expected_revision
+                     ) VALUES (?, ?, ?, 'roster-a', 'profile-a', 'REVIVE', ?,
+                         'REJECTED', ?, ?, ?, ?, NULL)
+                     """)) {
+            statement.setString(1, caller);
+            statement.setString(2, key);
+            statement.setString(3, OWNER.toString());
+            statement.setString(4, "d".repeat(64));
+            statement.setString(5, """
+                    {"code":"INVALID_STATE","reason":"legacy",\
+                    "valueType":"PROFILE","value":null}
+                    """.replace("\\\n", ""));
+            statement.setLong(6, updatedAt - 1L);
+            statement.setLong(7, updatedAt);
+            statement.setLong(8, expiresAt);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private void insertPending(Path database, String key, String requestHash)
+            throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_operation(
+                         caller_namespace, idempotency_key, owner_uuid,
+                         roster_id, profile_id, operation_type, request_hash,
+                         operation_state, result_json, created_at_ms,
+                         updated_at_ms, expires_at_ms, expected_revision
+                     ) VALUES (?, ?, ?, 'roster-a', 'profile-a', 'REVIVE', ?,
+                         'PENDING', NULL, -8000, -8000, 10000, 1)
+                     """)) {
+            statement.setString(1, CALLER);
+            statement.setString(2, key);
+            statement.setString(3, OWNER.toString());
+            statement.setString(4, requestHash);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private long expiry(Path database, String caller, String key)
+            throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT expires_at_ms FROM bonded_companion_operation
+                     WHERE caller_namespace = ? AND idempotency_key = ?
+                     """)) {
+            statement.setString(1, caller);
+            statement.setString(2, key);
+            try (ResultSet row = statement.executeQuery()) {
+                assertTrue(row.next());
+                return row.getLong(1);
+            }
         }
     }
 

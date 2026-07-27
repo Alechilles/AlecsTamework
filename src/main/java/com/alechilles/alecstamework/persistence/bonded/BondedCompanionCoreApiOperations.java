@@ -426,10 +426,11 @@ public final class BondedCompanionCoreApiOperations {
             BondedCompanionPolicy.RevivePrice price,
             long now
     ) {
-        return operation(action.callerNamespace(), action.idempotencyKey(),
+        return BondedCompanionRevivePaymentProof.operation(
+                action.callerNamespace(), action.idempotencyKey(),
                 action.ownerUuid(), action.rosterId(), action.profileId(),
-                BondedCompanionOperation.Type.REVIVE,
-                price.itemId() + ":" + price.quantity(), now);
+                price.itemId(), price.quantity(), now,
+                safeAdd(now, OPERATION_RETENTION_MS));
     }
 
     private String provisionPayload(BondedCompanionProvisionRequest request) {

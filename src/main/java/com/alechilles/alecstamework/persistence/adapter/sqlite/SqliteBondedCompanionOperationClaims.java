@@ -122,7 +122,7 @@ final class SqliteBondedCompanionOperationClaims {
             @Nullable Long expected,
             @Nullable Long stored
     ) {
-        return expected == null || Objects.equals(expected, stored);
+        return Objects.equals(expected, stored);
     }
 
     private Long nullableLong(ResultSet row, int column) throws SQLException {

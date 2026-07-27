@@ -48,6 +48,7 @@ public final class TameworkBondedReviveEscrowComponent
     public enum Phase {
         STAGED,
         RESERVED,
+        REFUNDING,
         REFUNDED,
         COMMITTED,
         QUARANTINED

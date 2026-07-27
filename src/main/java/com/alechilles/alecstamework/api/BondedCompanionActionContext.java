@@ -87,6 +87,12 @@ public record BondedCompanionActionContext(
         /** Operation identity this receipt can compensate. */
         @Nonnull String operationId();
 
+        /** Exact item identity proving a full prepared escrow claim, if known. */
+        default @Nullable String itemId() { return null; }
+
+        /** Exact item quantity proving a full prepared escrow claim, if known. */
+        default int quantity() { return 0; }
+
         /** Whether this receipt was recovered instead of newly charged. */
         default boolean replayed() { return false; }
 
