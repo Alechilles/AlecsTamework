@@ -100,6 +100,12 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed bonded-roster revival payments being recoverable only from changing
+  inventory totals. Each payment now moves into a hidden operation-specific
+  escrow, saves with the player before revival commits, and is consumed or
+  returned exactly once from canonical operation evidence. Ambiguous receipts
+  from earlier builds remain quarantined instead of guessing a refund. An
+  interrupted payment is reconciled automatically after the player rejoins.
 - Fixed successful tame-and-link capture updating the companion and command
   roster but still reporting failure when its timed-summon event was committed
   after the original request timestamp. Composite capture, revival, and

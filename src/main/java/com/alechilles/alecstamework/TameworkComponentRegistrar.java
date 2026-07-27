@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
+import com.alechilles.alecstamework.items.components.TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -185,6 +186,13 @@ final class TameworkComponentRegistrar {
                         "TameworkInventoryOperationReceipts",
                         TameworkInventoryOperationReceiptsComponent.CODEC
                 );
+        ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+                bondedReviveEscrow =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkBondedReviveEscrowComponent.class,
+                        "TameworkBondedReviveEscrow",
+                        TameworkBondedReviveEscrowComponent.CODEC
+                );
         ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile =
                 plugin.getEntityStoreRegistry().registerComponent(
                         HomingVisualProjectileComponent.class,
@@ -212,6 +220,7 @@ final class TameworkComponentRegistrar {
                 lifeStage, projectileImpactEffect, lingeringHazardProjectile, lingeringHazard,
                 apiSelfTestFixtureMarker, projectionIdentity, persistenceRetirement,
                 captureSourceReceipts, inventoryOperationReceipts,
+                bondedReviveEscrow,
                 homingVisualProjectile, feedTroughWaterCharges, coopCaptureReceipts
         );
     }
@@ -253,6 +262,8 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent> captureSourceReceipts,
             ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
                     inventoryOperationReceipts,
+            ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+                    bondedReviveEscrow,
             ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile,
             ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges,
             ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> coopCaptureReceipts) {

@@ -10,6 +10,9 @@ import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.items.components
+        .TameworkBondedReviveEscrowComponent;
+import com.hypixel.hytale.component.ComponentType;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
@@ -68,7 +71,11 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BondedCompanionPanelActionRouter bonded =
                     new BondedCompanionPanelActionRouter(
                             new BondedCompanionPanelActionService(() -> api),
-                            new CommandFeedbackService(null));
+                            new CommandFeedbackService(null),
+                            new HytaleBondedCompanionActionContextFactory(
+                                    new ComponentType<EntityStore,
+                                            TameworkBondedReviveEscrowComponent>(),
+                                    null));
             CommandSelectionPageService service = new CommandSelectionPageService(
                     null, null, null, null, null, null, null, bonded);
             AtomicReference<CommandSelectionPageService.FeatureRoute> route =

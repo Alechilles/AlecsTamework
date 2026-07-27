@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
+import java.util.UUID;
 
 /** Routes only explicitly bonded command-item rows to bonded mutations. */
 final class BondedCompanionPanelActionRouter {
@@ -62,10 +63,41 @@ final class BondedCompanionPanelActionRouter {
         var context = contexts.create(
                 player, store, feature.bonded().roleId(),
                 action == BondedCompanionPanelActionService.Action.SUMMON);
-        var outcome = actions.perform(
-                action, player.getUuid(), world, context, feature.bonded());
-        if (!outcome.applied()) {
-            feedback.showWarning(player, outcome.reason());
+        UUID ownerUuid = player.getUuid();
+        var outcome = actions.performAsync(
+                action, ownerUuid, world, context, feature.bonded());
+        var owningWorld = player.getWorld();
+        outcome.whenComplete((resolved, failure) -> {
+            if (failure == null && resolved != null && resolved.applied()) return;
+            String reason = resolved == null
+                    ? "Bonded action failed." : resolved.reason();
+            if (owningWorld == null || ownerUuid == null) return;
+            try {
+                owningWorld.execute(() -> showWarning(
+                        owningWorld, store, ownerUuid, reason));
+            } catch (RuntimeException | LinkageError ignored) {
+                // A changed world is already an unavailable action context.
+            }
+        });
+    }
+
+    private void showWarning(
+            com.hypixel.hytale.server.core.universe.world.World world,
+            Store<EntityStore> store,
+            UUID ownerUuid,
+            String reason
+    ) {
+        try {
+            store.assertThread();
+            var playerRef = world.getEntityRef(ownerUuid);
+            if (playerRef == null || !playerRef.isValid()
+                    || playerRef.getStore() != store
+                    || Player.getComponentType() == null) return;
+            Player live = store.getComponent(
+                    playerRef, Player.getComponentType());
+            if (live != null) feedback.showWarning(live, reason);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Feedback is best-effort after the durable mutation result.
         }
     }
 }

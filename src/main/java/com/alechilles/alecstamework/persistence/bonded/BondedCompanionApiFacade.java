@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -127,7 +128,7 @@ public final class BondedCompanionApiFacade
     public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             revive(BondedCompanionReviveRequest request) {
         Objects.requireNonNull(request, "request");
-        return execute(() -> operations.revive(request));
+        return executeAsync(() -> operations.reviveAsync(request));
     }
 
     @Override
@@ -164,6 +165,47 @@ public final class BondedCompanionApiFacade
             return failed(BondedCompanionResultCode.VALIDATION_FAILED,
                     "bonded-request-invalid");
         } catch (RuntimeException failure) {
+            diagnostics.recordFailure(
+                    BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+            );
+            return failed(BondedCompanionResultCode.INTERNAL_FAILURE,
+                    "bonded-operation-failed");
+        }
+    }
+
+    private <T> CompletableFuture<BondedCompanionResult<T>> executeAsync(
+            Supplier<? extends CompletionStage<BondedCompanionResult<T>>>
+                    operation
+    ) {
+        BondedCompanionResult<T> denied = persistenceDenied();
+        if (denied != null) {
+            return CompletableFuture.completedFuture(denied);
+        }
+        try {
+            CompletionStage<BondedCompanionResult<T>> stage = operation.get();
+            if (stage == null) {
+                return failed(BondedCompanionResultCode.INTERNAL_FAILURE,
+                        "bonded-operation-returned-no-stage");
+            }
+            CompletableFuture<BondedCompanionResult<T>> completion =
+                    new CompletableFuture<>();
+            stage.whenComplete((result, failure) -> {
+                if (failure == null && result != null) {
+                    completion.complete(result);
+                    return;
+                }
+                diagnostics.recordFailure(
+                        BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+                );
+                completion.complete(new BondedCompanionResult<>(
+                        BondedCompanionResultCode.INTERNAL_FAILURE, null,
+                        "bonded-operation-failed"));
+            });
+            return completion;
+        } catch (IllegalArgumentException invalid) {
+            return failed(BondedCompanionResultCode.VALIDATION_FAILED,
+                    "bonded-request-invalid");
+        } catch (RuntimeException | LinkageError failure) {
             diagnostics.recordFailure(
                     BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
             );

@@ -14,6 +14,8 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.*;
 import com.alechilles.alecstamework.persistence.bonded.*;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticContributor;
+import com.alechilles.alecstamework.persistence.operation
+        .BondedCompanionPaymentOperationId;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
@@ -21,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -114,6 +118,46 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 "Ingredient_Life_Essence"));
         assertEquals(BondedCompanionState.STORED,
                 runtime.api.list(OWNER, ROSTER).join().value().getFirst().state());
+        runtime.close();
+    }
+
+    @Test
+    void retainedExactReservationKeepsPanelReviveActionEnabled()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("reserved-quote.db");
+        BondedCompanionRosterRegistry rosters = registry();
+        AtomicLong clock = new AtomicLong(15_000L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        BondedCompanionProfileView dead = deadProfile(
+                runtime, world, clock,
+                UUID.fromString("73000000-0000-0000-0000-000000000012"));
+        String operationKey = BondedCompanionPanelActionService.operationKey(
+                "revive", dead.profileId(), dead.revision());
+        String operationId = BondedCompanionPaymentOperationId.create(
+                BondedCompanionPanelActionService.CALLER, operationKey,
+                OWNER, ROSTER, dead.profileId(), dead.revision());
+        RetainedQuoteInventory inventory = new RetainedQuoteInventory(
+                operationId, "Ingredient_Life_Essence", 2);
+        BondedCompanionActionContext context =
+                new BondedCompanionActionContext(null, inventory);
+
+        BondedCompanionActionRequest quoteRequest =
+                BondedCompanionPanelFeaturePresentationSource.action(
+                        OWNER, "world-a", dead, "revive", context);
+        BondedCompanionReviveQuote quote = runtime.api.quoteRevive(
+                quoteRequest).join().value();
+        var row = BondedCompanionPanelFeaturePresentationSource.presentation(
+                dead, clock.get(), quote, context, "world-a");
+
+        assertEquals(BondedCompanionPanelActionService.CALLER,
+                quoteRequest.callerNamespace());
+        assertEquals(operationKey, quoteRequest.idempotencyKey());
+        assertEquals(0, inventory.availableQuantity(
+                "Ingredient_Life_Essence"));
+        assertEquals(operationId, inventory.observedOperationId);
+        assertTrue(quote.affordable());
+        assertTrue(row.status().actionEnabled());
         runtime.close();
     }
 
@@ -244,6 +288,105 @@ class BondedCompanionPanelLifecycleIntegrationTest {
             firstRuntime.close();
             secondRuntime.close();
         }
+    }
+
+    @Test
+    void sqliteReviveWaitsForDurableReservationAndAsyncEscrowCleanup()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("revive-durability-order.db");
+        BondedCompanionRosterRegistry rosters = registry();
+        AtomicLong clock = new AtomicLong(40_000L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        try {
+            BondedCompanionProfileView dead = deadProfile(
+                    runtime, world, clock,
+                    UUID.fromString(
+                            "73000000-0000-0000-0000-000000000006"));
+            DeferredDurableInventory inventory =
+                    new DeferredDurableInventory(Map.of(
+                            "Ingredient_Life_Essence", 2));
+            CompletableFuture<BondedCompanionResult<
+                    BondedCompanionProfileView>> result = runtime.api.revive(
+                    reviveRequest("durable-order", dead, inventory, rosters));
+
+            assertFalse(result.isDone());
+            assertEquals(BondedCompanionState.DEAD,
+                    runtime.api.list(OWNER, ROSTER).join().value()
+                            .getFirst().state());
+
+            inventory.completeDurableReservation();
+
+            assertFalse(result.isDone());
+            assertEquals(BondedCompanionState.STORED,
+                    runtime.api.list(OWNER, ROSTER).join().value()
+                            .getFirst().state());
+            inventory.completeDurableCleanup();
+            assertTrue(result.join().successful());
+            assertEquals(0, inventory.availableQuantity(
+                    "Ingredient_Life_Essence"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void ambiguousLegacyPendingNeverRefundsOrRetriesACharge()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("revive-legacy-unknown.db");
+        BondedCompanionRosterRegistry rosters = registry();
+        AtomicLong clock = new AtomicLong(50_000L);
+        TestWorld world = new TestWorld();
+        Harness runtime = harness(database, rosters, clock, world);
+        try {
+            BondedCompanionProfileView dead = deadProfile(
+                    runtime, world, clock,
+                    UUID.fromString(
+                            "73000000-0000-0000-0000-000000000007"));
+            LegacyUnknownInventory inventory = new LegacyUnknownInventory(
+                    Map.of("Ingredient_Life_Essence", 2));
+            BondedCompanionReviveRequest request = reviveRequest(
+                    "legacy-unknown", dead, inventory, rosters);
+
+            BondedCompanionResult<BondedCompanionProfileView> first =
+                    runtime.api.revive(request).join();
+            BondedCompanionResult<BondedCompanionProfileView> retry =
+                    runtime.api.revive(request).join();
+
+            assertEquals("bonded-revive-payment-quarantined", first.reason());
+            assertEquals("bonded-revive-payment-quarantined", retry.reason());
+            assertEquals(2, inventory.availableQuantity(
+                    "Ingredient_Life_Essence"));
+            assertEquals(0, inventory.refundApplications);
+            assertEquals(BondedCompanionState.DEAD,
+                    runtime.api.list(OWNER, ROSTER).join().value()
+                            .getFirst().state());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private BondedCompanionProfileView deadProfile(
+            Harness runtime,
+            TestWorld world,
+            AtomicLong clock,
+            UUID source
+    ) {
+        runtime.capture.store(captureIntent(source, "Nimbus", "Miniwyvern"));
+        BondedCompanionProfileView stored = runtime.api.list(OWNER, ROSTER)
+                .join().value().getFirst();
+        BondedCompanionActionContext context = new BondedCompanionActionContext(
+                new CompanionSpawnPlacement(
+                        "world-a", 4D, 64D, 7D, 0F, 1F, 0F),
+                new TestInventory(Map.of()));
+        assertTrue(runtime.api.summon(action(
+                "summon-dead-profile", stored, context)).join().successful());
+        var lease = runtime.durability.activeLeases(8).getFirst();
+        assertEquals(BondedCompanionProjectionService.ReconcileStatus.DEAD,
+                runtime.projections.confirmDeath(
+                        lease, world.readExact(lease), clock.incrementAndGet())
+                        .status());
+        return runtime.api.list(OWNER, ROSTER).join().value().getFirst();
     }
 
     private BondedCompanionReviveRequest reviveRequest(
@@ -427,6 +570,41 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         }
     }
 
+    private static final class RetainedQuoteInventory
+            implements BondedCompanionActionContext.Inventory {
+        private final String expectedOperationId;
+        private final String expectedItemId;
+        private final int reservedQuantity;
+        private String observedOperationId;
+
+        private RetainedQuoteInventory(
+                String expectedOperationId,
+                String expectedItemId,
+                int reservedQuantity
+        ) {
+            this.expectedOperationId = expectedOperationId;
+            this.expectedItemId = expectedItemId;
+            this.reservedQuantity = reservedQuantity;
+        }
+
+        @Override public int availableQuantity(String itemId) { return 0; }
+
+        @Override
+        public int availableQuantity(
+                String operationId, String itemId, int quantity) {
+            observedOperationId = operationId;
+            return expectedOperationId.equals(operationId)
+                    && expectedItemId.equals(itemId)
+                    && reservedQuantity == quantity ? quantity : 0;
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            return null;
+        }
+    }
+
     private static class BarrierInventory extends TestInventory {
         private final CyclicBarrier bothCharged;
 
@@ -481,6 +659,14 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
         @Override
         public synchronized BondedCompanionActionContext.ChargeReceipt findCharge(
+                String operationId) {
+            return durableCharge != null
+                    && operationId.equals(chargedOperationId)
+                    ? receipt(true) : null;
+        }
+
+        @Override
+        public synchronized BondedCompanionActionContext.ChargeReceipt findCharge(
                 String operationId, String itemId, int quantity) {
             return durableCharge != null
                     && operationId.equals(chargedOperationId)
@@ -531,6 +717,73 @@ class BondedCompanionPanelLifecycleIntegrationTest {
 
         private synchronized boolean hasDurableCharge() {
             return durableCharge != null;
+        }
+    }
+
+    private static final class DeferredDurableInventory extends TestInventory {
+        private final CompletableFuture<
+                BondedCompanionActionContext.ChargeReceipt> reservation =
+                new CompletableFuture<>();
+        private final CompletableFuture<Boolean> cleanup =
+                new CompletableFuture<>();
+        private String operationId;
+        private String itemId;
+        private int quantity;
+
+        private DeferredDurableInventory(Map<String, Integer> quantities) {
+            super(quantities);
+        }
+
+        @Override
+        public CompletionStage<BondedCompanionActionContext.ChargeReceipt>
+                consumeExactAsync(
+                        String operationId, String itemId, int quantity) {
+            this.operationId = operationId;
+            this.itemId = itemId;
+            this.quantity = quantity;
+            return reservation;
+        }
+
+        private void completeDurableReservation() {
+            quantities.compute(itemId, (ignored, available) ->
+                    Math.subtractExact(available, quantity));
+            reservation.complete(new BondedCompanionActionContext.ChargeReceipt() {
+                @Override public String operationId() {
+                    return DeferredDurableInventory.this.operationId;
+                }
+
+                @Override public boolean refund() { return false; }
+
+                @Override public CompletionStage<Boolean> completeAsync() {
+                    return cleanup;
+                }
+            });
+        }
+
+        private void completeDurableCleanup() {
+            cleanup.complete(true);
+        }
+    }
+
+    private static final class LegacyUnknownInventory extends TestInventory {
+        private int refundApplications;
+
+        private LegacyUnknownInventory(Map<String, Integer> quantities) {
+            super(quantities);
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            return new BondedCompanionActionContext.ChargeReceipt() {
+                @Override public String operationId() { return operationId; }
+                @Override public boolean replayed() { return true; }
+                @Override public boolean quarantined() { return true; }
+                @Override public boolean refund() {
+                    refundApplications++;
+                    return false;
+                }
+            };
         }
     }
 }

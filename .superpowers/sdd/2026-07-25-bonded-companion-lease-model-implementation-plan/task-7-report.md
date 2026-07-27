@@ -123,3 +123,33 @@ No live in-game UI session was run for this isolated task. Documentation/changel
 ### Remaining validation
 
 No live in-game inventory contention session was run. The atomicity contract is grounded in Hytale 0.5.7 source and covered through the deterministic coordinator seam; runtime behavior still warrants normal release smoke testing.
+
+## Review fix round 5
+
+### Root causes
+
+- The aggregate receipt model could not safely represent multiple independent revival attempts. A same-operation loser could also refund a debit that the winning attempt had already committed.
+- SQLite terminal outcomes expired on a wall-clock retention deadline, leaving a cross-store crash window in which player escrow could survive after the database evidence required to settle it had been pruned.
+- Recovery ran from the raw player-add event before the `Player` component was guaranteed to be attached. It also trusted operation-only legacy markers, absent escrow, and null asynchronous gateway results too readily.
+- Operation identity omitted the expected profile revision, and the original terminal-retention sentinel could collide with a valid caller-provided deadline. Historical failed operations were also accidentally included in terminal pinning.
+
+### Corrections
+
+- Replaced aggregate charging state with bounded per-operation escrow receipts. Canonical IDs include owner, profile, expected revision, and request identity; quotes count reserved escrow and terminal SQLite state is probed before mutable inventory gates.
+- Same-operation `APPLIED` results now always consume the matching escrow. Different-operation terminal receipts are garbage-collected and recovered across reloads, while ambiguous legacy zero/partial/full states fail closed or quarantine without refunding unproven value.
+- REVIVE `SUCCEEDED` and `REJECTED` rows are pinned until an outcome-aware acknowledgement CAS succeeds. Schema v5 adds `expected_revision`, migrates historical settled revival rows to the pin, excludes `FAILED`, and reserves `Long.MAX_VALUE` solely for unsettled cross-store evidence.
+- Added post-attach `RefSystem` recovery that queues only world and owner UUID, re-resolves the live player component on the world thread, reconciles legacy evidence before absent-escrow acknowledgement, and leaves malformed, foreign-owner, null-stage, disappearing-player, or otherwise ambiguous cases fail closed.
+- Split claim/probe logic into `SqliteBondedCompanionOperationClaims` and kept all new production collaborators within the repository size limits.
+
+### TDD and verification evidence
+
+- Focused schema, SQLite probe/recovery, operation-ID, escrow inventory/component, revive service, and panel lifecycle suite: 68 tests, 0 failures, 0 errors.
+- ECS/thread, persistence-boundary, routing, paid-revival boundary, and process-crash guard suite: 39 tests, 0 failures, 0 errors.
+- Full `./mvnw test`: 3,212 tests executed; 3,207 passed, 1 skipped, and only the same four unrelated baseline failures remained in capture/VFX/relocation/spawner tests. No bonded, payment, schema, or changed-area test failed.
+- Required ECS/player-access grep returned no matches; `git diff --check` passed.
+- Hytale source confirms the add-player event precedes component attachment, `World.execute(...)` supplies the required world-thread queue, and combined inventory mutation holds the constituent container locks.
+- The generated agent index was rebuilt. `check-agent-docs.ps1` reached the known linked-worktree limitation because the externally supplied root `AGENTS.md` is not present inside this worktree.
+
+### Remaining validation
+
+No live in-game crash/rejoin session was run. Deterministic tests cover bounded player-add recovery, SQLite terminal retention, same-item concurrent mutation, shared 32-receipt capacity, 40 gateway cycles, component codec/save round trips, and legacy pending zero/partial/full quarantine behavior.

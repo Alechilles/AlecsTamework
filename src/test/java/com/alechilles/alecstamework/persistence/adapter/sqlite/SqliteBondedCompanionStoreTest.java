@@ -235,7 +235,21 @@ class SqliteBondedCompanionStoreTest {
                         "profile-a", "STORE", "b".repeat(64), "PENDING",
                         null, -4_000L, -4_000L, 1_000L
                 )).code());
-        assertEquals(1, store.pruneOperations(2_000L, 1));
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.recordOperation(new SqliteBondedCompanionOperationRow(
+                        "example", "request-2", OWNER_A, "roster-a",
+                        "profile-a", "STORE", "c".repeat(64), "REJECTED",
+                        "{}", -4_000L, -4_000L, 1_000L
+                )).code());
+        assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
+                store.recordOperation(new SqliteBondedCompanionOperationRow(
+                        "example", "request-3", OWNER_A, "roster-a",
+                        "profile-a", "STORE", "d".repeat(64), "FAILED",
+                        "{}", -3_000L, -3_000L, 1_000L
+                )).code());
+        assertEquals(2, store.pruneOperations(2_000L, 2));
+        assertEquals(SqliteBondedCompanionStore.MutationCode.IDEMPOTENT_REPLAY,
+                store.recordOperation(operation).code());
     }
 
     private SqliteBondedCompanionProfileRow profile(

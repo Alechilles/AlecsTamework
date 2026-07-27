@@ -41,15 +41,15 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(first.availability().available());
         assertTrue(second.availability().available());
         assertEquals(BondedCompanionSchemaManager.requiredTables(), tables(database));
-        assertEquals(4, BondedCompanionSchemaManager.VERSION);
-        assertEquals(4L, queryLong(database,
+        assertEquals(5, BondedCompanionSchemaManager.VERSION);
+        assertEquals(5L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(4L, queryLong(database,
+        assertEquals(5L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(-5_000L, queryLong(database,
-                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 4"));
+                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 5"));
         assertEquals(manager.schemaHash(), queryString(database,
-                "SELECT schema_hash FROM bonded_schema_history WHERE version = 4"));
+                "SELECT schema_hash FROM bonded_schema_history WHERE version = 5"));
         assertEquals(1L, queryLong(database, """
                 SELECT COUNT(*) FROM pragma_table_info(
                     'bonded_companion_cleanup'
@@ -75,6 +75,65 @@ class BondedCompanionSchemaManagerTest {
                 "aec0fd76bd67d52047034a4acedac4bbeab36fab48fda405c50d576f31f328cf",
                 hash(resource("/persistence/bonded/v3.sql"))
         );
+    }
+
+    @Test
+    void bundledV5RemainsByteStableForUpgradeRecognition() throws Exception {
+        assertEquals(
+                "64ae60b2c91d9939b7826d69a3a9e961181d39eb0b1682f1d3948d399e256d48",
+                hash(resource("/persistence/bonded/v5.sql"))
+        );
+    }
+
+    @Test
+    void v4UpgradePinsHistoricalTerminalRevivesForPaymentRepair()
+            throws Exception {
+        Path database = tempDir.resolve("historical-v4-revive.sqlite");
+        BondedCompanionSchemaManager manager = manager(database, -8_000L);
+        assertTrue(manager.initialize().availability().available());
+        try (Connection connection = new SqliteConnectionFactory(database)
+                .openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            assertEquals(1, statement.executeUpdate(
+                    "DELETE FROM bonded_schema_history WHERE version = 5"));
+            statement.executeUpdate("""
+                    ALTER TABLE bonded_companion_operation
+                    DROP COLUMN expected_revision
+                    """);
+            assertEquals(1, statement.executeUpdate("""
+                    INSERT INTO bonded_companion_operation(
+                        caller_namespace, idempotency_key, owner_uuid, roster_id,
+                        profile_id, operation_type, request_hash,
+                        operation_state, result_json, created_at_ms,
+                        updated_at_ms, expires_at_ms
+                    ) VALUES (
+                        'legacy-panel', 'revive-v4',
+                        '10000000-0000-0000-0000-000000000001', 'roster-a',
+                        NULL, 'REVIVE',
+                        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                        'REJECTED',
+                        '{"code":"INVALID_STATE","reason":"legacy",'
+                            || '"valueType":"PROFILE","value":null}',
+                        -10000, -9000, 10000
+                    )
+                    """));
+        }
+
+        assertTrue(manager(database, -7_000L).initialize()
+                .availability().available());
+
+        assertEquals(5L, queryLong(database,
+                "SELECT MAX(version) FROM bonded_schema_history"));
+        assertEquals(Long.MAX_VALUE, queryLong(database, """
+                SELECT expires_at_ms FROM bonded_companion_operation
+                WHERE caller_namespace = 'legacy-panel'
+                  AND idempotency_key = 'revive-v4'
+                """));
+        assertEquals(1L, queryLong(database, """
+                SELECT COUNT(*) FROM pragma_table_info(
+                    'bonded_companion_operation'
+                ) WHERE name = 'expected_revision'
+                """));
     }
 
     @Test
@@ -154,9 +213,9 @@ class BondedCompanionSchemaManagerTest {
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertTrue(readiness.availability().available());
-        assertEquals(4L, queryLong(database,
+        assertEquals(5L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(4L, queryLong(database,
+        assertEquals(5L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         BondedCompanionStore store =
                 new com.alechilles.alecstamework.persistence.adapter.sqlite

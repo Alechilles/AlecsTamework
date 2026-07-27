@@ -27,14 +27,14 @@ final class SqliteBondedCompanionStore {
     private final SqliteBondedCompanionExtensionStore extensions;
     private final SqliteBondedCompanionLeaseStore leases;
 
-    SqliteBondedCompanionStore(
-            @Nonnull Connection connection
-    ) {
+    SqliteBondedCompanionStore(@Nonnull Connection connection) {
         this.connection = Objects.requireNonNull(connection, "connection");
         retention = new SqliteBondedCompanionRetentionStore(connection);
         extensions = new SqliteBondedCompanionExtensionStore(connection);
         leases = new SqliteBondedCompanionLeaseStore(connection);
     }
+
+    SqliteBondedCompanionRetentionStore retention() { return retention; }
 
     /** Stable domain outcomes that never expose SQLite result codes. */
     public enum MutationCode {

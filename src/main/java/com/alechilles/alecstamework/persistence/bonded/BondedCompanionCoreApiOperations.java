@@ -9,10 +9,13 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticContributor;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticSnapshot;
+import com.alechilles.alecstamework.persistence.operation
+        .BondedCompanionPaymentOperationId;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.CompletionStage;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -28,6 +31,7 @@ public final class BondedCompanionCoreApiOperations {
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
     private final LongSupplier clock;
+    private final BondedCompanionReviveOperationService revives;
     private final BondedCompanionSnapshotCodec snapshots = new BondedCompanionSnapshotCodec();
     private final BondedCompanionViewFactory views = new BondedCompanionViewFactory();
 
@@ -49,6 +53,9 @@ public final class BondedCompanionCoreApiOperations {
         this.changes = Objects.requireNonNull(changes, "changes");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.clock = Objects.requireNonNull(clock, "clock");
+        revives = new BondedCompanionReviveOperationService(
+                store, rosters, policies, transitions, clock,
+                new BondedCompanionCoreReviveSupport(this));
     }
 
     BondedCompanionResult<BondedCompanionProfileView> provision(
@@ -187,7 +194,7 @@ public final class BondedCompanionCoreApiOperations {
         BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
         long remaining = cooldownRemaining(profile.reviveCooldownUntilMs(), clock.getAsLong());
         boolean affordable = price != null && hasPayment(
-                request.actionContext(), price);
+                request, price);
         return success(new BondedCompanionReviveQuote(
                 profile.profileId(), policy.features().revive(),
                 price == null ? null : price.itemId(),
@@ -196,112 +203,10 @@ public final class BondedCompanionCoreApiOperations {
         ));
     }
 
-    BondedCompanionResult<BondedCompanionProfileView> revive(
+    CompletionStage<BondedCompanionResult<BondedCompanionProfileView>> reviveAsync(
             BondedCompanionReviveRequest request
     ) {
-        BondedCompanionActionRequest action = request.action();
-        BondedCompanionRecord.Profile profile = profile(action);
-        if (profile == null) return notFound();
-        if (request.quoteRevision() != rosters.snapshot().revision()) {
-            return failure(BondedCompanionResultCode.REVISION_CONFLICT,
-                    "bonded-revive-quote-stale");
-        }
-        BondedCompanionPolicyResolver.Resolution resolved = policies.resolve(
-                profile.rosterId(), request.quoteRevision());
-        BondedCompanionPolicy policy = resolved.policy();
-        if (policy == null || policy.revivePrice() == null) {
-            return policyDenied();
-        }
-        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
-        String reviveOperationId = operationId(
-                action.callerNamespace(), action.idempotencyKey());
-        BondedCompanionActionContext.Inventory inventory =
-                inventory(action.actionContext());
-        BondedCompanionActionContext.ChargeReceipt recovered =
-                inventory == null ? null : safeFindCharge(
-                        inventory, reviveOperationId,
-                        price.itemId(), price.quantity());
-        if (recovered != null) {
-            if (safeCompensationPending(recovered)) {
-                if (!safeRefund(recovered)) {
-                    return internal(
-                            "bonded-revive-payment-compensation-pending");
-                }
-                return internal("bonded-revive-payment-compensated");
-            }
-            return commitRevive(action, price, recovered);
-        }
-        if (cooldownRemaining(profile.reviveCooldownUntilMs(),
-                clock.getAsLong()) > 0L) {
-            return failure(BondedCompanionResultCode.POLICY_DENIED,
-                    "bonded-revive-cooldown-active");
-        }
-        BondedCompanionSnapshot snapshot = decode(profile);
-        if (snapshot == null) return internal("bonded-snapshot-invalid");
-        var validation = transitions.revive(
-                mutation(action, clock.getAsLong()), domain(profile, snapshot),
-                new BondedCompanionTransitionService.RevivePayment(
-                        price.itemId(), price.quantity()));
-        if (!validation.applied()) {
-            return transitionFailure(validation.code());
-        }
-        BondedCompanionActionContext.ChargeReceipt charge = inventory == null
-                ? null : safeConsume(inventory, reviveOperationId,
-                        price.itemId(), price.quantity());
-        if (charge == null) {
-            return failure(BondedCompanionResultCode.POLICY_DENIED,
-                    "bonded-revive-payment-unavailable");
-        }
-        if (safeCompensationPending(charge)) {
-            if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-pending");
-            }
-            return internal("bonded-revive-payment-compensated");
-        }
-        return commitRevive(action, price, charge);
-    }
-
-    private BondedCompanionResult<BondedCompanionProfileView> commitRevive(
-            BondedCompanionActionRequest action,
-            BondedCompanionPolicy.RevivePrice price,
-            BondedCompanionActionContext.ChargeReceipt charge
-    ) {
-        String expectedOperationId = operationId(
-                action.callerNamespace(), action.idempotencyKey());
-        if (!safeChargeMatches(charge, expectedOperationId)) {
-            if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-pending");
-            }
-            return internal("bonded-revive-payment-receipt-invalid");
-        }
-        long now = clock.getAsLong();
-        BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved =
-                store.reviveProfile(operation(
-                        action.callerNamespace(), action.idempotencyKey(),
-                        action.ownerUuid(), action.rosterId(), action.profileId(),
-                        BondedCompanionOperation.Type.REVIVE,
-                        price.itemId() + ":" + price.quantity(), now),
-                        action.expectedRevision(), now);
-        if (saved.code() != BondedCompanionStoreResult.Code.APPLIED
-                || saved.value() == null) {
-            if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-pending");
-            }
-            return storeFailure(saved);
-        }
-        if (saved.replayed() && !safeReplayed(charge)) {
-            if (!safeRefund(charge)) {
-                return internal("bonded-revive-payment-compensation-pending");
-            }
-        } else if (!safeComplete(charge)) {
-            return internal("bonded-revive-payment-receipt-release-pending");
-        }
-        if (!saved.replayed()) {
-            publish(saved.value(), BondedCompanionState.DEAD,
-                    BondedCompanionState.STORED, "revived",
-                    BondedCompanionChangePublisher.WorldEffectOutcome.CONFIRMED);
-        }
-        return success(view(saved.value()));
+        return revives.revive(request);
     }
 
     BondedCompanionProfileView view(
@@ -405,13 +310,13 @@ public final class BondedCompanionCoreApiOperations {
                 .getBytes(StandardCharsets.UTF_8));
     }
 
-    private BondedCompanionSnapshot decode(BondedCompanionRecord.Profile profile) {
+    BondedCompanionSnapshot decode(BondedCompanionRecord.Profile profile) {
         var decoded = snapshots.decode(new String(profile.snapshot().bytes(), StandardCharsets.UTF_8));
         return decoded.status() == BondedCompanionSnapshotCodec.Status.FOUND
                 ? decoded.snapshot() : null;
     }
 
-    private BondedCompanionProfile domain(BondedCompanionRecord.Profile profile,
+    BondedCompanionProfile domain(BondedCompanionRecord.Profile profile,
             BondedCompanionSnapshot snapshot) {
         BondedCompanionRecord.Lease lease = lease(profile.ownerUuid(), profile.rosterId(), profile.profileId());
         BondedCompanionLease active = lease == null ? null : new BondedCompanionLease(
@@ -432,7 +337,7 @@ public final class BondedCompanionCoreApiOperations {
                         lease.projectionState().name()));
     }
 
-    private BondedCompanionTransitionService.MutationRequest mutation(
+    BondedCompanionTransitionService.MutationRequest mutation(
             BondedCompanionActionRequest request, long now) {
         return new BondedCompanionTransitionService.MutationRequest(
                 operationId(request.callerNamespace(), request.idempotencyKey()),
@@ -447,7 +352,7 @@ public final class BondedCompanionCoreApiOperations {
                         == BondedCompanionState.ACTIVE).count());
     }
 
-    private BondedCompanionRecord.Profile profile(BondedCompanionActionRequest request) {
+    BondedCompanionRecord.Profile profile(BondedCompanionActionRequest request) {
         return store.findProfile(request.ownerUuid(), request.rosterId(), request.profileId())
                 .orElse(null);
     }
@@ -470,20 +375,26 @@ public final class BondedCompanionCoreApiOperations {
                 .findFirst().orElse(null);
     }
 
-    private BondedCompanionProfileView view(BondedCompanionRecord.Profile profile) {
+    BondedCompanionProfileView view(BondedCompanionRecord.Profile profile) {
         return view(profile,
                 lease(profile.ownerUuid(), profile.rosterId(), profile.profileId()),
                 store.listProfiles(profile.ownerUuid(), profile.rosterId()));
     }
 
     private boolean hasPayment(
-            BondedCompanionActionContext context,
+            BondedCompanionActionRequest request,
             BondedCompanionPolicy.RevivePrice price
     ) {
-        BondedCompanionActionContext.Inventory inventory = inventory(context);
+        BondedCompanionActionContext.Inventory inventory = inventory(
+                request.actionContext());
         if (inventory == null) return false;
         try {
-            return inventory.availableQuantity(price.itemId())
+            return inventory.availableQuantity(
+                    BondedCompanionPaymentOperationId.create(
+                            request.callerNamespace(), request.idempotencyKey(),
+                            request.ownerUuid(), request.rosterId(),
+                            request.profileId(), request.expectedRevision()),
+                    price.itemId(), price.quantity())
                     >= price.quantity();
         } catch (RuntimeException | LinkageError failure) {
             return false;
@@ -494,80 +405,6 @@ public final class BondedCompanionCoreApiOperations {
             BondedCompanionActionContext context
     ) {
         return context == null ? null : context.inventory();
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt safeConsume(
-            BondedCompanionActionContext.Inventory inventory,
-            String operationId, String itemId,
-            int quantity
-    ) {
-        try {
-            return inventory.consumeExact(operationId, itemId, quantity);
-        } catch (RuntimeException | LinkageError failure) {
-            return null;
-        }
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt safeFindCharge(
-            BondedCompanionActionContext.Inventory inventory,
-            String operationId, String itemId, int quantity
-    ) {
-        try {
-            return inventory.findCharge(operationId, itemId, quantity);
-        } catch (RuntimeException | LinkageError failure) {
-            return null;
-        }
-    }
-
-    private boolean safeRefund(
-            BondedCompanionActionContext.ChargeReceipt receipt
-    ) {
-        try {
-            return receipt.refund();
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
-    }
-
-    private boolean safeChargeMatches(
-            BondedCompanionActionContext.ChargeReceipt receipt,
-            String operationId
-    ) {
-        try {
-            return operationId.equals(receipt.operationId());
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
-    }
-
-    private boolean safeReplayed(
-            BondedCompanionActionContext.ChargeReceipt receipt
-    ) {
-        try {
-            return receipt.replayed();
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
-    }
-
-    private boolean safeCompensationPending(
-            BondedCompanionActionContext.ChargeReceipt receipt
-    ) {
-        try {
-            return receipt.compensationPending();
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
-    }
-
-    private boolean safeComplete(
-            BondedCompanionActionContext.ChargeReceipt receipt
-    ) {
-        try {
-            return receipt.complete();
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
-        }
     }
 
     private String stableProfileId(BondedCompanionProvisionRequest request) {
@@ -582,6 +419,17 @@ public final class BondedCompanionCoreApiOperations {
                 request.ownerUuid(), request.rosterId(), profileId,
                 BondedCompanionOperation.Type.PROVISION,
                 provisionPayload(request), now);
+    }
+
+    BondedCompanionOperation reviveOperation(
+            BondedCompanionActionRequest action,
+            BondedCompanionPolicy.RevivePrice price,
+            long now
+    ) {
+        return operation(action.callerNamespace(), action.idempotencyKey(),
+                action.ownerUuid(), action.rosterId(), action.profileId(),
+                BondedCompanionOperation.Type.REVIVE,
+                price.itemId() + ":" + price.quantity(), now);
     }
 
     private String provisionPayload(BondedCompanionProvisionRequest request) {
@@ -629,7 +477,7 @@ public final class BondedCompanionCoreApiOperations {
         catch (ArithmeticException overflow) { return Long.MAX_VALUE; }
     }
 
-    private long cooldownRemaining(long until, long now) {
+    long cooldownRemaining(long until, long now) {
         if (until == 0L || now >= until) return 0L;
         long delta;
         try { delta = Math.subtractExact(until, now); }
@@ -647,7 +495,7 @@ public final class BondedCompanionCoreApiOperations {
                 value.revision(), value.updatedAtMs());
     }
 
-    private void publish(BondedCompanionRecord.Profile profile,
+    void publish(BondedCompanionRecord.Profile profile,
             @Nullable BondedCompanionState oldState, BondedCompanionState newState,
             String reason, BondedCompanionChangePublisher.WorldEffectOutcome outcome) {
         changes.publishCommitted(new BondedCompanionChangedEvent(profile.profileId(),
@@ -655,23 +503,23 @@ public final class BondedCompanionCoreApiOperations {
                 profile.revision(), reason), outcome);
     }
 
-    private <T> BondedCompanionResult<T> success(T value) {
+    <T> BondedCompanionResult<T> success(T value) {
         return new BondedCompanionResult<>(BondedCompanionResultCode.SUCCESS, value, null);
     }
-    private <T> BondedCompanionResult<T> failure(BondedCompanionResultCode code, String reason) {
+    <T> BondedCompanionResult<T> failure(BondedCompanionResultCode code, String reason) {
         return new BondedCompanionResult<>(code, null, reason);
     }
-    private <T> BondedCompanionResult<T> notFound() {
+    <T> BondedCompanionResult<T> notFound() {
         return failure(BondedCompanionResultCode.NOT_FOUND, "bonded-profile-not-found");
     }
-    private <T> BondedCompanionResult<T> policyDenied() {
+    <T> BondedCompanionResult<T> policyDenied() {
         return failure(BondedCompanionResultCode.POLICY_DENIED, "bonded-policy-denied");
     }
-    private <T> BondedCompanionResult<T> internal(String reason) {
+    <T> BondedCompanionResult<T> internal(String reason) {
         diagnostics.recordFailure(BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE);
         return failure(BondedCompanionResultCode.INTERNAL_FAILURE, reason);
     }
-    private <T> BondedCompanionResult<T> transitionFailure(
+    <T> BondedCompanionResult<T> transitionFailure(
             BondedCompanionTransitionService.ResultCode code) {
         BondedCompanionResultCode mapped = switch (code) {
             case NOT_OWNER -> BondedCompanionResultCode.NOT_OWNER;
@@ -682,7 +530,7 @@ public final class BondedCompanionCoreApiOperations {
         };
         return failure(mapped, "bonded-transition-" + code.name().toLowerCase(Locale.ROOT));
     }
-    private <T> BondedCompanionResult<T> storeFailure(BondedCompanionStoreResult<?> result) {
+    <T> BondedCompanionResult<T> storeFailure(BondedCompanionStoreResult<?> result) {
         BondedCompanionResultCode mapped = switch (result.code()) {
             case NOT_FOUND -> BondedCompanionResultCode.NOT_FOUND;
             case NOT_OWNER -> BondedCompanionResultCode.NOT_OWNER;

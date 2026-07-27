@@ -220,6 +220,18 @@ create one normalized generic multi-item refund recipe. Absence alone is not
 proof. An ambiguous result remains contained and never guesses a refund or
 authorizes a second revival.
 
+The bonded-roster panel's single-item payment uses a hidden temporary escrow
+attached to the player. Tamework saves the ordinary inventory and that exact
+operation escrow in one player snapshot before touching the canonical profile.
+SQLite terminal replay is checked before any later charge; success destroys the
+escrowed items, rejection returns those same items, and storage failure keeps
+the escrow intact for retry. The terminal operation is protected from pruning
+until the matching success or rejection disposition is acknowledged. If a
+crash interrupts that handshake, a post-attachment player system repeats it on
+join using the hash-validated owner, roster, profile, and request identity.
+Historical bare pending markers are ambiguous and remain quarantined until
+independent terminal evidence permits cleanup.
+
 Free restoration remains available for ordinary configured Tamework companions
 outside paid command revival.
 

@@ -36,6 +36,8 @@ import com.alechilles.alecstamework.persistence.bonded
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPersistenceReadiness;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionPaymentRecoveryService;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionSchemaManager;
 import com.alechilles.alecstamework.persistence.diagnostics
         .BondedCompanionDiagnosticContributor;
@@ -44,6 +46,8 @@ import com.alechilles.alecstamework.persistence.diagnostics
 import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureFeedbackDispatcher;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureIntent;
+import com.alechilles.alecstamework.items
+        .HytaleBondedCompanionPaymentRecovery;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -76,6 +80,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             .BondedCompanionStore store;
     private final LongSupplier clock;
     private final BondedCompanionCaptureAuthor captureAuthor;
+    private final HytaleBondedCompanionPaymentRecovery paymentRecovery;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -94,7 +99,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             com.alechilles.alecstamework.persistence.bonded
                     .BondedCompanionStore store,
             LongSupplier clock,
-            BondedCompanionCaptureAuthor captureAuthor
+            BondedCompanionCaptureAuthor captureAuthor,
+            HytaleBondedCompanionPaymentRecovery paymentRecovery
     ) {
         this.persistence = persistence;
         this.api = api;
@@ -110,6 +116,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.store = store;
         this.clock = clock;
         this.captureAuthor = captureAuthor;
+        this.paymentRecovery = paymentRecovery;
     }
 
     /** Opens the bonded authority without accepting generic persistence state. */
@@ -183,6 +190,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 runtime::readiness,
                 store, changes, diagnostics, operations
         );
+        HytaleBondedCompanionPaymentRecovery paymentRecovery =
+                new HytaleBondedCompanionPaymentRecovery(
+                        new BondedCompanionPaymentRecoveryService(
+                                store, clock));
         SqliteBondedCompanionCapturePersistenceAdapter capturePersistence =
                 new SqliteBondedCompanionCapturePersistenceAdapter(
                         rosters, transitions, store, store, durability, cleanup
@@ -214,7 +225,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, expiry,
-                cleanup, durability, world, store, clock, captureAuthor
+                cleanup, durability, world, store, clock, captureAuthor,
+                paymentRecovery
         );
     }
 
@@ -289,6 +301,14 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (player != null && player.getUuid() != null) {
             onPlayerAdded(player.getUuid(), event.getWorld().getName());
         }
+    }
+
+    /** Defers retained-payment repair until a Player is live in its store. */
+    public void onPlayerPaymentReady(
+            @Nonnull com.hypixel.hytale.server.core.universe.world.World world,
+            @Nonnull UUID ownerUuid
+    ) {
+        if (operational()) paymentRecovery.onPlayerAdded(world, ownerUuid);
     }
 
     /** Stores exact active projections when their owner disconnects. */

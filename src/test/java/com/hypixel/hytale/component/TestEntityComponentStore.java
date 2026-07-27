@@ -41,6 +41,21 @@ public final class TestEntityComponentStore extends Store<EntityStore> implement
         }
     }
 
+    @Override
+    public <T extends Component<EntityStore>> void putComponent(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull ComponentType<EntityStore, T> type,
+            @Nonnull T component) {
+        put(reference, type, component);
+    }
+
+    @Override
+    public <T extends Component<EntityStore>> void removeComponent(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull ComponentType<EntityStore, T> type) {
+        put(reference, type, null);
+    }
+
     @Nonnull
     @Override
     @SuppressWarnings("unchecked")

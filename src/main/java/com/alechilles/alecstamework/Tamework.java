@@ -120,6 +120,7 @@ import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
+import com.alechilles.alecstamework.items.components.TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -166,6 +167,8 @@ import com.alechilles.alecstamework.persistence.diagnostics
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionMaintenanceSystem;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionPaymentRecoverySystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionDeathSystem;
 import com.alechilles.alecstamework.persistence.runtime
@@ -374,6 +377,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectileComponentType;
     private ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
             inventoryOperationReceiptsComponentType;
+    private ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+            bondedReviveEscrowComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -628,6 +633,7 @@ public class Tamework extends JavaPlugin {
         homingVisualProjectileComponentType = components.homingVisualProjectile();
         inventoryOperationReceiptsComponentType =
                 components.inventoryOperationReceipts();
+        bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         getEntityStoreRegistry().registerSystem(
@@ -883,6 +889,11 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new BondedCompanionMaintenanceSystem(
+                        bondedCompanionComposition
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new BondedCompanionPaymentRecoverySystem(
                         bondedCompanionComposition
                 )
         );
@@ -2984,6 +2995,11 @@ public class Tamework extends JavaPlugin {
     public ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
             getInventoryOperationReceiptsComponentType() {
         return inventoryOperationReceiptsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+            getBondedReviveEscrowComponentType() {
+        return bondedReviveEscrowComponentType;
     }
 
     public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {

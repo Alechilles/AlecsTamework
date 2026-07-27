@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionOperationProbe;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -130,11 +134,96 @@ final class SqliteBondedCompanionRetentionStore {
                 WHERE (caller_namespace, idempotency_key) IN (
                     SELECT caller_namespace, idempotency_key
                     FROM bonded_companion_operation
-                    WHERE expires_at_ms <= ?
+                    WHERE operation_state IN (
+                        'SUCCEEDED', 'REJECTED', 'FAILED'
+                    )
+                      AND expires_at_ms <> 9223372036854775807
+                      AND expires_at_ms <= ?
                     ORDER BY expires_at_ms, caller_namespace, idempotency_key
                     LIMIT ?
                 )
                 """, nowMs, limit, "prune-bonded-operations");
+    }
+
+    int markProfileOperationPaymentSettled(
+            BondedCompanionOperationProbe operation,
+            boolean terminalApplied,
+            long retainedUntilMs
+    ) {
+        if (retainedUntilMs == 0L || retainedUntilMs == Long.MAX_VALUE) {
+            throw new IllegalArgumentException("retainedUntilMs is required");
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_companion_operation
+                SET expires_at_ms = ?
+                WHERE caller_namespace = ? AND idempotency_key = ?
+                  AND owner_uuid = ? AND roster_id = ? AND profile_id = ?
+                  AND operation_type = 'REVIVE'
+                  AND operation_state = ?
+                  AND result_json IS NOT NULL
+                  AND (? IS NULL OR expected_revision = ?)
+                """)) {
+            statement.setLong(1, retainedUntilMs);
+            statement.setString(2, operation.callerNamespace());
+            statement.setString(3, operation.idempotencyKey());
+            statement.setString(4, operation.ownerUuid().toString());
+            statement.setString(5, operation.rosterId());
+            statement.setString(6, operation.profileId());
+            statement.setString(7, terminalApplied
+                    ? "SUCCEEDED" : "REJECTED");
+            if (operation.expectedRevision() == null) {
+                statement.setNull(8, java.sql.Types.BIGINT);
+                statement.setNull(9, java.sql.Types.BIGINT);
+            } else {
+                statement.setLong(8, operation.expectedRevision());
+                statement.setLong(9, operation.expectedRevision());
+            }
+            return statement.executeUpdate();
+        } catch (SQLException failure) {
+            throw storageFailure("settle-bonded-revive-payment", failure);
+        }
+    }
+
+    List<BondedCompanionOperationProbe> listAwaitingProfilePaymentSettlements(
+            UUID ownerUuid,
+            int limit
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        requirePositiveLimit(limit);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT caller_namespace, idempotency_key, roster_id, profile_id,
+                       expected_revision
+                FROM bonded_companion_operation
+                WHERE owner_uuid = ? AND operation_type = 'REVIVE'
+                  AND operation_state IN ('SUCCEEDED', 'REJECTED')
+                  AND result_json IS NOT NULL AND expires_at_ms = ?
+                ORDER BY updated_at_ms, caller_namespace, idempotency_key
+                LIMIT ?
+                """)) {
+            statement.setString(1, ownerUuid.toString());
+            statement.setLong(2, Long.MAX_VALUE);
+            statement.setInt(3, limit);
+            try (ResultSet rows = statement.executeQuery()) {
+                ArrayList<BondedCompanionOperationProbe> result =
+                        new ArrayList<>();
+                while (rows.next()) {
+                    result.add(new BondedCompanionOperationProbe(
+                            rows.getString(1), rows.getString(2), ownerUuid,
+                            rows.getString(3), rows.getString(4),
+                            BondedCompanionOperation.Type.REVIVE,
+                            nullableLong(rows, 5)));
+                }
+                return List.copyOf(result);
+            }
+        } catch (SQLException failure) {
+            throw storageFailure("list-bonded-revive-payment-settlements",
+                    failure);
+        }
+    }
+
+    private Long nullableLong(ResultSet rows, int column) throws SQLException {
+        long value = rows.getLong(column);
+        return rows.wasNull() ? null : value;
     }
 
     private Optional<SqliteBondedCompanionOperationRow> operation(

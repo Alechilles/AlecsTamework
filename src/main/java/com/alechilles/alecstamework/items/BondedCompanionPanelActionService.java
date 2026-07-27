@@ -4,13 +4,15 @@ import com.alechilles.alecstamework.api.*;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Performs bonded panel mutations using only the rendered profile/revision fence. */
 final class BondedCompanionPanelActionService {
-    private static final String CALLER = "tamework:bonded-panel";
+    static final String CALLER = "tamework:bonded-panel";
     private final Supplier<BondedCompanionApi> api;
 
     BondedCompanionPanelActionService(@Nonnull Supplier<BondedCompanionApi> api) {
@@ -18,6 +20,8 @@ final class BondedCompanionPanelActionService {
     }
 
     @Nonnull
+    // Compatibility entry point for synchronous tests and non-runtime callers.
+    // The panel router always uses performAsync so the world thread never waits.
     Outcome perform(@Nonnull Action action, @Nonnull UUID ownerUuid,
                     @Nullable String worldKey,
                     @Nonnull BondedCompanionPanelPresentation row) {
@@ -29,32 +33,53 @@ final class BondedCompanionPanelActionService {
                     @Nullable String worldKey,
                     @Nullable BondedCompanionActionContext context,
                     @Nonnull BondedCompanionPanelPresentation row) {
+        return performAsync(action, ownerUuid, worldKey, context, row)
+                .toCompletableFuture().join();
+    }
+
+    @Nonnull
+    CompletionStage<Outcome> performAsync(
+            @Nonnull Action action,
+            @Nonnull UUID ownerUuid,
+            @Nullable String worldKey,
+            @Nullable BondedCompanionActionContext context,
+            @Nonnull BondedCompanionPanelPresentation row
+    ) {
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(row, "row");
         if (row.status().action() != mapped(action)
                 || !row.status().actionEnabled()) {
-            return Outcome.denied(row.status().unavailableReason());
+            return CompletableFuture.completedFuture(
+                    Outcome.denied(row.status().unavailableReason()));
         }
         BondedCompanionActionRequest request = new BondedCompanionActionRequest(
                 CALLER,
-                action.name().toLowerCase(java.util.Locale.ROOT) + ":"
-                        + row.profileId() + ":" + row.revision(),
+                operationKey(action.name(), row.profileId(), row.revision()),
                 ownerUuid, row.rosterId(), row.profileId(), row.revision(),
                 worldKey, context);
         try {
-            BondedCompanionResult<?> result = switch (action) {
-                case SUMMON -> currentApi().summon(request).join();
-                case STORE -> currentApi().store(request).join();
+            CompletionStage<? extends BondedCompanionResult<?>> result =
+                    switch (action) {
+                case SUMMON -> currentApi().summon(request);
+                case STORE -> currentApi().store(request);
                 case REVIVE -> currentApi().revive(new BondedCompanionReviveRequest(
                         request, row.reviveQuote() == null
-                                ? 0L : row.reviveQuote().policyRevision())).join();
+                                ? 0L : row.reviveQuote().policyRevision()));
             };
-            return result != null && result.successful()
-                    ? Outcome.success() : Outcome.failed(result == null
-                            ? "Bonded action returned no result." : result.reason());
+            if (result == null) {
+                return CompletableFuture.completedFuture(
+                        Outcome.failed("Bonded action returned no result."));
+            }
+            return result.handle((resolved, failure) -> {
+                if (failure != null) return Outcome.failed("Bonded action failed.");
+                return resolved != null && resolved.successful()
+                        ? Outcome.success() : Outcome.failed(resolved == null
+                        ? "Bonded action returned no result." : resolved.reason());
+            });
         } catch (RuntimeException | LinkageError failure) {
-            return Outcome.failed("Bonded action failed.");
+            return CompletableFuture.completedFuture(
+                    Outcome.failed("Bonded action failed."));
         }
     }
 
@@ -77,6 +102,12 @@ final class BondedCompanionPanelActionService {
             case REVIVE -> com.alechilles.alecstamework.ui
                     .BondedCompanionStatusPresentation.Action.REVIVE;
         };
+    }
+
+    static String operationKey(
+            String operation, String profileId, long revision) {
+        return operation.toLowerCase(java.util.Locale.ROOT) + ":"
+                + profileId + ":" + revision;
     }
 
     enum Action { SUMMON, STORE, REVIVE }

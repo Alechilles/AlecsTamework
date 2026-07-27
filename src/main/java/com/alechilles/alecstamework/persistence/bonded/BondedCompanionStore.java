@@ -21,6 +21,35 @@ public interface BondedCompanionStore {
             @Nonnull UUID ownerUuid, @Nonnull String rosterId,
             @Nonnull String profileId);
 
+    /**
+     * Probes an existing profile-operation result without claiming or mutating.
+     *
+     * <p>This is the canonical replay fence used before a payment is reserved.
+     * Adapter-neutral test stores may retain the absent default.</p>
+     */
+    @Nonnull
+    default Optional<BondedCompanionStoreResult<BondedCompanionRecord.Profile>>
+            findProfileOperationByIdentity(
+                    @Nonnull BondedCompanionOperationProbe operation) {
+        return Optional.empty();
+    }
+
+    /** Returns a terminal revive operation to bounded retention after payment. */
+    default boolean markProfileOperationPaymentSettled(
+            @Nonnull BondedCompanionOperationProbe operation,
+            boolean terminalApplied,
+            long retainedUntilMs) {
+        return false;
+    }
+
+    /** Lists bounded terminal revive rows retained for player-payment repair. */
+    @Nonnull
+    default List<BondedCompanionOperationProbe>
+            listAwaitingProfilePaymentSettlements(
+                    @Nonnull UUID ownerUuid, int limit) {
+        return List.of();
+    }
+
     /** Acquires the sole live lease under an optimistic profile revision. */
     @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Lease> acquireLease(
             @Nonnull BondedCompanionOperation operation, long expectedRevision,

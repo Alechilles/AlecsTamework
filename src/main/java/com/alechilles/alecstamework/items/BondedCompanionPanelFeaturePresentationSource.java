@@ -15,7 +15,6 @@ import javax.annotation.Nullable;
 
 /** Builds bonded status/actions from the same immutable profiles as card data. */
 final class BondedCompanionPanelFeaturePresentationSource {
-    private static final String CALLER = "tamework:bonded-panel-query";
     private final Supplier<BondedCompanionApi> api;
     private final java.util.function.LongSupplier clock;
 
@@ -129,7 +128,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
         try {
             BondedCompanionResult<BondedCompanionReviveQuote> result =
                     current.quoteRevive(action(
-                            owner, worldKey, profile, "quote", context)).join();
+                            owner, worldKey, profile, "revive", context)).join();
             return result != null && result.successful() ? result.value() : null;
         } catch (RuntimeException | LinkageError ignored) {
             return null;
@@ -146,7 +145,9 @@ final class BondedCompanionPanelFeaturePresentationSource {
             UUID owner, String worldKey, BondedCompanionProfileView profile,
             String operation, BondedCompanionActionContext context) {
         return new BondedCompanionActionRequest(
-                CALLER, operation + ":" + profile.profileId() + ":" + profile.revision(),
+                BondedCompanionPanelActionService.CALLER,
+                BondedCompanionPanelActionService.operationKey(
+                        operation, profile.profileId(), profile.revision()),
                 owner, profile.rosterId(), profile.profileId(),
                 profile.revision(), worldKey, context);
     }
