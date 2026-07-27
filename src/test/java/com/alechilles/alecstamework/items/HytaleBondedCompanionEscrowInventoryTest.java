@@ -1088,6 +1088,14 @@ class HytaleBondedCompanionEscrowInventoryTest {
             return store.getComponent(actor, escrowType);
         }
 
+        void failNextSave() {
+            durability.enqueue(SaveResult.retryable(null));
+        }
+
+        int saveCalls() {
+            return durability.saveCalls;
+        }
+
         private HytaleBondedCompanionEscrowInventory newInventory(
                 BondedCompanionEscrowTransfer transfer) {
             return new HytaleBondedCompanionEscrowInventory(

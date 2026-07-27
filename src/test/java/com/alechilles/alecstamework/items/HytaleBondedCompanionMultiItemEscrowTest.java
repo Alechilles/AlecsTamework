@@ -117,6 +117,23 @@ class HytaleBondedCompanionMultiItemEscrowTest {
         }
     }
 
+    @Test
+    void freshShortageDoesNotMutateOrDependOnARefundSave() throws Exception {
+        try (var fixture = funded(3)) {
+            fixture.failNextSave();
+
+            BondedCompanionActionContext.ChargeReceipt receipt = fixture.inventory
+                    .consumeExactAsync(operation(905), COSTS)
+                    .toCompletableFuture().join();
+
+            assertNull(receipt);
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertEquals(3, fixture.sourceQuantity(OTHER));
+            assertNull(fixture.escrow());
+            assertEquals(0, fixture.saveCalls());
+        }
+    }
+
     private static HytaleBondedCompanionEscrowInventoryTest.Fixture funded(
             int secondQuantity
     ) throws Exception {

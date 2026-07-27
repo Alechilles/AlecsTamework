@@ -35,6 +35,7 @@ final class HytaleBondedCompanionEscrowInventory
     private final BondedCompanionEscrowDurability durability;
     private final Supplier<CombinedItemContainer> sourceOverride;
     private final BondedCompanionEscrowTransfer transfer;
+    private final BondedCompanionEscrowPreflight preflight;
     private final BondedCompanionEscrowSettlementCoordinator settlements;
     private final HytaleBondedCompanionLegacyPaymentAdapter legacyPayments;
     private final BondedCompanionEscrowReceiptFactory receipts;
@@ -107,6 +108,7 @@ final class HytaleBondedCompanionEscrowInventory
         this.durability = Objects.requireNonNull(durability, "durability");
         this.sourceOverride = sourceOverride;
         this.transfer = Objects.requireNonNull(transfer, "transfer");
+        this.preflight = new BondedCompanionEscrowPreflight(transfer);
         this.settlements = new BondedCompanionEscrowSettlementCoordinator(
                 store, escrowType, durability, transfer,
                 ownerUuid,
@@ -327,6 +329,9 @@ final class HytaleBondedCompanionEscrowInventory
             TameworkBondedReviveEscrowComponent escrow = currentEscrow();
             boolean replayed = escrow != null;
             if (escrow == null) {
+                if (!preflight.canReserveFresh(source, costs)) {
+                    return completed(null);
+                }
                 escrow = TameworkBondedReviveEscrowComponent.create(
                         source.getCapacity(), operationId, costs,
                         System.currentTimeMillis());
