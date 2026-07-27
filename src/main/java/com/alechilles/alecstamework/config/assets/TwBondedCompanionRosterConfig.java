@@ -184,11 +184,8 @@ public final class TwBondedCompanionRosterConfig implements
             revivePrice = parent.revivePrice;
             return;
         }
-        if (!nested.contains("ItemId")) {
-            revivePrice.itemId = parent.revivePrice.itemId;
-        }
-        if (!nested.contains("Quantity")) {
-            revivePrice.quantity = parent.revivePrice.quantity;
+        if (!nested.contains("Costs")) {
+            revivePrice.costs = parent.revivePrice.getCosts();
         }
     }
 
@@ -258,13 +255,14 @@ public final class TwBondedCompanionRosterConfig implements
         if (revivePrice == null) {
             return;
         }
-        String itemId = normalize(revivePrice.itemId);
-        if (itemId == null || revivePrice.quantity <= 0) {
+        TwItemCostComponent[] costs = revivePrice.getCosts();
+        if (costs.length == 0) {
             throw new IllegalArgumentException(
-                    "Bonded roster RevivePrice requires ItemId and a positive "
-                            + "Quantity: " + configId
+                    "Bonded roster RevivePrice requires a non-empty Costs "
+                            + "recipe: " + configId
             );
         }
+        TwItemCostComponent.validateAndCopy(costs);
     }
 
     private static void requireNamespaced(
@@ -342,17 +340,13 @@ public final class TwBondedCompanionRosterConfig implements
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** Mutable codec target for the optional revive item price. */
+    /** Mutable codec target for the optional ordered bonded revive recipe. */
     public static final class RevivePriceDefinition {
-        String itemId;
-        int quantity;
+        TwItemCostComponent[] costs = TwItemCostComponent.EMPTY_ARRAY;
 
-        public String getItemId() {
-            return normalize(itemId);
-        }
-
-        public int getQuantity() {
-            return quantity;
+        @Nonnull
+        public TwItemCostComponent[] getCosts() {
+            return TwItemCostComponent.validateAndCopy(costs);
         }
     }
 

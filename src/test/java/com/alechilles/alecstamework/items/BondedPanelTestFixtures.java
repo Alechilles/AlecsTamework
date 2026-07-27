@@ -36,8 +36,10 @@ final class BondedPanelTestFixtures {
                 0L,
                 state == BondedCompanionStateView.DEAD
                         ? new BondedCompanionReviveQuote(
-                                id, true, "Ingredient_Life_Essence", 2,
-                                true, 0L, 9L)
+                                id, true, List.of(
+                                new BondedCompanionReviveQuote.CostLine(
+                                        "Ingredient_Life_Essence", 2, 2)),
+                                0L, 9L)
                         : null);
     }
 

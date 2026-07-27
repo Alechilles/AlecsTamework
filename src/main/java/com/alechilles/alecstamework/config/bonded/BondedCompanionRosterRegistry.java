@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.config.bonded;
 
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwItemCostComponent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -196,12 +198,8 @@ public final class BondedCompanionRosterRegistry {
     ) {
         TwBondedCompanionRosterConfig.RevivePriceDefinition configuredPrice =
                 config.getRevivePrice();
-        RevivePrice revivePrice = configuredPrice == null
-                ? null
-                : new RevivePrice(
-                        configuredPrice.getItemId(),
-                        configuredPrice.getQuantity()
-                );
+        RevivePrice revivePrice = configuredPrice == null ? null
+                : revivePrice(configuredPrice.getCosts());
         TwBondedCompanionRosterConfig.FeatureToggles configuredFeatures =
                 config.getFeatures();
         LinkedHashSet<String> allowedRoles = new LinkedHashSet<>();
@@ -227,6 +225,16 @@ public final class BondedCompanionRosterRegistry {
                         configuredFeatures.isRevive()
                 )
         );
+    }
+
+    private static RevivePrice revivePrice(TwItemCostComponent[] configured) {
+        ArrayList<BondedCompanionReviveCost> costs = new ArrayList<>(
+                configured.length);
+        for (TwItemCostComponent cost : configured) {
+            costs.add(new BondedCompanionReviveCost(
+                    cost.getItemId(), cost.getQuantity()));
+        }
+        return new RevivePrice(costs);
     }
 
     private static void validateDependentCommands(
@@ -410,13 +418,13 @@ public final class BondedCompanionRosterRegistry {
         }
     }
 
-    /** Immutable optional revive price in one roster definition. */
-    public record RevivePrice(@Nonnull String itemId, int quantity) {
+    /** Immutable optional ordered revive recipe in one roster definition. */
+    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
         public RevivePrice {
-            itemId = Objects.requireNonNull(itemId, "itemId");
-            if (quantity <= 0) {
+            costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
+            if (costs.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Revive price quantity must be positive."
+                        "Revive costs must not be empty."
                 );
             }
         }

@@ -327,10 +327,10 @@ class BondedCompanionReviveOperationServiceTest {
                                   "MaximumActive": 1,
                                   "SessionDurationSeconds": 600,
                                   "SummonCooldownSeconds": 0,
-                                  "RevivePrice": {
+                                  "RevivePrice": {"Costs": [{
                                     "ItemId": "Ingredient_Life_Essence",
                                     "Quantity": 2
-                                  },
+                                  }]},
                                   "Features": {
                                     "Capture": true,
                                     "Provision": true,
@@ -798,7 +798,7 @@ class BondedCompanionReviveOperationServiceTest {
             return new BondedCompanionOperation(
                     action.callerNamespace(), action.idempotencyKey(),
                     BondedCompanionRevivePaymentProof.requestHash(
-                            price.itemId(), price.quantity()),
+                            price.costs()),
                     action.ownerUuid(), action.rosterId(),
                     action.profileId(), BondedCompanionOperation.Type.REVIVE,
                     now, now + 10_000L);

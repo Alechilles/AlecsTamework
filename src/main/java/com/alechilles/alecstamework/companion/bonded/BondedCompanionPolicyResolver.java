@@ -137,7 +137,7 @@ public final class BondedCompanionPolicyResolver {
                 source.maximumActive(), source.sessionDurationSeconds(),
                 source.summonCooldownSeconds(),
                 price == null ? null : new BondedCompanionPolicy.RevivePrice(
-                        price.itemId(), price.quantity()
+                        price.costs()
                 ),
                 new BondedCompanionPolicy.FeatureFlags(
                         flags.capture(), flags.provision(), flags.summon(),

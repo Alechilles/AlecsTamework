@@ -213,12 +213,11 @@ public final class BondedCompanionCoreApiOperations {
         if (resolved.policy() == null) return policyDenied();
         BondedCompanionPolicy policy = resolved.policy();
         BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
-        boolean affordable = price != null && hasPayment(
-                request, price);
+        List<BondedCompanionReviveQuote.CostLine> costs = price == null
+                ? List.of() : quoteCosts(request, price);
         return success(new BondedCompanionReviveQuote(
                 profile.profileId(), policy.features().revive(),
-                price == null ? null : price.itemId(),
-                price == null ? 0 : price.quantity(), affordable, 0L,
+                costs, 0L,
                 revision
         ));
     }
@@ -350,24 +349,37 @@ public final class BondedCompanionCoreApiOperations {
                 store.listProfiles(profile.ownerUuid(), profile.rosterId()));
     }
 
-    private boolean hasPayment(
+    private List<BondedCompanionReviveQuote.CostLine> quoteCosts(
             BondedCompanionActionRequest request,
             BondedCompanionPolicy.RevivePrice price
     ) {
         BondedCompanionActionContext.Inventory inventory = inventory(
                 request.actionContext());
-        if (inventory == null) return false;
+        if (inventory == null) return unavailableCosts(price);
+        ArrayList<BondedCompanionReviveQuote.CostLine> lines = new ArrayList<>();
         try {
-            return inventory.availableQuantity(
-                    BondedCompanionPaymentOperationId.create(
-                            request.callerNamespace(), request.idempotencyKey(),
-                            request.ownerUuid(), request.rosterId(),
-                            request.profileId(), request.expectedRevision()),
-                    price.itemId(), price.quantity())
-                    >= price.quantity();
+            String operationId = BondedCompanionPaymentOperationId.create(
+                    request.callerNamespace(), request.idempotencyKey(),
+                    request.ownerUuid(), request.rosterId(), request.profileId(),
+                    request.expectedRevision());
+            for (BondedCompanionReviveCost cost : price.costs()) {
+                lines.add(new BondedCompanionReviveQuote.CostLine(
+                        cost.itemId(), cost.quantity(), Math.max(0,
+                        inventory.availableQuantity(operationId, cost.itemId(),
+                                cost.quantity()))));
+            }
+            return List.copyOf(lines);
         } catch (RuntimeException | LinkageError failure) {
-            return false;
+            return unavailableCosts(price);
         }
+    }
+
+    private List<BondedCompanionReviveQuote.CostLine> unavailableCosts(
+            BondedCompanionPolicy.RevivePrice price
+    ) {
+        return price.costs().stream().map(cost ->
+                new BondedCompanionReviveQuote.CostLine(
+                        cost.itemId(), cost.quantity(), 0)).toList();
     }
 
     private BondedCompanionActionContext.Inventory inventory(
@@ -384,7 +396,7 @@ public final class BondedCompanionCoreApiOperations {
         return BondedCompanionRevivePaymentProof.operation(
                 action.callerNamespace(), action.idempotencyKey(),
                 action.ownerUuid(), action.rosterId(), action.profileId(),
-                price.itemId(), price.quantity(), now,
+                price.costs(), now,
                 safeAdd(now, OPERATION_RETENTION_MS));
     }
 

@@ -65,11 +65,11 @@ public final class CommandPanelFeaturePresentation {
             status = com.alechilles.alecstamework.api.PaidCommandRevivalQuote.Status.READY;
         }
         java.util.List<CommandReviveCostPresentation.CostLine> costs =
-                quote.itemId() == null ? java.util.List.of() : java.util.List.of(
+                quote.costs().stream().map(cost ->
                         new CommandReviveCostPresentation.CostLine(
-                                quote.itemId(), quote.itemId(), null,
-                                quote.affordable() ? quote.quantity() : 0,
-                                quote.quantity()));
+                                cost.itemId(), cost.itemId(), null,
+                                cost.ownedQuantity(), cost.requiredQuantity()))
+                        .toList();
         return new CommandReviveCostPresentation(
                 status, quote.cooldownRemainingSeconds() * 1_000L, costs,
                 Long.toString(quote.policyRevision()), null, null);

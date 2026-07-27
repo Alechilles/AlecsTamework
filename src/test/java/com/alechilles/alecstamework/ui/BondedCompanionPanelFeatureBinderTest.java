@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -89,8 +90,10 @@ class BondedCompanionPanelFeatureBinderTest {
                         BondedCompanionStatusPresentation.Action.REVIVE,
                         true, null, 0L),
                 new BondedCompanionReviveQuote(
-                        "profile-7", true, "Ingredient_Life_Essence", 2,
-                        true, 0L, 9L));
+                        "profile-7", true, List.of(
+                        new BondedCompanionReviveQuote.CostLine(
+                                "Ingredient_Life_Essence", 2, 2)),
+                        0L, 9L));
         CommandPanelFeaturePresentation feature =
                 CommandPanelFeaturePresentation.bonded(row);
 

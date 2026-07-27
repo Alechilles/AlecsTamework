@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.companion.bonded;
 
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -32,12 +35,19 @@ public record BondedCompanionPolicy(
         }
     }
 
-    /** Exact item price required for a paid revival. */
-    public record RevivePrice(@Nonnull String itemId, int quantity) {
+    /** Ordered AND recipe required for one paid bonded revival. */
+    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
         public RevivePrice {
-            itemId = text(itemId, "itemId");
-            if (quantity <= 0) {
-                throw new IllegalArgumentException("quantity must be positive");
+            costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
+            if (costs.isEmpty()) {
+                throw new IllegalArgumentException("costs must not be empty");
+            }
+            HashSet<String> itemIds = new HashSet<>();
+            for (BondedCompanionReviveCost cost : costs) {
+                if (!itemIds.add(cost.itemId())) {
+                    throw new IllegalArgumentException(
+                            "duplicate revive item: " + cost.itemId());
+                }
             }
         }
     }
