@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.persistence.runtime.player
@@ -16,6 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
@@ -35,6 +37,7 @@ final class HytaleBondedCompanionEscrowInventory
     private final BondedCompanionEscrowTransfer transfer;
     private final BondedCompanionEscrowSettlementCoordinator settlements;
     private final HytaleBondedCompanionLegacyPaymentAdapter legacyPayments;
+    private final BondedCompanionEscrowReceiptFactory receipts;
 
     HytaleBondedCompanionEscrowInventory(
             World world,
@@ -110,6 +113,8 @@ final class HytaleBondedCompanionEscrowInventory
                 this::actorRef, this::sourceInventory);
         this.legacyPayments = new HytaleBondedCompanionLegacyPaymentAdapter(
                 store, legacyType, durability, this::actorRef);
+        this.receipts = new BondedCompanionEscrowReceiptFactory(
+                settlements, legacyPayments);
     }
 
     @Override
@@ -157,31 +162,31 @@ final class HytaleBondedCompanionEscrowInventory
             TameworkBondedReviveEscrowComponent escrow = currentEscrow();
             if (legacy != null) {
                 return escrow == null && legacy.safe()
-                        ? legacyIdentityReceipt(
+                        ? receipts.legacyIdentity(
                         operationId, legacy.compensated())
-                        : quarantineReceipt(operationId);
+                        : receipts.quarantined(operationId);
             }
             if (escrow == null) return null;
             if (!escrow.operationId().equals(operationId)) {
-                return quarantineReceipt(escrow.operationId());
+                return receipts.quarantined(escrow.operationId());
             }
             boolean reserved = escrow.phase()
                     == TameworkBondedReviveEscrowComponent.Phase.RESERVED
                     && escrow.hasExactReservedCharge();
             boolean refunding = escrow.phase()
                     == TameworkBondedReviveEscrowComponent.Phase.REFUNDING
-                    && escrow.reservedQuantity() >= 0
-                    && escrow.reservedQuantity() <= escrow.quantity();
+                    && escrow.reservedState()
+                    != TameworkBondedReviveEscrowComponent.ReservedState.INVALID;
             if (!reserved && !refunding && !escrow.isEmptyTerminal()) {
-                return quarantineReceipt(escrow.operationId());
+                return receipts.quarantined(escrow.operationId());
             }
-            return escrowReceipt(
-                    operationId, escrow.itemId(), escrow.quantity(),
+            return receipts.escrow(
+                    operationId, escrow.costs(),
                     reserved, refunding || escrow.phase()
                             == TameworkBondedReviveEscrowComponent.Phase
                             .REFUNDED, true);
         } catch (RuntimeException | LinkageError failure) {
-            return quarantineReceipt(operationId);
+            return receipts.quarantined(operationId);
         }
     }
 
@@ -191,7 +196,7 @@ final class HytaleBondedCompanionEscrowInventory
         return settlements.read(
                 operationId,
                 () -> findCharge(operationId),
-                () -> quarantineReceipt(operationId));
+                () -> receipts.quarantined(operationId));
     }
 
     @Override
@@ -205,9 +210,9 @@ final class HytaleBondedCompanionEscrowInventory
             TameworkBondedReviveEscrowComponent escrow = currentEscrow();
             if (legacy != null && legacy.hasEvidence()) {
                 return escrow == null
-                        ? legacyReceipt(operationId, itemId, quantity,
+                        ? receipts.legacy(operationId, itemId, quantity,
                         legacy.hasCompensatedEvidence())
-                        : quarantineReceipt(operationId);
+                        : receipts.quarantined(operationId);
             }
             if (escrow == null) return null;
             if (escrow.matches(operationId, itemId, quantity)) {
@@ -224,16 +229,16 @@ final class HytaleBondedCompanionEscrowInventory
                         && escrow.reservedQuantity() >= 0
                         && escrow.reservedQuantity() <= escrow.quantity();
                 if (reserved || refunding || terminal) {
-                    return escrowReceipt(
+                    return receipts.escrow(
                             operationId, itemId, quantity, reserved,
                             refunding || escrow.phase()
                                     == TameworkBondedReviveEscrowComponent.Phase
                                     .REFUNDED, true);
                 }
             }
-            return quarantineReceipt(operationId);
+            return receipts.quarantined(operationId);
         } catch (RuntimeException | LinkageError failure) {
-            return quarantineReceipt(operationId);
+            return receipts.quarantined(operationId);
         }
     }
 
@@ -243,7 +248,7 @@ final class HytaleBondedCompanionEscrowInventory
         return settlements.read(
                 operationId,
                 () -> findCharge(operationId, itemId, quantity),
-                () -> quarantineReceipt(operationId));
+                () -> receipts.quarantined(operationId));
     }
 
     @Override
@@ -256,32 +261,41 @@ final class HytaleBondedCompanionEscrowInventory
     public CompletionStage<BondedCompanionActionContext.ChargeReceipt>
             consumeExactAsync(
                     String operationId, String itemId, int quantity) {
+        return consumeExactAsync(operationId, List.of(
+                new BondedCompanionReviveCost(itemId, quantity)));
+    }
+
+    @Override
+    public CompletionStage<BondedCompanionActionContext.ChargeReceipt>
+            consumeExactAsync(
+                    String operationId, List<BondedCompanionReviveCost> costs) {
         try {
             store.assertThread();
-            if (!validRequest(operationId, itemId, quantity)) {
+            if (!validRequest(operationId, costs)) {
                 return completed(null);
             }
             return settlements.prepare(
                     operationId,
                     () -> consumeExactInCurrentFlight(
-                            operationId, itemId, quantity),
-                    () -> quarantineReceipt(operationId));
+                            operationId, List.copyOf(costs)),
+                    () -> receipts.quarantined(operationId));
         } catch (RuntimeException | LinkageError failure) {
-            return completed(quarantineReceipt(operationId));
+            return completed(receipts.quarantined(operationId));
         }
     }
 
     private CompletionStage<BondedCompanionActionContext.ChargeReceipt>
             consumeExactInCurrentFlight(
-                    String operationId, String itemId, int quantity) {
+                    String operationId, List<BondedCompanionReviveCost> costs) {
         try {
             store.assertThread();
-            HytaleBondedCompanionChargeReceiptPlan legacy =
-                    canonical(operationId) ? null : legacyPayments.find(
-                            operationId, itemId, quantity);
+            BondedCompanionReviveCost first = costs.getFirst();
+            HytaleBondedCompanionChargeReceiptPlan legacy = costs.size() == 1
+                    && !canonical(operationId) ? legacyPayments.find(
+                    operationId, first.itemId(), first.quantity()) : null;
             if (legacy != null && legacy.hasEvidence()) {
-                return completed(legacyReceipt(
-                        operationId, itemId, quantity,
+                return completed(receipts.legacy(
+                        operationId, first.itemId(), first.quantity(),
                         legacy.hasCompensatedEvidence()));
             }
             CombinedItemContainer source = sourceInventory();
@@ -292,42 +306,43 @@ final class HytaleBondedCompanionEscrowInventory
             boolean replayed = escrow != null;
             if (escrow == null) {
                 escrow = TameworkBondedReviveEscrowComponent.create(
-                        source.getCapacity(), operationId, itemId, quantity,
+                        source.getCapacity(), operationId, costs,
                         System.currentTimeMillis());
                 store.putComponent(actorRef(), escrowType, escrow);
             }
-            if (!escrow.matches(operationId, itemId, quantity)
+            if (!escrow.matches(operationId, costs)
                     && escrow.isEmptyTerminal()) {
                 String staleOperationId = escrow.operationId();
                 return settlements.removeTerminalInCurrentFlight(escrow)
                         .thenCompose(removed ->
                         removed ? durability.resumeOnWorldThread(
                                 () -> consumeExactInCurrentFlight(
-                                        operationId, itemId, quantity),
-                                () -> quarantineReceipt(operationId))
-                                : completed(quarantineReceipt(
+                                        operationId, costs),
+                                () -> receipts.quarantined(operationId))
+                                : completed(receipts.quarantined(
                                 staleOperationId)));
             }
-            if (!escrow.matches(operationId, itemId, quantity)) {
-                return completed(quarantineReceipt(
+            if (!escrow.matches(operationId, costs)) {
+                return completed(receipts.quarantined(
                         escrow.operationId()));
             }
-            return prepare(source, escrow, replayed);
+            return prepare(source, escrow, replayed, costs);
         } catch (RuntimeException | LinkageError failure) {
-            return completed(quarantineReceipt(operationId));
+            return completed(receipts.quarantined(operationId));
         }
     }
 
     private CompletionStage<BondedCompanionActionContext.ChargeReceipt> prepare(
             CombinedItemContainer source,
             TameworkBondedReviveEscrowComponent escrow,
-            boolean replayed
+            boolean replayed,
+            List<BondedCompanionReviveCost> costs
     ) {
         if (escrow.phase()
                 == TameworkBondedReviveEscrowComponent.Phase.QUARANTINED
                 || escrow.phase()
                 == TameworkBondedReviveEscrowComponent.Phase.COMMITTED) {
-            return completed(quarantineReceipt(escrow.operationId()));
+            return completed(receipts.quarantined(escrow.operationId()));
         }
         if (escrow.phase()
                 == TameworkBondedReviveEscrowComponent.Phase.REFUNDED) {
@@ -339,25 +354,30 @@ final class HytaleBondedCompanionEscrowInventory
             return settlements.refundInCurrentFlight(escrow)
                     .thenApply(ignored -> null);
         }
-        int reserved = escrow.reservedQuantity();
-        if (reserved < 0 || reserved > escrow.quantity()) {
+        if (escrow.reservedState()
+                == TameworkBondedReviveEscrowComponent.ReservedState.INVALID) {
             return quarantine(escrow);
         }
-        if (reserved < escrow.quantity()) {
-            transfer.reserveRemaining(
-                    source, escrow, escrow.quantity() - reserved);
-            reserved = escrow.reservedQuantity();
+        for (BondedCompanionReviveCost cost : costs) {
+            int reserved = escrow.reservedQuantity(cost.itemId());
+            if (reserved < 0 || reserved > cost.quantity()) {
+                return quarantine(escrow);
+            }
+            if (reserved < cost.quantity()) {
+                transfer.reserveRemaining(source, escrow, cost.itemId(),
+                        cost.quantity() - reserved);
+            }
         }
-        if (reserved != escrow.quantity()) {
+        if (!escrow.hasExactReservedCharge()) {
             return restoreInsufficient(escrow);
         }
         escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.RESERVED);
         store.putComponent(actorRef(), escrowType, escrow);
-        BondedCompanionActionContext.ChargeReceipt receipt = escrowReceipt(
-                escrow.operationId(), escrow.itemId(), escrow.quantity(),
+        BondedCompanionActionContext.ChargeReceipt receipt = receipts.escrow(
+                escrow.operationId(), costs,
                 true, false, replayed);
         return durability.saveActor().thenApply(saved -> saved.saved()
-                ? receipt : quarantineReceipt(escrow.operationId()));
+                ? receipt : receipts.quarantined(escrow.operationId()));
     }
 
     private CompletionStage<BondedCompanionActionContext.ChargeReceipt>
@@ -373,18 +393,7 @@ final class HytaleBondedCompanionEscrowInventory
         escrow.setPhase(TameworkBondedReviveEscrowComponent.Phase.QUARANTINED);
         store.putComponent(actorRef(), escrowType, escrow);
         return durability.saveActor().thenApply(ignored ->
-                quarantineReceipt(escrow.operationId()));
-    }
-
-    private CompletionStage<Boolean> settle(
-            String operationId,
-            String itemId,
-            int quantity,
-            boolean consume
-    ) {
-        return consume
-                ? settlements.consume(operationId, itemId, quantity)
-                : settlements.refund(operationId, itemId, quantity);
+                receipts.quarantined(escrow.operationId()));
     }
 
     private CombinedItemContainer sourceInventory() {
@@ -410,59 +419,21 @@ final class HytaleBondedCompanionEscrowInventory
         return actor;
     }
 
-    private boolean validRequest(String operationId, String itemId, int quantity) {
-        return operationId != null && !operationId.isBlank()
-                && itemId != null && !itemId.isBlank() && quantity > 0;
+    private boolean validRequest(
+            String operationId, List<BondedCompanionReviveCost> costs) {
+        if (operationId == null || operationId.isBlank() || costs == null
+                || costs.isEmpty()) return false;
+        try {
+            TameworkBondedReviveEscrowComponent.create(
+                    (short) 1, operationId, costs, 0L);
+            return true;
+        } catch (RuntimeException invalid) {
+            return false;
+        }
     }
 
     private boolean canonical(String operationId) {
         return BondedCompanionPaymentOperationId.parse(operationId).isPresent();
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt escrowReceipt(
-            String operationId,
-            String itemId,
-            int quantity,
-            boolean claimPrepared,
-            boolean compensationPending,
-            boolean replayed
-    ) {
-        return BondedCompanionChargeReceipts.escrow(
-                operationId,
-                itemId,
-                quantity,
-                claimPrepared,
-                compensationPending,
-                replayed,
-                () -> settle(operationId, itemId, quantity, false),
-                () -> settle(operationId, itemId, quantity, true));
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt legacyReceipt(
-            String operationId,
-            String itemId,
-            int quantity,
-            boolean compensated
-    ) {
-        return BondedCompanionChargeReceipts.legacy(
-                operationId,
-                compensated,
-                () -> legacyPayments.release(
-                        operationId, itemId, quantity));
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt legacyIdentityReceipt(
-            String operationId,
-            boolean compensated
-    ) {
-        return BondedCompanionChargeReceipts.legacy(
-                operationId, compensated,
-                () -> legacyPayments.releaseByIdentity(operationId));
-    }
-
-    private BondedCompanionActionContext.ChargeReceipt quarantineReceipt(
-            String operationId) {
-        return BondedCompanionChargeReceipts.quarantined(operationId);
     }
 
     private static String requireText(String value, String field) {

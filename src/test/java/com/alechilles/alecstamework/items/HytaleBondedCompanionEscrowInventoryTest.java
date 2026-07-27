@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -67,6 +68,48 @@ class HytaleBondedCompanionEscrowInventoryTest {
             "77000000-0000-0000-0000-000000000002");
     private static final String ITEM = "Ingredient_Life_Essence";
     private static final String OTHER = "Ingredient_Concurrent";
+
+    @Test
+    void reservesEveryOrderedRecipeLineInOneDurableEscrow() throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSourceSlot((short) 0, ITEM, 2);
+            fixture.setSourceSlot((short) 1, OTHER, 4);
+            List<BondedCompanionReviveCost> costs = List.of(
+                    new BondedCompanionReviveCost(ITEM, 2),
+                    new BondedCompanionReviveCost(OTHER, 4));
+
+            BondedCompanionActionContext.ChargeReceipt receipt = fixture.inventory
+                    .consumeExactAsync(operation(900), costs)
+                    .toCompletableFuture().join();
+
+            assertNotNull(receipt);
+            assertEquals(costs, fixture.escrow().costs());
+            assertTrue(fixture.escrow().hasExactReservedCharge());
+            assertEquals(0, fixture.sourceQuantity(ITEM));
+            assertEquals(0, fixture.sourceQuantity(OTHER));
+        }
+    }
+
+    @Test
+    void insufficientSecondRecipeLineRestoresTheFirstWithoutAReceipt()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSourceSlot((short) 0, ITEM, 2);
+            fixture.setSourceSlot((short) 1, OTHER, 3);
+            List<BondedCompanionReviveCost> costs = List.of(
+                    new BondedCompanionReviveCost(ITEM, 2),
+                    new BondedCompanionReviveCost(OTHER, 4));
+
+            BondedCompanionActionContext.ChargeReceipt receipt = fixture.inventory
+                    .consumeExactAsync(operation(901), costs)
+                    .toCompletableFuture().join();
+
+            assertNull(receipt);
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertEquals(3, fixture.sourceQuantity(OTHER));
+            assertNull(fixture.escrow());
+        }
+    }
 
     @Test
     void committedEscrowSavedBeforeRemovalIsReleasedOnSuccessfulReplay()
@@ -1277,13 +1320,22 @@ class HytaleBondedCompanionEscrowInventoryTest {
                 CombinedItemContainer source,
                 TameworkBondedReviveEscrowComponent escrow,
                 int remaining) {
+            reserveRemaining(source, escrow, escrow.itemId(), remaining);
+        }
+
+        @Override
+        public void reserveRemaining(
+                CombinedItemContainer source,
+                TameworkBondedReviveEscrowComponent escrow,
+                String itemId,
+                int remaining) {
             int movedTotal = 0;
             try {
                 for (short slot = 0;
                      slot < source.getCapacity() && remaining > 0; slot++) {
                     ItemStack stack = source.getItemStack(slot);
                     if (ItemStack.isEmpty(stack)
-                            || !escrow.itemId().equals(stack.getItemId())) continue;
+                            || !itemId.equals(stack.getItemId())) continue;
                     int moved = Math.min(remaining, stack.getQuantity());
                     int left = stack.getQuantity() - moved;
                     source.setItemStackForSlot(slot, left == 0
@@ -1292,11 +1344,17 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     movedTotal += moved;
                     remaining -= moved;
                 }
-                int reserved = escrow.reservedQuantity();
+                int reserved = escrow.reservedQuantity(itemId);
                 if (movedTotal > 0) {
-                    escrow.getInventory().setItemStackForSlot(
-                            (short) 0, itemStack(
-                                    escrow.itemId(), reserved + movedTotal));
+                    for (short slot = 0;
+                         slot < escrow.getInventory().getCapacity(); slot++) {
+                        if (ItemStack.isEmpty(escrow.getInventory()
+                                .getItemStack(slot))) {
+                            escrow.getInventory().setItemStackForSlot(slot,
+                                    itemStack(itemId, reserved + movedTotal));
+                            break;
+                        }
+                    }
                 }
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
@@ -1320,7 +1378,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     for (short slot = 0; slot < source.getCapacity(); slot++) {
                         ItemStack stack = source.getItemStack(slot);
                         if (!ItemStack.isEmpty(stack)
-                                && escrow.itemId().equals(stack.getItemId())) {
+                                && reserved.getItemId().equals(stack.getItemId())) {
                             destination = slot;
                             existing = stack.getQuantity();
                             break;
@@ -1331,7 +1389,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     }
                     if (destination < 0) return RestoreResult.BLOCKED;
                     source.setItemStackForSlot(destination, itemStack(
-                            escrow.itemId(), existing + reserved.getQuantity()));
+                            reserved.getItemId(), existing + reserved.getQuantity()));
                     escrow.getInventory().setItemStackForSlot(
                             escrowSlot, ItemStack.EMPTY);
                     return RestoreResult.MOVED;

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import java.util.List;
 import java.util.Objects;
 
 /** Authenticates terminal SQLite evidence against one exact escrow payment. */
@@ -27,10 +29,9 @@ final class BondedCompanionRevivePaymentVerifier {
                     ? Verification.HISTORICAL_MARKER
                     : Verification.QUARANTINED;
         }
-        String itemId = itemId(receipt);
-        int quantity = quantity(receipt);
+        List<BondedCompanionReviveCost> costs = costs(receipt);
         if (probe.profileId() == null || probe.expectedRevision() == null
-                || itemId == null || itemId.isBlank() || quantity <= 0) {
+                || costs.isEmpty()) {
             return Verification.QUARANTINED;
         }
         BondedCompanionOperation exact;
@@ -38,7 +39,7 @@ final class BondedCompanionRevivePaymentVerifier {
             exact = BondedCompanionRevivePaymentProof.operation(
                     probe.callerNamespace(), probe.idempotencyKey(),
                     probe.ownerUuid(), probe.rosterId(), probe.profileId(),
-                    itemId, quantity, attemptedAtMs, retainedUntilMs);
+                    costs, attemptedAtMs, retainedUntilMs);
         } catch (RuntimeException | LinkageError invalid) {
             return Verification.QUARANTINED;
         }
@@ -75,19 +76,12 @@ final class BondedCompanionRevivePaymentVerifier {
         }
     }
 
-    private String itemId(BondedCompanionActionContext.ChargeReceipt receipt) {
+    private List<BondedCompanionReviveCost> costs(
+            BondedCompanionActionContext.ChargeReceipt receipt) {
         try {
-            return receipt.itemId();
+            return List.copyOf(receipt.costs());
         } catch (RuntimeException | LinkageError failure) {
-            return null;
-        }
-    }
-
-    private int quantity(BondedCompanionActionContext.ChargeReceipt receipt) {
-        try {
-            return receipt.quantity();
-        } catch (RuntimeException | LinkageError failure) {
-            return 0;
+            return List.of();
         }
     }
 
