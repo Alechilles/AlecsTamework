@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded;
 
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -221,7 +223,8 @@ public final class BondedCompanionTransitionService {
         if (profile.state() != BondedCompanionState.DEAD) {
             return rejected(ResultCode.INVALID_STATE, profile);
         }
-        if (!matches(checked.policy().revivePrice(), payment)) {
+        if (!BondedCompanionReviveRecipe.matches(
+                checked.policy().revivePrice(), payment.costs())) {
             return rejected(ResultCode.REVIVE_PRICE_MISMATCH, profile);
         }
         try {
@@ -348,13 +351,6 @@ public final class BondedCompanionTransitionService {
         );
     }
 
-    private static boolean matches(
-            BondedCompanionPolicy.RevivePrice price,
-            RevivePayment payment
-    ) {
-        return price != null && price.costs().equals(payment.costs());
-    }
-
     private static TransitionResult applied(BondedCompanionProfile profile) {
         return new TransitionResult(ResultCode.APPLIED, profile);
     }
@@ -461,30 +457,18 @@ public final class BondedCompanionTransitionService {
     }
 
     /** Exact ordered recipe payment consumed only after the transition is accepted. */
-    public record RevivePayment(@Nonnull java.util.List<
-            com.alechilles.alecstamework.api.BondedCompanionReviveCost> costs) {
+    public record RevivePayment(@Nonnull List<BondedCompanionReviveCost> costs) {
         public RevivePayment {
-            costs = java.util.List.copyOf(Objects.requireNonNull(costs, "costs"));
-            if (costs.isEmpty()) {
-                throw new IllegalArgumentException("costs must not be empty");
-            }
+            costs = BondedCompanionReviveRecipe.copyOf(costs);
         }
 
         /** Convenience construction for a one-line recipe in internal callers. */
         public RevivePayment(@Nonnull String itemId, int quantity) {
-            this(java.util.List.of(
-                    new com.alechilles.alecstamework.api
-                            .BondedCompanionReviveCost(itemId, quantity)));
+            this(List.of(new BondedCompanionReviveCost(itemId, quantity)));
         }
 
         private String fingerprint() {
-            StringBuilder encoded = new StringBuilder();
-            for (var cost : costs) {
-                encoded.append(cost.itemId().length()).append(':')
-                        .append(cost.itemId()).append(':')
-                        .append(cost.quantity()).append(';');
-            }
-            return encoded.toString();
+            return BondedCompanionReviveRecipe.fingerprint(costs);
         }
     }
 

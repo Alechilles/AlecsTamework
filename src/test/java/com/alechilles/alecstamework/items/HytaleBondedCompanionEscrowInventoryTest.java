@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
-import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
@@ -66,140 +65,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
             "77000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_OWNER = UUID.fromString(
             "77000000-0000-0000-0000-000000000002");
-    private static final String ITEM = "Ingredient_Life_Essence";
-    private static final String OTHER = "Ingredient_Concurrent";
-
-    @Test
-    void reservesEveryOrderedRecipeLineInOneDurableEscrow() throws Exception {
-        try (Fixture fixture = new Fixture()) {
-            fixture.setSourceSlot((short) 0, ITEM, 2);
-            fixture.setSourceSlot((short) 1, OTHER, 4);
-            List<BondedCompanionReviveCost> costs = List.of(
-                    new BondedCompanionReviveCost(ITEM, 2),
-                    new BondedCompanionReviveCost(OTHER, 4));
-
-            BondedCompanionActionContext.ChargeReceipt receipt = fixture.inventory
-                    .consumeExactAsync(operation(900), costs)
-                    .toCompletableFuture().join();
-
-            assertNotNull(receipt);
-            assertEquals(costs, fixture.escrow().costs());
-            assertTrue(fixture.escrow().hasExactReservedCharge());
-            assertEquals(0, fixture.sourceQuantity(ITEM));
-            assertEquals(0, fixture.sourceQuantity(OTHER));
-        }
-    }
-
-    @Test
-    void singletonAvailabilityAndReceiptFailClosedForReservedMultiLineEscrow()
-            throws Exception {
-        try (Fixture fixture = new Fixture()) {
-            fixture.setSourceSlot((short) 0, ITEM, 2);
-            fixture.setSourceSlot((short) 1, OTHER, 4);
-            List<BondedCompanionReviveCost> costs = List.of(
-                    new BondedCompanionReviveCost(ITEM, 2),
-                    new BondedCompanionReviveCost(OTHER, 4));
-            String operation = operation(902);
-            fixture.inventory.consumeExactAsync(operation, costs)
-                    .toCompletableFuture().join();
-
-            assertEquals(0, fixture.inventory.availableQuantity(
-                    operation, ITEM, 2));
-            assertEquals(List.of(2, 4), fixture.inventory.availableQuantities(
-                    operation, costs));
-            assertTrue(fixture.inventory.findCharge(operation, ITEM, 2)
-                    .quarantined());
-        }
-    }
-
-    @Test
-    void reorderedRecipeCannotSettleExistingFrozenEscrow() throws Exception {
-        try (Fixture fixture = new Fixture()) {
-            fixture.setSourceSlot((short) 0, ITEM, 2);
-            fixture.setSourceSlot((short) 1, OTHER, 4);
-            List<BondedCompanionReviveCost> costs = List.of(
-                    new BondedCompanionReviveCost(ITEM, 2),
-                    new BondedCompanionReviveCost(OTHER, 4));
-            String operation = operation(903);
-            fixture.inventory.consumeExactAsync(operation, costs)
-                    .toCompletableFuture().join();
-
-            BondedCompanionActionContext.ChargeReceipt mismatched =
-                    fixture.inventory.consumeExactAsync(operation, List.of(
-                            costs.get(1), costs.getFirst()))
-                            .toCompletableFuture().join();
-
-            assertTrue(mismatched.quarantined());
-            assertFalse(mismatched.completeAsync().toCompletableFuture().join());
-            assertTrue(fixture.escrow().matches(operation, costs));
-        }
-    }
-
-    @Test
-    void productionReorderedEscrowReceiptQuarantinesBeforeRecoveryRevive()
-            throws Exception {
-        try (Fixture fixture = new Fixture()) {
-            fixture.setSourceSlot((short) 0, ITEM, 2);
-            fixture.setSourceSlot((short) 1, OTHER, 4);
-            List<BondedCompanionReviveCost> costs = List.of(
-                    new BondedCompanionReviveCost(ITEM, 2),
-                    new BondedCompanionReviveCost(OTHER, 4));
-            String operation = operation(904);
-            fixture.inventory.consumeExactAsync(operation, costs)
-                    .toCompletableFuture().join();
-            BondedCompanionActionContext.ChargeReceipt reordered = fixture.inventory
-                    .consumeExactAsync(operation, List.of(
-                            costs.get(1), costs.getFirst()))
-                    .toCompletableFuture().join();
-            RecoveryStore store = new RecoveryStore(RecoveryResult.MISSING,
-                    false, 904);
-            BondedCompanionActionContext.Inventory recoveredInventory =
-                    new BondedCompanionActionContext.Inventory() {
-                        @Override public int availableQuantity(String itemId) {
-                            return 0;
-                        }
-                        @Override public BondedCompanionActionContext.ChargeReceipt
-                                findCharge(String operationId) {
-                            return reordered;
-                        }
-                        @Override public BondedCompanionActionContext.ChargeReceipt
-                                consumeExact(String operationId, String itemId,
-                                             int quantity) { return null; }
-                    };
-
-            BondedCompanionPaymentRecoveryService.Outcome outcome =
-                    new BondedCompanionPaymentRecoveryService(store.store,
-                            () -> -5_000L).recover(
-                            BondedCompanionPaymentOperationId.parse(operation)
-                                    .orElseThrow(), recoveredInventory)
-                            .toCompletableFuture().join();
-
-            assertEquals(BondedCompanionPaymentRecoveryService.Outcome.QUARANTINED,
-                    outcome);
-            assertEquals(0, store.revives);
-        }
-    }
-
-    @Test
-    void insufficientSecondRecipeLineRestoresTheFirstWithoutAReceipt()
-            throws Exception {
-        try (Fixture fixture = new Fixture()) {
-            fixture.setSourceSlot((short) 0, ITEM, 2);
-            fixture.setSourceSlot((short) 1, OTHER, 3);
-            List<BondedCompanionReviveCost> costs = List.of(
-                    new BondedCompanionReviveCost(ITEM, 2),
-                    new BondedCompanionReviveCost(OTHER, 4));
-
-            BondedCompanionActionContext.ChargeReceipt receipt = fixture.inventory
-                    .consumeExactAsync(operation(901), costs)
-                    .toCompletableFuture().join();
-
-            assertNull(receipt);
-            assertEquals(2, fixture.sourceQuantity(ITEM));
-            assertEquals(3, fixture.sourceQuantity(OTHER));
-            assertNull(fixture.escrow());
-        }
-    }
+    static final String ITEM = "Ingredient_Life_Essence";
+    static final String OTHER = "Ingredient_Concurrent";
 
     @Test
     void committedEscrowSavedBeforeRemovalIsReleasedOnSuccessfulReplay()
@@ -1058,7 +925,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
     }
 
-    private static String operation(int ordinal) {
+    static String operation(int ordinal) {
         return BondedCompanionPaymentOperationId.create(
                 "test:panel", "revive:" + ordinal, OWNER,
                 "hydragon:dragons", "profile-7", ordinal);
@@ -1147,7 +1014,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
         return (Unsafe) field.get(null);
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         private final TestWorld world;
         private final TestEntityComponentStore store;
         private final Ref<EntityStore> actor;
@@ -1160,9 +1027,9 @@ class HytaleBondedCompanionEscrowInventoryTest {
         private final CombinedItemContainer combined =
                 new CombinedItemContainer(source.getInventory());
         private final RecordingDurability durability;
-        private final HytaleBondedCompanionEscrowInventory inventory;
+        final HytaleBondedCompanionEscrowInventory inventory;
 
-        private Fixture() throws Exception {
+        Fixture() throws Exception {
             this(new DirectTransfer());
         }
 
@@ -1199,13 +1066,13 @@ class HytaleBondedCompanionEscrowInventoryTest {
             if (quantity > 0) setSourceSlot((short) 0, itemId, quantity);
         }
 
-        private void setSourceSlot(short slot, String itemId, int quantity)
+        void setSourceSlot(short slot, String itemId, int quantity)
                 throws Exception {
             source.getInventory().setItemStackForSlot(
                     slot, itemStack(itemId, quantity));
         }
 
-        private int sourceQuantity(String itemId) {
+        int sourceQuantity(String itemId) {
             int quantity = 0;
             for (short slot = 0; slot < combined.getCapacity(); slot++) {
                 ItemStack stack = combined.getItemStack(slot);
@@ -1217,7 +1084,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
             return quantity;
         }
 
-        private TameworkBondedReviveEscrowComponent escrow() {
+        TameworkBondedReviveEscrowComponent escrow() {
             return store.getComponent(actor, escrowType);
         }
 
@@ -1281,9 +1148,9 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
     }
 
-    private enum RecoveryResult { APPLIED, REJECTED, MISSING, PENDING }
+    enum RecoveryResult { APPLIED, REJECTED, MISSING, PENDING }
 
-    private static final class RecoveryStore {
+    static final class RecoveryStore {
         private final RecoveryResult result;
         private final boolean awaiting;
         private final int ordinal;
@@ -1292,11 +1159,11 @@ class HytaleBondedCompanionEscrowInventoryTest {
         private int lookups;
         private int acknowledgments;
         private int quarantines;
-        private int revives;
+        int revives;
         private Boolean acknowledgedApplied;
-        private final BondedCompanionStore store;
+        final BondedCompanionStore store;
 
-        private RecoveryStore(
+        RecoveryStore(
                 RecoveryResult result, boolean awaiting, int ordinal) {
             this.result = result;
             this.awaiting = awaiting;
