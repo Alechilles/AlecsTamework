@@ -137,21 +137,22 @@ class BondedCompanionCommandRoutingIsolationTest {
         assertGuardBefore(travel,
                 "private void queue(",
                 "String toolId = stack.getFromMetadataOrNull(");
-        assertGuardBefore(handler, "private void openGroupManagerFromSelection(",
+        assertCallbackAuthorityBefore(handler,
+                "private void openGroupManagerFromSelection(",
                 "groupManagerPageService.openGroupManagerPage(");
-        assertGuardBefore(handler, "private void applyMenuUnlink(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuUnlink(",
                 "Inventory inventory = player.getInventory();");
-        assertGuardBefore(handler, "private void applyMenuRelease(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuRelease(",
                 "ownerReleaseService.release(");
-        assertGuardBefore(handler, "private void applyMenuCull(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuCull(",
                 "ownerCullService.cull(");
-        assertGuardBefore(handler, "private void applyMenuRespawn(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuRespawn(",
                 "freeRestorationActions.request(");
-        assertGuardBefore(handler, "private void applyMenuSetHome(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuSetHome(",
                 "Inventory inventory = player.getInventory();");
-        assertGuardBefore(handler, "private void applyMenuLocate(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuLocate(",
                 "locateService.locate(");
-        assertGuardBefore(handler, "private void applyMenuMoveCommand(",
+        assertCallbackAuthorityBefore(handler, "private void applyMenuMoveCommand(",
                 "menuMoveService.applyMenuMoveCommand(");
 
         String panel = Files.readString(ITEMS.resolve(
@@ -182,16 +183,39 @@ class BondedCompanionCommandRoutingIsolationTest {
 
         assertTrue(source.contains(
                 "CommandRosterStorageBoundary.allowsGenericRosterActions(config)"));
-        assertTrue(source.contains(
-                "genericRosterActions ? actions.unlink() : ignoreUuid"));
-        assertTrue(source.contains(
-                "genericRosterActions ? actions.respawn() : ignoreUuid"));
-        assertTrue(source.contains(
-                "genericRosterActions ? actions.manageGroups() : ignoreAction"));
-        assertTrue(source.contains(
-                "? enabled -> panelActionService.applySetAutoLinkEnabled("));
-        assertTrue(source.contains(
-                "? value -> groupAssignPageService.applyGroupActivation("));
+        assertTrue(source.contains("BooleanSupplier genericCallbackAuthority"));
+        assertTrue(source.contains("guardedUuid(guardedGenericCallbacks,"));
+        assertTrue(source.contains("guardedBoolean(guardedGenericCallbacks,"));
+        assertTrue(source.contains("guardedPair(guardedGenericCallbacks,"));
+        assertTrue(source.contains("guardedAction(guardedGenericCallbacks,"));
+        assertTrue(source.contains("panelPreferenceAuthority"));
+    }
+
+    @Test
+    void authorityPolicyIsWiredAtEveryGenericConsumerBoundary()
+            throws IOException {
+        String panel = Files.readString(ITEMS.resolve(
+                "CommandPanelEntrySourceService.java"));
+        String release = Files.readString(ITEMS.resolve(
+                "CommandOwnerReleaseService.java"));
+        String cull = Files.readString(ITEMS.resolve(
+                "CommandOwnerCullService.java"));
+        String handler = Files.readString(ITEMS.resolve(
+                "CommandItemFeatureHandler.java"));
+        String groups = Files.readString(ITEMS.resolve(
+                "CommandGroupManagerPageService.java"));
+
+        assertTrue(panel.contains("allowsNearbyPresentation("));
+        assertBefore(release, "allowsGenericTargetMutation(", "canRelease(");
+        assertBefore(release, "allowsGenericTargetMutation(", "clearOwner(");
+        assertBefore(cull, "allowsGenericTargetMutation(", "canCull(");
+        assertBefore(cull, "allowsGenericTargetMutation(",
+                "clearNpcCommandLinks(target);");
+        assertBefore(cull, "allowsGenericCullRepair(",
+                "removeLinkedNpcRecord(stack, npcUuid)");
+        assertTrue(handler.contains("findUniqueToolStack("));
+        assertTrue(groups.contains("runIfAllowed(authority,"));
+        assertTrue(groups.contains("authority.getAsBoolean()"));
     }
 
     private void assertGuardBefore(String source, String method,
@@ -205,5 +229,24 @@ class BondedCompanionCommandRoutingIsolationTest {
         assertTrue(methodStart >= 0, "Missing method: " + method);
         assertTrue(guard > methodStart && legacyAccess > guard,
                 "Bonded guard must precede legacy access in " + method);
+    }
+
+    private void assertCallbackAuthorityBefore(String source, String method,
+                                               String callback) {
+        int methodStart = source.indexOf(method);
+        int guard = source.indexOf("allowsCurrentGenericCallback(", methodStart);
+        int callbackIndex = source.indexOf(callback, methodStart);
+
+        assertTrue(methodStart >= 0, "Missing method: " + method);
+        assertTrue(guard > methodStart && callbackIndex > guard,
+                "Callback authority must precede generic manager opening in "
+                        + method);
+    }
+
+    private void assertBefore(String source, String first, String second) {
+        int firstIndex = source.indexOf(first);
+        int secondIndex = source.indexOf(second);
+        assertTrue(firstIndex >= 0 && secondIndex > firstIndex,
+                first + " must precede " + second);
     }
 }

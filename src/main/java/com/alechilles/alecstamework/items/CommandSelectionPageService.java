@@ -14,6 +14,8 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -79,12 +81,17 @@ final class CommandSelectionPageService {
         this.bondedActions = bondedActions;
     }
 
+    /**
+     * Opens a page whose generic callbacks are checked against the physical
+     * tool again when the player presses them.
+     */
     boolean open(Player player,
                  Store<EntityStore> store,
                  TwCommandItemConfig config,
                  ItemStack working,
                  String toolId,
-                 Actions actions) {
+                 Actions actions,
+                 BooleanSupplier genericCallbackAuthority) {
         if (!canOpen(player, store, config, toolId, actions)) {
             return false;
         }
@@ -95,7 +102,9 @@ final class CommandSelectionPageService {
             return false;
         }
         TameworkCommandSelectionPage page = createPage(
-                player, store, uiPlayerRef, config, working, toolId, actions
+                player, store, uiPlayerRef, config, working, toolId, actions,
+                genericCallbackAuthority != null
+                        ? genericCallbackAuthority : () -> false
         );
         return openPage(player, playerRef, store, page);
     }
@@ -119,7 +128,8 @@ final class CommandSelectionPageService {
                                                     TwCommandItemConfig config,
                                                     ItemStack working,
                                                     String toolId,
-                                                    Actions actions) {
+                                                    Actions actions,
+                                                    BooleanSupplier genericCallbackAuthority) {
         String selectedId = working != null
                 ? working.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING)
                 : null;
@@ -127,6 +137,13 @@ final class CommandSelectionPageService {
         boolean recallTeleportingEnabled = CommandTravelSettings.isRecallTeleportingEnabled();
         boolean genericRosterActions =
                 CommandRosterStorageBoundary.allowsGenericRosterActions(config);
+        BooleanSupplier guardedGenericCallbacks = genericRosterActions
+                ? genericCallbackAuthority : () -> false;
+        // Sort, filter, and panel-mode metadata are safe local presentation
+        // preferences for both roster types. Only a stale generic page needs
+        // the physical-tool revalidation gate.
+        BooleanSupplier panelPreferenceAuthority = genericRosterActions
+                ? genericCallbackAuthority : () -> true;
         Consumer<UUID> ignoreUuid = ignored -> { };
         Consumer<Boolean> ignoreBoolean = ignored -> { };
         Consumer<String> ignoreString = ignored -> { };
@@ -164,18 +181,28 @@ final class CommandSelectionPageService {
                 command -> recallTeleportingEnabled || !resolutionService.isRecallCommand(command),
                 recallTeleportingEnabled,
                 genericRosterActions
-                        ? npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid)
+                        ? guardedUuid(guardedGenericCallbacks,
+                                npcUuid -> panelActionService.applyLink(
+                                        player, toolId, config, npcUuid))
                         : ignoreUuid,
-                genericRosterActions ? actions.unlink() : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.unlink()) : ignoreUuid,
                 genericRosterActions
-                        ? npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid)
+                        ? guardedUuid(guardedGenericCallbacks,
+                                npcUuid -> panelActionService.applyToggleActive(
+                                        player, toolId, config, npcUuid))
                         : ignoreUuid,
                 genericRosterActions
-                        ? npcUuid -> panelActionService.applyToggleBreeding(player, toolId, config, npcUuid)
+                        ? guardedUuid(guardedGenericCallbacks,
+                                npcUuid -> panelActionService.applyToggleBreeding(
+                                        player, toolId, config, npcUuid))
                         : ignoreUuid,
-                genericRosterActions ? actions.release() : ignoreUuid,
-                genericRosterActions ? actions.cull() : ignoreUuid,
-                genericRosterActions ? actions.respawn() : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.release()) : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.cull()) : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.respawn()) : ignoreUuid,
                 npcUuid -> applyFeatureAction(
                         player, store, config, npcUuid, FeatureAction.SUMMON,
                         panelSnapshot
@@ -188,36 +215,105 @@ final class CommandSelectionPageService {
                         player, store, config, npcUuid, FeatureAction.REVIVE,
                         panelSnapshot
                 ),
-                genericRosterActions ? actions.locate() : ignoreUuid,
-                genericRosterActions ? actions.recall() : ignoreUuid,
-                genericRosterActions ? actions.setHome() : ignoreUuid,
-                genericRosterActions ? actions.returnHome() : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.locate()) : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.recall()) : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.setHome()) : ignoreUuid,
+                genericRosterActions ? guardedUuid(guardedGenericCallbacks,
+                        actions.returnHome()) : ignoreUuid,
                 genericRosterActions
-                        ? npcUuid -> talentPageService.openTalentPage(
+                        ? guardedUuid(guardedGenericCallbacks,
+                                npcUuid -> talentPageService.openTalentPage(
                                 player, toolId, npcUuid, actions.reopenMenu())
+                        )
                         : ignoreUuid,
-                value -> panelActionService.applySetPanelMode(player, toolId, value),
+                guardedString(panelPreferenceAuthority,
+                        value -> panelActionService.applySetPanelMode(
+                                player, toolId, value)),
                 genericRosterActions
-                        ? enabled -> panelActionService.applySetAutoLinkEnabled(
+                        ? guardedBoolean(guardedGenericCallbacks,
+                                enabled -> panelActionService.applySetAutoLinkEnabled(
                                 player, toolId, config, enabled)
+                        )
                         : ignoreBoolean,
-                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
-                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
-                genericRosterActions ? actions.manageGroups() : ignoreAction,
-                value -> panelActionService.applySetSort(player, toolId, value),
-                value -> panelActionService.applySetFilterMode(player, toolId, value),
-                value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
-                () -> panelActionService.applyClearFilters(player, toolId),
+                guardedAction(guardedGenericCallbacks,
+                        () -> panelActionService.applyAdjustPanelRadius(
+                                player, toolId, config, false)),
+                guardedAction(guardedGenericCallbacks,
+                        () -> panelActionService.applyAdjustPanelRadius(
+                                player, toolId, config, true)),
+                genericRosterActions ? guardedAction(guardedGenericCallbacks,
+                        actions.manageGroups()) : ignoreAction,
+                guardedString(panelPreferenceAuthority,
+                        value -> panelActionService.applySetSort(player, toolId, value)),
+                guardedString(panelPreferenceAuthority,
+                        value -> panelActionService.applySetFilterMode(player, toolId, value)),
+                guardedString(panelPreferenceAuthority,
+                        value -> panelActionService.applySetSelectedFilterText(player, toolId, value)),
+                guardedAction(panelPreferenceAuthority,
+                        () -> panelActionService.applyClearFilters(player, toolId)),
                 genericRosterActions
-                        ? value -> groupAssignPageService.applyGroupActivation(
+                        ? guardedString(guardedGenericCallbacks,
+                                value -> groupAssignPageService.applyGroupActivation(
                                 player, toolId, config, value)
+                        )
                         : ignoreString,
                 genericRosterActions
-                        ? (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
+                        ? guardedPair(guardedGenericCallbacks,
+                                (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
                                 player, toolId, config, npcUuid, groupId)
+                        )
                         : (ignoredUuid, ignoredGroup) -> { },
-                actions.selectCommand()
+                genericRosterActions ? guardedString(guardedGenericCallbacks,
+                        actions.selectCommand()) : ignoreString
         );
+    }
+
+    private static Consumer<UUID> guardedUuid(BooleanSupplier authority,
+                                               Consumer<UUID> callback) {
+        return uuid -> {
+            if (authority.getAsBoolean()) {
+                callback.accept(uuid);
+            }
+        };
+    }
+
+    private static Consumer<Boolean> guardedBoolean(BooleanSupplier authority,
+                                                     Consumer<Boolean> callback) {
+        return value -> {
+            if (authority.getAsBoolean()) {
+                callback.accept(value);
+            }
+        };
+    }
+
+    private static Consumer<String> guardedString(BooleanSupplier authority,
+                                                   Consumer<String> callback) {
+        return value -> {
+            if (authority.getAsBoolean()) {
+                callback.accept(value);
+            }
+        };
+    }
+
+    private static BiConsumer<UUID, String> guardedPair(
+            BooleanSupplier authority, BiConsumer<UUID, String> callback) {
+        return (uuid, value) -> {
+            if (authority.getAsBoolean()) {
+                callback.accept(uuid, value);
+            }
+        };
+    }
+
+    private static Runnable guardedAction(BooleanSupplier authority,
+                                          Runnable callback) {
+        return () -> {
+            if (authority.getAsBoolean()) {
+                callback.run();
+            }
+        };
     }
 
     /**

@@ -354,6 +354,57 @@ final class CommandToolInventoryService {
         return null;
     }
 
+    /**
+     * Resolves an unambiguous physical command stack for destructive callback
+     * authority. Duplicate tool ids are corrupt/stale state and must not let
+     * whichever hotbar slot is encountered first choose the authority path.
+     */
+    ItemStack findUniqueToolStack(Player player, String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return null;
+        }
+        ArrayList<ToolCandidate> candidates = new ArrayList<>();
+        ItemContainer hotbar = inventory.getHotbar();
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            candidates.add(new ToolCandidate(stack, stackToolId));
+        }
+        return selectUniqueToolStack(toolId, candidates);
+    }
+
+    /** Pure ambiguity rule shared by runtime inventory scanning and tests. */
+    static ItemStack selectUniqueToolStack(
+            String toolId, Iterable<ToolCandidate> candidates
+    ) {
+        if (toolId == null || toolId.isBlank() || candidates == null) {
+            return null;
+        }
+        ItemStack resolved = null;
+        for (ToolCandidate candidate : candidates) {
+            if (candidate == null || candidate.stack() == null
+                    || !toolId.equals(candidate.toolId())) {
+                continue;
+            }
+            if (resolved != null) {
+                return null;
+            }
+            resolved = candidate.stack();
+        }
+        return resolved;
+    }
+
+    record ToolCandidate(ItemStack stack, String toolId) {
+    }
+
     static final class ToolResolution {
         final ItemStack stack;
         final String toolId;

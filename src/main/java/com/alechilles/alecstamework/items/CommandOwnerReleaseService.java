@@ -60,6 +60,11 @@ final class CommandOwnerReleaseService {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.mustBeLoaded");
             return;
         }
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                npcRef, store
+        )) {
+            return;
+        }
         if (!canRelease(player, config, npcRef, store)) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
             return;

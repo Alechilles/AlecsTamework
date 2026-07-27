@@ -207,6 +207,11 @@ final class CommandPanelEntrySourceService {
                 if (npcRef == null || !npcRef.isValid()) {
                     continue;
                 }
+                if (!CommandGenericTargetAuthority.allowsNearbyPresentation(
+                        npcRef, store
+                )) {
+                    continue;
+                }
                 if (!linkPolicyService.passesOwnerAndTamed(
                         requireOwner,
                         config != null && config.isRequireTamed(),

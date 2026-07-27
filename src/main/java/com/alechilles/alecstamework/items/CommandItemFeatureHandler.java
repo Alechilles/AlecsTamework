@@ -299,6 +299,7 @@ public final class CommandItemFeatureHandler {
         );
         this.ownerCullService = new CommandOwnerCullService(
                 linkPolicyService,
+                registry,
                 linkMutationService,
                 feedbackService,
                 npcNameResolver
@@ -451,26 +452,30 @@ public final class CommandItemFeatureHandler {
                 () -> reopenSelectionMenu(player, config, toolId),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
-        return selectionPageService.open(player, store, config, working, toolId, actions);
+        return selectionPageService.open(
+                player, store, config, working, toolId, actions,
+                () -> allowsCurrentGenericCallback(player, toolId, config)
+        );
     }
 
     private void openGroupManagerFromSelection(Player player,
                                                TwCommandItemConfig config,
                                                String toolId) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         groupManagerPageService.openGroupManagerPage(
                 player,
                 toolId,
-                () -> reopenSelectionMenu(player, config, toolId)
+                () -> reopenSelectionMenu(player, config, toolId),
+                () -> allowsCurrentGenericCallback(player, toolId, config)
         );
     }
 
     private void reopenSelectionMenu(Player player,
                                      TwCommandItemConfig config,
                                      String toolId) {
-        if (player == null || config == null || toolId == null || toolId.isBlank()) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         World world = player.getWorld();
@@ -483,7 +488,8 @@ public final class CommandItemFeatureHandler {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
             return;
         }
-        ItemStack toolStack = findCommandToolStack(player, toolId);
+        ItemStack toolStack = toolInventoryService.findUniqueToolStack(
+                player, toolId);
         if (toolStack == null || toolStack.isEmpty()) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
             return;
@@ -498,7 +504,7 @@ public final class CommandItemFeatureHandler {
                                     String toolId,
                                     TwCommandItemConfig config,
                                     String commandId) {
-        if (player == null || toolId == null || toolId.isBlank() || config == null
+        if (!allowsCurrentGenericCallback(player, toolId, config)
                 || commandId == null || commandId.isBlank()) {
             return;
         }
@@ -520,7 +526,7 @@ public final class CommandItemFeatureHandler {
                                  String toolId,
                                  TwCommandItemConfig config,
                                  UUID npcUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+        if (!allowsCurrentGenericCallback(player, toolId, config)
                 || player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
             return;
@@ -559,7 +565,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID presentationUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         ownerReleaseService.release(
@@ -571,7 +577,7 @@ public final class CommandItemFeatureHandler {
                                String toolId,
                                TwCommandItemConfig config,
                                UUID presentationUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         ownerCullService.cull(
@@ -583,7 +589,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID npcUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         freeRestorationActions.request(player, toolId, npcUuid);
@@ -599,7 +605,7 @@ public final class CommandItemFeatureHandler {
                                   String toolId,
                                   TwCommandItemConfig config,
                                   UUID npcUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+        if (!allowsCurrentGenericCallback(player, toolId, config)
                 || player == null || toolId == null || toolId.isBlank()
                 || npcUuid == null) {
             return;
@@ -698,7 +704,7 @@ public final class CommandItemFeatureHandler {
                                  String toolId,
                                  TwCommandItemConfig config,
                                  UUID npcUuid) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         locateService.locate(player, toolId, npcUuid);
@@ -716,7 +722,7 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+        if (!allowsCurrentGenericCallback(player, toolId, config)) {
             return;
         }
         menuMoveService.applyMenuMoveCommand(
@@ -748,10 +754,6 @@ public final class CommandItemFeatureHandler {
         return linkedNpcRecordStore.write(stack, canonical.records());
     }
 
-    private ItemStack findCommandToolStack(Player player, String toolId) {
-        return toolInventoryService.findToolStack(player, toolId);
-    }
-
     private String resolveCommandLabel(Player player, CommandEntry command) {
         if (command == null) {
             return LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
@@ -763,6 +765,14 @@ public final class CommandItemFeatureHandler {
                 ? player.getPlayerRef().getLanguage()
                 : null;
         return LocalizedText.resolveConfigValue(language, command.getDisplayName(), fallback);
+    }
+
+    /** Revalidates the physical generic tool before a delayed page callback. */
+    private boolean allowsCurrentGenericCallback(
+            Player player, String toolId, TwCommandItemConfig config
+    ) {
+        return CommandGenericTargetAuthority.allowsCurrentGenericCallback(
+                player, toolId, config, toolInventoryService, registry);
     }
 
     private Vector3d readStoredHomePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
