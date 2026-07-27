@@ -19,7 +19,12 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.LivingEntity;
+import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.io.PacketHandler;
 import com.hypixel.hytale.server.core.io.ProtocolVersion;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
@@ -182,6 +187,54 @@ class CommandGenericTargetAuthorityTest {
     }
 
     @Test
+    void preferredAutoLinkRefreshCannotPersistBondedProjectionUuid()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget bonded = scope.liveBondedTarget(true);
+            SimpleItemContainer hotbar = installCommandTool(
+                    bonded.player, "test:generic-whistle", "generic-tool");
+            CommandItemRegistry registry = new CommandItemRegistry();
+            TwCommandItemConfig config = genericConfig();
+            registry.register("test:generic-whistle", config);
+
+            invokePreferredAutoLinkRefresh(
+                    new CommandAutoLinkService(registry,
+                            new CommandPanelPreferenceService(),
+                            new CommandLinkMutationService(null, null, null)),
+                    bonded.player, bonded.reference, scope.store,
+                    hotbar, config, "generic-tool");
+
+            assertTrue(new CommandLinkedNpcRecordStore().read(
+                    hotbar.getItemStack((short) 0)).isEmpty());
+        }
+    }
+
+    @Test
+    void preferredAutoLinkRefreshStillPersistsOrdinaryGenericTarget()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget ordinary = scope.liveOrdinaryTarget(true);
+            SimpleItemContainer hotbar = installCommandTool(
+                    ordinary.player, "test:generic-whistle", "generic-tool");
+            CommandItemRegistry registry = new CommandItemRegistry();
+            TwCommandItemConfig config = genericConfig();
+            registry.register("test:generic-whistle", config);
+
+            invokePreferredAutoLinkRefresh(
+                    new CommandAutoLinkService(registry,
+                            new CommandPanelPreferenceService(),
+                            new CommandLinkMutationService(null, null, null)),
+                    ordinary.player, ordinary.reference, scope.store,
+                    hotbar, config, "generic-tool");
+
+            assertEquals(List.of(ordinary.uuid),
+                    new CommandLinkedNpcRecordStore().read(
+                                    hotbar.getItemStack((short) 0)).stream()
+                            .map(record -> record.npcUuid).toList());
+        }
+    }
+
+    @Test
     void genericNearbyPresentationRejectsBondedLiveMarker()
             throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
@@ -267,6 +320,48 @@ class CommandGenericTargetAuthorityTest {
 
         assertFalse(allowsGenericCallbackAtRevision(
                 physicalGenericTool, openedConfig, openedRevision, registry));
+    }
+
+    @Test
+    void genericLifecycleAuthorityRetainsExactRegisteredConfigIdOverride()
+            throws Exception {
+        ItemStack physicalOverrideItem = testStack("test:override-item");
+        TwCommandItemConfig opened = genericConfig();
+        setField(opened, TwCommandItemConfig.class, "id", "generic-override");
+        CommandItemRegistry registry = bondedCommandRegistry(
+                "test:roster-a", "test:override-item", "bonded-base",
+                bondedConfig("test:roster-a", true));
+        registry.register("generic-override", "test:configured-generic-item",
+                opened);
+        CommandItemRegistry nullBaseRegistry = new CommandItemRegistry();
+        nullBaseRegistry.register("generic-override",
+                "test:configured-generic-item", opened);
+
+        assertTrue(allowsGenericCallbackAtRevision(
+                physicalOverrideItem, opened, registry.revision(), registry));
+        assertTrue(allowsGenericCallbackAtRevision(
+                physicalOverrideItem, opened, nullBaseRegistry.revision(),
+                nullBaseRegistry));
+    }
+
+    @Test
+    void genericLifecycleAuthorityRejectsUnboundConfigAndPhysicalSubstitution()
+            throws Exception {
+        ItemStack physicalGenericTool = testStack("test:generic-whistle");
+        TwCommandItemConfig registered = genericConfig();
+        setField(registered, TwCommandItemConfig.class, "id", "registered");
+        TwCommandItemConfig different = genericConfig();
+        setField(different, TwCommandItemConfig.class, "id", "different");
+        CommandItemRegistry registry = new CommandItemRegistry();
+        registry.register("registered", "test:generic-whistle", registered);
+        long openedRevision = registry.revision();
+
+        assertFalse(allowsGenericCallbackAtRevision(
+                physicalGenericTool, different, openedRevision, registry));
+        assertFalse(allowsGenericCallbackAtRevision(
+                testStack("test:substituted-whistle"),
+                "test:generic-whistle", registered, openedRevision,
+                registry));
     }
 
     @Test
@@ -425,6 +520,17 @@ class CommandGenericTargetAuthorityTest {
                 openTimeConfig, openedRevision, registry);
     }
 
+    private static boolean allowsGenericCallbackAtRevision(
+            ItemStack stack,
+            String openedItemId,
+            TwCommandItemConfig openTimeConfig,
+            long openedRevision,
+            CommandItemRegistry registry
+    ) throws Exception {
+        return invokeBoolean("allowsCurrentGenericCallback", stack,
+                openedItemId, openTimeConfig, openedRevision, registry);
+    }
+
     private static boolean allowsBondedCallback(
             ItemStack stack,
             String openedItemId,
@@ -513,6 +619,50 @@ class CommandGenericTargetAuthorityTest {
 
     private static ItemStack metadataStack(String itemId) {
         return new MetadataItemStack(itemId, null);
+    }
+
+    private static SimpleItemContainer installCommandTool(
+            Player player, String itemId, String toolId) throws Exception {
+        ItemStack stack = metadataStack(itemId).withMetadata(
+                com.alechilles.alecstamework.config.TameworkMetadataKeys
+                        .COMMAND_TOOL_ID,
+                com.hypixel.hytale.codec.Codec.STRING,
+                toolId);
+        SimpleItemContainer hotbar = new SimpleItemContainer((short) 1);
+        hotbar.setItemStackForSlot((short) 0, stack);
+        Inventory inventory = new Inventory();
+        setField(inventory, Inventory.class, "hotbar",
+                new InventoryComponent.Hotbar(hotbar, (byte) 0));
+        setField(player, LivingEntity.class, "inventory", inventory);
+        return hotbar;
+    }
+
+    private static void invokePreferredAutoLinkRefresh(
+            CommandAutoLinkService service,
+            Player player,
+            Ref<EntityStore> npcRef,
+            TestEntityComponentStore store,
+            SimpleItemContainer hotbar,
+            TwCommandItemConfig config,
+            String toolId
+    ) throws Exception {
+        CombinedItemContainer combined = new CombinedItemContainer(hotbar);
+        Class<?> candidateType = Class.forName(
+                CommandAutoLinkService.class.getName() + "$ToolCandidate");
+        var constructor = candidateType.getDeclaredConstructor(
+                CombinedItemContainer.class, short.class, ItemStack.class,
+                String.class, TwCommandItemConfig.class);
+        constructor.setAccessible(true);
+        Object candidate = constructor.newInstance(
+                combined, (short) 0, hotbar.getItemStack((short) 0), toolId,
+                config);
+        Method method = CommandAutoLinkService.class.getDeclaredMethod(
+                "syncPreferredCandidate",
+                Player.class, com.hypixel.hytale.component.Store.class,
+                Ref.class, candidateType,
+                String.class);
+        method.setAccessible(true);
+        method.invoke(service, player, store, npcRef, candidate, toolId);
     }
 
     /** Asset-store-free stack that keeps real BSON metadata semantics. */

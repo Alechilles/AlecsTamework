@@ -214,6 +214,9 @@ class BondedCompanionCommandRoutingIsolationTest {
         assertBefore(cull, "allowsGenericCullRepair(",
                 "removeLinkedNpcRecord(stack, npcUuid)");
         assertTrue(handler.contains("findUniqueToolStack("));
+        assertBefore(handler, "callbackAuthority.bindGeneric(working, config)",
+                "selectionPageService.open(");
+        assertTrue(handler.contains("genericBinding == null"));
         assertTrue(groups.contains("runIfAllowed(authority,"));
         assertTrue(groups.contains("authority.getAsBoolean()"));
     }

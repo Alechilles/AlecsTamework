@@ -83,10 +83,27 @@ final class CommandGenericTargetAuthority {
                 || physicalStack == null || physicalStack.isEmpty()) {
             return false;
         }
-        TwCommandItemConfig current = registry.get(physicalStack.getItemId());
         return registry.revision() == openedRegistryRevision
+                && CommandRosterStorageBoundary.allowsGenericRosterActions(
+                        openTimeConfig)
+                && isExactRegisteredConfig(
+                        physicalStack, openTimeConfig, registry)
+                && registry.revision() == openedRegistryRevision;
+    }
+
+    static boolean allowsCurrentGenericCallback(
+            @Nullable ItemStack physicalStack,
+            @Nullable String openedPhysicalItemId,
+            @Nullable TwCommandItemConfig openTimeConfig,
+            long openedRegistryRevision,
+            @Nullable CommandItemRegistry registry
+    ) {
+        return physicalStack != null
+                && Objects.equals(openedPhysicalItemId,
+                        physicalStack.getItemId())
                 && allowsCurrentGenericCallback(
-                        physicalStack, openTimeConfig, current);
+                        physicalStack, openTimeConfig,
+                        openedRegistryRevision, registry);
     }
 
     /**
@@ -200,5 +217,21 @@ final class CommandGenericTargetAuthority {
         TwCommandItemConfig override = configId == null || configId.isBlank()
                 ? null : registry.getByConfigId(configId);
         return override != null ? override : registry.get(physicalStack.getItemId());
+    }
+
+    private static boolean isExactRegisteredConfig(
+            ItemStack physicalStack,
+            TwCommandItemConfig openTimeConfig,
+            CommandItemRegistry registry
+    ) {
+        if (openTimeConfig == null) {
+            return false;
+        }
+        String configId = openTimeConfig.getId();
+        if (configId != null && !configId.isBlank()
+                && registry.getByConfigId(configId) == openTimeConfig) {
+            return true;
+        }
+        return registry.get(physicalStack.getItemId()) == openTimeConfig;
     }
 }

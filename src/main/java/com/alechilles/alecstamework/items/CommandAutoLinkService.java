@@ -165,6 +165,10 @@ public final class CommandAutoLinkService {
         if (links == null || !links.containsToolId(preferredToolId)) {
             return tryLinkCandidate(player, store, npcRef, candidate);
         }
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                npcRef, store)) {
+            return false;
+        }
         ItemStack stack = candidate.container().getItemStack(candidate.slot());
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (stack == null || stack.isEmpty() || npc == null || npc.getUuid() == null) {

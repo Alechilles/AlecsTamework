@@ -445,6 +445,12 @@ public final class CommandItemFeatureHandler {
                                       TwCommandItemConfig config,
                                       ItemStack working,
                                       String toolId) {
+        CommandPanelCallbackAuthority.GenericBinding genericBinding =
+                callbackAuthority.bindGeneric(working, config);
+        if (CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                && genericBinding == null) {
+            return false;
+        }
         long openedRegistryRevision = callbackAuthority.revision();
         CommandSelectionPageService.Actions actions = new CommandSelectionPageService.Actions(
                 npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
@@ -456,15 +462,15 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuSetHome(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, config, npcUuid),
                 () -> openGroupManagerFromSelection(
-                        player, config, toolId, openedRegistryRevision),
+                        player, config, toolId, genericBinding),
                 () -> reopenSelectionMenu(
-                        player, config, toolId, openedRegistryRevision),
+                        player, config, toolId, genericBinding),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         return selectionPageService.open(
                 player, store, config, working, toolId, actions,
                 () -> callbackAuthority.allowsGeneric(
-                        player, toolId, config, openedRegistryRevision),
+                        player, toolId, genericBinding),
                 () -> callbackAuthority.allowsBonded(
                         player, toolId,
                         working == null ? null : working.getItemId(),
@@ -475,27 +481,29 @@ public final class CommandItemFeatureHandler {
     private void openGroupManagerFromSelection(Player player,
                                                TwCommandItemConfig config,
                                                String toolId,
-                                               long openedRegistryRevision) {
+                                               CommandPanelCallbackAuthority
+                                                       .GenericBinding binding) {
         if (!callbackAuthority.allowsGeneric(
-                player, toolId, config, openedRegistryRevision)) {
+                player, toolId, binding)) {
             return;
         }
         groupManagerPageService.openGroupManagerPage(
                 player,
                 toolId,
                 () -> reopenSelectionMenu(
-                        player, config, toolId, openedRegistryRevision),
+                        player, config, toolId, binding),
                 () -> callbackAuthority.allowsGeneric(
-                        player, toolId, config, openedRegistryRevision)
+                        player, toolId, binding)
         );
     }
 
     private void reopenSelectionMenu(Player player,
                                      TwCommandItemConfig config,
                                      String toolId,
-                                     long openedRegistryRevision) {
+                                     CommandPanelCallbackAuthority
+                                             .GenericBinding binding) {
         if (!callbackAuthority.allowsGeneric(
-                player, toolId, config, openedRegistryRevision)) {
+                player, toolId, binding)) {
             return;
         }
         World world = player.getWorld();
