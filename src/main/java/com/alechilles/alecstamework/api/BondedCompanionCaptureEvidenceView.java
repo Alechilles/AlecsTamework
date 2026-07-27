@@ -9,8 +9,9 @@ import javax.annotation.Nullable;
  * Immutable proof that a bonded capture durably created its stored profile.
  *
  * <p>This proof does not claim that later source-NPC cleanup or capture-item
- * finalization has completed. It is retained with the bounded bonded capture
- * operation so restart recovery never needs generic profile persistence.</p>
+ * finalization has completed. It is retained with the bonded profile's
+ * dedicated source authority so operation-history pruning cannot release the
+ * captured NPC identity for reuse.</p>
  */
 public record BondedCompanionCaptureEvidenceView(
         @Nonnull UUID operationId,

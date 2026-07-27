@@ -39,7 +39,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 Objects.requireNonNull(databasePath, "databasePath"));
         operations = new SqliteBondedCompanionOperationExecutor(connections);
         captureEvents = new SqliteBondedCompanionCaptureEvidenceAccess(
-                connections, operations);
+                connections);
     }
 
     @Override public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
@@ -65,20 +65,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                 mapper::toDomain);
     }
 
-    /** Atomically creates one captured profile and its exact cleanup intent. */
-    public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
-            createCapturedProfile(
-            BondedCompanionOperation operation,
-            BondedCompanionRecord.Profile profile,
-            BondedCompanionRecord.Cleanup cleanup,
-            int maximumOwned
-    ) {
-        return createCapturedProfile(
-                operation, profile, cleanup, maximumOwned, null
-        );
-    }
-
-    /** Atomically creates a captured profile, cleanup, and optional event proof. */
+    /** Atomically creates a captured profile, source authority, and cleanup. */
     public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
             createCapturedProfile(
             BondedCompanionOperation operation,
@@ -89,13 +76,18 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
     ) {
         requireScope(operation, profile.ownerUuid(), profile.rosterId(),
                 profile.profileId());
-        if (captureEvidence != null) {
-            captureEvents.requireMatches(operation, profile, captureEvidence);
-        }
+        captureEvents.requireMatches(
+                operation, profile, cleanup,
+                Objects.requireNonNull(captureEvidence, "captureEvidence"));
+        SqliteBondedCompanionProfileRow profileRow = mapper.toRow(profile);
+        SqliteBondedCompanionCaptureSourceRow sourceRow =
+                new SqliteBondedCompanionCaptureSourceRow(
+                        captureEvidence, profileRow, operation.requestHash(), null);
         return mutate(operation, null, false,
                 SqliteBondedCompanionProfileRow.class,
                 store -> store.createCapturedProfile(
-                        mapper.toRow(profile), mapper.toRow(cleanup), maximumOwned),
+                        profileRow, mapper.toRow(cleanup), sourceRow,
+                        maximumOwned),
                 mapper::toDomain, captureEvidence);
     }
 
@@ -113,6 +105,13 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             UUID sourceNpcUuid
     ) {
         return captureEvents.findBySource(sourceNpcUuid, 2);
+    }
+
+    /** Internal immutable source authority, including the capture-time profile. */
+    List<SqliteBondedCompanionCaptureSourceRow> findCaptureSourcesBySource(
+            UUID sourceNpcUuid
+    ) {
+        return captureEvents.findRowsBySource(sourceNpcUuid, 2);
     }
 
     @Override

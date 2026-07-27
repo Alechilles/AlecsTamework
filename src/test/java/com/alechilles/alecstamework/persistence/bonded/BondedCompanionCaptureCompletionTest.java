@@ -115,9 +115,9 @@ class BondedCompanionCaptureCompletionTest {
         assertEquals(0, restartedPublisher.publishPending(16));
     }
 
-    /** Evidence expires only with the bounded operation tombstone. */
+    /** Profile-lifetime capture evidence survives bounded operation pruning. */
     @Test
-    void captureLookupExpiresWithItsOperationRetention() {
+    void captureLookupSurvivesOperationRetention() {
         SqliteBondedCompanionDatabase database = database();
         database.createCapturedProfile(
                 operation(), profile(), cleanup(), 4, evidence()
@@ -126,7 +126,7 @@ class BondedCompanionCaptureCompletionTest {
         int pruned = database.pruneOperations(20_001L, 16);
 
         assertEquals(1, pruned);
-        assertFalse(database.findCaptureEvidence(
+        assertTrue(database.findCaptureEvidence(
                 OWNER, ROSTER, SOURCE).isPresent());
     }
 

@@ -26,6 +26,8 @@ final class SqliteBondedCompanionStore {
     private final SqliteBondedCompanionExtensionStore extensions;
     private final SqliteBondedCompanionLeaseStore leases;
     private final SqliteBondedCompanionProfileReader profiles;
+    private final SqliteBondedCompanionCapacityPolicy capacity;
+    private final SqliteBondedCompanionCaptureSourceStore captureSources;
 
     SqliteBondedCompanionStore(@Nonnull Connection connection) {
         this.connection = Objects.requireNonNull(connection, "connection");
@@ -33,6 +35,8 @@ final class SqliteBondedCompanionStore {
         extensions = new SqliteBondedCompanionExtensionStore(connection);
         leases = new SqliteBondedCompanionLeaseStore(connection);
         profiles = new SqliteBondedCompanionProfileReader(connection);
+        capacity = new SqliteBondedCompanionCapacityPolicy(profiles);
+        captureSources = new SqliteBondedCompanionCaptureSourceStore(connection);
     }
 
     SqliteBondedCompanionRetentionStore retention() { return retention; }
@@ -101,7 +105,7 @@ final class SqliteBondedCompanionStore {
             int maximumOwned
     ) {
         MutationResult<SqliteBondedCompanionProfileRow> denial =
-                familyCapacityDenial(row, maximumOwned);
+                capacity.denial(row, maximumOwned);
         return denial == null ? createProfile(row) : denial;
     }
 
@@ -110,37 +114,26 @@ final class SqliteBondedCompanionStore {
     public MutationResult<SqliteBondedCompanionProfileRow> createCapturedProfile(
             @Nonnull SqliteBondedCompanionProfileRow profile,
             @Nonnull SqliteBondedCompanionCleanupRow cleanup,
+            @Nonnull SqliteBondedCompanionCaptureSourceRow captureSource,
             int maximumOwned
     ) {
         MutationResult<SqliteBondedCompanionProfileRow> denial =
-                familyCapacityDenial(profile, maximumOwned);
+                capacity.denial(profile, maximumOwned);
         if (denial != null) return denial;
         MutationResult<SqliteBondedCompanionProfileRow> created =
                 createProfile(profile);
         if (!created.applied()) return created;
+        try {
+            captureSources.insert(captureSource);
+        } catch (SQLException failure) {
+            return result(MutationCode.STORAGE_FAILURE, null,
+                    "bonded-capture-source-not-claimed");
+        }
         MutationResult<SqliteBondedCompanionCleanupRow> queued =
                 enqueueCleanup(profile.ownerUuid(), profile.rosterId(), cleanup);
         return queued.applied() ? created : result(
                 MutationCode.STORAGE_FAILURE, null,
                 "bonded-capture-cleanup-not-enqueued");
-    }
-
-    private MutationResult<SqliteBondedCompanionProfileRow>
-            familyCapacityDenial(
-                    SqliteBondedCompanionProfileRow profile,
-                    int maximumOwned
-            ) {
-        if (maximumOwned < 0) {
-            return result(MutationCode.VALIDATION_FAILED, null,
-                    "bonded-capacity-invalid");
-        }
-        if (maximumOwned == 0) return null;
-        long owned = profiles.countFamily(
-                profile.ownerUuid(), profile.rosterId(), profile.familyId());
-        return owned >= maximumOwned
-                ? result(MutationCode.CONFLICT, null,
-                        "bonded-family-capacity-reached")
-                : null;
     }
 
     /** Lists profiles in deterministic order for exactly one owner roster. */

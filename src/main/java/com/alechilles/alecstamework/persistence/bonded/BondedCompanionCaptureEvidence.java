@@ -8,7 +8,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Self-contained capture proof retained inside one bounded bonded operation. */
+/** Self-contained capture proof retained for the bonded profile's lifetime. */
 public record BondedCompanionCaptureEvidence(
         @Nonnull UUID operationId,
         @Nonnull UUID attemptId,

@@ -37,6 +37,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,6 +50,8 @@ class BondedCompanionCaptureAdapterReplayTest {
             "20000000-0000-0000-0000-000000000002");
     private static final UUID OTHER = UUID.fromString(
             "90000000-0000-0000-0000-000000000009");
+    private static final UUID OTHER_SOURCE = UUID.fromString(
+            "80000000-0000-0000-0000-000000000008");
     @TempDir Path tempDir;
 
     @Test
@@ -64,6 +67,30 @@ class BondedCompanionCaptureAdapterReplayTest {
                 OWNER, "hydragon:companions").size());
         assertEquals(1, fixture.database.listCleanup(
                 OWNER, "hydragon:companions", 10).size());
+    }
+
+    /** Regression: world identity is part of direct replay authority. */
+    @Test
+    void wrongWorldDirectReplayConflictsWithoutStartingCleanup()
+            throws Exception {
+        Fixture fixture = fixture("wrong-world-direct-replay.sqlite",
+                rosterRegistry());
+        AtomicInteger cleanups = new AtomicInteger();
+        var author = new BondedCompanionCaptureAuthor(
+                fixture.persistence, fixture.persistence::validate,
+                fixture.persistence::store, intent -> {
+                    cleanups.incrementAndGet();
+                    return fixture.persistence.cleanup(intent);
+                }, BondedCompanionCaptureFeedbackDispatcher.production(),
+                (intent, failure) -> {});
+        var original = frozenIntentAt(10L);
+
+        assertTrue(author.capture(original).durable());
+        var rejected = author.capture(withWorld(original, "other-world"));
+
+        assertEquals(BondedCompanionCaptureAuthor.Status.DATABASE_FAILED,
+                rejected.status());
+        assertEquals(1, cleanups.get());
     }
 
     @Test
@@ -144,17 +171,65 @@ class BondedCompanionCaptureAdapterReplayTest {
     }
 
     @Test
+    void cleanupConflictRollsBackProfileSourceAndOperation() throws Exception {
+        Fixture fixture = fixture("cleanup-conflict-rollback.sqlite",
+                rosterRegistry());
+        var original = frozenIntentAt(10L);
+        var duplicate = withSource(forActor(original, OTHER), OTHER_SOURCE);
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                fixture.persistence.store(original));
+        injectBlockingCleanup(fixture.path, original, duplicate);
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED,
+                fixture.persistence.store(duplicate));
+        assertTrue(fixture.database.listProfiles(
+                OTHER, duplicate.rosterId()).isEmpty());
+        assertTrue(fixture.database.findCaptureEvidence(
+                OTHER, duplicate.rosterId(), OTHER_SOURCE).isEmpty());
+        assertTrue(fixture.database.findProfileOperationByIdentity(
+                operationProbe(duplicate)).isEmpty());
+    }
+
+    /** Regression: bounded operation pruning cannot release source ownership. */
+    @Test
+    void sourceAuthoritySurvivesOperationPruningAndRejectsSecondOwner()
+            throws Exception {
+        Fixture fixture = fixture("pruned-operation-source-claim.sqlite",
+                rosterRegistry());
+        var original = frozenIntentAt(10L);
+        var duplicate = forActor(original, OTHER);
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                fixture.persistence.store(original));
+        assertEquals(BondedCompanionCaptureAuthor.CleanupOutcome.RETRY_PENDING,
+                fixture.persistence.cleanup(original));
+        assertEquals(1, fixture.database.pruneOperations(Long.MAX_VALUE, 16));
+
+        assertEquals(BondedCompanionCaptureReplayGateway.LookupStatus.MATCHED,
+                fixture.persistence.lookup(request(original)).status());
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED,
+                fixture.persistence.store(original));
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED,
+                fixture.persistence.store(duplicate));
+        assertTrue(fixture.database.listProfiles(
+                OTHER, duplicate.rosterId()).isEmpty());
+        assertTrue(fixture.database.listCleanup(
+                OTHER, duplicate.rosterId(), 10).isEmpty());
+    }
+
+    @Test
     void globalLookupFailsClosedIfCorruptionContainsMultipleEvidence()
             throws Exception {
         Fixture fixture = fixture("duplicate-source-corruption.sqlite",
                 rosterRegistry());
         dropSourceIndex(fixture.path);
         var original = frozenIntentAt(10L);
+        var duplicate = forActor(original, OTHER);
 
         assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
                 fixture.persistence.store(original));
-        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
-                fixture.persistence.store(forActor(original, OTHER)));
+        injectDuplicateCaptureEvidence(fixture.path, original, duplicate);
         assertEquals(BondedCompanionCaptureReplayGateway.LookupStatus.CONFLICT,
                 fixture.persistence.lookup(request(original)).status());
     }
@@ -166,8 +241,7 @@ class BondedCompanionCaptureAdapterReplayTest {
 
         String sql = indexSql(fixture.path);
         assertTrue(sql.contains("CREATE UNIQUE INDEX"));
-        assertTrue(sql.contains(
-                "$.captureEvidence.sourceNpcUuid"));
+        assertTrue(sql.contains("source_npc_uuid"));
     }
 
     @Test
@@ -179,9 +253,9 @@ class BondedCompanionCaptureAdapterReplayTest {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            assertEquals(1, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version = 6"));
-            statement.execute("DROP INDEX bonded_capture_source_once_idx");
+            assertEquals(2, statement.executeUpdate(
+                    "DELETE FROM bonded_schema_history WHERE version IN (6, 7)"));
+            statement.execute("DROP TABLE bonded_companion_capture_source");
         }
 
         assertTrue(manager.initialize().availability().available());
@@ -270,6 +344,46 @@ class BondedCompanionCaptureAdapterReplayTest {
                 source.familyId(), source.familySelection());
     }
 
+    private static BondedCompanionCaptureIntent withWorld(
+            BondedCompanionCaptureIntent source,
+            String worldKey
+    ) {
+        return new BondedCompanionCaptureIntent(
+                source.callerNamespace(), source.idempotencyKey(),
+                source.actorUuid(), worldKey, source.hotbarSlot(),
+                source.sourceFingerprint(), source.sourceNpcUuid(),
+                source.attemptEvidence(), source.roleId(), source.species(),
+                source.rosterId(), source.rosterRevision(), source.snapshot(),
+                source.completionEffect(), true, true, true, true, true, true,
+                source.familyId(), source.familySelection());
+    }
+
+    private static BondedCompanionCaptureIntent withSource(
+            BondedCompanionCaptureIntent source,
+            UUID sourceNpcUuid
+    ) {
+        CoopResidentStateSnapshot state = source.snapshot().fullState();
+        BondedCompanionSnapshot snapshot = BondedCompanionSnapshot.of(
+                new CoopResidentStateSnapshot(
+                        sourceNpcUuid, state.coopId(), state.residentSlot(),
+                        state.roleId(), state.commandLinks(), state.owner(),
+                        state.tamed(), state.npcName(), state.happiness(),
+                        state.needs(), state.breeding(), state.leveling(),
+                        state.traits(), state.talents(), state.lifeStage(),
+                        state.attachments(), state.healthPercent(),
+                        state.capturedAtMs()),
+                source.snapshot().extensionData());
+        return new BondedCompanionCaptureIntent(
+                source.callerNamespace(), source.actorUuid() + ":"
+                + source.rosterId() + ":" + sourceNpcUuid,
+                source.actorUuid(), source.worldKey(), source.hotbarSlot(),
+                "fingerprint-" + sourceNpcUuid, sourceNpcUuid,
+                source.attemptEvidence(), source.roleId(), source.species(),
+                source.rosterId(), source.rosterRevision(), snapshot,
+                source.completionEffect(), true, true, true, true, true, true,
+                source.familyId(), source.familySelection());
+    }
+
     private static BondedCompanionCaptureReplayGateway.Request request(
             BondedCompanionCaptureIntent intent
     ) {
@@ -293,7 +407,81 @@ class BondedCompanionCaptureAdapterReplayTest {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            statement.execute("DROP INDEX bonded_capture_source_once_idx");
+            statement.execute("DROP INDEX bonded_capture_source_uuid_uq");
+        }
+    }
+
+    private static void injectDuplicateCaptureEvidence(
+            Path path,
+            BondedCompanionCaptureIntent original,
+            BondedCompanionCaptureIntent duplicate
+    ) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(path)
+                .openWriterConnection();
+             PreparedStatement profile = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_profile
+                     SELECT ?, ?, roster_id, family_id, role_id, state,
+                            revision, snapshot_json, created_at_ms,
+                            updated_at_ms, policy_json, display_name, species,
+                            gender, died_at_ms, revive_cooldown_until_ms,
+                            revive_count, quarantine_reason, quarantined_at_ms
+                     FROM bonded_companion_profile WHERE profile_id = ?
+                     """);
+             PreparedStatement source = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_capture_source
+                     SELECT ?, ?, roster_id, source_npc_uuid, source_world_key,
+                            caller_namespace, ?, request_hash,
+                            json_set(capture_evidence_json,
+                                '$.ownerUuid', ?, '$.profileId', ?,
+                                '$.idempotencyKey', ?),
+                            json_set(capture_snapshot_json,
+                                '$.ownerUuid', ?, '$.profileId', ?),
+                            committed_at_ms, event_published_at_ms
+                     FROM bonded_companion_capture_source
+                     WHERE profile_id = ?
+                     """)) {
+            profile.setString(1, duplicate.profileId());
+            profile.setString(2, duplicate.actorUuid().toString());
+            profile.setString(3, original.profileId());
+            assertEquals(1, profile.executeUpdate());
+            source.setString(1, duplicate.profileId());
+            source.setString(2, duplicate.actorUuid().toString());
+            source.setString(3, duplicate.idempotencyKey());
+            source.setString(4, duplicate.actorUuid().toString());
+            source.setString(5, duplicate.profileId());
+            source.setString(6, duplicate.idempotencyKey());
+            source.setString(7, duplicate.actorUuid().toString());
+            source.setString(8, duplicate.profileId());
+            source.setString(9, original.profileId());
+            assertEquals(1, source.executeUpdate());
+        }
+    }
+
+    private static void injectBlockingCleanup(
+            Path path,
+            BondedCompanionCaptureIntent existing,
+            BondedCompanionCaptureIntent blocked
+    ) throws Exception {
+        try (Connection connection = new SqliteConnectionFactory(path)
+                .openWriterConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO bonded_companion_cleanup(
+                         cleanup_id, owner_uuid, roster_id, profile_id,
+                         lease_token, target_kind, target_npc_uuid,
+                         cleanup_reason, world_key, cleanup_state,
+                         attempt_count, next_attempt_at_ms, created_at_ms,
+                         retained_until_ms
+                     )
+                     SELECT ?, owner_uuid, roster_id, profile_id, lease_token,
+                            target_kind, target_npc_uuid, cleanup_reason,
+                            world_key, cleanup_state, attempt_count,
+                            next_attempt_at_ms, created_at_ms,
+                            retained_until_ms
+                     FROM bonded_companion_cleanup WHERE cleanup_id = ?
+                     """)) {
+            statement.setString(1, blocked.profileId() + ":capture-source");
+            statement.setString(2, existing.profileId() + ":capture-source");
+            assertEquals(1, statement.executeUpdate());
         }
     }
 
@@ -304,7 +492,7 @@ class BondedCompanionCaptureAdapterReplayTest {
              ResultSet row = statement.executeQuery("""
                      SELECT sql FROM sqlite_master
                      WHERE type = 'index'
-                       AND name = 'bonded_capture_source_once_idx'
+                       AND name = 'bonded_capture_source_uuid_uq'
                      """)) {
             return row.next() ? row.getString(1) : "";
         }
@@ -317,14 +505,22 @@ class BondedCompanionCaptureAdapterReplayTest {
     ) throws Exception {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openWriterConnection();
-             PreparedStatement statement = connection.prepareStatement("""
+             PreparedStatement operation = connection.prepareStatement("""
                      UPDATE bonded_companion_operation SET request_hash = ?
                      WHERE caller_namespace = ? AND idempotency_key = ?
+                     """);
+             PreparedStatement source = connection.prepareStatement("""
+                     UPDATE bonded_companion_capture_source SET request_hash = ?
+                     WHERE caller_namespace = ? AND idempotency_key = ?
                      """)) {
-            statement.setString(1, hash);
-            statement.setString(2, intent.callerNamespace());
-            statement.setString(3, intent.idempotencyKey());
-            assertEquals(1, statement.executeUpdate());
+            operation.setString(1, hash);
+            operation.setString(2, intent.callerNamespace());
+            operation.setString(3, intent.idempotencyKey());
+            assertEquals(1, operation.executeUpdate());
+            source.setString(1, hash);
+            source.setString(2, intent.callerNamespace());
+            source.setString(3, intent.idempotencyKey());
+            assertEquals(1, source.executeUpdate());
         }
     }
 

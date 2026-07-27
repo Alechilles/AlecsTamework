@@ -15,7 +15,6 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopR
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
-import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEventPublisher;
 import com.alechilles.alecstamework.persistence.bonded
@@ -25,8 +24,6 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -55,6 +52,10 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
     private final BondedCompanionCaptureEventPublisher captureEvents;
     private final BondedCompanionSnapshotCodec snapshots =
             new BondedCompanionSnapshotCodec();
+    private final BondedCompanionCaptureRequestIdentity requestIdentity =
+            new BondedCompanionCaptureRequestIdentity();
+    private final SqliteBondedCompanionMapper mapper =
+            new SqliteBondedCompanionMapper();
 
     public SqliteBondedCompanionCapturePersistenceAdapter(
             @Nonnull BondedCompanionRosterRegistry rosters,
@@ -158,31 +159,15 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
     public LookupResult lookup(@Nonnull Request request) {
         Objects.requireNonNull(request, "request");
         try {
-            var captured = database.findCaptureEvidenceBySource(
+            var captured = database.findCaptureSourcesBySource(
                     request.sourceNpcUuid());
             if (captured.isEmpty()) return LookupResult.absent();
             if (captured.size() != 1) return LookupResult.conflict();
-            BondedCompanionCaptureEvidence evidence = captured.get(0);
+            SqliteBondedCompanionCaptureSourceRow source = captured.get(0);
+            BondedCompanionCaptureEvidence evidence = source.evidence();
             if (!matches(request, evidence)) return LookupResult.conflict();
-
-            var prior = profiles.findProfileOperationByIdentity(
-                    new BondedCompanionOperationProbe(
-                            evidence.callerNamespace(),
-                            evidence.idempotencyKey(), evidence.ownerUuid(),
-                            evidence.rosterId(), evidence.profileId(),
-                            BondedCompanionOperation.Type.CAPTURE));
-            if (prior.isEmpty()) return LookupResult.failed();
-            BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
-                    prior.get();
-            if (result.code()
-                    == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
-                return LookupResult.conflict();
-            }
-            if (result.code() != BondedCompanionStoreResult.Code.APPLIED
-                    || result.value() == null || !result.replayed()) {
-                return LookupResult.failed();
-            }
-            BondedCompanionSnapshot snapshot = decode(result.value());
+            BondedCompanionSnapshot snapshot = decode(
+                    source.capturedProfile());
             if (snapshot == null) return LookupResult.failed();
             return LookupResult.matched(new Evidence(
                     attemptEvidence(evidence), evidence.roleId(),
@@ -199,6 +184,16 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
         Objects.requireNonNull(intent, "intent");
         if (intent.snapshot() == null) return ExactResult.absent();
         try {
+            var captured = database.findCaptureSourcesBySource(
+                    intent.sourceNpcUuid());
+            if (captured.size() > 1) return ExactResult.conflict();
+            if (captured.size() == 1) {
+                if (!matches(intent, captured.getFirst())) {
+                    return ExactResult.conflict();
+                }
+                publishCaptureEvents();
+                return ExactResult.replayed();
+            }
             long nowMs = intent.snapshot().fullState().capturedAtMs();
             var prior = profiles.findProfileOperationByExactRequest(
                     operation(intent, nowMs));
@@ -209,15 +204,29 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
                     == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
                 return ExactResult.conflict();
             }
-            if (result.code() != BondedCompanionStoreResult.Code.APPLIED
-                    || result.value() == null || !result.replayed()) {
-                return ExactResult.failed();
-            }
-            publishCaptureEvents();
-            return ExactResult.replayed();
+            return ExactResult.failed();
         } catch (RuntimeException failure) {
             return ExactResult.failed();
         }
+    }
+
+    private boolean matches(
+            BondedCompanionCaptureIntent intent,
+            SqliteBondedCompanionCaptureSourceRow source
+    ) {
+        BondedCompanionCaptureEvidence evidence = source.evidence();
+        return intent.callerNamespace().equals(evidence.callerNamespace())
+                && intent.idempotencyKey().equals(evidence.idempotencyKey())
+                && intent.actorUuid().equals(evidence.ownerUuid())
+                && intent.rosterId().equals(evidence.rosterId())
+                && intent.profileId().equals(evidence.profileId())
+                && intent.sourceNpcUuid().equals(evidence.sourceNpcUuid())
+                && intent.worldKey().equals(evidence.sourceWorldKey())
+                && intent.attemptEvidence().sourceItemId().equals(
+                evidence.sourceItemId())
+                && intent.roleId().equals(evidence.roleId())
+                && requestIdentity.matches(
+                source.requestHash(), intent, claimed(intent));
     }
 
     private boolean matches(
@@ -241,10 +250,11 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
 
     @Nullable
     private BondedCompanionSnapshot decode(
-            BondedCompanionRecord.Profile profile
+            SqliteBondedCompanionProfileRow profile
     ) {
         String encoded = new String(
-                profile.snapshot().bytes(), StandardCharsets.UTF_8);
+                mapper.payload(profile.snapshotJson()).bytes(),
+                StandardCharsets.UTF_8);
         BondedCompanionSnapshotCodec.DecodeResult decoded = snapshots.decode(
                 encoded);
         return decoded.status() == BondedCompanionSnapshotCodec.Status.FOUND
@@ -268,7 +278,7 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
         try {
             captureEvents.publishPending(64);
         } catch (RuntimeException | LinkageError ignored) {
-            // The committed tombstone remains pending for maintenance replay.
+            // The committed capture authority remains pending for replay.
         }
     }
 
@@ -380,7 +390,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
             long nowMs
     ) {
         return new BondedCompanionOperation(
-                intent.callerNamespace(), intent.idempotencyKey(), hash(intent),
+                intent.callerNamespace(), intent.idempotencyKey(),
+                requestIdentity.current(intent, claimed(intent)),
                 intent.actorUuid(), intent.rosterId(), intent.profileId(),
                 BondedCompanionOperation.Type.CAPTURE, nowMs,
                 safeAdd(nowMs, OPERATION_RETENTION_MS)
@@ -444,49 +455,6 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter
                 intent.sourceNpcUuid(), intent.worldKey(), "capture", nowMs,
                 safeAdd(nowMs, CLEANUP_RETENTION_MS)
         );
-    }
-
-    private String hash(BondedCompanionCaptureIntent intent) {
-        var attempt = intent.attemptEvidence();
-        String canonical = intent.actorUuid() + "\0" + intent.rosterId()
-                + "\0" + intent.roleId() + "\0" + intent.sourceNpcUuid()
-                + "\0" + attempt.attemptId()
-                + "\0" + attempt.sourceItemId()
-                + "\0" + attempt.spawnerConfigId()
-                + "\0" + attempt.spawnerConfigRevision()
-                + "\0" + attempt.capturePolicyConfigId()
-                + "\0" + attempt.capturePolicyConfigRevision()
-                + "\0" + attempt.sourceConsumption()
-                + "\0" + attempt.successDisposition()
-                + "\0" + attempt.outcome()
-                + "\0" + attempt.reason()
-                + "\0" + snapshots.encode(requestIdentitySnapshot(intent));
-        if (intent.familySelection()
-                == BondedCompanionCaptureIntent.FamilySelection.EXPLICIT) {
-            canonical += "\0family:" + intent.familyId();
-        }
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(canonical.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception failure) {
-            throw new IllegalStateException(failure);
-        }
-    }
-
-    /** Excludes only the volatile observation timestamp from retry identity. */
-    private BondedCompanionSnapshot requestIdentitySnapshot(
-            BondedCompanionCaptureIntent intent
-    ) {
-        BondedCompanionSnapshot claimed = claimed(intent);
-        CoopResidentStateSnapshot state = claimed.fullState();
-        CoopResidentStateSnapshot stable = new CoopResidentStateSnapshot(
-                state.npcUuid(), state.coopId(), state.residentSlot(),
-                state.roleId(), state.commandLinks(), state.owner(), state.tamed(),
-                state.npcName(), state.happiness(), state.needs(), state.breeding(),
-                state.leveling(), state.traits(), state.talents(), state.lifeStage(),
-                state.attachments(), state.healthPercent(), 0L
-        );
-        return BondedCompanionSnapshot.of(stable, claimed.extensionData());
     }
 
     private long safeAdd(long value, long amount) {

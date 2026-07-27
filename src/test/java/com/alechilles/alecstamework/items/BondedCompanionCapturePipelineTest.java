@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompa
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionCapturePersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionCaptureEvidence;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEventPublisher;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
@@ -346,9 +347,20 @@ class BondedCompanionCapturePipelineTest {
                 "spawner-bonded-capture:v1", "key", "a".repeat(64), OWNER,
                 "hydragon:companions", "profile", BondedCompanionOperation.Type.CAPTURE,
                 10L, 300_010L);
+        var evidence = new BondedCompanionCaptureEvidence(
+                UUID.fromString("40000000-0000-0000-0000-000000000004"),
+                UUID.fromString("30000000-0000-0000-0000-000000000003"),
+                OWNER, "hydragon:companions", "hydragon", SOURCE, "profile",
+                "Dragon_Fire", "spawner-bonded-capture:v1", "key",
+                "Ancient_Stone", "HydragonCapture", 7L, null, -1L,
+                CaptureSourceConsumption.SUCCESS_ONLY,
+                CaptureSuccessDisposition.STORE_BONDED_COMPANION,
+                CaptureAttemptOutcome.CAPTURED, "guaranteed", "world", 10L);
 
-        var first = database.createCapturedProfile(operation, profile, cleanup, 3);
-        var replay = database.createCapturedProfile(operation, profile, cleanup, 3);
+        var first = database.createCapturedProfile(
+                operation, profile, cleanup, 3, evidence);
+        var replay = database.createCapturedProfile(
+                operation, profile, cleanup, 3, evidence);
 
         assertEquals(BondedCompanionStoreResult.Code.APPLIED, first.code());
         assertFalse(first.replayed());

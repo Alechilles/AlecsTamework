@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
-/** Bounded capture-proof query and publication checkpoint port. */
+/** Profile-lifetime capture-proof query and publication checkpoint port. */
 public interface BondedCompanionCaptureEvidenceStore {
     @Nonnull
     Optional<BondedCompanionCaptureEvidence> findCaptureEvidence(

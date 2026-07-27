@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** Replays committed bonded capture notifications from bounded operation evidence. */
+/** Replays committed notifications from profile-lifetime capture evidence. */
 public final class BondedCompanionCaptureEventPublisher {
     private final BondedCompanionCaptureEvidenceStore evidence;
     private final Consumer<BondedCompanionCaptureResolvedEvent> events;

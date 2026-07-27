@@ -17,9 +17,9 @@ public interface BondedCompanionApi {
             list(@Nonnull UUID ownerUuid, @Nonnull String rosterId);
 
     /**
-     * Finds bounded proof for one original NPC captured into this owner roster.
-     * This exact lookup is the restart-safe counterpart to the live bonded
-     * capture event and never consults generic companion profiles.
+     * Finds profile-lifetime proof for one original NPC captured into this
+     * owner roster. This exact lookup is the restart-safe counterpart to the
+     * live bonded capture event and survives operation-history pruning.
      */
     @Nonnull
     default CompletableFuture<BondedCompanionResult<

@@ -115,8 +115,10 @@ after the commit and remain independently recoverable.
 Event subscriptions are live notifications. Restart-sensitive integrations
 must also call
 `BondedCompanionApi.findCapture(ownerUuid, rosterId, sourceNpcUuid)`. That
-bounded lookup reads the retained bonded `CAPTURE` operation evidence and does
-not consult generic companion profiles. `NOT_FOUND` means no matching retained
-capture proof; `UNAVAILABLE` or `INTERNAL_FAILURE` must be treated as unknown,
-not as proof that capture did not occur. Capture evidence expires with the
-bounded operation retention policy.
+lookup reads dedicated capture-source authority retained for the bonded
+profile's lifetime; pruning bounded operation history cannot release the
+source NPC identity or erase replay evidence. `NOT_FOUND` means no matching
+profile-lifetime capture proof; `UNAVAILABLE` or `INTERNAL_FAILURE` must be
+treated as unknown, not as proof that capture did not occur. Deleting the
+bonded profile also removes its capture proof through the same transactionally
+enforced lifecycle.
