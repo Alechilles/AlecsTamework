@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation and local verification complete at `4b39b1d7`; fresh
+Implementation and local verification complete at `a1f50737`; fresh
 exact-range review is pending.
 
 ## Integration
@@ -17,6 +17,23 @@ exact-range review is pending.
   quantities, deterministic full-recipe proof, atomic multi-stack escrow,
   terminal verification, and restart recovery.
 - Added no migration or SQLite schema revision and did not touch HyDragon.
+
+## Atomicity review fix RED -> GREEN
+
+- Review found that a fresh multi-item charge moved earlier ingredients before
+  proving every later recipe line was available. A later shortage could enter
+  refund persistence after already mutating the player's inventory.
+- RED command:
+  `./mvnw test -Dtest=HytaleBondedCompanionMultiItemEscrowTest#freshShortageDoesNotMutateOrDependOnARefundSave`
+- RED result: 1 test, 1 failure. The first ingredient expected quantity `2`
+  but was `0`; the fixture also injected a failing next save to prove the
+  shortage path must not depend on refund durability.
+- GREEN correction: `BondedCompanionEscrowPreflight` verifies all ordered
+  recipe lines inside the existing serialized actor/world flight, immediately
+  before fresh escrow creation or transfer. A shortage now returns without
+  inventory movement, escrow mutation, or a save attempt. Pre-existing escrow
+  still follows the original resume/recovery path.
+- GREEN result: the exact regression passed 1/1; committed as `a1f50737`.
 
 ## Reconciliation RED -> GREEN
 
@@ -41,10 +58,15 @@ exact-range review is pending.
 - API/lifecycle/escrow/recovery selector: 74 tests, 0 failures, 0 errors.
 - Broad bonded/config/UI selector: 335 tests, 0 failures, 0 errors.
 - Extracted recipe and focused escrow rerun: 52 tests, 0 failures, 0 errors.
+- Post-review escrow/component/recovery selector: 54 tests, 0 failures, 0
+  errors.
+- Post-review broad bonded/config/UI selector: 336 tests, 0 failures, 0 errors.
 - ECS, async, bonded boundary, and payment-recovery guards: 8 tests, 0
   failures, 0 errors.
 - Required player-access/thread grep: no matches.
 - `git diff --check`: PASS.
+- `HytaleBondedCompanionEscrowInventory` remains below the class ceiling at
+  477 lines; the new preflight collaborator is 28 lines.
 - No Maven or helper process remained after verification.
 
 ## Known untouched baseline

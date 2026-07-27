@@ -29,4 +29,4 @@ Task 11: pending
 Task 8 routing authority fix round 2: complete after 0f035634; five frozen
 authority/presentation cases covered, broad and full-suite baselines recorded
 Task 9 multi-item revive prerequisite: implementation verified on
-e215e136..4b39b1d7; fresh review pending
+e215e136..a1f50737; atomicity fix round 1 addressed, fresh review pending
