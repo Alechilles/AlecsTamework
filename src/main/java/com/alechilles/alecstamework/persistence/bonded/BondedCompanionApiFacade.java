@@ -36,7 +36,7 @@ public final class BondedCompanionApiFacade
     private static final String CLOSED = "bonded-companion-authority-closed";
 
     private final Supplier<BondedCompanionPersistenceReadiness> readiness;
-    private final BondedCompanionStore store;
+    private final BondedCompanionRosterReader rosterReader;
     private final BondedCompanionCaptureEvidenceStore captureEvidence;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
@@ -66,7 +66,8 @@ public final class BondedCompanionApiFacade
             BondedCompanionCaptureEvidenceStore captureEvidence
     ) {
         this.readiness = Objects.requireNonNull(readiness, "readiness");
-        this.store = Objects.requireNonNull(store, "store");
+        this.rosterReader = new BondedCompanionRosterReader(
+                Objects.requireNonNull(store, "store"));
         this.changes = Objects.requireNonNull(changes, "changes");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.operations = Objects.requireNonNull(operations, "operations");
@@ -94,12 +95,13 @@ public final class BondedCompanionApiFacade
             return CompletableFuture.completedFuture(denied);
         }
         try {
+            BondedCompanionRosterReader.Read roster = rosterReader.read(
+                    ownerUuid, rosterId);
             Map<String, BondedCompanionRecord.Lease> leases = new LinkedHashMap<>();
-            store.findActiveLeases(ownerUuid, rosterId).forEach(
+            roster.leases().forEach(
                     lease -> leases.put(lease.profileId(), lease)
             );
-            List<BondedCompanionRecord.Profile> profiles = store.listProfiles(
-                    ownerUuid, rosterId);
+            List<BondedCompanionRecord.Profile> profiles = roster.profiles();
             List<BondedCompanionProfileView> profileViews = profiles.stream()
                     .map(profile -> operations.view(
                             profile, leases.get(profile.profileId()), profiles))
