@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.companion.bonded;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
@@ -10,35 +9,22 @@ import javax.annotation.Nonnull;
 public final class BondedCompanionWorldLifecycleObserver {
     private final BondedCompanionProjectionService projections;
     private final ProjectionSource source;
-    private final ReconciliationCooldownResolver cooldowns;
     private final ReconciliationListener listener;
 
     public BondedCompanionWorldLifecycleObserver(
             @Nonnull BondedCompanionProjectionService projections,
             @Nonnull ProjectionSource source
     ) {
-        this(projections, source, (lease, nowMs) -> OptionalLong.of(0L),
-                (lease, cause, result) -> { });
+        this(projections, source, (lease, cause, result) -> { });
     }
 
     public BondedCompanionWorldLifecycleObserver(
             @Nonnull BondedCompanionProjectionService projections,
             @Nonnull ProjectionSource source,
-            @Nonnull ReconciliationListener listener
-    ) {
-        this(projections, source, (lease, nowMs) -> OptionalLong.of(0L),
-                listener);
-    }
-
-    public BondedCompanionWorldLifecycleObserver(
-            @Nonnull BondedCompanionProjectionService projections,
-            @Nonnull ProjectionSource source,
-            @Nonnull ReconciliationCooldownResolver cooldowns,
             @Nonnull ReconciliationListener listener
     ) {
         this.projections = Objects.requireNonNull(projections, "projections");
         this.source = Objects.requireNonNull(source, "source");
-        this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.listener = Objects.requireNonNull(listener, "listener");
     }
 
@@ -152,15 +138,9 @@ public final class BondedCompanionWorldLifecycleObserver {
             BondedCompanionProjectionService.RecoveryCause cause,
             long observedAtMs
     ) {
-        OptionalLong cooldown = cooldowns.resolve(lease, observedAtMs);
-        return cooldown.isPresent()
-                ? projections.reconcile(
-                        lease, observed, cause, observedAtMs,
-                        cooldown.getAsLong())
-                : new BondedCompanionProjectionService.ReconcileResult(
-                        BondedCompanionProjectionService.ReconcileStatus
-                                .DURABILITY_REJECTED,
-                        List.of());
+        return projections.reconcile(
+                lease, observed, cause, observedAtMs
+        );
     }
 
     private List<BondedCompanionProjectionValidator.LeaseExpectation> ownerLeases(
@@ -176,14 +156,6 @@ public final class BondedCompanionWorldLifecycleObserver {
     /** Supplies a world-thread snapshot of loaded projections; it never scans Universe players. */
     public interface ProjectionSource {
         @Nonnull List<BondedCompanionProjectionValidator.Projection> projections();
-    }
-
-    /** Resolves the exact-family cooldown before a non-death store mutation. */
-    @FunctionalInterface
-    public interface ReconciliationCooldownResolver {
-        @Nonnull OptionalLong resolve(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                long observedAtMs);
     }
 
     /** Receives only completed durability/world outcomes for change publication. */

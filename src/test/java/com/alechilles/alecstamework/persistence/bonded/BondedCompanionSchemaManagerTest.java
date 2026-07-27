@@ -44,15 +44,15 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(first.availability().available());
         assertTrue(second.availability().available());
         assertEquals(BondedCompanionSchemaManager.requiredTables(), tables(database));
-        assertEquals(5, BondedCompanionSchemaManager.VERSION);
-        assertEquals(5L, queryLong(database,
+        assertEquals(6, BondedCompanionSchemaManager.VERSION);
+        assertEquals(6L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(5L, queryLong(database,
+        assertEquals(6L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(-5_000L, queryLong(database,
-                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 5"));
+                "SELECT applied_at_ms FROM bonded_schema_history WHERE version = 6"));
         assertEquals(manager.schemaHash(), queryString(database,
-                "SELECT schema_hash FROM bonded_schema_history WHERE version = 5"));
+                "SELECT schema_hash FROM bonded_schema_history WHERE version = 6"));
         assertEquals(1L, queryLong(database, """
                 SELECT COUNT(*) FROM pragma_table_info(
                     'bonded_companion_cleanup'
@@ -97,8 +97,9 @@ class BondedCompanionSchemaManagerTest {
         try (Connection connection = new SqliteConnectionFactory(database)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            assertEquals(1, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version = 5"));
+            assertEquals(2, statement.executeUpdate(
+                    "DELETE FROM bonded_schema_history WHERE version IN (5, 6)"));
+            statement.execute("DROP INDEX bonded_capture_source_once_idx");
             statement.executeUpdate("""
                     ALTER TABLE bonded_companion_operation
                     DROP COLUMN expected_revision
@@ -125,7 +126,7 @@ class BondedCompanionSchemaManagerTest {
         assertTrue(manager(database, -7_000L).initialize()
                 .availability().available());
 
-        assertEquals(5L, queryLong(database,
+        assertEquals(6L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         assertEquals(Long.MAX_VALUE, queryLong(database, """
                 SELECT expires_at_ms FROM bonded_companion_operation
@@ -254,9 +255,9 @@ class BondedCompanionSchemaManagerTest {
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertTrue(readiness.availability().available());
-        assertEquals(5L, queryLong(database,
+        assertEquals(6L, queryLong(database,
                 "SELECT COUNT(*) FROM bonded_schema_history"));
-        assertEquals(5L, queryLong(database,
+        assertEquals(6L, queryLong(database,
                 "SELECT MAX(version) FROM bonded_schema_history"));
         BondedCompanionStore store =
                 new com.alechilles.alecstamework.persistence.adapter.sqlite

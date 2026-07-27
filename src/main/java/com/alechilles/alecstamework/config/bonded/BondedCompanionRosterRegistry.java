@@ -3,8 +3,9 @@ package com.alechilles.alecstamework.config.bonded;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -134,11 +135,19 @@ public final class BondedCompanionRosterRegistry {
         TreeMap<String, TreeMap<String, RosterDefinition>> definitions =
                 new TreeMap<>();
         LinkedHashSet<String> assetIds = new LinkedHashSet<>();
+        ArrayList<TwBondedCompanionRosterConfig> ordered = new ArrayList<>();
         for (TwBondedCompanionRosterConfig config : configs) {
             if (config == null) {
                 continue;
             }
             config.validateOrThrow();
+            ordered.add(config);
+        }
+        ordered.sort(Comparator
+                .comparing(TwBondedCompanionRosterConfig::getId)
+                .thenComparing(TwBondedCompanionRosterConfig::getRosterId)
+                .thenComparing(TwBondedCompanionRosterConfig::getFamilyId));
+        for (TwBondedCompanionRosterConfig config : ordered) {
             if (!assetIds.add(config.getId())) {
                 throw new IllegalArgumentException(
                         "Duplicate bonded-roster asset ID: " + config.getId()
@@ -247,8 +256,10 @@ public final class BondedCompanionRosterRegistry {
                         "Bonded-roster revision cannot be negative."
                 );
             }
-            byRosterId = immutableOrderedMap(byRosterId, "byRosterId");
-            familiesByRosterId = immutableFamilies(familiesByRosterId);
+            var canonical = BondedCompanionRosterSnapshotCanonicalizer
+                    .canonicalize(byRosterId, familiesByRosterId);
+            byRosterId = canonical.representatives();
+            familiesByRosterId = canonical.families();
         }
 
         /** Preserves the source contract for snapshots constructed by tests. */
@@ -256,7 +267,12 @@ public final class BondedCompanionRosterRegistry {
                 long revision,
                 @Nonnull Map<String, RosterDefinition> byRosterId
         ) {
-            this(revision, byRosterId, singletonFamilies(byRosterId));
+            this(
+                    revision,
+                    byRosterId,
+                    BondedCompanionRosterSnapshotCanonicalizer
+                            .singletonFamilies(byRosterId)
+            );
         }
 
         /** Returns all independently configured families for one roster. */
@@ -327,46 +343,6 @@ public final class BondedCompanionRosterRegistry {
             return match == null
                     ? FamilyResolution.notFound()
                     : FamilyResolution.found(match);
-        }
-
-        private static Map<String, Map<String, RosterDefinition>>
-                singletonFamilies(Map<String, RosterDefinition> definitions) {
-            LinkedHashMap<String, Map<String, RosterDefinition>> families =
-                    new LinkedHashMap<>();
-            for (Map.Entry<String, RosterDefinition> entry
-                    : definitions.entrySet()) {
-                families.put(
-                        entry.getKey(),
-                        Map.of(entry.getValue().familyId(), entry.getValue())
-                );
-            }
-            return families;
-        }
-
-        private static Map<String, Map<String, RosterDefinition>>
-                immutableFamilies(
-                        Map<String, Map<String, RosterDefinition>> source
-                ) {
-            Objects.requireNonNull(source, "familiesByRosterId");
-            LinkedHashMap<String, Map<String, RosterDefinition>> copy =
-                    new LinkedHashMap<>();
-            for (Map.Entry<String, Map<String, RosterDefinition>> entry
-                    : source.entrySet()) {
-                copy.put(
-                        entry.getKey(),
-                        immutableOrderedMap(entry.getValue(), "families")
-                );
-            }
-            return Collections.unmodifiableMap(copy);
-        }
-
-        private static <V> Map<String, V> immutableOrderedMap(
-                Map<String, V> source,
-                String name
-        ) {
-            return Collections.unmodifiableMap(new LinkedHashMap<>(
-                    Objects.requireNonNull(source, name)
-            ));
         }
 
         static Snapshot empty() {

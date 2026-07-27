@@ -17,19 +17,25 @@ final class BondedCompanionCaptureRoute {
     private final BondedCompanionCaptureAdmissionService admission;
     private final SpawnerCaptureRollService rolls;
     private final SpawnerCaptureIntentFactory intents;
+    private final BondedCompanionCaptureReplayRoute replays;
+    private final BondedCompanionCaptureReplayIntentFactory replayIntents;
 
     BondedCompanionCaptureRoute(
             BondedCompanionCaptureAuthor author,
             BondedCompanionRosterRegistry rosters,
             BondedCompanionCaptureAdmissionService admission,
             SpawnerCaptureRollService rolls,
-            SpawnerCaptureIntentFactory intents
+            SpawnerCaptureIntentFactory intents,
+            BondedCompanionCaptureReplayIntentFactory replayIntents
     ) {
         this.author = author;
         this.rosters = rosters;
         this.admission = admission;
         this.rolls = rolls;
         this.intents = intents;
+        this.replays = author == null
+                ? null : new BondedCompanionCaptureReplayRoute(author);
+        this.replayIntents = replayIntents;
     }
 
     boolean capture(
@@ -41,7 +47,22 @@ final class BondedCompanionCaptureRoute {
             return false;
         }
         var completion = completion(player);
-        if (!sourceEligible || targetRef == null || !targetRef.isValid()) {
+        if (targetRef == null || !targetRef.isValid()) {
+            author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
+                    completion);
+            return true;
+        }
+        var replayRequest = replayIntents == null ? null
+                : replayIntents.request(player, targetRef, source, config);
+        if (replayRequest != null && replays != null) {
+            var resumed = replays.resume(
+                    replayRequest,
+                    evidence -> replayIntents.intent(
+                            replayRequest, attempt, evidence),
+                    completion);
+            if (resumed.handled()) return true;
+        }
+        if (!sourceEligible) {
             author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
                     completion);
             return true;

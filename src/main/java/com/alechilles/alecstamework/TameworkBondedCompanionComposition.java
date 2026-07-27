@@ -43,7 +43,7 @@ import com.alechilles.alecstamework.persistence.bonded
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPaymentRecoveryService;
 import com.alechilles.alecstamework.persistence.bonded
-        .BondedCompanionReconciliationCooldownResolver;
+        .BondedCompanionStorePlanner;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionSchemaManager;
 import com.alechilles.alecstamework.persistence.diagnostics
@@ -193,6 +193,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 new SqliteBondedCompanionProjectionDurability(databasePath);
         BondedCompanionProjectionService projections =
                 new BondedCompanionProjectionService(
+                        new BondedCompanionStorePlanner(store, rosters),
                         durability, world, cleanup,
                         () -> UUID.randomUUID().toString(), UUID::randomUUID
                 );
@@ -203,8 +204,6 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                 .map(world::readExact)
                                 .filter(Objects::nonNull)
                                 .toList(),
-                        new BondedCompanionReconciliationCooldownResolver(
-                                store, rosters),
                         (lease, cause, result) -> publishLifecycleChange(
                                 store, changes, lease, result
                         )
@@ -243,6 +242,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         BondedCompanionCaptureAuthor captureAuthor =
                 new BondedCompanionCaptureAuthor(
+                        capturePersistence,
                         capturePersistence::validate,
                         capturePersistence::store,
                         capturePersistence::cleanup,

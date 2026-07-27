@@ -8,11 +8,14 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionTransitionService;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureAuthor;
+import com.alechilles.alecstamework.items.BondedCompanionCaptureAttemptEvidence;
 import com.alechilles.alecstamework.items.BondedCompanionCaptureIntent;
+import com.alechilles.alecstamework.items.BondedCompanionCaptureReplayGateway;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEventPublisher;
 import com.alechilles.alecstamework.persistence.bonded
@@ -37,7 +40,8 @@ import javax.annotation.Nullable;
  * <p>Keeps adapter-specific durability out of gameplay orchestration while
  * preserving one atomic profile-and-cleanup transaction.</p>
  */
-public final class SqliteBondedCompanionCapturePersistenceAdapter {
+public final class SqliteBondedCompanionCapturePersistenceAdapter
+        implements BondedCompanionCaptureReplayGateway {
     private static final long OPERATION_RETENTION_MS = 2_592_000_000L;
     private static final long CLEANUP_RETENTION_MS = 300_000L;
 
@@ -110,19 +114,29 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
     public BondedCompanionCaptureAuthor.PersistenceOutcome store(
             @Nonnull BondedCompanionCaptureIntent intent
     ) {
-        BondedCompanionRosterRegistry.RosterDefinition family =
-                family(intent);
-        if (family == null || intent.snapshot() == null) {
+        if (intent.snapshot() == null) {
+            return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
+        }
+        ExactResult replay = probeExact(intent);
+        if (replay.status() == ExactStatus.REPLAYED) {
+            return BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED;
+        }
+        if (replay.status() != ExactStatus.ABSENT) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
         }
         long nowMs = intent.snapshot().fullState().capturedAtMs();
+        BondedCompanionOperation operation = operation(intent, nowMs);
+        BondedCompanionRosterRegistry.RosterDefinition family =
+                family(intent);
+        if (family == null) {
+            return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
+        }
         BondedCompanionRecord.Profile profile = profiles.findProfile(
                 intent.actorUuid(), intent.rosterId(), intent.profileId()
         ).orElseGet(() -> newProfile(intent, nowMs));
         if (profile == null) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
         }
-        BondedCompanionOperation operation = operation(intent, nowMs);
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
                 database.createCapturedProfile(
                         operation, profile, cleanupRecord(intent, nowMs),
@@ -132,16 +146,130 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
         if (result.code() != BondedCompanionStoreResult.Code.APPLIED) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
         }
-        if (captureEvents != null) {
-            try {
-                captureEvents.publishPending(64);
-            } catch (RuntimeException | LinkageError ignored) {
-                // The committed tombstone remains pending for maintenance replay.
-            }
-        }
+        publishCaptureEvents();
         return result.replayed()
                 ? BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED
                 : BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED;
+    }
+
+    /** Finds immutable committed evidence without consulting current policy. */
+    @Override
+    @Nonnull
+    public LookupResult lookup(@Nonnull Request request) {
+        Objects.requireNonNull(request, "request");
+        try {
+            var captured = database.findCaptureEvidenceBySource(
+                    request.sourceNpcUuid());
+            if (captured.isEmpty()) return LookupResult.absent();
+            if (captured.size() != 1) return LookupResult.conflict();
+            BondedCompanionCaptureEvidence evidence = captured.get(0);
+            if (!matches(request, evidence)) return LookupResult.conflict();
+
+            var prior = profiles.findProfileOperationByIdentity(
+                    new BondedCompanionOperationProbe(
+                            evidence.callerNamespace(),
+                            evidence.idempotencyKey(), evidence.ownerUuid(),
+                            evidence.rosterId(), evidence.profileId(),
+                            BondedCompanionOperation.Type.CAPTURE));
+            if (prior.isEmpty()) return LookupResult.failed();
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
+                    prior.get();
+            if (result.code()
+                    == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
+                return LookupResult.conflict();
+            }
+            if (result.code() != BondedCompanionStoreResult.Code.APPLIED
+                    || result.value() == null || !result.replayed()) {
+                return LookupResult.failed();
+            }
+            BondedCompanionSnapshot snapshot = decode(result.value());
+            if (snapshot == null) return LookupResult.failed();
+            return LookupResult.matched(new Evidence(
+                    attemptEvidence(evidence), evidence.roleId(),
+                    evidence.familyId(), evidence.sourceWorldKey(), snapshot));
+        } catch (RuntimeException failure) {
+            return LookupResult.failed();
+        }
+    }
+
+    /** Probes the full request hash without resolving a current family. */
+    @Override
+    @Nonnull
+    public ExactResult probeExact(@Nonnull BondedCompanionCaptureIntent intent) {
+        Objects.requireNonNull(intent, "intent");
+        if (intent.snapshot() == null) return ExactResult.absent();
+        try {
+            long nowMs = intent.snapshot().fullState().capturedAtMs();
+            var prior = profiles.findProfileOperationByExactRequest(
+                    operation(intent, nowMs));
+            if (prior.isEmpty()) return ExactResult.absent();
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
+                    prior.get();
+            if (result.code()
+                    == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
+                return ExactResult.conflict();
+            }
+            if (result.code() != BondedCompanionStoreResult.Code.APPLIED
+                    || result.value() == null || !result.replayed()) {
+                return ExactResult.failed();
+            }
+            publishCaptureEvents();
+            return ExactResult.replayed();
+        } catch (RuntimeException failure) {
+            return ExactResult.failed();
+        }
+    }
+
+    private boolean matches(
+            Request request,
+            BondedCompanionCaptureEvidence evidence
+    ) {
+        return request.callerNamespace().equals(evidence.callerNamespace())
+                && request.idempotencyKey().equals(evidence.idempotencyKey())
+                && request.actorUuid().equals(evidence.ownerUuid())
+                && request.rosterId().equals(evidence.rosterId())
+                && request.sourceNpcUuid().equals(evidence.sourceNpcUuid())
+                && request.sourceWorldKey().equals(evidence.sourceWorldKey())
+                && request.sourceItemId().equals(evidence.sourceItemId())
+                && request.roleId().equals(evidence.roleId())
+                && evidence.outcome()
+                == com.alechilles.alecstamework.api.CaptureAttemptOutcome.CAPTURED
+                && evidence.successDisposition()
+                == com.alechilles.alecstamework.api.CaptureSuccessDisposition
+                .STORE_BONDED_COMPANION;
+    }
+
+    @Nullable
+    private BondedCompanionSnapshot decode(
+            BondedCompanionRecord.Profile profile
+    ) {
+        String encoded = new String(
+                profile.snapshot().bytes(), StandardCharsets.UTF_8);
+        BondedCompanionSnapshotCodec.DecodeResult decoded = snapshots.decode(
+                encoded);
+        return decoded.status() == BondedCompanionSnapshotCodec.Status.FOUND
+                ? decoded.snapshot() : null;
+    }
+
+    private BondedCompanionCaptureAttemptEvidence attemptEvidence(
+            BondedCompanionCaptureEvidence evidence
+    ) {
+        return new BondedCompanionCaptureAttemptEvidence(
+                evidence.attemptId(), evidence.sourceItemId(),
+                evidence.spawnerConfigId(), evidence.spawnerConfigRevision(),
+                evidence.capturePolicyConfigId(),
+                evidence.capturePolicyConfigRevision(),
+                evidence.sourceConsumption(), evidence.successDisposition(),
+                evidence.outcome(), evidence.reason());
+    }
+
+    private void publishCaptureEvents() {
+        if (captureEvents == null) return;
+        try {
+            captureEvents.publishPending(64);
+        } catch (RuntimeException | LinkageError ignored) {
+            // The committed tombstone remains pending for maintenance replay.
+        }
     }
 
     /** Attempts only the durable exact-source cleanup and records its outcome. */

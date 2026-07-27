@@ -463,6 +463,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 new BondedCompanionProjectionCleanupService(world);
         BondedCompanionProjectionService projections =
                 new BondedCompanionProjectionService(
+                        new BondedCompanionStorePlanner(store, rosters),
                         durability, world, cleanup,
                         () -> UUID.randomUUID().toString(), UUID::randomUUID);
         BondedCompanionChangePublisher changes =

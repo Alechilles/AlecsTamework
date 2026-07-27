@@ -6,6 +6,7 @@ import javax.annotation.Nullable;
 
 /** Orders validation, atomic durability, cleanup, item spend, and feedback. */
 public final class BondedCompanionCaptureAuthor {
+    private final BondedCompanionCaptureReplayGateway replays;
     private final Policy policy;
     private final Persistence persistence;
     private final Cleanup cleanup;
@@ -18,7 +19,8 @@ public final class BondedCompanionCaptureAuthor {
             @Nonnull Cleanup cleanup,
             @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback
     ) {
-        this(policy, persistence, cleanup, feedback, (intent, failure) -> {});
+        this(BondedCompanionCaptureReplayGateway.unavailable(), policy,
+                persistence, cleanup, feedback, (intent, failure) -> {});
     }
 
     public BondedCompanionCaptureAuthor(
@@ -28,6 +30,20 @@ public final class BondedCompanionCaptureAuthor {
             @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback,
             @Nonnull Diagnostics diagnostics
     ) {
+        this(BondedCompanionCaptureReplayGateway.unavailable(), policy,
+                persistence, cleanup, feedback, diagnostics);
+    }
+
+    /** Creates the production author with durable pre-policy replay evidence. */
+    public BondedCompanionCaptureAuthor(
+            @Nonnull BondedCompanionCaptureReplayGateway replays,
+            @Nonnull Policy policy,
+            @Nonnull Persistence persistence,
+            @Nonnull Cleanup cleanup,
+            @Nonnull BondedCompanionCaptureFeedbackDispatcher feedback,
+            @Nonnull Diagnostics diagnostics
+    ) {
+        this.replays = Objects.requireNonNull(replays, "replays");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
@@ -48,6 +64,16 @@ public final class BondedCompanionCaptureAuthor {
             @Nullable BondedCompanionCaptureFeedbackDispatcher.CompletionContext
                     completion
     ) {
+        BondedCompanionCaptureReplayGateway.ExactResult replay =
+                safeReplayProbe(intent);
+        if (replay.status()
+                == BondedCompanionCaptureReplayGateway.ExactStatus.REPLAYED) {
+            return replayed(intent, completion);
+        }
+        if (replay.status()
+                != BondedCompanionCaptureReplayGateway.ExactStatus.ABSENT) {
+            return rejected(intent, completion, Status.DATABASE_FAILED);
+        }
         Status intrinsic = intrinsicDenial(intent);
         if (intrinsic != null) return rejected(intent, completion, intrinsic);
         PolicyCheck checked = safePolicy(intent);
@@ -64,9 +90,7 @@ public final class BondedCompanionCaptureAuthor {
         }
         PersistenceOutcome stored = safePersist(intent);
         if (stored == PersistenceOutcome.REPLAYED) {
-            boolean delivered = feedback.failure(
-                    intent, completion, Status.REPLAYED);
-            return new Result(Status.REPLAYED, true, null, delivered);
+            return replayed(intent, completion);
         }
         if (stored != PersistenceOutcome.APPLIED) {
             return rejected(intent, completion, Status.DATABASE_FAILED);
@@ -80,6 +104,20 @@ public final class BondedCompanionCaptureAuthor {
         };
         return new Result(
                 status, true, cleanupOutcome, completed.feedbackDelivered());
+    }
+
+    BondedCompanionCaptureReplayGateway.LookupResult lookupReplay(
+            BondedCompanionCaptureReplayGateway.Request request
+    ) {
+        try {
+            BondedCompanionCaptureReplayGateway.LookupResult value =
+                    replays.lookup(request);
+            return value == null
+                    ? BondedCompanionCaptureReplayGateway.LookupResult.failed()
+                    : value;
+        } catch (RuntimeException failure) {
+            return BondedCompanionCaptureReplayGateway.LookupResult.failed();
+        }
     }
 
     /** Emits one terminal bonded-route rejection before an intent can be frozen. */
@@ -119,6 +157,23 @@ public final class BondedCompanionCaptureAuthor {
         }
     }
 
+    private BondedCompanionCaptureReplayGateway.ExactResult safeReplayProbe(
+            BondedCompanionCaptureIntent intent
+    ) {
+        if (intent == null) {
+            return BondedCompanionCaptureReplayGateway.ExactResult.absent();
+        }
+        try {
+            BondedCompanionCaptureReplayGateway.ExactResult value =
+                    replays.probeExact(intent);
+            return value == null
+                    ? BondedCompanionCaptureReplayGateway.ExactResult.failed()
+                    : value;
+        } catch (RuntimeException failure) {
+            return BondedCompanionCaptureReplayGateway.ExactResult.failed();
+        }
+    }
+
     private PersistenceOutcome safePersist(BondedCompanionCaptureIntent intent) {
         try {
             PersistenceOutcome value = persistence.store(intent);
@@ -135,6 +190,16 @@ public final class BondedCompanionCaptureAuthor {
         } catch (RuntimeException failure) {
             return CleanupOutcome.RETRY_PENDING;
         }
+    }
+
+    private Result replayed(
+            BondedCompanionCaptureIntent intent,
+            BondedCompanionCaptureFeedbackDispatcher.CompletionContext completion
+    ) {
+        CleanupOutcome cleanupOutcome = safeCleanup(intent);
+        boolean delivered = feedback.failure(intent, completion, Status.REPLAYED);
+        return new Result(
+                Status.REPLAYED, true, cleanupOutcome, delivered);
     }
 
     private Result rejected(

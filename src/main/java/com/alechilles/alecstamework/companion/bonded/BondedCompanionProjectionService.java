@@ -11,6 +11,7 @@ import javax.annotation.Nullable;
 
 /** Coordinates durable bonded leases with disposable world projections. */
 public final class BondedCompanionProjectionService {
+    private final BondedCompanionProjectionStorePlanner storePlanner;
     private final Durability durability;
     private final World world;
     private final BondedCompanionProjectionCleanupService cleanup;
@@ -22,12 +23,15 @@ public final class BondedCompanionProjectionService {
     private final Supplier<UUID> npcUuids;
 
     public BondedCompanionProjectionService(
+            @Nonnull BondedCompanionProjectionStorePlanner storePlanner,
             @Nonnull Durability durability,
             @Nonnull World world,
             @Nonnull BondedCompanionProjectionCleanupService cleanup,
             @Nonnull Supplier<String> leaseTokens,
             @Nonnull Supplier<UUID> npcUuids
     ) {
+        this.storePlanner = Objects.requireNonNull(
+                storePlanner, "storePlanner");
         this.durability = Objects.requireNonNull(durability, "durability");
         this.world = Objects.requireNonNull(world, "world");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
@@ -86,13 +90,21 @@ public final class BondedCompanionProjectionService {
                 || projection.snapshot() == null) {
             return new StoreResult(StoreStatus.PROJECTION_NOT_FOUND, null);
         }
-        BondedCompanionSnapshot merged = request.storedSnapshot()
-                .mergeForStore(projection.snapshot());
+        var planned = storePlanner.plan(
+                new BondedCompanionProjectionStorePlanner.PlanningRequest(
+                        request.lease(), request.expectedRevision(),
+                        request.nowMs(), projection.snapshot(),
+                        BondedCompanionProjectionStorePlanner.Cause.EXPLICIT
+                )
+        );
+        if (planned.plan() == null) {
+            return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
+        }
         var intent = cleanupIntents.projection(
                 request.lease(), "store", request.nowMs()
         );
         if (!durability.storeAndEnqueueCleanup(
-                request, merged, intent)) {
+                request, planned.plan(), intent)) {
             return new StoreResult(StoreStatus.DURABILITY_REJECTED, null);
         }
         BondedCompanionProjectionCleanupService.Outcome outcome = cleanup.recover(intent);
@@ -108,8 +120,7 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             @Nonnull List<BondedCompanionProjectionValidator.Projection> observed,
             @Nonnull RecoveryCause cause,
-            long observedAtMs,
-            long summonCooldownUntilMs
+            long observedAtMs
     ) {
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(cause, "cause");
@@ -128,14 +139,30 @@ public final class BondedCompanionProjectionService {
         }
         String reason = expired ? "LEASE_EXPIRED"
                 : interrupted ? "SPAWN_INTERRUPTED"
-                : reason(cause, validation.status());
-        BondedCompanionSnapshot snapshot = snapshot(validation);
+                : BondedCompanionProjectionRecoveryEvidence.reason(
+                        cause, validation.status());
+        BondedCompanionSnapshot snapshot =
+                BondedCompanionProjectionRecoveryEvidence.snapshot(validation);
+        var planned = storePlanner.plan(
+                new BondedCompanionProjectionStorePlanner.PlanningRequest(
+                        lease, null, observedAtMs, snapshot,
+                        BondedCompanionProjectionStorePlanner.Cause.RECONCILIATION
+                )
+        );
+        if (planned.plan() == null) {
+            ReconcileStatus status = planned.status()
+                    == BondedCompanionProjectionStorePlanner.Status
+                    .SNAPSHOT_IDENTITY_MISMATCH
+                    ? ReconcileStatus.IDENTITY_MISMATCH
+                    : ReconcileStatus.DURABILITY_REJECTED;
+            return new ReconcileResult(status, List.of());
+        }
         List<BondedCompanionProjectionCleanupService.CleanupIntent> intents =
                 cleanupIntents.projections(
                         lease, validation.exactMatches(), reason, observedAtMs
                 );
         if (!durability.reconcileStored(
-                lease, snapshot, summonCooldownUntilMs, intents, reason)) {
+                lease, planned.plan(), intents, reason)) {
             return new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, intents);
         }
         for (var intent : intents) {
@@ -155,7 +182,22 @@ public final class BondedCompanionProjectionService {
         if (validation.status() != BondedCompanionProjectionValidator.Status.VALID) {
             return new ReconcileResult(ReconcileStatus.IDENTITY_MISMATCH, List.of());
         }
-        return durability.confirmDeath(lease, projection.snapshot(), diedAtMs)
+        var planned = storePlanner.plan(
+                new BondedCompanionProjectionStorePlanner.PlanningRequest(
+                        lease, null, diedAtMs, projection.snapshot(),
+                        BondedCompanionProjectionStorePlanner.Cause
+                                .CONFIRMED_DEATH
+                )
+        );
+        if (planned.plan() == null) {
+            ReconcileStatus status = planned.status()
+                    == BondedCompanionProjectionStorePlanner.Status
+                    .SNAPSHOT_IDENTITY_MISMATCH
+                    ? ReconcileStatus.IDENTITY_MISMATCH
+                    : ReconcileStatus.DURABILITY_REJECTED;
+            return new ReconcileResult(status, List.of());
+        }
+        return durability.confirmDeath(lease, planned.plan(), diedAtMs)
                 ? new ReconcileResult(ReconcileStatus.DEAD, List.of())
                 : new ReconcileResult(ReconcileStatus.DURABILITY_REJECTED, List.of());
     }
@@ -251,35 +293,6 @@ public final class BondedCompanionProjectionService {
         );
     }
 
-    @Nullable
-    private BondedCompanionSnapshot snapshot(
-            BondedCompanionProjectionValidator.Validation validation
-    ) {
-        if (validation.validProjection() != null) {
-            return validation.validProjection().snapshot();
-        }
-        for (var projection : validation.exactMatches()) {
-            if (projection.snapshot() != null) {
-                return projection.snapshot();
-            }
-        }
-        return null;
-    }
-
-    private String reason(
-            RecoveryCause cause,
-            BondedCompanionProjectionValidator.Status status
-    ) {
-        return switch (cause) {
-            case EXPIRED -> "LEASE_EXPIRED";
-            case WORLD_TRANSFER -> "WORLD_TRANSFER";
-            case LOGOUT -> "LOGOUT";
-            case STARTUP -> status == BondedCompanionProjectionValidator.Status.MISSING
-                    ? "PROJECTION_MISSING" : status.name();
-            case WORLD_LOAD, PLAYER_JOIN, MISSING_SCAN -> status.name();
-        };
-    }
-
     /** Atomic durable operations; implementations own their bonded DB transaction. */
     public interface Durability {
         /** Atomically authors ACTIVE, the lease, and its bounded spawn-recovery intent. */
@@ -305,15 +318,14 @@ public final class BondedCompanionProjectionService {
         /** Atomically replaces the snapshot, invalidates the lease, stores, and enqueues cleanup. */
         boolean storeAndEnqueueCleanup(
                 @Nonnull StoreRequest request,
-                @Nonnull BondedCompanionSnapshot snapshot,
+                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
                 @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent cleanup
         );
 
         /** Atomically returns a non-death exit to STORED and enqueues every exact cleanup. */
         boolean reconcileStored(
                 @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nullable BondedCompanionSnapshot snapshot,
-                long summonCooldownUntilMs,
+                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
                 @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
                 @Nonnull String reason
         );
@@ -321,7 +333,7 @@ public final class BondedCompanionProjectionService {
         /** Atomically authors DEAD only for the confirmed exact projection death. */
         boolean confirmDeath(
                 @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nullable BondedCompanionSnapshot snapshot,
+                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
                 long diedAtMs
         );
     }
@@ -367,14 +379,10 @@ public final class BondedCompanionProjectionService {
     public record StoreRequest(
             @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
             long expectedRevision,
-            long nowMs,
-            @Nonnull BondedCompanionSnapshot storedSnapshot,
-            long summonCooldownUntilMs
+            long nowMs
     ) {
         public StoreRequest {
             lease = Objects.requireNonNull(lease, "lease");
-            storedSnapshot = Objects.requireNonNull(
-                    storedSnapshot, "storedSnapshot");
             if (expectedRevision < 0L) {
                 throw new IllegalArgumentException("negative expectedRevision");
             }

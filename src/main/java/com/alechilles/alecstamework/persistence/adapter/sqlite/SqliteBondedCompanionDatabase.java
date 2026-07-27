@@ -108,6 +108,13 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         return captureEvents.find(ownerUuid, rosterId, sourceNpcUuid);
     }
 
+    /** Internal global-source fence; the public evidence API stays owner scoped. */
+    List<BondedCompanionCaptureEvidence> findCaptureEvidenceBySource(
+            UUID sourceNpcUuid
+    ) {
+        return captureEvents.findBySource(sourceNpcUuid, 2);
+    }
+
     @Override
     public List<BondedCompanionCaptureEvidence> listUnpublishedCaptureEvidence(
             int limit

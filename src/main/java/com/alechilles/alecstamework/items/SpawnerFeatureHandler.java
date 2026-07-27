@@ -207,7 +207,8 @@ public final class SpawnerFeatureHandler {
         );
         this.bondedCaptureRoute = new BondedCompanionCaptureRoute(
                 bondedCaptureAuthor, bondedRosters, bondedAdmission,
-                captureRolls, captureIntents);
+                captureRolls, captureIntents,
+                new BondedCompanionCaptureReplayIntentFactory(roles));
         SpawnerSpawnPositionService positions =
                 new SpawnerSpawnPositionService(logger);
         this.releaseIntents = new SpawnerReleaseIntentFactory(

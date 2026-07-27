@@ -1,9 +1,10 @@
 package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
-import java.util.ArrayList;
-import java.util.HashMap;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,19 +17,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Restart and lifecycle recovery matrix for disposable bonded projections. */
 class BondedCompanionRecoveryTest {
-    private RecordingDurability durability;
-    private RecordingWorld world;
+    private RecordingBondedDurability durability;
+    private RecordingBondedWorld world;
     private BondedCompanionProjectionCleanupService cleanup;
     private BondedCompanionProjectionService projections;
     private BondedCompanionWorldLifecycleObserver observer;
 
     @BeforeEach
     void setUp() {
-        durability = new RecordingDurability();
-        world = new RecordingWorld();
+        durability = new RecordingBondedDurability();
+        world = new RecordingBondedWorld();
         cleanup = new BondedCompanionProjectionCleanupService(world);
         projections = new BondedCompanionProjectionService(
-                durability, world, cleanup,
+                durability, durability, world, cleanup,
                 () -> "lease-new", () -> uuid(90)
         );
         observer = new BondedCompanionWorldLifecycleObserver(
@@ -57,7 +58,7 @@ class BondedCompanionRecoveryTest {
     @Test
     void retryableSpawnPersistsRollbackCleanupBeforeWorldRemoval() {
         durability.events = world.events;
-        world.spawnMode = RecordingWorld.SpawnMode.RETRYABLE;
+        world.spawnMode = RecordingBondedWorld.SpawnMode.RETRYABLE;
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
@@ -81,7 +82,7 @@ class BondedCompanionRecoveryTest {
     @Test
     void spawnExceptionLeavesDurableStoredCleanupForRestartRecovery() {
         durability.events = world.events;
-        world.spawnMode = RecordingWorld.SpawnMode.THROW;
+        world.spawnMode = RecordingBondedWorld.SpawnMode.THROW;
         world.removeSucceeds = false;
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
@@ -107,7 +108,7 @@ class BondedCompanionRecoveryTest {
     @Test
     void identityMismatchRollsBackAndPersistsCleanupBeforeRemovingSpawn() {
         durability.events = world.events;
-        world.spawnMode = RecordingWorld.SpawnMode.IDENTITY_MISMATCH;
+        world.spawnMode = RecordingBondedWorld.SpawnMode.IDENTITY_MISMATCH;
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
@@ -127,7 +128,7 @@ class BondedCompanionRecoveryTest {
     void rollbackDurabilityFailureLeavesSpawnRecoveryAndDoesNotTouchWorld() {
         durability.events = world.events;
         durability.rollbackSucceeds = false;
-        world.spawnMode = RecordingWorld.SpawnMode.IDENTITY_MISMATCH;
+        world.spawnMode = RecordingBondedWorld.SpawnMode.IDENTITY_MISMATCH;
 
         var result = projections.summon(new BondedCompanionProjectionService.SummonRequest(
                 uuid(1), "roster-a", "profile-a", 4L, "role-a",
@@ -163,11 +164,11 @@ class BondedCompanionRecoveryTest {
         var lease = lease(uuid(40), "world-a",
                 BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
         var live = projection(uuid(40), "world-a", snapshot(uuid(40)));
-        durability.activate(lease);
+        durability.activate(lease, snapshot(uuid(20)));
         world.projections.add(live);
 
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
-                lease, 5L, -900L, snapshot(uuid(20)), 0L
+                lease, 5L, -900L
         ));
 
         assertEquals(BondedCompanionProjectionService.StoreStatus.STORED,
@@ -183,17 +184,17 @@ class BondedCompanionRecoveryTest {
     void storePreservesSnapshotStateAbsentFromTheLiveProjection() {
         var lease = lease(uuid(40), "world-a",
                 BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
-        durability.activate(lease);
         world.projections.add(projection(
                 uuid(40), "world-a", snapshot(uuid(40))));
         BondedCompanionSnapshot stored = BondedCompanionSnapshot.of(
                 snapshot(uuid(20)).fullState(),
                 Map.of("hydragon.abilities", "{\"attuned\":true}")
         );
+        durability.activate(lease, stored);
 
         var result = projections.store(
                 new BondedCompanionProjectionService.StoreRequest(
-                        lease, 5L, -900L, stored, 0L
+                        lease, 5L, -900L
                 )
         );
 
@@ -204,6 +205,54 @@ class BondedCompanionRecoveryTest {
                 durability.lastStoredSnapshot.extensionData()
                         .get("hydragon.abilities")
         );
+    }
+
+    @Test
+    void manualStoreRejectsLiveSnapshotOwnedByAnotherPlayer() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, snapshot(uuid(20)));
+        world.projections.add(projection(
+                uuid(40), "world-a",
+                snapshot(uuid(40), uuid(2), "role-a", null, Map.of())));
+
+        var result = projections.store(
+                new BondedCompanionProjectionService.StoreRequest(
+                        lease, 5L, -900L
+                )
+        );
+
+        assertEquals(
+                BondedCompanionProjectionService.StoreStatus.DURABILITY_REJECTED,
+                result.status()
+        );
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-a"));
+        assertTrue(world.removed.isEmpty());
+    }
+
+    @Test
+    void manualStoreRejectsLiveSnapshotWithAnotherRole() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, snapshot(uuid(20)));
+        world.projections.add(projection(
+                uuid(40), "world-a",
+                snapshot(uuid(40), uuid(1), "role-b", null, Map.of())));
+
+        var result = projections.store(
+                new BondedCompanionProjectionService.StoreRequest(
+                        lease, 5L, -900L
+                )
+        );
+
+        assertEquals(
+                BondedCompanionProjectionService.StoreStatus.DURABILITY_REJECTED,
+                result.status()
+        );
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-a"));
+        assertTrue(world.removed.isEmpty());
     }
 
     @Test
@@ -341,6 +390,69 @@ class BondedCompanionRecoveryTest {
     }
 
     @Test
+    void logoutPreservesDurableExtensionsAndUnobservedOptionalState() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, 0L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+        world.projections.add(projection(
+                uuid(40), "world-a", snapshot(uuid(40))));
+
+        observer.onPlayerLogout(uuid(1), List.of(lease), -600L);
+
+        assertDurableSnapshotSurvived("profile-a");
+    }
+
+    @Test
+    void worldTransferPreservesDurableExtensionsAndUnobservedOptionalState() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, 0L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+        world.projections.add(projection(
+                uuid(40), "world-a", snapshot(uuid(40))));
+
+        observer.onPlayerWorldTransfer(
+                uuid(1), "world-a", "world-b", List.of(lease), -600L);
+
+        assertDurableSnapshotSurvived("profile-a");
+    }
+
+    @Test
+    void expiryPreservesDurableExtensionsAndUnobservedOptionalState() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+        world.projections.add(projection(
+                uuid(40), "world-a", snapshot(uuid(40))));
+
+        observer.onLeaseExpired(lease, -900L);
+
+        assertDurableSnapshotSurvived("profile-a");
+    }
+
+    @Test
+    void reconciliationRejectsPresentSnapshotWithWrongOwner() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, 0L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+        var observed = projection(
+                uuid(40), "world-a",
+                snapshot(uuid(40), uuid(2), "role-a", null, Map.of()));
+
+        var result = projections.reconcile(
+                lease, List.of(observed),
+                BondedCompanionProjectionService.RecoveryCause.LOGOUT,
+                -600L
+        );
+
+        assertEquals(
+                BondedCompanionProjectionService.ReconcileStatus.IDENTITY_MISMATCH,
+                result.status()
+        );
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-a"));
+    }
+
+    @Test
     void onlyConfirmedDeathAuthorsDead() {
         var lease = lease(uuid(40), "world-a",
                 BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
@@ -351,6 +463,44 @@ class BondedCompanionRecoveryTest {
 
         assertEquals(BondedCompanionState.DEAD, durability.states.get("profile-a"));
         assertEquals("CONFIRMED_DEATH", durability.lastReason);
+    }
+
+    @Test
+    void confirmedDeathMergesSparseLiveEvidenceIntoDurableSnapshot() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+
+        var result = projections.confirmDeath(
+                lease,
+                projection(uuid(40), "world-a", snapshot(uuid(40))),
+                -800L
+        );
+
+        assertEquals(BondedCompanionProjectionService.ReconcileStatus.DEAD,
+                result.status());
+        assertDurableSnapshotSurvived("profile-a");
+    }
+
+    @Test
+    void confirmedDeathRejectsLiveSnapshotWithAnotherOwner() {
+        var lease = lease(uuid(40), "world-a",
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, -1_000L);
+        durability.activate(lease, durableSnapshot(uuid(20)));
+        var wrongOwner = snapshot(
+                uuid(40), uuid(2), "role-a", null, Map.of());
+
+        var result = projections.confirmDeath(
+                lease, projection(uuid(40), "world-a", wrongOwner), -800L
+        );
+
+        assertEquals(
+                BondedCompanionProjectionService.ReconcileStatus
+                        .IDENTITY_MISMATCH,
+                result.status()
+        );
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-a"));
     }
 
     private BondedCompanionProjectionValidator.LeaseExpectation lease(
@@ -395,210 +545,47 @@ class BondedCompanionRecoveryTest {
         );
     }
 
+    private BondedCompanionSnapshot durableSnapshot(UUID npcUuid) {
+        return snapshot(
+                npcUuid, uuid(1), "role-a", "Durable Drake",
+                Map.of("hydragon.abilities", "{\"attuned\":true}")
+        );
+    }
+
+    private void assertDurableSnapshotSurvived(String profileId) {
+        BondedCompanionSnapshot stored = durability.snapshots.get(profileId);
+        assertEquals(
+                "{\"attuned\":true}",
+                stored.extensionData().get("hydragon.abilities")
+        );
+        assertEquals("Durable Drake",
+                stored.fullState().npcName().getName());
+    }
+
     private BondedCompanionSnapshot snapshot(UUID npcUuid) {
+        return snapshot(npcUuid, uuid(1), "role-a", null, Map.of());
+    }
+
+    private BondedCompanionSnapshot snapshot(
+            UUID npcUuid,
+            UUID ownerUuid,
+            String roleId,
+            String name,
+            Map<String, String> extensions
+    ) {
         return BondedCompanionSnapshot.of(new CoopResidentStateSnapshot(
-                npcUuid, null, -1, "role-a", null, null, null, null, null,
-                null, null, null, null, null, null, null, -1.0, -1L
-        ), Map.of());
+                npcUuid, null, -1, roleId, null,
+                new TameworkOwnerComponent(ownerUuid, "Owner"),
+                new TameworkTamedComponent(true),
+                name == null ? null : new TameworkNpcNameComponent(
+                        name, ownerUuid, -1L,
+                        TameworkNpcNameComponent.NameSource.System
+                ),
+                null, null, null, null, null, null, null, null, -1.0, -1L
+        ), extensions);
     }
 
     private static UUID uuid(long value) {
         return new UUID(0L, value);
-    }
-
-    private static final class RecordingDurability
-            implements BondedCompanionProjectionService.Durability {
-        private final Map<String, BondedCompanionState> states = new HashMap<>();
-        private final Map<String, BondedCompanionProjectionValidator.LeaseExpectation>
-                spawnRecovery = new HashMap<>();
-        private List<String> events = new ArrayList<>();
-        private final List<Long> cleanupRetentions = new ArrayList<>();
-        private final List<BondedCompanionProjectionCleanupService.CleanupIntent>
-                spawnFailureCleanups = new ArrayList<>();
-        private BondedCompanionSnapshot lastStoredSnapshot;
-        private String lastReason;
-        private boolean rollbackSucceeds = true;
-
-        void activate(BondedCompanionProjectionValidator.LeaseExpectation lease) {
-            states.put(lease.profileId(), BondedCompanionState.ACTIVE);
-            spawnRecovery.put(lease.profileId(), lease);
-        }
-
-        @Override
-        public boolean beginSummon(
-                BondedCompanionProjectionService.SummonRequest request,
-                BondedCompanionProjectionValidator.LeaseExpectation lease,
-                BondedCompanionProjectionCleanupService.CleanupIntent recovery
-        ) {
-            events.add("begin:" + lease.profileId() + ":" + lease.leaseToken()
-                    + ":" + lease.liveNpcUuid());
-            states.put(lease.profileId(), BondedCompanionState.ACTIVE);
-            spawnRecovery.put(lease.profileId(), lease);
-            return true;
-        }
-
-        @Override
-        public boolean confirmSpawn(
-                BondedCompanionProjectionValidator.LeaseExpectation lease,
-                UUID spawnedNpcUuid
-        ) {
-            events.add("confirm:" + lease.profileId() + ":" + lease.leaseToken()
-                    + ":" + spawnedNpcUuid);
-            spawnRecovery.remove(lease.profileId());
-            return lease.liveNpcUuid().equals(spawnedNpcUuid);
-        }
-
-        @Override
-        public boolean failSpawnAndEnqueueCleanup(
-                BondedCompanionProjectionValidator.LeaseExpectation lease,
-                List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
-                String reason
-        ) {
-            events.add("rollback:" + lease.profileId() + ":" + reason);
-            if (!rollbackSucceeds) {
-                return false;
-            }
-            states.put(lease.profileId(), BondedCompanionState.STORED);
-            spawnRecovery.remove(lease.profileId());
-            spawnFailureCleanups.addAll(cleanups);
-            lastReason = reason;
-            return true;
-        }
-
-        @Override
-        public boolean storeAndEnqueueCleanup(
-                BondedCompanionProjectionService.StoreRequest request,
-                BondedCompanionSnapshot snapshot,
-                BondedCompanionProjectionCleanupService.CleanupIntent cleanup
-        ) {
-            events.add("store:" + request.lease().profileId());
-            lastStoredSnapshot = snapshot;
-            states.put(request.lease().profileId(), BondedCompanionState.STORED);
-            return true;
-        }
-
-        @Override
-        public boolean reconcileStored(
-                BondedCompanionProjectionValidator.LeaseExpectation lease,
-                BondedCompanionSnapshot snapshot,
-                long summonCooldownUntilMs,
-                List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
-                String reason
-        ) {
-            states.put(lease.profileId(), BondedCompanionState.STORED);
-            spawnRecovery.remove(lease.profileId());
-            cleanups.forEach(cleanup -> cleanupRetentions.add(
-                    cleanup.retainedUntilMs()));
-            lastReason = reason;
-            return true;
-        }
-
-        @Override
-        public boolean confirmDeath(
-                BondedCompanionProjectionValidator.LeaseExpectation lease,
-                BondedCompanionSnapshot snapshot, long diedAtMs
-        ) {
-            states.put(lease.profileId(), BondedCompanionState.DEAD);
-            spawnRecovery.remove(lease.profileId());
-            lastReason = "CONFIRMED_DEATH";
-            return true;
-        }
-    }
-
-    private static final class RecordingWorld
-            implements BondedCompanionProjectionService.World,
-            BondedCompanionProjectionCleanupService.WorldGateway,
-            BondedCompanionWorldLifecycleObserver.ProjectionSource {
-        private final List<String> events = new ArrayList<>();
-        private final List<BondedCompanionProjectionValidator.Projection> projections =
-                new ArrayList<>();
-        private final Map<UUID, String> sources = new HashMap<>();
-        private final List<UUID> removed = new ArrayList<>();
-        private SpawnMode spawnMode = SpawnMode.SPAWNED;
-        private boolean removeSucceeds = true;
-
-        @Override
-        public BondedCompanionProjectionService.SpawnResult spawn(
-                BondedCompanionProjectionService.SpawnPlan plan
-        ) {
-            events.add("spawn:" + plan.lease().profileId() + ":"
-                    + plan.lease().leaseToken());
-            if (spawnMode == SpawnMode.THROW) {
-                throw new IllegalStateException("spawn failed");
-            }
-            if (spawnMode == SpawnMode.RETRYABLE) {
-                return BondedCompanionProjectionService.SpawnResult.retryRequired();
-            }
-            UUID spawnedUuid = spawnMode == SpawnMode.IDENTITY_MISMATCH
-                    ? uuid(91) : plan.lease().liveNpcUuid();
-            projections.add(new BondedCompanionProjectionValidator.Projection(
-                    spawnedUuid, plan.lease().worldKey(),
-                    plan.marker(), plan.snapshot()
-            ));
-            return spawnMode == SpawnMode.IDENTITY_MISMATCH
-                    ? BondedCompanionProjectionService.SpawnResult.identityMismatch(
-                            spawnedUuid)
-                    : BondedCompanionProjectionService.SpawnResult.spawned(spawnedUuid);
-        }
-
-        @Override
-        public BondedCompanionProjectionValidator.Projection readExact(
-                BondedCompanionProjectionValidator.LeaseExpectation lease
-        ) {
-            events.add("read:" + lease.liveNpcUuid());
-            return projections.stream().filter(projection ->
-                    projection.npcUuid().equals(lease.liveNpcUuid()))
-                    .findFirst().orElse(null);
-        }
-
-        @Override
-        public List<BondedCompanionProjectionValidator.Projection> projections() {
-            return List.copyOf(projections);
-        }
-
-        @Override
-        public BondedCompanionProjectionCleanupService.Outcome removeIfExact(
-                BondedCompanionProjectionCleanupService.CleanupIntent intent) {
-            events.add("remove-if-exact:" + intent.worldKey() + ":"
-                    + intent.targetNpcUuid());
-            for (int index = 0; index < projections.size(); index++) {
-                var projection = projections.get(index);
-                if (projection.npcUuid().equals(intent.targetNpcUuid())) {
-                    boolean exact = projection.worldKey().equals(intent.worldKey())
-                            && intent.target()
-                            == BondedCompanionProjectionCleanupService.Target.PROJECTION
-                            && projection.marker().isBondedCompanion()
-                            && intent.profileId().equals(projection.marker().getProfileId())
-                            && intent.leaseToken().equals(
-                            projection.marker().getBondedLeaseToken());
-                    if (!exact) {
-                        return BondedCompanionProjectionCleanupService.Outcome.IDENTITY_MISMATCH;
-                    }
-                    if (!removeSucceeds) {
-                        return BondedCompanionProjectionCleanupService.Outcome.RETRY_REQUIRED;
-                    }
-                    projections.remove(index);
-                    removed.add(intent.targetNpcUuid());
-                    return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
-                }
-            }
-            String sourceWorld = sources.get(intent.targetNpcUuid());
-            if (sourceWorld == null) {
-                return BondedCompanionProjectionCleanupService.Outcome.ALREADY_MISSING;
-            }
-            if (intent.target()
-                    != BondedCompanionProjectionCleanupService.Target.SOURCE
-                    || !sourceWorld.equals(intent.worldKey())) {
-                return BondedCompanionProjectionCleanupService.Outcome.IDENTITY_MISMATCH;
-            }
-            if (!removeSucceeds) {
-                return BondedCompanionProjectionCleanupService.Outcome.RETRY_REQUIRED;
-            }
-            sources.remove(intent.targetNpcUuid());
-            removed.add(intent.targetNpcUuid());
-            return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
-        }
-
-        private enum SpawnMode { SPAWNED, RETRYABLE, IDENTITY_MISMATCH, THROW }
     }
 }

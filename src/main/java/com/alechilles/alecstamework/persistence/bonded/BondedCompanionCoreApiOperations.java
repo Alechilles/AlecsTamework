@@ -180,19 +180,9 @@ public final class BondedCompanionCoreApiOperations {
             return failure(BondedCompanionResultCode.WORLD_UNAVAILABLE,
                     "bonded-world-context-unavailable");
         }
-        BondedCompanionSnapshot storedSnapshot = decode(profile);
-        if (storedSnapshot == null) return internal("bonded-snapshot-invalid");
         long now = clock.getAsLong();
-        long policyRevision = rosters.snapshot().revision();
-        var transition = transitions.store(
-                mutation(request, now, policyRevision),
-                domain(profile, storedSnapshot), storedSnapshot);
-        if (!transition.applied()) {
-            return transitionFailure(transition.code());
-        }
         var result = projections.store(new BondedCompanionProjectionService.StoreRequest(
-                expectation(profile, lease), request.expectedRevision(), now,
-                storedSnapshot, transition.profile().summonCooldownUntilMs()
+                expectation(profile, lease), request.expectedRevision(), now
         ));
         BondedCompanionRecord.Profile refreshed = profile(request);
         if ((result.status() == BondedCompanionProjectionService.StoreStatus.STORED

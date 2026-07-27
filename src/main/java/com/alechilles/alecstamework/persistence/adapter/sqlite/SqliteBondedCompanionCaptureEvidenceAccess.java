@@ -64,6 +64,47 @@ final class SqliteBondedCompanionCaptureEvidenceAccess {
         }
     }
 
+    /** Internal cross-owner fence preventing one lingering source being recaptured. */
+    List<BondedCompanionCaptureEvidence> findBySource(
+            UUID sourceNpcUuid,
+            int limit
+    ) {
+        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+        try (Connection connection = connections.openReadConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT result_json
+                     FROM bonded_companion_operation
+                     WHERE operation_type = 'CAPTURE'
+                       AND operation_state = 'SUCCEEDED'
+                       AND json_type(
+                           result_json, '$.captureEvidence'
+                       ) = 'object'
+                       AND json_extract(
+                           result_json,
+                           '$.captureEvidence.sourceNpcUuid'
+                       ) = ?
+                     ORDER BY created_at_ms, caller_namespace, idempotency_key
+                     LIMIT ?
+                     """)) {
+            statement.setString(1, sourceNpcUuid.toString());
+            statement.setInt(2, limit);
+            try (ResultSet rows = statement.executeQuery()) {
+                ArrayList<BondedCompanionCaptureEvidence> result =
+                        new ArrayList<>();
+                while (rows.next()) {
+                    result.add(operations.captureEvidence(rows.getString(1)));
+                }
+                return List.copyOf(result);
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException(
+                    "bonded-capture-evidence-read-failed", failure);
+        }
+    }
+
     List<BondedCompanionCaptureEvidence> listUnpublished(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");

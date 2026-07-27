@@ -18,13 +18,14 @@ import javax.annotation.Nonnull;
 
 /** Creates, upgrades, and verifies the standalone bonded-companion schema. */
 public final class BondedCompanionSchemaManager {
-    public static final int VERSION = 5;
+    public static final int VERSION = 6;
     public static final String LINEAGE = "bonded-companions";
     private static final String V1_RESOURCE = "/persistence/bonded/v1.sql";
     private static final String V2_RESOURCE = "/persistence/bonded/v2.sql";
     private static final String V3_RESOURCE = "/persistence/bonded/v3.sql";
     private static final String V4_RESOURCE = "/persistence/bonded/v4.sql";
     private static final String V5_RESOURCE = "/persistence/bonded/v5.sql";
+    private static final String V6_RESOURCE = "/persistence/bonded/v6.sql";
     private static final Set<String> REQUIRED_TABLES = Set.of(
             "bonded_schema_history",
             "bonded_companion_profile",
@@ -41,12 +42,8 @@ public final class BondedCompanionSchemaManager {
     private final String v3Script;
     private final String v4Script;
     private final String v5Script;
-    private final String v1Hash;
-    private final String v2Hash;
-    private final String v3Hash;
-    private final String v4Hash;
-    private final String v5Hash;
-
+    private final String v6Script;
+    private final String v1Hash, v2Hash, v3Hash, v4Hash, v5Hash, v6Hash;
     BondedCompanionSchemaManager(
             @Nonnull SqliteConnectionFactory connections
     ) {
@@ -64,11 +61,13 @@ public final class BondedCompanionSchemaManager {
         v3Script = loadScript(V3_RESOURCE);
         v4Script = loadScript(V4_RESOURCE);
         v5Script = loadScript(V5_RESOURCE);
+        v6Script = loadScript(V6_RESOURCE);
         v1Hash = sha256(v1Script);
         v2Hash = sha256(v2Script);
         v3Hash = sha256(v3Script);
         v4Hash = sha256(v4Script);
         v5Hash = sha256(v5Script);
+        v6Hash = sha256(v6Script);
     }
 
     /** Creates a manager that owns connections to the supplied database path. */
@@ -109,6 +108,9 @@ public final class BondedCompanionSchemaManager {
                 } else if (latestVersion(connection) == 4) {
                     verifyV4(connection);
                     applyV5(connection);
+                } else if (latestVersion(connection) == 5) {
+                    verifyV5(connection);
+                    applyV6(connection);
                 } else {
                     verify(connection);
                 }
@@ -141,7 +143,7 @@ public final class BondedCompanionSchemaManager {
     /** Returns the SHA-256 of the exact bundled current bonded schema. */
     @Nonnull
     public String schemaHash() {
-        return v5Hash;
+        return v6Hash;
     }
 
     /** Returns the exact bonded-only user-table set. */
@@ -206,6 +208,12 @@ public final class BondedCompanionSchemaManager {
     private void applyV5(Connection connection) throws Exception {
         executeScript(connection, v5Script);
         insertHistory(connection, 5, v5Hash);
+        applyV6(connection);
+    }
+
+    private void applyV6(Connection connection) throws Exception {
+        executeScript(connection, v6Script);
+        insertHistory(connection, 6, v6Hash);
         verify(connection);
     }
 
@@ -228,17 +236,11 @@ public final class BondedCompanionSchemaManager {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history ORDER BY version
-                     """)) {
-            verifyHistoryRow(rows, 1, v1Hash);
-            verifyHistoryRow(rows, 2, v2Hash);
-            verifyHistoryRow(rows, 3, v3Hash);
-            verifyHistoryRow(rows, 4, v4Hash);
-            verifyHistoryRow(rows, 5, v5Hash);
-            if (rows.next()) throw historyMismatch();
+        verifyHistory(connection, v1Hash, v2Hash, v3Hash, v4Hash, v5Hash,
+                v6Hash);
+        if (!BondedCompanionSchemaAuthorityVerifier
+                .hasCaptureSourceFence(connection)) {
+            throw new VerificationFailure("bonded-capture-source-fence-missing");
         }
         try {
             new BondedCompanionStoredRowValidator().verify(connection);
@@ -277,14 +279,7 @@ public final class BondedCompanionSchemaManager {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history ORDER BY version
-                     """)) {
-            verifyHistoryRow(rows, 1, v1Hash);
-            if (rows.next()) throw historyMismatch();
-        }
+        verifyHistory(connection, v1Hash);
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",
                 "bonded-integrity-check-failed");
         try (Statement statement = connection.createStatement();
@@ -299,15 +294,7 @@ public final class BondedCompanionSchemaManager {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history ORDER BY version
-                     """)) {
-            verifyHistoryRow(rows, 1, v1Hash);
-            verifyHistoryRow(rows, 2, v2Hash);
-            if (rows.next()) throw historyMismatch();
-        }
+        verifyHistory(connection, v1Hash, v2Hash);
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",
                 "bonded-integrity-check-failed");
         try (Statement statement = connection.createStatement();
@@ -322,16 +309,7 @@ public final class BondedCompanionSchemaManager {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                     SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history ORDER BY version
-                     """)) {
-            verifyHistoryRow(rows, 1, v1Hash);
-            verifyHistoryRow(rows, 2, v2Hash);
-            verifyHistoryRow(rows, 3, v3Hash);
-            if (rows.next()) throw historyMismatch();
-        }
+        verifyHistory(connection, v1Hash, v2Hash, v3Hash);
         assertSingleValue(connection, "PRAGMA integrity_check", "ok",
                 "bonded-integrity-check-failed");
     }
@@ -340,19 +318,32 @@ public final class BondedCompanionSchemaManager {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
+        verifyHistory(connection, v1Hash, v2Hash, v3Hash, v4Hash);
+        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
+                "bonded-integrity-check-failed");
+    }
+
+    private void verifyV5(Connection connection) throws Exception {
+        if (!tables(connection).equals(REQUIRED_TABLES)) {
+            throw new VerificationFailure("bonded-schema-table-mismatch");
+        }
+        verifyHistory(connection, v1Hash, v2Hash, v3Hash, v4Hash, v5Hash);
+        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
+                "bonded-integrity-check-failed");
+    }
+
+    private void verifyHistory(Connection connection, String... hashes)
+            throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("""
                      SELECT version, lineage, schema_hash
                      FROM bonded_schema_history ORDER BY version
                      """)) {
-            verifyHistoryRow(rows, 1, v1Hash);
-            verifyHistoryRow(rows, 2, v2Hash);
-            verifyHistoryRow(rows, 3, v3Hash);
-            verifyHistoryRow(rows, 4, v4Hash);
+            for (int index = 0; index < hashes.length; index++) {
+                verifyHistoryRow(rows, index + 1, hashes[index]);
+            }
             if (rows.next()) throw historyMismatch();
         }
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
     }
 
     private void prepareV1OperationBackup(Connection connection) throws Exception {

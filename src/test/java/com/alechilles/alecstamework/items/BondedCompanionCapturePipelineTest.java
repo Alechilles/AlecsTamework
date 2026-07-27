@@ -21,7 +21,6 @@ import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionDatabase;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionCapturePersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
-import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEventPublisher;
@@ -31,8 +30,6 @@ import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaMana
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStoreResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -131,7 +128,10 @@ class BondedCompanionCapturePipelineTest {
         var result = harness.author().capture(validIntent());
 
         assertEquals(BondedCompanionCaptureAuthor.Status.REPLAYED, result.status());
-        assertEquals(List.of("policy", "persist", "message"), harness.events);
+        assertEquals(BondedCompanionCaptureAuthor.CleanupOutcome.REMOVED,
+                result.cleanupOutcome());
+        assertEquals(List.of("policy", "persist", "cleanup", "message"),
+                harness.events);
     }
 
     /** Regression: accepted scheduling is not completed item finalization. */
@@ -357,59 +357,6 @@ class BondedCompanionCapturePipelineTest {
         assertEquals(1, database.listCleanup(OWNER, "hydragon:companions", 10).size());
     }
 
-    /** Regression: a retry re-reads the NPC later but retains request identity. */
-    @Test
-    void realAdapterReplaysSameCaptureWhenFreshSnapshotTimestampDiffers()
-            throws Exception {
-        Path path = tempDir.resolve("fresh-snapshot-replay.sqlite");
-        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
-                .initialize().availability().available());
-        BondedCompanionRosterRegistry rosters = rosterRegistry();
-        SqliteBondedCompanionDatabase database =
-                new SqliteBondedCompanionDatabase(path);
-        var adapter = new SqliteBondedCompanionCapturePersistenceAdapter(
-                rosters,
-                new BondedCompanionTransitionService(
-                        new BondedCompanionPolicyResolver(rosters)),
-                database, database,
-                new SqliteBondedCompanionProjectionDurability(path),
-                new BondedCompanionProjectionCleanupService(
-                        ignored -> BondedCompanionProjectionCleanupService
-                                .Outcome.RETRY_REQUIRED)
-        );
-        BondedCompanionCaptureIntent first = frozenIntentAt(10L);
-        BondedCompanionCaptureIntent retry = frozenIntentAt(20L);
-
-        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
-                adapter.store(first));
-        rewriteOperationHash(path, first, legacyCaptureHash(first));
-        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED,
-                adapter.store(retry));
-        assertEquals(1, database.listProfiles(
-                OWNER, "hydragon:companions").size());
-        assertEquals(1, database.listCleanup(
-                OWNER, "hydragon:companions", 10).size());
-    }
-
-    @Test
-    void explicitFamilySelectionAddsRequestIdentityProvenance()
-            throws Exception {
-        Path path = tempDir.resolve("explicit-family-hash.sqlite");
-        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
-                .initialize().availability().available());
-        BondedCompanionRosterRegistry rosters = rosterRegistry();
-        SqliteBondedCompanionDatabase database =
-                new SqliteBondedCompanionDatabase(path);
-        var adapter = adapter(path, rosters, database);
-        BondedCompanionCaptureIntent inferred = frozenIntentAt(10L);
-        BondedCompanionCaptureIntent explicit = explicitFamily(inferred);
-
-        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
-                adapter.store(inferred));
-        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED,
-                adapter.store(explicit));
-    }
-
     @Test
     void realAdapterPublishesExactEvidenceOnlyAfterBondedCommit()
             throws Exception {
@@ -630,23 +577,6 @@ class BondedCompanionCapturePipelineTest {
         );
     }
 
-    private static BondedCompanionCaptureIntent explicitFamily(
-            BondedCompanionCaptureIntent intent
-    ) {
-        return new BondedCompanionCaptureIntent(
-                intent.callerNamespace(), intent.idempotencyKey(),
-                intent.actorUuid(), intent.worldKey(), intent.hotbarSlot(),
-                intent.sourceFingerprint(), intent.sourceNpcUuid(),
-                intent.attemptEvidence(), intent.roleId(), intent.species(),
-                intent.rosterId(), intent.rosterRevision(), intent.snapshot(),
-                intent.completionEffect(), intent.targetValid(),
-                intent.chanceSuccessful(), intent.tranquilized(),
-                intent.toolAccess(), intent.ownerAllowed(), intent.roleAllowed(),
-                intent.familyId(),
-                BondedCompanionCaptureIntent.FamilySelection.EXPLICIT
-        );
-    }
-
     private static BondedCompanionSnapshot snapshot() {
         return snapshotAt(10L);
     }
@@ -746,69 +676,6 @@ class BondedCompanionCapturePipelineTest {
                         ignored -> BondedCompanionProjectionCleanupService
                                 .Outcome.RETRY_REQUIRED)
         );
-    }
-
-    private static void rewriteOperationHash(
-            Path database,
-            BondedCompanionCaptureIntent intent,
-            String hash
-    ) throws Exception {
-        try (Connection connection = new SqliteConnectionFactory(database)
-                .openWriterConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     UPDATE bonded_companion_operation
-                     SET request_hash = ?
-                     WHERE caller_namespace = ? AND idempotency_key = ?
-                     """)) {
-            statement.setString(1, hash);
-            statement.setString(2, intent.callerNamespace());
-            statement.setString(3, intent.idempotencyKey());
-            assertEquals(1, statement.executeUpdate());
-        }
-    }
-
-    private static String legacyCaptureHash(
-            BondedCompanionCaptureIntent intent
-    ) throws Exception {
-        BondedCompanionCaptureAttemptEvidence attempt = intent.attemptEvidence();
-        String canonical = intent.actorUuid() + "\0" + intent.rosterId()
-                + "\0" + intent.roleId() + "\0" + intent.sourceNpcUuid()
-                + "\0" + attempt.attemptId()
-                + "\0" + attempt.sourceItemId()
-                + "\0" + attempt.spawnerConfigId()
-                + "\0" + attempt.spawnerConfigRevision()
-                + "\0" + attempt.capturePolicyConfigId()
-                + "\0" + attempt.capturePolicyConfigRevision()
-                + "\0" + attempt.sourceConsumption()
-                + "\0" + attempt.successDisposition()
-                + "\0" + attempt.outcome()
-                + "\0" + attempt.reason()
-                + "\0" + new BondedCompanionSnapshotCodec().encode(
-                        legacyIdentitySnapshot(intent));
-        return java.util.HexFormat.of().formatHex(
-                java.security.MessageDigest.getInstance("SHA-256")
-                        .digest(canonical.getBytes(StandardCharsets.UTF_8))
-        );
-    }
-
-    private static BondedCompanionSnapshot legacyIdentitySnapshot(
-            BondedCompanionCaptureIntent intent
-    ) {
-        CoopResidentStateSnapshot source = intent.snapshot().fullState();
-        CoopResidentStateSnapshot claimed = new CoopResidentStateSnapshot(
-                source.npcUuid(), source.coopId(), source.residentSlot(),
-                source.roleId(), source.commandLinks(),
-                new com.alechilles.alecstamework.npc.components
-                        .TameworkOwnerComponent(intent.actorUuid(), null),
-                new com.alechilles.alecstamework.npc.components
-                        .TameworkTamedComponent(true),
-                source.npcName(), source.happiness(), source.needs(),
-                source.breeding(), source.leveling(), source.traits(),
-                source.talents(), source.lifeStage(), source.attachments(),
-                source.healthPercent(), 0L
-        );
-        return BondedCompanionSnapshot.of(
-                claimed, intent.snapshot().extensionData());
     }
 
     private static final class Harness {

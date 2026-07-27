@@ -165,6 +165,85 @@ class TwBondedCompanionRosterConfigTest {
     }
 
     @Test
+    void combinedDuplicateAssetAndFamilyDiagnosticsAreOrderIndependent()
+            throws Exception {
+        TwBondedCompanionRosterConfig first = roster(
+                "SharedAsset",
+                familyRosterJson(
+                        "hydragon:shared", "hydragon:dragon", "Dragon", 1,
+                        1, 0, 0, 1
+                )
+        );
+        TwBondedCompanionRosterConfig duplicateFamily = roster(
+                "UniqueAsset",
+                familyRosterJson(
+                        "hydragon:shared", "hydragon:dragon", "OtherDragon", 1,
+                        1, 0, 0, 1
+                )
+        );
+        TwBondedCompanionRosterConfig duplicateAsset = roster(
+                "SharedAsset",
+                familyRosterJson(
+                        "hydragon:shared", "hydragon:mini", "Mini", 1,
+                        1, 0, 0, 1
+                )
+        );
+        BondedCompanionRosterRegistry registry =
+                new BondedCompanionRosterRegistry();
+
+        BondedCompanionRosterRegistry.ReloadResult familyFirst =
+                registry.replace(
+                        List.of(first, duplicateFamily, duplicateAsset), 1L
+                );
+        BondedCompanionRosterRegistry.ReloadResult assetFirst =
+                registry.replace(
+                        List.of(duplicateAsset, duplicateFamily, first), 1L
+                );
+
+        assertFalse(familyFirst.applied());
+        assertFalse(assetFirst.applied());
+        assertEquals(familyFirst.error(), assetFirst.error());
+    }
+
+    @Test
+    void snapshotCanonicalConstructorRejectsIncoherentRepresentativeMap()
+            throws Exception {
+        BondedCompanionRosterRegistry registry = registryWith(roster(
+                "Roster", minimalRosterJson("hydragon:dragons")
+        ));
+        BondedCompanionRosterRegistry.Snapshot coherent = registry.snapshot();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new BondedCompanionRosterRegistry.Snapshot(
+                        coherent.revision(), Map.of(),
+                        coherent.familiesByRosterId()
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new BondedCompanionRosterRegistry.Snapshot(
+                        coherent.revision(),
+                        Map.of("wrong:roster", coherent.byRosterId()
+                                .get("hydragon:dragons")),
+                        coherent.familiesByRosterId()
+                )
+        );
+    }
+
+    @Test
+    void snapshotCanonicalConstructorRejectsRosterWithoutFamilies() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new BondedCompanionRosterRegistry.Snapshot(
+                        1L,
+                        Map.of(),
+                        Map.of("hydragon:horn", Map.of())
+                )
+        );
+    }
+
+    @Test
     void sharedRosterCompilesIndependentFamiliesAndKeepsExactLookup()
             throws Exception {
         TwBondedCompanionRosterConfig dragons = roster(

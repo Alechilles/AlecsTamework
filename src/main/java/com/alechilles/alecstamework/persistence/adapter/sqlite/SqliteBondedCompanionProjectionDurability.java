@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionSe
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
+import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionProjectionStorePlanner;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import java.nio.charset.StandardCharsets;
@@ -84,69 +86,67 @@ public final class SqliteBondedCompanionProjectionDurability implements
             String reason
     ) {
         return returnToStored(
-                lease, null, null, null, cleanups,
-                lease.startedAtMs(), false
+                lease, null, cleanups, lease.startedAtMs()
         );
     }
 
     @Override
     public boolean storeAndEnqueueCleanup(
             BondedCompanionProjectionService.StoreRequest request,
-            BondedCompanionSnapshot snapshot,
+            BondedCompanionProjectionStorePlanner.StorePlan plan,
             BondedCompanionProjectionCleanupService.CleanupIntent cleanup
     ) {
         return returnToStored(
-                request.lease(), snapshot, request.expectedRevision(),
-                request.summonCooldownUntilMs(), List.of(cleanup),
-                request.nowMs(), true
+                request.lease(), plan, List.of(cleanup), request.nowMs()
         );
     }
 
     @Override
     public boolean reconcileStored(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            BondedCompanionSnapshot snapshot,
-            long summonCooldownUntilMs,
+            BondedCompanionProjectionStorePlanner.StorePlan plan,
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
             String reason
     ) {
         long updatedAt = cleanups.isEmpty()
                 ? lease.startedAtMs() : cleanups.getFirst().createdAtMs();
         return returnToStored(
-                lease, snapshot, null, summonCooldownUntilMs,
-                cleanups, updatedAt, false
+                lease, plan, cleanups, updatedAt
         );
     }
 
     @Override
     public boolean confirmDeath(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            BondedCompanionSnapshot snapshot,
+            BondedCompanionProjectionStorePlanner.StorePlan plan,
             long diedAtMs
     ) {
+        Objects.requireNonNull(plan, "plan");
         return transaction(connection -> {
-            String encoded = snapshot == null ? null : encoded(snapshot);
             try (PreparedStatement update = connection.prepareStatement("""
                     UPDATE bonded_companion_profile
                     SET state = 'DEAD', revision = revision + 1,
-                        snapshot_json = COALESCE(?, snapshot_json),
+                        snapshot_json = ?,
+                        revive_cooldown_until_ms = 0,
                         died_at_ms = ?, updated_at_ms = ?
                     WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
-                      AND state = 'ACTIVE'
+                      AND state = 'ACTIVE' AND revision = ?
                       AND EXISTS (
                         SELECT 1 FROM bonded_companion_lease l
                         WHERE l.profile_id = bonded_companion_profile.profile_id
                           AND l.lease_token = ? AND l.live_npc_uuid = ?
-                          AND l.world_key = ?
+                          AND l.world_key = ? AND l.projection_state = ?
                       )
                     """)) {
-                update.setString(1, encoded);
+                update.setString(1, encoded(plan.snapshot()));
                 update.setLong(2, diedAtMs);
                 update.setLong(3, diedAtMs);
                 scope(update, 4, lease);
-                update.setString(7, lease.leaseToken());
-                update.setString(8, lease.liveNpcUuid().toString());
-                update.setString(9, lease.worldKey());
+                update.setLong(7, plan.expectedRevision());
+                update.setString(8, lease.leaseToken());
+                update.setString(9, lease.liveNpcUuid().toString());
+                update.setString(10, lease.worldKey());
+                update.setString(11, lease.phase().name());
                 if (update.executeUpdate() != 1) return false;
             }
             return deleteLease(connection, lease) == 1;
@@ -253,16 +253,13 @@ public final class SqliteBondedCompanionProjectionDurability implements
 
     private boolean returnToStored(
             BondedCompanionProjectionValidator.LeaseExpectation lease,
-            @Nullable BondedCompanionSnapshot snapshot,
-            @Nullable Long expectedRevision,
-            @Nullable Long summonCooldownUntilMs,
+            @Nullable BondedCompanionProjectionStorePlanner.StorePlan plan,
             List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
-            long updatedAtMs,
-            boolean requireRevision
+            long updatedAtMs
     ) {
         Objects.requireNonNull(cleanups, "cleanups");
         return transaction(connection -> {
-            String revisionClause = requireRevision ? " AND revision = ?" : "";
+            String revisionClause = plan == null ? "" : " AND revision = ?";
             try (PreparedStatement update = connection.prepareStatement("""
                     UPDATE bonded_companion_profile
                     SET state = 'STORED', revision = revision + 1,
@@ -277,21 +274,25 @@ public final class SqliteBondedCompanionProjectionDurability implements
                         SELECT 1 FROM bonded_companion_lease l
                         WHERE l.profile_id = bonded_companion_profile.profile_id
                           AND l.lease_token = ? AND l.live_npc_uuid = ?
-                          AND l.world_key = ?
+                          AND l.world_key = ? AND l.projection_state = ?
                       )
                     """ + revisionClause)) {
-                update.setString(1, snapshot == null ? null : encoded(snapshot));
-                if (summonCooldownUntilMs == null) {
+                update.setString(1, plan == null
+                        ? null : encoded(plan.snapshot()));
+                if (plan == null) {
                     update.setNull(2, Types.BIGINT);
                 } else {
-                    update.setLong(2, summonCooldownUntilMs);
+                    update.setLong(2, plan.summonCooldownUntilMs());
                 }
                 update.setLong(3, updatedAtMs);
                 scope(update, 4, lease);
                 update.setString(7, lease.leaseToken());
                 update.setString(8, lease.liveNpcUuid().toString());
                 update.setString(9, lease.worldKey());
-                if (requireRevision) update.setLong(10, expectedRevision);
+                update.setString(10, lease.phase().name());
+                if (plan != null) {
+                    update.setLong(11, plan.expectedRevision());
+                }
                 if (update.executeUpdate() != 1) return false;
             }
             if (deleteLease(connection, lease) != 1) return false;
@@ -359,8 +360,10 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 DELETE FROM bonded_companion_lease
                 WHERE profile_id = ? AND lease_token = ?
                   AND live_npc_uuid = ? AND world_key = ?
+                  AND projection_state = ?
                 """)) {
             bindLeaseIdentity(delete, lease);
+            delete.setString(5, lease.phase().name());
             return delete.executeUpdate();
         }
     }
