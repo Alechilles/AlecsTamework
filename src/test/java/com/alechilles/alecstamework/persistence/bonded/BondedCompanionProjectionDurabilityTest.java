@@ -239,13 +239,35 @@ class BondedCompanionProjectionDurabilityTest {
                 .findFirst().orElseThrow();
         assertTrue(durability.confirmSpawn(pendingLive, pendingLive.liveNpcUuid()));
 
+        List<BondedCompanionProjectionValidator.LeaseExpectation> firstPage =
+                durability.inWorldAfter("world-a", null, 64);
+        List<BondedCompanionProjectionValidator.LeaseExpectation> secondPage =
+                durability.inWorldAfter(
+                        "world-a", firstPage.getLast().profileId(), 64);
+        List<BondedCompanionProjectionValidator.LeaseExpectation> ownerFirst =
+                durability.forOwnerAfter(OWNER, null, null, 64);
+        var ownerCursor = ownerFirst.getLast();
+        List<BondedCompanionProjectionValidator.LeaseExpectation> ownerSecond =
+                durability.forOwnerAfter(OWNER, ownerCursor.worldKey(),
+                        ownerCursor.profileId(), 64);
+        List<BondedCompanionProjectionValidator.LeaseExpectation> ownerWorldFirst =
+                durability.forOwnerInWorldAfter(OWNER, "world-a", null, 64);
+        List<BondedCompanionProjectionValidator.LeaseExpectation> ownerWorldSecond =
+                durability.forOwnerInWorldAfter(OWNER, "world-a",
+                        ownerWorldFirst.getLast().profileId(), 64);
         List<BondedCompanionProjectionValidator.LeaseExpectation> live =
-                durability.inWorld("world-a", 128).stream()
+                secondPage.stream()
                         .filter(lease -> lease.phase()
                                 == BondedCompanionProjectionValidator
                                 .LeasePhase.LIVE)
                         .toList();
 
+        assertEquals(64, firstPage.size());
+        assertEquals(1, secondPage.size());
+        assertEquals(64, ownerFirst.size());
+        assertEquals(1, ownerSecond.size());
+        assertEquals(64, ownerWorldFirst.size());
+        assertEquals(1, ownerWorldSecond.size());
         assertEquals(1, live.size());
         assertEquals("z-live", live.getFirst().profileId());
         assertEquals(BondedCompanionProjectionValidator.LeasePhase.LIVE,

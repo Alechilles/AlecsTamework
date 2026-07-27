@@ -229,27 +229,35 @@ public final class SqliteBondedCompanionProjectionDurability implements
 
     @Override
     @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation> inWorld(
-            @Nonnull String worldKey, int limit
+    public List<BondedCompanionProjectionValidator.LeaseExpectation> inWorldAfter(
+            @Nonnull String worldKey, @Nullable String afterProfileId, int limit
     ) {
-        return leaseReader.inWorld(worldKey, limit);
+        return leaseReader.inWorldAfter(worldKey, afterProfileId, limit);
     }
 
     @Override
     @Nonnull
-    public List<BondedCompanionProjectionValidator.LeaseExpectation> forOwner(
-            @Nonnull UUID ownerUuid, int limit
+    public List<BondedCompanionProjectionValidator.LeaseExpectation> forOwnerAfter(
+            @Nonnull UUID ownerUuid,
+            @Nullable String afterWorldKey,
+            @Nullable String afterProfileId,
+            int limit
     ) {
-        return leaseReader.forOwner(ownerUuid, limit);
+        return leaseReader.forOwnerAfter(
+                ownerUuid, afterWorldKey, afterProfileId, limit);
     }
 
     @Override
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
-    forOwnerInWorld(
-            @Nonnull UUID ownerUuid, @Nonnull String worldKey, int limit
+    forOwnerInWorldAfter(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String worldKey,
+            @Nullable String afterProfileId,
+            int limit
     ) {
-        return leaseReader.forOwnerInWorld(ownerUuid, worldKey, limit);
+        return leaseReader.forOwnerInWorldAfter(
+                ownerUuid, worldKey, afterProfileId, limit);
     }
 
     @Override

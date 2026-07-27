@@ -2,13 +2,17 @@ package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -156,6 +160,105 @@ class BondedCompanionLocalProjectionLifecycleTest {
                 durability.states.get(lease.profileId()));
     }
 
+    @Test
+    void maintenanceKeysetPagesPastValidLeadingLeases() {
+        for (int index = 0; index < 65; index++) {
+            var lease = lease("profile-page-%03d".formatted(index),
+                    "lease-page-%03d".formatted(index), uuid(1_000 + index),
+                    "world-a");
+            durability.activate(lease);
+            leases.add(lease);
+            if (index < 64) {
+                world.projections.add(projection(
+                        lease, lease.liveNpcUuid(), "world-a"));
+            }
+        }
+
+        int submitted = lifecycle.reconcileCurrentWorld(
+                "world-a", BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
+                -500L);
+
+        assertEquals(65, submitted);
+        assertEquals(2, observations.worldQueries.size());
+        assertEquals(BondedCompanionState.ACTIVE,
+                durability.states.get("profile-page-000"));
+        assertEquals(BondedCompanionState.STORED,
+                durability.states.get("profile-page-064"));
+    }
+
+    @Test
+    void logoutKeysetPagesEveryMatchingOwnerLease() {
+        observations.unavailableWorlds.add("world-a");
+        for (int index = 0; index < 65; index++) {
+            var lease = lease("profile-logout-%03d".formatted(index),
+                    "lease-logout-%03d".formatted(index), uuid(2_000 + index),
+                    "world-a");
+            durability.activate(lease);
+            leases.add(lease);
+        }
+
+        int submitted = lifecycle.storeOwner(
+                uuid(1), BondedCompanionProjectionService.RecoveryCause.LOGOUT,
+                -400L);
+
+        assertEquals(65, submitted);
+        assertTrue(durability.states.values().stream()
+                .allMatch(state -> state == BondedCompanionState.STORED));
+    }
+
+    @Test
+    void transferKeysetPagesEveryMatchingOwnerLeaseInTheOldWorld() {
+        observations.unavailableWorlds.add("world-a");
+        for (int index = 0; index < 65; index++) {
+            var lease = lease("profile-transfer-%03d".formatted(index),
+                    "lease-transfer-%03d".formatted(index), uuid(3_000 + index),
+                    "world-a");
+            durability.activate(lease);
+            leases.add(lease);
+        }
+
+        int submitted = lifecycle.storeOwnerInWorld(
+                uuid(1), "world-a",
+                BondedCompanionProjectionService.RecoveryCause.WORLD_TRANSFER,
+                -400L);
+
+        assertEquals(65, submitted);
+        assertTrue(durability.states.values().stream()
+                .allMatch(state -> state == BondedCompanionState.STORED));
+    }
+
+    @Test
+    void authoritativeExitTimesOutToDurableStoreWhenInspectionNeverCompletes()
+            throws Exception {
+        var lease = lease("profile-timeout", "lease-timeout", uuid(4_000),
+                "world-a");
+        durability.activate(lease);
+        leases.add(lease);
+        observations.neverCompletes = true;
+        CountDownLatch reconciled = new CountDownLatch(1);
+        var observer = new BondedCompanionWorldLifecycleObserver(
+                new BondedCompanionProjectionService(
+                        durability, durability, world,
+                        new BondedCompanionProjectionCleanupService(world),
+                        () -> "lease-new", () -> uuid(900)),
+                world,
+                (ignoredLease, ignoredCause, ignoredResult) ->
+                        reconciled.countDown());
+        var timedLifecycle = new BondedCompanionLocalProjectionLifecycle(
+                observer, leases, observations, 64, 128,
+                Duration.ofMillis(10));
+
+        timedLifecycle.storeOwner(
+                lease.ownerUuid(),
+                BondedCompanionProjectionService.RecoveryCause.LOGOUT, -400L);
+
+        assertTrue(reconciled.await(1, TimeUnit.SECONDS));
+        assertEquals(BondedCompanionState.STORED,
+                durability.states.get(lease.profileId()));
+        assertEquals(lease.liveNpcUuid(), durability.reconciledCleanups
+                .getFirst().targetNpcUuid());
+    }
+
     private static BondedCompanionProjectionValidator.LeaseExpectation lease(
             String profileId, String token, UUID npcUuid, String worldKey
     ) {
@@ -193,28 +296,53 @@ class BondedCompanionLocalProjectionLifecycleTest {
         }
 
         @Override
-        public List<BondedCompanionProjectionValidator.LeaseExpectation> inWorld(
-                String worldKey, int limit
+        public List<BondedCompanionProjectionValidator.LeaseExpectation>
+        inWorldAfter(String worldKey, String afterProfileId, int limit
         ) {
             worldQueries.add(worldKey);
             return leases.stream().filter(lease -> lease.worldKey().equals(worldKey))
-                    .limit(limit).toList();
-        }
-
-        @Override
-        public List<BondedCompanionProjectionValidator.LeaseExpectation> forOwner(
-                UUID ownerUuid, int limit
-        ) {
-            return leases.stream().filter(lease -> lease.ownerUuid().equals(ownerUuid))
+                    .filter(lease -> afterProfileId == null
+                            || lease.profileId().compareTo(afterProfileId) > 0)
+                    .sorted(Comparator.comparing(
+                            BondedCompanionProjectionValidator.LeaseExpectation
+                                    ::profileId))
                     .limit(limit).toList();
         }
 
         @Override
         public List<BondedCompanionProjectionValidator.LeaseExpectation>
-        forOwnerInWorld(UUID ownerUuid, String worldKey, int limit) {
+        forOwnerAfter(
+                UUID ownerUuid, String afterWorldKey, String afterProfileId,
+                int limit
+        ) {
+            return leases.stream().filter(lease -> lease.ownerUuid().equals(ownerUuid))
+                    .filter(lease -> afterWorldKey == null
+                            || lease.worldKey().compareTo(afterWorldKey) > 0
+                            || lease.worldKey().equals(afterWorldKey)
+                            && lease.profileId().compareTo(afterProfileId) > 0)
+                    .sorted(Comparator.comparing(
+                                    BondedCompanionProjectionValidator.LeaseExpectation
+                                            ::worldKey)
+                            .thenComparing(
+                                    BondedCompanionProjectionValidator.LeaseExpectation
+                                            ::profileId))
+                    .limit(limit).toList();
+        }
+
+        @Override
+        public List<BondedCompanionProjectionValidator.LeaseExpectation>
+        forOwnerInWorldAfter(
+                UUID ownerUuid, String worldKey, String afterProfileId,
+                int limit
+        ) {
             return leases.stream().filter(lease ->
                     lease.ownerUuid().equals(ownerUuid)
                             && lease.worldKey().equals(worldKey))
+                    .filter(lease -> afterProfileId == null
+                            || lease.profileId().compareTo(afterProfileId) > 0)
+                    .sorted(Comparator.comparing(
+                            BondedCompanionProjectionValidator.LeaseExpectation
+                                    ::profileId))
                     .limit(limit).toList();
         }
 
@@ -235,6 +363,7 @@ class BondedCompanionLocalProjectionLifecycleTest {
         private final List<String> worldQueries = new ArrayList<>();
         private final List<String> unavailableWorlds = new ArrayList<>();
         private boolean conclusive = true;
+        private boolean neverCompletes;
 
         private RecordingObservationSource(RecordingBondedWorld world) {
             this.world = world;
@@ -248,6 +377,7 @@ class BondedCompanionLocalProjectionLifecycleTest {
                 int maximumObservations
         ) {
             worldQueries.add(worldKey);
+            if (neverCompletes) return new CompletableFuture<>();
             if (unavailableWorlds.contains(worldKey)) {
                 return CompletableFuture.completedFuture(
                         BondedCompanionLocalProjectionLifecycle.WorldObservation

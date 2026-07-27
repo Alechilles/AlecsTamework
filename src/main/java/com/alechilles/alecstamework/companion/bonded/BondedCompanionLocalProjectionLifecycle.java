@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.bonded;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -7,8 +8,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Routes bonded recovery through only the exact world recorded by each lease.
@@ -19,11 +23,14 @@ import javax.annotation.Nonnull;
  * No method enumerates worlds or pages a global live-lease population.</p>
  */
 public final class BondedCompanionLocalProjectionLifecycle {
+    private static final Duration DEFAULT_INSPECTION_TIMEOUT =
+            Duration.ofSeconds(2);
     private final BondedCompanionWorldLifecycleObserver observer;
     private final LeaseSource leases;
     private final ObservationSource observations;
     private final int maximumLeases;
     private final int maximumObservations;
+    private final long inspectionTimeoutMs;
 
     public BondedCompanionLocalProjectionLifecycle(
             @Nonnull BondedCompanionWorldLifecycleObserver observer,
@@ -31,6 +38,18 @@ public final class BondedCompanionLocalProjectionLifecycle {
             @Nonnull ObservationSource observations,
             int maximumLeases,
             int maximumObservations
+    ) {
+        this(observer, leases, observations, maximumLeases,
+                maximumObservations, DEFAULT_INSPECTION_TIMEOUT);
+    }
+
+    public BondedCompanionLocalProjectionLifecycle(
+            @Nonnull BondedCompanionWorldLifecycleObserver observer,
+            @Nonnull LeaseSource leases,
+            @Nonnull ObservationSource observations,
+            int maximumLeases,
+            int maximumObservations,
+            @Nonnull Duration inspectionTimeout
     ) {
         this.observer = Objects.requireNonNull(observer, "observer");
         this.leases = Objects.requireNonNull(leases, "leases");
@@ -40,6 +59,13 @@ public final class BondedCompanionLocalProjectionLifecycle {
         }
         this.maximumLeases = maximumLeases;
         this.maximumObservations = maximumObservations;
+        Duration timeout = Objects.requireNonNull(
+                inspectionTimeout, "inspectionTimeout");
+        if (timeout.isNegative() || timeout.isZero()) {
+            throw new IllegalArgumentException(
+                    "inspection timeout must be positive");
+        }
+        this.inspectionTimeoutMs = Math.max(1L, timeout.toMillis());
     }
 
     /** Submits one conclusive-only inspection for leases owned by this world. */
@@ -49,10 +75,7 @@ public final class BondedCompanionLocalProjectionLifecycle {
             long observedAtMs
     ) {
         String currentWorld = text(worldKey, "worldKey");
-        List<BondedCompanionProjectionValidator.LeaseExpectation> local =
-                localLeases(currentWorld);
-        submit(currentWorld, local, cause, observedAtMs, false);
-        return local.size();
+        return reconcileWorldPages(currentWorld, cause, observedAtMs);
     }
 
     /** Stores every exact lease for an owner, grouped by its recorded world. */
@@ -62,17 +85,29 @@ public final class BondedCompanionLocalProjectionLifecycle {
             long observedAtMs
     ) {
         requireOwnerExit(cause);
-        List<BondedCompanionProjectionValidator.LeaseExpectation> owned =
-                safeOwnerLeases(Objects.requireNonNull(ownerUuid, "ownerUuid"));
-        Map<String, List<BondedCompanionProjectionValidator.LeaseExpectation>>
-                byWorld = new LinkedHashMap<>();
-        for (var lease : owned) {
-            byWorld.computeIfAbsent(lease.worldKey(), ignored -> new ArrayList<>())
-                    .add(lease);
+        UUID owner = Objects.requireNonNull(ownerUuid, "ownerUuid");
+        LeaseCursor cursor = null;
+        int submitted = 0;
+        while (true) {
+            List<BondedCompanionProjectionValidator.LeaseExpectation> page =
+                    safeOwnerPage(owner, cursor);
+            if (page.isEmpty()) return submitted;
+            Map<String, List<BondedCompanionProjectionValidator.LeaseExpectation>>
+                    byWorld = new LinkedHashMap<>();
+            for (var lease : page) {
+                if (owner.equals(lease.ownerUuid())) {
+                    byWorld.computeIfAbsent(lease.worldKey(), ignored ->
+                            new ArrayList<>()).add(lease);
+                    submitted++;
+                }
+            }
+            byWorld.forEach((worldKey, worldLeases) -> submit(
+                    worldKey, List.copyOf(worldLeases), cause, observedAtMs, true));
+            if (page.size() < maximumLeases) return submitted;
+            LeaseCursor next = cursor(page.getLast());
+            if (!advances(cursor, next)) return submitted;
+            cursor = next;
         }
-        byWorld.forEach((worldKey, worldLeases) -> submit(
-                worldKey, List.copyOf(worldLeases), cause, observedAtMs, true));
-        return owned.size();
     }
 
     /** Stores only the owner's leases recorded in the exact prior world. */
@@ -85,18 +120,22 @@ public final class BondedCompanionLocalProjectionLifecycle {
         requireOwnerExit(cause);
         UUID owner = Objects.requireNonNull(ownerUuid, "ownerUuid");
         String exactWorld = text(worldKey, "worldKey");
-        List<BondedCompanionProjectionValidator.LeaseExpectation> exact;
-        try {
-            exact = List.copyOf(Objects.requireNonNull(
-                    leases.forOwnerInWorld(owner, exactWorld, maximumLeases),
-                    "owner world leases").stream().filter(Objects::nonNull)
-                    .filter(lease -> owner.equals(lease.ownerUuid())
-                            && exactWorld.equals(lease.worldKey())).toList());
-        } catch (RuntimeException | LinkageError failure) {
-            exact = List.of();
+        String cursor = null;
+        int submitted = 0;
+        while (true) {
+            List<BondedCompanionProjectionValidator.LeaseExpectation> page =
+                    safeOwnerWorldPage(owner, exactWorld, cursor);
+            if (page.isEmpty()) return submitted;
+            List<BondedCompanionProjectionValidator.LeaseExpectation> exact =
+                    page.stream().filter(lease -> owner.equals(lease.ownerUuid())
+                            && exactWorld.equals(lease.worldKey())).toList();
+            submit(exactWorld, exact, cause, observedAtMs, true);
+            submitted += exact.size();
+            if (page.size() < maximumLeases) return submitted;
+            String next = page.getLast().profileId();
+            if (!advances(cursor, next)) return submitted;
+            cursor = next;
         }
-        submit(exactWorld, exact, cause, observedAtMs, true);
-        return exact.size();
     }
 
     /** Resolves death from the exact marker supplied by the current world event. */
@@ -128,8 +167,8 @@ public final class BondedCompanionLocalProjectionLifecycle {
         if (exactLeases.isEmpty()) return;
         CompletionStage<WorldObservation> stage;
         try {
-            stage = observations.inspect(
-                    worldKey, exactLeases, maximumObservations);
+            stage = bound(observations.inspect(
+                    worldKey, exactLeases, maximumObservations));
         } catch (RuntimeException | LinkageError failure) {
             settleUnavailable(exactLeases, cause, observedAtMs, authoritativeExit);
             return;
@@ -152,6 +191,23 @@ public final class BondedCompanionLocalProjectionLifecycle {
         });
     }
 
+    private CompletionStage<WorldObservation> bound(
+            CompletionStage<WorldObservation> stage
+    ) {
+        if (stage == null) return null;
+        CompletableFuture<WorldObservation> bounded = new CompletableFuture<>();
+        stage.whenComplete((result, failure) -> {
+            if (failure == null) bounded.complete(result);
+            else bounded.completeExceptionally(failure);
+        });
+        if (!bounded.isDone()) {
+            CompletableFuture.delayedExecutor(
+                    inspectionTimeoutMs, TimeUnit.MILLISECONDS).execute(() ->
+                    bounded.complete(WorldObservation.inconclusive()));
+        }
+        return bounded;
+    }
+
     private void settleUnavailable(
             List<BondedCompanionProjectionValidator.LeaseExpectation> exactLeases,
             BondedCompanionProjectionService.RecoveryCause cause,
@@ -163,29 +219,85 @@ public final class BondedCompanionLocalProjectionLifecycle {
         }
     }
 
-    private List<BondedCompanionProjectionValidator.LeaseExpectation> localLeases(
-            String worldKey
+    private int reconcileWorldPages(
+            String worldKey,
+            BondedCompanionProjectionService.RecoveryCause cause,
+            long observedAtMs
     ) {
+        String cursor = null;
+        int submitted = 0;
+        while (true) {
+            List<BondedCompanionProjectionValidator.LeaseExpectation> page =
+                    safeWorldPage(worldKey, cursor);
+            if (page.isEmpty()) return submitted;
+            List<BondedCompanionProjectionValidator.LeaseExpectation> local =
+                    page.stream().filter(lease -> worldKey.equals(
+                            lease.worldKey())).toList();
+            submit(worldKey, local, cause, observedAtMs, false);
+            submitted += local.size();
+            if (page.size() < maximumLeases) return submitted;
+            String next = page.getLast().profileId();
+            if (!advances(cursor, next)) return submitted;
+            cursor = next;
+        }
+    }
+
+    private List<BondedCompanionProjectionValidator.LeaseExpectation>
+    safeWorldPage(String worldKey, @Nullable String afterProfileId) {
         try {
             return List.copyOf(Objects.requireNonNull(
-                    leases.inWorld(worldKey, maximumLeases), "world leases")
-                    .stream().filter(Objects::nonNull)
-                    .filter(lease -> worldKey.equals(lease.worldKey())).toList());
+                    leases.inWorldAfter(
+                            worldKey, afterProfileId, maximumLeases),
+                    "world leases").stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException | LinkageError failure) {
             return List.of();
         }
     }
 
     private List<BondedCompanionProjectionValidator.LeaseExpectation>
-            safeOwnerLeases(UUID ownerUuid) {
+    safeOwnerPage(UUID ownerUuid, @Nullable LeaseCursor cursor) {
         try {
             return List.copyOf(Objects.requireNonNull(
-                    leases.forOwner(ownerUuid, maximumLeases), "owner leases")
-                    .stream().filter(Objects::nonNull)
-                    .filter(lease -> ownerUuid.equals(lease.ownerUuid())).toList());
+                    leases.forOwnerAfter(
+                            ownerUuid, cursor == null ? null : cursor.worldKey(),
+                            cursor == null ? null : cursor.profileId(), maximumLeases),
+                    "owner leases").stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException | LinkageError failure) {
             return List.of();
         }
+    }
+
+    private List<BondedCompanionProjectionValidator.LeaseExpectation>
+    safeOwnerWorldPage(
+            UUID ownerUuid, String worldKey, @Nullable String afterProfileId
+    ) {
+        try {
+            return List.copyOf(Objects.requireNonNull(
+                    leases.forOwnerInWorldAfter(ownerUuid, worldKey,
+                            afterProfileId, maximumLeases),
+                    "owner world leases").stream().filter(Objects::nonNull).toList());
+        } catch (RuntimeException | LinkageError failure) {
+            return List.of();
+        }
+    }
+
+    private LeaseCursor cursor(
+            BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) {
+        return new LeaseCursor(lease.worldKey(), lease.profileId());
+    }
+
+    private boolean advances(@Nullable String previous, String next) {
+        return previous == null || next.compareTo(previous) > 0;
+    }
+
+    private boolean advances(
+            @Nullable LeaseCursor previous, LeaseCursor next
+    ) {
+        if (previous == null) return true;
+        int world = next.worldKey().compareTo(previous.worldKey());
+        return world > 0 || world == 0
+                && next.profileId().compareTo(previous.profileId()) > 0;
     }
 
     private Optional<BondedCompanionProjectionValidator.LeaseExpectation>
@@ -217,19 +329,26 @@ public final class BondedCompanionLocalProjectionLifecycle {
 
     /** Targeted durable reads; none enumerate all active leases for recovery. */
     public interface LeaseSource {
-        @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> inWorld(
-                @Nonnull String worldKey, int limit);
-
-        @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation> forOwner(
-                @Nonnull UUID ownerUuid, int limit);
+        @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation>
+        inWorldAfter(
+                @Nonnull String worldKey, @Nullable String afterProfileId,
+                int limit);
 
         @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation>
-        forOwnerInWorld(
-                @Nonnull UUID ownerUuid, @Nonnull String worldKey, int limit);
+        forOwnerAfter(
+                @Nonnull UUID ownerUuid, @Nullable String afterWorldKey,
+                @Nullable String afterProfileId, int limit);
+
+        @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation>
+        forOwnerInWorldAfter(
+                @Nonnull UUID ownerUuid, @Nonnull String worldKey,
+                @Nullable String afterProfileId, int limit);
 
         @Nonnull Optional<BondedCompanionProjectionValidator.LeaseExpectation> exact(
                 @Nonnull String profileId, @Nonnull String leaseToken);
     }
+
+    private record LeaseCursor(String worldKey, String profileId) { }
 
     /** Schedules one inspection of the supplied exact recorded world. */
     @FunctionalInterface

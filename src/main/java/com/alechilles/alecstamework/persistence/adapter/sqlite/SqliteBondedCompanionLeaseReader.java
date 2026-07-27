@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Exact world-, owner-, and marker-keyed bonded lease reads. */
 final class SqliteBondedCompanionLeaseReader {
@@ -37,42 +38,82 @@ final class SqliteBondedCompanionLeaseReader {
     }
 
     @Nonnull
-    List<BondedCompanionProjectionValidator.LeaseExpectation> inWorld(
-            String worldKey, int limit
+    List<BondedCompanionProjectionValidator.LeaseExpectation> inWorldAfter(
+            String worldKey, @Nullable String afterProfileId, int limit
     ) {
+        if (afterProfileId == null) {
+            return query(SELECT + """
+                     AND l.world_key = ?
+                     ORDER BY l.profile_id LIMIT ?
+                    """, statement -> {
+                statement.setString(1, worldKey);
+                statement.setInt(2, positive(limit));
+            });
+        }
         return query(SELECT + """
-                 AND l.world_key = ?
+                 AND l.world_key = ? AND l.profile_id > ?
                  ORDER BY l.profile_id LIMIT ?
                 """, statement -> {
             statement.setString(1, worldKey);
-            statement.setInt(2, positive(limit));
+            statement.setString(2, afterProfileId);
+            statement.setInt(3, positive(limit));
         });
     }
 
     @Nonnull
-    List<BondedCompanionProjectionValidator.LeaseExpectation> forOwner(
-            UUID ownerUuid, int limit
+    List<BondedCompanionProjectionValidator.LeaseExpectation> forOwnerAfter(
+            UUID ownerUuid,
+            @Nullable String afterWorldKey,
+            @Nullable String afterProfileId,
+            int limit
     ) {
+        if (afterWorldKey == null || afterProfileId == null) {
+            return query(SELECT + """
+                     AND p.owner_uuid = ?
+                     ORDER BY l.world_key, l.profile_id LIMIT ?
+                    """, statement -> {
+                statement.setString(1, ownerUuid.toString());
+                statement.setInt(2, positive(limit));
+            });
+        }
         return query(SELECT + """
                  AND p.owner_uuid = ?
+                 AND (l.world_key > ? OR (
+                     l.world_key = ? AND l.profile_id > ?))
                  ORDER BY l.world_key, l.profile_id LIMIT ?
                 """, statement -> {
             statement.setString(1, ownerUuid.toString());
-            statement.setInt(2, positive(limit));
+            statement.setString(2, afterWorldKey);
+            statement.setString(3, afterWorldKey);
+            statement.setString(4, afterProfileId);
+            statement.setInt(5, positive(limit));
         });
     }
 
     @Nonnull
-    List<BondedCompanionProjectionValidator.LeaseExpectation> forOwnerInWorld(
-            UUID ownerUuid, String worldKey, int limit
+    List<BondedCompanionProjectionValidator.LeaseExpectation> forOwnerInWorldAfter(
+            UUID ownerUuid, String worldKey, @Nullable String afterProfileId,
+            int limit
     ) {
+        if (afterProfileId == null) {
+            return query(SELECT + """
+                     AND p.owner_uuid = ? AND l.world_key = ?
+                     ORDER BY l.profile_id LIMIT ?
+                    """, statement -> {
+                statement.setString(1, ownerUuid.toString());
+                statement.setString(2, worldKey);
+                statement.setInt(3, positive(limit));
+            });
+        }
         return query(SELECT + """
                  AND p.owner_uuid = ? AND l.world_key = ?
+                 AND l.profile_id > ?
                  ORDER BY l.profile_id LIMIT ?
                 """, statement -> {
             statement.setString(1, ownerUuid.toString());
             statement.setString(2, worldKey);
-            statement.setInt(3, positive(limit));
+            statement.setString(3, afterProfileId);
+            statement.setInt(4, positive(limit));
         });
     }
 
