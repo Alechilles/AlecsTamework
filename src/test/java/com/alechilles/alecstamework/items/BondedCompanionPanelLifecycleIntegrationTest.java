@@ -170,6 +170,56 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         }
     }
 
+    /**
+     * A duplicate live SUMMON is rejected after restart, while terminal STORE
+     * replays without repeating either world effect.
+     */
+    @Test
+    void duplicateSummonIsRejectedAfterAdapterRestartWhileStoreRetryReplays()
+            throws Exception {
+        Path database = temporaryDirectory.resolve("action-replay.db");
+        BondedCompanionRosterRegistry rosters = registry();
+        AtomicLong clock = new AtomicLong(10_000L);
+        TestWorld world = new TestWorld();
+        Harness initial = harness(database, rosters, clock, world);
+        initial.capture.store(captureIntent(
+                UUID.fromString("73000000-0000-0000-0000-000000000021"),
+                "Nimbus", "Miniwyvern"));
+        BondedCompanionProfileView stored = initial.api.list(OWNER, ROSTER)
+                .join().value().getFirst();
+        BondedCompanionActionContext context = new BondedCompanionActionContext(
+                new BondedCompanionPlacement(
+                        "world-a", 10D, 64D, 12D, 0F, 1F, 0F),
+                new TestInventory(Map.of()));
+        BondedCompanionActionRequest summon = action("summon-retry", stored,
+                context);
+
+        assertTrue(initial.api.summon(summon).join().successful());
+        assertEquals(1, world.spawnCount);
+        initial.close();
+
+        Harness reopened = harness(database, rosters, clock, world);
+        BondedCompanionResult<BondedCompanionProfileView> duplicateSummon =
+                reopened.api.summon(summon).join();
+        assertEquals(BondedCompanionResultCode.INVALID_STATE,
+                duplicateSummon.code());
+        assertEquals("bonded-summon-already-live", duplicateSummon.reason());
+        assertEquals(1, world.spawnCount);
+        BondedCompanionProfileView active = reopened.api.list(OWNER, ROSTER)
+                .join().value().getFirst();
+        BondedCompanionActionRequest store = action("store-retry", active,
+                context);
+
+        assertTrue(reopened.api.store(store).join().successful());
+        assertEquals(1, world.cleanupCount);
+        reopened.close();
+
+        Harness finalRuntime = harness(database, rosters, clock, world);
+        assertTrue(finalRuntime.api.store(store).join().successful());
+        assertEquals(1, world.cleanupCount);
+        finalRuntime.close();
+    }
+
     @Test
     void retainedExactReservationKeepsPanelReviveActionEnabled()
             throws Exception {
@@ -567,10 +617,13 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         private final Map<UUID, BondedCompanionProjectionValidator.Projection>
                 projections = new HashMap<>();
         private CompanionSpawnPlacement lastPlacement;
+        private int spawnCount;
+        private int cleanupCount;
 
         @Override
         public BondedCompanionProjectionService.SpawnResult spawn(
                 BondedCompanionProjectionService.SpawnPlan plan) {
+            spawnCount++;
             lastPlacement = plan.placement();
             UUID uuid = plan.lease().liveNpcUuid();
             projections.put(uuid, new BondedCompanionProjectionValidator.Projection(
@@ -587,9 +640,11 @@ class BondedCompanionPanelLifecycleIntegrationTest {
         @Override
         public BondedCompanionProjectionCleanupService.Outcome removeIfExact(
                 BondedCompanionProjectionCleanupService.CleanupIntent intent) {
-            return projections.remove(intent.targetNpcUuid()) == null
-                    ? BondedCompanionProjectionCleanupService.Outcome.ALREADY_MISSING
-                    : BondedCompanionProjectionCleanupService.Outcome.REMOVED;
+            if (projections.remove(intent.targetNpcUuid()) != null) {
+                cleanupCount++;
+                return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
+            }
+            return BondedCompanionProjectionCleanupService.Outcome.ALREADY_MISSING;
         }
     }
 
