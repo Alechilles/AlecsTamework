@@ -160,6 +160,7 @@ final class SpawnerCaptureIntentFactory {
             boolean tranquilized,
             boolean ownerAllowed,
             boolean roleAllowed,
+            @Nullable String authoritativeRoleId,
             @Nullable String familyId,
             @Nullable String particleSystemOverride
     ) {
@@ -168,9 +169,11 @@ final class SpawnerCaptureIntentFactory {
                 ? null : world.getEntityStore().getStore();
         if (world == null || store == null || targetRef == null || source == null
                 || config == null || attempt == null || roll == null
-                || roll.terminal() == null) return null;
+                || roll.terminal() == null || authoritativeRoleId == null
+                || authoritativeRoleId.isBlank()) return null;
         var captured = bondedSnapshots.readSourceNeutral(
-                targetRef, store, new NpcAlias(roll.targetUuid()), roll.roleId());
+                targetRef, store, new NpcAlias(roll.targetUuid()),
+                authoritativeRoleId);
         var snapshot = captured.successful()
                 ? com.alechilles.alecstamework.companion.bonded
                 .BondedCompanionSnapshot.of(captured.snapshot(), Map.of())
@@ -187,7 +190,8 @@ final class SpawnerCaptureIntentFactory {
                 player.getUuid() + ":" + config.getCaptureMechanics()
                         .bondedRosterId() + ":" + roll.targetUuid(),
                 player.getUuid(), world.getName(), attempt.hotbarSlot(),
-                attempt.sourceFingerprint(), roll.targetUuid(), roll.roleId(),
+                attempt.sourceFingerprint(), roll.targetUuid(),
+                authoritativeRoleId,
                 BondedCompanionCaptureAttemptEvidence.from(
                         source.getItemId(), roll.terminal()), species,
                 config.getCaptureMechanics().bondedRosterId(), rosterRevision,
@@ -201,6 +205,8 @@ final class SpawnerCaptureIntentFactory {
     static BondedCompanionCaptureIntent freezeBonded(
             FrozenBondedCapture frozen
     ) {
+        var snapshot = BondedCompanionCaptureRoleResolver.alignSnapshotRole(
+                frozen.snapshot(), frozen.roleId());
         return new BondedCompanionCaptureIntent(
                 frozen.callerNamespace(), frozen.idempotencyKey(),
                 frozen.actorUuid(), frozen.worldKey(), frozen.hotbarSlot(),
@@ -208,7 +214,7 @@ final class SpawnerCaptureIntentFactory {
                 frozen.attemptEvidence(), frozen.roleId(), frozen.species(),
                 frozen.rosterId(),
                 frozen.rosterRevision(),
-                frozen.snapshot(), frozen.completionEffect(),
+                snapshot, frozen.completionEffect(),
                 frozen.targetValid(), frozen.chanceSuccessful(),
                 frozen.tranquilized(), frozen.toolAccess(),
                 frozen.ownerAllowed(), frozen.roleAllowed(), frozen.familyId(),

@@ -131,7 +131,7 @@ final class BondedCompanionCaptureRoute {
                 this.admission.hasToolAccess(player, config),
                 this.admission.isTranquilized(player, targetRef),
                 admission.ownerAllowed(), admission.roleAllowed(),
-                admission.familyId(),
+                admission.roleId(), admission.familyId(),
                 particleOverride);
         if (intent == null) {
             author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,

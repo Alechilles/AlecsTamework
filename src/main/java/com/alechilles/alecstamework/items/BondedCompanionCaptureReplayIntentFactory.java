@@ -53,7 +53,9 @@ final class BondedCompanionCaptureReplayIntentFactory {
         NPCEntity npc = store.getComponent(
                 targetRef, NPCEntity.getComponentType());
         UUID sourceUuid = identity == null ? null : identity.getUuid();
-        String roleId = roles.resolveRoleIdFromNpc(npc);
+        String sourceRoleId = roles.resolveRoleIdFromNpc(npc);
+        String roleId = BondedCompanionCaptureRoleResolver.authoritativeRole(
+                config, sourceRoleId);
         String rosterId = config.getCaptureMechanics().bondedRosterId();
         if (sourceUuid == null || roleId == null || roleId.isBlank()
                 || rosterId == null || rosterId.isBlank()

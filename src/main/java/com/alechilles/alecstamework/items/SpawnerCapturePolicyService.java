@@ -256,39 +256,29 @@ public final class SpawnerCapturePolicyService {
                     BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
                     rosterRevision);
         }
-        String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
-        BondedCompanionRosterRegistry.RosterDefinition family =
-                uniqueFamily(families, roleId);
-        boolean roleAllowed = rolePolicyService.isRoleAllowed(roleId, config)
-                && family != null;
+        String sourceRoleId = rolePolicyService.resolveRoleIdFromNpc(npc);
+        BondedCompanionCaptureRoleResolver.Resolution resolvedRole =
+                BondedCompanionCaptureRoleResolver.resolve(
+                        config, families, sourceRoleId);
+        boolean roleAllowed = rolePolicyService.isRoleAllowed(
+                sourceRoleId, config) && resolvedRole != null;
         UUID owner = npcStateService.resolveOwnerFromComponent(
                 targetRef, world);
         boolean ownerAllowed = ownershipPolicyService.isCaptureAllowed(
                 player.getUuid(), owner, config);
         BondedCompanionCaptureAuthor.Status denial = bondedPolicyDenial(
-                player, targetRef, config, itemStack, world, store, owner, roleId);
+                player, targetRef, config, itemStack, world, store, owner);
         return new BondedAdmissionEvidence(
                 denial, ownerAllowed, roleAllowed,
-                family == null ? null : family.familyId(), rosterRevision);
-    }
-
-    private BondedCompanionRosterRegistry.RosterDefinition uniqueFamily(
-            List<BondedCompanionRosterRegistry.RosterDefinition> families,
-            String roleId
-    ) {
-        BondedCompanionRosterRegistry.RosterDefinition match = null;
-        for (var family : families) {
-            if (!family.allowedRoles().contains(roleId)) continue;
-            if (match != null) return null;
-            match = family;
-        }
-        return match;
+                resolvedRole == null ? null : resolvedRole.roleId(),
+                resolvedRole == null ? null : resolvedRole.family().familyId(),
+                rosterRevision);
     }
 
     private BondedCompanionCaptureAuthor.Status bondedPolicyDenial(
             Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config,
             ItemStack itemStack, World world, Store<EntityStore> store,
-            UUID ownerUuid, String roleId
+            UUID ownerUuid
     ) {
         if (isCooldownActive(itemStack,
                 TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
@@ -299,8 +289,7 @@ public final class SpawnerCapturePolicyService {
         }
         if (config.isCaptureTamesTarget()
                 && (npcStateService.resolveTamedState(targetRef, world)
-                || ownerUuid != null
-                || config.resolveCaptureTamedRole(roleId) == null)) {
+                || ownerUuid != null)) {
             return admissionDenied();
         }
         if (!meetsHealthRequirement(targetRef, config, store)
@@ -318,6 +307,7 @@ public final class SpawnerCapturePolicyService {
             BondedCompanionCaptureAuthor.Status denial,
             boolean ownerAllowed,
             boolean roleAllowed,
+            String roleId,
             String familyId,
             long rosterRevision
     ) {
@@ -332,7 +322,7 @@ public final class SpawnerCapturePolicyService {
                 boolean ownerAllowed,
                 boolean roleAllowed
         ) {
-            this(denial, ownerAllowed, roleAllowed, null, 0L);
+            this(denial, ownerAllowed, roleAllowed, null, null, 0L);
         }
 
         BondedAdmissionEvidence(
@@ -341,7 +331,18 @@ public final class SpawnerCapturePolicyService {
                 boolean roleAllowed,
                 String familyId
         ) {
-            this(denial, ownerAllowed, roleAllowed, familyId, 0L);
+            this(denial, ownerAllowed, roleAllowed, null, familyId, 0L);
+        }
+
+        BondedAdmissionEvidence(
+                BondedCompanionCaptureAuthor.Status denial,
+                boolean ownerAllowed,
+                boolean roleAllowed,
+                String familyId,
+                long rosterRevision
+        ) {
+            this(denial, ownerAllowed, roleAllowed, null, familyId,
+                    rosterRevision);
         }
 
         static BondedAdmissionEvidence denied(
@@ -349,7 +350,7 @@ public final class SpawnerCapturePolicyService {
                 long rosterRevision
         ) {
             return new BondedAdmissionEvidence(
-                    denial, false, false, null, rosterRevision);
+                    denial, false, false, null, null, rosterRevision);
         }
     }
 
