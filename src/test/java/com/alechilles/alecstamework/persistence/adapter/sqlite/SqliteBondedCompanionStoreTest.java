@@ -268,11 +268,15 @@ class SqliteBondedCompanionStoreTest {
         assertEquals(1, store.pruneCleanup(0L, 1));
         assertEquals(List.of(future), store.listCleanup(OWNER_A, "roster-a", 10));
 
+        String rejectedResult = """
+                {"code":"CONFLICT","reason":"test-conflict",\
+                "valueType":"PROFILE","value":null}
+                """.replace("\\\n", "");
         SqliteBondedCompanionOperationRow operation =
                 new SqliteBondedCompanionOperationRow(
                         "example", "request-1", OWNER_A, "roster-a",
-                        "profile-a", "SUMMON", "a".repeat(64), "PENDING",
-                        null, -5_000L, -5_000L, 1_000L
+                        "profile-a", "CAPTURE", "a".repeat(64), "REJECTED",
+                        rejectedResult, -5_000L, -5_000L, 10_000L
                 );
         assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
                 store.recordOperation(operation).code());
@@ -281,20 +285,20 @@ class SqliteBondedCompanionStoreTest {
         assertEquals(SqliteBondedCompanionStore.MutationCode.CONFLICT,
                 store.recordOperation(new SqliteBondedCompanionOperationRow(
                         "example", "request-1", OWNER_A, "roster-a",
-                        "profile-a", "STORE", "b".repeat(64), "PENDING",
-                        null, -4_000L, -4_000L, 1_000L
+                        "profile-a", "PROVISION", "b".repeat(64), "REJECTED",
+                        rejectedResult, -4_000L, -4_000L, 10_000L
                 )).code());
         assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
                 store.recordOperation(new SqliteBondedCompanionOperationRow(
                         "example", "request-2", OWNER_A, "roster-a",
                         "profile-a", "STORE", "c".repeat(64), "REJECTED",
-                        "{}", -4_000L, -4_000L, 1_000L
+                        rejectedResult, -4_000L, -4_000L, 1_000L
                 )).code());
         assertEquals(SqliteBondedCompanionStore.MutationCode.APPLIED,
                 store.recordOperation(new SqliteBondedCompanionOperationRow(
                         "example", "request-3", OWNER_A, "roster-a",
-                        "profile-a", "STORE", "d".repeat(64), "FAILED",
-                        "{}", -3_000L, -3_000L, 1_000L
+                        "profile-a", "REVIVE", "d".repeat(64), "REJECTED",
+                        rejectedResult, -3_000L, -3_000L, 1_000L
                 )).code());
         assertEquals(2, store.pruneOperations(2_000L, 2));
         assertEquals(SqliteBondedCompanionStore.MutationCode.IDEMPOTENT_REPLAY,

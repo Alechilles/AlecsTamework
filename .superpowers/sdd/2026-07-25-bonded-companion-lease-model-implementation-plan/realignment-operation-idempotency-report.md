@@ -3,10 +3,12 @@
 ## Status
 
 Implementation and focused verification are complete and ready for scoped
-re-review. The implementation range is `0b30decf..280b9017`:
+re-review. The implementation range is `0b30decf..280b9017`; its report
+baseline is `490f59a6`:
 
 - `9158bf9e` - `Fix: narrow bonded operation idempotency`
 - `280b9017` - `Fix: bind bonded operations to exact leases`
+- `490f59a6` - `Docs: report bonded operation idempotency`
 
 Task A panel, UI, locale, and progress work remained untouched and unstaged.
 
@@ -67,6 +69,7 @@ Persistence contracts and helpers:
 
 Focused tests:
 
+- `src/test/java/com/alechilles/alecstamework/persistence/adapter/sqlite/SqliteBondedCompanionStoreTest.java`
 - `src/test/java/com/alechilles/alecstamework/companion/bonded/BondedCompanionRecoveryTest.java`
 - `src/test/java/com/alechilles/alecstamework/companion/bonded/BondedCompanionRecoveryTestFixtures.java`
 - `src/test/java/com/alechilles/alecstamework/companion/bonded/BondedCompanionStateMachineTest.java`
@@ -107,6 +110,18 @@ Focused GREEN command:
 ```
 
 Result: `BUILD SUCCESS`; 113 tests, 0 failures, 0 errors, 0 skipped.
+
+Scoped review follow-up command:
+
+```text
+./mvnw -Dtest=SqliteBondedCompanionStoreTest,BondedCompanionSchemaManagerTest,EcsWriteSafetyGuardTest,AsyncThreadSafetyGuardTest test
+```
+
+Result: `BUILD SUCCESS`; 31 tests, 0 failures, 0 errors, 0 skipped. The
+follow-up replaced the last low-level retention fixture's removed
+`SUMMON`/`PENDING`/`FAILED` vocabulary with valid terminal action rows and a
+valid typed result envelope while preserving replay, conflict, and bounded
+pruning assertions.
 
 The first review-regression run produced the intended RED signal in one stale
 test that still called runtime `reconcileStored(PENDING)`. It was corrected to
