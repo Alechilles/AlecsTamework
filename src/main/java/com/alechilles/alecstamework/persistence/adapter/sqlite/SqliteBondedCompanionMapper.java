@@ -21,7 +21,7 @@ final class SqliteBondedCompanionMapper {
                 payloadJson(value.snapshot()), value.createdAtMs(),
                 value.updatedAtMs(), GSON.toJson(value.policy()),
                 value.displayName(), value.species(), value.gender(),
-                value.diedAtMs(), value.reviveCooldownUntilMs(),
+                value.diedAtMs(), value.summonCooldownUntilMs(),
                 value.reviveCount(), value.quarantineReason(),
                 value.quarantinedAtMs());
     }
@@ -34,7 +34,7 @@ final class SqliteBondedCompanionMapper {
                 row.roleId(), row.state(), row.revision(), payload(row.snapshotJson()),
                 row.createdAtMs(), row.updatedAtMs(), policy, row.displayName(),
                 row.species(), row.gender(), row.diedAtMs(),
-                row.reviveCooldownUntilMs(), row.reviveCount(),
+                row.summonCooldownUntilMs(), row.reviveCount(),
                 row.quarantineReason(), row.quarantinedAtMs());
     }
 

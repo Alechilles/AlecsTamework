@@ -14,17 +14,25 @@ import com.alechilles.alecstamework.items.persistence
         .TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
@@ -131,6 +139,56 @@ public final class HytaleBondedCompanionWorldGateway implements
         }
     }
 
+    /**
+     * Reads only marker-bearing projections for the supplied durable leases.
+     * The scan is capped by both lease count at the caller and result count
+     * here; it never enumerates players or generic runtime systems.
+     */
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.Projection> readBounded(
+            @Nonnull List<BondedCompanionProjectionValidator.LeaseExpectation>
+                    leases,
+            int maximumResults
+    ) {
+        Objects.requireNonNull(leases, "leases");
+        if (maximumResults < 1 || leases.isEmpty()) return List.of();
+        Map<String, Set<LeaseMarker>> markersByWorld = new HashMap<>();
+        int considered = 0;
+        for (var lease : leases) {
+            if (lease == null || considered++ >= maximumResults) continue;
+            markersByWorld.computeIfAbsent(lease.worldKey(), ignored ->
+                    new HashSet<>()).add(new LeaseMarker(
+                    lease.profileId(), lease.leaseToken()
+            ));
+        }
+        if (markersByWorld.isEmpty()) return List.of();
+
+        ArrayList<BondedCompanionProjectionValidator.Projection> found =
+                new ArrayList<>();
+        try {
+            for (var entry : markersByWorld.entrySet()) {
+                if (found.size() >= maximumResults) break;
+                World world = Universe.get().getWorld(entry.getKey());
+                if (world == null) continue;
+                int remaining = maximumResults - found.size();
+                List<BondedCompanionProjectionValidator.Projection> scanned =
+                        world.isInThread()
+                                ? scanOnWorldThread(
+                                        world, entry.getValue(), remaining
+                                )
+                                : CompletableFuture.supplyAsync(
+                                        () -> scanOnWorldThread(
+                                                world, entry.getValue(), remaining
+                                        ), world
+                                ).join();
+                found.addAll(scanned);
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            return List.copyOf(found);
+        }
+        return List.copyOf(found);
+    }
+
     @Override
     @Nonnull
     public BondedCompanionProjectionCleanupService.Outcome removeIfExact(
@@ -211,6 +269,54 @@ public final class HytaleBondedCompanionWorldGateway implements
         return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
     }
 
+    private List<BondedCompanionProjectionValidator.Projection>
+    scanOnWorldThread(
+            World world, Set<LeaseMarker> expectedMarkers, int maximumResults
+    ) {
+        if (!world.isInThread() || world.getEntityStore() == null
+                || maximumResults < 1 || expectedMarkers.isEmpty()) {
+            return List.of();
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        ComponentType<EntityStore, UUIDComponent> uuidType =
+                UUIDComponent.getComponentType();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent>
+                markerType = TameworkProjectionIdentityComponent
+                        .getComponentType();
+        if (store == null || uuidType == null || markerType == null) {
+            return List.of();
+        }
+        ArrayList<BondedCompanionProjectionValidator.Projection> found =
+                new ArrayList<>();
+        store.forEachChunk(
+                Query.and(uuidType, markerType),
+                (ArchetypeChunk<EntityStore> chunk,
+                        CommandBuffer<EntityStore> ignored) -> {
+                    if (found.size() >= maximumResults) return;
+                    for (int index = 0; index < chunk.size()
+                            && found.size() < maximumResults; index++) {
+                        UUIDComponent uuid = chunk.getComponent(index, uuidType);
+                        TameworkProjectionIdentityComponent marker =
+                                chunk.getComponent(index, markerType);
+                        String profileId = marker == null
+                                ? null : marker.getProfileId();
+                        String leaseToken = marker == null
+                                ? null : marker.getBondedLeaseToken();
+                        if (uuid == null || uuid.getUuid() == null || marker == null
+                                || !marker.isBondedCompanion()
+                                || profileId == null || leaseToken == null
+                                || !expectedMarkers.contains(new LeaseMarker(
+                                        profileId, leaseToken
+                                ))) continue;
+                        found.add(new BondedCompanionProjectionValidator.Projection(
+                                uuid.getUuid(), world.getName(), marker, null
+                        ));
+                    }
+                }
+        );
+        return List.copyOf(found);
+    }
+
     private BondedCompanionProjectionValidator.Projection readOnWorldThread(
             World world,
             BondedCompanionProjectionValidator.LeaseExpectation lease
@@ -269,5 +375,13 @@ public final class HytaleBondedCompanionWorldGateway implements
                         intent.leaseToken(),
                         intent.profileId()
                 );
+    }
+
+    /** Stable durable marker key used to restrict a bounded entity-store scan. */
+    private record LeaseMarker(String profileId, String leaseToken) {
+        private LeaseMarker {
+            profileId = Objects.requireNonNull(profileId, "profileId");
+            leaseToken = Objects.requireNonNull(leaseToken, "leaseToken");
+        }
     }
 }

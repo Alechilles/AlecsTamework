@@ -7,6 +7,11 @@ import javax.annotation.Nullable;
 
 /** Replays bounded physical cleanup without ever widening an exact target. */
 public final class BondedCompanionProjectionCleanupService {
+    /**
+     * Exact marker identity is retained long enough to reconcile a world that was unloaded
+     * during cleanup, while still giving every retained record a finite terminal lifetime.
+     */
+    public static final long CLEANUP_RETENTION_MS = 30L * 24L * 60L * 60L * 1_000L;
     private final WorldGateway world;
 
     public BondedCompanionProjectionCleanupService(@Nonnull WorldGateway world) {
@@ -95,7 +100,7 @@ public final class BondedCompanionProjectionCleanupService {
 
         private static long inferredCreatedAt(long retainedUntilMs) {
             try {
-                return Math.subtractExact(retainedUntilMs, 300_000L);
+                return Math.subtractExact(retainedUntilMs, CLEANUP_RETENTION_MS);
             } catch (ArithmeticException underflow) {
                 return Long.MIN_VALUE;
             }

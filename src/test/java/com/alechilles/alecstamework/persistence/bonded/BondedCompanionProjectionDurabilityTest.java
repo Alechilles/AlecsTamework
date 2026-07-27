@@ -108,8 +108,93 @@ class BondedCompanionProjectionDurabilityTest {
                 store.findProfile(OWNER, "roster-a", "profile-a")
                         .orElseThrow().state());
         assertEquals(-20L, store.findProfile(OWNER, "roster-a", "profile-a")
-                .orElseThrow().reviveCooldownUntilMs());
+                .orElseThrow().summonCooldownUntilMs());
         assertTrue(store.findActiveLeases(OWNER, "roster-a").isEmpty());
+    }
+
+    @Test
+    void retryRequiredCleanupBacksOffUntilItsBoundedRetentionThenAbandons() {
+        Path database = temporaryDirectory.resolve("cleanup-retry.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> 0L)
+                .initialize().availability().available());
+        SqliteBondedCompanionDatabase store =
+                new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(), profile()).code());
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        var lease = new BondedCompanionProjectionValidator.LeaseExpectation(
+                OWNER, "roster-a", "profile-a", "lease-a", NPC,
+                "world-a", 0L, 0L,
+                BondedCompanionProjectionValidator.LeasePhase.PENDING
+        );
+        var request = new BondedCompanionProjectionService.SummonRequest(
+                OWNER, "roster-a", "profile-a", 0L, "role:wolf",
+                snapshot(), "world-a", null, 0L, 0L,
+                new BondedCompanionActiveCapacity("family:wolf", 1)
+        );
+        var cleanup = new BondedCompanionProjectionCleanupService.CleanupIntent(
+                "cleanup-retry", OWNER, "roster-a", "profile-a", "lease-a",
+                BondedCompanionProjectionCleanupService.Target.PROJECTION,
+                NPC, "world-a", "spawn-recovery", 0L, 10_000L
+        );
+        assertTrue(durability.beginSummon(request, lease, cleanup));
+        BondedCompanionProjectionCleanupService retry =
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService.Outcome
+                                .RETRY_REQUIRED
+                );
+
+        assertEquals(1, durability.replayPendingCleanup(retry, 0L, 1));
+        var first = store.listCleanup(OWNER, "roster-a", 1).getFirst();
+        assertEquals(BondedCompanionRecord.CleanupState.PENDING, first.state());
+        assertEquals(1, first.attemptCount());
+        assertTrue(first.nextAttemptAtMs() > 0L);
+
+        assertEquals(1, durability.replayPendingCleanup(
+                retry, first.nextAttemptAtMs(), 1
+        ));
+        var second = store.listCleanup(OWNER, "roster-a", 1).getFirst();
+        assertEquals(2, second.attemptCount());
+        assertTrue(second.nextAttemptAtMs() - first.nextAttemptAtMs()
+                > first.nextAttemptAtMs());
+
+        assertEquals(1, durability.replayPendingCleanup(retry, 10_000L, 1));
+        assertEquals(BondedCompanionRecord.CleanupState.ABANDONED,
+                store.listCleanup(OWNER, "roster-a", 1).getFirst().state());
+        assertEquals(1, store.pruneCleanup(10_000L, 1));
+        assertTrue(store.listCleanup(OWNER, "roster-a", 1).isEmpty());
+    }
+
+    @Test
+    void liveLeaseMaintenanceReadIsNotStarvedByEarlierPendingSummons() {
+        Path database = temporaryDirectory.resolve("live-lease-window.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -100L)
+                .initialize().availability().available());
+        SqliteBondedCompanionDatabase store =
+                new SqliteBondedCompanionDatabase(database);
+        SqliteBondedCompanionProjectionDurability durability =
+                new SqliteBondedCompanionProjectionDurability(database);
+        for (int index = 0; index < 64; index++) {
+            String profileId = "a-pending-%03d".formatted(index);
+            String familyId = "family:" + profileId;
+            create(store, profileId, familyId);
+            assertTrue(begin(durability, profileId, familyId, 100 + index));
+        }
+        create(store, "z-live", "family:z-live");
+        assertTrue(begin(durability, "z-live", "family:z-live", 200));
+        var pendingLive = durability.activeLeases(128).stream()
+                .filter(lease -> lease.profileId().equals("z-live"))
+                .findFirst().orElseThrow();
+        assertTrue(durability.confirmSpawn(pendingLive, pendingLive.liveNpcUuid()));
+
+        List<BondedCompanionProjectionValidator.LeaseExpectation> live =
+                durability.liveLeases(1);
+
+        assertEquals(1, live.size());
+        assertEquals("z-live", live.getFirst().profileId());
+        assertEquals(BondedCompanionProjectionValidator.LeasePhase.LIVE,
+                live.getFirst().phase());
     }
 
     @Test
@@ -364,7 +449,7 @@ class BondedCompanionProjectionDurabilityTest {
                 OWNER, POLICY_ROSTER, "profile-a").orElseThrow();
         assertEquals(BondedCompanionState.DEAD, dead.state());
         assertEquals(2L, dead.revision());
-        assertEquals(0L, dead.reviveCooldownUntilMs());
+        assertEquals(0L, dead.summonCooldownUntilMs());
         BondedCompanionSnapshot durable = new BondedCompanionSnapshotCodec()
                 .decode(new String(
                         dead.snapshot().bytes(), StandardCharsets.UTF_8

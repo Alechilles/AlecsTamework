@@ -257,7 +257,7 @@ public final class BondedCompanionCoreApiOperations {
                 matches && profile.state() == BondedCompanionState.STORED
                         && policy.features().summon()
                         && cooldownRemaining(
-                                profile.reviveCooldownUntilMs(),
+                                profile.summonCooldownUntilMs(),
                                 clock.getAsLong()) == 0L
                         && BondedCompanionFamilyScope.hasActiveCapacity(
                                 active, policy.maximumActive()),
@@ -297,7 +297,7 @@ public final class BondedCompanionCoreApiOperations {
                 lease.leaseToken(), lease.worldKey(), lease.startedAtMs(), lease.expiresAtMs());
         return new BondedCompanionProfile(profile.profileId(), profile.ownerUuid(),
                 profile.rosterId(), profile.familyId(), profile.roleId(), profile.state(),
-                profile.revision(), snapshot, active, profile.reviveCooldownUntilMs(),
+                profile.revision(), snapshot, active, profile.summonCooldownUntilMs(),
                 profile.diedAtMs(), profile.reviveCount(), BondedCompanionOperationLedger.empty());
     }
 

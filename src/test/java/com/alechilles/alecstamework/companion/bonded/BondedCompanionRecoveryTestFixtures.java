@@ -21,6 +21,8 @@ final class RecordingBondedDurability
     List<String> events = new ArrayList<>();
     final List<Long> cleanupRetentions = new ArrayList<>();
     final List<BondedCompanionProjectionCleanupService.CleanupIntent>
+            reconciledCleanups = new ArrayList<>();
+    final List<BondedCompanionProjectionCleanupService.CleanupIntent>
             spawnFailureCleanups = new ArrayList<>();
     final Map<String, BondedCompanionSnapshot> snapshots = new HashMap<>();
     BondedCompanionSnapshot lastStoredSnapshot;
@@ -106,6 +108,7 @@ final class RecordingBondedDurability
         spawnRecovery.remove(lease.profileId());
         cleanups.forEach(cleanup -> cleanupRetentions.add(
                 cleanup.retainedUntilMs()));
+        reconciledCleanups.addAll(cleanups);
         lastReason = reason;
         return true;
     }

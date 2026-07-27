@@ -23,7 +23,7 @@ CREATE TABLE bonded_companion_profile (
     species TEXT,
     gender TEXT,
     died_at_ms INTEGER,
-    revive_cooldown_until_ms INTEGER NOT NULL,
+    summon_cooldown_until_ms INTEGER NOT NULL,
     revive_count INTEGER NOT NULL CHECK (revive_count >= 0),
     quarantine_reason TEXT,
     quarantined_at_ms INTEGER,

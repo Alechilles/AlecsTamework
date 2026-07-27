@@ -62,7 +62,7 @@ final class BondedCompanionViewFactory {
                 BondedCompanionStateView.valueOf(profile.state().name()),
                 summonAvailable, storeAvailable,
                 reviveAvailable,
-                presentation, active, profile.reviveCooldownUntilMs(), null
+                presentation, active, profile.summonCooldownUntilMs(), null
         );
     }
 

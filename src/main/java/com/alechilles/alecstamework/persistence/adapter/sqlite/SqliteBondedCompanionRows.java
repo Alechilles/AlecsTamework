@@ -30,7 +30,7 @@ final class SqliteBondedCompanionRows {
         statement.setString(13, row.species());
         statement.setString(14, row.gender());
         setNullableLong(statement, 15, row.diedAtMs());
-        statement.setLong(16, row.reviveCooldownUntilMs());
+        statement.setLong(16, row.summonCooldownUntilMs());
         statement.setLong(17, row.reviveCount());
         statement.setString(18, row.quarantineReason());
         setNullableLong(statement, 19, row.quarantinedAtMs());
@@ -78,7 +78,7 @@ final class SqliteBondedCompanionRows {
                 row.getString("policy_json"), row.getString("display_name"),
                 row.getString("species"), row.getString("gender"),
                 nullableLong(row, "died_at_ms"),
-                row.getLong("revive_cooldown_until_ms"),
+                row.getLong("summon_cooldown_until_ms"),
                 row.getLong("revive_count"), row.getString("quarantine_reason"),
                 nullableLong(row, "quarantined_at_ms")
         );

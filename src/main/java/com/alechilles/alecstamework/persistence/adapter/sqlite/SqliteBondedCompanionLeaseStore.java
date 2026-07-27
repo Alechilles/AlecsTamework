@@ -200,7 +200,7 @@ final class SqliteBondedCompanionLeaseStore {
             SELECT profile_id, owner_uuid, roster_id, family_id, role_id,
                    state, revision, snapshot_json, created_at_ms, updated_at_ms,
                    policy_json, display_name, species, gender, died_at_ms,
-                   revive_cooldown_until_ms, revive_count, quarantine_reason,
+                   summon_cooldown_until_ms, revive_count, quarantine_reason,
                    quarantined_at_ms
             FROM bonded_companion_profile
             """;

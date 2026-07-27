@@ -325,7 +325,8 @@ class BondedCompanionRecoveryTest {
 
         assertEquals(BondedCompanionState.STORED, durability.states.get("profile-a"));
         assertEquals(List.of(uuid(40), uuid(41)), world.removed);
-        assertEquals(List.of(299_100L, 299_100L), durability.cleanupRetentions);
+        assertEquals(List.of(2_591_999_100L, 2_591_999_100L),
+                durability.cleanupRetentions);
         assertFalse(world.removed.contains(uuid(42)));
     }
 

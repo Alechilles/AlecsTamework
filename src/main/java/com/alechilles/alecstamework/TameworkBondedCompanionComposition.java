@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.companion.bonded
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionProjectionRecoverySystem;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionPolicyResolver;
@@ -81,6 +83,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private final BondedCompanionProjectionService projections;
     private final BondedCompanionWorldLifecycleObserver observer;
     private final BondedCompanionExpirySystem expiry;
+    private final BondedCompanionProjectionRecoverySystem projectionRecovery;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final SqliteBondedCompanionProjectionDurability durability;
     private final HytaleBondedCompanionWorldGateway world;
@@ -103,6 +106,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             BondedCompanionProjectionService projections,
             BondedCompanionWorldLifecycleObserver observer,
             BondedCompanionExpirySystem expiry,
+            BondedCompanionProjectionRecoverySystem projectionRecovery,
             BondedCompanionProjectionCleanupService cleanup,
             SqliteBondedCompanionProjectionDurability durability,
             HytaleBondedCompanionWorldGateway world,
@@ -121,6 +125,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.projections = projections;
         this.observer = observer;
         this.expiry = expiry;
+        this.projectionRecovery = projectionRecovery;
         this.cleanup = cleanup;
         this.durability = durability;
         this.world = world;
@@ -200,10 +205,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         BondedCompanionWorldLifecycleObserver observer =
                 new BondedCompanionWorldLifecycleObserver(
                         projections,
-                        () -> durability.activeLeases(256).stream()
-                                .map(world::readExact)
-                                .filter(Objects::nonNull)
-                                .toList(),
+                        () -> world.readBounded(
+                                durability.activeLeases(64), 128
+                        ),
                         (lease, cause, result) -> publishLifecycleChange(
                                 store, changes, lease, result
                         )
@@ -211,6 +215,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         BondedCompanionExpirySystem expiry = new BondedCompanionExpirySystem(
                 observer, durability::findExpired, 64
         );
+        BondedCompanionProjectionRecoverySystem projectionRecovery =
+                new BondedCompanionProjectionRecoverySystem(
+                        observer, durability::liveLeases, 64
+                );
         BondedCompanionCoreApiOperations operations =
                 new BondedCompanionCoreApiOperations(
                         store, rosters, policies, transitions, projections,
@@ -268,7 +276,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         }
         return new TameworkBondedCompanionComposition(
                 runtime, api, changes, diagnostics,
-                transitions, projections, observer, expiry,
+                transitions, projections, observer, expiry, projectionRecovery,
                 cleanup, durability, world, store, clock, captureAuthor,
                 captureEvents, paymentRecovery
         );
@@ -394,7 +402,9 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         long now = clock.getAsLong();
         durability.replayPendingCleanup(cleanup, now, 64);
         publishPendingCaptureEvents(captureEvents, diagnostics, 64);
+        store.pruneCleanup(now, 64);
         store.pruneOperations(now, 64);
+        projectionRecovery.tick(now);
         expiry.tick(now);
     }
 

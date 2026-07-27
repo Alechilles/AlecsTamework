@@ -25,7 +25,7 @@ public final class BondedCompanionRecord {
             @Nonnull Map<String, String> policy,
             @Nullable String displayName, @Nullable String species,
             @Nullable String gender, @Nullable Long diedAtMs,
-            long reviveCooldownUntilMs, long reviveCount,
+            long summonCooldownUntilMs, long reviveCount,
             @Nullable String quarantineReason, @Nullable Long quarantinedAtMs
     ) {
         public Profile {

@@ -23,7 +23,7 @@ public record SqliteBondedCompanionProfileRow(
         @Nullable String species,
         @Nullable String gender,
         @Nullable Long diedAtMs,
-        long reviveCooldownUntilMs,
+        long summonCooldownUntilMs,
         long reviveCount,
         @Nullable String quarantineReason,
         @Nullable Long quarantinedAtMs

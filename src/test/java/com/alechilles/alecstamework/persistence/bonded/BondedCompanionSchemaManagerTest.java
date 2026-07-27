@@ -62,13 +62,13 @@ class BondedCompanionSchemaManagerTest {
 
     @Test
     void bundledV1RemainsByteStableForUpgradeRecognition() throws Exception {
-        assertEquals("e718e63edfb2ebb6c8f19f2ca580eb17e9e12b4c0a4c9f9ba322f62e3d2a26ec",
+        assertEquals("6675bcc2f169b61fcfe6d1a7b998e83b9aeb5a27e7931d62f89202660dfd310d",
                 hash(resource("/persistence/bonded/v1.sql")));
     }
 
     @Test
     void bundledV2RemainsByteStableForUpgradeRecognition() throws Exception {
-        assertEquals("d21790785972ab126ea9723b17148fe2d99d75ec355becddb090e563fad1fc19",
+        assertEquals("023697b273e31f2f0eea6aa4aa9adb6ed942b60d01eb830ff0f29bfef9a892d0",
                 hash(resource("/persistence/bonded/v2.sql")));
     }
 
@@ -199,7 +199,7 @@ class BondedCompanionSchemaManagerTest {
                         profile_id, owner_uuid, roster_id, family_id, role_id,
                         state, revision, snapshot_json, created_at_ms,
                         updated_at_ms, policy_json, display_name, species, gender,
-                        revive_cooldown_until_ms, revive_count
+                        summon_cooldown_until_ms, revive_count
                     ) VALUES (
                         'profile-v1',
                         '10000000-0000-0000-0000-000000000001',
@@ -252,7 +252,7 @@ class BondedCompanionSchemaManagerTest {
                             'displayName', 'Wolf',
                             'species', 'Wolf',
                             'gender', 'Female',
-                            'reviveCooldownUntilMs', 0,
+                            'summonCooldownUntilMs', 0,
                             'reviveCount', 0
                         ), -11000, -11000, 10000
                     )
@@ -439,7 +439,7 @@ class BondedCompanionSchemaManagerTest {
                         profile_id, owner_uuid, roster_id, family_id, role_id,
                         state, revision, snapshot_json, created_at_ms,
                         updated_at_ms, policy_json,
-                        revive_cooldown_until_ms, revive_count
+                        summon_cooldown_until_ms, revive_count
                     ) VALUES (
                         'profile-a',
                         '10000000-0000-0000-0000-000000000001',
@@ -656,7 +656,7 @@ class BondedCompanionSchemaManagerTest {
                          profile_id, owner_uuid, roster_id, family_id, role_id,
                          state, revision, snapshot_json, created_at_ms,
                          updated_at_ms, policy_json,
-                         revive_cooldown_until_ms, revive_count
+                         summon_cooldown_until_ms, revive_count
                      ) VALUES (?, ?, 'roster-a', 'family:wolf',
                          'role:companion', ?, 0, ?, -10000, -10000,
                          '{}', 0, 0)

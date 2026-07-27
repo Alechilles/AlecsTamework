@@ -44,5 +44,8 @@ class BondedCompanionLifecycleIntegrationTest {
         assertTrue(source.contains("observer.onPlayerWorldTransfer("));
         assertTrue(source.contains("observer.onPlayerLogout("));
         assertTrue(source.contains("observer.onConfirmedDeath("));
+        assertTrue(source.contains("projectionRecovery.tick(now)"));
+        assertTrue(source.contains("durability::liveLeases"));
+        assertTrue(source.contains("store.pruneCleanup(now, 64)"));
     }
 }

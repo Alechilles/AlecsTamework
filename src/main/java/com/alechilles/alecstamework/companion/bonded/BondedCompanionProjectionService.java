@@ -158,8 +158,8 @@ public final class BondedCompanionProjectionService {
             return new ReconcileResult(status, List.of());
         }
         List<BondedCompanionProjectionCleanupService.CleanupIntent> intents =
-                cleanupIntents.projections(
-                        lease, validation.exactMatches(), reason, observedAtMs
+                cleanupIntents.recovery(
+                        lease, validation, reason, observedAtMs
                 );
         if (!durability.reconcileStored(
                 lease, planned.plan(), intents, reason)) {

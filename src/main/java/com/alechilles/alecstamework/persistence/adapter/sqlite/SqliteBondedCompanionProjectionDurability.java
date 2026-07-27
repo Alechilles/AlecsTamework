@@ -127,7 +127,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                     UPDATE bonded_companion_profile
                     SET state = 'DEAD', revision = revision + 1,
                         snapshot_json = ?,
-                        revive_cooldown_until_ms = 0,
+                        summon_cooldown_until_ms = 0,
                         died_at_ms = ?, updated_at_ms = ?
                     WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
                       AND state = 'ACTIVE' AND revision = ?
@@ -172,7 +172,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                             ? BondedCompanionProjectionCleanupService.Outcome
                             .IDENTITY_MISMATCH
                             : cleanup.recover(intent);
-            cleanupQueue.recordOutcome(intent.cleanupId(), outcome, nowMs);
+            cleanupQueue.recordOutcome(intent, outcome, nowMs);
             attempted++;
         }
         return attempted;
@@ -187,7 +187,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
     ) {
         BondedCompanionProjectionCleanupService.Outcome outcome =
                 cleanup.recover(intent);
-        cleanupQueue.recordOutcome(intent.cleanupId(), outcome, nowMs);
+        cleanupQueue.recordOutcome(intent, outcome, nowMs);
         return outcome;
     }
 
@@ -195,18 +195,30 @@ public final class SqliteBondedCompanionProjectionDurability implements
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     activeLeases(int limit) {
-        return leases(null, limit);
+        return leases(null, null, limit);
+    }
+
+    /**
+     * Returns only committed LIVE leases for recurring maintenance so pending summons cannot
+     * consume the bounded scan window.
+     */
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation>
+    liveLeases(int limit) {
+        return leases(null,
+                BondedCompanionProjectionValidator.LeasePhase.LIVE, limit);
     }
 
     /** Returns finite expired leases without rejecting negative world time. */
     @Nonnull
     public List<BondedCompanionProjectionValidator.LeaseExpectation>
     findExpired(long nowMs, int limit) {
-        return leases(nowMs, limit);
+        return leases(nowMs, null, limit);
     }
 
     private List<BondedCompanionProjectionValidator.LeaseExpectation> leases(
             @Nullable Long expiredAt,
+            @Nullable BondedCompanionProjectionValidator.LeasePhase phase,
             int limit
     ) {
         if (limit <= 0) throw new IllegalArgumentException("limit must be positive");
@@ -216,6 +228,7 @@ public final class SqliteBondedCompanionProjectionDurability implements
                 WHERE p.state = 'ACTIVE' AND l.expires_at_ms != 0
                   AND l.expires_at_ms <= ?
                 """;
+        String phaseClause = phase == null ? "" : " AND l.projection_state = ?";
         try (Connection connection = connections.openReadConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT p.owner_uuid, p.roster_id, l.profile_id,
@@ -224,11 +237,12 @@ public final class SqliteBondedCompanionProjectionDurability implements
                      FROM bonded_companion_lease l
                      JOIN bonded_companion_profile p
                        ON p.profile_id = l.profile_id
-                     """ + expiry + """
+                     """ + expiry + phaseClause + """
                      ORDER BY l.profile_id LIMIT ?
                      """)) {
             int index = 1;
             if (expiredAt != null) statement.setLong(index++, expiredAt);
+            if (phase != null) statement.setString(index++, phase.name());
             statement.setInt(index, limit);
             try (ResultSet rows = statement.executeQuery()) {
                 ArrayList<BondedCompanionProjectionValidator.LeaseExpectation>
@@ -264,8 +278,8 @@ public final class SqliteBondedCompanionProjectionDurability implements
                     UPDATE bonded_companion_profile
                     SET state = 'STORED', revision = revision + 1,
                         snapshot_json = COALESCE(?, snapshot_json),
-                        revive_cooldown_until_ms = COALESCE(
-                            ?, revive_cooldown_until_ms
+                        summon_cooldown_until_ms = COALESCE(
+                            ?, summon_cooldown_until_ms
                         ),
                         died_at_ms = NULL, updated_at_ms = ?
                     WHERE profile_id = ? AND owner_uuid = ? AND roster_id = ?
