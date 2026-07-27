@@ -33,3 +33,17 @@ provisioning journal. `findOperation` is the restart recovery surface.
 
 Provisioned death/revival preserves the entitlement. A dormant revival can
 return to `PROVISIONED_DORMANT` without spawning until activation is requested.
+
+## Bonded companions are separate
+
+This generic API remains the supported authority for ordinary provisioned
+companions and generic command-family integration. It does not provision a
+profile in the bonded lease-model database.
+
+For an ephemeral bonded roster profile, require `BONDED_COMPANIONS` and call
+`BondedCompanionApi.provision`. That operation creates a `STORED` bonded
+profile directly, uses the bonded roster/family policy, and does not create a
+generic dormant lifecycle, population-group membership, command-family row,
+or timed-summon lease. Do not call both provisioning APIs for one entitlement.
+
+See [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference).

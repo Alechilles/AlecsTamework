@@ -31,3 +31,19 @@ exact refund claim; ambiguous evidence fails closed.
 Use a stable caller namespace and idempotency key, and recover uncertain
 results through `findOperation`. Do not retry with a new key or implement an
 external charge/refund journal.
+
+## Bonded companions are separate
+
+This generic surface continues to revive ordinary Dead or Lost canonical
+profiles in owner/command-family rosters. It is not used for a bonded profile.
+
+Bonded revival is exposed by `BondedCompanionApi.quoteRevive` and
+`BondedCompanionApi.revive` under `BONDED_COMPANIONS`. Its recipe belongs to
+the bonded roster family, every configured cost is reserved as one atomic
+batch, and success changes `DEAD` to `STORED` without summoning. The normal
+bonded panel supplies the required live inventory/escrow context.
+
+Do not recover a failed bonded revive through `PaidCommandRevivalApi` or turn a
+bonded `DEAD` profile into generic Lost/dead lifecycle state.
+
+See [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference).

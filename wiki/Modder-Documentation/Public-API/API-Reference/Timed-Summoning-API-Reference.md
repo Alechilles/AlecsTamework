@@ -31,3 +31,17 @@ valid; `0` is the only unset sentinel.
 
 Always close the `subscribe` handle. Missing timed-summon capability must deny
 a new projection without deleting roster membership.
+
+## Bonded companions are separate
+
+This API remains the timed-lease authority for generic owner/command-family
+rosters. It is not used for bonded profiles.
+
+Bonded session duration and summon cooldown live in
+`TwBondedCompanionRosterConfig`; `BondedCompanionApi.summon` and `store` own
+the corresponding projection lease. A zero duration is unlimited, a positive
+duration expires to `STORED`, and every non-death disappearance also converges
+to `STORED`. Bonded leases do not create generic timed-summon rows or generic
+lifecycle aliases.
+
+See [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference).

@@ -1,144 +1,186 @@
-# Tamework–HyDragon Integration Contract
+# Tamework–HyDragon Bonded Integration Contract
 
 - Primary mod: Tamework
 - External mod: HyDragon
 - Dependency: HyDragon requires Tamework
-- Version range: Tamework `>=3.0.0 <4.0.0`; HyDragon 0.2.x
-- Project profile/plugin set: Tamework plus HyDragon; exact asset profile is
-  recorded when asset implementation begins
-- Failure behavior: independent capability gates fail closed before player cost
-- Validation: dependency on/off, each capability unavailable/degraded/available,
-  and complete affected-consumer paths
+- Required range in HyDragon manifest, Maven property, and runtime bridge:
+  Tamework `>=3.0.0 <4.0.0`
+- Public API contract: experimental API `0.9.0`
+- Validation status: automated API/asset integration covered; clean packaged
+  alignment and fresh-world gameplay acceptance pending
 
-Status: automated implementation complete; exact live acceptance pending
+This document does not assert validation against an exact Hytale `0.5.6`
+schema profile. That exact profile is not present in the local schema catalog;
+the implementation is validated through the registered codecs, Java contract
+tests, current asset validator, packaging checks, and bounded live acceptance.
 
 ## Goal
 
-HyDragon consumes versioned public Tamework capabilities and immutable DTOs. It
-does not link against internal services, access SQLite, mirror canonical
-companion state, or infer capability availability from version alone.
+HyDragon consumes Tamework's dedicated bonded-companion API for full dragons
+and bonded Miniwyverns. It does not import internal services, open Tamework
+SQLite files, mirror bonded lifecycle/lease state, or fall back to generic
+companion persistence.
 
 ## Required capabilities
 
-| Capability | Authority |
+| HyDragon feature | Required Tamework capabilities |
 | --- | --- |
-| `PROFILES` | Stable profile/alias identity |
-| `PROFILE_DATA` and `PROFILE_DATA_TRANSACTIONS` | Namespaced HyDragon state |
-| `POLICY` | Ownership and lifecycle policy |
-| `PERSISTENCE_RESILIENCE` | Health, incidents, and operation recovery |
-| `CAPTURE_POLICY` | Capture configuration and requirement handlers |
-| `POPULATION_GROUPS` | Group membership, counts, and admission |
-| `COMPANION_PROVISIONING` | Soul Bond profile grant/activation |
-| `COMMAND_FAMILY_ROSTERS` | Dragon Horn roster |
-| `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION` | One result and source spend |
-| `CAPTURE_TAME_AND_LINK` | In-place successful capture |
-| `COMMAND_TIMED_SUMMONING` | Summon, Dismiss, expiry, and cooldown |
-| `PAID_COMMAND_REVIVAL` | Quote, exact charge, restore, and compensation |
+| Dragon Horn roster/actions | `BONDED_COMPANIONS` |
+| Timed summon/store | `BONDED_COMPANIONS` |
+| Paid bonded revival | `BONDED_COMPANIONS` |
+| Soul Bond claim/provision | `BONDED_COMPANIONS` |
+| Miniwyvern attunement | `BONDED_COMPANIONS` |
+| Miniwyvern abilities | `BONDED_COMPANIONS` |
+| Draconic capture and roster | `BONDED_COMPANIONS`, `CAPTURE_POLICY`, `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `INTERACTION_EXTENSIONS`, `EVENTS` |
+| Dynamic encounters | `BONDED_COMPANIONS`, `CAPTURE_POLICY`, `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, `INTERACTION_EXTENSIONS`, `EVENTS` |
+| Tamework diagnostic integration | `DIAGNOSTICS` |
 
-Optional/deferred:
+HyDragon checks the advertised capability names and
+`BondedCompanionApi.availability()` at request time. This allows the bonded
+runtime to become ready after startup without requiring another server restart.
 
-- `COMPANION_INVENTORY`
+## Superseded HyDragon bindings
 
-Removed:
+Bonded full dragons and Miniwyverns no longer use:
 
-- `BONDED_VESSELS`
+- `CommandFamilyRosterApi`;
+- `CommandTimedSummoningApi`;
+- `CompanionProvisioningApi`;
+- `PaidCommandRevivalApi`;
+- generic `ProfileDataApi` extension storage;
+- `PopulationGroupApi` for bonded ownership/active eligibility; or
+- generic profile, lifecycle, alias, outbox, or evidence readiness.
+
+These public surfaces remain supported in Tamework for ordinary companions and
+other mods. Their absence is not part of this refactor; only HyDragon's old
+route through them is removed.
 
 ## Feature gates
 
-| HyDragon feature | Required recovery capabilities | Unavailable/degraded behavior |
+| Feature | Available behavior | Unavailable/degraded behavior |
 | --- | --- | --- |
-| Probabilistic stone attempt | capture policy, population groups, resolved-attempt consumption | deny before entropy and source spend |
-| Tame in place/add to Horn | above plus roster and tame/link | deny before entropy and source spend |
-| Wyvern Egg claim | population groups, provisioning, roster | deny before Egg consumption |
-| Horn roster/commands | roster | preserve rows; disable unsafe mutation |
-| Timed Summon/Dismiss | roster, population groups, timed summoning | preserve lease/profile; deny new projection |
-| Paid revival | roster, population groups, timed summoning, paid revival | preserve dead row; consume nothing |
-| Elemental profile state | profile data transactions | deny essence consumption |
-| Miniwyvern backpack | companion inventory | feature absent; Miniwyvern itself remains supported |
+| Draconic Stone | resolved probabilistic capture into a stored bonded profile | deny before entropy/source spend; do not tame/link or create a filled item |
+| Dragon Horn reads | list complete profile-first cards | show a specific bonded-unavailable reason; never read generic roster rows |
+| Summon | create one exact lease/projection | deny without deleting or rewriting the stored profile |
+| Dismiss/store | snapshot and retire the active projection | retain exact active evidence/recovery; never route through generic relocation |
+| Paid revive | quote and atomically reserve the complete family recipe | keep `DEAD`; consume nothing |
+| Soul Bond | provision one stored Miniwyvern and initialize its extension | do not consume or duplicate the one-lifetime grant |
+| Miniwyvern attunement/abilities | CAS the bonded extension and bind only while active | retain extension/profile; disable dependent mutation/runtime binding |
+| Encounter/flight eligibility | require a confirmed active full-dragon lease | stored/dead/mini/invalid profiles do not qualify; unavailable authority fails closed |
 
-Missing paid revival must not disable safe Horn commands. Missing companion
-inventory must not disable Miniwyvern provisioning, roster membership, or
-ordinary behavior.
+Missing paid-revive context must not disable safe reads or Dismiss. Missing
+capture-policy support must not disable an already stored Horn profile. Feature
+gates remain independent except where their complete contract requires the same
+bonded capability.
 
 ## Authority matrix
 
-| Data/behavior | Owner | Consumer rule |
+| Data or behavior | Tamework owns | HyDragon owns |
 | --- | --- | --- |
-| Profile, alias, owner, lifecycle, death/lost state | Tamework | HyDragon stores stable references only |
-| Capture result, cooldown, and source spend | Tamework | HyDragon never pre-rolls or mirrors |
-| Roster membership and command preferences | Tamework | Horn metadata is disposable projection |
-| Group membership/count/admission | Tamework | HyDragon supplies config, not counters |
-| Summon lease/storage/cooldown | Tamework | HyDragon supplies role balance |
-| Revival quote/charge/refund | Tamework | HyDragon supplies item recipe/presentation |
-| Soul Bond entitlement | HyDragon | Tamework provisions exactly one profile |
-| Elemental/archetype state | HyDragon namespace in Tamework profile data | Cannot represent lifecycle/roster authority |
-| Stone/Horn/Egg assets and balance | HyDragon | Tamework treats IDs as content data |
+| Stable profile, owner, roster/family, role | bonded authority | stable references only |
+| `STORED` / `ACTIVE` / `DEAD` | bonded authority | no second lifecycle |
+| Full snapshot and panel presentation | bonded authority | source role assets and extension presentation values |
+| Lease token, exact projection, expiry/cooldown | bonded authority | declarative family policy values |
+| Projection spawn/store/death cleanup | bonded authority | normal dragon/Miniwyvern role behavior |
+| Capture durability and original-source proof | bonded authority | Stone assets, allowed roles, channel/effects, balance |
+| Revival quote, atomic charge, recovery | bonded authority | item IDs/quantities in policy assets |
+| Miniwyvern archetype, attunement, ability/progression document | owner/profile/namespace extension row | schema, merge rules, and domain behavior |
+| One-lifetime Soul Bond eligibility | stored bonded profile plus HyDragon entitlement evidence | acquisition policy and request identity |
+| Active full-dragon eligibility | read-only bonded roster/profile/lease query | encounter decision using that result |
 
-## Idempotency
+The live entity UUID is never a cross-plugin durable identity. HyDragon uses
+profile IDs and, where necessary, reads the current lease summary returned by
+Tamework.
 
-Cross-plugin mutations use:
+## Idempotency and concurrency
 
-```text
-hydragon:<operation-kind>:<stable-player-action-id>
-```
+Cross-plugin mutations use a stable caller namespace and idempotency key that
+survive callbacks, async continuation, relog, and restart. Equivalent repeats
+return the durable result. A reused key with different payload is rejected.
 
-The key survives callbacks, async continuation, relog, and restart. Tamework
-returns the recorded result for duplicates.
+Profile actions include the expected profile revision. Extension updates use
+owner/profile/namespace plus expected extension revision and
+`MISSING_REVISION` for create-only writes. On conflict, HyDragon reloads and
+merges its domain document; it does not overwrite another revision.
 
-Rules:
+Capture entropy is resolved once, and one original source UUID can create only
+one bonded profile. Revival reserves its complete ordered recipe as one batch.
+Ambiguous work remains contained; HyDragon never guesses success/failure or
+retries with a new identity to force progress.
 
-1. Preflight queries are advisory and side-effect-free.
-2. Positive work uses prepare/live-apply/durable/publish or compensation.
-3. Inventory uses exact slot/stack/revision receipts.
-4. Capture entropy is resolved once.
-5. Source spend and revival charge are never repeated.
-6. Ambiguity remains pending/contained; callers do not guess failure.
-7. A terminal result and spendable compensation cannot both exist.
-8. Listener or presentation failure cannot change committed state.
+## Threading and world context
 
-## Threading
-
-- Blocking persistence runs off world threads.
-- ECS and inventory live access resolves current entities/components on the
+- Blocking storage work does not run on Hytale world threads.
+- ECS, placement, entity removal, and player inventory access resolve on the
   owning world thread.
-- Deferred work carries stable IDs and immutable snapshots, never stale
-  `Player` components or entity refs.
-- Cross-plugin events are immutable post-commit notifications unless explicitly
-  documented as synchronous, side-effect-free preflight handlers.
+- Deferred work carries owner/profile/world/operation IDs and immutable data,
+  never a stale `Player`, entity reference, or live component.
+- Summon supplies one world-qualified placement in
+  `BondedCompanionActionContext`.
+- Store validates the exact current lease world.
+- Event listeners consume immutable post-commit notifications and read the
+  current profile view when full data is needed.
 
-## Compatibility matrix
+## Miniwyvern extension contract
 
-| Tamework | HyDragon | Integration state | Static | Live | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Historical reduced 3.0 dev build | 0.2.x | recovery capabilities absent | superseded | not release-valid | Recorded only as the corrected 2026-07-24 baseline |
-| Feature-slice candidate | 0.2.x | individual capabilities independently enabled | per-slice tests | per-slice smoke | Superseded by the composed feature-complete candidate |
-| Feature-complete 3.0 candidate | 0.2.x | all required capabilities available | full cross-repo suite green | full live matrix pending | Only release-eligible combination after live acceptance |
-| Tamework absent/incompatible | 0.2.x | dependency failure | startup explains range | no gameplay mutation | No private HyDragon fallback DB |
-| Tamework feature degraded | 0.2.x | affected capability degraded | deterministic denial | no player cost | Unrelated safe capabilities remain usable |
+HyDragon stores Miniwyvern archetype, attunement, ability scheduler state, and
+other domain data in a namespaced bonded extension document. It uses
+`getExtensionData` and `compareAndSetExtensionData`, not generic
+`ProfileDataApi`.
+
+The document survives store, summon, logout, transfer, expiration, death,
+revive, and relog. `MiniwyvernAbilityRuntime` subscribes to
+`BondedCompanionChangedEvent`: it attaches only to an exact active projection
+and detaches when the profile becomes stored or dead without deleting data.
+
+## Active full-dragon eligibility
+
+Dynamic encounter and flight eligibility queries
+`hydragon:dragon_horn`, then accepts only a profile with:
+
+- family `hydragon:full_dragons`;
+- state `ACTIVE`;
+- a non-null active lease;
+- the expected roster/owner; and
+- a valid full-dragon role/policy match.
+
+Stored or dead dragons, active Miniwyverns, stale projections, and generic
+population evidence do not qualify.
+
+## Dependency and compatibility behavior
+
+| Runtime combination | Result |
+| --- | --- |
+| Tamework in declared range with `BONDED_COMPANIONS` ready | full bonded integration enabled |
+| Tamework in range but bonded capability absent | bonded HyDragon features report missing capability and do not mutate generic persistence |
+| Capability advertised but bonded runtime unavailable | dependent gates report the bonded availability reason; no player cost |
+| Tamework missing or outside manifest range | plugin dependency validation fails before gameplay |
+| Unrelated Tamework capability degraded | only HyDragon features requiring that capability are disabled |
+
+`manifest.json`, the Maven Tamework version/path, and
+`TameworkBridge.REQUIRED_TAMEWORK_RANGE` must stay aligned. There is no private
+HyDragon bonded database or legacy generic fallback.
 
 ## Diagnostics
 
-Required read-only summaries:
+Tamework reports redacted aggregate bonded readiness, schema version, state
+counts, active leases, bounded cleanup count, and a fixed failure category.
+`/tw debugdb export` includes `bonded-companions.json` without owners, profile
+IDs, NPC UUIDs, snapshots, or extension payloads.
 
-- capability availability and stable reason;
-- command family by owner/family;
-- population groups/counts/admission;
-- provisioning by operation/profile;
-- summon by operation/profile;
-- capture attempt by operation;
-- revival by operation/profile;
-- bounded persistence incidents/quarantines/circuits.
-
-Routine diagnostics omit secret entropy, full inventory contents, and unrelated
-player data.
+HyDragon reports capability names, per-feature gate state, missing
+capabilities, and the bonded availability reason. A diagnostic must never
+authorize gameplay mutation by itself.
 
 ## Acceptance
 
-- HyDragon compiles only against public Tamework APIs;
-- every feature denies before cost when a dependency is unavailable;
-- capture, provisioning, timed storage, and revival return prior results on
-  retry;
-- one profile/roster/lease survives world movement, unload, death, relog, and
-  restart;
-- no bonded-vessel or private companion-inventory authority exists;
-- integration-on and dependency/capability-off paths are both tested.
+- HyDragon compiles only against public Tamework API types;
+- all bonded consumers require `BONDED_COMPANIONS`;
+- old generic bonded routes have no production call sites;
+- unavailable paths fail before Stone, Egg, or revive-cost consumption;
+- full dragons and Miniwyverns share one Horn but retain separate families;
+- Miniwyvern extension state survives every intended transition;
+- active-full-dragon eligibility ignores stored, dead, Miniwyvern, and generic
+  population evidence;
+- manifest, Maven, runtime range, and packaged assets agree; and
+- both dependency-on and capability-off behavior are covered before release.
