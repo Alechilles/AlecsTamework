@@ -98,3 +98,25 @@ The ordinary Tamework owner cap is separate. It counts canonical owned
 profiles in its configured global/per-world scope and uses durable positive
 reservations; it does not use claims or provider selection. There is no
 provider-neutral claims bridge or persistent reflected provider cache.
+
+## Bonded capture completion
+
+Integrations that use `StoreBondedCompanion` receive a
+`BondedCompanionCaptureResolvedEvent` after the stored bonded profile and its
+exact source-cleanup intent commit. The event contains one
+`BondedCompanionCaptureEvidenceView` with stable operation, attempt, owner,
+roster, family, source NPC, profile, role, item/config, policy, disposition,
+outcome, reason, world, and commit-time evidence.
+
+The event proves bonded profile durability. It does not claim that physical
+source cleanup or capture-item finalization has finished; those steps occur
+after the commit and remain independently recoverable.
+
+Event subscriptions are live notifications. Restart-sensitive integrations
+must also call
+`BondedCompanionApi.findCapture(ownerUuid, rosterId, sourceNpcUuid)`. That
+bounded lookup reads the retained bonded `CAPTURE` operation evidence and does
+not consult generic companion profiles. `NOT_FOUND` means no matching retained
+capture proof; `UNAVAILABLE` or `INTERNAL_FAILURE` must be treated as unknown,
+not as proof that capture did not occur. Capture evidence expires with the
+bounded operation retention policy.

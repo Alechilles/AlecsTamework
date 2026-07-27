@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionAvailability;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
+import com.alechilles.alecstamework.api.BondedCompanionCaptureEvidenceView;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionData;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
@@ -36,6 +37,7 @@ public final class BondedCompanionApiFacade
 
     private final Supplier<BondedCompanionPersistenceReadiness> readiness;
     private final BondedCompanionStore store;
+    private final BondedCompanionCaptureEvidenceStore captureEvidence;
     private final BondedCompanionChangePublisher changes;
     private final BondedCompanionDiagnosticContributor diagnostics;
     private final BondedCompanionCoreApiOperations operations;
@@ -48,11 +50,27 @@ public final class BondedCompanionApiFacade
             @Nonnull BondedCompanionDiagnosticContributor diagnostics,
             @Nonnull BondedCompanionCoreApiOperations operations
     ) {
+        this(
+                readiness, store, changes, diagnostics, operations,
+                store instanceof BondedCompanionCaptureEvidenceStore evidence
+                        ? evidence : null
+        );
+    }
+
+    public BondedCompanionApiFacade(
+            @Nonnull Supplier<BondedCompanionPersistenceReadiness> readiness,
+            @Nonnull BondedCompanionStore store,
+            @Nonnull BondedCompanionChangePublisher changes,
+            @Nonnull BondedCompanionDiagnosticContributor diagnostics,
+            @Nonnull BondedCompanionCoreApiOperations operations,
+            BondedCompanionCaptureEvidenceStore captureEvidence
+    ) {
         this.readiness = Objects.requireNonNull(readiness, "readiness");
         this.store = Objects.requireNonNull(store, "store");
         this.changes = Objects.requireNonNull(changes, "changes");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.operations = Objects.requireNonNull(operations, "operations");
+        this.captureEvidence = captureEvidence;
     }
 
     @Override
@@ -93,6 +111,43 @@ public final class BondedCompanionApiFacade
             );
             return failed(BondedCompanionResultCode.INTERNAL_FAILURE,
                     "bonded-storage-read-failed");
+        }
+    }
+
+    @Override
+    public CompletableFuture<BondedCompanionResult<
+            BondedCompanionCaptureEvidenceView>> findCapture(
+            UUID ownerUuid,
+            String rosterId,
+            UUID sourceNpcUuid
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(rosterId, "rosterId");
+        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        BondedCompanionResult<BondedCompanionCaptureEvidenceView> denied =
+                persistenceDenied();
+        if (denied != null) {
+            return CompletableFuture.completedFuture(denied);
+        }
+        if (captureEvidence == null) {
+            return failed(
+                    BondedCompanionResultCode.UNAVAILABLE,
+                    "bonded-capture-evidence-unavailable");
+        }
+        try {
+            return captureEvidence.findCaptureEvidence(
+                            ownerUuid, rosterId, sourceNpcUuid)
+                    .map(BondedCompanionCaptureEvidence::toView)
+                    .map(this::completed)
+                    .orElseGet(() -> failed(
+                            BondedCompanionResultCode.NOT_FOUND,
+                            "bonded-capture-evidence-not-found"));
+        } catch (RuntimeException failure) {
+            diagnostics.recordFailure(
+                    BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+            );
+            return failed(BondedCompanionResultCode.INTERNAL_FAILURE,
+                    "bonded-capture-evidence-read-failed");
         }
     }
 

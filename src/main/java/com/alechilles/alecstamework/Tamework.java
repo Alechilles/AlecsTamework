@@ -885,7 +885,8 @@ public class Tamework extends JavaPlugin {
                 runtimeDataDirectory,
                 bondedCompanionRosterRegistry,
                 getLogger(),
-                System::currentTimeMillis
+                System::currentTimeMillis,
+                apiEventBus::publishPersistenceEvent
         );
         getEntityStoreRegistry().registerSystem(
                 new BondedCompanionMaintenanceSystem(

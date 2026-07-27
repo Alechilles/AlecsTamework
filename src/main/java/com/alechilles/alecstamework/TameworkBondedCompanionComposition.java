@@ -2,6 +2,7 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
+import com.alechilles.alecstamework.api.BondedCompanionCaptureResolvedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionExpirySystem;
 import com.alechilles.alecstamework.companion.bonded
@@ -31,6 +32,8 @@ import com.alechilles.alecstamework.persistence.bonded
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionChangePublisher;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionCaptureEventPublisher;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCoreApiOperations;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionDataPath;
 import com.alechilles.alecstamework.persistence.bonded
@@ -57,6 +60,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -82,6 +86,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             .BondedCompanionStore store;
     private final LongSupplier clock;
     private final BondedCompanionCaptureAuthor captureAuthor;
+    @Nullable
+    private final BondedCompanionCaptureEventPublisher captureEvents;
     private final HytaleBondedCompanionPaymentRecovery paymentRecovery;
     private final Map<UUID, String> ownerWorlds = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -102,6 +108,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                     .BondedCompanionStore store,
             LongSupplier clock,
             BondedCompanionCaptureAuthor captureAuthor,
+            BondedCompanionCaptureEventPublisher captureEvents,
             HytaleBondedCompanionPaymentRecovery paymentRecovery
     ) {
         this.persistence = persistence;
@@ -118,6 +125,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         this.store = store;
         this.clock = clock;
         this.captureAuthor = captureAuthor;
+        this.captureEvents = captureEvents;
         this.paymentRecovery = paymentRecovery;
     }
 
@@ -128,6 +136,19 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
             @Nonnull BondedCompanionRosterRegistry rosters,
             @Nullable HytaleLogger logger,
             @Nonnull LongSupplier clock
+    ) {
+        return open(commonDataDirectory, rosters, logger, clock, null);
+    }
+
+    /** Opens the bonded authority with an optional public capture-event sink. */
+    @Nonnull
+    public static TameworkBondedCompanionComposition open(
+            @Nonnull Path commonDataDirectory,
+            @Nonnull BondedCompanionRosterRegistry rosters,
+            @Nullable HytaleLogger logger,
+            @Nonnull LongSupplier clock,
+            @Nullable Consumer<BondedCompanionCaptureResolvedEvent>
+                    captureEventSink
     ) {
         Objects.requireNonNull(commonDataDirectory, "commonDataDirectory");
         Objects.requireNonNull(rosters, "rosters");
@@ -140,6 +161,10 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         SqliteBondedCompanionDatabase store =
                 new SqliteBondedCompanionDatabase(databasePath);
+        BondedCompanionCaptureEventPublisher captureEvents =
+                captureEventSink == null ? null
+                        : new BondedCompanionCaptureEventPublisher(
+                                store, captureEventSink, clock);
         BondedCompanionDiagnosticContributor diagnostics =
                 new BondedCompanionDiagnosticContributor(
                         runtime::readiness,
@@ -209,7 +234,8 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                                                 .CONFIRMED)));
         SqliteBondedCompanionCapturePersistenceAdapter capturePersistence =
                 new SqliteBondedCompanionCapturePersistenceAdapter(
-                        rosters, transitions, store, store, durability, cleanup
+                        rosters, transitions, store, store, durability, cleanup,
+                        captureEvents
                 );
         BondedCompanionCaptureAuthor captureAuthor =
                 new BondedCompanionCaptureAuthor(
@@ -223,6 +249,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 );
         if (started.availability().available()) {
             long startupTime = clock.getAsLong();
+            publishPendingCaptureEvents(captureEvents, diagnostics, 128);
             durability.replayPendingCleanup(
                     cleanup, startupTime, 128
             );
@@ -239,7 +266,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 runtime, api, changes, diagnostics,
                 transitions, projections, observer, expiry,
                 cleanup, durability, world, store, clock, captureAuthor,
-                paymentRecovery
+                captureEvents, paymentRecovery
         );
     }
 
@@ -362,6 +389,7 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         if (!operational()) return;
         long now = clock.getAsLong();
         durability.replayPendingCleanup(cleanup, now, 64);
+        publishPendingCaptureEvents(captureEvents, diagnostics, 64);
         store.pruneOperations(now, 64);
         expiry.tick(now);
     }
@@ -369,6 +397,21 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
     private boolean operational() {
         return !closed.get() && persistence.readiness()
                 .availability().available();
+    }
+
+    private static void publishPendingCaptureEvents(
+            BondedCompanionCaptureEventPublisher captureEvents,
+            BondedCompanionDiagnosticContributor diagnostics,
+            int limit
+    ) {
+        if (captureEvents == null) return;
+        try {
+            captureEvents.publishPending(limit);
+        } catch (RuntimeException | LinkageError failure) {
+            diagnostics.recordFailure(
+                    BondedCompanionDiagnosticSnapshot.FailureCategory.STORAGE
+            );
+        }
     }
 
     private static void publishLifecycleChange(

@@ -18,6 +18,9 @@
 - Added resolved probabilistic capture attempts that consume their configured
   source exactly once after either terminal result, plus successful in-place
   tame-and-command-link capture for command-roster integrations.
+- Added restart-safe bonded capture completion evidence for integrations,
+  including live notifications and exact owner/roster/source-NPC lookup without
+  generic companion profile dependencies.
 - Added direct captured-item intake for configured coops. A captured companion
   can now move into a coop without an intermediate live spawn or duplicate.
 - Restored `/tw debugdb export` for the replacement persistence system. It

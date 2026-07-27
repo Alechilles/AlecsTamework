@@ -16,6 +16,26 @@ public interface BondedCompanionApi {
     CompletableFuture<BondedCompanionResult<List<BondedCompanionProfileView>>>
             list(@Nonnull UUID ownerUuid, @Nonnull String rosterId);
 
+    /**
+     * Finds bounded proof for one original NPC captured into this owner roster.
+     * This exact lookup is the restart-safe counterpart to the live bonded
+     * capture event and never consults generic companion profiles.
+     */
+    @Nonnull
+    default CompletableFuture<BondedCompanionResult<
+            BondedCompanionCaptureEvidenceView>> findCapture(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String rosterId,
+            @Nonnull UUID sourceNpcUuid
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(rosterId, "rosterId");
+        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        return CompletableFuture.completedFuture(
+                BondedCompanionResult.unavailable(
+                        "bonded-capture-evidence-unavailable"));
+    }
+
     @Nonnull
     CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             provision(@Nonnull BondedCompanionProvisionRequest request);

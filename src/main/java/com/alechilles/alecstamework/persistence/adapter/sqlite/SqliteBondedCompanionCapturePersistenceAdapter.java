@@ -13,6 +13,10 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopR
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionCaptureEventPublisher;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionCaptureEvidence;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionStore;
@@ -23,6 +27,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -42,6 +47,8 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
     private final SqliteBondedCompanionDatabase database;
     private final SqliteBondedCompanionProjectionDurability durability;
     private final BondedCompanionProjectionCleanupService cleanup;
+    @Nullable
+    private final BondedCompanionCaptureEventPublisher captureEvents;
     private final BondedCompanionSnapshotCodec snapshots =
             new BondedCompanionSnapshotCodec();
 
@@ -53,12 +60,28 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
             @Nonnull SqliteBondedCompanionProjectionDurability durability,
             @Nonnull BondedCompanionProjectionCleanupService cleanup
     ) {
+        this(
+                rosters, transitions, profiles, database, durability, cleanup,
+                null
+        );
+    }
+
+    public SqliteBondedCompanionCapturePersistenceAdapter(
+            @Nonnull BondedCompanionRosterRegistry rosters,
+            @Nonnull BondedCompanionTransitionService transitions,
+            @Nonnull BondedCompanionStore profiles,
+            @Nonnull SqliteBondedCompanionDatabase database,
+            @Nonnull SqliteBondedCompanionProjectionDurability durability,
+            @Nonnull BondedCompanionProjectionCleanupService cleanup,
+            @Nullable BondedCompanionCaptureEventPublisher captureEvents
+    ) {
         this.rosters = Objects.requireNonNull(rosters, "rosters");
         this.transitions = Objects.requireNonNull(transitions, "transitions");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.database = Objects.requireNonNull(database, "database");
         this.durability = Objects.requireNonNull(durability, "durability");
         this.cleanup = Objects.requireNonNull(cleanup, "cleanup");
+        this.captureEvents = captureEvents;
     }
 
     /** Validates current policy and capacity without mutating durable state. */
@@ -99,13 +122,22 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
         if (profile == null) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
         }
+        BondedCompanionOperation operation = operation(intent, nowMs);
         BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
                 database.createCapturedProfile(
-                        operation(intent, nowMs), profile,
-                        cleanupRecord(intent, nowMs), roster.maximumOwned()
+                        operation, profile, cleanupRecord(intent, nowMs),
+                        roster.maximumOwned(),
+                        captureEvidence(intent, profile, operation, nowMs)
                 );
         if (result.code() != BondedCompanionStoreResult.Code.APPLIED) {
             return BondedCompanionCaptureAuthor.PersistenceOutcome.FAILED;
+        }
+        if (captureEvents != null) {
+            try {
+                captureEvents.publishPending(64);
+            } catch (RuntimeException | LinkageError ignored) {
+                // The committed tombstone remains pending for maintenance replay.
+            }
         }
         return result.replayed()
                 ? BondedCompanionCaptureAuthor.PersistenceOutcome.REPLAYED
@@ -210,6 +242,36 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
         );
     }
 
+    private BondedCompanionCaptureEvidence captureEvidence(
+            BondedCompanionCaptureIntent intent,
+            BondedCompanionRecord.Profile profile,
+            BondedCompanionOperation operation,
+            long committedAtMs
+    ) {
+        var attempt = intent.attemptEvidence();
+        return new BondedCompanionCaptureEvidence(
+                stableOperationId(operation), attempt.attemptId(),
+                intent.actorUuid(), intent.rosterId(), profile.familyId(),
+                intent.sourceNpcUuid(), intent.profileId(), intent.roleId(),
+                operation.callerNamespace(), operation.idempotencyKey(),
+                attempt.sourceItemId(), attempt.spawnerConfigId(),
+                attempt.spawnerConfigRevision(),
+                attempt.capturePolicyConfigId(),
+                attempt.capturePolicyConfigRevision(),
+                attempt.sourceConsumption(), attempt.successDisposition(),
+                attempt.outcome(), attempt.reason(), intent.worldKey(),
+                committedAtMs
+        );
+    }
+
+    private UUID stableOperationId(BondedCompanionOperation operation) {
+        return UUID.nameUUIDFromBytes((
+                "tamework:bonded-capture-operation:v1\0"
+                        + operation.callerNamespace() + "\0"
+                        + operation.idempotencyKey()
+        ).getBytes(StandardCharsets.UTF_8));
+    }
+
     private BondedCompanionRecord.Cleanup cleanupRecord(
             BondedCompanionCaptureIntent intent,
             long nowMs
@@ -240,8 +302,19 @@ public final class SqliteBondedCompanionCapturePersistenceAdapter {
     }
 
     private String hash(BondedCompanionCaptureIntent intent) {
+        var attempt = intent.attemptEvidence();
         String canonical = intent.actorUuid() + "\0" + intent.rosterId()
                 + "\0" + intent.roleId() + "\0" + intent.sourceNpcUuid()
+                + "\0" + attempt.attemptId()
+                + "\0" + attempt.sourceItemId()
+                + "\0" + attempt.spawnerConfigId()
+                + "\0" + attempt.spawnerConfigRevision()
+                + "\0" + attempt.capturePolicyConfigId()
+                + "\0" + attempt.capturePolicyConfigRevision()
+                + "\0" + attempt.sourceConsumption()
+                + "\0" + attempt.successDisposition()
+                + "\0" + attempt.outcome()
+                + "\0" + attempt.reason()
                 + "\0" + snapshots.encode(requestIdentitySnapshot(intent));
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

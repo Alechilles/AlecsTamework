@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.api.BondedCompanionCaptureResolvedEvent;
+import com.alechilles.alecstamework.api.CaptureAttemptOutcome;
+import com.alechilles.alecstamework.api.CaptureSourceConsumption;
+import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionTransitionService;
@@ -18,6 +22,8 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompa
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionCapturePersistenceAdapter;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionProjectionDurability;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
+import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionCaptureEventPublisher;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionRecord;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionSchemaManager;
@@ -370,6 +376,64 @@ class BondedCompanionCapturePipelineTest {
                 OWNER, "hydragon:companions").size());
         assertEquals(1, database.listCleanup(
                 OWNER, "hydragon:companions", 10).size());
+    }
+
+    @Test
+    void realAdapterPublishesExactEvidenceOnlyAfterBondedCommit()
+            throws Exception {
+        Path path = tempDir.resolve("capture-event.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(path, () -> 10L)
+                .initialize().availability().available());
+        BondedCompanionRosterRegistry rosters = rosterRegistry();
+        SqliteBondedCompanionDatabase database =
+                new SqliteBondedCompanionDatabase(path);
+        List<BondedCompanionCaptureResolvedEvent> events = new ArrayList<>();
+        var publisher = new BondedCompanionCaptureEventPublisher(
+                database,
+                event -> {
+                    assertTrue(database.findCaptureEvidence(
+                            OWNER, "hydragon:companions", SOURCE).isPresent());
+                    events.add(event);
+                },
+                () -> 20L
+        );
+        var adapter = new SqliteBondedCompanionCapturePersistenceAdapter(
+                rosters,
+                new BondedCompanionTransitionService(
+                        new BondedCompanionPolicyResolver(rosters)),
+                database, database,
+                new SqliteBondedCompanionProjectionDurability(path),
+                new BondedCompanionProjectionCleanupService(
+                        ignored -> BondedCompanionProjectionCleanupService
+                                .Outcome.RETRY_REQUIRED),
+                publisher
+        );
+        UUID attemptId = UUID.fromString(
+                "30000000-0000-0000-0000-000000000003");
+        BondedCompanionCaptureIntent intent = new BondedCompanionCaptureIntent(
+                "spawner-bonded-capture:v1", "source:" + SOURCE, OWNER,
+                "world", 2, "fingerprint", SOURCE,
+                new BondedCompanionCaptureAttemptEvidence(
+                        attemptId, "HyDragon_Draconic_Stone",
+                        "HyDragon_Draconic_Stone", 7L, null, -1L,
+                        CaptureSourceConsumption.SUCCESS_ONLY,
+                        CaptureSuccessDisposition.STORE_BONDED_COMPANION,
+                        CaptureAttemptOutcome.CAPTURED, "capture-success"),
+                "Dragon_Fire", null, "hydragon:companions", 4L,
+                snapshot(), null, true, true, true, true, true, true
+        );
+
+        assertEquals(BondedCompanionCaptureAuthor.PersistenceOutcome.APPLIED,
+                adapter.store(intent));
+        assertEquals(1, events.size());
+        var capture = events.getFirst().capture();
+        assertEquals(attemptId, capture.attemptId());
+        assertEquals(SOURCE, capture.sourceNpcUuid());
+        assertEquals("Dragon_Fire", capture.roleId());
+        assertEquals("HyDragon_Draconic_Stone",
+                capture.spawnerConfigId());
+        assertEquals(7L, capture.spawnerConfigRevision());
+        assertEquals("hydragon:dragon", capture.familyId());
     }
 
     @Test

@@ -187,7 +187,8 @@ final class SpawnerCaptureIntentFactory {
                         .bondedRosterId() + ":" + roll.targetUuid(),
                 player.getUuid(), world.getName(), attempt.hotbarSlot(),
                 attempt.sourceFingerprint(), roll.targetUuid(), roll.roleId(),
-                species,
+                BondedCompanionCaptureAttemptEvidence.from(
+                        source.getItemId(), roll.terminal()), species,
                 config.getCaptureMechanics().bondedRosterId(), rosterRevision,
                 snapshot, publishedEffect(targetRef, store, particle,
                 config.getCaptureSoundEvent()), targetRef.isValid(),
@@ -203,7 +204,8 @@ final class SpawnerCaptureIntentFactory {
                 frozen.callerNamespace(), frozen.idempotencyKey(),
                 frozen.actorUuid(), frozen.worldKey(), frozen.hotbarSlot(),
                 frozen.sourceFingerprint(), frozen.sourceNpcUuid(),
-                frozen.roleId(), frozen.species(), frozen.rosterId(),
+                frozen.attemptEvidence(), frozen.roleId(), frozen.species(),
+                frozen.rosterId(),
                 frozen.rosterRevision(),
                 frozen.snapshot(), frozen.completionEffect(),
                 frozen.targetValid(), frozen.chanceSuccessful(),
@@ -215,7 +217,9 @@ final class SpawnerCaptureIntentFactory {
     record FrozenBondedCapture(
             String callerNamespace, String idempotencyKey, UUID actorUuid,
             String worldKey, int hotbarSlot, String sourceFingerprint,
-            UUID sourceNpcUuid, String roleId, String species, String rosterId,
+            UUID sourceNpcUuid, String roleId,
+            BondedCompanionCaptureAttemptEvidence attemptEvidence,
+            String species, String rosterId,
             long rosterRevision,
             com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot
                     snapshot,
@@ -224,6 +228,27 @@ final class SpawnerCaptureIntentFactory {
             boolean tranquilized, boolean toolAccess,
             boolean ownerAllowed, boolean roleAllowed
     ) {
+        FrozenBondedCapture(
+                String callerNamespace, String idempotencyKey, UUID actorUuid,
+                String worldKey, int hotbarSlot, String sourceFingerprint,
+                UUID sourceNpcUuid, String roleId, String species,
+                String rosterId, long rosterRevision,
+                com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionSnapshot snapshot,
+                SpawnerPublishedEffect completionEffect,
+                boolean targetValid, boolean chanceSuccessful,
+                boolean tranquilized, boolean toolAccess,
+                boolean ownerAllowed, boolean roleAllowed
+        ) {
+            this(callerNamespace, idempotencyKey, actorUuid, worldKey,
+                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId,
+                    BondedCompanionCaptureIntent.legacyEvidence(
+                            idempotencyKey, chanceSuccessful),
+                    species, rosterId, rosterRevision, snapshot,
+                    completionEffect, targetValid, chanceSuccessful,
+                    tranquilized, toolAccess, ownerAllowed, roleAllowed);
+        }
+
         FrozenBondedCapture(
                 String callerNamespace, String idempotencyKey, UUID actorUuid,
                 String worldKey, int hotbarSlot, String sourceFingerprint,
@@ -237,7 +262,9 @@ final class SpawnerCaptureIntentFactory {
                 boolean ownerAllowed, boolean roleAllowed
         ) {
             this(callerNamespace, idempotencyKey, actorUuid, worldKey,
-                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId, null,
+                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId,
+                    BondedCompanionCaptureIntent.legacyEvidence(
+                            idempotencyKey, chanceSuccessful), null,
                     rosterId, rosterRevision, snapshot, completionEffect,
                     targetValid, chanceSuccessful, tranquilized, toolAccess,
                     ownerAllowed, roleAllowed);
