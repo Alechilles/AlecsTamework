@@ -26,6 +26,14 @@ public record BondedCompanionActionContext(
             return availableQuantity(itemId);
         }
 
+        /** Returns owned quantities for one complete ordered recipe identity. */
+        default @Nonnull List<Integer> availableQuantities(
+                @Nonnull String operationId,
+                @Nonnull List<BondedCompanionReviveCost> costs) {
+            return costs.stream().map(cost -> availableQuantity(operationId,
+                    cost.itemId(), cost.quantity())).toList();
+        }
+
         /** Finds durable evidence when current policy details are unavailable. */
         default @Nullable ChargeReceipt findCharge(
                 @Nonnull String operationId) {

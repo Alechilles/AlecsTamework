@@ -362,11 +362,13 @@ public final class BondedCompanionCoreApiOperations {
                     request.callerNamespace(), request.idempotencyKey(),
                     request.ownerUuid(), request.rosterId(), request.profileId(),
                     request.expectedRevision());
-            for (BondedCompanionReviveCost cost : price.costs()) {
+            List<Integer> owned = inventory.availableQuantities(operationId,
+                    price.costs());
+            for (int index = 0; index < price.costs().size(); index++) {
+                BondedCompanionReviveCost cost = price.costs().get(index);
                 lines.add(new BondedCompanionReviveQuote.CostLine(
                         cost.itemId(), cost.quantity(), Math.max(0,
-                        inventory.availableQuantity(operationId, cost.itemId(),
-                                cost.quantity()))));
+                        owned.get(index))));
             }
             return List.copyOf(lines);
         } catch (RuntimeException | LinkageError failure) {

@@ -105,8 +105,33 @@ class HytaleBondedCompanionEscrowInventoryTest {
 
             assertEquals(0, fixture.inventory.availableQuantity(
                     operation, ITEM, 2));
+            assertEquals(List.of(2, 4), fixture.inventory.availableQuantities(
+                    operation, costs));
             assertTrue(fixture.inventory.findCharge(operation, ITEM, 2)
                     .quarantined());
+        }
+    }
+
+    @Test
+    void reorderedRecipeCannotSettleExistingFrozenEscrow() throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSourceSlot((short) 0, ITEM, 2);
+            fixture.setSourceSlot((short) 1, OTHER, 4);
+            List<BondedCompanionReviveCost> costs = List.of(
+                    new BondedCompanionReviveCost(ITEM, 2),
+                    new BondedCompanionReviveCost(OTHER, 4));
+            String operation = operation(903);
+            fixture.inventory.consumeExactAsync(operation, costs)
+                    .toCompletableFuture().join();
+
+            BondedCompanionActionContext.ChargeReceipt mismatched =
+                    fixture.inventory.consumeExactAsync(operation, List.of(
+                            costs.get(1), costs.getFirst()))
+                            .toCompletableFuture().join();
+
+            assertTrue(mismatched.quarantined());
+            assertFalse(mismatched.completeAsync().toCompletableFuture().join());
+            assertTrue(fixture.escrow().matches(operation, costs));
         }
     }
 
