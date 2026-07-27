@@ -21,12 +21,24 @@ Task 6: fix round 1/5 (4 addressed, 0 open; commits fae07d0f..9b8a8fa9)
 Task 6: fix round 2/5 (3 addressed, 0 open; commits 9b8a8fa9..1bfa0600)
 Task 6: fix round 3/5 (1 addressed, 0 open; commits 1bfa0600..d3a40c9c)
 Task 6: complete (commits 05731fe1..d3a40c9c, review clean; full suite has 4 pre-existing untouched source-text failures)
-Task 7: pending
-Task 8: pending
-Task 9: pending
-Task 10: pending
-Task 11: pending
+Task 7: complete (commits cb5ca076..b3940ff6 plus revive prerequisite
+commits e215e136..43b7bdfe; profile-first panel, exact command authority,
+full snapshot presentation, and crash-safe multi-item revive reviewed clean)
+Task 8: complete (HyDragon commits 53c1d65, 3019c3f, 909becc;
+Tamework integration/routing commits through b3940ff6; fresh reviews clean)
+Task 9: complete (HyDragon asset commits c697915 and 947a246; repository
+asset validator, focused contracts, packaged verification, and reference audit
+passed; exact public HytaleNpcAssetTools 0.5.6 profile unavailable and not
+claimed)
+Task 10: complete except release-time changelog intentionally deferred
+(Tamework docs b596c227, HyDragon docs db68076, external specification and
+lessons-learned entry; independent cross-reviews clean)
+Task 11: pending final clean full suites, package inspection, local install,
+and fresh-world manual acceptance
 Task 8 routing authority fix round 2: complete after 0f035634; five frozen
 authority/presentation cases covered, broad and full-suite baselines recorded
-Task 9 multi-item revive prerequisite: implementation verified on
-e215e136..a1f50737; atomicity fix round 1 addressed, fresh review pending
+Task 9 multi-item revive prerequisite: complete on e215e136..43b7bdfe;
+atomicity and recovery gates passed and fresh review clean
+Bonded capture tamed-role authority fix: complete on 66c899e7; focused
+NordicDrake/Hydra, capture pipeline, replay, adapter replay, and wild-config
+suites passed; fresh independent review pending
