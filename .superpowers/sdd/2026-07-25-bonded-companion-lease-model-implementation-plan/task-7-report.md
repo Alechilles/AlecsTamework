@@ -191,3 +191,39 @@ No live in-game crash/rejoin session was run. Deterministic tests cover bounded 
 ### Remaining validation
 
 No live in-game crash/rejoin or inventory-contention session was run. Deterministic restart, reconnect, partial-refund, collision, exact-CAS, and pruning tests cover the remediated crash windows; normal release smoke testing remains appropriate.
+
+## Review fix round 7
+
+### Root causes
+
+- Escrow refunds had an actor-scoped single flight, but reservation, successful consumption, terminal component removal, and recovery reads did not share it. Separate short-lived panel/action adapters for the same player could therefore overlap player saves or observe the transient gap between in-memory removal and its durability fence.
+- Canonical v2 operation IDs still consulted the flattened legacy receipt store before canonical escrow. The verifier also accepted a historical marker without first requiring a genuinely historical probe, so a colliding legacy marker could be consumed or removed by a canonical operation.
+- A fresh `DEAD -> STORED` revival published its roster event only after fallible escrow settlement and acknowledgement. If settlement failed after the unique SQLite commit, retry returned the replayed result and never published the event.
+
+### Corrections
+
+- Generalized settlement flights into a bounded actor FIFO shared by reservation, reads, successful consumption, terminal removal, and refunds. Every escrow slot mutation now waits for its player save fence before the next operation can mutate or read that actor; duplicate terminal calls still share one result. The queue fails closed above 64 pending actor operations and releases all actor references after completion.
+- Valid canonical v2 IDs now bypass flattened legacy receipt lookup and settlement entirely. Historical receipt settlement is accepted only when the probe has no expected revision; canonical probes with colliding legacy markers quarantine instead of removing those markers.
+- Fresh, non-replayed direct revivals publish exactly once immediately after the unique database commit and before escrow settlement. Publication listener failures are isolated from the durable result, while settlement retries do not republish.
+
+### TDD evidence
+
+- RED: two production-shaped inventory adapters for one player allowed a terminal consume/remove save to overlap the next reservation save.
+- RED: a recovery read completed during the in-memory component-removal gap instead of waiting for the final save fence.
+- RED: a canonical v2 ID consumed a colliding flattened legacy marker instead of reserving canonical escrow.
+- RED: the 65th pending actor operation joined the unbounded queue instead of failing closed.
+- RED: a fresh committed revival reached settlement before its publication, and a canonical terminal probe accepted a colliding historical marker.
+- GREEN: the new ordering, collision, capacity, publication, and retry regressions all pass through the production-shaped seams.
+
+### Review-fix verification
+
+- Focused escrow/revival suite: 38 tests, 0 failures, 0 errors.
+- Complete bonded-companion suite: 210 tests, 0 failures, 0 errors.
+- ECS write, async thread, and payment-recovery architecture guards: 5 tests, 0 failures, 0 errors.
+- Required ECS/player-access grep: no matches. `git diff --check`: PASS.
+- Changed production classes remain within the 500-line target (`HytaleBondedCompanionEscrowInventory` 479 lines, settlement coordinator 258, settlement flights 197, revive operation service 445).
+- Full `./mvnw test`: 3,235 tests executed, 3,230 passed, 1 skipped, with only the same four unrelated baseline failures in capture architecture, channel VFX, relocation recovery, and stacked spawner validation. Every bonded-companion and changed-area test passed.
+
+### Remaining validation
+
+No live in-game crash/rejoin or cross-panel contention session was run. Deterministic out-of-order save, component-removal fence, bounded-queue, canonical/legacy collision, settlement-failure, and retry tests cover the remediated paths; the parent plan still pauses before user-directed manual testing.

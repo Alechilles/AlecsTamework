@@ -46,6 +46,7 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -464,12 +465,15 @@ class HytaleBondedCompanionEscrowInventoryTest {
             CompletionStage<BondedCompanionActionContext.ChargeReceipt> first =
                     fixture.inventory.consumeExactAsync(operation, ITEM, 2);
 
-            BondedCompanionActionContext.ChargeReceipt replay =
-                    fixture.inventory.consumeExactAsync(operation, ITEM, 2)
-                            .toCompletableFuture().join();
+            CompletionStage<BondedCompanionActionContext.ChargeReceipt>
+                    replayStage = fixture.inventory.consumeExactAsync(
+                    operation, ITEM, 2);
+            assertFalse(replayStage.toCompletableFuture().isDone());
             firstSave.complete(SaveResult.success());
             BondedCompanionActionContext.ChargeReceipt fresh =
                     first.toCompletableFuture().join();
+            BondedCompanionActionContext.ChargeReceipt replay =
+                    replayStage.toCompletableFuture().join();
 
             assertFalse(fresh.replayed());
             assertTrue(replay.replayed());
@@ -479,6 +483,141 @@ class HytaleBondedCompanionEscrowInventoryTest {
             assertTrue(replay.completeAsync().toCompletableFuture().join());
             assertEquals(0, fixture.sourceQuantity(ITEM));
             assertNull(fixture.escrow());
+        }
+    }
+
+    @Test
+    void terminalConsumeAndNextReservationShareOneActorSaveQueue()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSource(ITEM, 3);
+            String firstOperation = operation(71);
+            BondedCompanionActionContext.ChargeReceipt charged =
+                    fixture.inventory.consumeExactAsync(
+                            firstOperation, ITEM, 2)
+                            .toCompletableFuture().join();
+            CompletableFuture<SaveResult> committedSave =
+                    fixture.durability.deferNext();
+            CompletableFuture<SaveResult> removedSave =
+                    fixture.durability.deferNext();
+            HytaleBondedCompanionEscrowInventory second =
+                    fixture.newInventory(new DirectTransfer());
+
+            CompletionStage<Boolean> settlement = charged.completeAsync();
+            CompletionStage<Boolean> duplicate = second
+                    .findCharge(firstOperation).completeAsync();
+            CompletionStage<BondedCompanionActionContext.ChargeReceipt> next =
+                    second.consumeExactAsync(operation(72), ITEM, 1);
+            int savesBeforeFirstFenceCompleted = fixture.durability.saveCalls;
+
+            // Complete the later queued barrier first. A production-shaped
+            // implementation must not have invoked it yet.
+            removedSave.complete(SaveResult.success());
+            committedSave.complete(SaveResult.success());
+
+            assertTrue(settlement.toCompletableFuture().join());
+            assertTrue(duplicate.toCompletableFuture().join());
+            BondedCompanionActionContext.ChargeReceipt nextCharge =
+                    next.toCompletableFuture().join();
+            assertNotNull(nextCharge);
+            assertEquals(2, savesBeforeFirstFenceCompleted,
+                    "separate action contexts must not overlap actor saves");
+            assertEquals(operation(72), fixture.escrow().operationId());
+            assertEquals(0, fixture.sourceQuantity(ITEM));
+        }
+    }
+
+    @Test
+    void canonicalV2PaymentNeverConsumesFlattenedLegacyEvidence()
+            throws Exception {
+        for (String suffix : List.of(":pending", ":compensated")) {
+            try (Fixture fixture = new Fixture()) {
+                fixture.setSource(ITEM, 2);
+                String canonical = operation(73);
+                InventoryOperationReceipt legacy = legacyReceipt(
+                        canonical, ITEM, 2, suffix);
+                fixture.store.put(fixture.actor, fixture.legacyType,
+                        new TameworkInventoryOperationReceiptsComponent()
+                                .withReceipt(legacy));
+
+                assertEquals(2, fixture.inventory.availableQuantity(
+                        canonical, ITEM, 2));
+                assertNull(fixture.inventory.findCharge(canonical));
+                BondedCompanionActionContext.ChargeReceipt charged =
+                        fixture.inventory.consumeExactAsync(
+                                canonical, ITEM, 2)
+                                .toCompletableFuture().join();
+
+                assertNotNull(charged);
+                assertFalse(charged.historicalPaymentMarker());
+                assertNotNull(fixture.store.getComponent(
+                        fixture.actor, fixture.legacyType)
+                        .receiptFor(legacy.receiptKey()));
+                assertTrue(charged.refundAsync().toCompletableFuture().join());
+                assertNotNull(fixture.store.getComponent(
+                        fixture.actor, fixture.legacyType)
+                        .receiptFor(legacy.receiptKey()));
+            }
+        }
+    }
+
+    @Test
+    void terminalRecoveryReadWaitsForTheRemovalSaveFence()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSource(ITEM, 2);
+            String operation = operation(74);
+            BondedCompanionActionContext.ChargeReceipt charged =
+                    fixture.inventory.consumeExactAsync(operation, ITEM, 2)
+                            .toCompletableFuture().join();
+            CompletableFuture<SaveResult> committedSave =
+                    fixture.durability.deferNext();
+            CompletableFuture<SaveResult> removedSave =
+                    fixture.durability.deferNext();
+            HytaleBondedCompanionEscrowInventory second =
+                    fixture.newInventory(new DirectTransfer());
+
+            CompletionStage<Boolean> settlement = charged.completeAsync();
+            committedSave.complete(SaveResult.success());
+            assertNull(fixture.escrow());
+            CompletionStage<BondedCompanionActionContext.ChargeReceipt> read =
+                    second.findChargeAsync(operation);
+
+            assertFalse(read.toCompletableFuture().isDone(),
+                    "absence is not durable until the removal save completes");
+            removedSave.complete(SaveResult.success());
+
+            assertTrue(settlement.toCompletableFuture().join());
+            assertNull(read.toCompletableFuture().join());
+        }
+    }
+
+    @Test
+    void actorMutationQueueFailsClosedAtItsBoundedCapacity()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSource(ITEM, 2);
+            CompletableFuture<SaveResult> firstSave =
+                    fixture.durability.deferNext();
+            List<CompletionStage<BondedCompanionActionContext.ChargeReceipt>>
+                    accepted = new ArrayList<>();
+            for (int ordinal = 1; ordinal <= 64; ordinal++) {
+                accepted.add(fixture.inventory.consumeExactAsync(
+                        operation(4000 + ordinal), ITEM, 2));
+            }
+
+            CompletionStage<BondedCompanionActionContext.ChargeReceipt>
+                    overflow = fixture.inventory.consumeExactAsync(
+                    operation(4065), ITEM, 2);
+
+            assertTrue(overflow.toCompletableFuture().isDone());
+            assertTrue(overflow.toCompletableFuture().join().quarantined());
+            firstSave.complete(SaveResult.success());
+            for (CompletionStage<
+                    BondedCompanionActionContext.ChargeReceipt> stage
+                    : accepted) {
+                assertNotNull(stage.toCompletableFuture().join());
+            }
         }
     }
 
@@ -521,13 +660,13 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     new TameworkInventoryOperationReceiptsComponent();
             for (int available = 0; available <= 2; available++) {
                 legacy = legacy.withReceipt(legacyPending(
-                        operation(200 + available), ITEM, 2));
+                        historicalOperation(200 + available), ITEM, 2));
             }
             fixture.store.put(fixture.actor, fixture.legacyType, legacy);
 
             for (int available = 0; available <= 2; available++) {
                 fixture.setSource(ITEM, available);
-                String operation = operation(200 + available);
+                String operation = historicalOperation(200 + available);
 
                 assertEquals(0, fixture.inventory.availableQuantity(
                         operation, ITEM, 2));
@@ -551,7 +690,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
     void policyIndependentLegacyRecoveryReleasesOnlyTerminalSafeEvidence()
             throws Exception {
         try (Fixture fixture = new Fixture()) {
-            String pendingOperation = operation(250);
+            String pendingOperation = historicalOperation(250);
             fixture.store.put(fixture.actor, fixture.legacyType,
                     new TameworkInventoryOperationReceiptsComponent()
                             .withReceipt(legacyReceipt(
@@ -564,7 +703,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
             assertTrue(successRecovery.completeAsync()
                     .toCompletableFuture().join());
 
-            String compensatedOperation = operation(251);
+            String compensatedOperation = historicalOperation(251);
             fixture.store.put(fixture.actor, fixture.legacyType,
                     new TameworkInventoryOperationReceiptsComponent()
                             .withReceipt(legacyReceipt(
@@ -790,6 +929,11 @@ class HytaleBondedCompanionEscrowInventoryTest {
         return BondedCompanionPaymentOperationId.create(
                 "test:panel", "revive:" + ordinal, OWNER,
                 "hydragon:dragons", "profile-7", ordinal);
+    }
+
+    private static String historicalOperation(int ordinal) {
+        return BondedCompanionPaymentOperationId.legacyOperationKey(
+                operation(ordinal));
     }
 
     private static BondedCompanionOperationProbe probe(int ordinal) {

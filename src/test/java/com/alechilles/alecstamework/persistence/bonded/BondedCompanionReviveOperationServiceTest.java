@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
@@ -31,6 +32,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.IntSupplier;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -230,6 +232,49 @@ class BondedCompanionReviveOperationServiceTest {
         assertEquals("bonded-revive-payment-quarantined", result.reason());
         assertEquals(0, inventory.refundApplications);
         assertEquals(1, inventory.activeCharges());
+        assertEquals(0, store.acknowledgments);
+    }
+
+    @Test
+    void freshCommitPublishesBeforeSettlementAndRetryNeverPublishesTwice()
+            throws Exception {
+        StoreDouble store = new StoreDouble(false, true);
+        ServiceHarness harness = harness(store);
+        FlakySettlementInventory inventory = new FlakySettlementInventory(
+                () -> harness.support.publications);
+        BondedCompanionReviveRequest request = request(
+                "publish-before-settlement", inventory,
+                harness.rosters.snapshot().revision());
+
+        BondedCompanionResult<BondedCompanionProfileView> first =
+                harness.service.revive(request).toCompletableFuture().join();
+        harness.service.revive(request).toCompletableFuture().join();
+
+        assertEquals(BondedCompanionResultCode.INTERNAL_FAILURE, first.code());
+        assertEquals(1, inventory.publicationsAtFirstSettlement);
+        assertEquals(2, inventory.settlementAttempts);
+        assertEquals(1, harness.support.publications);
+        assertEquals(1, store.acknowledgments);
+        assertNull(inventory.active);
+    }
+
+    @Test
+    void canonicalTerminalNeverReleasesAFlattenedHistoricalMarker()
+            throws Exception {
+        StoreDouble store = new StoreDouble(false);
+        ServiceHarness harness = harness(store);
+        HistoricalMarkerInventory inventory = new HistoricalMarkerInventory();
+        BondedCompanionReviveRequest request = request(
+                "canonical-legacy-collision", inventory,
+                harness.rosters.snapshot().revision());
+        store.seedTerminalRejection(request.action());
+
+        BondedCompanionResult<BondedCompanionProfileView> result =
+                harness.service.revive(request).toCompletableFuture().join();
+
+        assertEquals(BondedCompanionResultCode.INTERNAL_FAILURE, result.code());
+        assertEquals("bonded-revive-payment-quarantined", result.reason());
+        assertEquals(0, inventory.markerRemovals);
         assertEquals(0, store.acknowledgments);
     }
 
@@ -607,12 +652,114 @@ class BondedCompanionReviveOperationServiceTest {
         }
     }
 
+    private static final class FlakySettlementInventory
+            implements BondedCompanionActionContext.Inventory {
+        private final IntSupplier publicationCount;
+        private Receipt active;
+        private int settlementAttempts;
+        private int publicationsAtFirstSettlement = -1;
+
+        private FlakySettlementInventory(IntSupplier publicationCount) {
+            this.publicationCount = publicationCount;
+        }
+
+        @Override public int availableQuantity(String itemId) { return 2; }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt findCharge(
+                String operationId) {
+            return active == null ? null : active.replay();
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            if (active == null) {
+                active = new Receipt(operationId, itemId, quantity, false);
+            }
+            return active;
+        }
+
+        private final class Receipt
+                implements BondedCompanionActionContext.ChargeReceipt {
+            private final String operationId;
+            private final String itemId;
+            private final int quantity;
+            private final boolean replayed;
+
+            private Receipt(String operationId, String itemId, int quantity,
+                            boolean replayed) {
+                this.operationId = operationId;
+                this.itemId = itemId;
+                this.quantity = quantity;
+                this.replayed = replayed;
+            }
+
+            private Receipt replay() {
+                return new Receipt(operationId, itemId, quantity, true);
+            }
+
+            @Override public String operationId() { return operationId; }
+            @Override public String itemId() { return itemId; }
+            @Override public int quantity() { return quantity; }
+            @Override public boolean replayed() { return replayed; }
+            @Override public boolean refund() { return false; }
+            @Override public boolean complete() { return false; }
+
+            @Override
+            public CompletionStage<Boolean> completeAsync() {
+                settlementAttempts++;
+                if (settlementAttempts == 1) {
+                    publicationsAtFirstSettlement = publicationCount.getAsInt();
+                    return CompletableFuture.completedFuture(false);
+                }
+                active = null;
+                return CompletableFuture.completedFuture(true);
+            }
+        }
+    }
+
+    private static final class HistoricalMarkerInventory
+            implements BondedCompanionActionContext.Inventory {
+        private int markerRemovals;
+
+        @Override public int availableQuantity(String itemId) { return 0; }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt findCharge(
+                String operationId) {
+            return new BondedCompanionActionContext.ChargeReceipt() {
+                @Override public String operationId() { return operationId; }
+                @Override public boolean replayed() { return true; }
+                @Override public boolean historicalPaymentMarker() {
+                    return true;
+                }
+                @Override public boolean quarantined() { return true; }
+                @Override public boolean terminalRejectionCleanupSafe() {
+                    return true;
+                }
+                @Override public boolean refund() { return false; }
+                @Override public boolean complete() {
+                    markerRemovals++;
+                    return true;
+                }
+            };
+        }
+
+        @Override
+        public BondedCompanionActionContext.ChargeReceipt consumeExact(
+                String operationId, String itemId, int quantity) {
+            throw new AssertionError("Terminal recovery must not charge");
+        }
+    }
+
     private static final class Support
             implements BondedCompanionReviveOperationService.Support {
         private BondedCompanionRecord.Profile profile;
         private final BondedCompanionProfile domain;
         private final BondedCompanionSnapshot snapshot;
         private final long policyRevision;
+        private int publications;
 
         private Support(
                 BondedCompanionRecord.Profile profile,
@@ -693,6 +840,6 @@ class BondedCompanionReviveOperationServiceTest {
             return failure(code, result.reason());
         }
         @Override public void publishRevived(
-                BondedCompanionRecord.Profile profile) { }
+                BondedCompanionRecord.Profile profile) { publications++; }
     }
 }

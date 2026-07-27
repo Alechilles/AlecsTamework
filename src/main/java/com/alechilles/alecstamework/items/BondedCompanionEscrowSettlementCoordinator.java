@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.items.components
         .TameworkBondedReviveEscrowComponent.Phase;
+import com.alechilles.alecstamework.items.BondedCompanionEscrowSettlementFlights
+        .Action;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -50,20 +52,67 @@ final class BondedCompanionEscrowSettlementCoordinator {
         this.flights = BondedCompanionEscrowSettlementFlights.shared();
     }
 
-    /** Resumes an exact refund and returns true only after it is empty. */
+    /** Serializes an exact refund even while another save hides the escrow. */
     CompletionStage<Boolean> refund(
-            TameworkBondedReviveEscrowComponent expected) {
+            String operationId, String itemId, int quantity) {
         return flights.coordinate(
-                escrowType, ownerUuid, expected.operationId(),
+                escrowType, ownerUuid, operationId, Action.REFUND,
+                true,
                 () -> durability.resumeOnWorldThread(
-                        () -> begin(expected), () -> false)
-                        .thenCompose(refunded -> refunded
-                                ? removeTerminal(expected)
-                                : completed(false)));
+                        () -> refundIdentityInCurrentFlight(
+                                operationId, itemId, quantity),
+                        () -> false),
+                () -> false);
     }
 
-    /** Durably removes an already-empty terminal escrow tombstone. */
-    CompletionStage<Boolean> removeTerminal(
+    /** Serializes one durable reservation behind every terminal actor save. */
+    <T> CompletionStage<T> prepare(
+            String operationId,
+            Supplier<CompletionStage<T>> action,
+            Supplier<T> unavailable
+    ) {
+        return flights.coordinate(
+                escrowType, ownerUuid, operationId, Action.PREPARE, false,
+                () -> durability.resumeOnWorldThread(action, unavailable),
+                unavailable);
+    }
+
+    /** Reads escrow only after every earlier actor mutation is durable. */
+    <T> CompletionStage<T> read(
+            String operationId,
+            Supplier<T> action,
+            Supplier<T> unavailable
+    ) {
+        return flights.coordinate(
+                escrowType, ownerUuid, operationId, Action.READ, false,
+                () -> durability.resumeOnWorldThread(
+                        () -> completed(action.get()), unavailable),
+                unavailable);
+    }
+
+    /** Consumes and removes one exact escrow under the shared actor queue. */
+    CompletionStage<Boolean> consume(
+            String operationId, String itemId, int quantity) {
+        return flights.coordinate(
+                escrowType, ownerUuid, operationId, Action.COMMIT, true,
+                () -> durability.resumeOnWorldThread(
+                        () -> consumeInCurrentFlight(
+                                operationId, itemId, quantity),
+                        () -> false),
+                () -> false);
+    }
+
+    /** Resumes an exact refund while the caller already owns the actor queue. */
+    CompletionStage<Boolean> refundInCurrentFlight(
+            TameworkBondedReviveEscrowComponent expected) {
+        return begin(expected)
+                .thenCompose(refunded -> refunded
+                        ? removeTerminalInCurrentFlight(expected)
+                        : completed(false));
+    }
+
+    /** Removes a terminal tombstone while already inside the actor queue. */
+    CompletionStage<Boolean> removeTerminalInCurrentFlight(
             TameworkBondedReviveEscrowComponent expected) {
         return durability.saveActor().thenCompose(saved -> {
             if (!saved.saved()) return completed(false);
@@ -88,6 +137,48 @@ final class BondedCompanionEscrowSettlementCoordinator {
                 });
             }, () -> false);
         });
+    }
+
+    private CompletionStage<Boolean> consumeInCurrentFlight(
+            String operationId, String itemId, int quantity) {
+        TameworkBondedReviveEscrowComponent escrow = current();
+        if (escrow == null) return completed(true);
+        if (!escrow.matches(operationId, itemId, quantity)) {
+            return completed(false);
+        }
+        if (escrow.phase() == Phase.REFUNDED
+                || escrow.phase() == Phase.QUARANTINED
+                || escrow.phase() == Phase.REFUNDING) {
+            return completed(false);
+        }
+        if (escrow.phase() != Phase.COMMITTED) {
+            if (escrow.phase() != Phase.RESERVED
+                    || !escrow.hasExactReservedCharge()) {
+                return completed(false);
+            }
+            escrow.getInventory().clear();
+            if (escrow.reservedQuantity() != 0) return completed(false);
+            escrow.setPhase(Phase.COMMITTED);
+            store.putComponent(actorRef.get(), escrowType, escrow);
+        }
+        return removeTerminalInCurrentFlight(escrow);
+    }
+
+    private CompletionStage<Boolean> refundIdentityInCurrentFlight(
+            String operationId, String itemId, int quantity) {
+        TameworkBondedReviveEscrowComponent escrow = current();
+        if (escrow == null) return completed(true);
+        if (!escrow.matches(operationId, itemId, quantity)) {
+            return completed(false);
+        }
+        if (escrow.phase() == Phase.COMMITTED
+                || escrow.phase() == Phase.QUARANTINED) {
+            return completed(false);
+        }
+        if (escrow.phase() == Phase.REFUNDED) {
+            return removeTerminalInCurrentFlight(escrow);
+        }
+        return refundInCurrentFlight(escrow);
     }
 
     private CompletionStage<Boolean> begin(

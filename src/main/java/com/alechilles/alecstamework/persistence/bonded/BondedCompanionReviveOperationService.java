@@ -172,6 +172,7 @@ final class BondedCompanionReviveOperationService {
         }
         if (saved.code() == BondedCompanionStoreResult.Code.APPLIED
                 && saved.value() != null) {
+            if (!saved.replayed()) publishRevived(saved.value());
             return settle(receipt, true).thenApply(settled -> {
                 if (!settled) return support.internal(
                         "bonded-revive-payment-receipt-release-pending");
@@ -180,7 +181,6 @@ final class BondedCompanionReviveOperationService {
                     return support.internal(
                             "bonded-revive-payment-retention-pending");
                 }
-                if (!saved.replayed()) support.publishRevived(saved.value());
                 return support.success(saved.value());
             });
         }
@@ -276,6 +276,14 @@ final class BondedCompanionReviveOperationService {
             return stage == null ? completed(false) : stage;
         } catch (RuntimeException | LinkageError failure) {
             return completed(false);
+        }
+    }
+
+    private void publishRevived(BondedCompanionRecord.Profile profile) {
+        try {
+            support.publishRevived(profile);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Listener failures cannot invalidate the unique durable commit.
         }
     }
 

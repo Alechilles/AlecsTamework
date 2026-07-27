@@ -22,7 +22,11 @@ final class BondedCompanionRevivePaymentVerifier {
         if (receipt == null || !operationId.equals(operationId(receipt))) {
             return Verification.QUARANTINED;
         }
-        if (historical(receipt)) return Verification.HISTORICAL_MARKER;
+        if (historical(receipt)) {
+            return probe.expectedRevision() == null
+                    ? Verification.HISTORICAL_MARKER
+                    : Verification.QUARANTINED;
+        }
         String itemId = itemId(receipt);
         int quantity = quantity(receipt);
         if (probe.profileId() == null || probe.expectedRevision() == null
