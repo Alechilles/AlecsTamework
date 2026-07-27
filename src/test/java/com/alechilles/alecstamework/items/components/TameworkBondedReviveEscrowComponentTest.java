@@ -81,6 +81,27 @@ class TameworkBondedReviveEscrowComponentTest {
     }
 
     @Test
+    void missingPersistedCostsReconstructsLegacySingletonRecipe() throws Exception {
+        TameworkBondedReviveEscrowComponent escrow =
+                TameworkBondedReviveEscrowComponent.create(
+                        (short) 2, "panel:legacy-costs",
+                        "Ingredient_Life_Essence", 2, 1L);
+        ensureSimpleContainerCodec();
+        BsonDocument encoded = TameworkBondedReviveEscrowComponent.CODEC
+                .encode(escrow, new ExtraInfo());
+        encoded.remove("Costs");
+
+        TameworkBondedReviveEscrowComponent decoded =
+                TameworkBondedReviveEscrowComponent.CODEC.decode(
+                        encoded, new ExtraInfo());
+
+        assertEquals(List.of(new BondedCompanionReviveCost(
+                "Ingredient_Life_Essence", 2)), decoded.costs());
+        assertTrue(decoded.matches("panel:legacy-costs",
+                "Ingredient_Life_Essence", 2));
+    }
+
+    @Test
     void duplicatePersistedCostsAndOverfilledStacksAreInvalidEvidence()
             throws Exception {
         List<BondedCompanionReviveCost> costs = List.of(

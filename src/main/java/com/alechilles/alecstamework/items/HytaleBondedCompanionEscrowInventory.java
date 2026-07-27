@@ -266,6 +266,28 @@ final class HytaleBondedCompanionEscrowInventory
     }
 
     @Override
+    public List<Integer> availableQuantities(
+            String operationId, List<BondedCompanionReviveCost> costs) {
+        try {
+            store.assertThread();
+            List<BondedCompanionReviveCost> recipe = List.copyOf(costs);
+            CombinedItemContainer source = sourceInventory();
+            TameworkBondedReviveEscrowComponent escrow = currentEscrow();
+            boolean retained = escrow != null && escrow.matches(operationId, recipe)
+                    && escrow.phase() == TameworkBondedReviveEscrowComponent.Phase.RESERVED
+                    && escrow.hasExactReservedCharge();
+            return recipe.stream().map(cost -> {
+                int owned = source == null ? 0 : transfer.availableQuantity(
+                        source, cost.itemId());
+                return retained ? Math.addExact(owned,
+                        escrow.reservedQuantity(cost.itemId())) : owned;
+            }).toList();
+        } catch (RuntimeException | LinkageError failure) {
+            return costs.stream().map(ignored -> 0).toList();
+        }
+    }
+
+    @Override
     public CompletionStage<BondedCompanionActionContext.ChargeReceipt>
             consumeExactAsync(
                     String operationId, List<BondedCompanionReviveCost> costs) {
