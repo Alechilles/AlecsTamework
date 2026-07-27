@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
@@ -264,11 +265,12 @@ class BondedCompanionCapturePipelineTest {
 
         var ownerDecision = BondedCompanionCaptureRoute.resolveAdmission(
                 new SpawnerCapturePolicyService.BondedAdmissionEvidence(
-                        null, false, true),
+                        null, false, true, "Tamed_NordicDrake",
+                        "hydragon:full_dragons", 4L),
                 () -> { rollAttempts.incrementAndGet(); return null; });
         var roleDecision = BondedCompanionCaptureRoute.resolveAdmission(
                 new SpawnerCapturePolicyService.BondedAdmissionEvidence(
-                        null, true, false),
+                        null, true, false, null, null, 4L),
                 () -> { rollAttempts.incrementAndGet(); return null; });
 
         assertEquals(BondedCompanionCaptureAuthor.Status.OWNER_DENIED,
@@ -281,10 +283,36 @@ class BondedCompanionCapturePipelineTest {
     @Test
     void admissionEvidenceCarriesTheFamilyAndRosterGenerationTogether() {
         var evidence = new SpawnerCapturePolicyService.BondedAdmissionEvidence(
-                null, true, true, "hydragon:dragon", 4L);
+                null, true, true, "Tamed_NordicDrake",
+                "hydragon:dragon", 4L);
 
+        assertEquals("Tamed_NordicDrake", evidence.roleId());
         assertEquals("hydragon:dragon", evidence.familyId());
         assertEquals(4L, evidence.rosterRevision());
+    }
+
+    @Test
+    void roleAllowedAdmissionRequiresRoleAndFamilyBeforeChance() {
+        AtomicInteger rollAttempts = new AtomicInteger();
+        assertThrows(IllegalArgumentException.class,
+                () -> BondedCompanionCaptureRoute.resolveAdmission(
+                        new SpawnerCapturePolicyService.BondedAdmissionEvidence(
+                                null, true, true, null,
+                                "hydragon:full_dragons", 4L),
+                        () -> {
+                            rollAttempts.incrementAndGet();
+                            return null;
+                        }));
+        assertThrows(IllegalArgumentException.class,
+                () -> BondedCompanionCaptureRoute.resolveAdmission(
+                        new SpawnerCapturePolicyService.BondedAdmissionEvidence(
+                                null, true, true,
+                                "Tamed_NordicDrake", null, 4L),
+                        () -> {
+                            rollAttempts.incrementAndGet();
+                            return null;
+                        }));
+        assertEquals(0, rollAttempts.get());
     }
 
     @Test

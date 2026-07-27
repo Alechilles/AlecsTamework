@@ -315,34 +315,12 @@ public final class SpawnerCapturePolicyService {
             if (rosterRevision < 0L) {
                 throw new IllegalArgumentException("negative rosterRevision");
             }
-        }
-
-        BondedAdmissionEvidence(
-                BondedCompanionCaptureAuthor.Status denial,
-                boolean ownerAllowed,
-                boolean roleAllowed
-        ) {
-            this(denial, ownerAllowed, roleAllowed, null, null, 0L);
-        }
-
-        BondedAdmissionEvidence(
-                BondedCompanionCaptureAuthor.Status denial,
-                boolean ownerAllowed,
-                boolean roleAllowed,
-                String familyId
-        ) {
-            this(denial, ownerAllowed, roleAllowed, null, familyId, 0L);
-        }
-
-        BondedAdmissionEvidence(
-                BondedCompanionCaptureAuthor.Status denial,
-                boolean ownerAllowed,
-                boolean roleAllowed,
-                String familyId,
-                long rosterRevision
-        ) {
-            this(denial, ownerAllowed, roleAllowed, null, familyId,
-                    rosterRevision);
+            roleId = normalized(roleId);
+            familyId = normalized(familyId);
+            if (roleAllowed && (roleId == null || familyId == null)) {
+                throw new IllegalArgumentException(
+                        "allowed role requires resolved role and family");
+            }
         }
 
         static BondedAdmissionEvidence denied(
@@ -351,6 +329,13 @@ public final class SpawnerCapturePolicyService {
         ) {
             return new BondedAdmissionEvidence(
                     denial, false, false, null, null, rosterRevision);
+        }
+
+        private static String normalized(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            return value.trim();
         }
     }
 
