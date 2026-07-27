@@ -91,6 +91,26 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
+    void singletonAvailabilityAndReceiptFailClosedForReservedMultiLineEscrow()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSourceSlot((short) 0, ITEM, 2);
+            fixture.setSourceSlot((short) 1, OTHER, 4);
+            List<BondedCompanionReviveCost> costs = List.of(
+                    new BondedCompanionReviveCost(ITEM, 2),
+                    new BondedCompanionReviveCost(OTHER, 4));
+            String operation = operation(902);
+            fixture.inventory.consumeExactAsync(operation, costs)
+                    .toCompletableFuture().join();
+
+            assertEquals(0, fixture.inventory.availableQuantity(
+                    operation, ITEM, 2));
+            assertTrue(fixture.inventory.findCharge(operation, ITEM, 2)
+                    .quarantined());
+        }
+    }
+
+    @Test
     void insufficientSecondRecipeLineRestoresTheFirstWithoutAReceipt()
             throws Exception {
         try (Fixture fixture = new Fixture()) {
