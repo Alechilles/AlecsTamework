@@ -4,6 +4,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderManager;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.builders.BuilderRole;
 import com.hypixel.hytale.server.npc.role.builders.BuilderRoleVariant;
@@ -66,8 +67,11 @@ final class HytaleBondedCompanionRoleHealthResolver
             BuilderManager builders,
             ExecutionContext context
     ) {
+        // Release Hytale only exposes the NPC-bearing constructor. This NPC is
+        // deliberately detached: it is neither added to a store nor mutated,
+        // and BuilderRole#getMaxHealth reads only the supplied context.
         BuilderSupport support = new BuilderSupport(
-                builders, null, null, context, role, new RoleStats());
+                builders, new NPCEntity(), null, context, role, new RoleStats());
         double maximum = role.getMaxHealth(support);
         return Double.isFinite(maximum) && maximum > 0.0D
                 ? maximum : null;
