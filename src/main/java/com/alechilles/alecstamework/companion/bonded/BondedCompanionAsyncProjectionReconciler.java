@@ -108,9 +108,19 @@ public final class BondedCompanionAsyncProjectionReconciler {
         long nowNanos = monotonicNanos.getAsLong();
         for (PendingReconciliation reconciliation : current) {
             if (!owns(reconciliation)) continue;
+            if (!reconciliation.scan().isDone()) {
+                if (nowNanos - reconciliation.startedAtNanos() >= scanTimeoutNanos) {
+                    reconciliation.scan().cancel(true);
+                    retry(reconciliation, nowNanos);
+                }
+                continue;
+            }
             BondedCompanionProjectionRecoverySystem.ScanResult result =
-                    completedOrRetry(reconciliation, nowNanos);
-            if (result == null) continue;
+                    completed(reconciliation.scan());
+            if (result == null) {
+                retry(reconciliation, nowNanos);
+                continue;
+            }
             if (!result.conclusivelyScanned().contains(reconciliation.lease())) {
                 retry(reconciliation, nowNanos);
                 continue;
@@ -135,20 +145,12 @@ public final class BondedCompanionAsyncProjectionReconciler {
         }
     }
 
-    private BondedCompanionProjectionRecoverySystem.ScanResult completedOrRetry(
-            PendingReconciliation current, long nowNanos
+    private BondedCompanionProjectionRecoverySystem.ScanResult completed(
+            CompletableFuture<BondedCompanionProjectionRecoverySystem.ScanResult> scan
     ) {
-        if (!current.scan().isDone()) {
-            if (nowNanos - current.startedAtNanos() >= scanTimeoutNanos) {
-                current.scan().cancel(true);
-                retry(current, nowNanos);
-            }
-            return null;
-        }
         try {
-            return current.scan().getNow(null);
+            return scan.getNow(null);
         } catch (CompletionException | CancellationException failure) {
-            retry(current, nowNanos);
             return null;
         }
     }

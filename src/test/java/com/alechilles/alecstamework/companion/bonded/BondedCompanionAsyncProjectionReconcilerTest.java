@@ -188,6 +188,59 @@ class BondedCompanionAsyncProjectionReconcilerTest {
         assertEquals(BondedCompanionState.STORED, durability.states.get("profile-timeout"));
     }
 
+    @Test
+    void retriesACompletedNullScanWithoutRetainingItsQueueSlotForever() {
+        var lease = lease("profile-null-stage", 48L);
+        durability.activate(lease);
+        AtomicInteger calls = new AtomicInteger();
+        BondedCompanionAsyncProjectionReconciler reconciler = new
+                BondedCompanionAsyncProjectionReconciler(
+                observer(), (leases, maximum) -> calls.incrementAndGet() == 1 ? null
+                        : CompletableFuture.completedFuture(
+                                new BondedCompanionProjectionRecoverySystem.ScanResult(
+                                        List.of(), leases)), 8
+        );
+
+        reconciler.reconcileAsync(List.of(lease),
+                BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD, -500L);
+        assertEquals(0, reconciler.tick());
+        assertEquals(1, reconciler.pendingCount());
+        assertEquals(1, reconciler.tick());
+        assertEquals(2, calls.get());
+        assertEquals(BondedCompanionState.STORED,
+                durability.states.get("profile-null-stage"));
+        assertEquals(0, reconciler.pendingCount());
+        assertEquals(true, reconciler.reconcileAsync(List.of(lease("profile-after-null", 50L)),
+                BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD, -500L));
+    }
+
+    @Test
+    void retriesASynchronousScanFailureWithoutRetainingItsQueueSlotForever() {
+        var lease = lease("profile-sync-failure", 49L);
+        durability.activate(lease);
+        AtomicInteger calls = new AtomicInteger();
+        BondedCompanionAsyncProjectionReconciler reconciler = new
+                BondedCompanionAsyncProjectionReconciler(
+                observer(), (leases, maximum) -> {
+                    if (calls.incrementAndGet() == 1) {
+                        throw new IllegalStateException("world_scan_unavailable");
+                    }
+                    return CompletableFuture.completedFuture(
+                            new BondedCompanionProjectionRecoverySystem.ScanResult(
+                                    List.of(), leases));
+                }, 8
+        );
+
+        reconciler.reconcileAsync(List.of(lease),
+                BondedCompanionProjectionService.RecoveryCause.WORLD_LOAD, -500L);
+        assertEquals(0, reconciler.tick());
+        assertEquals(1, reconciler.pendingCount());
+        assertEquals(1, reconciler.tick());
+        assertEquals(2, calls.get());
+        assertEquals(BondedCompanionState.STORED,
+                durability.states.get("profile-sync-failure"));
+    }
+
     private BondedCompanionAsyncProjectionReconciler reconciler(
             BondedCompanionAsyncProjectionReconciler.ScanSource scans,
             int maximumPending,
