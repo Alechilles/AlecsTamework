@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService
+        .CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteBondedCompanionDatabase;
 import com.alechilles.alecstamework.persistence.adapter.sqlite
@@ -768,9 +773,23 @@ class BondedCompanionPaymentRecoverySqliteTest {
         return new BondedCompanionRecord.Profile(
                 "profile-a", OWNER, "roster-a", "family:wolf",
                 "role:companion", BondedCompanionState.STORED, 0L,
-                BondedCompanionPayload.of(
-                        "full-snapshot".getBytes(StandardCharsets.UTF_8)),
+                snapshotPayload(),
                 -10_000L, -10_000L, Map.of(), "Wolf", "Wolf", "Female",
                 null, 0L, 0L, null, null);
+    }
+
+    private BondedCompanionPayload snapshotPayload() {
+        BondedCompanionSnapshot snapshot = BondedCompanionSnapshot.of(
+                new CoopResidentStateSnapshot(
+                        UUID.fromString(
+                                "20000000-0000-0000-0000-000000000001"),
+                        null, -1, "role:companion", null,
+                        new TameworkOwnerComponent(OWNER, null), null, null,
+                        null, null, null, null, null, null, null, null,
+                        100.0D, 100.0D, 100.0D, -10_000L),
+                Map.of());
+        return BondedCompanionPayload.of(
+                new BondedCompanionSnapshotCodec().encode(snapshot)
+                        .getBytes(StandardCharsets.UTF_8));
     }
 }

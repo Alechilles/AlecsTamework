@@ -281,7 +281,8 @@ public final class BondedCompanionTransitionService {
         if (identityDenial != null) {
             return identityDenial;
         }
-        if (atCapacity(counts.owned(), policy.maximumOwned())) {
+        if (BondedCompanionTransitionRules.atCapacity(
+                counts.owned(), policy.maximumOwned())) {
             return ResultCode.OWNED_CAPACITY_REACHED;
         }
         return null;
@@ -302,7 +303,8 @@ public final class BondedCompanionTransitionService {
         if (profile.state() != BondedCompanionState.STORED) {
             return ResultCode.INVALID_STATE;
         }
-        if (atCapacity(counts.active(), checked.policy().maximumActive())) {
+        if (BondedCompanionTransitionRules.atCapacity(
+                counts.active(), checked.policy().maximumActive())) {
             return ResultCode.ACTIVE_CAPACITY_REACHED;
         }
         long cooldown = profile.summonCooldownUntilMs();
@@ -327,10 +329,6 @@ public final class BondedCompanionTransitionService {
             return ResultCode.ROLE_NOT_ALLOWED;
         }
         return enabled.test(policy) ? null : ResultCode.FEATURE_DISABLED;
-    }
-
-    private static boolean atCapacity(int count, int configuredLimit) {
-        return configuredLimit != 0 && count >= configuredLimit;
     }
 
     private BondedCompanionProfile copy(

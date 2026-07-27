@@ -1,10 +1,6 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
-import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
-import com.alechilles.alecstamework.persistence.bonded.BondedCompanionPayload;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,10 +28,8 @@ final class SqliteBondedCompanionStore {
     private final SqliteBondedCompanionProfileReader profiles;
     private final SqliteBondedCompanionCapacityPolicy capacity;
     private final SqliteBondedCompanionCaptureSourceStore captureSources;
-    private final SqliteBondedCompanionMapper mapper =
-            new SqliteBondedCompanionMapper();
-    private final BondedCompanionSnapshotCodec snapshots =
-            new BondedCompanionSnapshotCodec();
+    private final SqliteBondedCompanionSnapshotRestorer snapshotRestorer =
+            new SqliteBondedCompanionSnapshotRestorer();
 
     SqliteBondedCompanionStore(@Nonnull Connection connection) {
         this.connection = Objects.requireNonNull(connection, "connection");
@@ -275,7 +269,8 @@ final class SqliteBondedCompanionStore {
                 return result(MutationCode.INVALID_STATE, current,
                         "revive-requires-dead-profile");
             }
-            String restoredSnapshot = restoredSnapshot(current.snapshotJson());
+            String restoredSnapshot = snapshotRestorer.restore(
+                    current.snapshotJson());
             if (restoredSnapshot == null) {
                 return result(MutationCode.VALIDATION_FAILED, current,
                         "bonded-revive-snapshot-invalid");
@@ -298,25 +293,6 @@ final class SqliteBondedCompanionStore {
             }
             return applied(profile(connection, profileId));
         });
-    }
-
-    @Nullable
-    private String restoredSnapshot(@Nonnull String snapshotJson) {
-        try {
-            BondedCompanionPayload payload = mapper.payload(snapshotJson);
-            BondedCompanionSnapshotCodec.DecodeResult decoded = snapshots.decode(
-                    new String(payload.bytes(), StandardCharsets.UTF_8));
-            BondedCompanionSnapshot snapshot = decoded.snapshot();
-            if (decoded.status() != BondedCompanionSnapshotCodec.Status.FOUND
-                    || snapshot == null) {
-                return null;
-            }
-            return mapper.payloadJson(BondedCompanionPayload.of(
-                    snapshots.encode(snapshot.restoredAfterRevive())
-                            .getBytes(StandardCharsets.UTF_8)));
-        } catch (RuntimeException failure) {
-            return null;
-        }
     }
 
     /** Finds one namespaced payload in the exact owner roster scope. */

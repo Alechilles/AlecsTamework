@@ -46,4 +46,8 @@ final class BondedCompanionTransitionRules {
         }
         return result;
     }
+
+    static boolean atCapacity(int count, int configuredLimit) {
+        return configuredLimit != 0 && count >= configuredLimit;
+    }
 }

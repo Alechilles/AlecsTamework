@@ -1,6 +1,11 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService
+        .CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionDatabase;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
 import java.lang.reflect.Modifier;
@@ -9,6 +14,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -166,11 +172,11 @@ class BondedCompanionStoreReviewFixTest {
                         );
                     });
 
-            Set<BondedCompanionStoreResult.Code> codes =
-                    Set.of(one.get().code(), two.get().code());
-            assertTrue(codes.contains(BondedCompanionStoreResult.Code.APPLIED));
-            assertTrue(codes.contains(
-                    BondedCompanionStoreResult.Code.REVISION_CONFLICT));
+            var results = List.of(one.get(), two.get());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.APPLIED).count());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.REVISION_CONFLICT).count());
         }
         assertEquals(1, store.findActiveLeases(OWNER, "roster-a").size());
     }
@@ -254,11 +260,11 @@ class BondedCompanionStoreReviewFixTest {
                         );
                     });
 
-            Set<BondedCompanionStoreResult.Code> codes =
-                    Set.of(one.get().code(), two.get().code());
-            assertTrue(codes.contains(BondedCompanionStoreResult.Code.APPLIED));
-            assertTrue(codes.contains(
-                    BondedCompanionStoreResult.Code.REVISION_CONFLICT));
+            var results = List.of(one.get(), two.get());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.APPLIED).count());
+            assertEquals(1L, results.stream().filter(result -> result.code()
+                    == BondedCompanionStoreResult.Code.REVISION_CONFLICT).count());
         }
         assertEquals(1L, store.findProfile(OWNER, "roster-a", "profile-c")
                 .orElseThrow().reviveCount());
@@ -278,12 +284,24 @@ class BondedCompanionStoreReviewFixTest {
         return new BondedCompanionRecord.Profile(
                 profileId, OWNER, "roster-a", "family:wolf",
                 "role:companion", BondedCompanionState.STORED, 0,
-                BondedCompanionPayload.of("full-snapshot"
-                        .getBytes(StandardCharsets.UTF_8)),
+                snapshotPayload(),
                 -10_000L, -10_000L, Map.of("policy", "unlimited"),
                 "Wolf", "Wolf", "Female", null, 0L, 0L,
                 null, null
         );
+    }
+
+    private BondedCompanionPayload snapshotPayload() {
+        BondedCompanionSnapshot snapshot = BondedCompanionSnapshot.of(
+                new CoopResidentStateSnapshot(
+                        NPC_A, null, -1, "role:companion", null,
+                        new TameworkOwnerComponent(OWNER, null), null, null,
+                        null, null, null, null, null, null, null, null,
+                        100.0D, 100.0D, 100.0D, -10_000L),
+                Map.of());
+        return BondedCompanionPayload.of(
+                new BondedCompanionSnapshotCodec().encode(snapshot)
+                        .getBytes(StandardCharsets.UTF_8));
     }
 
     private BondedCompanionRecord.Lease lease(
