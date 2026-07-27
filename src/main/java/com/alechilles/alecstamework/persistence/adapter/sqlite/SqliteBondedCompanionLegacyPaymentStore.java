@@ -34,11 +34,12 @@ final class SqliteBondedCompanionLegacyPaymentStore {
                     FROM bonded_companion_operation
                     WHERE owner_uuid = ? AND operation_type = 'REVIVE'
                       AND expected_revision IS NULL
-                      AND operation_state IN ('SUCCEEDED', 'REJECTED')
-                      AND result_json IS NOT NULL
                     GROUP BY legacy_operation_id
-                    HAVING MAX(CASE WHEN expires_at_ms =
-                        9223372036854775807 THEN 1 ELSE 0 END) = 1
+                    HAVING MAX(CASE
+                        WHEN operation_state IN ('SUCCEEDED', 'REJECTED')
+                         AND result_json IS NOT NULL
+                         AND expires_at_ms = 9223372036854775807
+                        THEN 1 ELSE 0 END) = 1
                     ORDER BY first_updated_at_ms, legacy_operation_id
                     LIMIT ?
                 )
@@ -52,8 +53,6 @@ final class SqliteBondedCompanionLegacyPaymentStore {
                  AND operation.owner_uuid = ?
                  AND operation.operation_type = 'REVIVE'
                  AND operation.expected_revision IS NULL
-                 AND operation.operation_state IN ('SUCCEEDED', 'REJECTED')
-                 AND operation.result_json IS NOT NULL
                 ORDER BY group_row.first_updated_at_ms,
                          group_row.legacy_operation_id,
                          operation.caller_namespace,
@@ -83,8 +82,6 @@ final class SqliteBondedCompanionLegacyPaymentStore {
                 SET expires_at_ms = ?
                 WHERE owner_uuid = ? AND operation_type = 'REVIVE'
                   AND expected_revision IS NULL
-                  AND operation_state IN ('SUCCEEDED', 'REJECTED')
-                  AND result_json IS NOT NULL
                   AND expires_at_ms = 9223372036854775807
                   AND caller_namespace || ':' || idempotency_key = ?
                 """)) {

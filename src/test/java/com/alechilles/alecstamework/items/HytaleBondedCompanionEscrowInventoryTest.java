@@ -186,6 +186,78 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
+    void playerAddResumesPersistedRefundWithoutAnyDatabaseClaim()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSource(ITEM, 1);
+            String operation = operation(321);
+            TameworkBondedReviveEscrowComponent refunding =
+                    TameworkBondedReviveEscrowComponent.create(
+                            (short) 2, operation, ITEM, 2, -1L);
+            refunding.getInventory().setItemStackForSlot(
+                    (short) 0, itemStack(ITEM, 1));
+            refunding.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.REFUNDING);
+            fixture.store.put(fixture.actor, fixture.escrowType, refunding);
+            RecoveryStore missing = new RecoveryStore(
+                    RecoveryResult.MISSING, false, 321);
+
+            assertTrue(fixture.inventory.findCharge(operation)
+                    .compensationPending());
+
+            recovery(fixture, missing).onPlayerAdded(fixture.world, OWNER);
+
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertNull(fixture.escrow());
+            assertEquals(0, missing.revives);
+            assertEquals(0, missing.acknowledgments);
+        }
+    }
+
+    @Test
+    void playerAddValidatesAndRemovesCommittedEscrowAfterRestart()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            String operation = operation(322);
+            fixture.installTerminal(operation,
+                    TameworkBondedReviveEscrowComponent.Phase.COMMITTED);
+            RecoveryStore terminal = new RecoveryStore(
+                    RecoveryResult.APPLIED, false, 322);
+
+            recovery(fixture, terminal).onPlayerAdded(fixture.world, OWNER);
+
+            assertNull(fixture.escrow());
+            assertEquals(1, terminal.acknowledgments);
+            assertEquals(Boolean.TRUE, terminal.acknowledgedApplied);
+        }
+    }
+
+    @Test
+    void terminalRejectionResumesRefundingEscrowAfterRestart()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            fixture.setSource(ITEM, 2);
+            String operation = operation(323);
+            fixture.inventory.consumeExactAsync(operation, ITEM, 2)
+                    .toCompletableFuture().join();
+            TameworkBondedReviveEscrowComponent refunding =
+                    fixture.durability.persistedEscrow.clone();
+            refunding.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.REFUNDING);
+            fixture.store.put(fixture.actor, fixture.escrowType, refunding);
+            RecoveryStore terminal = new RecoveryStore(
+                    RecoveryResult.REJECTED, false, 323);
+
+            recovery(fixture, terminal).onPlayerAdded(fixture.world, OWNER);
+
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertNull(fixture.escrow());
+            assertEquals(1, terminal.acknowledgments);
+            assertEquals(Boolean.FALSE, terminal.acknowledgedApplied);
+        }
+    }
+
+    @Test
     void missingOrPendingClaimResumesFromReloadedExactReservedEscrow()
             throws Exception {
         for (RecoveryResult result : List.of(
@@ -530,7 +602,8 @@ class HytaleBondedCompanionEscrowInventoryTest {
     }
 
     @Test
-    void onlyFullReservedEscrowExposesMissingClaimProof() throws Exception {
+    void exactMetadataSurvivesWhileOnlyReservedEscrowProvesMissingClaim()
+            throws Exception {
         try (Fixture fixture = new Fixture()) {
             String operation = operation(3001);
             TameworkBondedReviveEscrowComponent escrow =
@@ -546,13 +619,16 @@ class HytaleBondedCompanionEscrowInventoryTest {
                     fixture.inventory.findCharge(operation);
             assertEquals(ITEM, reserved.itemId());
             assertEquals(2, reserved.quantity());
+            assertTrue(reserved.preparedClaimProof());
 
             escrow.setPhase(
                     TameworkBondedReviveEscrowComponent.Phase.REFUNDING);
             BondedCompanionActionContext.ChargeReceipt refunding =
                     fixture.inventory.findCharge(operation);
-            assertNull(refunding.itemId());
-            assertEquals(0, refunding.quantity());
+            assertEquals(ITEM, refunding.itemId());
+            assertEquals(2, refunding.quantity());
+            assertFalse(refunding.preparedClaimProof());
+            assertTrue(refunding.compensationPending());
 
             escrow.getInventory().clear();
             for (TameworkBondedReviveEscrowComponent.Phase terminal
@@ -562,8 +638,9 @@ class HytaleBondedCompanionEscrowInventoryTest {
                 escrow.setPhase(terminal);
                 BondedCompanionActionContext.ChargeReceipt receipt =
                         fixture.inventory.findCharge(operation);
-                assertNull(receipt.itemId());
-                assertEquals(0, receipt.quantity());
+                assertEquals(ITEM, receipt.itemId());
+                assertEquals(2, receipt.quantity());
+                assertFalse(receipt.preparedClaimProof());
             }
         }
     }
@@ -648,6 +725,46 @@ class HytaleBondedCompanionEscrowInventoryTest {
         }
     }
 
+    @Test
+    void separateProductionInventoryInstancesShareOneActorRefundFlight()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            String operation = operation(303);
+            TameworkBondedReviveEscrowComponent escrow =
+                    TameworkBondedReviveEscrowComponent.create(
+                            (short) 2, operation, ITEM, 2, -1L);
+            escrow.setPhase(
+                    TameworkBondedReviveEscrowComponent.Phase.RESERVED);
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 0, itemStack(ITEM, 1));
+            escrow.getInventory().setItemStackForSlot(
+                    (short) 1, itemStack(ITEM, 1));
+            fixture.store.put(fixture.actor, fixture.escrowType, escrow);
+            fixture.durability.enqueue(SaveResult.success());
+            CompletableFuture<SaveResult> firstSlotSave =
+                    fixture.durability.deferNext();
+            HytaleBondedCompanionEscrowInventory second =
+                    fixture.newInventory(new DirectTransfer());
+
+            CompletionStage<Boolean> first = fixture.inventory
+                    .findCharge(operation).refundAsync();
+            CompletionStage<Boolean> duplicate = second
+                    .findCharge(operation).refundAsync();
+
+            assertEquals(1, fixture.sourceQuantity(ITEM));
+            assertEquals(1, fixture.escrow().reservedQuantity());
+            assertFalse(first.toCompletableFuture().isDone());
+            assertFalse(duplicate.toCompletableFuture().isDone());
+
+            firstSlotSave.complete(SaveResult.success());
+
+            assertTrue(first.toCompletableFuture().join());
+            assertTrue(duplicate.toCompletableFuture().join());
+            assertEquals(2, fixture.sourceQuantity(ITEM));
+            assertNull(fixture.escrow());
+        }
+    }
+
     private void assertTerminalReplayRemoves(
             TameworkBondedReviveEscrowComponent.Phase phase,
             boolean committed
@@ -693,7 +810,7 @@ class HytaleBondedCompanionEscrowInventoryTest {
                 () -> fixture.escrowType,
                 () -> fixture.legacyType,
                 (world, store, owner, worldKey, escrowType, receiptType) ->
-                        fixture.inventory);
+                        fixture.newInventory(new DirectTransfer()));
     }
 
     private static InventoryOperationReceipt legacyPending(
@@ -827,6 +944,13 @@ class HytaleBondedCompanionEscrowInventoryTest {
             return store.getComponent(actor, escrowType);
         }
 
+        private HytaleBondedCompanionEscrowInventory newInventory(
+                BondedCompanionEscrowTransfer transfer) {
+            return new HytaleBondedCompanionEscrowInventory(
+                    world, store, OWNER, "world-a", escrowType, legacyType,
+                    durability, () -> combined, transfer);
+        }
+
         @Override public void close() {
             store.close();
         }
@@ -916,7 +1040,17 @@ class HytaleBondedCompanionEscrowInventoryTest {
                             }
                             case "reviveProfile" -> {
                                 revives++;
-                                yield terminal();
+                                yield switch (result) {
+                                    case APPLIED -> terminal().asReplay();
+                                    case REJECTED ->
+                                            new BondedCompanionStoreResult<>(
+                                                    BondedCompanionStoreResult
+                                                            .Code.INVALID_STATE,
+                                                    null,
+                                                    "profile-is-not-dead",
+                                                    true);
+                                    case MISSING, PENDING -> terminal();
+                                };
                             }
                             case "listAwaitingProfilePaymentSettlements" ->
                                     awaiting ? List.of(probe(ordinal))

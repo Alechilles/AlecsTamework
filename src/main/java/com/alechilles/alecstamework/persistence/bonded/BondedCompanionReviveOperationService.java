@@ -37,6 +37,7 @@ final class BondedCompanionReviveOperationService {
     private final BondedCompanionTransitionService transitions;
     private final LongSupplier clock;
     private final Support support;
+    private final BondedCompanionRevivePaymentVerifier paymentVerifier;
 
     BondedCompanionReviveOperationService(
             BondedCompanionStore store,
@@ -52,6 +53,7 @@ final class BondedCompanionReviveOperationService {
         this.transitions = Objects.requireNonNull(transitions, "transitions");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.support = Objects.requireNonNull(support, "support");
+        this.paymentVerifier = new BondedCompanionRevivePaymentVerifier(store);
     }
 
     @Nonnull
@@ -209,33 +211,59 @@ final class BondedCompanionReviveOperationService {
         }
         if (found == null) return completed(support.internal(
                 "bonded-revive-payment-recovery-pending"));
-        return found.thenCompose(receipt -> {
-            if (receipt == null) return completed(terminalWithoutReceipt(
-                    action, stored));
-            if (!paymentOperationId.equals(safeOperationId(receipt))) {
-                return completed(support.internal(
-                        "bonded-revive-payment-quarantined"));
-            }
-            boolean success = stored.code()
-                    == BondedCompanionStoreResult.Code.APPLIED
-                    && stored.value() != null;
-            if (safeQuarantined(receipt) && !success
-                    && !safeTerminalRejectCleanup(receipt)) {
-                return completed(support.internal(
-                        "bonded-revive-payment-quarantined"));
-            }
-            return settle(receipt, success || safeQuarantined(receipt))
-                    .thenApply(settled -> {
-                        if (!settled) return support.internal(success
-                                ? "bonded-revive-payment-receipt-release-pending"
-                                : "bonded-revive-payment-compensation-pending");
-                        return acknowledge(action, stored, retainedUntil())
-                                ? support.storedResult(stored)
-                                : support.internal(
-                                "bonded-revive-payment-retention-pending");
-                    });
-        }).exceptionally(ignored -> support.internal(
+        return found.thenCompose(receipt -> verifyAndSettleTerminal(
+                action, paymentOperationId, stored, receipt))
+                .exceptionally(ignored -> support.internal(
                 "bonded-revive-payment-recovery-pending"));
+    }
+
+    private CompletionStage<BondedCompanionResult<BondedCompanionProfileView>>
+            verifyAndSettleTerminal(
+                    BondedCompanionActionRequest action,
+                    String operationId,
+                    BondedCompanionStoreResult<BondedCompanionRecord.Profile> stored,
+                    BondedCompanionActionContext.ChargeReceipt receipt
+            ) {
+        if (receipt == null) {
+            return completed(terminalWithoutReceipt(action, stored));
+        }
+        var verified = paymentVerifier.verifyTerminal(
+                probe(action), operationId, stored, receipt,
+                clock.getAsLong(), retainedUntil());
+        return switch (verified) {
+            case VERIFIED, HISTORICAL_MARKER ->
+                    settleVerifiedTerminal(action, stored, receipt);
+            case QUARANTINED -> completed(support.internal(
+                    "bonded-revive-payment-quarantined"));
+            case RETRY_REQUIRED -> completed(support.internal(
+                    "bonded-revive-payment-recovery-pending"));
+        };
+    }
+
+    private CompletionStage<BondedCompanionResult<BondedCompanionProfileView>>
+            settleVerifiedTerminal(
+                    BondedCompanionActionRequest action,
+                    BondedCompanionStoreResult<BondedCompanionRecord.Profile> stored,
+                    BondedCompanionActionContext.ChargeReceipt receipt
+            ) {
+        boolean success = stored.code()
+                == BondedCompanionStoreResult.Code.APPLIED
+                && stored.value() != null;
+        if (safeQuarantined(receipt) && !success
+                && !safeTerminalRejectCleanup(receipt)) {
+            return completed(support.internal(
+                    "bonded-revive-payment-quarantined"));
+        }
+        return settle(receipt, success || safeQuarantined(receipt))
+                .thenApply(settled -> {
+                    if (!settled) return support.internal(success
+                            ? "bonded-revive-payment-receipt-release-pending"
+                            : "bonded-revive-payment-compensation-pending");
+                    return acknowledge(action, stored, retainedUntil())
+                            ? support.storedResult(stored)
+                            : support.internal(
+                            "bonded-revive-payment-retention-pending");
+                });
     }
 
     private CompletionStage<Boolean> settle(

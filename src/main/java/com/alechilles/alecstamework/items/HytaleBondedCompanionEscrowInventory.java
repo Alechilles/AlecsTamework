@@ -104,6 +104,7 @@ final class HytaleBondedCompanionEscrowInventory
         this.transfer = Objects.requireNonNull(transfer, "transfer");
         this.settlements = new BondedCompanionEscrowSettlementCoordinator(
                 store, escrowType, durability, transfer,
+                ownerUuid,
                 this::actorRef, this::sourceInventory);
         this.legacyPayments = new HytaleBondedCompanionLegacyPaymentAdapter(
                 store, legacyType, durability, this::actorRef);
@@ -172,7 +173,9 @@ final class HytaleBondedCompanionEscrowInventory
             }
             return escrowReceipt(
                     operationId, escrow.itemId(), escrow.quantity(),
-                    reserved, true);
+                    reserved, refunding || escrow.phase()
+                            == TameworkBondedReviveEscrowComponent.Phase
+                            .REFUNDED, true);
         } catch (RuntimeException | LinkageError failure) {
             return quarantineReceipt(operationId);
         }
@@ -214,7 +217,10 @@ final class HytaleBondedCompanionEscrowInventory
                         && escrow.reservedQuantity() <= escrow.quantity();
                 if (reserved || refunding || terminal) {
                     return escrowReceipt(
-                            operationId, itemId, quantity, reserved, true);
+                            operationId, itemId, quantity, reserved,
+                            refunding || escrow.phase()
+                                    == TameworkBondedReviveEscrowComponent.Phase
+                                    .REFUNDED, true);
                 }
             }
             return quarantineReceipt(operationId);
@@ -319,7 +325,7 @@ final class HytaleBondedCompanionEscrowInventory
         store.putComponent(actorRef(), escrowType, escrow);
         BondedCompanionActionContext.ChargeReceipt receipt = escrowReceipt(
                 escrow.operationId(), escrow.itemId(), escrow.quantity(),
-                true, replayed);
+                true, false, replayed);
         return durability.saveActor().thenApply(saved -> saved.saved()
                 ? receipt : quarantineReceipt(escrow.operationId()));
     }
@@ -428,6 +434,7 @@ final class HytaleBondedCompanionEscrowInventory
             String itemId,
             int quantity,
             boolean claimPrepared,
+            boolean compensationPending,
             boolean replayed
     ) {
         return BondedCompanionChargeReceipts.escrow(
@@ -435,6 +442,7 @@ final class HytaleBondedCompanionEscrowInventory
                 itemId,
                 quantity,
                 claimPrepared,
+                compensationPending,
                 replayed,
                 () -> settle(operationId, itemId, quantity, false),
                 () -> settle(operationId, itemId, quantity, true));

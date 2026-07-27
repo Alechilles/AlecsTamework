@@ -203,6 +203,36 @@ class BondedCompanionReviveOperationServiceTest {
         assertEquals(0, store.acknowledgments);
     }
 
+    @Test
+    void directTerminalRetryRejectsMismatchedEscrowRequestHash()
+            throws Exception {
+        StoreDouble store = new StoreDouble(false);
+        ServiceHarness harness = harness(store);
+        PaymentInventory inventory = new PaymentInventory(2);
+        BondedCompanionReviveRequest request = request(
+                "direct-hash-mismatch", inventory,
+                harness.rosters.snapshot().revision());
+        BondedCompanionActionRequest action = request.action();
+        String paymentOperationId = BondedCompanionPaymentOperationId.create(
+                action.callerNamespace(), action.idempotencyKey(),
+                action.ownerUuid(), action.rosterId(), action.profileId(),
+                action.expectedRevision());
+        inventory.consumeExact(
+                paymentOperationId, "Ingredient_Life_Essence", 2);
+        store.seedTerminalRejection(
+                action, BondedCompanionRevivePaymentProof.requestHash(
+                        "Ingredient_Wrong_Essence", 2));
+
+        BondedCompanionResult<BondedCompanionProfileView> result =
+                harness.service.revive(request).toCompletableFuture().join();
+
+        assertEquals(BondedCompanionResultCode.INTERNAL_FAILURE, result.code());
+        assertEquals("bonded-revive-payment-quarantined", result.reason());
+        assertEquals(0, inventory.refundApplications);
+        assertEquals(1, inventory.activeCharges());
+        assertEquals(0, store.acknowledgments);
+    }
+
     private ServiceHarness harness(StoreDouble storeDouble) throws Exception {
         BondedCompanionRosterRegistry rosters = registry();
         BondedCompanionPolicyResolver policies =
@@ -290,6 +320,7 @@ class BondedCompanionReviveOperationServiceTest {
     private static final class StoreDouble {
         private final Map<String, BondedCompanionStoreResult<
                 BondedCompanionRecord.Profile>> terminals = new HashMap<>();
+        private final Map<String, String> requestHashes = new HashMap<>();
         private final boolean failStorage;
         private final boolean succeed;
         private int acknowledgments;
@@ -334,17 +365,37 @@ class BondedCompanionReviveOperationServiceTest {
             }
             BondedCompanionStoreResult<BondedCompanionRecord.Profile> existing =
                     terminals.get(key(operation));
-            if (existing != null) return existing.asReplay();
+            if (existing != null) {
+                if (!operation.requestHash().equals(
+                        requestHashes.get(key(operation)))) {
+                    return new BondedCompanionStoreResult<>(
+                            BondedCompanionStoreResult.Code
+                                    .IDEMPOTENCY_CONFLICT,
+                            null, "test-request-hash-conflict", false);
+                }
+                return existing.asReplay();
+            }
             BondedCompanionStoreResult<BondedCompanionRecord.Profile> result =
                     succeed ? terminalSuccess() : terminalRejection();
             terminals.put(key(operation), result);
+            requestHashes.put(key(operation), operation.requestHash());
             return result;
         }
 
         private void seedTerminalRejection(
                 BondedCompanionActionRequest action) {
+            seedTerminalRejection(action,
+                    BondedCompanionRevivePaymentProof.requestHash(
+                            "Ingredient_Life_Essence", 2));
+        }
+
+        private void seedTerminalRejection(
+                BondedCompanionActionRequest action,
+                String requestHash) {
             terminals.put(action.callerNamespace() + ":"
                     + action.idempotencyKey(), terminalRejection());
+            requestHashes.put(action.callerNamespace() + ":"
+                    + action.idempotencyKey(), requestHash);
         }
 
         private BondedCompanionStoreResult<BondedCompanionRecord.Profile>
@@ -416,7 +467,8 @@ class BondedCompanionReviveOperationServiceTest {
             if (this.quantity < quantity) return null;
             this.quantity -= quantity;
             chargeApplications++;
-            Receipt receipt = new Receipt(operationId, quantity, false);
+            Receipt receipt = new Receipt(
+                    operationId, itemId, quantity, false);
             active.put(operationId, receipt);
             return receipt;
         }
@@ -428,20 +480,26 @@ class BondedCompanionReviveOperationServiceTest {
         private final class Receipt
                 implements BondedCompanionActionContext.ChargeReceipt {
             private final String operationId;
+            private final String itemId;
             private final int charged;
             private final boolean replayed;
 
-            private Receipt(String operationId, int charged, boolean replayed) {
+            private Receipt(
+                    String operationId, String itemId, int charged,
+                    boolean replayed) {
                 this.operationId = operationId;
+                this.itemId = itemId;
                 this.charged = charged;
                 this.replayed = replayed;
             }
 
             private Receipt replay() {
-                return new Receipt(operationId, charged, true);
+                return new Receipt(operationId, itemId, charged, true);
             }
 
             @Override public String operationId() { return operationId; }
+            @Override public String itemId() { return itemId; }
+            @Override public int quantity() { return charged; }
             @Override public boolean replayed() { return replayed; }
 
             @Override
@@ -516,6 +574,10 @@ class BondedCompanionReviveOperationServiceTest {
                     return RacingPaymentInventory.this.operationId;
                 }
 
+                @Override public String itemId() {
+                    return "Ingredient_Life_Essence";
+                }
+                @Override public int quantity() { return 2; }
                 @Override public boolean replayed() { return replayed; }
                 @Override public boolean refund() { return refundCharge(); }
                 @Override public boolean complete() { return false; }
@@ -586,7 +648,9 @@ class BondedCompanionReviveOperationServiceTest {
                 BondedCompanionPolicy.RevivePrice price, long now) {
             return new BondedCompanionOperation(
                     action.callerNamespace(), action.idempotencyKey(),
-                    "a".repeat(64), action.ownerUuid(), action.rosterId(),
+                    BondedCompanionRevivePaymentProof.requestHash(
+                            price.itemId(), price.quantity()),
+                    action.ownerUuid(), action.rosterId(),
                     action.profileId(), BondedCompanionOperation.Type.REVIVE,
                     now, now + 10_000L);
         }

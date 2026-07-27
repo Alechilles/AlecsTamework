@@ -87,17 +87,25 @@ public record BondedCompanionActionContext(
         /** Operation identity this receipt can compensate. */
         @Nonnull String operationId();
 
-        /** Exact item identity proving a full prepared escrow claim, if known. */
+        /** Exact item identity authenticating this escrow request, if known. */
         default @Nullable String itemId() { return null; }
 
-        /** Exact item quantity proving a full prepared escrow claim, if known. */
+        /** Exact item quantity authenticating this escrow request, if known. */
         default int quantity() { return 0; }
+
+        /** Whether exact escrow evidence may create or resume a missing claim. */
+        default boolean preparedClaimProof() {
+            return itemId() != null && quantity() > 0;
+        }
 
         /** Whether this receipt was recovered instead of newly charged. */
         default boolean replayed() { return false; }
 
         /** Whether a rejected mutation already entered durable compensation. */
         default boolean compensationPending() { return false; }
+
+        /** Whether this is a pre-escrow historical marker, not item escrow. */
+        default boolean historicalPaymentMarker() { return false; }
 
         /** Ambiguous historical evidence that must never mint or recharge. */
         default boolean quarantined() { return false; }

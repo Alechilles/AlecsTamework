@@ -15,13 +15,14 @@ final class BondedCompanionChargeReceipts {
             String itemId,
             int quantity,
             boolean claimPrepared,
+            boolean compensationPending,
             boolean replayed,
             Supplier<CompletionStage<Boolean>> refund,
             Supplier<CompletionStage<Boolean>> complete
     ) {
         return new EscrowReceipt(
-                operationId, itemId, quantity, claimPrepared, replayed,
-                refund, complete);
+                operationId, itemId, quantity, claimPrepared,
+                compensationPending, replayed, refund, complete);
     }
 
     static BondedCompanionActionContext.ChargeReceipt legacy(
@@ -42,6 +43,7 @@ final class BondedCompanionChargeReceipts {
             String settlementItemId,
             int settlementQuantity,
             boolean claimPrepared,
+            boolean compensationPending,
             boolean replayed,
             Supplier<CompletionStage<Boolean>> refundAction,
             Supplier<CompletionStage<Boolean>> completeAction
@@ -57,11 +59,12 @@ final class BondedCompanionChargeReceipts {
         }
 
         @Override public String itemId() {
-            return claimPrepared ? settlementItemId : null;
+            return settlementItemId;
         }
         @Override public int quantity() {
-            return claimPrepared ? settlementQuantity : 0;
+            return settlementQuantity;
         }
+        @Override public boolean preparedClaimProof() { return claimPrepared; }
         @Override public boolean refund() { return false; }
         @Override public boolean complete() { return false; }
         @Override public CompletionStage<Boolean> refundAsync() {
@@ -84,6 +87,7 @@ final class BondedCompanionChargeReceipts {
 
         @Override public boolean replayed() { return true; }
         @Override public boolean quarantined() { return true; }
+        @Override public boolean historicalPaymentMarker() { return true; }
         @Override public boolean terminalRejectionCleanupSafe() {
             return compensated;
         }

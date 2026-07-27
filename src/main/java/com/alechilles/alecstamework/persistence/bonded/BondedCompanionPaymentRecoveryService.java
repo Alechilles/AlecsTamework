@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
@@ -16,14 +17,27 @@ public final class BondedCompanionPaymentRecoveryService {
     private static final long OPERATION_RETENTION_MS =
             30L * 24L * 60L * 60L * 1000L;
     private final BondedCompanionStore store;
+    private final BondedCompanionRevivePaymentVerifier paymentVerifier;
     private final LongSupplier clock;
+    private final Consumer<BondedCompanionRecord.Profile> revivedPublisher;
 
     public BondedCompanionPaymentRecoveryService(
             @Nonnull BondedCompanionStore store,
             @Nonnull LongSupplier clock
     ) {
+        this(store, clock, ignored -> { });
+    }
+
+    public BondedCompanionPaymentRecoveryService(
+            @Nonnull BondedCompanionStore store,
+            @Nonnull LongSupplier clock,
+            @Nonnull Consumer<BondedCompanionRecord.Profile> revivedPublisher
+    ) {
         this.store = Objects.requireNonNull(store, "store");
+        this.paymentVerifier = new BondedCompanionRevivePaymentVerifier(store);
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.revivedPublisher = Objects.requireNonNull(
+                revivedPublisher, "revivedPublisher");
     }
 
     /** Recovers only exact, hash-validated payment evidence for one owner. */
@@ -121,9 +135,30 @@ public final class BondedCompanionPaymentRecoveryService {
             return completed(Outcome.RETRY_REQUIRED);
         }
         if (found == null) return completed(Outcome.RETRY_REQUIRED);
-        return found.thenCompose(receipt -> recover(
+        return found.thenCompose(receipt -> validateTerminalProof(
                 operationId, probe, terminal, receipt))
                 .exceptionally(ignored -> Outcome.RETRY_REQUIRED);
+    }
+
+    private CompletionStage<Outcome> validateTerminalProof(
+            String operationId,
+            BondedCompanionOperationProbe probe,
+            BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal,
+            BondedCompanionActionContext.ChargeReceipt receipt
+    ) {
+        if (receipt == null) {
+            return recover(operationId, probe, terminal, null);
+        }
+        BondedCompanionRevivePaymentVerifier.Verification verified =
+                paymentVerifier.verifyTerminal(
+                        probe, operationId, terminal, receipt,
+                        clock.getAsLong(), retainedUntil());
+        return switch (verified) {
+            case VERIFIED, HISTORICAL_MARKER ->
+                    recover(operationId, probe, terminal, receipt);
+            case QUARANTINED -> completed(Outcome.QUARANTINED);
+            case RETRY_REQUIRED -> completed(Outcome.RETRY_REQUIRED);
+        };
     }
 
     private CompletionStage<Outcome> recoverCanonical(
@@ -168,9 +203,16 @@ public final class BondedCompanionPaymentRecoveryService {
                 || safeQuarantined(receipt)) {
             return completed(Outcome.QUARANTINED);
         }
+        if (safeCompensationPending(receipt)) {
+            if (operationPresent) return completed(Outcome.RETRY_REQUIRED);
+            return settle(receipt, false).thenApply(refunded -> refunded
+                    ? Outcome.SETTLED_UNCLAIMED_REFUND
+                    : Outcome.RETRY_REQUIRED);
+        }
         String itemId = safeItemId(receipt);
         int quantity = safeQuantity(receipt);
-        if (itemId == null || itemId.isBlank() || quantity <= 0) {
+        if (!safePreparedClaimProof(receipt)
+                || itemId == null || itemId.isBlank() || quantity <= 0) {
             return completed(Outcome.QUARANTINED);
         }
         long attemptedAtMs = clock.getAsLong();
@@ -198,6 +240,10 @@ public final class BondedCompanionPaymentRecoveryService {
         if (saved.code()
                 == BondedCompanionStoreResult.Code.IDEMPOTENCY_CONFLICT) {
             return completed(Outcome.QUARANTINED);
+        }
+        if (saved.code() == BondedCompanionStoreResult.Code.APPLIED
+                && saved.value() != null && !saved.replayed()) {
+            publishRevived(saved.value());
         }
         return recover(operationId, probe, saved, receipt);
     }
@@ -231,6 +277,14 @@ public final class BondedCompanionPaymentRecoveryService {
             return committed
                     ? Outcome.SETTLED_COMMITTED : Outcome.SETTLED_REJECTED;
         });
+    }
+
+    private void publishRevived(BondedCompanionRecord.Profile profile) {
+        try {
+            revivedPublisher.accept(profile);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Listener failures cannot invalidate a committed payment result.
+        }
     }
 
     private CompletionStage<Boolean> settle(
@@ -342,6 +396,24 @@ public final class BondedCompanionPaymentRecoveryService {
         }
     }
 
+    private boolean safePreparedClaimProof(
+            BondedCompanionActionContext.ChargeReceipt receipt) {
+        try {
+            return receipt.preparedClaimProof();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    private boolean safeCompensationPending(
+            BondedCompanionActionContext.ChargeReceipt receipt) {
+        try {
+            return receipt.compensationPending();
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
     private long retainedUntil() {
         try {
             long retained = Math.addExact(
@@ -364,6 +436,7 @@ public final class BondedCompanionPaymentRecoveryService {
         ALREADY_SETTLED,
         SETTLED_COMMITTED,
         SETTLED_REJECTED,
+        SETTLED_UNCLAIMED_REFUND,
         QUARANTINED,
         RETRY_REQUIRED,
         RETENTION_PENDING

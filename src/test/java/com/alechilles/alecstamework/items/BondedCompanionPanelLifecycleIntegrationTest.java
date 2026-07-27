@@ -558,6 +558,8 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 private boolean refunded;
 
                 @Override public String operationId() { return operationId; }
+                @Override public String itemId() { return itemId; }
+                @Override public int quantity() { return quantity; }
 
                 @Override
                 public synchronized boolean refund() {
@@ -683,6 +685,8 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                     return chargedOperationId;
                 }
 
+                @Override public String itemId() { return chargedItemId; }
+                @Override public int quantity() { return chargedQuantity; }
                 @Override public boolean replayed() { return replayed; }
 
                 @Override public boolean compensationPending() {
@@ -750,6 +754,14 @@ class BondedCompanionPanelLifecycleIntegrationTest {
             reservation.complete(new BondedCompanionActionContext.ChargeReceipt() {
                 @Override public String operationId() {
                     return DeferredDurableInventory.this.operationId;
+                }
+
+                @Override public String itemId() {
+                    return DeferredDurableInventory.this.itemId;
+                }
+
+                @Override public int quantity() {
+                    return DeferredDurableInventory.this.quantity;
                 }
 
                 @Override public boolean refund() { return false; }

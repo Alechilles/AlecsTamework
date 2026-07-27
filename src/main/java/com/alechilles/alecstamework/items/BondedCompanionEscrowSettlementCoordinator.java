@@ -12,6 +12,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
@@ -23,10 +24,10 @@ final class BondedCompanionEscrowSettlementCoordinator {
             TameworkBondedReviveEscrowComponent> escrowType;
     private final BondedCompanionEscrowDurability durability;
     private final BondedCompanionEscrowTransfer transfer;
+    private final UUID ownerUuid;
     private final Supplier<Ref<EntityStore>> actorRef;
     private final Supplier<CombinedItemContainer> sourceInventory;
-    private CompletableFuture<Boolean> refundInFlight;
-    private String refundOperationId;
+    private final BondedCompanionEscrowSettlementFlights flights;
 
     BondedCompanionEscrowSettlementCoordinator(
             Store<EntityStore> store,
@@ -34,6 +35,7 @@ final class BondedCompanionEscrowSettlementCoordinator {
                     TameworkBondedReviveEscrowComponent> escrowType,
             BondedCompanionEscrowDurability durability,
             BondedCompanionEscrowTransfer transfer,
+            UUID ownerUuid,
             Supplier<Ref<EntityStore>> actorRef,
             Supplier<CombinedItemContainer> sourceInventory
     ) {
@@ -41,48 +43,23 @@ final class BondedCompanionEscrowSettlementCoordinator {
         this.escrowType = Objects.requireNonNull(escrowType, "escrowType");
         this.durability = Objects.requireNonNull(durability, "durability");
         this.transfer = Objects.requireNonNull(transfer, "transfer");
+        this.ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
         this.actorRef = Objects.requireNonNull(actorRef, "actorRef");
         this.sourceInventory = Objects.requireNonNull(
                 sourceInventory, "sourceInventory");
+        this.flights = BondedCompanionEscrowSettlementFlights.shared();
     }
 
     /** Resumes an exact refund and returns true only after it is empty. */
     CompletionStage<Boolean> refund(
             TameworkBondedReviveEscrowComponent expected) {
-        CompletableFuture<Boolean> flight;
-        synchronized (this) {
-            if (refundInFlight != null) {
-                return expected.operationId().equals(refundOperationId)
-                        ? refundInFlight : completed(false);
-            }
-            flight = new CompletableFuture<>();
-            refundInFlight = flight;
-            refundOperationId = expected.operationId();
-        }
-        CompletionStage<Boolean> execution;
-        try {
-            execution = durability.resumeOnWorldThread(
-                    () -> begin(expected), () -> false)
-                    .thenCompose(refunded -> refunded
-                            ? removeTerminal(expected) : completed(false));
-        } catch (RuntimeException | LinkageError failure) {
-            finishFlight(flight, false);
-            return flight;
-        }
-        execution.whenComplete((result, failure) -> finishFlight(
-                flight, failure == null && Boolean.TRUE.equals(result)));
-        return flight;
-    }
-
-    private void finishFlight(
-            CompletableFuture<Boolean> flight, boolean result) {
-        synchronized (this) {
-            if (refundInFlight == flight) {
-                refundInFlight = null;
-                refundOperationId = null;
-            }
-        }
-        flight.complete(result);
+        return flights.coordinate(
+                escrowType, ownerUuid, expected.operationId(),
+                () -> durability.resumeOnWorldThread(
+                        () -> begin(expected), () -> false)
+                        .thenCompose(refunded -> refunded
+                                ? removeTerminal(expected)
+                                : completed(false)));
     }
 
     /** Durably removes an already-empty terminal escrow tombstone. */

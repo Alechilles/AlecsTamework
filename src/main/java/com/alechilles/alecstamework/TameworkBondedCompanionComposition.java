@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionTransitionService;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionWorldLifecycleObserver;
 import com.alechilles.alecstamework.companion.bonded.runtime
@@ -193,7 +194,18 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         HytaleBondedCompanionPaymentRecovery paymentRecovery =
                 new HytaleBondedCompanionPaymentRecovery(
                         new BondedCompanionPaymentRecoveryService(
-                                store, clock));
+                                store, clock,
+                                profile -> changes.publishCommitted(
+                                        new BondedCompanionChangedEvent(
+                                                profile.profileId(),
+                                                profile.ownerUuid(),
+                                                profile.rosterId(),
+                                                BondedCompanionState.DEAD,
+                                                BondedCompanionState.STORED,
+                                                profile.revision(), "revived"),
+                                        BondedCompanionChangePublisher
+                                                .WorldEffectOutcome
+                                                .CONFIRMED)));
         SqliteBondedCompanionCapturePersistenceAdapter capturePersistence =
                 new SqliteBondedCompanionCapturePersistenceAdapter(
                         rosters, transitions, store, store, durability, cleanup
