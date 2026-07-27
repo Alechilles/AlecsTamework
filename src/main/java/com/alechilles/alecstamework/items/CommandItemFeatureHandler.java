@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
@@ -172,6 +173,24 @@ public final class CommandItemFeatureHandler {
             @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
             @Nullable Supplier<PopulationGroupApi> populationGroups
     ) {
+        this(
+                registry, relocationService, stateSnapshotService, persistence,
+                restorationAuthor, timedSummoning, paidRevival,
+                populationGroups, null
+        );
+    }
+
+    public CommandItemFeatureHandler(
+            CommandItemRegistry registry,
+            CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService,
+            @Nullable PersistenceDomainFacades persistence,
+            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
+            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
+            @Nullable Supplier<PopulationGroupApi> populationGroups,
+            @Nullable Supplier<BondedCompanionApi> bondedCompanions
+    ) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.stateSnapshotService = stateSnapshotService;
@@ -264,7 +283,9 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 linkedNpcRecordStore,
                 panelPreferenceService,
-                profileActionResolver
+                profileActionResolver,
+                BondedCompanionCommandRecipientSource.production(
+                        bondedCompanions, linkPolicyService)
         );
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,

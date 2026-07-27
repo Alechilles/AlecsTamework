@@ -1103,7 +1103,8 @@ public class Tamework extends JavaPlugin {
                 persistenceComposition.restorationAuthor(),
                 api::commandTimedSummoning,
                 api::paidCommandRevival,
-                api::populationGroups
+                api::populationGroups,
+                api::bondedCompanions
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);

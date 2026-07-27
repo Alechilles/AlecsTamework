@@ -125,6 +125,9 @@ final class CommandRelocationDispatchService {
         if (context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
             return;
         }
+        if (context.config.usesBondedCompanionRoster()) {
+            return;
+        }
         if (!resolutionService.isRecallCommand(context.command)) {
             return;
         }

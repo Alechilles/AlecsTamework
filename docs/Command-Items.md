@@ -58,6 +58,20 @@ icon, and recipe/acquisition flow. Do not present the example whistle as a
 player-ready Tamework reward or silently depend on players finding it.
 
 ## Recipient selection and linking
+
+Command items using `RosterStorage: BondedCompanions` have a separate recipient
+authority. A command resolves only `ACTIVE` profiles owned by the player in the
+configured `BondedRosterId` whose current-world live UUID, profile ID, and lease
+token exactly match the NPC's bonded projection marker. Stored, dead, expired,
+other-world, duplicate, or stale projections are not command recipients.
+
+Bonded commands never create generic NPC links, reconcile or project linked rows
+onto the item, or queue generic unloaded/cross-world relocation. Summon, dismiss,
+and revive remain profile-keyed panel actions. Normal commands still operate on
+an exact loaded projection, and live command state such as a stored home position
+travels with the bonded full snapshot. These rules do not change recipient or
+link behavior for `ItemMetadata` and `OwnerCommandFamily` command items.
+
 `TwCommandItemConfig` recipient controls:
 - `MembershipMode`: `LinkedOnly`, `OwnerScope`, `MasterTarget`, `LinkedOrMasterTarget`
 - `RequireOwner`

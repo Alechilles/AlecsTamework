@@ -29,6 +29,7 @@ final class CommandRecipientService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandPanelPreferenceService panelPreferenceService;
+    private final BondedCompanionCommandRecipientSource bondedRecipients;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
 
@@ -42,15 +43,31 @@ final class CommandRecipientService {
                             CommandLinkedNpcRecordStore linkedNpcRecordStore,
                             CommandPanelPreferenceService panelPreferenceService,
                             @Nullable CommandNpcProfileActionResolver profileActionResolver) {
+        this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService,
+                profileActionResolver, null);
+    }
+
+    CommandRecipientService(CommandLinkPolicyService linkPolicyService,
+                            CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                            CommandPanelPreferenceService panelPreferenceService,
+                            @Nullable CommandNpcProfileActionResolver profileActionResolver,
+                            @Nullable BondedCompanionCommandRecipientSource bondedRecipients) {
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
                 : new CommandPanelPreferenceService();
         this.profileActionResolver = profileActionResolver;
+        this.bondedRecipients = bondedRecipients != null
+                ? bondedRecipients
+                : BondedCompanionCommandRecipientSource.production(
+                        null, this.linkPolicyService);
     }
 
     List<Candidate> queryRecipients(Context context) {
+        if (context.config.usesBondedCompanionRoster()) {
+            return bondedRecipients.queryRecipients(context);
+        }
         ArrayList<Candidate> out = new ArrayList<>();
         TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
         Vector3d playerPos = playerTransform != null ? new Vector3d(playerTransform.getPosition()) : null;
@@ -141,6 +158,9 @@ final class CommandRecipientService {
     }
 
     List<LinkedNpcRecord> queryUnloadedLinkedRecords(Context context, List<Candidate> loadedRecipients) {
+        if (context.config.usesBondedCompanionRoster()) {
+            return List.of();
+        }
         CommandPanelPreferenceService.PanelMode panelModeOverride =
                 panelPreferenceService.readPanelModeOverride(context.workingItem);
         MembershipMode mode = panelPreferenceService.resolveRecipientMembershipMode(context.workingItem, context.config);

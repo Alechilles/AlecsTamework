@@ -318,7 +318,8 @@ final class CommandStepExecutionService {
                     companionSettings.getReturnHomeTeleportDelayMs(),
                     context.returnHomeTeleportDelayMs
             );
-            if (CommandTravelSettings.isRecallTeleportingEnabled()
+            if (!context.config.usesBondedCompanionRoster()
+                    && CommandTravelSettings.isRecallTeleportingEnabled()
                     && start != null
                     && start.distance(targetPosition) > returnHomeTeleportDistance) {
                 Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);
@@ -388,7 +389,9 @@ final class CommandStepExecutionService {
         links.setHomePosition(home);
         context.store.putComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType(), links);
 
-        if (context.workingItem != null && !context.workingItem.isEmpty() && candidate.npc.getUuid() != null) {
+        if (!context.config.usesBondedCompanionRoster()
+                && context.workingItem != null && !context.workingItem.isEmpty()
+                && candidate.npc.getUuid() != null) {
             TransformComponent transform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d currentPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
             ItemStack updated = linkedNpcRecordStore.upsert(

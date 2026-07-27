@@ -62,6 +62,9 @@ final class CommandLinkMutationService {
                                    TwCommandItemConfig config,
                                    ItemStack workingItem,
                                    @Nullable DeferredLinkHandler deferredHandler) {
+        if (config == null || config.usesBondedCompanionRoster()) {
+            return LinkToggleResult.notToggled();
+        }
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc == null) {
             return LinkToggleResult.notToggled();

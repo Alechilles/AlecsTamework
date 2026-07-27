@@ -253,7 +253,8 @@ public final class NpcSpawnCommandService {
         ItemStack originalStack = heldStack;
 
         TwCommandItemConfig config = registry.get(heldStack.getItemId());
-        if (config == null || !config.isEnabled() || !config.isLinkEnabled()) {
+        if (config == null || config.usesBondedCompanionRoster()
+                || !config.isEnabled() || !config.isLinkEnabled()) {
             return null;
         }
 
