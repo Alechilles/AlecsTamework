@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import java.lang.reflect.Field;
 import java.util.List;
 import org.bson.BsonDocument;
+import org.bson.BsonArray;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -33,6 +34,77 @@ class TameworkBondedReviveEscrowComponentTest {
         assertEquals(recipe, escrow.costs());
         assertTrue(escrow.matches("panel:revive-multi", recipe));
         assertTrue(escrow.hasExactReservedCharge());
+    }
+
+    @Test
+    void multiLineRecipeCodecRoundTripRetainsOrderAndRejectsSingletonMatch()
+            throws Exception {
+        List<BondedCompanionReviveCost> costs = List.of(
+                new BondedCompanionReviveCost("Ingredient_Life_Essence", 2),
+                new BondedCompanionReviveCost("Ingredient_Dragon_Essence", 4));
+        TameworkBondedReviveEscrowComponent escrow =
+                TameworkBondedReviveEscrowComponent.create(
+                        (short) 4, "panel:recipe-codec", costs, -3L);
+        ensureSimpleContainerCodec();
+
+        TameworkBondedReviveEscrowComponent decoded =
+                TameworkBondedReviveEscrowComponent.CODEC.decode(
+                        TameworkBondedReviveEscrowComponent.CODEC.encode(
+                                escrow, new ExtraInfo()), new ExtraInfo());
+
+        assertEquals(costs, decoded.costs());
+        assertFalse(decoded.matches("panel:recipe-codec",
+                "Ingredient_Life_Essence", 2));
+    }
+
+    @Test
+    void explicitEmptyPersistedCostsAreInvalidRatherThanLegacyEvidence()
+            throws Exception {
+        TameworkBondedReviveEscrowComponent escrow =
+                TameworkBondedReviveEscrowComponent.create(
+                        (short) 2, "panel:empty-costs",
+                        "Ingredient_Life_Essence", 2, 1L);
+        ensureSimpleContainerCodec();
+        BsonDocument encoded = TameworkBondedReviveEscrowComponent.CODEC
+                .encode(escrow, new ExtraInfo());
+        encoded.put("Costs", new BsonArray());
+
+        TameworkBondedReviveEscrowComponent decoded =
+                TameworkBondedReviveEscrowComponent.CODEC.decode(
+                        encoded, new ExtraInfo());
+
+        assertTrue(decoded.costs().isEmpty());
+        assertEquals(TameworkBondedReviveEscrowComponent.ReservedState.INVALID,
+                decoded.reservedState());
+        assertFalse(decoded.matches("panel:empty-costs",
+                "Ingredient_Life_Essence", 2));
+    }
+
+    @Test
+    void duplicatePersistedCostsAndOverfilledStacksAreInvalidEvidence()
+            throws Exception {
+        List<BondedCompanionReviveCost> costs = List.of(
+                new BondedCompanionReviveCost("Ingredient_Life_Essence", 2),
+                new BondedCompanionReviveCost("Ingredient_Dragon_Essence", 4));
+        TameworkBondedReviveEscrowComponent escrow =
+                TameworkBondedReviveEscrowComponent.create(
+                        (short) 4, "panel:duplicate-costs", costs, 1L);
+        ensureSimpleContainerCodec();
+        BsonDocument encoded = TameworkBondedReviveEscrowComponent.CODEC
+                .encode(escrow, new ExtraInfo());
+        encoded.getArray("Costs").add(encoded.getArray("Costs").getFirst());
+        TameworkBondedReviveEscrowComponent duplicate =
+                TameworkBondedReviveEscrowComponent.CODEC.decode(
+                        encoded, new ExtraInfo());
+        assertEquals(TameworkBondedReviveEscrowComponent.ReservedState.INVALID,
+                duplicate.reservedState());
+
+        escrow.getInventory().setItemStackForSlot((short) 0,
+                itemStack("Ingredient_Life_Essence", 3));
+        assertEquals(TameworkBondedReviveEscrowComponent.ReservedState.INVALID,
+                escrow.reservedState());
+        assertFalse(escrow.matches("panel:duplicate-costs", List.of(
+                costs.get(1), costs.getFirst())));
     }
 
     @Test

@@ -78,6 +78,7 @@ public final class TameworkBondedReviveEscrowComponent
     private int quantity = 1;
     private List<BondedCompanionReviveCost> costs = List.of(
             new BondedCompanionReviveCost(itemId, quantity));
+    private boolean recipeValid = true;
     private Phase phase = Phase.STAGED;
     private long createdAtMs;
 
@@ -137,7 +138,7 @@ public final class TameworkBondedReviveEscrowComponent
 
     /** Returns whether this component belongs to the exact payment request. */
     public boolean matches(String operationId, String itemId, int quantity) {
-        return this.quantity == quantity
+        return recipeValid && costs.size() == 1 && this.quantity == quantity
                 && this.operationId.equals(operationId)
                 && this.itemId.equals(itemId);
     }
@@ -145,7 +146,7 @@ public final class TameworkBondedReviveEscrowComponent
     /** Returns whether this component belongs to the exact ordered recipe. */
     public boolean matches(String operationId,
             List<BondedCompanionReviveCost> costs) {
-        return this.operationId.equals(operationId)
+        return recipeValid && this.operationId.equals(operationId)
                 && this.costs.equals(validateCosts(costs));
     }
 
@@ -185,6 +186,7 @@ public final class TameworkBondedReviveEscrowComponent
 
     /** Classifies frozen-recipe stack evidence without consulting live policy. */
     public ReservedState reservedState() {
+        if (!recipeValid || costs.isEmpty()) return ReservedState.INVALID;
         int total = 0;
         java.util.Map<String, Integer> quantities = new java.util.HashMap<>();
         for (short slot = 0; slot < getInventory().getCapacity(); slot++) {
@@ -261,6 +263,7 @@ public final class TameworkBondedReviveEscrowComponent
         copy.itemId = itemId;
         copy.quantity = quantity;
         copy.costs = costs;
+        copy.recipeValid = recipeValid;
         copy.phase = phase;
         copy.createdAtMs = createdAtMs;
         copy.registerChangeEvent();
@@ -307,17 +310,27 @@ public final class TameworkBondedReviveEscrowComponent
     }
 
     private void setCostEntries(CostEntry[] entries) {
-        if (entries == null || entries.length == 0) return;
-        List<BondedCompanionReviveCost> parsed = new ArrayList<>(entries.length);
-        for (CostEntry entry : entries) {
-            if (entry == null) throw new IllegalArgumentException("cost is required");
-            parsed.add(new BondedCompanionReviveCost(entry.itemId(), entry.quantity()));
+        if (entries == null || entries.length == 0) {
+            invalidateRecipe();
+            return;
         }
-        setCosts(parsed);
+        try {
+            List<BondedCompanionReviveCost> parsed = new ArrayList<>(entries.length);
+            for (CostEntry entry : entries) {
+                if (entry == null) throw new IllegalArgumentException(
+                        "cost is required");
+                parsed.add(new BondedCompanionReviveCost(
+                        entry.itemId(), entry.quantity()));
+            }
+            setCosts(parsed);
+        } catch (RuntimeException invalid) {
+            invalidateRecipe();
+        }
     }
 
     private void setCosts(List<BondedCompanionReviveCost> costs) {
         this.costs = validateCosts(costs);
+        recipeValid = true;
         BondedCompanionReviveCost first = this.costs.getFirst();
         itemId = first.itemId();
         quantity = first.quantity();
@@ -337,6 +350,11 @@ public final class TameworkBondedReviveEscrowComponent
         return copy;
     }
 
+    private void invalidateRecipe() {
+        costs = List.of();
+        recipeValid = false;
+    }
+
     /** Valid persisted recipe evidence states. */
     public enum ReservedState { EMPTY, PARTIAL, RESERVED, INVALID }
 
@@ -354,11 +372,9 @@ public final class TameworkBondedReviveEscrowComponent
         private String itemId() { return itemId; }
         private int quantity() { return quantity; }
         private void setItemId(String itemId) {
-            this.itemId = requireText(itemId, "itemId");
+            this.itemId = itemId;
         }
         private void setQuantity(int quantity) {
-            if (quantity <= 0) throw new IllegalArgumentException(
-                    "quantity must be positive");
             this.quantity = quantity;
         }
     }
