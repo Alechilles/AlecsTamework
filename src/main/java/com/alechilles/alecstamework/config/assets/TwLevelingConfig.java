@@ -80,6 +80,40 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
             .add()
             .build();
 
+    private static final BuilderCodec<FlightXpSourceSettings> FLIGHT_XP_SOURCE_CODEC = BuilderCodec.builder(
+            FlightXpSourceSettings.class,
+            FlightXpSourceSettings::new
+    )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.enabled = value != null && value,
+                    settings -> settings.enabled
+            )
+            .documentation("If true, this XP source awards XP for qualified flight time. Inheritance: when Flight is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("XpPerQualifiedSecond", Codec.DOUBLE),
+                    (settings, value) -> settings.xpPerQualifiedSecond = value,
+                    settings -> settings.xpPerQualifiedSecond
+            )
+            .documentation("XP awarded per qualified flight second. Inheritance: when Flight is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("AwardIntervalSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.awardIntervalSeconds = value,
+                    settings -> settings.awardIntervalSeconds
+            )
+            .documentation("Seconds between flight XP awards. Inheritance: when Flight is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("MaxXpPerMinute", Codec.DOUBLE),
+                    (settings, value) -> settings.maxXpPerMinute = value,
+                    settings -> settings.maxXpPerMinute
+            )
+            .documentation("Maximum XP this source can award each minute. Inheritance: when Flight is present, an omitted field inherits from the parent setting.")
+            .add()
+            .build();
+
     private static final BuilderCodec<CombatXpSourceSettings> COMBAT_XP_SOURCE_CODEC = BuilderCodec.builder(
             CombatXpSourceSettings.class,
             CombatXpSourceSettings::new
@@ -159,6 +193,13 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
                     settings -> settings.combat
             )
             .documentation("Combat XP source settings. Inheritance: omitted section inherits from parent; when present, only explicitly defined nested fields override parent.")
+            .add()
+            .<FlightXpSourceSettings>append(
+                    new KeyedCodec<>("Flight", FLIGHT_XP_SOURCE_CODEC),
+                    (settings, value) -> settings.flight = value == null ? new FlightXpSourceSettings() : value,
+                    settings -> settings.flight
+            )
+            .documentation("Flight XP source settings. Inheritance: omitted section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .build();
 
@@ -512,6 +553,11 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         } else {
             inheritCombatSourceSection(parent, nestedExplicitKeys);
         }
+        if (!nestedExplicitKeys.contains("Flight")) {
+            xpSources.flight = parent.xpSources.flight;
+        } else {
+            inheritFlightSourceSection(parent, nestedExplicitKeys);
+        }
     }
 
     private void inheritSimpleSourceSection(@Nullable SimpleXpSourceSettings child,
@@ -561,6 +607,32 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         }
         if (!nestedExplicitKeys.contains("Combat.AwardVsOwnedAllies")) {
             xpSources.combat.awardVsOwnedAllies = parent.xpSources.combat.awardVsOwnedAllies;
+        }
+    }
+
+    private void inheritFlightSourceSection(@Nonnull TwLevelingConfig parent,
+                                            @Nonnull Set<String> nestedExplicitKeys) {
+        if (xpSources == null) {
+            return;
+        }
+        if (xpSources.flight == null) {
+            xpSources.flight = parent.xpSources != null ? parent.xpSources.flight : null;
+            return;
+        }
+        if (parent.xpSources == null || parent.xpSources.flight == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Flight.Enabled")) {
+            xpSources.flight.enabled = parent.xpSources.flight.enabled;
+        }
+        if (!nestedExplicitKeys.contains("Flight.XpPerQualifiedSecond")) {
+            xpSources.flight.xpPerQualifiedSecond = parent.xpSources.flight.xpPerQualifiedSecond;
+        }
+        if (!nestedExplicitKeys.contains("Flight.AwardIntervalSeconds")) {
+            xpSources.flight.awardIntervalSeconds = parent.xpSources.flight.awardIntervalSeconds;
+        }
+        if (!nestedExplicitKeys.contains("Flight.MaxXpPerMinute")) {
+            xpSources.flight.maxXpPerMinute = parent.xpSources.flight.maxXpPerMinute;
         }
     }
 
@@ -665,6 +737,7 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         private SimpleXpSourceSettings harvest = new SimpleXpSourceSettings();
         private SimpleXpSourceSettings breeding = new SimpleXpSourceSettings();
         private CombatXpSourceSettings combat = new CombatXpSourceSettings();
+        private FlightXpSourceSettings flight = new FlightXpSourceSettings();
 
         public SimpleXpSourceSettings getFeed() {
             return feed == null ? new SimpleXpSourceSettings() : feed;
@@ -680,6 +753,10 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
 
         public CombatXpSourceSettings getCombat() {
             return combat == null ? new CombatXpSourceSettings() : combat;
+        }
+
+        public FlightXpSourceSettings getFlight() {
+            return flight == null ? new FlightXpSourceSettings() : flight;
         }
     }
 
@@ -733,6 +810,30 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean isAwardVsOwnedAllies() {
             return awardVsOwnedAllies;
+        }
+    }
+
+    /** Flight XP settings for qualified companion flight time. */
+    public static final class FlightXpSourceSettings {
+        private boolean enabled;
+        private double xpPerQualifiedSecond;
+        private double awardIntervalSeconds = 10.0;
+        private double maxXpPerMinute;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public double getXpPerQualifiedSecond() {
+            return Double.isFinite(xpPerQualifiedSecond) && xpPerQualifiedSecond > 0.0 ? xpPerQualifiedSecond : 0.0;
+        }
+
+        public double getAwardIntervalSeconds() {
+            return Double.isFinite(awardIntervalSeconds) && awardIntervalSeconds > 0.0 ? awardIntervalSeconds : 10.0;
+        }
+
+        public double getMaxXpPerMinute() {
+            return Double.isFinite(maxXpPerMinute) && maxXpPerMinute > 0.0 ? maxXpPerMinute : 0.0;
         }
     }
 

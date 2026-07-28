@@ -106,7 +106,7 @@ class TameworkEventBusTest {
                 toolIds,
                 "Mob_Test",
                 "Leveling_Test",
-                CompanionXpSource.FEED,
+                CompanionXpSource.AVATAR_FLIGHT,
                 8.0,
                 1,
                 2,
@@ -131,7 +131,7 @@ class TameworkEventBusTest {
         assertEquals(npcUuid, delivered.npcUuid());
         assertEquals(ownerUuid, delivered.ownerUuid());
         assertEquals(Set.of("tool-a", "tool-b"), delivered.toolIds());
-        assertEquals(CompanionXpSource.FEED, delivered.source());
+        assertEquals(CompanionXpSource.AVATAR_FLIGHT, delivered.source());
         assertEquals(8.0, delivered.awardedXp());
         assertEquals(1, delivered.previousLevel());
         assertEquals(2, delivered.currentLevel());

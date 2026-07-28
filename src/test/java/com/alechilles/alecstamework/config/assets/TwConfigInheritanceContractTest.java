@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Cross-config inheritance contract checks for nested-object inheritance and array/map replacement semantics. */
 class TwConfigInheritanceContractTest {
+    private static final double EPSILON = 0.00001d;
 
     @Test
     void breedingRoleOverridesRemainLocalOnlyAndRoleIdsStillInherit() throws Exception {
@@ -422,6 +423,8 @@ class TwConfigInheritanceContractTest {
         TwLevelingConfig.SimpleXpSourceSettings childFeed = new TwLevelingConfig.SimpleXpSourceSettings();
         TwLevelingConfig.CombatXpSourceSettings parentCombat = new TwLevelingConfig.CombatXpSourceSettings();
         TwLevelingConfig.CombatXpSourceSettings childCombat = new TwLevelingConfig.CombatXpSourceSettings();
+        TwLevelingConfig.FlightXpSourceSettings parentFlight = new TwLevelingConfig.FlightXpSourceSettings();
+        TwLevelingConfig.FlightXpSourceSettings childFlight = new TwLevelingConfig.FlightXpSourceSettings();
         setField(parentFeed, "enabled", false);
         setField(parentFeed, "flatXp", 8.0d);
         setField(parentFeed, "awardCooldownSeconds", 900);
@@ -429,10 +432,17 @@ class TwConfigInheritanceContractTest {
         setField(parentCombat, "damageDealtXpPerPoint", 1.25d);
         setField(parentCombat, "awardVsPlayers", true);
         setField(childCombat, "damageTakenXpPerPoint", 0.4d);
+        setField(parentFlight, "enabled", true);
+        setField(parentFlight, "xpPerQualifiedSecond", 0.1d);
+        setField(parentFlight, "awardIntervalSeconds", 10.0d);
+        setField(parentFlight, "maxXpPerMinute", 9.0d);
+        setField(childFlight, "xpPerQualifiedSecond", 0.15d);
         setField(parentSources, "feed", parentFeed);
         setField(childSources, "feed", childFeed);
         setField(parentSources, "combat", parentCombat);
         setField(childSources, "combat", childCombat);
+        setField(parentSources, "flight", parentFlight);
+        setField(childSources, "flight", childFlight);
         setField(parent, "xpSources", parentSources);
         setField(child, "xpSources", childSources);
 
@@ -446,7 +456,7 @@ class TwConfigInheritanceContractTest {
 
         Map<String, Set<String>> nested = new HashMap<>();
         nested.put("Levels", Set.of("BaseXp"));
-        nested.put("XpSources", Set.of("Feed", "Feed.Enabled", "Combat", "Combat.DamageTakenXpPerPoint"));
+        nested.put("XpSources", Set.of("Feed", "Feed.Enabled", "Combat", "Combat.DamageTakenXpPerPoint", "Flight", "Flight.XpPerQualifiedSecond"));
         nested.put("StatGrowth", Set.of("Effects"));
         child.inheritMissingTopLevelFrom(parent, Set.of("Levels", "XpSources", "StatGrowth"), nested);
 
@@ -459,6 +469,10 @@ class TwConfigInheritanceContractTest {
         assertEquals(1.25d, child.getXpSources().getCombat().getDamageDealtXpPerPoint(), 0.00001d);
         assertEquals(0.4d, child.getXpSources().getCombat().getDamageTakenXpPerPoint(), 0.00001d);
         assertTrue(child.getXpSources().getCombat().isAwardVsPlayers());
+        assertTrue(child.getXpSources().getFlight().isEnabled());
+        assertEquals(0.15d, child.getXpSources().getFlight().getXpPerQualifiedSecond(), EPSILON);
+        assertEquals(10.0d, child.getXpSources().getFlight().getAwardIntervalSeconds(), EPSILON);
+        assertEquals(9.0d, child.getXpSources().getFlight().getMaxXpPerMinute(), EPSILON);
         assertEquals(1, child.getStatGrowth().getEffects().length);
         assertSame(childEffect, child.getStatGrowth().getEffects()[0]);
     }
