@@ -77,6 +77,58 @@ class AvatarFlightExperienceServiceTest {
     }
 
     @Test
+    void capDoesNotRefreshUntilSixtySecondsAfterFirstAward() throws Exception {
+        AvatarFlightExperienceService service = new AvatarFlightExperienceService();
+        TwLevelingConfig.FlightXpSourceSettings settings = settings(0.15, 10.0, 9.0);
+        AvatarFlightExperienceService.Result firstAward = service.tick(
+                new AvatarFlightExperienceService.State(59.8, 0.0, 1_000L, 10_800L),
+                settings, true, 11_000L);
+        AvatarFlightExperienceService.State state = firstAward.state();
+        double totalAwardedXp = firstAward.awardedXp();
+
+        for (long nowMs = 11_250L; nowMs <= 61_000L; nowMs += 250L) {
+            AvatarFlightExperienceService.Result result = service.tick(state, settings, true, nowMs);
+            totalAwardedXp += result.awardedXp();
+            state = result.state();
+        }
+
+        assertEquals(9.0, totalAwardedXp, EPSILON);
+        assertEquals(0.0, state.qualifiedSeconds(), EPSILON);
+        assertEquals(9.0, state.windowAwardedXp(), EPSILON);
+    }
+
+    @Test
+    void backwardClockDoesNotRefreshCurrentMinuteAllowance() throws Exception {
+        AvatarFlightExperienceService service = new AvatarFlightExperienceService();
+
+        AvatarFlightExperienceService.Result result = service.tick(
+                new AvatarFlightExperienceService.State(9.8, 9.0, 11_000L, 10_800L),
+                settings(0.15, 10.0, 9.0), true, 9_000L);
+
+        assertEquals(0.0, result.awardedXp(), EPSILON);
+        assertEquals(9.8, result.state().qualifiedSeconds(), EPSILON);
+        assertEquals(9.0, result.state().windowAwardedXp(), EPSILON);
+        assertEquals(11_000L, result.state().windowStartedAtMs());
+    }
+
+    @Test
+    void rollingCapWaitsSixtySecondsAfterMostRecentAward() throws Exception {
+        AvatarFlightExperienceService service = new AvatarFlightExperienceService();
+        TwLevelingConfig.FlightXpSourceSettings settings = settings(0.15, 10.0, 9.0);
+        AvatarFlightExperienceService.State state = new AvatarFlightExperienceService.State(9.8, 0.0, 1_000L, 10_800L);
+
+        for (long nowMs = 11_000L; nowMs <= 61_000L; nowMs += 10_000L) {
+            state = service.tick(state, settings, true, nowMs).state();
+            state = new AvatarFlightExperienceService.State(9.8, state.windowAwardedXp(),
+                    state.windowStartedAtMs(), nowMs - 200L);
+        }
+        AvatarFlightExperienceService.Result result = service.tick(state, settings, true, 71_000L);
+
+        assertEquals(0.0, result.awardedXp(), EPSILON);
+        assertEquals(9.0, result.state().windowAwardedXp(), EPSILON);
+    }
+
+    @Test
     void largeClockJumpContributesAtMostOneTickOfQualifiedTime() throws Exception {
         AvatarFlightExperienceService service = new AvatarFlightExperienceService();
 

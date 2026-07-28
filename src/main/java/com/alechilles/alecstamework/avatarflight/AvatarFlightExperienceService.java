@@ -39,7 +39,7 @@ public final class AvatarFlightExperienceService {
 
         long windowStartedAtMs = current.windowStartedAtMs();
         double windowAwardedXp = nonNegative(current.windowAwardedXp());
-        if (nowMs - windowStartedAtMs >= MINUTE_MS || nowMs < windowStartedAtMs) {
+        if (windowAwardedXp > 0.0d && nowMs - windowStartedAtMs >= MINUTE_MS) {
             windowStartedAtMs = nowMs;
             windowAwardedXp = 0.0d;
         }
@@ -62,12 +62,18 @@ public final class AvatarFlightExperienceService {
         }
 
         qualifiedSeconds -= fullIntervals * awardIntervalSeconds;
+        if (windowAwardedXp == 0.0d) {
+            windowStartedAtMs = nowMs;
+        }
         double availableXp = Math.max(0.0d, settings.getMaxXpPerMinute() - windowAwardedXp);
         double award = Math.min(
                 fullIntervals * awardIntervalSeconds * settings.getXpPerQualifiedSecond(),
                 availableXp
         );
         windowAwardedXp += award;
+        if (award > 0.0d) {
+            windowStartedAtMs = nowMs;
+        }
         return new Result(new State(qualifiedSeconds, windowAwardedXp, windowStartedAtMs, nowMs), award);
     }
 
