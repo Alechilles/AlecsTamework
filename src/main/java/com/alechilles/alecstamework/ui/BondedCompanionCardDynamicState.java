@@ -8,14 +8,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Identifies card changes caused only by locally advancing session and
- * cooldown timers, which can be patched without recreating card controls.
+ * Identifies live card changes that can be patched without recreating controls.
  */
 final class BondedCompanionCardDynamicState {
     private BondedCompanionCardDynamicState() {
     }
 
-    static boolean changedOnlyByTimers(
+    static boolean changedOnlyByLiveFields(
             @Nonnull BondedCompanionPanelPresentation previous,
             @Nonnull BondedCompanionPanelPresentation current
     ) {
@@ -28,19 +27,22 @@ final class BondedCompanionCardDynamicState {
                 && Objects.equals(previous.species(), current.species())
                 && Objects.equals(previous.gender(), current.gender())
                 && Objects.equals(previous.rolePresentation(), current.rolePresentation())
-                && attributesWithoutSessionTimer(previous.attributes()).equals(
-                        attributesWithoutSessionTimer(current.attributes()))
+                && attributesWithoutLiveFields(previous.attributes()).equals(
+                        attributesWithoutLiveFields(current.attributes()))
                 && previous.extensions().equals(current.extensions())
                 && sameStatusExceptCooldown(previous.status(), current.status())
                 && sameQuoteExceptCooldown(previous.reviveQuote(),
                         current.reviveQuote());
     }
 
-    private static Map<String, String> attributesWithoutSessionTimer(
+    private static Map<String, String> attributesWithoutLiveFields(
             Map<String, String> attributes
     ) {
         Map<String, String> fixed = new HashMap<>(attributes);
         fixed.remove("sessionRemainingMs");
+        fixed.remove("currentHealth");
+        fixed.remove("maxHealth");
+        fixed.remove("healthPercent");
         return fixed;
     }
 

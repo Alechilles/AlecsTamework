@@ -67,8 +67,8 @@ final class BondedCompanionCardPresenter {
     }
 
     /**
-     * Patches only the text and accents that change as a session or cooldown
-     * counts down. Existing controls and their input bindings remain intact.
+     * Patches live status text, vitals, and accents without recreating card
+     * controls or their input bindings.
      */
     static void refreshDynamicState(
             @Nonnull UICommandBuilder commands,
@@ -77,6 +77,7 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         bindState(commands, entrySelector, row, language);
+        bindHealth(commands, entrySelector, row.attributes());
     }
 
     /**

@@ -37,18 +37,21 @@ final class LinkedNpcPanelCardRenderState {
     ) {
         LinkedNpcEntry previousEntry = entries[index];
         LinkedNpcEntry currentEntry = currentEntries[index];
-        if (!Objects.equals(previousEntry, currentEntry)
-                || pending(previousEntry, pendingUnlinkNpcUuid)
-                        != pending(currentEntry, currentPendingUnlinkNpcUuid)) {
+        if (pending(previousEntry, pendingUnlinkNpcUuid)
+                != pending(currentEntry, currentPendingUnlinkNpcUuid)) {
             return Update.FULL;
         }
         CommandPanelFeaturePresentation previous = features.get(
                 currentEntry.npcUuid());
         CommandPanelFeaturePresentation current = currentFeatures.get(
                 currentEntry.npcUuid());
+        // Active bonded health also updates the legacy row snapshot. Classify
+        // its matching bonded presentation before that stale generic row can
+        // force a full-card bind.
+        if (onlyDynamicBondedChange(previous, current)) return Update.DYNAMIC;
+        if (!Objects.equals(previousEntry, currentEntry)) return Update.FULL;
         if (Objects.equals(previous, current)) return Update.NONE;
-        return onlyDynamicBondedChange(previous, current)
-                ? Update.DYNAMIC : Update.FULL;
+        return Update.FULL;
     }
 
     void markRendered(
@@ -72,7 +75,7 @@ final class LinkedNpcPanelCardRenderState {
     ) {
         return previous != null && current != null
                 && previous.bonded() != null && current.bonded() != null
-                && BondedCompanionCardDynamicState.changedOnlyByTimers(
+                && BondedCompanionCardDynamicState.changedOnlyByLiveFields(
                         previous.bonded(), current.bonded());
     }
 

@@ -282,6 +282,23 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
+    void dynamicRefreshPatchesTheLiveHealthBarWithoutRecreatingTheCard() {
+        BondedCompanionPanelPresentation row = presentation(
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS,
+                true,
+                Map.of("currentHealth", "125", "maxHealth", "250"), null
+        );
+        UICommandBuilder commands = new UICommandBuilder();
+
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", row,
+                "en-US");
+
+        assertCommand(commands, "#Card #BondedHealthText.Text", "125 / 250");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "179");
+    }
+
+    @Test
     void progressionRowUsesTheExistingTalentCommandPathForEveryBondedState()
             throws Exception {
         String presenter = Files.readString(Path.of("src", "main", "java",
