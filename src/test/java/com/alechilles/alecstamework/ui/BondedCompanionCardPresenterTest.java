@@ -298,6 +298,26 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
+    void cardCanRebindTalentInputWithoutRecreatingItsVisualTree() throws Exception {
+        String presenter = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
+
+        int bindingStart = presenter.indexOf("static void bindEventBindings(");
+        int unlinkStart = presenter.indexOf("private static void bindUnlink(", bindingStart);
+        assertTrue(bindingStart >= 0,
+                "Bonded cards need an input-only refresh binding helper.");
+        assertTrue(unlinkStart > bindingStart,
+                "Input-only binding helper should be bounded by card rendering helpers.");
+
+        String binding = presenter.substring(bindingStart, unlinkStart);
+        assertTrue(binding.contains("bindProgressionEvents"),
+                "The lightweight refresh must keep the level/talent shortcut bound.");
+        assertFalse(binding.contains("UICommandBuilder"),
+                "Input refreshes must not rebuild or flicker the card visual tree.");
+    }
+
+    @Test
     void pointsUseTheCompactLevelUpIconInsteadOfLongInlineText() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.STORED,

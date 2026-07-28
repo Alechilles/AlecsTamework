@@ -844,6 +844,15 @@ public final class TameworkCommandSelectionPage
                     BondedCompanionCardPresenter.refreshDynamicState(
                             commandBuilder, "#TameworkLinkedPanelList[" + i + "]",
                             current.bonded(), resolveLanguage());
+                    bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
+                            current.bonded());
+                } else {
+                    CommandPanelFeaturePresentation current =
+                            featurePresentations.get(linkedNpcEntries[i].npcUuid());
+                    if (current != null && current.bonded() != null) {
+                        bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
+                                current.bonded());
+                    }
                 }
             }
         }
@@ -923,6 +932,17 @@ public final class TameworkCommandSelectionPage
                 resolveLanguage(),
                 featureController.presentation(entry.npcUuid())
         );
+    }
+
+    /** Rebinds stable bonded-card input after a lightweight refresh packet. */
+    private void bindBondedCardEvents(@Nonnull UIEventBuilder eventBuilder,
+                                      int index,
+                                      @Nonnull LinkedNpcEntry entry,
+                                      @Nonnull BondedCompanionPanelPresentation presentation) {
+        BondedCompanionCardPresenter.bindEventBindings(eventBuilder,
+                "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
+                presentation, isPendingUnlink(entry.npcUuid()), cardBindingConfig,
+                resolveLanguage());
     }
 
     private void applyGroupAssignOverlayState(@Nonnull UICommandBuilder commandBuilder) {

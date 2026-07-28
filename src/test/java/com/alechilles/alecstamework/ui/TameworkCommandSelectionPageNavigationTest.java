@@ -157,6 +157,22 @@ class TameworkCommandSelectionPageNavigationTest {
     }
 
     @Test
+    void lightweightRefreshesRebindBondedCardInput() throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
+        int updateEnd = content.indexOf("private void closePage()", updateStart);
+
+        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
+        assertTrue(updateEnd > updateStart, "Refresh sender should be bounded by page navigation.");
+
+        String update = content.substring(updateStart, updateEnd);
+        assertTrue(update.contains("bindBondedCardEvents(eventBuilder"),
+                "Refresh packets must retain the bonded card's talent click handler.");
+        assertTrue(content.contains("private void bindBondedCardEvents"),
+                "Bonded input rebinding should be isolated from visual card rendering.");
+    }
+
+    @Test
     void refreshTickPatchesUnchangedPanelChromeOnlyWhenItsValueChanges()
             throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);

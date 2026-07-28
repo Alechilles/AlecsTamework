@@ -79,6 +79,31 @@ final class BondedCompanionCardPresenter {
         bindState(commands, entrySelector, row, language);
     }
 
+    /**
+     * Re-emits card input bindings without recreating any visible controls.
+     *
+     * <p>The linked panel sends lightweight refresh packets while timers are
+     * running. Those packets have a fresh event-binding payload, so a bonded
+     * card must contribute its handlers again even when its visual tree did
+     * not need a rebuild.</p>
+     */
+    static void bindEventBindings(
+            @Nonnull UIEventBuilder events,
+            @Nonnull String entrySelector,
+            @Nonnull UUID cardUuid,
+            @Nonnull BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
+            @Nonnull LinkedNpcPanelCardBinder.CardBindingConfig config,
+            @Nullable String language
+    ) {
+        bindUnlinkEvents(events, entrySelector, cardUuid, config);
+        bindProgressionEvents(events, entrySelector, cardUuid,
+                progressionSummary(row.attributes(), row.roleId()),
+                pendingUnlink, config);
+        bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
+                pendingUnlink, config, language);
+    }
+
 
     private static void bindUnlink(
             UICommandBuilder commands,
@@ -99,6 +124,15 @@ final class BondedCompanionCardPresenter {
                             "tamework.ui.linkedPanel.bonded.detail.unlinkConfirm"));
             commands.set(entrySelector + " #BondedStateDetailValue.Text", "");
         }
+        bindUnlinkEvents(events, entrySelector, cardUuid, config);
+    }
+
+    private static void bindUnlinkEvents(
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            LinkedNpcPanelCardBinder.CardBindingConfig config
+    ) {
         String command = config.unlinkCommandPrefix() + cardUuid;
         events.addEventBinding(CustomUIEventBindingType.Activating,
                 entrySelector + " #BondedUnlinkButton",
@@ -284,6 +318,18 @@ final class BondedCompanionCardPresenter {
         }
         commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
                 progressionTooltip(progression, row.attributes()));
+        bindProgressionEvents(events, entrySelector, cardUuid, progression,
+                pendingUnlink, config);
+    }
+
+    private static void bindProgressionEvents(
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            ProgressionSummary progression,
+            boolean pendingUnlink,
+            LinkedNpcPanelCardBinder.CardBindingConfig config
+    ) {
         // A saved level is sufficient to inspect the durable talent page. The
         // page itself resolves a saved or role-derived tree and can explain a
         // genuinely missing configuration instead of leaving a silent button.
@@ -342,6 +388,25 @@ final class BondedCompanionCardPresenter {
         commands.set(entrySelector + " #BondedReviveActionNoTooltip.Visible",
                 enabled && revive && !tooltipVisible);
         commands.set(entrySelector + " #BondedReviveActionNoTooltip.Text", label);
+        bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
+                pendingUnlink, config, language);
+    }
+
+    private static void bindPrimaryActionEvents(
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            boolean pendingUnlink,
+            LinkedNpcPanelCardBinder.CardBindingConfig config,
+            @Nullable String language
+    ) {
+        BondedCompanionStatusPresentation status = row.status();
+        String tooltip = actionTooltip(row, status, language);
+        boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
+        boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
+        boolean revive = status.action() == BondedCompanionStatusPresentation.Action.REVIVE;
+        boolean tooltipVisible = !tooltip.isBlank();
         if (!enabled) {
             return;
         }
