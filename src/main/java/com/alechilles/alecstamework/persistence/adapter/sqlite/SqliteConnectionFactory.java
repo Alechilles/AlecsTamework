@@ -77,6 +77,23 @@ public final class SqliteConnectionFactory {
         }
     }
 
+    /**
+     * Opens an immutable schema probe without configuring SQLite pragmas or creating sidecars.
+     *
+     * <p>The result is {@code null} when no database file exists. Callers use this only to decide
+     * whether an existing target may be initialized; it must stay free of connection policy
+     * configuration so foreign databases remain untouched.</p>
+     */
+    public Connection openImmutableSchemaProbeConnection() throws SQLException {
+        ensureDriverLoaded();
+        if (!Files.isRegularFile(databasePath)) {
+            return null;
+        }
+        return DriverManager.getConnection(
+                "jdbc:sqlite:" + databasePath.toUri() + "?mode=ro&immutable=1"
+        );
+    }
+
     private Connection open() throws SQLException {
         try {
             return DriverManager.getConnection(jdbcUrl);

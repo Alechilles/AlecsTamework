@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceReadResult;
 import com.alechilles.alecstamework.persistence.kernel.PersistenceTransactionResult;
 import com.alechilles.alecstamework.persistence.kernel.StorageFailureKind;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -152,6 +154,94 @@ class SqliteSchemaV1ManagerTest {
     }
 
     @Test
+    void viewOnlyDatabaseIsRejectedWithoutChangingItsFiles() throws Exception {
+        Path viewOnlyPath = tempDir.resolve("view-only.sqlite");
+        SqliteConnectionFactory viewOnlyConnections = new SqliteConnectionFactory(viewOnlyPath);
+        try (Connection connection = viewOnlyConnections.openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE VIEW companion_profile AS SELECT 1 AS profile_id");
+            statement.execute("PRAGMA wal_checkpoint(FULL)");
+
+            byte[] databaseBefore = Files.readAllBytes(viewOnlyPath);
+            SidecarState walBefore = sidecarState(viewOnlyPath, "-wal");
+            SidecarState shmBefore = sidecarState(viewOnlyPath, "-shm");
+            assertTrue(walBefore.exists());
+            assertTrue(shmBefore.exists());
+            assertTrue(walBefore.bytes().length > 0);
+            assertTrue(shmBefore.bytes().length > 0);
+
+            SqliteSchemaV1Manager viewOnlySchemas = new SqliteSchemaV1Manager(viewOnlyConnections, () -> 1);
+            PersistenceTransactionResult.RolledBack<?> rejected =
+                    assertInstanceOf(PersistenceTransactionResult.RolledBack.class, viewOnlySchemas.initialize());
+
+            assertEquals(StorageFailureKind.SCHEMA, rejected.failure().kind());
+            assertArrayEquals(databaseBefore, Files.readAllBytes(viewOnlyPath));
+            assertSidecarUnchanged(walBefore, viewOnlyPath, "-wal");
+            assertSidecarUnchanged(shmBefore, viewOnlyPath, "-shm");
+        }
+    }
+
+    @Test
+    void triggerTamperingFailsInitializationAndReadinessClosed() throws Exception {
+        schemas.initialize();
+        execute("""
+                CREATE TRIGGER block_operation_envelope_insert
+                BEFORE INSERT ON operation_envelope
+                BEGIN
+                    SELECT RAISE(ABORT, 'unexpected trigger');
+                END
+                """);
+
+        PersistenceTransactionResult.RolledBack<?> initialization =
+                assertInstanceOf(PersistenceTransactionResult.RolledBack.class, schemas.initialize());
+        PersistenceReadResult.Failed<?> readiness =
+                assertInstanceOf(PersistenceReadResult.Failed.class, schemas.verify());
+
+        assertEquals(StorageFailureKind.SCHEMA, initialization.failure().kind());
+        assertEquals("replacement_schema_object_mismatch", readiness.failure().code());
+    }
+
+    @Test
+    void sameNamedNonUniqueAliasIndexFailsClosed() throws Exception {
+        schemas.initialize();
+        execute("DROP INDEX uq_companion_alias_current_profile");
+        execute("CREATE INDEX uq_companion_alias_current_profile ON companion_alias(profile_id)");
+
+        PersistenceTransactionResult.RolledBack<?> initialization =
+                assertInstanceOf(PersistenceTransactionResult.RolledBack.class, schemas.initialize());
+        PersistenceReadResult.Failed<?> readiness =
+                assertInstanceOf(PersistenceReadResult.Failed.class, schemas.verify());
+
+        assertEquals(StorageFailureKind.SCHEMA, initialization.failure().kind());
+        assertEquals("replacement_schema_definition_mismatch", initialization.failure().code());
+        assertEquals("replacement_schema_definition_mismatch", readiness.failure().code());
+    }
+
+    @Test
+    void caseOnlyOperationEnvelopeCheckLiteralTamperingFailsClosed() throws Exception {
+        schemas.initialize();
+        try (Connection connection = connections.openWriterConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA writable_schema = ON");
+            statement.executeUpdate("""
+                    UPDATE sqlite_master
+                    SET sql = replace(sql, '''PREPARED''', '''prepared''')
+                    WHERE type = 'table' AND name = 'operation_envelope'
+                    """);
+            statement.execute("PRAGMA writable_schema = OFF");
+        }
+
+        PersistenceTransactionResult.RolledBack<?> initialization =
+                assertInstanceOf(PersistenceTransactionResult.RolledBack.class, schemas.initialize());
+        PersistenceReadResult.Failed<?> readiness =
+                assertInstanceOf(PersistenceReadResult.Failed.class, schemas.verify());
+
+        assertEquals(StorageFailureKind.SCHEMA, initialization.failure().kind());
+        assertEquals("replacement_schema_definition_mismatch", initialization.failure().code());
+        assertEquals("replacement_schema_definition_mismatch", readiness.failure().code());
+    }
+
+    @Test
     void bundledSqlParserPreservesQuotedSemicolonsAndComments() {
         assertEquals(
                 java.util.List.of(
@@ -231,6 +321,20 @@ class SqliteSchemaV1ManagerTest {
         return Set.copyOf(names);
     }
 
+    private SidecarState sidecarState(Path databasePath, String suffix) throws Exception {
+        Path sidecar = Path.of(databasePath + suffix);
+        return Files.exists(sidecar)
+                ? new SidecarState(true, Files.readAllBytes(sidecar))
+                : new SidecarState(false, new byte[0]);
+    }
+
+    private void assertSidecarUnchanged(SidecarState before, Path databasePath, String suffix)
+            throws Exception {
+        SidecarState after = sidecarState(databasePath, suffix);
+        assertEquals(before.exists(), after.exists());
+        assertArrayEquals(before.bytes(), after.bytes());
+    }
+
     private long queryLong(String sql) throws Exception {
         try (Connection connection = connections.openReadConnection();
              Statement statement = connection.createStatement();
@@ -247,5 +351,8 @@ class SqliteSchemaV1ManagerTest {
             assertTrue(row.next());
             return row.getString(1);
         }
+    }
+
+    private record SidecarState(boolean exists, byte[] bytes) {
     }
 }
