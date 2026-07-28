@@ -28,7 +28,7 @@ class TameworkCommandSelectionPageNavigationTest {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
         int branchStart = content.indexOf("commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)");
         int branchEnd = content.indexOf(
-                "if (!CommandSelectionOptionSource.contains(options, commandId))",
+                "if (rosterEventBoundary.blocks(data, commandId))",
                 branchStart
         );
 
@@ -154,6 +154,20 @@ class TameworkCommandSelectionPageNavigationTest {
                 "countdown updates must not clear and recreate every card");
         assertTrue(update.contains("refreshDynamicState"),
                 "countdown updates should patch the existing bonded card in place");
+    }
+
+    @Test
+    void bondedTalentNavigationPrecedesTheLegacyRosterEventBoundary()
+            throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int talentBranch = content.indexOf(
+                "if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX))");
+        int legacyBoundary = content.indexOf(
+                "if (rosterEventBoundary.blocks(data, commandId))");
+
+        assertTrue(talentBranch >= 0, "Talent navigation branch should exist.");
+        assertTrue(legacyBoundary > talentBranch,
+                "A bonded companion's valid talent action must not be rejected as a legacy roster event.");
     }
 
     @Test

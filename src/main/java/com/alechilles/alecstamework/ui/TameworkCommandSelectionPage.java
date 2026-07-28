@@ -330,6 +330,32 @@ public final class TameworkCommandSelectionPage
                 == LinkedNpcPanelFeatureController.Outcome.HANDLED) {
             return;
         }
+        if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)) {
+            if (openTalentsCallback == null) {
+                logTalentNavigation(true, "event ignored: talent callback missing");
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                    OPEN_TALENTS_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                if (!beginPageNavigation()) {
+                    logTalentNavigation(true,
+                            "event ignored: navigation already pending");
+                    return;
+                }
+                logTalentNavigation(true, "navigation queued npc=" + npcUuid);
+                navigateAfterUiDrain(() -> {
+                    try {
+                        logTalentNavigation(true,
+                                "navigation dispatch npc=" + npcUuid);
+                        openTalentsCallback.accept(npcUuid);
+                    } finally {
+                        navigationPending = false;
+                    }
+                });
+            }
+            return;
+        }
         if (rosterEventBoundary.blocks(data, commandId)) {
             return;
         }
@@ -620,29 +646,6 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
-            }
-            return;
-        }
-        if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)) {
-            if (openTalentsCallback == null) {
-                logTalentNavigation(true, "event ignored: talent callback missing");
-                return;
-            }
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
-            if (npcUuid != null) {
-                if (!beginPageNavigation()) {
-                    logTalentNavigation(true, "event ignored: navigation already pending");
-                    return;
-                }
-                logTalentNavigation(true, "navigation queued npc=" + npcUuid);
-                navigateAfterUiDrain(() -> {
-                    try {
-                        logTalentNavigation(true, "navigation dispatch npc=" + npcUuid);
-                        openTalentsCallback.accept(npcUuid);
-                    } finally {
-                        navigationPending = false;
-                    }
-                });
             }
             return;
         }
