@@ -36,7 +36,7 @@ class BondedCompanionCardPresenterTest {
                 "Lifecycle state is informational text, not a button-like badge.");
         assertTrue(asset.contains("#BondedHealthFrame"));
         assertTrue(asset.contains("#BondedHealthFill")
-                        && asset.contains("Top: 1, Left: 1, Width: 375, Height: 16"),
+                        && asset.contains("Top: 1, Left: 1, Width: 363, Height: 16"),
                 "The static health fill begins inside the track; runtime sizing preserves its right inset.");
         assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
                 "Health treatment should be easier to read than the compact original.");
@@ -255,7 +255,8 @@ class BondedCompanionCardPresenterTest {
                         .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
                                 && command.data.contains("Female")),
                 "Gender belongs exclusively to the existing gender icon.");
-        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
+        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "true");
+        assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "false");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)
                                 && command.data.contains("<color")),
@@ -275,7 +276,7 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "375");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "363");
     }
 
     @Test
@@ -291,8 +292,8 @@ class BondedCompanionCardPresenterTest {
         assertTrue(progression.contains("#BondedProgressionButton"));
         assertTrue(progression.contains("config.openTalentsCommandPrefix() + cardUuid"),
                 "The inline level text must open this bonded companion's talent page.");
-        assertTrue(progression.contains("progression.visible() && !pendingUnlink"),
-                "Every bonded companion with saved level data should open its durable talent page.");
+        assertTrue(progression.contains("boolean canOpen = !pendingUnlink"),
+                "The persistent stats button should open the durable talent page in every card state.");
         assertFalse(progression.contains("row.status().state() == BondedCompanionStateView.ACTIVE"),
                 "Stored and dead bonded companions must open the same durable talent page.");
     }
@@ -332,11 +333,31 @@ class BondedCompanionCardPresenterTest {
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "true");
+        assertCommand(commands, "#Card #BondedTalentPointCount.Visible", "true");
         assertCommand(commands, "#Card #BondedTalentPointCount.Text", "2");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
                                 && command.data.contains("POINTS AVAILABLE")),
                 "Available points should be represented by the compact icon badge.");
+    }
+
+    @Test
+    void finalCardPlacesLevelInTheIdentityRowAndStatsBesideTheAction()
+            throws Exception {
+        String asset = Files.readString(Path.of("src", "main", "resources",
+                "Common", "UI", "Custom",
+                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
+
+        assertTrue(asset.contains("#BondedLevelText {\n        Anchor: (Top: 30, Left: 22"),
+                "Level should lead the compact identity row.");
+        assertTrue(asset.contains("#BondedGenderFemaleIcon {\n        Anchor: (Top: 33, Left: 82"),
+                "Gender icon should follow the level text.");
+        assertTrue(asset.contains("#BondedSpecies {\n        Anchor: (Top: 30, Left: 100"),
+                "Species should follow the gender icon.");
+        assertTrue(asset.contains("#BondedTalentPointAction {\n        Anchor: (Top: 82, Right: 118"),
+                "The stats button belongs beside the primary bottom-right action.");
+        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 20"),
+                "Health should retain equal visible inset on both sides of the card.");
     }
 
     @Test

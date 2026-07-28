@@ -187,28 +187,6 @@ class TameworkCommandSelectionPageNavigationTest {
     }
 
     @Test
-    void talentNavigationHasOptInBoundaryTracingForLiveDiagnosis()
-            throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int eventStart = content.indexOf("public void handleDataEvent(");
-        int helperStart = content.indexOf("private static void logTalentNavigation");
-
-        assertTrue(eventStart >= 0, "The page event handler should exist.");
-        assertTrue(helperStart > eventStart,
-                "Talent navigation diagnostics should be isolated in a helper.");
-
-        String eventHandler = content.substring(eventStart, helperStart);
-        assertTrue(eventHandler.contains("event received command="),
-                "Live traces must establish whether the click reached the server page.");
-        assertTrue(eventHandler.contains("navigation queued npc="),
-                "Live traces must establish whether the decoded click reaches page navigation.");
-        assertTrue(eventHandler.contains("navigation dispatch npc="),
-                "Live traces must establish whether the deferred page open actually runs.");
-        assertTrue(content.contains("Bonded talent navigation:"),
-                "Temporary tracing must identify the navigation boundary in the server log.");
-    }
-
-    @Test
     void refreshTickPatchesUnchangedPanelChromeOnlyWhenItsValueChanges()
             throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);

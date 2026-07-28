@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -27,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -296,22 +294,16 @@ public final class TameworkCommandSelectionPage
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
         String receivedCommandId = data.commandId == null ? "" : data.commandId.trim();
-        boolean talentEvent = receivedCommandId.startsWith(
-                OPEN_TALENTS_COMMAND_PREFIX);
         if (dismissed && !navigationPending) {
-            logTalentNavigation(talentEvent, "event ignored: page dismissed");
             return;
         }
         if (navigationPending) {
-            logTalentNavigation(talentEvent, "event ignored: navigation pending");
             return;
         }
         if (!isCurrentLinkedPanelOwner()) {
-            logTalentNavigation(talentEvent, "event ignored: stale panel owner");
             return;
         }
         String commandId = receivedCommandId;
-        logTalentNavigation(talentEvent, "event received command=" + commandId);
         if (handleBondedAbandon(commandId, ref, store)) {
             return;
         }
@@ -332,22 +324,16 @@ public final class TameworkCommandSelectionPage
         }
         if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)) {
             if (openTalentsCallback == null) {
-                logTalentNavigation(true, "event ignored: talent callback missing");
                 return;
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
                     OPEN_TALENTS_COMMAND_PREFIX);
             if (npcUuid != null) {
                 if (!beginPageNavigation()) {
-                    logTalentNavigation(true,
-                            "event ignored: navigation already pending");
                     return;
                 }
-                logTalentNavigation(true, "navigation queued npc=" + npcUuid);
                 navigateAfterUiDrain(() -> {
                     try {
-                        logTalentNavigation(true,
-                                "navigation dispatch npc=" + npcUuid);
                         openTalentsCallback.accept(npcUuid);
                     } finally {
                         navigationPending = false;
@@ -927,24 +913,10 @@ public final class TameworkCommandSelectionPage
                     Ref<EntityStore> activeRef = playerRef.getReference();
                     if (activeRef != null && activeRef.isValid()) {
                         action.run();
-                    } else {
-                        logTalentNavigation(true,
-                                "navigation dropped: player reference unavailable");
                     }
                 }),
                 CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS, TimeUnit.MILLISECONDS)
         );
-    }
-
-    /** Emits short-lived diagnostics while tracing bonded talent navigation. */
-    private static void logTalentNavigation(boolean talentEvent, @Nonnull String message) {
-        if (!talentEvent) {
-            return;
-        }
-        Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.getLogger() != null) {
-            plugin.getLogger().at(Level.INFO).log("Bonded talent navigation: " + message);
-        }
     }
 
     private void bindLinkedNpcCard(@Nonnull UICommandBuilder commandBuilder,

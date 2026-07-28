@@ -80,69 +80,72 @@ Group {
     }
 
     Group #BondedGenderMaleIcon {
-        Anchor: (Top: 33, Left: 22, Width: 14, Height: 14);
+        Anchor: (Top: 33, Left: 82, Width: 14, Height: 14);
         Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png");
         Visible: false;
     }
 
     Group #BondedGenderFemaleIcon {
-        Anchor: (Top: 33, Left: 22, Width: 14, Height: 14);
+        Anchor: (Top: 33, Left: 82, Width: 14, Height: 14);
         Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png");
         Visible: false;
     }
 
     Label #BondedSpecies {
-        Anchor: (Top: 30, Left: 40, Width: 108, Height: 18);
+        Anchor: (Top: 30, Left: 100, Width: 108, Height: 18);
         Text: "";
         Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #BondedLevelText {
-        Anchor: (Top: 30, Left: 152, Width: 40, Height: 18);
+        Anchor: (Top: 30, Left: 22, Width: 54, Height: 18);
         Text: "";
         Style: (FontSize: 11, RenderBold: true, TextColor: #f3d775, HorizontalAlignment: Start, VerticalAlignment: Center);
         Visible: false;
     }
 
     Group #BondedTalentPointAction {
-        Anchor: (Top: 27, Left: 194, Width: 24, Height: 24);
-        Visible: false;
+        Anchor: (Top: 82, Right: 118, Width: 28, Height: 28);
 
         Group #BondedTalentPointIcon {
-            Anchor: (Top: 2, Left: 2, Width: 20, Height: 20);
+            Anchor: (Top: 4, Left: 4, Width: 20, Height: 20);
             Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
         }
 
         Group #BondedTalentPointCountBadgeBorder {
             Anchor: (Top: 0, Left: 10, Width: 14, Height: 12);
             Background: #f6d56b;
+            Visible: false;
         }
 
         Group #BondedTalentPointCountBadgeFill {
             Anchor: (Top: 1, Left: 11, Width: 12, Height: 10);
             Background: #081220;
+            Visible: false;
         }
 
         Label #BondedTalentPointCountShadow {
             Anchor: (Top: 1, Left: 12, Width: 12, Height: 10);
             Text: "";
             Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Visible: false;
         }
 
         Label #BondedTalentPointCount {
             Anchor: (Top: 0, Left: 11, Width: 12, Height: 10);
             Text: "";
             Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Visible: false;
         }
     }
 
     TextButton #BondedProgressionButton {
-        Anchor: (Top: 27, Left: 40, Width: 178, Height: 24);
+        Anchor: (Top: 82, Right: 118, Width: 28, Height: 28);
         Style: @BondedTransparentButton;
         Text: "";
         TooltipText: "";
         TextTooltipStyle: @BondedCardTextTooltipStyle;
-        Visible: false;
+        Visible: true;
     }
 
     Label #BondedStateInWorld {
@@ -183,11 +186,11 @@ Group {
     }
 
     Group #BondedHealthFrame {
-        Anchor: (Top: 56, Left: 14, Right: 14, Height: 18);
+        Anchor: (Top: 56, Left: 20, Right: 20, Height: 18);
         Background: #08121f;
 
         Group #BondedHealthFill {
-            Anchor: (Top: 1, Left: 1, Width: 375, Height: 16);
+            Anchor: (Top: 1, Left: 1, Width: 363, Height: 16);
             Background: #69c77b;
         }
 
@@ -308,13 +311,13 @@ Group {
     }
 
     Label #BondedStateDetail {
-        Anchor: (Top: 82, Left: 14, Right: 118, Height: 14);
+        Anchor: (Top: 82, Left: 14, Right: 150, Height: 14);
         Text: "";
         Style: (FontSize: 10, RenderBold: true, TextColor: #a9c1d7, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #BondedStateDetailValue {
-        Anchor: (Top: 96, Left: 14, Right: 118, Height: 18);
+        Anchor: (Top: 96, Left: 14, Right: 150, Height: 18);
         Text: "";
         Style: (FontSize: 13, TextColor: #e8f1fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }

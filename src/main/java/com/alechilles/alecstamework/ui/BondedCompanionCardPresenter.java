@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
-    private static final int HEALTH_FILL_WIDTH = 375;
+    private static final int HEALTH_FILL_WIDTH = 363;
     private static final int METRIC_LEFT = 14;
     private static final int METRIC_WIDTH = 66;
     private static final int METRIC_GAP = 6;
@@ -158,9 +158,19 @@ final class BondedCompanionCardPresenter {
                 progression.visible() ? LocalizedText.format(language,
                         "tamework.ui.linkedPanel.bonded.talents.level",
                         progression.level()) : "");
-        commands.set(entrySelector + " #BondedTalentPointAction.Visible",
-                progression.talentsConfigured() && progression.availablePoints() > 0);
-        String points = Integer.toString(progression.availablePoints());
+        commands.set(entrySelector + " #BondedTalentPointAction.Visible", true);
+        boolean pointsAvailable = progression.talentsConfigured()
+                && progression.availablePoints() > 0;
+        commands.set(entrySelector + " #BondedTalentPointCountBadgeBorder.Visible",
+                pointsAvailable);
+        commands.set(entrySelector + " #BondedTalentPointCountBadgeFill.Visible",
+                pointsAvailable);
+        commands.set(entrySelector + " #BondedTalentPointCountShadow.Visible",
+                pointsAvailable);
+        commands.set(entrySelector + " #BondedTalentPointCount.Visible",
+                pointsAvailable);
+        String points = pointsAvailable
+                ? Integer.toString(progression.availablePoints()) : "";
         commands.set(entrySelector + " #BondedTalentPointCount.Text", points);
         commands.set(entrySelector + " #BondedTalentPointCountShadow.Text", points);
         commands.set(entrySelector + " #BondedGenderMaleIcon.Visible",
@@ -238,9 +248,9 @@ final class BondedCompanionCardPresenter {
             CardLayout layout
     ) {
         commands.setObject(entrySelector + " #BondedStateDetail.Anchor",
-                horizontalAnchor(14, layout.detailTop(), 118, 14));
+                horizontalAnchor(14, layout.detailTop(), 150, 14));
         commands.setObject(entrySelector + " #BondedStateDetailValue.Anchor",
-                horizontalAnchor(14, layout.detailTop() + 14, 118, 18));
+                horizontalAnchor(14, layout.detailTop() + 14, 150, 18));
         Anchor action = rightAnchor(layout.actionTop(), 14, 94, 28);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
         commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
@@ -312,12 +322,12 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         commands.set(entrySelector + " #BondedProgressionButton.Visible",
-                progression.visible());
-        if (!progression.visible()) {
-            return;
-        }
+                !pendingUnlink);
         commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
-                progressionTooltip(progression, row.attributes()));
+                progression.visible()
+                        ? progressionTooltip(progression, row.attributes())
+                        : LocalizedText.resolve(language,
+                                "tamework.ui.linkedPanel.bonded.talents.tooltip"));
         bindProgressionEvents(events, entrySelector, cardUuid, progression,
                 pendingUnlink, config);
     }
@@ -333,7 +343,7 @@ final class BondedCompanionCardPresenter {
         // A saved level is sufficient to inspect the durable talent page. The
         // page itself resolves a saved or role-derived tree and can explain a
         // genuinely missing configuration instead of leaving a silent button.
-        boolean canOpen = progression.visible() && !pendingUnlink;
+        boolean canOpen = !pendingUnlink;
         if (canOpen) {
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + " #BondedProgressionButton",
