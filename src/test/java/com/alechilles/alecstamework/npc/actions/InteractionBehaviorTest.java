@@ -8,14 +8,17 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.bson.BsonDocument;
 import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,14 +34,6 @@ class InteractionBehaviorTest {
     private static final Path INTERACTION_HARVEST_EFFECTS = Paths.get(
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "actions", "InteractionHarvestEffects.java"
-    );
-    private static final Path INTERACTION_EFFECTS = Paths.get(
-            "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractEffects.java"
-    );
-    private static final Path INTERACTION_STATE_EFFECTS = Paths.get(
-            "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionStateEffects.java"
     );
 
     @Test
@@ -99,25 +94,22 @@ class InteractionBehaviorTest {
 
     @Test
     void setRoleEffectForwardsVisualChangeFlagWhileLegacyRoleSwapsRemainFalse() throws Exception {
-        String interactionEffects = Files.readString(INTERACTION_EFFECTS, StandardCharsets.UTF_8);
-        String stateEffects = Files.readString(INTERACTION_STATE_EFFECTS, StandardCharsets.UTF_8);
+        CapturingRoleChangeEffects roleChanges = new CapturingRoleChangeEffects();
+        TameworkInteractEffects effects = newEffects(roleChanges);
+        TwInteractionConfig.SetRoleEffect visualSwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\",\"ChangeAppearance\":true}"),
+                new ExtraInfo()
+        );
+        TwInteractionConfig.SetRoleEffect legacySwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\"}"),
+                new ExtraInfo()
+        );
 
-        assertTrue(interactionEffects.contains(
-                "stateEffects.applySetRole(roleId, effect.getChangeAppearance(), npcRef, role, store)"),
-                "SetRole must forward its opt-in visual-change flag."
-        );
-        assertTrue(interactionEffects.contains(
-                "stateEffects.applySetRole(roleId, false, npcRef, role, store)"),
-                "Existing tame role swaps must retain the false visual-change default."
-        );
-        assertTrue(stateEffects.contains(
-                "boolean changeAppearance, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store)"),
-                "Role changes must accept the interaction visual-change flag."
-        );
-        assertTrue(stateEffects.contains(
-                "roleIndex,\n                changeAppearance,\n                store"),
-                "RoleChangeSystem must receive the requested visual-change flag."
-        );
+        assertTrue(invokeApplySetRole(effects, visualSwap));
+        assertTrue(roleChanges.changeAppearance);
+        assertTrue(invokeApplySetRole(effects, legacySwap));
+        assertFalse(roleChanges.changeAppearance);
+        assertEquals(2, roleChanges.calls);
     }
 
     @Test
@@ -473,6 +465,44 @@ class InteractionBehaviorTest {
                 null,
                 new StdScope[0]
         );
+    }
+
+    private static TameworkInteractEffects newEffects(InteractionRoleChangeEffects roleChanges) throws Exception {
+        TameworkInteractEffects effects = (TameworkInteractEffects) getUnsafe().allocateInstance(TameworkInteractEffects.class);
+        Field roleChangeEffectsField = TameworkInteractEffects.class.getDeclaredField("roleChangeEffects");
+        roleChangeEffectsField.setAccessible(true);
+        roleChangeEffectsField.set(effects, roleChanges);
+        return effects;
+    }
+
+    private static boolean invokeApplySetRole(TameworkInteractEffects effects,
+                                              TwInteractionConfig.SetRoleEffect roleEffect) throws Exception {
+        Method method = TameworkInteractEffects.class.getDeclaredMethod(
+                "applySetRole",
+                TwInteractionConfig.SetRoleEffect.class,
+                com.hypixel.hytale.component.Ref.class,
+                Role.class,
+                com.hypixel.hytale.component.Store.class,
+                InteractionContextSnapshot.class
+        );
+        method.setAccessible(true);
+        return (boolean) method.invoke(effects, roleEffect, null, null, null, null);
+    }
+
+    private static final class CapturingRoleChangeEffects implements InteractionRoleChangeEffects {
+        private boolean changeAppearance;
+        private int calls;
+
+        @Override
+        public boolean applySetRole(String roleId,
+                                    boolean changeAppearance,
+                                    com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> npcRef,
+                                    Role role,
+                                    com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store) {
+            this.changeAppearance = changeAppearance;
+            calls++;
+            return true;
+        }
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

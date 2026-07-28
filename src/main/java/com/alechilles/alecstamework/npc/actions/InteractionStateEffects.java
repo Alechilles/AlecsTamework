@@ -39,7 +39,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
-final class InteractionStateEffects {
+final class InteractionStateEffects implements InteractionRoleChangeEffects {
     private static final String HEALTH_STAT_ID = "Health";
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;

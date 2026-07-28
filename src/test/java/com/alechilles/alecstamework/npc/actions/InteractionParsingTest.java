@@ -67,9 +67,14 @@ class InteractionParsingTest {
                 BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\"}"),
                 new ExtraInfo()
         );
+        TwInteractionConfig.SetRoleEffect nullSwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\",\"ChangeAppearance\":null}"),
+                new ExtraInfo()
+        );
 
         assertTrue(visualSwap.getChangeAppearance());
         assertFalse(legacySwap.getChangeAppearance());
+        assertFalse(nullSwap.getChangeAppearance());
     }
 
     @Test
