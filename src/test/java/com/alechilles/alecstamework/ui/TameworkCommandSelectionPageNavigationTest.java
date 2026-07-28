@@ -101,7 +101,7 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Replacement-page navigation should use only a short drain delay now that stale refresh owners are blocked."
         );
         assertTrue(
-                helper.contains("dispatchNavigationAction(action)"),
+                helper.contains("CommandPageWorldDispatcher.dispatch("),
                 "Replacement-page navigation should still run the replacement-page open on the world thread."
         );
     }
