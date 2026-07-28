@@ -252,7 +252,7 @@ Group #TameworkLinkedPanelRoot {
             Visible: false;
 
             Group #TameworkLinkedPanelReviveModal {
-                Anchor: (Top: 92, Left: 24, Width: 382, Height: 420);
+                Anchor: (Top: 230, Left: 24, Width: 382, Height: 180);
                 Background: #102038;
 
                 Label #TameworkLinkedPanelReviveTitle {
@@ -261,20 +261,8 @@ Group #TameworkLinkedPanelRoot {
                     Style: (FontSize: 18, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
-                Label #TameworkLinkedPanelReviveSubtitle {
-                    Anchor: (Top: 39, Left: 14, Width: 354, Height: 22);
-                    Text: "";
-                    Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
-                }
-
-                Label {
-                    Anchor: (Top: 66, Left: 14, Width: 354, Height: 18);
-                    Text: %server.tamework.ui.linkedPanel.revive.costHeader;
-                    Style: (FontSize: 12, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
-                }
-
                 Group #TameworkLinkedPanelReviveCostViewport {
-                    Anchor: (Top: 88, Left: 14, Width: 354, Height: 240);
+                    Anchor: (Top: 44, Left: 14, Width: 354, Height: 88);
                     KeepScrollPosition: true;
                     ScrollbarStyle: $C.@DefaultScrollbarStyle;
                     LayoutMode: TopScrolling;
@@ -285,14 +273,8 @@ Group #TameworkLinkedPanelRoot {
                     }
                 }
 
-                Label #TameworkLinkedPanelReviveSummary {
-                    Anchor: (Top: 334, Left: 14, Width: 354, Height: 20);
-                    Text: "";
-                    Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
-                }
-
-                Group {
-                    Anchor: (Top: 366, Left: 14, Width: 354, Height: 30);
+                Group #TameworkLinkedPanelReviveActions {
+                    Anchor: (Top: 146, Left: 14, Width: 354, Height: 24);
                     LayoutMode: Left;
 
                     Group { Anchor: (Width: 158); }

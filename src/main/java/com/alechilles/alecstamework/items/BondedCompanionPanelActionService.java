@@ -48,8 +48,9 @@ final class BondedCompanionPanelActionService {
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(ownerUuid, "ownerUuid");
         Objects.requireNonNull(row, "row");
-        if (row.status().action() != mapped(action)
-                || !row.status().actionEnabled()) {
+        if (action != Action.ABANDON
+                && (row.status().action() != mapped(action)
+                || !row.status().actionEnabled())) {
             return CompletableFuture.completedFuture(
                     Outcome.denied(row.status().blockReason()));
         }
@@ -66,6 +67,7 @@ final class BondedCompanionPanelActionService {
                 case REVIVE -> currentApi().revive(new BondedCompanionReviveRequest(
                         request, row.reviveQuote() == null
                                 ? 0L : row.reviveQuote().policyRevision()));
+                case ABANDON -> currentApi().abandon(request);
             };
             if (result == null) {
                 return CompletableFuture.completedFuture(
@@ -104,6 +106,8 @@ final class BondedCompanionPanelActionService {
                     .BondedCompanionStatusPresentation.Action.DISMISS;
             case REVIVE -> com.alechilles.alecstamework.ui
                     .BondedCompanionStatusPresentation.Action.REVIVE;
+            case ABANDON -> com.alechilles.alecstamework.ui
+                    .BondedCompanionStatusPresentation.Action.NONE;
         };
     }
 
@@ -113,7 +117,7 @@ final class BondedCompanionPanelActionService {
                 + profileId + ":" + revision;
     }
 
-    enum Action { SUMMON, STORE, REVIVE }
+    enum Action { SUMMON, STORE, REVIVE, ABANDON }
 
     record Outcome(boolean applied,
                    @Nullable BondedCompanionActionBlockReason blockReason) {

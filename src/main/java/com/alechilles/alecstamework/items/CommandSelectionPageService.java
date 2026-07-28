@@ -180,9 +180,12 @@ final class CommandSelectionPageService {
                 context.requireUnlinkConfirm(), context.snapshot()::refreshEntries,
                 context.snapshot()::refreshEntries, context.snapshot()::featurePresentations,
                 context.snapshot()::emptyStateKey,
-                () -> toolInventoryService.resolvePanelModeValueForTool(
+                context.config().usesBondedCompanionRoster()
+                        ? () -> TameworkCommandSelectionPage.PANEL_MODE_LINKED
+                        : () -> toolInventoryService.resolvePanelModeValueForTool(
                         context.player(), context.toolId(), context.config()),
-                context.genericRosterActions()
+                context.config().usesBondedCompanionRoster()
+                        ? () -> true : context.genericRosterActions()
                         ? () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(
                                 context.player(), context.toolId())
                         : () -> false,
@@ -213,7 +216,8 @@ final class CommandSelectionPageService {
                 npcCallbacks.toggleBreeding(), npcCallbacks.release(),
                 npcCallbacks.cull(), npcCallbacks.respawn(),
                 featureCallbacks.summon(), featureCallbacks.dismiss(),
-                featureCallbacks.revive(), npcCallbacks.locate(),
+                featureCallbacks.revive(), featureCallbacks.abandon(),
+                npcCallbacks.locate(),
                 npcCallbacks.recall(), npcCallbacks.setHome(),
                 npcCallbacks.returnHome(), npcCallbacks.openTalents(),
                 panelCallbacks.setMode(), panelCallbacks.setAutoLinkEnabled(),
@@ -259,7 +263,8 @@ final class CommandSelectionPageService {
         return new FeatureCallbacks(
                 featureCallback(context, FeatureAction.SUMMON),
                 featureCallback(context, FeatureAction.DISMISS),
-                featureCallback(context, FeatureAction.REVIVE));
+                featureCallback(context, FeatureAction.REVIVE),
+                featureCallback(context, FeatureAction.ABANDON));
     }
 
     private LinkedNpcPanelFeatureAction featureCallback(
@@ -278,7 +283,8 @@ final class CommandSelectionPageService {
         BooleanSupplier genericAuthority = context.genericAuthority();
         BooleanSupplier preferenceAuthority = context.preferenceAuthority();
         return new PanelCallbacks(
-                guardedString(preferenceAuthority, value -> panelActionService.applySetPanelMode(player, toolId, value)),
+                context.config().usesBondedCompanionRoster() ? ignoredString
+                        : guardedString(preferenceAuthority, value -> panelActionService.applySetPanelMode(player, toolId, value)),
                 context.genericRosterActions() ? guardedBoolean(genericAuthority,
                         enabled -> panelActionService.applySetAutoLinkEnabled(
                                 player, toolId, context.config(), enabled)) : ignoredBoolean,
@@ -396,6 +402,7 @@ final class CommandSelectionPageService {
                     case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
                     case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
                     case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
+                    case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
                         }, bondedLifecycleAuthority);
             }
             return FeatureRoute.BONDED;
@@ -425,6 +432,7 @@ final class CommandSelectionPageService {
                     case SUMMON -> BondedCompanionPanelActionService.Action.SUMMON;
                     case DISMISS -> BondedCompanionPanelActionService.Action.STORE;
                     case REVIVE -> BondedCompanionPanelActionService.Action.REVIVE;
+                    case ABANDON -> BondedCompanionPanelActionService.Action.ABANDON;
                         }, bondedLifecycleAuthority);
             }
             return FeatureRoute.BONDED;
@@ -446,6 +454,7 @@ final class CommandSelectionPageService {
             case SUMMON -> featureActions.summon(player, config, presentationUuid);
             case DISMISS -> featureActions.dismiss(player, config, presentationUuid);
             case REVIVE -> featureActions.revive(player, config, presentationUuid);
+            case ABANDON -> { }
         }
         return FeatureRoute.GENERIC;
     }
@@ -527,7 +536,8 @@ final class CommandSelectionPageService {
     private record FeatureCallbacks(
             LinkedNpcPanelFeatureAction summon,
             LinkedNpcPanelFeatureAction dismiss,
-            LinkedNpcPanelFeatureAction revive) {
+            LinkedNpcPanelFeatureAction revive,
+            LinkedNpcPanelFeatureAction abandon) {
     }
 
     private record PanelCallbacks(
@@ -547,7 +557,8 @@ final class CommandSelectionPageService {
     enum FeatureAction {
         SUMMON,
         DISMISS,
-        REVIVE
+        REVIVE,
+        ABANDON
     }
 
     enum FeatureRoute { BONDED, GENERIC, IGNORED }

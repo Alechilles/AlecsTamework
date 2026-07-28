@@ -30,6 +30,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
     private final SqliteBondedCompanionMapper mapper = new SqliteBondedCompanionMapper();
     private final SqliteBondedCompanionOperationExecutor operations;
     private final SqliteBondedCompanionCaptureEvidenceAccess captureEvents;
+    private final SqliteBondedCompanionProfileDeletion deletions;
 
     /** Creates a safe store that owns every connection and transaction. */
     public SqliteBondedCompanionDatabase(@Nonnull Path databasePath) {
@@ -38,6 +39,7 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         operations = new SqliteBondedCompanionOperationExecutor(connections);
         captureEvents = new SqliteBondedCompanionCaptureEvidenceAccess(
                 connections);
+        deletions = new SqliteBondedCompanionProfileDeletion(connections, mapper);
     }
 
     @Override public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
@@ -143,6 +145,16 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
             UUID ownerUuid, String profileId) {
         return read(store -> store.findProfile(ownerUuid, profileId)
                 .map(mapper::toDomain));
+    }
+
+    @Override
+    public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            deleteProfile(
+                    UUID ownerUuid, String rosterId, String profileId,
+                    long expectedRevision
+            ) {
+        return deletions.delete(ownerUuid, rosterId, profileId,
+                expectedRevision);
     }
 
     @Override

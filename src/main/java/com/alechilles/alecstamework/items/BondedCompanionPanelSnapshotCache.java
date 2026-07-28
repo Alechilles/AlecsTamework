@@ -104,7 +104,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
                 if (entry.state == State.READY
                         && elapsed(now, entry.loadedAtNanos)
                         >= settings.refreshAfterNanos()) {
-                    invalidate(entry);
+                    refreshStale(entry);
                 }
             }
             if (shouldLoad(entry, now)) load = begin(key, entry);
@@ -199,6 +199,19 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
     }
 
     private void invalidate(Entry entry) {
+        entry.generation = nextGeneration(entry.generation);
+        entry.state = State.REFRESHING;
+        entry.actionTrusted = false;
+        entry.consecutiveFailures = 0;
+        entry.nextRetryNanos = 0L;
+    }
+
+    /**
+     * Refreshes expired presentation without revoking the last published
+     * action fence. Event-driven invalidation still uses {@link #invalidate}
+     * because it may represent a real profile revision.
+     */
+    private void refreshStale(Entry entry) {
         entry.generation = nextGeneration(entry.generation);
         entry.state = State.REFRESHING;
         entry.consecutiveFailures = 0;
@@ -321,6 +334,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
                 current.consecutiveFailures = 0;
                 current.nextRetryNanos = 0L;
                 current.loadedAtNanos = monotonicClock.getAsLong();
+                current.actionTrusted = true;
             }
         }
         submit(successor);
@@ -368,7 +382,8 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
     }
 
     private Snapshot snapshot(Entry entry) {
-        return new Snapshot(entry.profiles, entry.generation, entry.state);
+        return new Snapshot(entry.profiles, entry.generation, entry.state,
+                entry.actionTrusted);
     }
 
     private void evictIdle(long now) {
@@ -439,18 +454,19 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
     record Snapshot(
             @Nonnull List<BondedCompanionProfileView> profiles,
             long generation,
-            @Nonnull State state) {
+            @Nonnull State state,
+            boolean actionTrusted) {
         Snapshot {
             profiles = List.copyOf(Objects.requireNonNull(profiles, "profiles"));
             state = Objects.requireNonNull(state, "state");
         }
 
         boolean trusted() {
-            return state == State.READY;
+            return actionTrusted;
         }
 
         static Snapshot closed() {
-            return new Snapshot(List.of(), 0L, State.CLOSED);
+            return new Snapshot(List.of(), 0L, State.CLOSED, false);
         }
     }
 
@@ -485,6 +501,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
         private List<BondedCompanionProfileView> profiles = List.of();
         private long generation = 1L;
         private State state = State.REFRESHING;
+        private boolean actionTrusted;
         private boolean loading;
         private boolean reloadRequested;
         private int consecutiveFailures;

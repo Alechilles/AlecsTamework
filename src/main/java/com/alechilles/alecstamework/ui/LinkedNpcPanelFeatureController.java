@@ -97,6 +97,11 @@ final class LinkedNpcPanelFeatureController {
         return npcUuid == null ? null : presentations.get(npcUuid);
     }
 
+    /** Returns the immutable presentation set from the latest refresh. */
+    Map<UUID, CommandPanelFeaturePresentation> presentations() {
+        return presentations;
+    }
+
     long revision() {
         return revision;
     }

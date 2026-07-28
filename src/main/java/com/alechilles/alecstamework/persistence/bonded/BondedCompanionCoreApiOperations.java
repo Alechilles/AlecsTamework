@@ -24,10 +24,9 @@ public final class BondedCompanionCoreApiOperations {
     private final BondedCompanionDiagnosticContributor diagnostics;
     private final LongSupplier clock;
     private final BondedCompanionReviveOperationService revives;
-    private final BondedCompanionProvisioningSupport provisioning =
-            new BondedCompanionProvisioningSupport();
-    private final BondedCompanionReviveQuoteSupport reviveQuotes =
-            new BondedCompanionReviveQuoteSupport();
+    private final BondedCompanionAbandonmentService abandonment;
+    private final BondedCompanionProvisioningSupport provisioning = new BondedCompanionProvisioningSupport();
+    private final BondedCompanionReviveQuoteSupport reviveQuotes = new BondedCompanionReviveQuoteSupport();
     private final BondedCompanionExtensionOperations extensions;
     private final BondedCompanionSnapshotCodec snapshots = new BondedCompanionSnapshotCodec();
     private final BondedCompanionViewFactory views = new BondedCompanionViewFactory();
@@ -54,6 +53,8 @@ public final class BondedCompanionCoreApiOperations {
         revives = new BondedCompanionReviveOperationService(
                 store, rosters, policies, transitions, clock,
                 new BondedCompanionCoreReviveSupport(this));
+        abandonment = new BondedCompanionAbandonmentService(
+                store, projections, changes, clock);
     }
 
     BondedCompanionResult<BondedCompanionProfileView> provision(
@@ -242,8 +243,8 @@ public final class BondedCompanionCoreApiOperations {
                 "bonded-store-not-committed");
     }
 
-    private BondedCompanionResult<BondedCompanionProfileView>
-    terminalProfileResult(
+    BondedCompanionResult<Void> abandon(BondedCompanionActionRequest request) { return abandonment.abandon(request); }
+    private BondedCompanionResult<BondedCompanionProfileView> terminalProfileResult(
             BondedCompanionStoreResult<BondedCompanionRecord.Profile> result
     ) {
         return result.code() == BondedCompanionStoreResult.Code.APPLIED
@@ -304,6 +305,9 @@ public final class BondedCompanionCoreApiOperations {
                     new String(extension.payload().bytes(),
                             StandardCharsets.UTF_8)));
         }
+        boolean reviveAvailable = matches
+                && profile.state() == BondedCompanionState.DEAD
+                && policy.features().revive();
         return views.view(profile, lease,
                 matches && profile.state() == BondedCompanionState.STORED
                         && policy.features().summon()
@@ -314,8 +318,9 @@ public final class BondedCompanionCoreApiOperations {
                                 active, policy.maximumActive()),
                 matches && profile.state() == BondedCompanionState.ACTIVE
                         && policy.features().dismiss(),
-                matches && profile.state() == BondedCompanionState.DEAD
-                        && policy.features().revive(), extensions);
+                reviveAvailable, extensions,
+                reviveAvailable ? reviveQuotes.profileQuote(profile, policy) : null,
+                BondedCompanionFamilyCapacityPresentation.attributes(policy, active));
     }
 
     BondedCompanionResult<BondedCompanionExtensionData> extension(
@@ -489,7 +494,6 @@ public final class BondedCompanionCoreApiOperations {
         };
         return failure(mapped, result.reason() == null ? "bonded-storage-mutation-failed" : result.reason());
     }
-
     private static String operationId(String namespace, String key) {
         return namespace + ":" + key;
     }

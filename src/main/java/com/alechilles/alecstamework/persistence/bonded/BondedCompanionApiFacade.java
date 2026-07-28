@@ -175,6 +175,14 @@ public final class BondedCompanionApiFacade
     }
 
     @Override
+    public CompletableFuture<BondedCompanionResult<Void>> abandon(
+            BondedCompanionActionRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        return execute(() -> operations.abandon(request));
+    }
+
+    @Override
     public CompletableFuture<BondedCompanionResult<BondedCompanionReviveQuote>>
             quoteRevive(BondedCompanionActionRequest request) {
         Objects.requireNonNull(request, "request");

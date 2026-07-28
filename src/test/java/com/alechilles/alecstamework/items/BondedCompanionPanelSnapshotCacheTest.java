@@ -121,7 +121,7 @@ class BondedCompanionPanelSnapshotCacheTest {
     }
 
     @Test
-    void failedRefreshRetainsCompleteCardsButMarksThemUntrusted() {
+    void passiveRefreshKeepsPublishedCardsTrustedWhileReloadingOrRetrying() {
         ManualExecutor worker = new ManualExecutor();
         AtomicLong now = new AtomicLong();
         ControlledApi api = new ControlledApi(worker);
@@ -138,11 +138,13 @@ class BondedCompanionPanelSnapshotCacheTest {
         var failed = cache.peek(OWNER, ROSTER);
 
         assertEquals(List.of(profile), refreshing.profiles());
-        assertFalse(refreshing.trusted());
+        assertTrue(refreshing.trusted(),
+                "a routine background refresh must not disable a usable card");
         assertEquals(BondedCompanionPanelSnapshotCache.State.REFRESHING,
                 refreshing.state());
         assertEquals(List.of(profile), failed.profiles());
-        assertFalse(failed.trusted());
+        assertTrue(failed.trusted(),
+                "a failed background refresh must retain the last safe card");
         assertEquals(BondedCompanionPanelSnapshotCache.State.FAILED,
                 failed.state());
     }

@@ -34,18 +34,23 @@ public final class BondedCompanionSnapshotPresentationMapper {
         put(data, "roleId", state.roleId());
         put(data, "level", state.leveling() == null
                 ? null : Integer.toString(state.leveling().getLevel()));
+        put(data, "levelingConfigId", state.leveling() == null
+                ? null : state.leveling().getConfigId());
         put(data, "healthPercent", state.healthPercent() == null
                 ? null : Double.toString(state.healthPercent()));
         put(data, "currentHealth", state.currentHealth() == null
                 ? null : Double.toString(state.currentHealth()));
         put(data, "maxHealth", state.maximumHealth() == null
                 ? null : Double.toString(state.maximumHealth()));
-        put(data, "happiness", state.happiness() == null
-                ? null : Double.toString(state.happiness().getValue()));
-        put(data, "hunger", state.needs() == null
-                ? null : Double.toString(state.needs().getHunger()));
-        put(data, "thirst", state.needs() == null
-                ? null : Double.toString(state.needs().getThirst()));
+        put(data, "happiness", configured(state.happiness() == null
+                ? null : state.happiness().getConfigId())
+                ? Double.toString(state.happiness().getValue()) : null);
+        put(data, "hunger", configured(state.needs() == null
+                ? null : state.needs().getConfigId())
+                ? Double.toString(state.needs().getHunger()) : null);
+        put(data, "thirst", configured(state.needs() == null
+                ? null : state.needs().getConfigId())
+                ? Double.toString(state.needs().getThirst()) : null);
         put(data, "breedingReady", state.breeding() == null
                 ? null : Boolean.toString(state.breeding().isReady()));
         put(data, "breedingEnabled", state.breeding() == null
@@ -60,6 +65,9 @@ public final class BondedCompanionSnapshotPresentationMapper {
                     .collect(java.util.stream.Collectors.joining(", ")));
         }
         if (state.talents() != null) {
+            put(data, "talentConfigId", state.talents().getConfigId());
+            put(data, "talentSpentPoints", Integer.toString(
+                    state.talents().getSpentPoints()));
             put(data, "talents", String.join(", ",
                     state.talents().getPurchasedTalentIds()));
         }
@@ -85,6 +93,10 @@ public final class BondedCompanionSnapshotPresentationMapper {
 
     private static String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static boolean configured(@Nullable String configId) {
+        return normalize(configId) != null;
     }
 
     /** Supplies configured role presentation without requiring world state. */

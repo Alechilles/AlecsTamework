@@ -58,6 +58,18 @@ final class LinkedNpcPanelCardBinder {
                      String language,
                      CommandPanelFeaturePresentation feature) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
+        if (feature != null && feature.bonded() != null) {
+            if (appendCard) {
+                commandBuilder.append("#TameworkLinkedPanelList",
+                        BondedCompanionCardPresenter.CARD_UI_PATH);
+            }
+            BondedCompanionCardPresenter.bind(
+                    commandBuilder, eventBuilder, entrySelector,
+                    entry.npcUuid(), feature.bonded(), pendingUnlink, config,
+                    language
+            );
+            return;
+        }
         String nameSelector = entrySelector + " #Name";
         String maleIconSelector = entrySelector + " #GenderMaleIcon";
         String femaleIconSelector = entrySelector + " #GenderFemaleIcon";

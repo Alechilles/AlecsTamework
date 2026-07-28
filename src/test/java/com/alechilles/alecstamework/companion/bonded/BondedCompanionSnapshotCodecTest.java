@@ -170,9 +170,34 @@ class BondedCompanionSnapshotCodecTest {
         assertEquals("Male", presentation.gender());
         assertEquals("storm", presentation.data().get("variant"));
         assertEquals("7", presentation.data().get("level"));
+        assertEquals("level", presentation.data().get("levelingConfigId"));
+        assertEquals("talents", presentation.data().get("talentConfigId"));
+        assertEquals("1", presentation.data().get("talentSpentPoints"));
         assertEquals("63.25", presentation.data().get("healthPercent"));
         assertEquals("253.0", presentation.data().get("currentHealth"));
         assertEquals("400.0", presentation.data().get("maxHealth"));
+    }
+
+    @Test
+    void panelPresentationOmitsNeedsWithoutTheirConfiguredRuntimeSystems() {
+        BondedCompanionSnapshot snapshot = fullSnapshot(
+                "Bonded_Miniwyvern_Storm", "Nimbus", "Male", "storm-crest",
+                "{\"ability\":\"dash\"}"
+        );
+        var state = snapshot.fullState();
+        state.happiness().setConfigId(null);
+        state.needs().setConfigId(" ");
+        snapshot = BondedCompanionSnapshot.of(state, snapshot.extensionData());
+        BondedCompanionSnapshotPresentationMapper mapper =
+                new BondedCompanionSnapshotPresentationMapper(roleId ->
+                        new BondedCompanionSnapshotPresentationMapper
+                                .RolePresentation(null, null, null, Map.of()));
+
+        var presentation = mapper.map(snapshot);
+
+        assertFalse(presentation.data().containsKey("happiness"));
+        assertFalse(presentation.data().containsKey("hunger"));
+        assertFalse(presentation.data().containsKey("thirst"));
     }
 
     @Test

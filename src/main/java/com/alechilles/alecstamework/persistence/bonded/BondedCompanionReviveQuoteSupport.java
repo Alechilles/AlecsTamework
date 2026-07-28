@@ -12,6 +12,22 @@ import java.util.List;
 
 /** Resolves one revive quote from policy and exact inventory evidence. */
 final class BondedCompanionReviveQuoteSupport {
+    /**
+     * Produces the policy cost template for profile-list presentation. Player
+     * inventory quantities are intentionally resolved later on the world
+     * thread, immediately before the UI renders its action state.
+     */
+    BondedCompanionReviveQuote profileQuote(
+            BondedCompanionRecord.Profile profile,
+            BondedCompanionPolicy policy
+    ) {
+        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        List<BondedCompanionReviveQuote.CostLine> costs = price == null
+                ? List.of() : unavailable(price);
+        return new BondedCompanionReviveQuote(
+                profile.profileId(), true, costs, 0L, policy.revision());
+    }
+
     List<BondedCompanionReviveQuote.CostLine> costs(
             BondedCompanionActionRequest request,
             BondedCompanionPolicy.RevivePrice price

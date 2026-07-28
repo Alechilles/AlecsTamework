@@ -2,7 +2,11 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Store;
@@ -57,6 +61,7 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         BondedCompanionPanelRecordSource.PanelSnapshot snapshot =
                 records.snapshotFor(player.getUuid(), rosterId,
                         cache.peek(player.getUuid(), rosterId));
+        snapshot = withLiveNames(player, store, snapshot);
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(
                 snapshot.records().size());
         for (var record : snapshot.records()) entries.add(entry(record));
@@ -104,6 +109,59 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                 null, profile.species(), null, null, null,
                 false, false, false, 0L, 0D, false,
                 false, 0L, 0D, false, false, 0L);
+    }
+
+    /**
+     * A name tag changes the live projection immediately. Show that value on
+     * the card while the normal store/dismiss path carries it into the durable
+     * snapshot; no new mutable panel state is introduced.
+     */
+    private BondedCompanionPanelRecordSource.PanelSnapshot withLiveNames(
+            Player player, Store<EntityStore> store,
+            BondedCompanionPanelRecordSource.PanelSnapshot snapshot
+    ) {
+        if (snapshot.records().isEmpty() || player.getWorld() == null) {
+            return snapshot;
+        }
+        ArrayList<BondedCompanionPanelRecordSource.PanelRecord> updated =
+                new ArrayList<>(snapshot.records().size());
+        boolean changed = false;
+        for (var record : snapshot.records()) {
+            BondedCompanionProfileView profile = record.profile();
+            BondedCompanionProfileView overlay =
+                    BondedCompanionPanelLiveProfileOverlay.withDisplayName(
+                            profile, liveDisplayName(player, store, profile));
+            updated.add(overlay == profile ? record
+                    : new BondedCompanionPanelRecordSource.PanelRecord(
+                            record.presentationUuid(), overlay));
+            changed |= overlay != profile;
+        }
+        return changed ? new BondedCompanionPanelRecordSource.PanelSnapshot(
+                List.copyOf(updated), snapshot.generation(), snapshot.state(),
+                snapshot.trusted()) : snapshot;
+    }
+
+    @Nullable
+    private String liveDisplayName(
+            Player player, Store<EntityStore> store,
+            BondedCompanionProfileView profile
+    ) {
+        if (profile.state() != BondedCompanionStateView.ACTIVE
+                || profile.activeLease() == null || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkNpcNameComponent> type =
+                TameworkNpcNameComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        Ref<EntityStore> reference = player.getWorld().getEntityRef(
+                profile.activeLease().liveNpcUuid());
+        if (reference == null || !reference.isValid()) {
+            return null;
+        }
+        TameworkNpcNameComponent name = store.getComponent(reference, type);
+        return name == null ? null : name.getName();
     }
 
     private static int healthValue(java.util.Map<String, String> data,

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
@@ -23,7 +24,8 @@ final class BondedCompanionViewFactory {
         return view(profile, lease,
                 profile.state() == BondedCompanionState.STORED,
                 profile.state() == BondedCompanionState.ACTIVE,
-                profile.state() == BondedCompanionState.DEAD, Map.of());
+                profile.state() == BondedCompanionState.DEAD, Map.of(), null,
+                Map.of());
     }
 
     BondedCompanionProfileView view(
@@ -32,7 +34,9 @@ final class BondedCompanionViewFactory {
             boolean summonAvailable,
             boolean storeAvailable,
             boolean reviveAvailable,
-            Map<String, String> extensionData
+            Map<String, String> extensionData,
+            BondedCompanionReviveQuote reviveQuote,
+            Map<String, String> transientPresentationData
     ) {
         LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
         profile.policy().entrySet().stream()
@@ -44,6 +48,7 @@ final class BondedCompanionViewFactory {
         if (durable != null) presentation.putAll(durable.data());
         extensionData.forEach((namespace, json) ->
                 presentation.put("extension:" + namespace, json));
+        presentation.putAll(transientPresentationData);
         BondedCompanionLeaseView active = lease == null ? null
                 : new BondedCompanionLeaseView(
                         lease.leaseToken(), lease.liveNpcUuid(), lease.worldKey(),
@@ -62,7 +67,7 @@ final class BondedCompanionViewFactory {
                 BondedCompanionStateView.valueOf(profile.state().name()),
                 summonAvailable, storeAvailable,
                 reviveAvailable,
-                presentation, active, profile.summonCooldownUntilMs(), null
+                presentation, active, profile.summonCooldownUntilMs(), reviveQuote
         );
     }
 
