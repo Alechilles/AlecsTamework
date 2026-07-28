@@ -299,25 +299,6 @@ final class SqliteBondedCompanionStore {
         });
     }
 
-    @Nullable
-    private String restoredSnapshot(@Nonnull String snapshotJson) {
-        try {
-            BondedCompanionPayload payload = mapper.payload(snapshotJson);
-            BondedCompanionSnapshotCodec.DecodeResult decoded = snapshots.decode(
-                    new String(payload.bytes(), StandardCharsets.UTF_8));
-            BondedCompanionSnapshot snapshot = decoded.snapshot();
-            if (decoded.status() != BondedCompanionSnapshotCodec.Status.FOUND
-                    || snapshot == null) {
-                return null;
-            }
-            return mapper.payloadJson(BondedCompanionPayload.of(
-                    snapshots.encode(snapshot.restoredAfterRevive())
-                            .getBytes(StandardCharsets.UTF_8)));
-        } catch (RuntimeException failure) {
-            return null;
-        }
-    }
-
     /** Finds one namespaced payload in the exact owner roster scope. */
     @Nonnull
     public Optional<SqliteBondedCompanionExtensionDataRow> findExtensionData(
