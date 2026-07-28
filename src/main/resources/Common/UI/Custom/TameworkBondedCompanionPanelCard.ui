@@ -186,11 +186,11 @@ Group {
     }
 
     Group #BondedHealthFrame {
-        Anchor: (Top: 56, Left: 20, Right: 14, Height: 18);
+        Anchor: (Top: 56, Left: 20, Right: 24, Height: 18);
         Background: #08121f;
 
         Group #BondedHealthFill {
-            Anchor: (Top: 1, Left: 1, Width: 369, Height: 16);
+            Anchor: (Top: 1, Left: 1, Width: 359, Height: 16);
             Background: #69c77b;
         }
 
