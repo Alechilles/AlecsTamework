@@ -282,6 +282,58 @@ class BondedCompanionPaymentRecoverySqliteTest {
         };
     }
 
+    @Test
+    void reorderedFrozenRecipeQuarantinePreventsRecoveryMutation()
+            throws Exception {
+        Path database = tempDir.resolve("reordered-frozen-recipe.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation("reordered", 
+                        BondedCompanionOperation.Type.PROVISION, "a"),
+                        profile()).code());
+        markDead(database);
+        String paymentId = BondedCompanionPaymentOperationId.create(
+                CALLER, "revive:reordered", OWNER, "roster-a", "profile-a", 1L);
+        AtomicInteger publications = new AtomicInteger();
+        BondedCompanionActionContext.Inventory inventory =
+                quarantinedInventory(paymentId);
+
+        BondedCompanionPaymentRecoveryService.Outcome outcome =
+                new BondedCompanionPaymentRecoveryService(store, () -> -7_000L,
+                        ignored -> publications.incrementAndGet())
+                        .recover(BondedCompanionPaymentOperationId.parse(paymentId)
+                                .orElseThrow(), inventory)
+                        .toCompletableFuture().join();
+
+        assertEquals(BondedCompanionPaymentRecoveryService.Outcome.QUARANTINED,
+                outcome);
+        assertEquals(BondedCompanionState.DEAD,
+                store.findProfile(OWNER, "roster-a", "profile-a")
+                        .orElseThrow().state());
+        assertEquals(0, publications.get());
+    }
+
+    private BondedCompanionActionContext.Inventory quarantinedInventory(
+            String paymentId) {
+        return new BondedCompanionActionContext.Inventory() {
+            @Override public int availableQuantity(String itemId) { return 0; }
+            @Override public BondedCompanionActionContext.ChargeReceipt
+                    findCharge(String operationId) {
+                return new BondedCompanionActionContext.ChargeReceipt() {
+                    @Override public String operationId() { return paymentId; }
+                    @Override public boolean quarantined() { return true; }
+                    @Override public boolean refund() { return false; }
+                };
+            }
+            @Override public BondedCompanionActionContext.ChargeReceipt
+                    consumeExact(String operationId, String itemId, int quantity) {
+                throw new AssertionError("recovery must not charge");
+            }
+        };
+    }
+
     private BondedCompanionActionContext.Inventory nullStageInventory() {
         return new BondedCompanionActionContext.Inventory() {
             @Override public int availableQuantity(String itemId) { return 0; }
