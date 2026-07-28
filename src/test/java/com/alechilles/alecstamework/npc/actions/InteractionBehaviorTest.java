@@ -113,6 +113,18 @@ class InteractionBehaviorTest {
     }
 
     @Test
+    void tameRoleChangeAlwaysForwardsFalseForAppearance() throws Exception {
+        CapturingRoleChangeEffects roleChanges = new CapturingRoleChangeEffects(false);
+        TameworkInteractEffects effects = newEffects(roleChanges);
+        TwInteractionConfig.TameInteraction tame = new TwInteractionConfig.TameInteraction();
+        setField(tame, "role", "Tamed_Wyvern_Mini_Fire");
+
+        assertFalse(effects.applyTameRoleChange(tame, null, null, null, null));
+        assertFalse(roleChanges.changeAppearance);
+        assertEquals(1, roleChanges.calls);
+    }
+
+    @Test
     void paramMatchTypeAnyVsAll() throws Exception {
         ActionTameworkInteract interact = newInteract();
         StdScope scope = new StdScope(null);
@@ -490,8 +502,17 @@ class InteractionBehaviorTest {
     }
 
     private static final class CapturingRoleChangeEffects implements InteractionRoleChangeEffects {
+        private final boolean result;
         private boolean changeAppearance;
         private int calls;
+
+        private CapturingRoleChangeEffects() {
+            this(true);
+        }
+
+        private CapturingRoleChangeEffects(boolean result) {
+            this.result = result;
+        }
 
         @Override
         public boolean applySetRole(String roleId,
@@ -501,7 +522,7 @@ class InteractionBehaviorTest {
                                     com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store) {
             this.changeAppearance = changeAppearance;
             calls++;
-            return true;
+            return result;
         }
     }
 

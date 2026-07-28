@@ -318,7 +318,12 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
     }
 
     // Swaps the NPC role using the role change system.
-    boolean applySetRole(String roleId, boolean changeAppearance, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+    @Override
+    public boolean applySetRole(String roleId,
+                                boolean changeAppearance,
+                                Ref<EntityStore> npcRef,
+                                Role role,
+                                Store<EntityStore> store) {
         if (role == null || npcRef == null || store == null) {
             return false;
         }
