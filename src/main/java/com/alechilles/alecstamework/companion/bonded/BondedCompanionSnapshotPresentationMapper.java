@@ -68,9 +68,12 @@ public final class BondedCompanionSnapshotPresentationMapper {
         }
         if (state.talents() != null) {
             put(data, "talentConfigId", state.talents().getConfigId());
-            put(data, "talentSpentPoints", Integer.toString(
+            // Unlike optional metrics, these values are a complete talent
+            // state. An explicit empty list must replace a previously
+            // captured list when a player resets talents.
+            data.put("talentSpentPoints", Integer.toString(
                     state.talents().getSpentPoints()));
-            put(data, "talents", String.join(", ",
+            data.put("talents", String.join(", ",
                     state.talents().getPurchasedTalentIds()));
         }
         return new Presentation(

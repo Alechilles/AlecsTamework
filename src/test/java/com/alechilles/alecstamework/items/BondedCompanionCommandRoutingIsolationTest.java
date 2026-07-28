@@ -192,6 +192,20 @@ class BondedCompanionCommandRoutingIsolationTest {
     }
 
     @Test
+    void bondedTalentBackNavigationDoesNotRequireGenericRosterAuthority()
+            throws IOException {
+        String source = Files.readString(ITEMS.resolve(
+                "CommandItemFeatureHandler.java"));
+        int methodStart = source.indexOf("private void reopenSelectionMenu(");
+        int methodEnd = source.indexOf("private void applyMenuSelection(", methodStart);
+
+        assertTrue(methodStart >= 0 && methodEnd > methodStart);
+        String method = source.substring(methodStart, methodEnd);
+        assertTrue(method.contains("config.usesBondedCompanionRoster()"),
+                "The back callback must permit a bonded command item to reopen its roster.");
+    }
+
+    @Test
     void authorityPolicyIsWiredAtEveryGenericConsumerBoundary()
             throws IOException {
         String panel = Files.readString(ITEMS.resolve(

@@ -508,8 +508,10 @@ public final class CommandItemFeatureHandler {
                                      String toolId,
                                      CommandPanelCallbackAuthority
                                              .GenericBinding binding) {
-        if (!callbackAuthority.allowsGeneric(
-                player, toolId, binding)) {
+        // Bonded roster callbacks deliberately have no generic binding. Their
+        // panel actions are re-authorized by the freshly opened bonded page.
+        if ((config == null || !config.usesBondedCompanionRoster())
+                && !callbackAuthority.allowsGeneric(player, toolId, binding)) {
             return;
         }
         World world = player.getWorld();

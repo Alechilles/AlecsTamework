@@ -1,10 +1,13 @@
 package com.alechilles.alecstamework.items;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Guards the bonded roster's durable talent-page route. */
@@ -28,5 +31,17 @@ class BondedCompanionTalentRoutingTest {
         assertTrue(bondedTalentService.contains("applyLiveProjection"));
         assertTrue(persistenceService.contains("snapshot.withTalents(updated)"));
         assertTrue(persistenceService.contains("BondedCompanionOperation.Type.STORE"));
+    }
+
+    @Test
+    void resetStateRetainsZeroSpentTalentPointsForTheImmediateTreeRefresh()
+            throws Exception {
+        Method integer = BondedCompanionTalentPageService.class.getDeclaredMethod(
+                "integer", Map.class, String.class, int.class);
+        integer.setAccessible(true);
+
+        assertEquals(0, integer.invoke(null,
+                Map.of("talentSpentPoints", "0"),
+                "talentSpentPoints", 0));
     }
 }

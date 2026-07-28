@@ -299,7 +299,7 @@ final class BondedCompanionTalentPageService {
 
     private static int integer(Map<String, String> attributes, String key, int fallback) {
         try {
-            return Math.max(1, Integer.parseInt(attributes.get(key)));
+            return Math.max(0, Integer.parseInt(attributes.get(key)));
         } catch (RuntimeException ignored) {
             return fallback;
         }
@@ -342,7 +342,8 @@ final class BondedCompanionTalentPageService {
                             : text(data, "talents").split("\\s*,\\s*"));
             return new State(owner, row.rosterId(), row.profileId(), row.roleId(),
                     displayName == null ? "Companion" : displayName,
-                    text(data, "levelingConfigId"), integer(data, "level", 1),
+                    text(data, "levelingConfigId"), Math.max(1,
+                    integer(data, "level", 1)),
                     talents, row.revision(), parseUuid(data.get(LIVE_NPC_UUID)));
         }
 

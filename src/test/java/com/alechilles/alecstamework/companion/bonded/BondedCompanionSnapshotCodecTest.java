@@ -180,6 +180,26 @@ class BondedCompanionSnapshotCodecTest {
     }
 
     @Test
+    void panelPresentationKeepsAnExplicitEmptyTalentListAfterReset() {
+        BondedCompanionSnapshot snapshot = fullSnapshot(
+                "Bonded_Miniwyvern_Storm", "Nimbus", "Male", "storm-crest",
+                "{\"ability\":\"dash\"}"
+        );
+        snapshot = snapshot.withTalents(new TameworkTalentsComponent(
+                "talents", 0, new String[0]));
+
+        var presentation = new BondedCompanionSnapshotPresentationMapper(roleId ->
+                new BondedCompanionSnapshotPresentationMapper.RolePresentation(
+                        null, null, null, Map.of()))
+                .map(snapshot);
+
+        assertEquals("0", presentation.data().get("talentSpentPoints"));
+        assertTrue(presentation.data().containsKey("talents"),
+                "A reset must explicitly clear any previously presented talents.");
+        assertEquals("", presentation.data().get("talents"));
+    }
+
+    @Test
     void panelPresentationOmitsNeedsWithoutTheirConfiguredRuntimeSystems() {
         BondedCompanionSnapshot snapshot = fullSnapshot(
                 "Bonded_Miniwyvern_Storm", "Nimbus", "Male", "storm-crest",
