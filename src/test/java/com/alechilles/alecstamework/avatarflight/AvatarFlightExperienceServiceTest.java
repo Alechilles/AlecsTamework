@@ -112,20 +112,21 @@ class AvatarFlightExperienceServiceTest {
     }
 
     @Test
-    void rollingCapWaitsSixtySecondsAfterMostRecentAward() throws Exception {
+    void continuousQualifiedFlightAwardsAgainAtOriginalWindowExpiry() throws Exception {
         AvatarFlightExperienceService service = new AvatarFlightExperienceService();
         TwLevelingConfig.FlightXpSourceSettings settings = settings(0.15, 10.0, 9.0);
-        AvatarFlightExperienceService.State state = new AvatarFlightExperienceService.State(9.8, 0.0, 1_000L, 10_800L);
+        AvatarFlightExperienceService.State state = service.reset(1_000L);
+        state = service.tick(state, settings, true, 1_000L).state();
+        AvatarFlightExperienceService.Result result = null;
 
-        for (long nowMs = 11_000L; nowMs <= 61_000L; nowMs += 10_000L) {
-            state = service.tick(state, settings, true, nowMs).state();
-            state = new AvatarFlightExperienceService.State(9.8, state.windowAwardedXp(),
-                    state.windowStartedAtMs(), nowMs - 200L);
+        for (long nowMs = 1_250L; nowMs <= 71_000L; nowMs += 250L) {
+            result = service.tick(state, settings, true, nowMs);
+            state = result.state();
         }
-        AvatarFlightExperienceService.Result result = service.tick(state, settings, true, 71_000L);
 
-        assertEquals(0.0, result.awardedXp(), EPSILON);
-        assertEquals(9.0, result.state().windowAwardedXp(), EPSILON);
+        assertEquals(1.5, result.awardedXp(), EPSILON);
+        assertEquals(1.5, result.state().windowAwardedXp(), EPSILON);
+        assertEquals(71_000L, result.state().windowStartedAtMs());
     }
 
     @Test

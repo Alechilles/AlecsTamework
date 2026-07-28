@@ -71,9 +71,6 @@ public final class AvatarFlightExperienceService {
                 availableXp
         );
         windowAwardedXp += award;
-        if (award > 0.0d) {
-            windowStartedAtMs = nowMs;
-        }
         return new Result(new State(qualifiedSeconds, windowAwardedXp, windowStartedAtMs, nowMs), award);
     }
 
