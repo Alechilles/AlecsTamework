@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
@@ -48,7 +49,8 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         BondedCompanionStatusPresentation status = row.status();
-        ProgressionSummary progression = progressionSummary(row.attributes());
+        ProgressionSummary progression = progressionSummary(row.attributes(),
+                row.roleId());
         CardLayout layout = layout(row.attributes());
         commands.setObject(entrySelector + ".Anchor", layout.cardAnchor());
         bindIdentity(commands, entrySelector, row, progression, language);
@@ -115,7 +117,18 @@ final class BondedCompanionCardPresenter {
     ) {
         commands.set(entrySelector + " #BondedName.Text", displayName(row));
         commands.set(entrySelector + " #BondedSpecies.Text",
-                identityLine(row, progression, language));
+                identityLine(row));
+        commands.set(entrySelector + " #BondedLevelText.Visible",
+                progression.visible());
+        commands.set(entrySelector + " #BondedLevelText.Text",
+                progression.visible() ? LocalizedText.format(language,
+                        "tamework.ui.linkedPanel.bonded.talents.level",
+                        progression.level()) : "");
+        commands.set(entrySelector + " #BondedTalentPointAction.Visible",
+                progression.talentsConfigured() && progression.availablePoints() > 0);
+        String points = Integer.toString(progression.availablePoints());
+        commands.set(entrySelector + " #BondedTalentPointCount.Text", points);
+        commands.set(entrySelector + " #BondedTalentPointCountShadow.Text", points);
         commands.set(entrySelector + " #BondedGenderMaleIcon.Visible",
                 "male".equalsIgnoreCase(row.gender()));
         commands.set(entrySelector + " #BondedGenderFemaleIcon.Visible",
@@ -271,9 +284,10 @@ final class BondedCompanionCardPresenter {
         }
         commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
                 progressionTooltip(progression, row.attributes()));
-        boolean canOpen = progression.talentsConfigured()
-                && row.status().state() == BondedCompanionStateView.ACTIVE
-                && !pendingUnlink;
+        // A saved level is sufficient to inspect the durable talent page. The
+        // page itself resolves a saved or role-derived tree and can explain a
+        // genuinely missing configuration instead of leaving a silent button.
+        boolean canOpen = progression.visible() && !pendingUnlink;
         if (canOpen) {
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + " #BondedProgressionButton",
@@ -457,7 +471,8 @@ final class BondedCompanionCardPresenter {
     }
 
     private static ProgressionSummary progressionSummary(
-            Map<String, String> attributes
+            Map<String, String> attributes,
+            @Nullable String roleId
     ) {
         int level = positiveRoundedInt(attributes.get("level"), 0);
         String levelingConfig = attributes.get("levelingConfigId");
@@ -468,7 +483,9 @@ final class BondedCompanionCardPresenter {
         int spent = nonNegativeInt(attributes.get("talentSpentPoints"));
         int earned = CompanionLevelingService.resolveEarnedTalentPoints(level,
                 levelingConfig);
-        boolean talentsConfigured = talentConfig != null && !talentConfig.isBlank();
+        boolean talentsConfigured = talentConfig != null && !talentConfig.isBlank()
+                || roleId != null && !roleId.isBlank()
+                && TwTalentConfig.resolveForRole(roleId) != null;
         int available = talentsConfigured ? Math.max(0, earned - spent) : 0;
         return new ProgressionSummary(true, talentsConfigured, level, available);
     }
@@ -535,24 +552,8 @@ final class BondedCompanionCardPresenter {
                 "tamework.ui.linkedPanel.subtitle.defaultNpcName");
     }
 
-    private static String identityLine(
-            BondedCompanionPanelPresentation row,
-            ProgressionSummary progression,
-            @Nullable String language
-    ) {
-        String species = row.species() == null ? "" : row.species();
-        if (!progression.visible()) {
-            return species;
-        }
-        String level = LocalizedText.format(language,
-                "tamework.ui.linkedPanel.bonded.talents.level",
-                progression.level());
-        String points = progression.availablePoints() > 0
-                ? "  •  " + LocalizedText.format(language,
-                "tamework.ui.linkedPanel.bonded.talents.points",
-                progression.availablePoints())
-                : "";
-        return species + "  •  " + level + points;
+    private static String identityLine(BondedCompanionPanelPresentation row) {
+        return row.species() == null ? "" : row.species();
     }
 
     private static String progressionTooltip(
@@ -664,6 +665,7 @@ final class BondedCompanionCardPresenter {
         private static ProgressionSummary hidden() {
             return new ProgressionSummary(false, false, 0, 0);
         }
+
     }
 
     /** Compact vertical allocation that omits absent metrics. */

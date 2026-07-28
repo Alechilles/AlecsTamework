@@ -44,6 +44,9 @@ class BondedCompanionCardPresenterTest {
         assertTrue(asset.contains("#BondedMetricHunger"));
         assertTrue(asset.contains("#BondedMetricThirst"));
         assertTrue(asset.contains("#BondedProgressionButton"));
+        assertTrue(asset.contains("#BondedLevelText"));
+        assertTrue(asset.contains("#BondedTalentPointAction"));
+        assertTrue(asset.contains("TalentPoint_UpArrow.png"));
         assertFalse(asset.contains("#BondedTalentAction"),
                 "Progression belongs in the identity row, not a separate card action.");
         assertTrue(asset.contains("#BondedPrimaryActionDisabled"));
@@ -92,7 +95,8 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedMetricHappiness #MetricValue.Text", "1%");
         assertCommand(commands, "#Card #BondedMetricHunger.Visible", "false");
         assertCommand(commands, "#Card #BondedMetricThirst.Visible", "false");
-        assertCommand(commands, "#Card #BondedSpecies.Text", "LVL 12");
+        assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
+        assertCommand(commands, "#Card #BondedLevelText.Text", "LVL 12");
         assertCommand(commands, "#Card #BondedProgressionButton.Visible", "true");
         assertCommand(commands, "#Card #BondedProgressionButton.TooltipText",
                 "Level: 12");
@@ -228,7 +232,7 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void identityLineKeepsGenderInItsIconAndProgressionInline() {
+    void identityLineKeepsGenderInItsIconAndProgressionUsesSeparateSafeLabels() {
         BondedCompanionPanelPresentation row = new BondedCompanionPanelPresentation(
                 "profile-7", "hydragon:dragons", "NordicDrake", 4L,
                 "Wyatt", "Nordic Drake", "Female", null,
@@ -245,18 +249,15 @@ class BondedCompanionCardPresenterTest {
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
         assertCommand(commands, "#Card #BondedSpecies.Text", "Nordic Drake");
-        assertCommand(commands, "#Card #BondedSpecies.Text", "LVL 1");
+        assertCommand(commands, "#Card #BondedLevelText.Text", "LVL 1");
         assertCommand(commands, "#Card #BondedGenderFemaleIcon.Visible", "true");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
                                 && command.data.contains("Female")),
                 "Gender belongs exclusively to the existing gender icon.");
+        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "false");
         assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
-                                && command.data.contains("POINTS AVAILABLE")),
-                "Zero available points must not add redundant identity text.");
-        assertFalse(java.util.Arrays.stream(commands.getCommands())
-                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
+                        .anyMatch(command -> "#Card #BondedLevelText.Text".equals(command.selector)
                                 && command.data.contains("<color")),
                 "Runtime label text is literal; colored spans must not be sent as markup.");
     }
@@ -278,7 +279,8 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
-    void progressionRowUsesTheExistingTalentCommandPath() throws Exception {
+    void progressionRowUsesTheExistingTalentCommandPathForEveryBondedState()
+            throws Exception {
         String presenter = Files.readString(Path.of("src", "main", "java",
                 "com", "alechilles", "alecstamework", "ui",
                 "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
@@ -289,8 +291,32 @@ class BondedCompanionCardPresenterTest {
         assertTrue(progression.contains("#BondedProgressionButton"));
         assertTrue(progression.contains("config.openTalentsCommandPrefix() + cardUuid"),
                 "The inline level text must open this bonded companion's talent page.");
-        assertTrue(progression.contains("row.status().state() == BondedCompanionStateView.ACTIVE"),
-                "Only a live companion can open a mutable talent page.");
+        assertTrue(progression.contains("progression.visible() && !pendingUnlink"),
+                "Every bonded companion with saved level data should open its durable talent page.");
+        assertFalse(progression.contains("row.status().state() == BondedCompanionStateView.ACTIVE"),
+                "Stored and dead bonded companions must open the same durable talent page.");
+    }
+
+    @Test
+    void pointsUseTheCompactLevelUpIconInsteadOfLongInlineText() {
+        BondedCompanionPanelPresentation row = presentation(
+                BondedCompanionStateView.STORED,
+                BondedCompanionStatusPresentation.Action.SUMMON,
+                true,
+                Map.of("level", "4", "levelingConfigId", "missing-config",
+                        "talentConfigId", "saved-talents", "talentSpentPoints", "1"),
+                null);
+        UICommandBuilder commands = new UICommandBuilder();
+
+        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedTalentPointAction.Visible", "true");
+        assertCommand(commands, "#Card #BondedTalentPointCount.Text", "2");
+        assertFalse(java.util.Arrays.stream(commands.getCommands())
+                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
+                                && command.data.contains("POINTS AVAILABLE")),
+                "Available points should be represented by the compact icon badge.");
     }
 
     @Test

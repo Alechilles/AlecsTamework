@@ -92,13 +92,52 @@ Group {
     }
 
     Label #BondedSpecies {
-        Anchor: (Top: 30, Left: 40, Right: 108, Height: 18);
+        Anchor: (Top: 30, Left: 40, Width: 108, Height: 18);
         Text: "";
         Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
+    Label #BondedLevelText {
+        Anchor: (Top: 30, Left: 152, Width: 40, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #f3d775, HorizontalAlignment: Start, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Group #BondedTalentPointAction {
+        Anchor: (Top: 27, Left: 194, Width: 24, Height: 24);
+        Visible: false;
+
+        Group #BondedTalentPointIcon {
+            Anchor: (Top: 2, Left: 2, Width: 20, Height: 20);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
+        }
+
+        Group #BondedTalentPointCountBadgeBorder {
+            Anchor: (Top: 0, Left: 10, Width: 14, Height: 12);
+            Background: #f6d56b;
+        }
+
+        Group #BondedTalentPointCountBadgeFill {
+            Anchor: (Top: 1, Left: 11, Width: 12, Height: 10);
+            Background: #081220;
+        }
+
+        Label #BondedTalentPointCountShadow {
+            Anchor: (Top: 1, Left: 12, Width: 12, Height: 10);
+            Text: "";
+            Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        Label #BondedTalentPointCount {
+            Anchor: (Top: 0, Left: 11, Width: 12, Height: 10);
+            Text: "";
+            Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
     TextButton #BondedProgressionButton {
-        Anchor: (Top: 30, Left: 40, Right: 108, Height: 18);
+        Anchor: (Top: 27, Left: 40, Width: 178, Height: 24);
         Style: @BondedTransparentButton;
         Text: "";
         TooltipText: "";
