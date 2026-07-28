@@ -36,7 +36,7 @@ class BondedCompanionCardPresenterTest {
                 "Lifecycle state is informational text, not a button-like badge.");
         assertTrue(asset.contains("#BondedHealthFrame"));
         assertTrue(asset.contains("#BondedHealthFill")
-                        && asset.contains("Top: 1, Left: 1, Width: 359, Height: 16"),
+                        && asset.contains("Top: 1, Left: 1, Width: 358, Height: 16"),
                 "The static health fill begins inside the track; runtime sizing preserves its right inset.");
         assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
                 "Health treatment should be easier to read than the compact original.");
@@ -278,7 +278,7 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "359");
+        assertCommand(commands, "#Card #BondedHealthFill.Anchor", "358");
     }
 
     @Test
@@ -358,7 +358,7 @@ class BondedCompanionCardPresenterTest {
                 "Species should follow the gender icon.");
         assertTrue(asset.contains("#BondedTalentPointAction {\n        Anchor: (Top: 82, Right: 118"),
                 "The stats button belongs beside the primary bottom-right action.");
-        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 24"),
+        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 25"),
                 "Health should align to the primary action's right edge.");
     }
 

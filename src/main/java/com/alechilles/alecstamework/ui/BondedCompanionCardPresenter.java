@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
-    private static final int HEALTH_FILL_WIDTH = 359;
+    private static final int HEALTH_FILL_WIDTH = 358;
     private static final int METRIC_LEFT = 14;
     private static final int METRIC_WIDTH = 66;
     private static final int METRIC_GAP = 6;
