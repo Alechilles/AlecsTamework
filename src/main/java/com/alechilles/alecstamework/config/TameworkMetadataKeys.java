@@ -12,6 +12,11 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";
     public static final String CAPTURE_NAME_KEY = "Tamework.CaptureNameKey";
     public static final String CAPTURE_MODEL_ID = "Tamework.CaptureModelId";
+    /** Exact captured-artifact receipt, equal to the authoritative capture snapshot ID. */
+    public static final String CAPTURE_SNAPSHOT_ID = "Tamework.CaptureSnapshotId";
+    /** Operation-scoped receipt proving a captured artifact was consumed for release. */
+    public static final String CAPTURE_RELEASE_RECEIPT =
+            "Tamework.CaptureReleaseReceipt";
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
     public static final String CAPTURE_SOURCE_OWNER_UUID = "Tamework.CaptureSourceOwnerUuid";
@@ -64,6 +69,15 @@ public final class TameworkMetadataKeys {
     public static final String NPC_NAME_SOURCE = "Tamework.NpcNameSource";
     public static final String CAPTURE_TOOLTIP_DISPLAY_NAME = "Tamework.CaptureTooltipDisplayName";
     public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
+    /** Durable exact-source receipt while a resolved capture spend crosses persistence. */
+    public static final String CAPTURE_SOURCE_SPEND_ATTEMPT_ID =
+            "Tamework.Capture.SourceSpendAttemptId";
+    /** Temporary owner refund receipt; cleared only after the claim commits DELIVERED. */
+    public static final String CAPTURE_SOURCE_REFUND_ATTEMPT_ID =
+            "Tamework.Capture.SourceRefundAttemptId";
+    /** Durable line receipt proving one exact replacement-persistence refund delivery. */
+    public static final String PERSISTENCE_REFUND_RECEIPT =
+            "Tamework.Persistence.RefundReceipt";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
     public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";
@@ -86,7 +100,6 @@ public final class TameworkMetadataKeys {
     public static final String API_SELF_TEST_FIXTURE_SET_ID = "Tamework.ApiSelfTest.FixtureSetId";
     public static final String API_SELF_TEST_OWNER_UUID = "Tamework.ApiSelfTest.OwnerUuid";
     public static final String API_SELF_TEST_WORLD_NAME = "Tamework.ApiSelfTest.WorldName";
-
     private TameworkMetadataKeys() {
     }
 }

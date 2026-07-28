@@ -8,11 +8,12 @@ draft: false
 
 Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
 
-This subsection contains one page per `Tw*Config` asset family. Structure is intentionally unchanged in this reorganization pass.
+This subsection contains one page per `Tw*Config` asset family.
 
 ## Child Pages
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
+- [TwPopulationGroupConfig Reference](/mod/alecs-tamework/twpopulationgroupconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
@@ -28,5 +29,7 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)
 - [TwDebugConfig Reference](/mod/alecs-tamework/twdebugconfig-reference)
+- [TwCapturePolicyConfig Reference](/mod/alecs-tamework/twcapturepolicyconfig-reference)
+- [TwBondedCompanionRosterConfig Reference](/mod/alecs-tamework/twbondedcompanionrosterconfig-reference)
 
 

@@ -373,14 +373,14 @@ class LoadedNpcIdentityBootstrapServiceTest {
     }
 
     @Test
-    void startedWorldRevokesAbsenceUntilItsScanAndExplicitClearRemovesEvidence() {
+    void emptyUniverseStaysUnknownUntilAStartedWorldScanSealsCoverage() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         ManualScheduler scheduler = new ManualScheduler();
         LoadedNpcIdentityBootstrapService service = service(index, List.of(), new CopyOnWriteArrayList<>());
         service.bootstrapUniverse();
         CompletableFuture<LoadedNpcIdentitySnapshot> initial = service.awaitCurrentBootstrap();
-        assertTrue(initial.isDone());
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(MISSING_UUID).status());
+        assertFalse(initial.isDone());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
 
         service.scheduleStartedTarget(target(
                 WORLD_A,
@@ -415,8 +415,8 @@ class LoadedNpcIdentityBootstrapServiceTest {
         String snapshotSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkedNpcStateSnapshotService.java"
         ));
-        String pluginSource = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/Tamework.java"
+        String compositionSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java"
         ));
 
         assertTrue(source.contains("public void onStartWorld(@Nonnull StartWorldEvent event)"));
@@ -430,13 +430,27 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertTrue(snapshotSource.contains("LoadedNpcLocationResolver.resolve(store)"));
         assertTrue(snapshotSource.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
         assertTrue(snapshotSource.contains("projectionKey(marker)"));
-        int startWorldRegistration = pluginSource.indexOf("StartWorldEvent.class");
-        int initialBootstrap = pluginSource.indexOf("loadedNpcIdentityBootstrapService.bootstrapUniverse()");
-        assertTrue(startWorldRegistration >= 0 && initialBootstrap > startWorldRegistration);
-        assertTrue(pluginSource.contains(
-                "loadedNpcIdentityBootstrapService::awaitCurrentBootstrap"));
-        assertFalse(pluginSource.contains(
-                "loadedNpcIdentityBootstrapService.awaitCurrentBootstrap()"));
+        int startWorldRegistration = compositionSource.indexOf("StartWorldEvent.class");
+        int allWorldsRegistration = compositionSource.indexOf("AllWorldsLoadedEvent.class");
+        int sealedBootstrap = compositionSource.indexOf("identityBootstrap.bootstrapUniverse()");
+        assertTrue(startWorldRegistration >= 0
+                && allWorldsRegistration > startWorldRegistration
+                && sealedBootstrap > allWorldsRegistration);
+        assertTrue(compositionSource.contains("identityBootstrap.onStartWorld(event)"));
+        assertTrue(compositionSource.contains("startupWorldsLoaded.set(true)"));
+        assertTrue(compositionSource.contains("composition.resumeAfterWorldEvidence()"));
+        int dormantRegistration = compositionSource.indexOf(
+                "TameworkDormantPersistenceRegistration.register("
+        );
+        int compositionReturn = compositionSource.indexOf(
+                "return composition;", dormantRegistration
+        );
+        assertFalse(compositionSource.substring(
+                dormantRegistration, compositionReturn
+        ).contains("composition.resumeAfterWorldEvidence()"));
+        assertTrue(compositionSource.contains(
+                "identityBootstrap.awaitCurrentBootstrap().whenComplete("),
+                "World evidence readiness must resume asynchronously without blocking a world thread.");
     }
 
     private static LoadedNpcIdentityBootstrapService service(

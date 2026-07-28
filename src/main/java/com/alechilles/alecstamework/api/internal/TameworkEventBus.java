@@ -7,35 +7,58 @@ import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkEvent;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceChangeObserver;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TameworkEventBus
-        implements TameworkEventsApi, PersistenceChangeObserver, AutoCloseable {
+        implements TameworkEventsApi, AutoCloseable {
     @Nullable
     private final HytaleLogger logger;
     private final CopyOnWriteArrayList<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
+    private final LongAdder dispatchedEvents = new LongAdder();
+    private final LongAdder deliveryAttempts = new LongAdder();
+    private final LongAdder deliveredListeners = new LongAdder();
+    private final LongAdder listenerFailures = new LongAdder();
+    private final AtomicReference<String> lastFailedEventType = new AtomicReference<>();
 
     public TameworkEventBus(@Nullable HytaleLogger logger) {
         this.logger = logger;
+    }
+
+    /** Receives an already-mapped canonical profile projection after durable commit. */
+    public void publishProfileChanged(@Nonnull NpcProfileChangedEvent event) {
+        dispatch(Objects.requireNonNull(event));
+    }
+
+    /** Compatibility event seam over immutable profile values. */
+    public void publishProfileChanged(
+            @Nullable NpcProfileView before,
+            @Nullable NpcProfileView after,
+            long publishedAtMs
+    ) {
+        if (before == null && after == null) {
+            return;
+        }
+        dispatch(new NpcProfileChangedEvent(
+                after != null ? after.profileId() : before.profileId(),
+                CompanionProfileApiMapper.diff(before, after),
+                before,
+                after,
+                publishedAtMs
+        ));
     }
 
     @Override
@@ -45,74 +68,19 @@ public final class TameworkEventBus
         return () -> subscriptions.remove(subscription);
     }
 
-    @Override
-    public void onProfileChanged(@Nullable NpcProfileRepository.ProfileRecord before,
-                                 @Nullable NpcProfileRepository.ProfileRecord after) {
-        if (before == null && after == null) {
-            return;
-        }
-        String profileId = after != null ? after.profileId() : before.profileId();
-        EnumSet<ProfileChangeType> changeTypes = ApiMapper.diffProfileChanges(before, after);
-        dispatch(new NpcProfileChangedEvent(
-                profileId,
-                changeTypes,
-                before != null ? ApiMapper.mapProfile(before) : null,
-                after != null ? ApiMapper.mapProfile(after) : null,
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement capture event without legacy service types. */
+    public void publishCaptureRecorded(@Nonnull NpcCapturedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
-    @Override
-    public void onCaptureRecorded(@Nonnull CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot,
-                                  @Nullable NpcProfileRepository.ProfileRecord profile) {
-        dispatch(new NpcCapturedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                toOrderedSet(snapshot.toolIds()),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.capturedAtMs(),
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement death event without legacy service types. */
+    public void publishDeathRecorded(@Nonnull NpcDeathRecordedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
-    @Override
-    public void onDeathRecorded(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
-                                @Nullable NpcProfileRepository.ProfileRecord profile) {
-        dispatch(new NpcDeathRecordedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                snapshot.ownerName(),
-                toOrderedSet(snapshot.toolIds()),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                snapshot.customName(),
-                snapshot.tamed(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.diedAtMs(),
-                snapshot.respawnAvailableAtMs(),
-                System.currentTimeMillis()
-        ));
-    }
-
-    @Override
-    public void onLostRecorded(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot,
-                               @Nullable NpcProfileRepository.ProfileRecord profile) {
-        dispatch(new NpcLostRecordedEvent(
-                profile != null ? ApiMapper.mapProfile(profile) : null,
-                snapshot.npcUuid(),
-                ApiMapper.mapVector(snapshot.lastKnownPosition()),
-                ApiMapper.mapVector(snapshot.homePosition()),
-                snapshot.lastRelocationQueuedAtMs(),
-                snapshot.lostAtMs(),
-                snapshot.relocationRetryAttempts(),
-                System.currentTimeMillis()
-        ));
+    /** Publishes an already-mapped replacement lost event without legacy service types. */
+    public void publishLostRecorded(@Nonnull NpcLostRecordedEvent event) {
+        dispatch(Objects.requireNonNull(event));
     }
 
     public void emitConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Collection<String> changedIds) {
@@ -138,36 +106,54 @@ public final class TameworkEventBus
         dispatch(event);
     }
 
+    /** Publishes an already-mapped checkpointed persistence event. */
+    public void publishPersistenceEvent(@Nonnull TameworkEvent event) {
+        dispatch(Objects.requireNonNull(event));
+    }
+
     @Override
     public void close() {
         subscriptions.clear();
     }
 
     private void dispatch(@Nonnull TameworkEvent event) {
+        dispatchedEvents.increment();
         for (Subscription<?> subscription : List.copyOf(subscriptions)) {
             if (!subscription.accepts(event)) {
                 continue;
             }
-            subscription.invoke(event, logger);
+            deliveryAttempts.increment();
+            if (subscription.invoke(event, logger)) {
+                deliveredListeners.increment();
+            } else {
+                listenerFailures.increment();
+                lastFailedEventType.set(event.getClass().getSimpleName());
+            }
         }
     }
 
+    /** Thread-safe, bounded counters only; listener identities and event payloads are never exposed. */
     @Nonnull
-    private LinkedHashSet<String> toOrderedSet(@Nullable String[] values) {
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        if (values == null) {
-            return normalized;
-        }
-        for (String value : values) {
-            if (value == null) {
-                continue;
+    public DeliveryDiagnostics deliveryDiagnostics() {
+        return new DeliveryDiagnostics(
+                dispatchedEvents.sum(), deliveryAttempts.sum(), deliveredListeners.sum(),
+                listenerFailures.sum(), lastFailedEventType.get());
+    }
+
+    public record DeliveryDiagnostics(long dispatchedEvents,
+                                      long deliveryAttempts,
+                                      long deliveredListeners,
+                                      long listenerFailuresSinceBoot,
+                                      @Nullable String lastFailedEventType) {
+        public DeliveryDiagnostics {
+            if (dispatchedEvents < 0L || deliveryAttempts < 0L || deliveredListeners < 0L
+                    || listenerFailuresSinceBoot < 0L
+                    || deliveredListeners + listenerFailuresSinceBoot > deliveryAttempts) {
+                throw new IllegalArgumentException("Invalid event delivery diagnostics");
             }
-            String trimmed = value.trim();
-            if (!trimmed.isEmpty()) {
-                normalized.add(trimmed);
-            }
+            lastFailedEventType = lastFailedEventType == null
+                    || lastFailedEventType.isBlank() ? null : lastFailedEventType.trim();
         }
-        return normalized;
     }
 
     private static final class Subscription<E extends TameworkEvent> {
@@ -183,10 +169,11 @@ public final class TameworkEventBus
             return type.isAssignableFrom(event.getClass());
         }
 
-        private void invoke(@Nonnull TameworkEvent event, @Nullable HytaleLogger logger) {
+        private boolean invoke(@Nonnull TameworkEvent event, @Nullable HytaleLogger logger) {
             try {
                 listener.accept(type.cast(event));
-            } catch (Exception ex) {
+                return true;
+            } catch (RuntimeException | LinkageError ex) {
                 if (logger != null) {
                     logger.at(Level.SEVERE).log(
                             "Tamework API event listener failed for "
@@ -195,6 +182,7 @@ public final class TameworkEventBus
                                     + ex.getMessage()
                     );
                 }
+                return false;
             }
         }
     }

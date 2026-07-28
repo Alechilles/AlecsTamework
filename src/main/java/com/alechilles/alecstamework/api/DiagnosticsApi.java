@@ -19,20 +19,30 @@ public interface DiagnosticsApi {
         return PersistenceResilienceView.unavailable();
     }
 
-    /** Read-only exact-scope gate query; it never reserves capacity or mutates canonical state. */
+    /** Read-only exact-scope gate query; it never reserves or mutates canonical state. */
     @Nonnull
     default PersistenceMutationAvailabilityView queryPersistenceAvailability(
-            @Nonnull PersistenceMutationAvailabilityRequest request) {
+            @Nonnull PersistenceMutationAvailabilityRequest request
+    ) {
+        if (request == null) {
+            throw new NullPointerException("request");
+        }
         return PersistenceMutationAvailabilityView.unavailable();
     }
 
     /**
-     * Returns a sanitized bounded incident view. Implementations may perform a SQLite read, so
-     * callers must not invoke this method from a world tick callback.
+     * Returns a sanitized bounded incident view.
+     *
+     * <p>Implementations may perform a SQLite read, so callers must not invoke this from a world
+     * tick callback.</p>
      */
     @Nonnull
     default Optional<PersistenceIncidentSummaryView> findPersistenceIncident(
-            @Nonnull String incidentIdOrUniquePrefix) {
+            @Nonnull String incidentIdOrUniquePrefix
+    ) {
+        if (incidentIdOrUniquePrefix == null) {
+            throw new NullPointerException("incidentIdOrUniquePrefix");
+        }
         return Optional.empty();
     }
 }

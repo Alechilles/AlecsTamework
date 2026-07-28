@@ -222,11 +222,20 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
         Ref<EntityStore> targetRef = resolveTarget(parsedPhase, context, playerRef, player);
         if (commandBuffer == null || player == null || heldItem == null
                 || heldItem.isEmpty() || handler == null || parsedPhase == null) {
+            if (handler != null) {
+                handler.logCaptureChannelDiagnostic("reason=invalid-context"
+                        + " phase=" + parsedPhase
+                        + " item=" + (heldItem == null ? null : heldItem.getItemId()));
+            }
             fail(context, time, type, cooldownHandler);
             return;
         }
 
         if (parsedPhase != Phase.CANCEL && targetRef == null) {
+            handler.logCaptureChannelDiagnostic("reason=locked-target-unavailable"
+                    + " phase=" + parsedPhase
+                    + " player=" + player.getUuid()
+                    + " item=" + heldItem.getItemId());
             fail(context, time, type, cooldownHandler);
             return;
         }
@@ -237,38 +246,61 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             case CANCEL -> true;
         };
         if (!captureAllowed) {
+            handler.logCaptureChannelDiagnostic("reason=eligibility-denied"
+                    + " phase=" + parsedPhase
+                    + " player=" + player.getUuid()
+                    + " item=" + heldItem.getItemId()
+                    + " targetValid=" + (targetRef != null && targetRef.isValid()));
             fail(context, time, type, cooldownHandler);
             return;
         }
         switch (parsedPhase) {
-            case BEGIN -> commandBuffer.run(store -> handler.beginCaptureChannel(
-                    player,
-                    targetRef,
-                    heldItem,
-                    beamParticleSystem,
-                    beamNativeLength,
-                    beamNativeDurationSeconds,
-                    scaleBeamToTarget,
-                    beamFromTarget,
-                    channelDurationSeconds,
-                    new CaptureHomingProjectileSettings(
-                            homingProjectileEnabled,
-                            homingProjectileModelId,
-                            homingProjectileSpawnIntervalSeconds,
-                            homingProjectileSpeed,
-                            homingProjectileTurnRateDegreesPerSecond,
-                            homingProjectileArrivalRadius,
-                            homingProjectileLifetimeSeconds,
-                            homingProjectileMaxConcurrent
-                    )
-            ));
+            case BEGIN -> commandBuffer.run(store -> {
+                boolean started = handler.beginCaptureChannel(
+                        player,
+                        targetRef,
+                        heldItem,
+                        context.getHeldItemSlot(),
+                        beamParticleSystem,
+                        beamNativeLength,
+                        beamNativeDurationSeconds,
+                        scaleBeamToTarget,
+                        beamFromTarget,
+                        channelDurationSeconds,
+                        new CaptureHomingProjectileSettings(
+                                homingProjectileEnabled,
+                                homingProjectileModelId,
+                                homingProjectileSpawnIntervalSeconds,
+                                homingProjectileSpeed,
+                                homingProjectileTurnRateDegreesPerSecond,
+                                homingProjectileArrivalRadius,
+                                homingProjectileLifetimeSeconds,
+                                homingProjectileMaxConcurrent
+                        )
+                );
+                handler.logCaptureChannelDiagnostic(
+                        "phase=BEGIN started=" + started
+                                + " item=" + heldItem.getItemId()
+                );
+            });
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
-            case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(
-                    player,
-                    targetRef,
-                    heldItem,
-                    captureBurstParticleSystem
-            ));
+            case COMPLETE -> commandBuffer.run(store -> {
+                boolean scheduled = handler.completeCaptureChannel(
+                        player,
+                        targetRef,
+                        heldItem,
+                        captureBurstParticleSystem
+                );
+                handler.logCaptureChannelDiagnostic(
+                        "phase=COMPLETE scheduled=" + scheduled
+                                + " item=" + heldItem.getItemId()
+                );
+            });
+        }
+        if (parsedPhase == Phase.COMPLETE) {
+            // Completion is terminal for this native Charging sequence. Leaving
+            // it active lets the held-use input immediately begin another channel.
+            context.getState().state = InteractionState.Finished;
         }
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);
@@ -287,9 +319,18 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             UUIDComponent playerUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
             if (playerUuid != null && playerUuid.getUuid() != null) {
                 Ref<EntityStore> locked = CaptureChannelVfxSystem.resolveTarget(playerUuid.getUuid(), world);
-                if (locked != null) {
+                if (phase == Phase.CANCEL && locked != null) {
                     return locked;
                 }
+                if (phase == Phase.COMPLETE) {
+                    // Completion belongs to the server-created channel session, not to a new
+                    // client aim sample. The terminal policy check below still revalidates the
+                    // locked NPC's range, health, effect, role, and ownership requirements.
+                    return locked;
+                }
+            }
+            if (phase == Phase.COMPLETE) {
+                return null;
             }
         }
         Ref<EntityStore> explicit = context.getTargetEntity();

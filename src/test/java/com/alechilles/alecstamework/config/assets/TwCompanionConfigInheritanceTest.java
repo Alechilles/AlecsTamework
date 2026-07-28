@@ -7,6 +7,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies parent fallback behavior for role-scoped companion config inheritance. */
@@ -90,6 +91,51 @@ class TwCompanionConfigInheritanceTest {
         assertTrue(settings.isInvulnerableIfOwned());
     }
 
+    @Test
+    void effectiveSettingsKeepRoleScopedRespawnCooldown() throws Exception {
+        TwCompanionConfig scoped = new TwCompanionConfig();
+        setNestedIntField(
+                scoped, "command", "deadRespawnCooldownMs", 600_000
+        );
+        TwGlobalConfig global = TwGlobalConfig.defaultConfig();
+        setField(global, "commandDeadRespawnCooldownMs", 60_000);
+
+        TwCompanionConfig.EffectiveSettings settings =
+                TwCompanionConfig.EffectiveSettings.from(scoped, global);
+
+        assertEquals(600_000, settings.getDeadRespawnCooldownMs());
+    }
+
+    @Test
+    void deadRespawnFieldsInheritDirectly() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        setNestedBooleanField(
+                parent, "command", "deadRespawnEnabled", false
+        );
+        setNestedIntField(
+                parent, "command", "deadRespawnCooldownMs", 120_000
+        );
+        setNestedBooleanField(
+                child, "command", "deadRespawnEnabled", true
+        );
+        setNestedIntField(
+                child, "command", "deadRespawnCooldownMs", 1
+        );
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of("DeadRespawnEnabled"))
+        );
+
+        assertTrue(child.getCommand().isDeadRespawnEnabled());
+        assertEquals(
+                120_000,
+                child.getCommand().getDeadRespawnCooldownMs()
+        );
+    }
+
     private void setNestedIntField(Object target, String nestedFieldName, String fieldName, int value)
             throws Exception {
         Field nestedField = target.getClass().getDeclaredField(nestedFieldName);
@@ -105,6 +151,18 @@ class TwCompanionConfigInheritanceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setBoolean(target, value);
+    }
+
+    private void setLongField(Object target, String fieldName, long value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.setLong(target, value);
+    }
+
+    private void setField(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private void setNestedBooleanField(Object target, String nestedFieldName, String fieldName, boolean value)

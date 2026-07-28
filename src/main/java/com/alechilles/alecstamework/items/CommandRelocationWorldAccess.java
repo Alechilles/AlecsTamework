@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -85,6 +86,21 @@ final class CommandRelocationWorldAccess {
     @Nullable
     String normalizeWorldName(@Nullable String worldName) {
         return worldName == null || worldName.isBlank() ? null : worldName.trim();
+    }
+
+    @Nullable
+    World resolveLoadedWorld(@Nullable String worldName) {
+        String normalized = normalizeWorldName(worldName);
+        Universe universe = Universe.get();
+        if (normalized == null || universe == null) {
+            return null;
+        }
+        for (World world : universe.getWorlds().values()) {
+            if (world != null && normalized.equals(normalizeWorldName(world.getName()))) {
+                return world;
+            }
+        }
+        return null;
     }
 
     @Nullable

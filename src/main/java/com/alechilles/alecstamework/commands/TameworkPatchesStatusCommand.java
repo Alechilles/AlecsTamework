@@ -7,19 +7,13 @@ import javax.annotation.Nonnull;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.AssetPatchStatus;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Prints the last optional patch run.
  */
-public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
+public final class TameworkPatchesStatusCommand extends AbstractTameworkServerCommand {
     private static final int MAX_ROWS = 8;
 
     public TameworkPatchesStatusCommand() {
@@ -29,11 +23,7 @@ public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    protected void executeServer(@Nonnull CommandContext commandContext) {
         AssetPatchService service = resolveService(commandContext);
         if (service == null) {
             return;

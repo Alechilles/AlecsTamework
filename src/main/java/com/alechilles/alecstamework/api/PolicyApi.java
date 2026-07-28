@@ -19,15 +19,21 @@ public interface PolicyApi {
     DamagePolicyDecisionView evaluateDamage(String profileId, @Nullable UUID attackerPlayerUuid);
 
     @Nonnull
-    @Deprecated(since = "0.7.0", forRemoval = false)
     PopulationCapDecisionView evaluatePopulationCap(@Nullable UUID ownerUuid);
 
     /**
-     * Evaluates an owner-only cap with explicit world and slot context. This remains informational;
-     * use {@link #populationAdmissions()} to bind a gameplay mutation to reserved capacity.
+     * Evaluates an owner-only cap with explicit world and slot context.
+     *
+     * <p>This remains informational; use {@link #populationAdmissions()} to bind a gameplay
+     * mutation to reserved capacity.</p>
      */
     @Nonnull
-    default OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
+    default OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(
+            @Nonnull OwnerPopulationCapRequestV2 request
+    ) {
+        if (request == null) {
+            throw new NullPointerException("request");
+        }
         return OwnerPopulationCapDecisionViewV2.unavailable(
                 request,
                 OwnerPopulationCapDecisionViewV2.Scope.UNKNOWN,
@@ -40,4 +46,5 @@ public interface PolicyApi {
     default PopulationAdmissionApi populationAdmissions() {
         return PopulationAdmissionApi.unavailable();
     }
+
 }

@@ -209,7 +209,7 @@ class TwConfigInheritanceContractTest {
 
         assertTrue(child.getIdentityRules().isRequireSnapshotOnRelease());
         assertTrue(child.getIdentityRules().isPreserveUUID());
-        assertFalse(child.isManagedAuthorityEnabled());
+        assertTrue(child.isEnabled());
     }
 
     @Test

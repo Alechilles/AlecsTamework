@@ -214,6 +214,7 @@ def generate(args: argparse.Namespace) -> GenerationResult:
         output_common_model_asset,
         animation_outputs
     )
+    strip_unsafe_footstep_intervals(generated_server_model, warnings)
     warn_missing_native_locomotion_sets(generated_server_model, warnings)
     output_server_model_path = (
         output_root
@@ -526,6 +527,29 @@ def warn_missing_native_locomotion_sets(server_model: Any, warnings: list[str]) 
             warnings.append(
                 f"missing native transformed-player animation set {native_id!r}; "
                 "add it to the source model if this avatar will use grounded player locomotion"
+            )
+
+
+def strip_unsafe_footstep_intervals(server_model: Any, warnings: list[str]) -> None:
+    animation_sets = server_model.get("AnimationSets")
+    if not isinstance(animation_sets, dict):
+        return
+    for set_id, animation_set in animation_sets.items():
+        if not isinstance(animation_set, dict):
+            continue
+        animations = animation_set.get("Animations")
+        if not isinstance(animations, list):
+            continue
+        for index, animation in enumerate(animations):
+            if not isinstance(animation, dict):
+                continue
+            intervals = animation.get("FootstepIntervals")
+            if not isinstance(intervals, list) or not intervals:
+                continue
+            del animation["FootstepIntervals"]
+            warnings.append(
+                f"removed unsafe FootstepIntervals from animation set {set_id!r} entry {index}; "
+                "the client retains its interval index across transformed-player animation swaps"
             )
 
 

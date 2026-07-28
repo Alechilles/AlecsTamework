@@ -4,10 +4,17 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSessionRegistry;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSpawner;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.system.tick.TickingSystem;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -23,7 +30,7 @@ import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
 /** Owns capture-channel VFX sessions, including independently homing model-particle motes. */
-public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
+public final class CaptureChannelVfxSystem extends EntityTickingSystem<EntityStore> {
     private static final long LEGACY_EMIT_INTERVAL_MS = 50L;
     private static final long TARGET_LOCK_GRACE_MS = 2_000L;
     private static final double DEFAULT_NATIVE_DURATION_SECONDS = 0.5D;
@@ -32,6 +39,20 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     private static final Map<UUID, Session> ACTIVE = new ConcurrentHashMap<>();
     private static final Set<String> WARNED_HOMING_MODELS = ConcurrentHashMap.newKeySet();
     private static final AtomicLong NEXT_GENERATION = new AtomicLong();
+    private final ComponentType<EntityStore, Player> playerType;
+    private final ComponentType<EntityStore, UUIDComponent> uuidType;
+    private final Query<EntityStore> query;
+
+    public CaptureChannelVfxSystem() {
+        this(Player.getComponentType(), UUIDComponent.getComponentType());
+    }
+
+    CaptureChannelVfxSystem(@Nonnull ComponentType<EntityStore, Player> playerType,
+                            @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType) {
+        this.playerType = playerType;
+        this.uuidType = uuidType;
+        this.query = Query.and(playerType, uuidType);
+    }
 
     public static boolean start(@Nonnull UUID playerUuid,
                                 @Nonnull UUID targetUuid,
@@ -150,43 +171,49 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     }
 
     @Override
-    public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+    public void tick(float dt,
+                     int index,
+                     @Nonnull ArchetypeChunk<EntityStore> chunk,
+                     @Nonnull Store<EntityStore> store,
+                     @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null || ACTIVE.isEmpty()) {
             return;
         }
-        long nowMs = System.currentTimeMillis();
-        for (Session session : ACTIVE.values()) {
-            if (!session.worldName.equals(world.getName())) {
-                continue;
-            }
-            Ref<EntityStore> playerRef = world.getEntityRef(session.playerUuid);
-            Ref<EntityStore> targetRef = world.getEntityRef(session.targetUuid);
-            if (playerRef == null || !playerRef.isValid()
-                    || targetRef == null || !targetRef.isValid()) {
-                expire(session, targetRef, store);
-                continue;
-            }
-            if (nowMs >= session.expiresAtMs) {
-                expire(session, targetRef, store);
-                continue;
-            }
-            if (nowMs >= session.visualEndsAtMs) {
-                endVisuals(session, targetRef, store);
-                continue;
-            }
-            if (nowMs < session.nextEmitAtMs) {
-                continue;
-            }
-            session.nextEmitAtMs = nowMs + session.emissionIntervalMs();
-            emit(session, playerRef, targetRef, store);
+        UUIDComponent identity = chunk.getComponent(index, uuidType);
+        UUID playerUuid = identity == null ? null : identity.getUuid();
+        Session session = playerUuid == null ? null : ACTIVE.get(playerUuid);
+        if (session == null || !session.worldName.equals(world.getName())) {
+            return;
         }
+        long nowMs = System.currentTimeMillis();
+        Ref<EntityStore> playerRef = chunk.getReferenceTo(index);
+        Ref<EntityStore> targetRef = world.getEntityRef(session.targetUuid);
+        if (playerRef == null || !playerRef.isValid()
+                || targetRef == null || !targetRef.isValid()) {
+            expire(session, targetRef, commandBuffer);
+            return;
+        }
+        if (nowMs >= session.expiresAtMs) {
+            expire(session, targetRef, commandBuffer);
+            return;
+        }
+        if (nowMs >= session.visualEndsAtMs) {
+            endVisuals(session, targetRef, commandBuffer);
+            return;
+        }
+        if (nowMs < session.nextEmitAtMs) {
+            return;
+        }
+        session.nextEmitAtMs = nowMs + session.emissionIntervalMs();
+        emit(session, playerRef, targetRef, store, commandBuffer);
     }
 
     private static void emit(@Nonnull Session session,
                              @Nonnull Ref<EntityStore> playerRef,
                              @Nonnull Ref<EntityStore> targetRef,
-                             @Nonnull Store<EntityStore> store) {
+                             @Nonnull Store<EntityStore> store,
+                             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Vector3d playerRoot = CaptureChannelAnchorResolver.resolveRoot(playerRef, store);
         Vector3d targetRoot = CaptureChannelAnchorResolver.resolveRoot(targetRef, store);
         if (!isWithinConfiguredRange(playerRoot, targetRoot, session.maxDistance)) {
@@ -205,7 +232,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 return;
             }
             HomingVisualProjectileSpawner.SpawnResult result = HomingVisualProjectileSpawner.spawn(
-                    store,
+                    commandBuffer,
                     origin,
                     session.playerUuid,
                     session.homingSettings.toProjectileSpec(),
@@ -346,13 +373,43 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         return visualEndsAtMs + TARGET_LOCK_GRACE_MS;
     }
 
+    static void sweepOrphanedSessions(@Nonnull Store<EntityStore> store, long nowMs) {
+        World world = store.getExternalData() == null ? null : store.getExternalData().getWorld();
+        if (world == null || ACTIVE.isEmpty()) {
+            return;
+        }
+        for (Session session : ACTIVE.values()) {
+            Ref<EntityStore> playerRef = world.getEntityRef(session.playerUuid);
+            boolean playerPresentHere = playerRef != null && playerRef.isValid();
+            boolean expectedWorld = session.worldName.equals(world.getName());
+            if (!shouldSweepOrphanedSession(
+                    nowMs, session.expiresAtMs, expectedWorld, playerPresentHere)) {
+                continue;
+            }
+            if (ACTIVE.remove(session.playerUuid, session)) {
+                // There is no player archetype CommandBuffer for an orphan. Deactivate
+                // its harmless projectiles here; the bounded aura expires on its own.
+                deactivate(session);
+            }
+        }
+    }
+
+    static boolean shouldSweepOrphanedSession(long nowMs,
+                                              long expiresAtMs,
+                                              boolean expectedWorld,
+                                              boolean playerPresentHere) {
+        return nowMs >= expiresAtMs
+                || (expectedWorld && !playerPresentHere)
+                || (!expectedWorld && playerPresentHere);
+    }
+
     static boolean retainsTargetLock(long nowMs, long expiresAtMs) {
         return nowMs < expiresAtMs;
     }
 
     private static void endVisuals(@Nonnull Session session,
                                    @Nullable Ref<EntityStore> targetRef,
-                                   @Nonnull Store<EntityStore> store) {
+                                   @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         if (session.visualsEnded) {
             return;
         }
@@ -360,17 +417,23 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         deactivate(session);
         if (targetRef != null && targetRef.isValid()
                 && session.auraEffectId != null && !session.auraEffectId.isBlank()) {
-            TameworkEntityEffectService.removeEffect(targetRef, session.auraEffectId, store);
+            TameworkEntityEffectService.removeEffect(targetRef, session.auraEffectId, componentAccessor);
         }
     }
 
     private static void expire(@Nonnull Session session,
                                @Nullable Ref<EntityStore> targetRef,
-                               @Nonnull Store<EntityStore> store) {
+                               @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         if (!ACTIVE.remove(session.playerUuid, session)) {
             return;
         }
-        endVisuals(session, targetRef, store);
+        endVisuals(session, targetRef, componentAccessor);
+    }
+
+    @Nonnull
+    @Override
+    public Query<EntityStore> getQuery() {
+        return query;
     }
 
     private static void deactivate(@Nonnull Session session) {

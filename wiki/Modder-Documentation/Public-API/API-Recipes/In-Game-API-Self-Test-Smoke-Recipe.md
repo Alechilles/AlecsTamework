@@ -24,8 +24,23 @@ Goal: run the built-in in-game API smoke flow against a live server.
 /tw api test run trait-effects verbose
 ```
 
+## Console-safe smoke
+
+The server console can run the fixture-free aggregate without a player:
+
+```text
+/tw api test status
+/tw api test run all
+```
+
+Console `all` runs only `core`, `diagnostics`, and
+`hydragon-integrations`. Player/world suites still require an in-game operator
+and prepared fixtures where applicable.
+
 ## Notes
-- `prepare` and `reset` mutate fixtures; `run` is read-only.
+- `prepare` and `reset` mutate fixtures. A player's full `run all` includes
+  controlled progression mutations and baseline restoration; the console-safe
+  aggregate is read-only.
 - Each run writes full verbose test details to server logs.
 - For deterministic reruns, execute `reset` before `prepare`.
 

@@ -18,6 +18,11 @@ Thumbs.db
 *.tmp
 *.bak
 *.cache
+**/__pycache__/
+*.py[cod]
+
+# Focused verification compiler output
+/outputs/*-check/
 
 # IDE settings
 .settings/
@@ -30,6 +35,7 @@ AGENTS.md
 artifacts/
 /docs/superpowers/
 /.superpowers/
+/.worktrees/
 
 # Private local agreements
 /private-agreements/

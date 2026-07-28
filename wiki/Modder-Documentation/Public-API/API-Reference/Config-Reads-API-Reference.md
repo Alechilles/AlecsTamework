@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `configs()` contract in `TameworkApi`.
 
 Capability: `CONFIG_READ`
@@ -27,12 +27,20 @@ Role-scoped config families:
 - `getHappinessConfigById(...)` / `resolveHappinessConfigForRole(...)`
 - `getNeedsConfigById(...)` / `resolveNeedsConfigForRole(...)`
 - `getBreedingConfigById(...)` / `resolveBreedingConfigForRole(...)`
+- `getLevelingConfigById(...)` / `resolveLevelingConfigForRole(...)`
 - `getTraitConfigById(...)` / `resolveTraitConfigForRole(...)`
+- `getTalentConfigById(...)` / `resolveTalentConfigForRole(...)`
 
 Item-scoped config families:
 - `getSpawnerConfigById(...)` / `resolveSpawnerConfigForItemId(...)`
 - `getNameItemConfigById(...)` / `resolveNameItemConfigForItemId(...)`
 - `getCommandItemConfigById(...)` / `resolveCommandItemConfigForItemId(...)`
+
+API 0.9 capture views:
+
+- `getSpawnerCaptureMechanicsById(...)` / `resolveSpawnerCaptureMechanicsForItemId(...)`
+- `getCapturePolicyById(...)` / `resolveCapturePolicyForRole(...)`
+
 
 ## View Types
 - `GlobalConfigView`
@@ -41,11 +49,16 @@ Item-scoped config families:
 - `SpawnerConfigView`
 - `NameItemConfigView`
 - `CommandItemConfigView`
+- `SpawnerCaptureMechanicsView`
+- `CapturePolicyConfigView`
 
 ## Notes
 - Returned views are detached immutable DTOs.
 - `detailsJson` fields provide a compact JSON representation of resolved config details.
 - Config reload events are emitted through `events()` as `ConfigReloadedEvent`.
+- Capture-specific reads return `Optional.empty()` when the capture-policy
+  surface is unavailable. Require `CAPTURE_POLICY` before using those views to
+  enable gameplay.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

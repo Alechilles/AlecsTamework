@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
-import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
@@ -33,41 +31,52 @@ public final class CommandNpcRelocationService {
     private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, World> knownWorldByNpc = new ConcurrentHashMap<>();
     private final CommandRelocationNpcLifecycle npcLifecycle;
-    private final CommandRelocationAdmissionGate admissionGate = new CommandRelocationAdmissionGate();
     private final CommandRelocationPostMoveEffects postMoveEffects =
             new CommandRelocationPostMoveEffects();
     private final CommandRelocationWorldAccess worldAccess;
+    private final CommandRelocationLocationTracker locationTracker;
     private final CommandRelocationApplyScheduler applyScheduler;
-    private final CommandRelocationDropReporter dropReporter;
     private final CommandRelocationTimingPolicy timingPolicy = new CommandRelocationTimingPolicy();
     private final CommandRelocationRetryCoordinator retryCoordinator;
     private final CommandRelocationChunkRequestService chunkRequests;
+    private final CommandRelocationQueueCoordinator queueCoordinator;
     private final CommandRelocationTransferHolderService transferHolders =
             new CommandRelocationTransferHolderService();
     private final CommandRelocationDiagnostics diagnostics;
+    private final CommandRelocationTerminalService terminalService;
 
     public CommandNpcRelocationService() {
-        this(null);
+        this(null, ImportedRecallRecoverySink.NOOP);
     }
 
     public CommandNpcRelocationService(@Nullable HytaleLogger logger) {
+        this(logger, ImportedRecallRecoverySink.NOOP);
+    }
+
+    public CommandNpcRelocationService(
+            @Nullable HytaleLogger logger,
+            ImportedRecallRecoverySink importedRecallRecovery
+    ) {
         this.diagnostics = new CommandRelocationDiagnostics(logger);
         this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
+        this.locationTracker = new CommandRelocationLocationTracker(
+                lastKnownByNpc,
+                knownWorldByNpc,
+                worldAccess
+        );
         this.applyScheduler = new CommandRelocationApplyScheduler(
                 pendingByNpc,
                 worldAccess,
                 this::tryApply,
                 this::handleApplyDispatchRejected
         );
-        this.dropReporter = new CommandRelocationDropReporter(logger, this::logTravelDiagnostic);
         this.npcLifecycle = new CommandRelocationNpcLifecycle(
                 lastKnownByNpc,
                 knownWorldByNpc,
                 pendingByNpc,
-                dropReporter,
-                (world, npcUuid) -> scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS),
-                this::removePending,
-                pending -> cancelAdmission(pending, false, null, null)
+                (world, npcUuid) -> scheduleTryApply(
+                        world, npcUuid, INITIAL_APPLY_DELAY_MS
+                )
         );
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
         this.chunkRequests = new CommandRelocationChunkRequestService(
@@ -77,55 +86,44 @@ public final class CommandNpcRelocationService {
                 diagnostics,
                 this::scheduleTryApply
         );
+        this.terminalService = new CommandRelocationTerminalService(
+                logger,
+                importedRecallRecovery,
+                pendingByNpc,
+                this::removePending,
+                this::logTravelDiagnostic
+        );
+        this.queueCoordinator = new CommandRelocationQueueCoordinator(
+                pendingByNpc,
+                lastKnownByNpc,
+                knownWorldByNpc,
+                chunkRequests,
+                applyScheduler,
+                this::dropUnconfirmedRelocation,
+                this::logTravelDiagnostic
+        );
     }
 
-    public void setRelocationDropListener(@Nullable CommandRelocationDropListener relocationDropListener) {
-        dropReporter.setListener(relocationDropListener);
-    }
-
-    public void setRelocationAdmissionService(
-            @Nullable CompanionRelocationAdmissionService relocationAdmissionService
-    ) {
-        admissionGate.setAuthority(relocationAdmissionService);
+    public void rememberSourceWorld(@Nullable UUID npcUuid, @Nullable String worldName) {
+        locationTracker.rememberSourceWorld(npcUuid, worldName);
     }
 
     public void cancelPendingRelocation(@Nullable UUID npcUuid) {
-        if (npcUuid == null) {
-            return;
-        }
-        PendingRelocation pending = pendingByNpc.get(npcUuid);
-        if (pending == null) {
-            return;
-        }
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
-                    knownWorldByNpc.get(npcUuid), npcUuid, pending, System.currentTimeMillis()
-            );
-            return;
-        }
-        if (removePending(npcUuid, pending)) {
-            pending.markCrossWorldTransferFinished();
-            cancelAdmission(pending, false, null, null);
-            logTravelDiagnostic(Level.INFO, "Cancelled pending relocation for npc=" + npcUuid);
-        }
+        terminalService.cancel(npcUuid);
     }
 
     public LastKnownLocation getLastKnownLocation(@Nullable UUID npcUuid,
                                                   @Nullable Vector3d fallbackPosition,
                                                   @Nullable String fallbackWorldName) {
-        if (npcUuid == null) {
-            return new LastKnownLocation(
-                    worldAccess.normalizeWorldName(fallbackWorldName), worldAccess.copyPosition(fallbackPosition)
-            );
-        }
-        Vector3d position = lastKnownByNpc.get(npcUuid);
-        World world = knownWorldByNpc.get(npcUuid);
-        String worldName = world != null
-                ? worldAccess.normalizeWorldName(world.getName())
-                : worldAccess.normalizeWorldName(fallbackWorldName);
+        CommandRelocationLocationTracker.Location location =
+                locationTracker.resolve(
+                        npcUuid,
+                        fallbackPosition,
+                        fallbackWorldName
+                );
         return new LastKnownLocation(
-                worldName,
-                position != null ? new Vector3d(position) : worldAccess.copyPosition(fallbackPosition)
+                location.worldName(),
+                location.position()
         );
     }
 
@@ -140,11 +138,11 @@ public final class CommandNpcRelocationService {
         }
         long nowMs = System.currentTimeMillis();
         long maxWaitMs = Math.max(0L, timingPolicy.maxWaitMs());
-        long lostAtMs = pending.queuedAtMs + maxWaitMs;
+        long dropAtMs = pending.queuedAtMs + maxWaitMs;
         return new PendingRecallSnapshot(
                 pending.npcUuid,
                 pending.queuedAtMs,
-                Math.max(0L, lostAtMs - nowMs)
+                Math.max(0L, dropAtMs - nowMs)
         );
     }
 
@@ -222,75 +220,60 @@ public final class CommandNpcRelocationService {
                                 boolean allowCrossWorldTransfer,
                                 @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
                                 @Nullable String[] requiredStateFilter) {
+        queueRelocation(
+                world,
+                npcUuid,
+                destination,
+                ownerUuid,
+                assignOwnerAsMasterTarget,
+                clearLockedTarget,
+                state,
+                subState,
+                delayMs,
+                sourceHintPosition,
+                alternateSourceHintPosition,
+                allowCrossWorldTransfer,
+                onTransferFailure,
+                requiredStateFilter,
+                false
+        );
+    }
+
+    public void queueRelocation(World world,
+                                UUID npcUuid,
+                                Vector3d destination,
+                                @Nullable UUID ownerUuid,
+                                boolean assignOwnerAsMasterTarget,
+                                boolean clearLockedTarget,
+                                @Nullable String state,
+                                @Nullable String subState,
+                                long delayMs,
+                                @Nullable Vector3d sourceHintPosition,
+                                @Nullable Vector3d alternateSourceHintPosition,
+                                boolean allowCrossWorldTransfer,
+                                @Nullable TwCompanionConfig.TransferFailurePolicy onTransferFailure,
+                                @Nullable String[] requiredStateFilter,
+                                boolean explicitRecall) {
         boolean debugLag = isLagDebugEnabled();
         long startedNs = debugLag ? System.nanoTime() : 0L;
         try {
-            if (world == null || npcUuid == null || destination == null) {
-                return;
-            }
-            long executeAfterMs = System.currentTimeMillis() + Math.max(0L, delayMs);
-            PendingRelocation pending = new PendingRelocation(
+            queueCoordinator.queue(
+                    world,
                     npcUuid,
-                    new Vector3d(destination),
-                    world.getName(),
-                    sourceHintPosition != null ? new Vector3d(sourceHintPosition) : null,
-                    alternateSourceHintPosition != null ? new Vector3d(alternateSourceHintPosition) : null,
-                    admissionGate.resolveCanonicalSource(npcUuid),
+                    destination,
                     ownerUuid,
                     assignOwnerAsMasterTarget,
                     clearLockedTarget,
                     state,
                     subState,
-                    executeAfterMs,
-                    System.currentTimeMillis(),
+                    delayMs,
+                    sourceHintPosition,
+                    alternateSourceHintPosition,
                     allowCrossWorldTransfer,
                     onTransferFailure,
                     requiredStateFilter,
-                    CompanionRelocationAdmissionService.ForcePolicy.ENFORCE
+                    explicitRecall
             );
-            if (sourceHintPosition != null) {
-                // Do not overwrite an existing tracked position with a potentially stale metadata hint.
-                lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(sourceHintPosition));
-            } else if (alternateSourceHintPosition != null) {
-                lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(alternateSourceHintPosition));
-            }
-            PendingRelocation current = pendingByNpc.get(npcUuid);
-            if (current != null
-                    && (current.hasSameCommandIntent(pending) || current.physicalMutationAttempted())) {
-                requestChunksForPending(world, current);
-                scheduleTryApply(world, npcUuid, 0L);
-                return;
-            }
-            chunkRequests.open(pending);
-            PendingRelocation replaced = pendingByNpc.put(npcUuid, pending);
-            if (replaced != null) {
-                chunkRequests.release(replaced);
-                replaced.markCrossWorldTransferFinished();
-                if (replaced.admissionApplying() && replaced.physicalMutationAttempted()) {
-                    commitUnconfirmedRelocationAsLost(
-                            knownWorldByNpc.get(npcUuid), npcUuid, replaced, System.currentTimeMillis()
-                    );
-                } else {
-                    cancelAdmission(replaced, false, null, null);
-                }
-            }
-            if (allowCrossWorldTransfer || (requiredStateFilter != null && requiredStateFilter.length > 0)) {
-                logTravelDiagnostic(
-                        Level.INFO,
-                        "Queued relocation npc="
-                                + npcUuid
-                                + ", destinationWorld="
-                                + world.getName()
-                                + ", allowCrossWorldTransfer="
-                                + allowCrossWorldTransfer
-                                + ", onTransferFailure="
-                                + pending.onTransferFailure
-                                + ", requiredStateFilter="
-                                + describeStateFilter(requiredStateFilter)
-                );
-            }
-            requestChunksForPending(world, pending);
-            scheduleTryApply(world, npcUuid, Math.max(0L, delayMs));
         } finally {
             if (debugLag) {
                 logSlowOperation(startedNs, "relocation.queueRelocation npc=" + npcUuid);
@@ -307,15 +290,6 @@ public final class CommandNpcRelocationService {
                              Store<EntityStore> store,
                              @Nullable UUID npcUuidHint) {
         npcLifecycle.onNpcRemoved(reference, reason, store, npcUuidHint);
-    }
-
-    /** Submits strict Lost recovery after a terminal world's live identity has been retired. */
-    public void onWorldRemoved(@Nullable World world) {
-        npcLifecycle.onWorldRemoved(world, System.currentTimeMillis());
-    }
-
-    public boolean isDeleteOnRemoveRecoveryPending(@Nullable UUID npcUuid) {
-        return npcLifecycle.isDeleteOnRemoveRecoveryPending(npcUuid);
     }
 
     public boolean tryApply(World world, UUID npcUuid) {
@@ -373,7 +347,6 @@ public final class CommandNpcRelocationService {
                 );
                 pending.markCrossWorldTransferFinished();
                 removePending(npcUuid, pending);
-                cancelAdmission(pending, false, null, null);
                 return false;
             }
             TransformComponent transform = worldAccess.safeGetComponent(
@@ -382,17 +355,9 @@ public final class CommandNpcRelocationService {
                 retryCoordinator.afterLiveStateUnavailable(world, npcUuid, pending);
                 return false;
             }
-            if (!ensureAdmission(world, pending)) {
-                return false;
-            }
             if (!pending.relocationIssued) {
-                if (pending.admissionReserved() && !hasExpectedLiveOwner(store, ref, pending)) {
-                    cancelPendingAdmissionForDenial(
-                            world, pending, "relocation-live-owner-changed"
-                    );
-                    return false;
-                }
-                if (!claimAdmissionImmediatelyBeforeMutation(world, pending)) {
+                if (!hasExpectedLiveOwner(store, ref, pending)) {
+                    rejectRelocation(pending, "relocation-live-owner-changed");
                     return false;
                 }
                 pending.markRelocationIssued(now);
@@ -417,13 +382,13 @@ public final class CommandNpcRelocationService {
             )) {
                 if (now - pending.relocationIssuedAtMs > RELOCATION_CONFIRMATION_TIMEOUT_MS) {
                     pending.resetRelocationIssue();
-                    retryCoordinator.keepingAdmission(world, npcUuid, pending, true);
+                    retryCoordinator.continueRetry(world, npcUuid, pending, true);
                 } else {
                     scheduleTryApply(world, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
                 }
                 return false;
             }
-            commitAdmission(world, npcUuid, pending);
+            finishRelocation(npcUuid, pending);
             postMoveEffects.apply(
                     world, npc, ref, store, pending,
                     effect -> logTravelDiagnostic(
@@ -439,31 +404,6 @@ public final class CommandNpcRelocationService {
         }
     }
 
-    private boolean ensureAdmission(World world, PendingRelocation pending) {
-        if (pending.ownerUuid == null) {
-            denyAdmission(pending, "relocation-owner-missing");
-            return false;
-        }
-        CompanionRelocationAdmissionService.Request request =
-                new CompanionRelocationAdmissionService.Request(
-                        pending.npcUuid,
-                        pending.ownerUuid,
-                        world.getName(),
-                        worldAccess.toChunk(pending.destination.x),
-                        worldAccess.toChunk(pending.destination.z),
-                        pending.forcePolicy
-                );
-        return admissionGate.ensure(
-                pending,
-                request,
-                leaseBoundDispatcher(world),
-                () -> pendingByNpc.get(pending.npcUuid) == pending,
-                () -> scheduleTryApply(world, pending.npcUuid, 0L),
-                reason -> retryAdmission(world, pending, reason),
-                reason -> denyAdmission(pending, reason)
-        );
-    }
-
     private boolean hasExpectedLiveOwner(Store<EntityStore> store,
                                          Ref<EntityStore> ref,
                                          PendingRelocation pending) {
@@ -473,72 +413,17 @@ public final class CommandNpcRelocationService {
         return owner != null && Objects.equals(owner.getOwnerId(), pending.ownerUuid);
     }
 
-    private boolean claimAdmissionImmediatelyBeforeMutation(World world,
-                                                            PendingRelocation pending) {
-        return pending.admissionApplying() || admissionGate.claimForApply(
-                pending,
-                leaseBoundDispatcher(world),
-                () -> pendingByNpc.get(pending.npcUuid) == pending,
-                reason -> retryAdmission(world, pending, reason),
-                reason -> denyAdmission(pending, reason)
-        );
-    }
-
-    private void retryAdmission(World world, PendingRelocation pending, String reason) {
-        if (world == null || pendingByNpc.get(pending.npcUuid) != pending) {
+    private void finishRelocation(UUID npcUuid, PendingRelocation pending) {
+        if (pendingByNpc.get(npcUuid) != pending) {
             return;
         }
-        logTravelDiagnostic(Level.INFO,
-                "Retrying relocation admission for npc=" + pending.npcUuid + ", reason=" + reason);
-        retryCoordinator.keepingAdmission(world, pending.npcUuid, pending, false);
+        lastKnownByNpc.put(npcUuid, new Vector3d(pending.destination));
+        removePending(npcUuid, pending);
     }
 
-    private void cancelPendingAdmissionForDenial(World world,
-                                                  PendingRelocation pending,
-                                                  String reason) {
-        cancelAdmission(pending, false, world, null);
-        denyAdmission(pending, reason);
-    }
-
-    void cancelAdmission(PendingRelocation pending,
-                         boolean retry,
-                         @Nullable World world,
-                         @Nullable Runnable continuation) {
-        admissionGate.cancel(
-                pending,
-                retry,
-                leaseBoundDispatcher(world),
-                () -> pendingByNpc.get(pending.npcUuid) == pending,
-                continuation,
-                reason -> denyAdmission(pending, reason)
-        );
-    }
-
-    private void commitAdmission(World world, UUID npcUuid, PendingRelocation pending) {
-        admissionGate.commit(pending, leaseBoundDispatcher(world), (decision, failure) -> {
-            if (pendingByNpc.get(npcUuid) != pending) {
-                return;
-            }
-            lastKnownByNpc.put(npcUuid, new Vector3d(pending.destination));
-            removePending(npcUuid, pending);
-            if (failure != null || decision == null
-                    || decision.status() != CompanionRelocationAdmissionService.Status.COMMITTED) {
-                logTravelDiagnostic(Level.WARNING,
-                        "Relocation moved live NPC but population commit degraded for npc=" + npcUuid);
-            }
-        });
-    }
-
-    void commitUnconfirmedRelocationAsLost(
+    void dropUnconfirmedRelocation(
             @Nullable World world, UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
-        admissionGate.commit(pending, leaseBoundDispatcher(world), (decision, failure) -> {
-            if (failure != null || decision == null
-                    || decision.status() != CompanionRelocationAdmissionService.Status.COMMITTED) {
-                logTravelDiagnostic(Level.WARNING,
-                        "Unconfirmed relocation population commit degraded for npc=" + npcUuid);
-            }
-            dropPendingAsLost(npcUuid, pending, droppedAtMs);
-        });
+        finishDroppedRelocation(npcUuid, pending, droppedAtMs, false);
     }
 
     void commitUnconfirmedRelocationAsUnloaded(
@@ -548,7 +433,7 @@ public final class CommandNpcRelocationService {
                 "Same-world relocation became unobservable after its physical move; "
                         + "retaining unloaded destination state for npc=" + npcUuid
         );
-        commitAdmission(world, npcUuid, pending);
+        finishRelocation(npcUuid, pending);
     }
 
     void cancelObservedSameWorldRelocation(
@@ -558,18 +443,17 @@ public final class CommandNpcRelocationService {
         }
         pending.markPhysicalMutationCompensated();
         pending.markCrossWorldTransferFinished();
-        cancelAdmission(pending, false, world, null);
         logTravelDiagnostic(
                 Level.WARNING,
                 "Relocation timed out with the live NPC confirmed outside the destination; "
-                        + "retained source population state for npc=" + npcUuid
+                        + "retained the observed live source state for npc=" + npcUuid
         );
     }
 
-    private void denyAdmission(PendingRelocation pending, String reason) {
+    private void rejectRelocation(PendingRelocation pending, String reason) {
         removePending(pending.npcUuid, pending);
         logTravelDiagnostic(Level.WARNING,
-                "Relocation admission denied for npc=" + pending.npcUuid + ", reason=" + reason);
+                "Relocation rejected for npc=" + pending.npcUuid + ", reason=" + reason);
     }
 
     private boolean maybeStartCrossWorldTransfer(World destinationWorld,
@@ -582,9 +466,7 @@ public final class CommandNpcRelocationService {
                 || !chunkRequests.isDestinationReady(destinationWorld, pending)) {
             return false;
         }
-        World sourceWorld = pending.canonicalSource == null
-                ? knownWorldByNpc.get(npcUuid)
-                : chunkRequests.resolveCanonicalSourceWorld(destinationWorld, pending);
+        World sourceWorld = knownWorldByNpc.get(npcUuid);
         if (sourceWorld == null || worldAccess.isSameWorld(sourceWorld, destinationWorld)) {
             if (sourceWorld == null && pending.markSourceWorldMissingLogged()) {
                 logTravelDiagnostic(
@@ -596,9 +478,6 @@ public final class CommandNpcRelocationService {
                 );
             }
             return false;
-        }
-        if (!ensureAdmission(destinationWorld, pending)) {
-            return true;
         }
         pending.resetSourceWorldMissingLogged();
         if (!pending.markCrossWorldTransferStarted()) {
@@ -620,8 +499,8 @@ public final class CommandNpcRelocationService {
                     pending.markCrossWorldTransferFinished();
                     pending.resetRelocationIssue();
                     knownWorldByNpc.remove(npcUuid, sourceWorld);
-                    if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-                        commitUnconfirmedRelocationAsLost(
+                    if (pending.physicalMutationAttempted()) {
+                        dropUnconfirmedRelocation(
                                 destinationWorld, npcUuid, pending, System.currentTimeMillis()
                         );
                     } else {
@@ -734,34 +613,22 @@ public final class CommandNpcRelocationService {
         }
         if (!hasExpectedLiveOwner(sourceStore, sourceRef, pending)) {
             pending.markCrossWorldTransferFinished();
-            cancelPendingAdmissionForDenial(
-                    sourceWorld, pending, "relocation-live-owner-changed"
-            );
-            return;
-        }
-        Holder<EntityStore> drainedHolder;
-        if (!claimAdmissionImmediatelyBeforeMutation(sourceWorld, pending)) {
-            pending.markCrossWorldTransferFinished();
+            rejectRelocation(pending, "relocation-live-owner-changed");
             return;
         }
         pending.markPhysicalMutationAttempted();
-        try {
-            drainedHolder = sourceStore.removeEntity(sourceRef, RemoveReason.UNLOAD);
-        } catch (RuntimeException | LinkageError exception) {
-            handleSourceRemoveFailure(
-                    sourceWorld, destinationWorld, npcUuid, pending,
-                    "exception=" + exception.getClass().getSimpleName()
-            );
-            return;
-        }
+        CommandRelocationTransferHolderService.DrainResult drainResult =
+                transferHolders.drainForDestination(sourceStore, sourceRef, pending.destination);
+        Holder<EntityStore> drainedHolder = drainResult.holder();
         if (drainedHolder == null) {
             handleSourceRemoveFailure(
-                    sourceWorld, destinationWorld, npcUuid, pending, "empty-holder"
+                    sourceWorld, destinationWorld, npcUuid, pending,
+                    drainResult.failureDetail()
             );
             return;
         }
         CommandRelocationTransferHolderService.SourceTransform sourceTransform =
-                transferHolders.prepareForDestination(drainedHolder, pending.destination);
+                drainResult.sourceTransform();
         if (sourceTransform == null) {
             logTravelDiagnostic(
                     Level.WARNING,
@@ -920,7 +787,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         if (sourceWorld == null || sourceStore == null || drainedHolder == null) {
-            commitUnconfirmedRelocationAsLost(
+            dropUnconfirmedRelocation(
                     destinationWorld, npcUuid, pending, System.currentTimeMillis()
             );
             return;
@@ -928,7 +795,7 @@ public final class CommandNpcRelocationService {
         worldAccess.execute(sourceWorld, () -> {
             if (!restoreSourceEntity(
                     sourceWorld, sourceStore, drainedHolder, sourceTransform, npcUuid)) {
-                commitUnconfirmedRelocationAsLost(
+                dropUnconfirmedRelocation(
                         destinationWorld, npcUuid, pending, System.currentTimeMillis()
                 );
                 return;
@@ -959,7 +826,7 @@ public final class CommandNpcRelocationService {
 
     /**
      * Closes an already-drained transfer without touching either world's ECS. This method can run
-     * from the lease watchdog, so the population admission is conservatively committed as lost.
+     * from the lease watchdog, so it only closes the request and reports the loss.
      */
     private void terminalizeDrainedTransferAsLost(
             UUID npcUuid,
@@ -972,7 +839,7 @@ public final class CommandNpcRelocationService {
                 "Cross-world transfer became unobservable after source removal for npc="
                         + npcUuid + ", reason=" + reason
         );
-        commitUnconfirmedRelocationAsLost(
+        dropUnconfirmedRelocation(
                 null, npcUuid, pending, System.currentTimeMillis()
         );
     }
@@ -1000,7 +867,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         pending.markCrossWorldTransferFinished();
-        commitUnconfirmedRelocationAsLost(
+        dropUnconfirmedRelocation(
                 destinationWorld, npcUuid, pending, System.currentTimeMillis()
         );
     }
@@ -1017,14 +884,13 @@ public final class CommandNpcRelocationService {
 
     private void terminalizeRelocation(PendingRelocation pending, String reason) {
         pending.markCrossWorldTransferFinished();
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
+        if (pending.physicalMutationAttempted()) {
+            dropUnconfirmedRelocation(
                     knownWorldByNpc.get(pending.npcUuid), pending.npcUuid, pending, System.currentTimeMillis()
             );
             return;
         }
         removePending(pending.npcUuid, pending);
-        cancelAdmission(pending, false, null, null);
         logTravelDiagnostic(
                 Level.WARNING,
                 "Relocation terminalized for npc=" + pending.npcUuid + ", reason=" + reason
@@ -1048,11 +914,12 @@ public final class CommandNpcRelocationService {
         );
         if (policy == TwCompanionConfig.TransferFailurePolicy.Ignore) {
             removePending(npcUuid, pending);
-            cancelAdmission(pending, false, null, null);
             return;
         }
         if (policy == TwCompanionConfig.TransferFailurePolicy.MarkLost) {
-            dropPendingAsLost(npcUuid, pending, System.currentTimeMillis());
+            dropUnconfirmedRelocation(
+                    world, npcUuid, pending, System.currentTimeMillis()
+            );
             return;
         }
         pending.resetRelocationIssue();
@@ -1065,7 +932,6 @@ public final class CommandNpcRelocationService {
         }
         pending.markCrossWorldTransferFinished();
         removePending(npcUuid, pending);
-        cancelAdmission(pending, false, null, null);
         logTravelDiagnostic(
                 Level.INFO,
                 "Cancelled relocation due to state filter for npc="
@@ -1075,19 +941,26 @@ public final class CommandNpcRelocationService {
         );
     }
 
-    void dropPendingAsLost(UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
-        if (npcUuid == null || pending == null) {
-            return;
-        }
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
-                    knownWorldByNpc.get(npcUuid), npcUuid, pending, droppedAtMs
-            );
-            return;
-        }
-        removePending(npcUuid, pending);
-        cancelAdmission(pending, false, null, null);
-        dropReporter.report(pending, droppedAtMs);
+    void dropRetryExhausted(
+            UUID npcUuid,
+            PendingRelocation pending,
+            long droppedAtMs
+    ) {
+        finishDroppedRelocation(npcUuid, pending, droppedAtMs, true);
+    }
+
+    private void finishDroppedRelocation(
+            UUID npcUuid,
+            PendingRelocation pending,
+            long droppedAtMs,
+            boolean cleanRetryExhaustion
+    ) {
+        terminalService.finish(
+                npcUuid,
+                pending,
+                droppedAtMs,
+                cleanRetryExhaustion
+        );
     }
 
     void requestChunksForPending(World world, PendingRelocation pending) {
@@ -1116,24 +989,13 @@ public final class CommandNpcRelocationService {
             UUID npcUuid,
             PendingRelocation pending
     ) {
-        if (pending.admissionApplying() && pending.physicalMutationAttempted()) {
-            commitUnconfirmedRelocationAsLost(
+        if (pending.physicalMutationAttempted()) {
+            dropUnconfirmedRelocation(
                     world, npcUuid, pending, System.currentTimeMillis()
             );
             return;
         }
         terminalizeRelocation(pending, "relocation-confirmation-dispatch-rejected");
-    }
-
-    private static CommandRelocationAdmissionGate.Dispatcher leaseBoundDispatcher(
-            @Nullable World world
-    ) {
-        if (world == null) {
-            return (task, rejected) -> task.run();
-        }
-        return (task, rejected) -> LeaseBoundWorldDispatcher.execute(
-                world, task, rejected
-        );
     }
 
     @Nullable
@@ -1143,11 +1005,6 @@ public final class CommandNpcRelocationService {
         }
         String state = npc.getRole().getStateSupport().getStateName();
         return state != null && !state.isBlank() ? state : null;
-    }
-
-    private static String describeStateFilter(@Nullable String[] stateFilter) {
-        return stateFilter == null || stateFilter.length == 0
-                ? "[]" : java.util.Arrays.toString(stateFilter);
     }
 
     private boolean isLagDebugEnabled() {
@@ -1169,7 +1026,11 @@ public final class CommandNpcRelocationService {
     public record LastKnownLocation(@Nullable String worldName, @Nullable Vector3d position) {
     }
 
-    public record PendingRecallSnapshot(UUID npcUuid, long queuedAtMs, long remainingUntilLostMs) {
+    public record PendingRecallSnapshot(
+            UUID npcUuid,
+            long queuedAtMs,
+            long remainingUntilDropMs
+    ) {
     }
 
 }

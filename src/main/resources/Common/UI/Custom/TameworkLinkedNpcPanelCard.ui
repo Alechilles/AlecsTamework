@@ -6,7 +6,7 @@ $C = "Common.ui";
 @LinkedActionRecallButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionSetHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionReturnHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
-@LinkedActionRespawnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionRespawnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelIcons/Revive_Heartbeat.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelIcons/Revive_Heartbeat.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelIcons/Revive_Heartbeat.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelIcons/Revive_Heartbeat.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionLocateButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActiveStateButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @LinkedActiveStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
@@ -19,7 +19,7 @@ $C = "Common.ui";
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 
 Group {
-    Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 126);
     Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
     Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
@@ -507,7 +507,7 @@ Group {
     }
 
     TextButton #RespawnButton {
-        Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
+        Anchor: (Top: 26, Right: 118, Width: 34, Height: 34);
         Style: @LinkedActionRespawnButtonStyle;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn;
@@ -1016,6 +1016,38 @@ Group {
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
+    }
+
+    Label #RosterState {
+        Anchor: (Top: 84, Left: 0, Width: 150, Height: 16);
+        Style: (FontSize: 10, TextColor: #c8d9ea, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Label #RosterTimer {
+        Anchor: (Top: 101, Left: 0, Width: 180, Height: 16);
+        Style: (FontSize: 10, TextColor: #9fc4e7, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Label #RosterCapacity {
+        Anchor: (Top: 84, Left: 154, Width: 115, Height: 16);
+        Style: (FontSize: 10, TextColor: #f1c77c, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    TextButton #RosterSummonButton {
+        Anchor: (Top: 92, Right: 0, Width: 76, Height: 24);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Text: %server.tamework.ui.linkedPanel.roster.summon;
+        Visible: false;
+    }
+
+    TextButton #RosterDismissButton {
+        Anchor: (Top: 92, Right: 0, Width: 76, Height: 24);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Text: %server.tamework.ui.linkedPanel.roster.dismiss;
+        Visible: false;
     }
 
     Group #TalentPointAction {

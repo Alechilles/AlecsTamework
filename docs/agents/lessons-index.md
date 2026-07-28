@@ -18,6 +18,7 @@ Agents should check these notes when a task matches the topic. Keep this index l
 | `UI.md` | Tamework UI, HUD, or interaction presentation needs design/debug context. |
 | `Hytale Custom HUD Z-Order and Native Ability Overlays.md` | A custom gameplay HUD overlaps native abilities or shortcut hints, or native ability visibility differs between worlds. |
 | `2026-07-15-avatar-flight-mount-session-lifecycle.md` | Avatar-flight session cleanup, player model/skin/equipment presentation ordering, or source-NPC restoration is involved. |
+| `2026-07-25-bonded-companion-lease-boundary.md` | Durable companion profiles, temporary NPC projections, lease/source replay authority, or profile-keyed roster panels are involved. |
 
 When a new lesson is discovered during work, update the external note first, then update this index if the lesson adds a new file or major topic.
 

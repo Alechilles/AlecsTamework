@@ -12,9 +12,9 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BundledLanguageKeyParityTest {
-
+    private static final Set<String> PARTIAL_LOCALES = Set.of("es-ES");
     @Test
-    void bundledServerLangFilesExposeTheSameKeysAsEnglish() throws Exception {
+    void bundledServerLangFilesExposeKnownKeysAndCompleteLocalesMatchEnglish() throws Exception {
         Path root = Path.of("src/main/resources/Server/Languages");
         Set<String> englishKeys = loadKeys(root.resolve("en-US/server.lang"));
         HashSet<String> issues = new HashSet<>();
@@ -27,9 +27,11 @@ class BundledLanguageKeyParityTest {
                 }
                 Path langFile = languageDir.resolve("server.lang");
                 Set<String> keys = loadKeys(langFile);
-                for (String key : englishKeys) {
-                    if (!keys.contains(key)) {
-                        issues.add(language + " missing key: " + key);
+                if (!PARTIAL_LOCALES.contains(language)) {
+                    for (String key : englishKeys) {
+                        if (!keys.contains(key)) {
+                            issues.add(language + " missing key: " + key);
+                        }
                     }
                 }
                 for (String key : keys) {

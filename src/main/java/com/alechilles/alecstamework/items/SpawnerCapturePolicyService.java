@@ -1,14 +1,15 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -20,18 +21,29 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 
 /**
  * Evaluates whether a spawner item is currently allowed to capture a target NPC.
  */
 public final class SpawnerCapturePolicyService {
+    private static final String TRANQUILIZED_EFFECT_ID =
+            "Tw_Status_Tranquilized";
+    private static final String TRANQUILIZED_REQUIRED_MESSAGE =
+            "tamework.ui.notifications.capture.tranquilizedRequired";
+    private static final String EFFECT_REQUIRED_MESSAGE =
+            "tamework.ui.notifications.capture.effectRequired";
+
     private final HytaleLogger logger;
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerNpcStateService npcStateService;
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
     private final SpawnerNpcIdentityService npcIdentityService;
+    private final TameworkUiMessageService messages =
+            new TameworkUiMessageService();
 
     public SpawnerCapturePolicyService(HytaleLogger logger,
                                        SpawnerRolePolicyService rolePolicyService,
@@ -107,11 +119,22 @@ public final class SpawnerCapturePolicyService {
             }
         }
         if (enforceTerminalRequirements && !meetsHealthRequirement(targetRef, config, store)) {
+            CaptureHealth health = resolveCaptureHealth(targetRef, store);
+            String currentPercent = health == null ? "unavailable"
+                    : Double.toString((health.currentHealth() / health.maximumHealth()) * 100.0D);
             logCaptureDebug("denied reason=health-threshold player=" + player.getUuid()
+                    + " currentHealthPercent=" + currentPercent
                     + " maxHealthPercent=" + config.getCaptureMaxHealthPercent());
             return false;
         }
         if (enforceTerminalRequirements && !hasRequiredEffect(targetRef, config, store)) {
+            messages.showKey(
+                    player,
+                    NotificationStyle.Warning,
+                    missingRequiredEffectMessageKey(
+                            config.getCaptureRequiredEffectId()
+                    )
+            );
             logCaptureDebug("denied reason=required-effect player=" + player.getUuid()
                     + " effect=" + config.getCaptureRequiredEffectId());
             return false;
@@ -147,26 +170,32 @@ public final class SpawnerCapturePolicyService {
         if (!Double.isFinite(maximumPercent) || maximumPercent < 0.0 || maximumPercent > 100.0) {
             return false;
         }
-        var statType = EntityStatMap.getComponentType();
-        if (statType == null || EntityStatType.getAssetMap() == null) {
-            return false;
-        }
-        EntityStatMap statMap = store.getComponent(targetRef, statType);
-        if (statMap == null) {
-            return false;
-        }
-        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
-        if (healthIndex < 0) {
-            return false;
-        }
-        EntityStatValue health = statMap.get(healthIndex);
-        if (health == null || !Double.isFinite(health.get()) || !Double.isFinite(health.getMax())
-                || health.getMax() <= 0.0) {
-            return false;
-        }
-        double currentPercent = Math.max(0.0, Math.min(100.0, (health.get() / health.getMax()) * 100.0));
+        CaptureHealth health = resolveCaptureHealth(targetRef, store);
+        if (health == null) return false;
+        double currentPercent = Math.max(0.0, Math.min(100.0,
+                (health.currentHealth() / health.maximumHealth()) * 100.0));
         return currentPercent <= maximumPercent;
     }
+
+    /** Samples finite terminal health evidence for the durable chance boundary. */
+    public CaptureHealth resolveCaptureHealth(Ref<EntityStore> targetRef, Store<EntityStore> store) {
+        var statType = EntityStatMap.getComponentType();
+        if (targetRef == null || store == null || statType == null || EntityStatType.getAssetMap() == null) {
+            return null;
+        }
+        EntityStatMap statMap = store.getComponent(targetRef, statType);
+        if (statMap == null) return null;
+        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
+        if (healthIndex < 0) return null;
+        EntityStatValue health = statMap.get(healthIndex);
+        if (health == null || !Double.isFinite(health.get()) || !Double.isFinite(health.getMax())
+                || health.getMax() <= 0.0 || health.get() < 0.0 || health.get() > health.getMax()) {
+            return null;
+        }
+        return new CaptureHealth(health.get(), health.getMax());
+    }
+
+    public record CaptureHealth(double currentHealth, double maximumHealth) { }
 
     private boolean hasRequiredEffect(Ref<EntityStore> targetRef,
                                       ItemFeatureConfig config,
@@ -183,12 +212,144 @@ public final class SpawnerCapturePolicyService {
         return TameworkEntityEffectService.hasActiveEffect(effectController, requiredEffectId);
     }
 
-    private void logCaptureDebug(String message) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || !instance.isDebugSpawnerEnabled()) {
-            return;
+    /** Checks the explicit tranquilized fence used only by bonded capture. */
+    boolean isTranquilized(Ref<EntityStore> targetRef,
+                           Store<EntityStore> store) {
+        var effectType = EffectControllerComponent.getComponentType();
+        if (targetRef == null || store == null || effectType == null) return false;
+        EffectControllerComponent controller = store.getComponent(
+                targetRef, effectType);
+        return TameworkEntityEffectService.hasActiveEffect(
+                controller, TRANQUILIZED_EFFECT_ID);
+    }
+
+    /** Reads bonded admission evidence without emitting generic-path feedback. */
+    BondedAdmissionEvidence assessBonded(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemFeatureConfig config,
+            ItemStack itemStack,
+            List<BondedCompanionRosterRegistry.RosterDefinition> families,
+            long rosterRevision
+    ) {
+        if (rosterRevision < 0L) {
+            throw new IllegalArgumentException("negative rosterRevision");
         }
-        logger.at(Level.INFO).log("Spawner capture debug: " + message);
+        if (player == null || targetRef == null || !targetRef.isValid()
+                || config == null || itemStack == null || families == null
+                || families.isEmpty()) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
+                    rosterRevision);
+        }
+        World world = player.getWorld();
+        if (world == null || world.getEntityStore() == null) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
+                    rosterRevision);
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        NPCEntity npc = store.getComponent(
+                targetRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return BondedAdmissionEvidence.denied(
+                    BondedCompanionCaptureAuthor.Status.TARGET_INVALID,
+                    rosterRevision);
+        }
+        String sourceRoleId = rolePolicyService.resolveRoleIdFromNpc(npc);
+        BondedCompanionCaptureRoleResolver.Resolution resolvedRole =
+                BondedCompanionCaptureRoleResolver.resolve(
+                        config, families, sourceRoleId);
+        boolean roleAllowed = rolePolicyService.isRoleAllowed(
+                sourceRoleId, config) && resolvedRole != null;
+        UUID owner = npcStateService.resolveOwnerFromComponent(
+                targetRef, world);
+        boolean ownerAllowed = ownershipPolicyService.isCaptureAllowed(
+                player.getUuid(), owner, config);
+        BondedCompanionCaptureAuthor.Status denial = bondedPolicyDenial(
+                player, targetRef, config, itemStack, world, store, owner);
+        return new BondedAdmissionEvidence(
+                denial, ownerAllowed, roleAllowed,
+                resolvedRole == null ? null : resolvedRole.roleId(),
+                resolvedRole == null ? null : resolvedRole.family().familyId(),
+                rosterRevision);
+    }
+
+    private BondedCompanionCaptureAuthor.Status bondedPolicyDenial(
+            Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config,
+            ItemStack itemStack, World world, Store<EntityStore> store,
+            UUID ownerUuid
+    ) {
+        if (isCooldownActive(itemStack,
+                TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
+                config.getCaptureCooldownMs())) return admissionDenied();
+        if (config.isCaptureRequireTamed()
+                && !npcStateService.resolveTamedState(targetRef, world)) {
+            return admissionDenied();
+        }
+        if (config.isCaptureTamesTarget()
+                && (npcStateService.resolveTamedState(targetRef, world)
+                || ownerUuid != null)) {
+            return admissionDenied();
+        }
+        if (!meetsHealthRequirement(targetRef, config, store)
+                || !isWithinCaptureDistance(player, targetRef, config, store)) {
+            return admissionDenied();
+        }
+        return null;
+    }
+
+    private BondedCompanionCaptureAuthor.Status admissionDenied() {
+        return BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED;
+    }
+
+    record BondedAdmissionEvidence(
+            BondedCompanionCaptureAuthor.Status denial,
+            boolean ownerAllowed,
+            boolean roleAllowed,
+            String roleId,
+            String familyId,
+            long rosterRevision
+    ) {
+        BondedAdmissionEvidence {
+            if (rosterRevision < 0L) {
+                throw new IllegalArgumentException("negative rosterRevision");
+            }
+            roleId = normalized(roleId);
+            familyId = normalized(familyId);
+            if (roleAllowed && (roleId == null || familyId == null)) {
+                throw new IllegalArgumentException(
+                        "allowed role requires resolved role and family");
+            }
+        }
+
+        static BondedAdmissionEvidence denied(
+                BondedCompanionCaptureAuthor.Status denial,
+                long rosterRevision
+        ) {
+            return new BondedAdmissionEvidence(
+                    denial, false, false, null, null, rosterRevision);
+        }
+
+        private static String normalized(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            return value.trim();
+        }
+    }
+
+    static String missingRequiredEffectMessageKey(String requiredEffectId) {
+        return TRANQUILIZED_EFFECT_ID.equals(requiredEffectId)
+                ? TRANQUILIZED_REQUIRED_MESSAGE
+                : EFFECT_REQUIRED_MESSAGE;
+    }
+
+    private void logCaptureDebug(String message) {
+        // Capture interactions previously failed silently unless the global spawner-debug flag
+        // happened to be enabled. One bounded line per evaluated interaction is operationally
+        // useful and makes terminal channel failures diagnosable from ordinary server logs.
+        logger.at(Level.INFO).log("Spawner capture eligibility: " + message);
     }
 
     private boolean isWithinCaptureDistance(Player player,

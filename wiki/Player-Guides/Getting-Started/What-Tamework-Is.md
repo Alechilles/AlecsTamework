@@ -8,7 +8,10 @@ draft: false
 
 Parent: [Getting Started](/mod/alecs-tamework/getting-started) | [Player Guides](/mod/alecs-tamework/player-guides)
 
-Tamework is a framework that other mods build on. It provides systems for tameable companions, reusable interaction flows, command tools, linked companion UI, naming, capture and respawn items, progression systems, and supporting utility features.
+Tamework is a framework that other mods build on. It provides systems for
+tameable companions, reusable interaction flows, command tools, linked
+companion UI, naming, capture items, configurable dead/Lost restoration,
+progression systems, and supporting utility features.
 
 ## What players should expect
 - A mod that uses Tamework can add tameable or ownable NPCs without inventing a custom system from scratch.
@@ -21,7 +24,8 @@ Tamework is a framework that other mods build on. It provides systems for tameab
 - Command tools with a radial menu
 - A linked companion side panel
 - Naming items
-- Capture and respawn items
+- Capture items and configurable free or item-cost restoration for supported
+  command-linked companions
 - Happiness, needs, breeding, life stage, and traits
 - Coop and feed-trough support where the mod enables them
 
@@ -29,7 +33,8 @@ Tamework is a framework that other mods build on. It provides systems for tameab
 - Which mobs are compatible
 - Which items exist and what they are called
 - Which commands are available on a command item
-- Whether nearby `Release`, `Cull`, `Revive`, or breeding toggles are enabled
+- Whether nearby `Release`, `Cull`, `Revive`, or breeding toggles are enabled,
+  and whether a roster-backed `Revive` has an item cost
 - Whether advanced systems like coops, feed troughs, or trait icons are used
 
 ## A practical way to think about it

@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import javax.annotation.Nonnull;
@@ -13,7 +11,6 @@ import javax.annotation.Nonnull;
  */
 public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      @Nonnull TwGlobalConfig.PerPlayerLimitScope populationPerPlayerLimitScope,
-                                     @Nonnull ClaimIntegrationProvider simpleClaimsProvider,
                                      boolean simpleClaimsEnabled,
                                      int simpleClaimsLimitPerClaimChunk,
                                      int simpleClaimsLimitPerClaimTotal,
@@ -56,7 +53,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         return new TameworkSettingsStore.GlobalSettingsSnapshot(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope.configValue(),
-                simpleClaimsProvider.configValue(),
                 simpleClaimsEnabled,
                 simpleClaimsLimitPerClaimChunk,
                 simpleClaimsLimitPerClaimTotal,
@@ -110,7 +106,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         return new TameworkSettingsValues(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope,
-                simpleClaimsProvider,
                 simpleClaimsEnabled,
                 simpleClaimsLimitPerClaimChunk,
                 simpleClaimsLimitPerClaimTotal,
@@ -152,13 +147,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
 
     @Nonnull
     static TameworkSettingsValues fromRuntime() {
-        return fromRuntimeState().values();
-    }
-
-    @Nonnull
-    static RuntimeState fromRuntimeState() {
-        ResolvedTameworkSettings settings = TameworkSettingsStore.loadRuntimeGlobalSettings();
-        return new RuntimeState(fromResolvedSettings(settings), settings.simpleClaimsProviderRequest());
+        return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
     }
 
     @Nonnull
@@ -166,7 +155,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         return new TameworkSettingsValues(
                 settings.populationLimitPerPlayerOwnedTotal(),
                 TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope()),
-                ClaimIntegrationProvider.fromConfigValue(settings.simpleClaimsProvider()),
                 settings.simpleClaimsEnabled(),
                 settings.simpleClaimsLimitPerClaimChunk(),
                 settings.simpleClaimsLimitPerClaimTotal(),
@@ -205,9 +193,4 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 settings.telemetryBreadcrumbsEnabled()
         );
     }
-
-    record RuntimeState(@Nonnull TameworkSettingsValues values,
-                        @Nonnull ClaimProviderRequest claimProviderRequest) {
-    }
-
 }

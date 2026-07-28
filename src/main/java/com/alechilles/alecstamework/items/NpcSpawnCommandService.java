@@ -8,12 +8,17 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -21,6 +26,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +40,15 @@ import javax.annotation.Nullable;
  * Spawns owned+tamed NPC batches for commands and optionally links them to the held command item.
  */
 public final class NpcSpawnCommandService {
+    private static final double SPAWN_RING_RADIUS_STEP = 0.9;
+    private static final int SPAWN_RING_SIZE = 6;
+
     private final SpawnerSpawnPositionService spawnPositionService;
     private final SpawnerAttachmentService attachmentService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final NpcSpawnAttachmentResolutionService attachmentResolutionService;
-    private final NpcOwnedBatchSpawnService batchSpawnService;
 
     public NpcSpawnCommandService(@Nonnull Tamework plugin) {
         this.spawnPositionService = new SpawnerSpawnPositionService(plugin.getLogger());
@@ -49,7 +57,6 @@ public final class NpcSpawnCommandService {
         this.npcNameResolver = new CommandNpcNameResolver();
         this.linkPolicyService = new CommandLinkPolicyService();
         this.attachmentResolutionService = new NpcSpawnAttachmentResolutionService();
-        this.batchSpawnService = new NpcOwnedBatchSpawnService(this, spawnPositionService);
     }
 
     public void spawnTamedOwnedBatch(@Nonnull Player player,
@@ -62,9 +69,133 @@ public final class NpcSpawnCommandService {
                                      @Nullable Map<String, String> attachmentOverrides,
                                      @Nonnull Consumer<SpawnBatchResult> completion) {
         Objects.requireNonNull(completion, "completion");
-        batchSpawnService.schedule(
-                player, store, playerRef, world, roleId, quantity, spawnRadius,
-                attachmentOverrides, completion
+        SpawnPreparation preparation = prepareSpawn(player, roleId, quantity);
+        if (preparation.failure() != null) {
+            completion.accept(SpawnBatchResult.failure(preparation.failure()));
+            return;
+        }
+        BatchTracker tracker = newBatchTracker(quantity, player, completion);
+        for (int index = 0; index < quantity; index++) {
+            if (!spawnOne(
+                    player, store, playerRef, world, preparation,
+                    offsetSpawnPosition(preparation.base(), index, spawnRadius),
+                    attachmentOverrides, tracker
+            )) {
+                break;
+            }
+        }
+        tracker.seal();
+    }
+
+    @Nonnull
+    private SpawnPreparation prepareSpawn(Player player, String roleId, int quantity) {
+        if (quantity <= 0) {
+            return SpawnPreparation.failure("Quantity must be greater than zero.");
+        }
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        if (npcPlugin == null) {
+            return SpawnPreparation.failure("NPC plugin not available.");
+        }
+        int roleIndex = npcPlugin.getIndex(roleId);
+        if (roleIndex < 0) {
+            return SpawnPreparation.failure("Unknown role '" + roleId + "'.");
+        }
+        UUID ownerId = player.getUuid();
+        if (ownerId == null) {
+            return SpawnPreparation.failure("Player UUID not available.");
+        }
+        Vector3d base = spawnPositionService.resolveSpawnPosition(player, null);
+        return base == null
+                ? SpawnPreparation.failure("Unable to resolve a spawn position.")
+                : new SpawnPreparation(npcPlugin, roleIndex, ownerId, base, null);
+    }
+
+    private boolean spawnOne(
+            Player player,
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            World world,
+            SpawnPreparation preparation,
+            Vector3d position,
+            @Nullable Map<String, String> attachmentOverrides,
+            BatchTracker tracker
+    ) {
+        OwnerPopulationCapService.Decision cap =
+                OwnerPopulationCapService.evaluateAcquisition(store, preparation.ownerId());
+        if (!cap.allowed()) {
+            OwnerMessageUtil.sendPopulationCapReached(
+                    player, cap.currentCount(), cap.limit(), cap.scope()
+            );
+            tracker.stop("Owner population cap reached.");
+            return false;
+        }
+        Rotation3f rotation = spawnPositionService.resolveSpawnRotation(
+                store, playerRef, position
+        );
+        var spawned = preparation.npcPlugin().spawnEntity(
+                store, preparation.roleIndex(), position, rotation, null, null
+        );
+        if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            tracker.stop("Spawn failed before completing the requested quantity.");
+            return false;
+        }
+        return applySpawned(
+                player, store, playerRef, world, spawned.first(), spawned.second(),
+                preparation.ownerId(), attachmentOverrides, tracker
+        );
+    }
+
+    private boolean applySpawned(
+            Player player,
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            World world,
+            Ref<EntityStore> npcRef,
+            NPCEntity npc,
+            UUID ownerId,
+            @Nullable Map<String, String> attachmentOverrides,
+            BatchTracker tracker
+    ) {
+        var ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            npc.setToDespawn();
+            tracker.stop("Tamework owner component is unavailable.");
+            return false;
+        }
+        store.putComponent(
+                npcRef,
+                ownerType,
+                new TameworkOwnerComponent(ownerId, OwnerNameUtil.resolve(player))
+        );
+        AttachmentResolution resolution =
+                resolveAttachmentOverrides(npcRef, store, attachmentOverrides);
+        applyPostAdmissionState(store, world, playerRef, npcRef, npc, resolution);
+        tracker.register(resolution);
+        tracker.applied(linkHeldCommandItem(
+                tracker.autoLink(), player, store, npcRef, npc
+        ), resolution);
+        return true;
+    }
+
+    @Nonnull
+    private static Vector3d offsetSpawnPosition(
+            Vector3d base, int spawnIndex, @Nullable Double spawnRadius
+    ) {
+        if (spawnIndex <= 0) {
+            return new Vector3d(base);
+        }
+        int ring = (spawnIndex - 1) / SPAWN_RING_SIZE + 1;
+        int ringSlot = (spawnIndex - 1) % SPAWN_RING_SIZE;
+        double radius = spawnRadius == null
+                ? ring * SPAWN_RING_RADIUS_STEP
+                : Math.min(spawnRadius, Math.max(
+                        SPAWN_RING_RADIUS_STEP, ring * SPAWN_RING_RADIUS_STEP
+                ));
+        double angle = (Math.PI * 2.0 * ringSlot) / SPAWN_RING_SIZE;
+        return new Vector3d(
+                base.x + Math.cos(angle) * radius,
+                base.y,
+                base.z + Math.sin(angle) * radius
         );
     }
 
@@ -122,7 +253,8 @@ public final class NpcSpawnCommandService {
         ItemStack originalStack = heldStack;
 
         TwCommandItemConfig config = registry.get(heldStack.getItemId());
-        if (config == null || !config.isEnabled() || !config.isLinkEnabled()) {
+        if (config == null || config.usesBondedCompanionRoster()
+                || !config.isEnabled() || !config.isLinkEnabled()) {
             return null;
         }
 
@@ -469,6 +601,19 @@ public final class NpcSpawnCommandService {
         private AttachmentResolution(Map<String, String> appliedSelections, List<String> invalidSelections) {
             this.appliedSelections = appliedSelections != null ? Map.copyOf(appliedSelections) : Map.of();
             this.invalidSelections = invalidSelections != null ? List.copyOf(invalidSelections) : List.of();
+        }
+    }
+
+    private record SpawnPreparation(
+            @Nullable NPCPlugin npcPlugin,
+            int roleIndex,
+            @Nullable UUID ownerId,
+            @Nullable Vector3d base,
+            @Nullable String failure
+    ) {
+        @Nonnull
+        private static SpawnPreparation failure(@Nonnull String reason) {
+            return new SpawnPreparation(null, -1, null, null, reason);
         }
     }
 }

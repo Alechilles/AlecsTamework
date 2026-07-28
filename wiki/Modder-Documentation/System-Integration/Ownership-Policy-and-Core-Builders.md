@@ -58,15 +58,11 @@ Use this page when you need the shared building blocks rather than one specific 
 - Role-specific ownership and command protection belong in `TwCompanionConfig`
 - Item systems should not re-implement their own ownership rules unless the item config explicitly needs a stricter or looser override
 
-`TameworkSetOwner` schedules admission asynchronously. For a vanilla tame action list, put
-`TameOnApplied`, `ConsumeHeldItemOnApplied`, `StateOnApplied`, `ParticleSystemOnApplied`, and
-`SoundEventParamOnApplied` on that action instead of adding eager inventory/tamed/state/presentation
-siblings. The configured bundle runs against a freshly resolved NPC/player after the capacity
-reservation is revalidated and claimed and the canonical owner write reports applied. It runs before
-the population journal's final asynchronous commit, so these fields are an applied-mutation
-continuation rather than a post-commit event. A continuation or commit failure leaves the operation
-degraded for recovery instead of reporting ordinary success. Item consumption also rechecks that the
-active item still has the item ID captured when the action was scheduled.
+`TameworkSetOwner` and Tame check durable owner-population admission before
+assigning a non-null owner. The cap counts canonical owned profiles in the
+configured global/per-world scope and reserves positive capacity within the
+same shared operation. It remains independent from SimpleClaims
+claim-placement policy.
 
 `TameworkOwnerComponent` is authoritative. Clearing or transferring canonical ownership invalidates
 the prior command-link authority, while retained name metadata follows the new canonical owner.

@@ -59,6 +59,22 @@ public final class PersistenceScopeFactory {
         return new PersistenceScope(type, normalized, hash(type, normalized), authorityDimension);
     }
 
+    /**
+     * Hashes a replacement scope without exposing its local lookup key.
+     *
+     * <p>The caller supplies the stable replacement scope kind rather than
+     * coercing it into the retired resilience scope vocabulary.</p>
+     */
+    @Nonnull
+    public String hashLocalScope(
+            @Nonnull String scopeKind,
+            @Nonnull String key
+    ) {
+        String normalizedKind = requireText(scopeKind, "scopeKind");
+        String normalizedKey = requireText(key, "scope key");
+        return hash(normalizedKind, normalizedKey);
+    }
+
     @Nonnull
     public PersistenceScope profile(@Nonnull String profileId) {
         return scope(PersistenceScopeType.PROFILE, profileId, "canonical_profile_catalog");
@@ -115,14 +131,25 @@ public final class PersistenceScopeFactory {
 
     @Nonnull
     private String hash(PersistenceScopeType type, String key) {
+        return hash(type.name(), key);
+    }
+
+    private String hash(String type, String key) {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
             hmac.init(new SecretKeySpec(identitySalt, "HmacSHA256"));
-            return HexFormat.of().formatHex(hmac.doFinal((type.name() + "\n" + key)
+            return HexFormat.of().formatHex(hmac.doFinal((type + "\n" + key)
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         } catch (Exception unavailable) {
             throw new IllegalStateException("scope_hmac_unavailable", unavailable);
         }
+    }
+
+    private String requireText(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label);
+        }
+        return value.trim();
     }
 
     private static void installSalt(Path temporary, Path destination) throws Exception {

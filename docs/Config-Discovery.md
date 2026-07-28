@@ -20,6 +20,8 @@ This document explains where Tamework config assets live and how each family res
 - `TwAttachmentDisplayConfig`: `<ModRoot>/Server/Tamework/AttachmentDisplays/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
+- `TwCapturePolicyConfig`: `<ModRoot>/Server/Tamework/CapturePolicies/*.json`
+- `TwPopulationGroupConfig`: `<ModRoot>/Server/Tamework/PopulationGroups/*.json`
 
 ## Resolution patterns
 ### Single active global config
@@ -37,6 +39,10 @@ Resolved by role id + `Priority`:
 - `TwAttachmentMigrationConfig`
 - `TwDynamicAttachmentsConfig`
 - `TwTraitConfig`
+- `TwCapturePolicyConfig`
+- `TwPopulationGroupConfig` uses role matching to classify companions into one
+  or more namespaced groups, then applies its configured global/per-world
+  owned and active limits.
 
 ### Dynamic attachment family
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
@@ -76,9 +82,23 @@ Behavior summary:
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.
-- `/tw settings` owns high-impact server runtime policy such as population caps, ownership requirements, ownership damage protection, revive enablement, claim-provider companion limits, needs resource mode, needs tick/damage policy, passive breeding enablement, and spawner owner transfer defaults.
-- `TwCompanionConfig` is the role-scoped location for command distances, travel policy, cooldowns, placement rings, and other companion command behavior.
+- `/tw settings` owns high-impact server runtime policy such as the durable owner
+  cap, ownership requirements, ownership damage protection, SimpleClaims
+  breeding/damage options, needs resource mode, needs tick/damage policy,
+  passive breeding enablement, and spawner owner transfer defaults.
+- `TwCompanionConfig` is the role-scoped location for command distances, travel
+  policy, placement rings, paid `Command.Revive` cost/cooldown policy,
+  `Command.Summon` duration/storage/cooldown policy, and other companion
+  command behavior.
 - Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config` hide them so server owners use `/tw settings`.
+
+Persistence machinery does not have feature-specific asset families.
+Population groups are authored through `TwPopulationGroupConfig`; paid revival
+and timed summon balance are nested role policy in `TwCompanionConfig`.
+Command rosters and companion provisioning are public integration authorities,
+not asset families. The `feature_circuit` control plane is internal and
+registry-derived, not a configurable rehearsal runtime or a return to the old
+per-feature failure catalogs.
 
 ## Asset-set gates
 `TwGlobalConfig.AssetSets` gates optional bundled asset sets:
@@ -98,6 +118,9 @@ Recipe visibility reconciliation removes disabled gated tranquilizer recipes fro
 - `TwCommandItemConfig`
 
 Other families are asset-registry driven and update through normal loaded/removed asset events.
+
+This includes `TwCapturePolicyConfig`. A failed rebuild retains the last valid
+compiled index and does not publish the invalid revision.
 
 ## Player-facing text
 Player-facing string fields such as talent names/descriptions/branches, trait display names, command labels/messages, interaction messages, and happiness labels may be raw text or `server.lang` keys. Prefer language keys for built-in packs and public integrations so translations can be provided under `Server/Languages/*/server.lang` without editing behavior assets.

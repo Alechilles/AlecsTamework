@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -67,8 +65,8 @@ class SimpleClaimsTamedDamagePolicyTest {
                 () -> {
                     resolutions.incrementAndGet();
                     return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                            ClaimProviderState.ABSENT,
-                            ClaimProviderGeneration.NONE,
+                            SimpleClaimsPluginState.ABSENT,
+                            SimpleClaimsPluginGeneration.NONE,
                             null,
                             "not installed"
                     );
@@ -213,7 +211,7 @@ class SimpleClaimsTamedDamagePolicyTest {
         UUID partyId = UUID.randomUUID();
         AtomicReference<SimpleClaimsDamageCapabilityResolver.Resolution> current = new AtomicReference<>();
         current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
-                new ClaimProviderGeneration("plugin-a", "loader-a", 1L),
+                new SimpleClaimsPluginGeneration("plugin-a", "loader-a", 1L),
                 "1.0.38",
                 policyGeneration(SimpleClaimsBreedingBridge.DamageAccessStatus.DENIED, partyId)
         ));
@@ -229,7 +227,7 @@ class SimpleClaimsTamedDamagePolicyTest {
                 "world", POSITION, ATTACKER, config(true, true));
 
         current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
-                new ClaimProviderGeneration("plugin-b", "loader-b", 2L),
+                new SimpleClaimsPluginGeneration("plugin-b", "loader-b", 2L),
                 "1.0.39",
                 policyGeneration(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, partyId)
         ));
@@ -247,8 +245,8 @@ class SimpleClaimsTamedDamagePolicyTest {
     void absentDamageProviderFailsOpenThenReadyGenerationEnforces() throws Exception {
         AtomicReference<SimpleClaimsDamageCapabilityResolver.Resolution> current = new AtomicReference<>(
                 SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                        ClaimProviderState.ABSENT,
-                        ClaimProviderGeneration.NONE,
+                        SimpleClaimsPluginState.ABSENT,
+                        SimpleClaimsPluginGeneration.NONE,
                         null,
                         "not installed"
                 )
@@ -262,7 +260,7 @@ class SimpleClaimsTamedDamagePolicyTest {
 
         TamedDamageDecision absent = evaluateEligible(policy);
         current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
-                new ClaimProviderGeneration("plugin-a", "loader-a", 1L),
+                new SimpleClaimsPluginGeneration("plugin-a", "loader-a", 1L),
                 "1.0.38",
                 new SimpleClaimsDamageGeneration(
                         (world, position, attacker, key) -> new SimpleClaimsBreedingBridge.DamageAccessResult(

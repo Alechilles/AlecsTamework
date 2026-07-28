@@ -10,9 +10,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
-import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -38,7 +36,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -58,23 +55,14 @@ public final class ApiSelfTestFixtureManager {
     private static final String DISPLAY_NAME_OWNED = "API Self-Test Owned Example";
     private static final String DISPLAY_NAME_STRANGER = "API Self-Test Stranger Example";
 
-    private final ApiSelfTestPopulationAuthority populationAuthority;
     private final ApiSelfTestCommandToolFactory toolFactory;
 
-    public ApiSelfTestFixtureManager(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
-                                     @Nonnull OwnerPopulationRuntime populationRuntime) {
-        this(
-                new ApiSelfTestPopulationAuthority(persistenceRuntime, populationRuntime),
-                new ApiSelfTestCommandToolFactory()
-        );
+    public ApiSelfTestFixtureManager() {
+        this(new ApiSelfTestCommandToolFactory());
     }
 
-    ApiSelfTestFixtureManager(@Nonnull ApiSelfTestPopulationAuthority populationAuthority,
-                              @Nonnull ApiSelfTestCommandToolFactory toolFactory) {
-        this.populationAuthority = Objects.requireNonNull(
-                populationAuthority, "populationAuthority"
-        );
-        this.toolFactory = Objects.requireNonNull(toolFactory, "toolFactory");
+    ApiSelfTestFixtureManager(@Nonnull ApiSelfTestCommandToolFactory toolFactory) {
+        this.toolFactory = toolFactory;
     }
 
     @Nonnull
@@ -140,26 +128,25 @@ public final class ApiSelfTestFixtureManager {
             );
             spawnedFixtures.add(stranger);
 
-            CompletableFuture<Void> ownership = CompletableFuture.allOf(
-                    populationAuthority.assignOwnerAsync(
-                            store, owned.reference(), owned.fixture(), fixtureSetId
-                    ),
-                    populationAuthority.assignOwnerAsync(
-                            store, stranger.reference(), stranger.fixture(), fixtureSetId
-                    )
-            );
-            return ownership
-                    .thenCompose(ignored -> populationAuthority.persistMetadataAsync(
-                            owned.fixture(), stranger.fixture(), fixtureSetId, ownerPlayerUuid, toolId
-                    ))
-                    .thenCompose(ignored -> onWorld(world, () -> finishPrepare(
+            return onWorld(world, () -> finishPrepare(
                             player, owned.fixture(), stranger.fixture(), fixtureSetId,
                             ownerPlayerUuid, worldName, toolId
-                    )))
-                    .handle((result, failure) -> failure == null
-                            ? CompletableFuture.completedFuture(result)
-                            : cleanupFailedPrepareAsync(store, spawnedFixtures, failure))
-                    .thenCompose(future -> future);
+                    ))
+                    .handle((result, failure) -> {
+                        if (failure == null) {
+                            return result;
+                        }
+                        cleanupSpawnedFixtures(
+                                world,
+                                spawnedFixtures.stream()
+                                        .map(fixture -> fixture.fixture().npcUuid())
+                                        .toList()
+                        );
+                        return FixtureOperationResult.failure(
+                                "Failed to prepare self-test fixtures: " + rootMessage(failure),
+                                null
+                        );
+                    });
         } catch (Exception ex) {
             cleanupSpawnedFixtures(world, spawnedFixtures.stream()
                     .map(fixture -> fixture.fixture().npcUuid()).toList());
@@ -196,23 +183,18 @@ public final class ApiSelfTestFixtureManager {
                     null
             );
         }
-        List<CompletableFuture<Void>> releases = new ArrayList<>();
-        for (LiveFixtureMarkerMatch liveFixture : liveFixtures) {
-            releases.add(populationAuthority.releaseLoadedAsync(
-                    store, liveFixture.reference(), liveFixture.npcUuid()
-            ));
-        }
-        return CompletableFuture.allOf(releases.toArray(CompletableFuture[]::new))
-                .thenCompose(ignored -> onWorld(world, () -> {
+        return onWorld(world, () -> {
+                    for (LiveFixtureMarkerMatch liveFixture : liveFixtures) {
+                        despawn(store, liveFixture.reference());
+                    }
                     for (ToolStackMatch tool : tools) {
                         removeHotbarSlot(player, tool.slot());
                     }
                     return FixtureOperationResult.success(
-                            "Reset API self-test fixtures. Permanently released "
-                                    + liveNpcUuids.size() + " fixture profile(s).",
+                            "Reset " + liveNpcUuids.size() + " API self-test fixture(s).",
                             null
                     );
-                }))
+                })
                 .exceptionally(failure -> FixtureOperationResult.failure(
                         "Failed to reset self-test fixtures safely: " + rootMessage(failure),
                         null
@@ -261,28 +243,6 @@ public final class ApiSelfTestFixtureManager {
                 null,
                 fixture.roleId()
         );
-    }
-
-    @Nonnull
-    private CompletableFuture<FixtureOperationResult> cleanupFailedPrepareAsync(
-            @Nonnull Store<EntityStore> store,
-            @Nonnull List<SpawnedFixture> spawnedFixtures,
-            @Nonnull Throwable failure
-    ) {
-        List<CompletableFuture<Void>> cleanup = new ArrayList<>();
-        for (SpawnedFixture spawned : spawnedFixtures) {
-            cleanup.add(populationAuthority.releaseOrDespawnUnownedAsync(
-                    store, spawned.reference(), spawned.fixture().npcUuid()
-            ));
-        }
-        return CompletableFuture.allOf(cleanup.toArray(CompletableFuture[]::new))
-                .handle((ignored, cleanupFailure) -> FixtureOperationResult.failure(
-                        "Failed to prepare self-test fixtures: " + rootMessage(failure)
-                                + (cleanupFailure == null
-                                ? ""
-                                : " (cleanup pending: " + rootMessage(cleanupFailure) + ")"),
-                        null
-                ));
     }
 
     @Nonnull
@@ -469,6 +429,16 @@ public final class ApiSelfTestFixtureManager {
         if (linksType != null) {
             store.putComponent(npcRef, linksType, new TameworkCommandLinksComponent(ownerUuid, new String[] { toolId }, homePosition));
         }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            throw new IllegalStateException("Tamework owner component is unavailable");
+        }
+        store.putComponent(
+                npcRef,
+                ownerType,
+                new TameworkOwnerComponent(ownerUuid, ownerName)
+        );
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType != null) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
@@ -541,6 +511,16 @@ public final class ApiSelfTestFixtureManager {
             if (npc != null) {
                 npc.setToDespawn();
             }
+        }
+    }
+
+    private static void despawn(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> reference
+    ) {
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        if (npc != null) {
+            npc.setToDespawn();
         }
     }
 

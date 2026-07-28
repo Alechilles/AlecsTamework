@@ -22,7 +22,6 @@ import javax.annotation.Nullable;
  * Applies and removes avatar-flight rider visuals from the transformed player model.
  */
 public final class AvatarFlightRiderVisualService {
-    static final long INITIAL_RIDER_ATTACHMENT_DELAY_MS = 1_000L;
     private static final String PLAYER_MODEL = "Characters/Player.blockymodel";
     private static final String PLAYER_MOUNT_ANCHOR_MODEL =
             "Tamework/AvatarFlight/Rider/Player_MountAnchor.blockymodel";
@@ -41,17 +40,7 @@ public final class AvatarFlightRiderVisualService {
         remove(store, ownerRef);
         AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment =
                 AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store);
-        long attachAfterMs = 0L;
-        if (settings.isShowRider() && savedModel != null) {
-            attachAfterMs = System.currentTimeMillis() + INITIAL_RIDER_ATTACHMENT_DELAY_MS;
-        }
-        store.putComponent(ownerRef, visualType, marker(
-                ownerUuid,
-                null,
-                false,
-                equipment.armorSignature(),
-                attachAfterMs
-        ));
+        store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false, equipment.armorSignature()));
         if (!settings.isShowRider()) {
             logRiderAttachmentSkipped("show_rider_disabled", null, null);
             return false;
@@ -60,8 +49,15 @@ public final class AvatarFlightRiderVisualService {
             logRiderAttachmentSkipped("missing_saved_model", null, null);
             return false;
         }
-        logRiderAttachmentDeferred(savedModel);
-        return true;
+        PlayerSkinComponent skin = store.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
+        return appendRiderAttachment(
+                store,
+                ownerRef,
+                savedModel,
+                skin,
+                equipment,
+                settings.isIncludeAppearanceAttachments()
+        );
     }
 
     public boolean refresh(@Nonnull CommandBuffer<EntityStore> commandBuffer,
@@ -108,6 +104,35 @@ public final class AvatarFlightRiderVisualService {
             store.removeEntity(riderRef, RemoveReason.REMOVE);
         }
         store.tryRemoveComponent(ownerRef, visualType);
+    }
+
+    private static boolean appendRiderAttachment(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> ownerRef,
+            @Nonnull Model savedModel,
+            @Nullable PlayerSkinComponent skin,
+            @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
+            boolean includeAppearanceAttachments) {
+        ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
+        if (component == null || component.getModel() == null) {
+            logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
+            return false;
+        }
+        Model strippedModel = modelWithoutRiderAttachments(component.getModel());
+        Model withRider = modelWithRiderAttachment(
+                strippedModel,
+                savedModel,
+                skin,
+                equipment,
+                includeAppearanceAttachments
+        );
+        if (withRider == null) {
+            logRiderAttachmentSkipped("missing_rider_model_texture", strippedModel, savedModel);
+            return false;
+        }
+        store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
+        logRiderAttachment(strippedModel, savedModel, skin, equipment, includeAppearanceAttachments);
+        return true;
     }
 
     @Nonnull
@@ -375,18 +400,6 @@ public final class AvatarFlightRiderVisualService {
         ));
     }
 
-    private static void logRiderAttachmentDeferred(@Nonnull Model savedModel) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
-            return;
-        }
-        instance.getLogger().at(Level.INFO).log(String.format(
-                "TameworkAvatarFlight debug: riderAttachmentDeferred delayMs=%s riderModelAsset=%s",
-                INITIAL_RIDER_ATTACHMENT_DELAY_MS,
-                savedModel.getModelAssetId()
-        ));
-    }
-
     @Nullable
     public static Ref<EntityStore> resolveRiderRef(@Nonnull Store<EntityStore> store,
                                                    @Nonnull AvatarFlightRiderVisualComponent visual) {
@@ -404,14 +417,12 @@ public final class AvatarFlightRiderVisualService {
     private static AvatarFlightRiderVisualComponent marker(@Nonnull UUID ownerUuid,
                                                           @Nullable UUID riderUuid,
                                                           boolean riderEntity,
-                                                          @Nonnull String equipmentSignature,
-                                                          long riderAttachAfterMs) {
+                                                          @Nonnull String equipmentSignature) {
         AvatarFlightRiderVisualComponent visual = new AvatarFlightRiderVisualComponent();
         visual.setOwnerUuid(ownerUuid.toString());
         visual.setRiderEntityUuid(riderUuid == null ? "" : riderUuid.toString());
         visual.setRiderEntity(riderEntity);
         visual.setEquipmentSignature(equipmentSignature);
-        visual.setRiderAttachAfterMs(riderAttachAfterMs);
         return visual;
     }
 }

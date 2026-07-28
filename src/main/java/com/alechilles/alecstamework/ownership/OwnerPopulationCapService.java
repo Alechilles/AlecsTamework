@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -11,11 +12,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Compatibility preflight facade over the authoritative owner population index.
+ * Evaluates the released owner cap against currently loaded NPCs.
  *
- * <p>This class never scans ECS stores, enumerates worlds, schedules foreign-world work, or waits
- * on a future. Mutation callers must use {@link OwnerPopulationAdmissionCoordinator}; this facade
- * remains informational for legacy callers while they migrate.
+ * <p>The live index is process-local and updated by world ECS callbacks. Reads
+ * never enter another world thread, block on futures, or create durable
+ * reservations.
  */
 public final class OwnerPopulationCapService {
     private OwnerPopulationCapService() {
@@ -36,49 +37,53 @@ public final class OwnerPopulationCapService {
     static Decision evaluateAcquisition(@Nullable TwGlobalConfig globalConfig,
                                         @Nullable Store<EntityStore> store,
                                         @Nullable UUID ownerId) {
+        return evaluateAcquisition(
+                globalConfig,
+                resolveIndex(),
+                resolveWorldName(store),
+                ownerId
+        );
+    }
+
+    @Nonnull
+    static Decision evaluateAcquisition(
+            @Nullable TwGlobalConfig globalConfig,
+            @Nullable OwnerPopulationLiveIndex index,
+            @Nullable String worldName,
+            @Nullable UUID ownerId
+    ) {
         if (ownerId == null) {
             return Decision.allowNoOwner();
         }
-        TwGlobalConfig resolved = globalConfig == null ? TwGlobalConfig.defaultConfig() : globalConfig;
+        TwGlobalConfig resolved = globalConfig == null
+                ? TwGlobalConfig.defaultConfig()
+                : globalConfig;
         int limit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
                 resolved.getPopulationLimitPerPlayerOwnedTotal()
         );
-        TwGlobalConfig.PerPlayerLimitScope configuredScope =
+        TwGlobalConfig.PerPlayerLimitScope scope =
                 TameworkRuntimeSettings.populationPerPlayerLimitScope(
                         resolved.getPopulationPerPlayerLimitScope()
                 );
-        OwnerPopulationLimitScope scope = toIndexScope(configuredScope);
-        String worldName = resolveWorldName(store);
-        OwnerPopulationIndex index = resolveIndex();
-        if (index == null) {
-            return limit <= 0
-                    ? Decision.allowDisabled(configuredScope)
-                    : Decision.denyUnavailable(limit, configuredScope, "owner-population-index-unavailable");
-        }
-
-        OwnerPopulationCounts counts = index.counts(ownerId, worldName);
-        long committed = scope == OwnerPopulationLimitScope.GLOBAL
-                ? counts.globalCommitted()
-                : counts.worldCommitted();
-        long pending = scope == OwnerPopulationLimitScope.GLOBAL
-                ? counts.globalPending()
-                : counts.worldPending();
-        int current = saturatingInt(committed + pending);
+        int current = countOwnedPopulation(index, scope, worldName, ownerId);
         if (limit <= 0) {
-            return Decision.allowDisabled(configuredScope, current);
+            return Decision.allowDisabled(scope, current);
         }
-        if (scope == OwnerPopulationLimitScope.PER_WORLD && worldName == null) {
-            return Decision.denyUnavailable(limit, configuredScope, "owner-cap-world-context-required");
-        }
-        OwnerPopulationReadiness readiness = index.readiness(scope);
-        if (!readiness.allowsPositiveCappedAdmissions()) {
+        if (index == null) {
             return Decision.denyUnavailable(
                     limit,
-                    configuredScope,
-                    "owner-population-" + readiness.name().toLowerCase(java.util.Locale.ROOT)
+                    scope,
+                    "owner-population-live-index-unavailable"
             );
         }
-        return evaluateResolved(limit, current, configuredScope);
+        if (current < 0) {
+            return Decision.denyUnavailable(
+                    limit,
+                    scope,
+                    "owner-population-world-context-unavailable"
+            );
+        }
+        return evaluateResolved(limit, current, scope);
     }
 
     @Nonnull
@@ -99,47 +104,34 @@ public final class OwnerPopulationCapService {
                 : Decision.allowWithCap(safeLimit, safeCurrent, remaining, safeScope);
     }
 
-    /**
-     * Legacy count read backed only by the index. Unready state returns a conservative sentinel.
-     */
     public static int countOwnedPopulation(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
                                            @Nullable Store<EntityStore> store,
                                            @Nonnull UUID ownerId) {
-        OwnerPopulationIndex index = resolveIndex();
-        OwnerPopulationLimitScope indexScope = toIndexScope(scope);
-        String worldName = resolveWorldName(store);
-        return countOwnedPopulation(index, indexScope, worldName, ownerId);
+        return countOwnedPopulation(
+                resolveIndex(),
+                scope,
+                resolveWorldName(store),
+                ownerId
+        );
     }
 
-    static int countOwnedPopulation(@Nullable OwnerPopulationIndex index,
-                                    @Nonnull OwnerPopulationLimitScope scope,
+    static int countOwnedPopulation(@Nullable OwnerPopulationLiveIndex index,
+                                    @Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
                                     @Nullable String worldName,
                                     @Nonnull UUID ownerId) {
-        if (scope == OwnerPopulationLimitScope.PER_WORLD && worldName == null) {
-            return Integer.MAX_VALUE;
-        }
-        if (index == null || !index.readiness(scope).allowsPositiveCappedAdmissions()) {
-            return Integer.MAX_VALUE;
-        }
-        OwnerPopulationCounts counts = index.counts(ownerId, worldName);
-        return saturatingInt(scope == OwnerPopulationLimitScope.GLOBAL
-                ? counts.globalCommitted() + counts.globalPending()
-                : counts.worldCommitted() + counts.worldPending());
+        return index == null
+                ? 0
+                : index.count(
+                        ownerId,
+                        scope,
+                        worldName
+                );
     }
 
     @Nullable
-    private static OwnerPopulationIndex resolveIndex() {
+    private static OwnerPopulationLiveIndex resolveIndex() {
         Tamework plugin = Tamework.getInstance();
-        return plugin == null ? null : plugin.getOwnerPopulationIndex();
-    }
-
-    @Nonnull
-    private static OwnerPopulationLimitScope toIndexScope(
-            @Nullable TwGlobalConfig.PerPlayerLimitScope scope
-    ) {
-        return scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
-                ? OwnerPopulationLimitScope.GLOBAL
-                : OwnerPopulationLimitScope.PER_WORLD;
+        return plugin == null ? null : plugin.getOwnerPopulationLiveIndex();
     }
 
     @Nullable
@@ -152,10 +144,6 @@ public final class OwnerPopulationCapService {
             return null;
         }
         return world.getName().trim();
-    }
-
-    private static int saturatingInt(long value) {
-        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
     }
 
     public record Decision(boolean allowed,

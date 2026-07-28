@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
+import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -19,9 +20,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Builds command-panel entries using linked and nearby-owned companions.
@@ -32,11 +35,46 @@ final class CommandPanelEntrySourceService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
+    @Nullable
+    private final CommandRosterPanelRecordSource rosterRecordSource;
+    @Nullable
+    private final CommandPanelFeaturePresentationSource featurePresentations;
+    @Nullable
+    private final BondedCompanionPanelEntrySourceService bondedEntrySource;
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandNpcNameResolver npcNameResolver) {
+        this(
+                linkedPanelEntryService,
+                panelPreferenceService,
+                linkPolicyService,
+                npcNameResolver,
+                null,
+                null,
+                null
+        );
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource,
+                                   @Nullable CommandPanelFeaturePresentationSource featurePresentations) {
+        this(linkedPanelEntryService, panelPreferenceService, linkPolicyService,
+                npcNameResolver, rosterRecordSource, featurePresentations,
+                null);
+    }
+
+    CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
+                                   CommandPanelPreferenceService panelPreferenceService,
+                                   CommandLinkPolicyService linkPolicyService,
+                                   CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandRosterPanelRecordSource rosterRecordSource,
+                                   @Nullable CommandPanelFeaturePresentationSource featurePresentations,
+                                   @Nullable BondedCompanionPanelEntrySourceService bondedEntrySource) {
         this.linkedPanelEntryService = linkedPanelEntryService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -49,6 +87,9 @@ final class CommandPanelEntrySourceService {
                 new CommandLinkedPanelProgressionPresentationService(),
                 new CommandLinkedPanelCooldownSnapshotService()
         );
+        this.rosterRecordSource = rosterRecordSource;
+        this.featurePresentations = featurePresentations;
+        this.bondedEntrySource = bondedEntrySource;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -56,7 +97,82 @@ final class CommandPanelEntrySourceService {
                                       ItemStack stack,
                                       TwCommandItemConfig config,
                                       String toolId) {
-        List<LinkedNpcEntry> linkedEntries = linkedPanelEntryService.buildEntries(player, store, stack, toolId);
+        return buildEntries(
+                player, store, stack, config, toolId, null, null
+        );
+    }
+
+    /**
+     * Builds card data and roster actions from one immutable roster read.
+     */
+    CommandPanelSnapshot buildSnapshot(Player player,
+                                       Store<EntityStore> store,
+                                       ItemStack stack,
+                                       TwCommandItemConfig config,
+                                       String toolId) {
+        if (player != null && config != null
+                && config.usesBondedCompanionRoster()
+                && bondedEntrySource != null) {
+            CommandPanelSnapshot durable = bondedEntrySource.buildSnapshot(
+                    player, store, config.getBondedRosterId());
+            return new CommandPanelSnapshot(
+                    applyFiltersAndSort(durable.entries(), stack),
+                    durable.featurePresentations(), durable.emptyStateKey());
+        }
+        CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot =
+                resolveRosterSnapshot(player, config);
+        CommandLinkedPanelEntryService.ResolvedEntries rosterEntries =
+                resolveRosterEntries(
+                        player, store, stack, config, toolId, rosterSnapshot
+                );
+        List<LinkedNpcEntry> entries = buildEntries(
+                player, store, stack, config, toolId, rosterSnapshot,
+                rosterEntries
+        );
+        if (rosterSnapshot == null || featurePresentations == null
+                || player == null || config == null) {
+            return new CommandPanelSnapshot(entries, Map.of());
+        }
+        String worldName = player.getWorld() == null
+                ? null
+                : player.getWorld().getName();
+        Map<UUID, CommandPanelFeaturePresentation> features =
+                featurePresentations.snapshotForMembers(
+                        player.getUuid(),
+                        worldName,
+                        config.getCommandFamilyId(),
+                        rosterSnapshot.members()
+                );
+        return new CommandPanelSnapshot(
+                entries, CommandPanelFeatureRemapper.remap(features, rosterEntries)
+        );
+    }
+
+    @Nullable
+    BondedCompanionPanelEntrySourceService bondedReadModel() {
+        return bondedEntrySource;
+    }
+
+    void warmBondedRoster(@Nullable UUID ownerUuid, @Nullable String rosterId) {
+        if (bondedEntrySource != null) bondedEntrySource.warm(ownerUuid, rosterId);
+    }
+
+    private List<LinkedNpcEntry> buildEntries(Player player,
+                                               Store<EntityStore> store,
+                                               ItemStack stack,
+                                               TwCommandItemConfig config,
+                                               String toolId,
+                                               @Nullable CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot,
+                                               @Nullable CommandLinkedPanelEntryService.ResolvedEntries rosterEntries) {
+        List<LinkedNpcEntry> linkedEntries = config != null
+                && config.usesOwnerCommandFamilyRoster()
+                ? buildRosterEntries(
+                        player, store, stack, config, toolId, rosterSnapshot,
+                        rosterEntries
+                )
+                : linkedPanelEntryService.buildEntries(
+                        player, store, stack, toolId
+                );
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
@@ -100,6 +216,11 @@ final class CommandPanelEntrySourceService {
                 }
                 Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
                 if (npcRef == null || !npcRef.isValid()) {
+                    continue;
+                }
+                if (!CommandGenericTargetAuthority.allowsNearbyPresentation(
+                        npcRef, store
+                )) {
                     continue;
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
@@ -158,6 +279,83 @@ final class CommandPanelEntrySourceService {
             }
         });
         return applyFiltersAndSort(out, stack);
+    }
+
+    @Nullable
+    private CommandRosterPanelRecordSource.PanelSnapshot resolveRosterSnapshot(
+            @Nullable Player player,
+            @Nullable TwCommandItemConfig config
+    ) {
+        if (player == null || config == null
+                || !config.usesOwnerCommandFamilyRoster()
+                || rosterRecordSource == null) {
+            return null;
+        }
+        return rosterRecordSource.snapshotFor(
+                player.getUuid(), config.getCommandFamilyId()
+        );
+    }
+
+    private List<LinkedNpcEntry> buildRosterEntries(
+            Player player,
+            Store<EntityStore> store,
+            ItemStack stack,
+            TwCommandItemConfig config,
+            String toolId,
+            @Nullable CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot,
+            @Nullable CommandLinkedPanelEntryService.ResolvedEntries rosterEntries
+    ) {
+        if (player == null || rosterRecordSource == null) {
+            return List.of();
+        }
+        List<LinkedNpcRecord> records = rosterSnapshot != null
+                ? rosterSnapshot.records()
+                : rosterRecordSource.recordsFor(
+                        player.getUuid(), config.getCommandFamilyId()
+                );
+        return rosterEntries != null
+                ? rosterEntries.entries()
+                : linkedPanelEntryService.buildEntriesFromRecords(
+                        player, store, stack, toolId, records
+                );
+    }
+
+    @Nullable
+    private CommandLinkedPanelEntryService.ResolvedEntries resolveRosterEntries(
+            @Nullable Player player,
+            @Nullable Store<EntityStore> store,
+            @Nullable ItemStack stack,
+            @Nullable TwCommandItemConfig config,
+            @Nullable String toolId,
+            @Nullable CommandRosterPanelRecordSource.PanelSnapshot rosterSnapshot
+    ) {
+        if (player == null || store == null || stack == null
+                || config == null || toolId == null || rosterSnapshot == null
+                || !config.usesOwnerCommandFamilyRoster()) {
+            return null;
+        }
+        return linkedPanelEntryService.resolveEntriesFromRecords(
+                player, store, stack, toolId, rosterSnapshot.records()
+        );
+    }
+
+    /** Immutable card and action-presentation result for one panel refresh. */
+    record CommandPanelSnapshot(
+            List<LinkedNpcEntry> entries,
+            Map<UUID, CommandPanelFeaturePresentation> featurePresentations,
+            @Nullable String emptyStateKey
+    ) {
+        CommandPanelSnapshot {
+            entries = List.copyOf(entries);
+            featurePresentations = Map.copyOf(featurePresentations);
+        }
+
+        CommandPanelSnapshot(
+                List<LinkedNpcEntry> entries,
+                Map<UUID, CommandPanelFeaturePresentation> featurePresentations
+        ) {
+            this(entries, featurePresentations, null);
+        }
     }
 
     private boolean resolveLinkingRequireOwner() {

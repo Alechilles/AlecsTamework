@@ -499,21 +499,6 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return enabled;
     }
 
-    /** Returns whether this config may become the sole authority for its managed coop. */
-    public boolean isManagedAuthorityEnabled() {
-        return enabled && getManagedAuthorityValidationError() == null;
-    }
-
-    /** Returns the actionable reason an enabled config cannot own managed-coop lifecycle. */
-    @Nullable
-    public String getManagedAuthorityValidationError() {
-        if (!enabled || !getIdentityRules().isPreserveUUID()) {
-            return null;
-        }
-        return "IdentityRules.PreserveUUID=true is unsupported for managed coops; set it to false "
-                + "because profile_id is the stable identity";
-    }
-
     public int getPriority() {
         return priority;
     }

@@ -10,7 +10,7 @@ Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](
 
 Goal: keep plugin-specific state (cooldowns, affinity, quest flags, etc.) per companion profile.
 
-## Write
+## Simple write
 ```java
 String namespace = "example.plugin";
 String key = "companion_state";
@@ -21,6 +21,11 @@ if (!ok) {
     // invalid args, reserved namespace, invalid JSON, or queue rejection
 }
 ```
+
+`put(...)` reports submission acceptance only. When this value coordinates
+item consumption, a cooldown, an entitlement, or another durable effect,
+require `PROFILE_DATA_TRANSACTIONS` and use `getVersioned(...)` plus
+`compareAndSet(...)` with one stable idempotency key.
 
 ## Read
 ```java
@@ -43,6 +48,8 @@ boolean deleted = api.profileData().delete(profileId, "example.plugin", "compani
 - `Alechilles:Tamework` is reserved.
 - `namespace` and `key` must be nonblank.
 - Payload must be JSON text.
+- Prefer the transactional methods whenever queue acceptance is not a strong
+  enough success result.
 
 ## Related Pages
 - [Profile Data API Reference](/mod/alecs-tamework/profile-data-api-reference)

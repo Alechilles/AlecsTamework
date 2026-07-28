@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
+> **Experimental API Contract (`0.9.0`)**
 > This reference tracks the current `profiles()` contract in `TameworkApi`.
 
 Capability: `PROFILES`
@@ -42,6 +42,9 @@ Capability: `PROFILES`
 - Values are detached immutable snapshots (`record` + defensive copies).
 - Prefer `profileId` for long-lived references; UUIDs can remap.
 - `getActiveSnapshot(...)` returns raw JSON payload text for the active snapshot type.
+- Snapshot names and payloads are data views, not a substitute for Tamework's
+  canonical lifecycle decisions. Do not create a parallel lifecycle state from
+  them.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

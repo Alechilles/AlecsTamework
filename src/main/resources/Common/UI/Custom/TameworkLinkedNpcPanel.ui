@@ -245,6 +245,83 @@ Group #TameworkLinkedPanelRoot {
                 }
             }
         }
+
+        Group #TameworkLinkedPanelReviveOverlay {
+            Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+            Background: #060b13(0.82);
+            Visible: false;
+
+            Group #TameworkLinkedPanelReviveModal {
+                Anchor: (Top: 92, Left: 24, Width: 382, Height: 420);
+                Background: #102038;
+
+                Label #TameworkLinkedPanelReviveTitle {
+                    Anchor: (Top: 10, Left: 14, Width: 354, Height: 24);
+                    Text: %server.tamework.ui.linkedPanel.revive.title;
+                    Style: (FontSize: 18, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Label #TameworkLinkedPanelReviveSubtitle {
+                    Anchor: (Top: 39, Left: 14, Width: 354, Height: 22);
+                    Text: "";
+                    Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Label {
+                    Anchor: (Top: 66, Left: 14, Width: 354, Height: 18);
+                    Text: %server.tamework.ui.linkedPanel.revive.costHeader;
+                    Style: (FontSize: 12, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Group #TameworkLinkedPanelReviveCostViewport {
+                    Anchor: (Top: 88, Left: 14, Width: 354, Height: 240);
+                    KeepScrollPosition: true;
+                    ScrollbarStyle: $C.@DefaultScrollbarStyle;
+                    LayoutMode: TopScrolling;
+
+                    Group #TameworkLinkedPanelReviveCostList {
+                        LayoutMode: Top;
+                        Anchor: (Bottom: 4);
+                    }
+                }
+
+                Label #TameworkLinkedPanelReviveSummary {
+                    Anchor: (Top: 334, Left: 14, Width: 354, Height: 20);
+                    Text: "";
+                    Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Group {
+                    Anchor: (Top: 366, Left: 14, Width: 354, Height: 30);
+                    LayoutMode: Left;
+
+                    Group { Anchor: (Width: 158); }
+
+                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelReviveCancelButton {
+                        @Sounds = $C.@ButtonSounds;
+                        @Anchor = (Width: 88, Height: 24);
+                        @Text = %server.tamework.ui.shared.button.cancel;
+                    }
+
+                    Group { Anchor: (Width: 8); }
+
+                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelReviveConfirmButton {
+                        @Sounds = $C.@ButtonSounds;
+                        @Anchor = (Width: 100, Height: 24);
+                        @Text = %server.tamework.ui.linkedPanel.revive.confirm;
+                        Visible: false;
+                    }
+
+                    Label #TameworkLinkedPanelReviveBlockedButton {
+                        Anchor: (Width: 100, Height: 24);
+                        Text: %server.tamework.ui.linkedPanel.revive.confirm;
+                        Style: (FontSize: 11, RenderBold: true, TextColor: #74869a, HorizontalAlignment: Center, VerticalAlignment: Center);
+                        Visible: false;
+                    }
+                }
+            }
+        }
+
     }
 }
 

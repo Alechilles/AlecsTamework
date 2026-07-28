@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -26,13 +24,12 @@ final class TameworkSettingsFormParser {
 
     @Nonnull
     ParseResult parse(@Nonnull TameworkSettingsPage.EventPayload payload,
-                      @Nonnull TameworkSettingsValues currentValues,
-                      @Nonnull ClaimProviderRequest currentClaimProviderRequest) {
+                      @Nonnull TameworkSettingsValues currentValues) {
         NumericResult numericResult = parseNumbers(payload);
         if (!numericResult.success()) {
             return ParseResult.failure(numericResult.message());
         }
-        ChoiceResult choiceResult = resolveChoices(payload, currentValues, currentClaimProviderRequest);
+        ChoiceResult choiceResult = resolveChoices(payload, currentValues);
         if (!choiceResult.success()) {
             return ParseResult.failure(choiceResult.message());
         }
@@ -88,18 +85,7 @@ final class TameworkSettingsFormParser {
 
     @Nonnull
     private ChoiceResult resolveChoices(@Nonnull TameworkSettingsPage.EventPayload payload,
-                                        @Nonnull TameworkSettingsValues currentValues,
-                                        @Nonnull ClaimProviderRequest currentClaimProviderRequest) {
-        ClaimProviderRequest providerRequest = TameworkSettingsValidation.resolveClaimProvider(
-                payload.claimProvider,
-                currentClaimProviderRequest
-        );
-        if (!providerRequest.valid()) {
-            return ChoiceResult.failure(format(
-                    "tamework.ui.settings.validation.claimProvider",
-                    providerRequest.displayValue()
-            ));
-        }
+                                        @Nonnull TameworkSettingsValues currentValues) {
         String tickPolicy = fallback(
                 payload.needsTickPolicyMode,
                 currentValues.needsTickPolicyMode().toConfigValue()
@@ -115,7 +101,6 @@ final class TameworkSettingsFormParser {
         );
         return ChoiceResult.success(new ChoiceValues(
                 TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope),
-                providerRequest.provider(),
                 TwNeedsConfig.TickPolicyMode.fromConfigValue(tickPolicy),
                 NeedsResourceMode.fromConfigValue(resourceMode).toConfigValue(),
                 TwNeedsConfig.DamageModel.fromConfigValue(damageModel),
@@ -131,7 +116,6 @@ final class TameworkSettingsFormParser {
         return new TameworkSettingsValues(
                 numbers.populationLimit(),
                 choices.populationScope(),
-                choices.claimProvider(),
                 boolOrDefault(payload.simpleClaimsEnabled, current.simpleClaimsEnabled()),
                 numbers.claimLimitChunk(),
                 numbers.claimLimitTotal(),
@@ -265,7 +249,6 @@ final class TameworkSettingsFormParser {
     }
 
     private record ChoiceValues(@Nonnull TwGlobalConfig.PerPlayerLimitScope populationScope,
-                                @Nonnull ClaimIntegrationProvider claimProvider,
                                 @Nonnull TwNeedsConfig.TickPolicyMode tickPolicyMode,
                                 @Nonnull String needsResourceMode,
                                 @Nonnull TwNeedsConfig.DamageModel damageModel,

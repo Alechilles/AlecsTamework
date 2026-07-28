@@ -1,28 +1,19 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
-import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
-import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
-import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -30,7 +21,7 @@ import javax.annotation.Nullable;
 /**
  * Command to remove all unowned live NPC entities matching one requested role id.
  */
-public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
+public final class TameworkNpcCleanCommand extends AbstractWorldCommand {
     public TameworkNpcCleanCommand() {
         super("npcclean", "Remove all unowned NPCs matching a specific role id.");
         setAllowsExtraArguments(true);
@@ -38,10 +29,8 @@ public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         String requestedRole = getArg(commandContext, 2);
         if (requestedRole == null || requestedRole.isBlank()) {
             commandContext.sender().sendMessage(Message.raw("Usage: /tw npcclean <roleId>"));
@@ -61,23 +50,12 @@ public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
             return;
         }
 
-        NpcCleanOwnershipGuard ownershipGuard = resolveOwnershipGuard();
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
                 TameworkCommandLinksComponent.getComponentType();
-        ComponentType<EntityStore, TameworkNpcNameComponent> nameType =
-                TameworkNpcNameComponent.getComponentType();
-        ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
-        if (ownershipGuard == null || ownerType == null || linksType == null
-                || nameType == null || uuidType == null) {
+        if (ownerType == null || linksType == null) {
             commandContext.sender().sendMessage(Message.raw(
                     "NPC cleanup is unavailable while companion ownership data is unavailable."
-            ));
-            return;
-        }
-        if (!ownershipGuard.readyForDestructiveCleanup()) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "NPC cleanup is unavailable until companion population reconciliation is ready."
             ));
             return;
         }
@@ -94,10 +72,7 @@ public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
             }
             TameworkOwnerComponent liveOwner = archetypeChunk.getComponent(index, ownerType);
             TameworkCommandLinksComponent liveLinks = archetypeChunk.getComponent(index, linksType);
-            TameworkNpcNameComponent liveName = archetypeChunk.getComponent(index, nameType);
-            UUIDComponent identity = archetypeChunk.getComponent(index, uuidType);
-            UUID npcUuid = identity == null ? null : identity.getUuid();
-            if (ownershipGuard.isProtectedOwnedCompanion(npcUuid, liveOwner, liveLinks, liveName)) {
+            if (isProtectedOwnedCompanion(liveOwner, liveLinks)) {
                 protectedCount.incrementAndGet();
                 return;
             }
@@ -129,20 +104,16 @@ public final class TameworkNpcCleanCommand extends AbstractPlayerCommand {
         ));
     }
 
-    @Nullable
-    private static NpcCleanOwnershipGuard resolveOwnershipGuard() {
-        Tamework plugin = Tamework.getInstance();
-        CompanionIdentityResolver identityResolver = plugin == null
-                ? null
-                : plugin.getCompanionIdentityResolver();
-        OwnerPopulationIndex populationIndex = plugin == null
-                ? null
-                : plugin.getOwnerPopulationIndex();
-        OwnerPopulationRuntime runtime = plugin == null ? null : plugin.getOwnerPopulationRuntime();
-        ClaimOccupancyIndex claimIndex = runtime == null ? null : runtime.claimOccupancyIndex();
-        return identityResolver == null || populationIndex == null || claimIndex == null
-                ? null
-                : new NpcCleanOwnershipGuard(identityResolver, populationIndex, claimIndex);
+    private static boolean isProtectedOwnedCompanion(
+            @Nullable TameworkOwnerComponent owner,
+            @Nullable TameworkCommandLinksComponent links
+    ) {
+        if (owner != null && owner.getOwnerId() != null) {
+            return true;
+        }
+        return links != null
+                && (links.getOwnerId() != null
+                || (links.getToolIds() != null && links.getToolIds().length > 0));
     }
 
     @Nullable

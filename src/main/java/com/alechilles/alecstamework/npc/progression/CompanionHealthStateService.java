@@ -22,26 +22,55 @@ public final class CompanionHealthStateService {
     @Nullable
     public static Double captureHealthPercent(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store) {
+        HealthSnapshot snapshot = captureHealth(npcRef, store);
+        return snapshot == null ? null : snapshot.healthPercent();
+    }
+
+    /** Captures the exact live health pair and its compatibility percentage. */
+    @Nullable
+    public static HealthSnapshot captureHealth(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store) {
         HealthContext context = resolveHealthContext(npcRef, store);
         if (context == null) {
             return null;
         }
-        return resolveStoredHealthPercent(context.value().get(), context.value().getMax());
+        double current = context.value().get();
+        double maximum = context.value().getMax();
+        Double percent = resolveStoredHealthPercent(current, maximum);
+        return percent == null ? null : new HealthSnapshot(
+                clamp(current, 0.0, maximum), maximum, percent
+        );
     }
 
     public static boolean applyStoredHealthPercent(@Nullable Ref<EntityStore> npcRef,
                                                    @Nullable Store<EntityStore> store,
                                                    @Nullable Double healthPercent) {
-        if (healthPercent == null) {
-            return false;
-        }
+        return applyStoredHealth(npcRef, store, null, null, healthPercent);
+    }
+
+    /**
+     * Restores an exact stored health value when the rebuilt stat maximum still
+     * matches; otherwise the durable percentage remains the safe fallback.
+     */
+    public static boolean applyStoredHealth(@Nullable Ref<EntityStore> npcRef,
+                                            @Nullable Store<EntityStore> store,
+                                            @Nullable Double currentHealth,
+                                            @Nullable Double maximumHealth,
+                                            @Nullable Double healthPercent) {
         HealthContext context = resolveHealthContext(npcRef, store);
         if (context == null) {
             return false;
         }
-        double targetHealth = resolveRestoredHealthValue(healthPercent, context.value().getMax());
-        double currentHealth = context.value().get();
-        if (Double.isFinite(currentHealth) && Math.abs(currentHealth - targetHealth) <= EPSILON) {
+        double rebuiltMaximum = context.value().getMax();
+        Double exact = exactValue(currentHealth, maximumHealth, rebuiltMaximum);
+        if (exact == null && healthPercent == null) {
+            return false;
+        }
+        double targetHealth = exact != null ? exact
+                : resolveRestoredHealthValue(healthPercent, rebuiltMaximum);
+        double existingHealth = context.value().get();
+        if (Double.isFinite(existingHealth)
+                && Math.abs(existingHealth - targetHealth) <= EPSILON) {
             return false;
         }
         context.statMap().setStatValue(context.healthIndex(), (float) targetHealth);
@@ -63,6 +92,24 @@ public final class CompanionHealthStateService {
         }
         double clampedPercent = clamp(healthPercent, 0.0, 100.0);
         return clamp(maxHealth * (clampedPercent / 100.0), 0.0, maxHealth);
+    }
+
+    @Nullable
+    private static Double exactValue(@Nullable Double currentHealth,
+                                     @Nullable Double maximumHealth,
+                                     double rebuiltMaximum) {
+        if (currentHealth == null || maximumHealth == null
+                || !Double.isFinite(currentHealth)
+                || !Double.isFinite(maximumHealth)
+                || maximumHealth <= 0.0
+                || currentHealth < 0.0
+                || currentHealth > maximumHealth
+                || !Double.isFinite(rebuiltMaximum)
+                || rebuiltMaximum <= 0.0
+                || Math.abs(rebuiltMaximum - maximumHealth) > EPSILON) {
+            return null;
+        }
+        return currentHealth;
     }
 
     @Nullable
@@ -104,5 +151,17 @@ public final class CompanionHealthStateService {
     }
 
     private record HealthContext(EntityStatMap statMap, int healthIndex, EntityStatValue value) {
+    }
+
+    /** Exact source values plus the legacy percentage restoration fallback. */
+    public record HealthSnapshot(double currentHealth, double maximumHealth,
+                                 double healthPercent) {
+        public HealthSnapshot {
+            if (!Double.isFinite(currentHealth) || !Double.isFinite(maximumHealth)
+                    || !Double.isFinite(healthPercent) || maximumHealth <= 0.0
+                    || currentHealth < 0.0 || currentHealth > maximumHealth) {
+                throw new IllegalArgumentException("invalid health snapshot");
+            }
+        }
     }
 }

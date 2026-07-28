@@ -32,10 +32,11 @@ class CommandWorldChangeArrivalArchitectureTest {
 
     @Test
     void queuedTravelRechecksTheLiveSourceCommandState() throws Exception {
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
+        String coordinator = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandWorldChangeTravelCoordinator.java"
         ));
 
-        assertTrue(handler.contains("settings.getFollowMasterOnWorldChangeStateFilter()"));
+        assertTrue(coordinator.contains(
+                "settings.getFollowMasterOnWorldChangeStateFilter()"));
     }
 }

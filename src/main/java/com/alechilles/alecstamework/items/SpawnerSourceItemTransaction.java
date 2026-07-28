@@ -73,6 +73,17 @@ final class SpawnerSourceItemTransaction {
         return true;
     }
 
+    /** Exact-CAS decrements this transaction's prepare-time source by one. */
+    boolean consumeOne() {
+        if (original.getQuantity() <= 0) {
+            return false;
+        }
+        ItemStack replacement = original.getQuantity() == 1
+                ? ItemStack.EMPTY
+                : original.withQuantity(original.getQuantity() - 1);
+        return prepare(replacement);
+    }
+
     void commit() {
         applied = null;
         appliedSlot = null;

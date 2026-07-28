@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
@@ -18,8 +19,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
-import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -152,6 +153,8 @@ final class TwConfigSchemaAdapter {
             case HAPPINESS -> TwHappinessConfig.CODEC;
             case NEEDS -> TwNeedsConfig.CODEC;
             case BREEDING -> TwBreedingConfig.CODEC;
+            case CAPTURE_POLICY -> TwCapturePolicyConfig.CODEC;
+            case POPULATION_GROUP -> TwPopulationGroupConfig.CODEC;
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
             case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;
@@ -160,7 +163,6 @@ final class TwConfigSchemaAdapter {
             case TALENT -> TwTalentConfig.CODEC;
             case COOP -> TwCoopConfig.CODEC;
             case DEBUG -> TwDebugConfig.CODEC;
-            case PERSISTENCE -> TwPersistenceConfig.CODEC;
             case OTHER -> null;
         };
     }

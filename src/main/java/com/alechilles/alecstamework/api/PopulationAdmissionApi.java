@@ -16,6 +16,22 @@ public interface PopulationAdmissionApi {
     @Nonnull
     CompletionStage<PopulationAdmissionDecision> tryAdmit(@Nonnull PopulationAdmissionRequest request);
 
+    /**
+     * Role-aware admission used when population groups may apply. The default fails closed so an
+     * API 0.8 implementation cannot silently bypass group capacity.
+     */
+    @Nonnull
+    default CompletionStage<PopulationAdmissionDecision> tryAdmitV2(
+            @Nonnull PopulationAdmissionRequestV2 request
+    ) {
+        if (request == null) {
+            throw new NullPointerException("request");
+        }
+        return CompletableFuture.completedFuture(
+                PopulationAdmissionDecision.unavailable("population-admission-v2-authority-unavailable")
+        );
+    }
+
     @Nonnull
     CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(
             @Nonnull PopulationBatchAdmissionRequest request

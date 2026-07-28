@@ -155,7 +155,10 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                     "AnimationSets": {
                         "Run": {
                             "Animations": [
-                                {"Animation": "NPC/Test/Dragon/Animations/Run.blockyanim"}
+                                {
+                                    "Animation": "NPC/Test/Dragon/Animations/Run.blockyanim",
+                                    "FootstepIntervals": [4],
+                                }
                             ]
                         },
                         "JumpRun": {
@@ -202,6 +205,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
             self.assertIn("missing native transformed-player animation set 'Sprint'", result.stdout)
             self.assertIn("missing native transformed-player animation set 'JumpSprint'", result.stdout)
             self.assertIn("missing native transformed-player animation set 'StepSprint'", result.stdout)
+            self.assertIn("removed unsafe FootstepIntervals from animation set 'Run' entry 0", result.stdout)
             server_model = json.loads(
                 (output / "Server" / "Models" / "Creature" / "Dragon_AvatarFlight.json").read_text()
             )
@@ -210,6 +214,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
             self.assertNotIn("Sprint", animation_sets)
             self.assertNotIn("JumpSprint", animation_sets)
             self.assertNotIn("StepSprint", animation_sets)
+            self.assertNotIn("FootstepIntervals", animation_sets["Run"]["Animations"][0])
 
 
 if __name__ == "__main__":

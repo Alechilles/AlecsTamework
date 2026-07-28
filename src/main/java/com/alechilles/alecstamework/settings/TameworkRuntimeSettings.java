@@ -3,8 +3,6 @@ package com.alechilles.alecstamework.settings;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -66,18 +64,6 @@ public final class TameworkRuntimeSettings {
     @Nonnull
     public String populationPerPlayerLimitScope() {
         return values.populationPerPlayerLimitScope();
-    }
-
-    @Nonnull
-    public ClaimIntegrationProvider simpleClaimsProvider() {
-        ClaimProviderRequest request = simpleClaimsProviderRequest();
-        return request.valid() ? request.provider() : ClaimIntegrationProvider.OFF;
-    }
-
-    /** Returns the provider request with any invalid legacy value intact for fail-closed policy resolution. */
-    @Nonnull
-    public ClaimProviderRequest simpleClaimsProviderRequest() {
-        return values.simpleClaimsProviderRequest();
     }
 
     public boolean simpleClaimsEnabled() {
@@ -280,14 +266,6 @@ public final class TameworkRuntimeSettings {
     public static boolean simpleClaimsEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.simpleClaimsEnabled() : configEnabled;
-    }
-
-    @Nonnull
-    public static ClaimIntegrationProvider simpleClaimsProvider(@Nullable ClaimIntegrationProvider configProvider) {
-        TameworkRuntimeSettings settings = currentOrNull();
-        return settings != null
-                ? settings.simpleClaimsProvider()
-                : (configProvider == null ? ClaimIntegrationProvider.AUTO : configProvider);
     }
 
     public static int simpleClaimsLimitPerClaimChunk(int configLimit) {

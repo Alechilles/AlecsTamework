@@ -43,8 +43,13 @@ final class CommandGroupAssignPageService {
         return groupActivationService.resolveSelectionValue(stack);
     }
 
-    void applyGroupActivation(Player player, String toolId, String selectorValue) {
-        if (player == null || toolId == null || toolId.isBlank() || toolInventoryService == null) {
+    void applyGroupActivation(Player player,
+                              String toolId,
+                              TwCommandItemConfig config,
+                              String selectorValue) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                || player == null || toolId == null || toolId.isBlank()
+                || toolInventoryService == null) {
             return;
         }
         toolInventoryService.mutateToolStack(
@@ -59,7 +64,9 @@ final class CommandGroupAssignPageService {
                               TwCommandItemConfig config,
                               UUID npcUuid,
                               String groupId) {
-        if (player == null || config == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                || player == null || toolId == null || toolId.isBlank()
+                || npcUuid == null) {
             return;
         }
         if (panelActionService == null) {
@@ -68,7 +75,7 @@ final class CommandGroupAssignPageService {
         if (groupId != null && !isNpcLinkedToTool(player, toolId, config, npcUuid)) {
             panelActionService.applyLink(player, toolId, config, npcUuid);
         }
-        panelActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
+        panelActionService.applySetLinkedNpcGroup(player, toolId, config, npcUuid, groupId);
     }
 
     private boolean isNpcLinkedToTool(Player player,

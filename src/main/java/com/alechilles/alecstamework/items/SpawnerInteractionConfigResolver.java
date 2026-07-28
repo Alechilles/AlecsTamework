@@ -39,6 +39,7 @@ final class SpawnerInteractionConfigResolver {
                 .captureSoundEvent(baseConfig.getCaptureSoundEvent())
                 .captureRequiredEffectId(baseConfig.getCaptureRequiredEffectId())
                 .captureChannelAuraEffectId(baseConfig.getCaptureChannelAuraEffectId())
+                .captureChannelSoundEvent(baseConfig.getCaptureChannelSoundEvent())
                 .captureMaxHealthPercent(baseConfig.getCaptureMaxHealthPercent())
                 .captureTamedRoleOverrides(baseConfig.getCaptureTamedRoleOverrides())
                 .spawnSoundEvent(baseConfig.getSpawnSoundEvent())
@@ -52,6 +53,7 @@ final class SpawnerInteractionConfigResolver {
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
                 .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
+                .captureMechanics(baseConfig.getCaptureMechanics())
                 .build();
     }
 }

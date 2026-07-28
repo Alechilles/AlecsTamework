@@ -165,6 +165,10 @@ public final class CommandAutoLinkService {
         if (links == null || !links.containsToolId(preferredToolId)) {
             return tryLinkCandidate(player, store, npcRef, candidate);
         }
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                npcRef, store)) {
+            return false;
+        }
         ItemStack stack = candidate.container().getItemStack(candidate.slot());
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (stack == null || stack.isEmpty() || npc == null || npc.getUuid() == null) {
@@ -201,7 +205,7 @@ public final class CommandAutoLinkService {
                 continue;
             }
             TwCommandItemConfig config = registry != null ? registry.get(stack.getItemId()) : null;
-            if (config == null) {
+            if (config == null || config.usesBondedCompanionRoster()) {
                 continue;
             }
             if (!config.isEnabled()) {
@@ -302,7 +306,8 @@ public final class CommandAutoLinkService {
         }
         String roleId = resolveRoleId(npcRef, store);
         for (TwCommandItemConfig config : registry.snapshot().values()) {
-            if (config == null || !config.isEnabled() || !config.isLinkEnabled()) {
+            if (config == null || config.usesBondedCompanionRoster()
+                    || !config.isEnabled() || !config.isLinkEnabled()) {
                 continue;
             }
             if (!policyService.isRoleAllowed(roleId, config, true)) {

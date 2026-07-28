@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -191,6 +192,25 @@ class LinkedNpcPanelStatusTextServiceTest {
         LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry));
         assertEquals(1, snapshots.length);
         assertEquals("12345678", snapshots[0].recoveryIncidentId());
+    }
+
+    @Test
+    void snapshotMapperPreservesDisabledRespawnSentinel() {
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Dead Dragon", 0, 0, 0, 0, null,
+                0, 0, 0, 0, false, false, true, false, false, false,
+                -1L, LinkedNpcTraitIndicator.EMPTY
+        );
+
+        LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(List.of(entry));
+
+        assertEquals(1, snapshots.length);
+        assertEquals(-1L, snapshots[0].deadRespawnRemainingMs());
+        assertEquals(
+                LocalizedText.resolve((String) null,
+                        "tamework.ui.linkedPanel.health.deadRespawnDisabled"),
+                LinkedNpcPanelStatusTextService.resolveDeadHealthText(snapshots[0])
+        );
     }
 
     @Test

@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Level;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -10,43 +9,41 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Guards truthful diagnostics and pre-shutdown Lost submission for temporary worlds. */
+/** Guards truthful diagnostics for retry exhaustion without lifecycle inference. */
 class CommandRelocationDropReporterTest {
 
     @Test
-    void deleteOnRemoveSubmissionReportsAcceptedLostTransition() {
+    void retryExhaustionReportsDropWithoutClaimingLostState() {
         List<Diagnostic> diagnostics = new ArrayList<>();
         CommandRelocationDropReporter reporter = new CommandRelocationDropReporter(
                 null, (level, message) -> diagnostics.add(new Diagnostic(level, message)));
-        reporter.setListener((npcUuid, ownerUuid, source, home, destination, queued, dropped, retries) -> true);
 
-        reporter.reportWorldRemoval(candidate());
+        reporter.report(pending(), 500L);
 
         assertEquals(1, diagnostics.size());
-        assertEquals(Level.INFO, diagnostics.get(0).level());
-        assertTrue(diagnostics.get(0).message().contains("lostTransitionSubmitted=true"));
-    }
-
-    @Test
-    void rejectedLostTransitionNeverClaimsCompanionWasMarkedLost() {
-        List<Diagnostic> diagnostics = new ArrayList<>();
-        CommandRelocationDropReporter reporter = new CommandRelocationDropReporter(
-                null, (level, message) -> diagnostics.add(new Diagnostic(level, message)));
-        reporter.setListener((npcUuid, ownerUuid, source, home, destination, queued, dropped, retries) -> false);
-
-        reporter.reportWorldRemoval(candidate());
-
         assertEquals(Level.WARNING, diagnostics.get(0).level());
-        assertTrue(diagnostics.get(0).message().contains("lostTransitionSubmitted=false"));
+        assertTrue(diagnostics.get(0).message().contains(
+                "no lifecycle transition was inferred"
+        ));
     }
 
-    private CommandRelocationNpcTracker.WorldRemovalCandidate candidate() {
-        return new CommandRelocationNpcTracker.WorldRemovalCandidate(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
+    private PendingRelocation pending() {
+        return new PendingRelocation(
+                java.util.UUID.randomUUID(),
                 new Vector3d(1.0, 2.0, 3.0),
-                "instance-Forgotten_Temple-test",
-                500L
+                "world",
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                null,
+                0L,
+                100L,
+                false,
+                null,
+                null
         );
     }
 

@@ -1,6 +1,11 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
+import com.alechilles.alecstamework.api.DiagnosticsApi;
+import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
+import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageAdapterMatrix;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageAdapterMatrix.GlobalConfigScope;
@@ -11,18 +16,16 @@ import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.Hytal
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.UniverseScope;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture.WorldFixture;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsDamageBridgeFixture;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.ResourceLock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,9 +39,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ResourceLock("TwGlobalConfig-static-state")
 @ResourceLock("SimpleClaims-damage-adapter-static-state")
 class SimpleClaimsDamageAdapterParityTest {
-    @TempDir
-    Path tempDir;
-
     @TestFactory
     Collection<DynamicTest> runtimeAndApiAdapterMatrix() {
         List<DynamicTest> tests = new ArrayList<>();
@@ -49,7 +49,6 @@ class SimpleClaimsDamageAdapterParityTest {
     }
 
     private void assertScenario(Scenario scenario) throws Exception {
-        Path databasePath = tempDir.resolve(scenario.name());
         try (HytaleModuleScope ignoredModule = HytaleModuleScope.install();
              GlobalConfigScope ignoredConfig = GlobalConfigScope.install(scenario);
              PolicyFixture policyFixture = PolicyFixture.open(scenario);
@@ -57,21 +56,15 @@ class SimpleClaimsDamageAdapterParityTest {
              UniverseScope ignoredUniverse = UniverseScope.install(
                      worldFixture.world(), scenario.apiTargetLive()
              );
-             TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(databasePath, null)) {
-            String profileId = insertProfile(runtime, worldFixture, scenario);
+             TameworkApiImpl apiAdapter = apiAdapter(
+                     worldFixture, scenario, policyFixture
+             )) {
+            String profileId = scenario.name();
 
             Damage runtimeDamage = worldFixture.newDamage();
             OwnerDamageFilterSystem runtimeAdapter = new OwnerDamageFilterSystem(null, policyFixture.policy());
             worldFixture.invoke(runtimeAdapter, runtimeDamage);
 
-            TameworkApiImpl apiAdapter = new TameworkApiImpl(
-                    runtime,
-                    new TameworkEventBus(null),
-                    null,
-                    new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository()),
-                    policyFixture.policy()
-            );
             DamagePolicyDecisionView apiDecision = apiAdapter.evaluateDamage(
                     profileId,
                     scenario.apiAttackerUuid()
@@ -84,10 +77,11 @@ class SimpleClaimsDamageAdapterParityTest {
         }
     }
 
-    private String insertProfile(TameworkPersistenceRuntime runtime,
-                                 WorldFixture worldFixture,
-                                 Scenario scenario) throws Exception {
-        NpcProfileRepository repository = runtime.getNpcProfileRepository();
+    private TameworkApiImpl apiAdapter(
+            WorldFixture worldFixture,
+            Scenario scenario,
+            PolicyFixture policyFixture
+    ) {
         if (scenario.liveOwnerEvidence()
                 == SimpleClaimsDamageAdapterMatrix.LiveOwnerEvidence.COMMAND_LINK_ONLY
                 || scenario.liveOwnerEvidence()
@@ -98,7 +92,8 @@ class SimpleClaimsDamageAdapterParityTest {
                     "fallback cases require conflicting persisted ownership"
             );
         }
-        assertTrue(repository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+        NpcProfileView profile = new NpcProfileView(
+                scenario.name(),
                 worldFixture.targetUuid(),
                 scenario.persistedOwnerUuid(),
                 scenario.persistedOwnerUuid() != null ? "Fixture Owner" : null,
@@ -108,11 +103,21 @@ class SimpleClaimsDamageAdapterParityTest {
                 scenario.targetTamed(),
                 null,
                 null,
+                Set.of(),
+                Set.of(),
+                -1L
+        );
+        NpcProfilesApi profiles = profiles(profile);
+        return new TameworkApiImpl(
+                profiles,
+                emptyProfileData(),
+                emptyDiagnostics(),
+                new TameworkEventBus(null),
                 null,
-                null
-        )));
-        assertTrue(awaitUntil(() -> repository.resolveProfileId(worldFixture.targetUuid()) != null));
-        return repository.resolveProfileId(worldFixture.targetUuid());
+                new InteractionExtensionRegistry(null),
+                new TraitEffectRegistry(null, profiles),
+                policyFixture.policy()
+        );
     }
 
     private void assertRuntimeOutcome(Scenario scenario, Damage damage) {
@@ -193,14 +198,98 @@ class SimpleClaimsDamageAdapterParityTest {
         }
     }
 
-    private boolean awaitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 3_000L;
-        while (System.currentTimeMillis() < deadline) {
-            if (condition.getAsBoolean()) {
-                return true;
+    private NpcProfilesApi profiles(NpcProfileView profile) {
+        return new NpcProfilesApi() {
+            @Override
+            public Optional<String> resolveProfileId(UUID npcUuid) {
+                return profile.currentNpcUuid().equals(npcUuid)
+                        ? Optional.of(profile.profileId())
+                        : Optional.empty();
             }
-            Thread.sleep(20L);
-        }
-        return condition.getAsBoolean();
+
+            @Override
+            public Optional<NpcProfileView> getByProfileId(String profileId) {
+                return profile.profileId().equals(profileId)
+                        ? Optional.of(profile)
+                        : Optional.empty();
+            }
+
+            @Override
+            public Optional<NpcProfileView> getByNpcUuid(UUID npcUuid) {
+                return profile.currentNpcUuid().equals(npcUuid)
+                        ? Optional.of(profile)
+                        : Optional.empty();
+            }
+
+            @Override
+            public Optional<String> getActiveSnapshot(
+                    String profileId,
+                    String snapshotType
+            ) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Set<String> listActiveSnapshotTypes(String profileId) {
+                return Set.of();
+            }
+        };
+    }
+
+    private ProfileDataApi emptyProfileData() {
+        return new ProfileDataApi() {
+            @Override
+            public Optional<String> get(
+                    String profileId,
+                    String namespace,
+                    String key
+            ) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, String> list(
+                    String profileId,
+                    String namespace
+            ) {
+                return Map.of();
+            }
+
+            @Override
+            public boolean put(
+                    String profileId,
+                    String namespace,
+                    String key,
+                    String jsonPayload
+            ) {
+                return false;
+            }
+
+            @Override
+            public boolean delete(
+                    String profileId,
+                    String namespace,
+                    String key
+            ) {
+                return false;
+            }
+        };
+    }
+
+    private DiagnosticsApi emptyDiagnostics() {
+        return () -> new PersistenceDiagnosticsView(
+                "",
+                0L,
+                0L,
+                0L,
+                0L,
+                new PersistenceDiagnosticsView.QueueMetricsView(
+                        0, 0, 0, 0L, 0L, 0L, 0L,
+                        0.0, 0.0, 0.0, null, 0L
+                ),
+                new PersistenceDiagnosticsView.HealthView(
+                        "UNAVAILABLE", null, 0L
+                )
+        );
     }
 }

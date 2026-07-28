@@ -83,30 +83,42 @@ NPC instructions using the hook:
   - `Tamework.Command.MoveToPosition.RaycastHit`
   - `Tamework.Command.MoveToPosition.StoredHome`
 
-## Claim provider bridge
+## SimpleClaims bridge
 
-Claim-aware population limits use an optional, provider-neutral bridge. The verified contracts are:
+SimpleClaims is the supported optional claims integration. Tamework calls it
+directly for released breeding-per-claim limits and its native
+tamed-companion damage decision.
 
-- QuestLines Claims exactly `1.3.1` (`net.evilcraft:QuestLinesClaims`).
-- SimpleClaims `>=1.0.38 <1.1.0` (`Buuz135:SimpleClaims`).
+- Breeding may require a claim and may apply per-chunk or total claim limits.
+- Damage protection follows SimpleClaims' native owner, member, ally, party,
+  administrator, full-world, permission, and outsider rules.
+- A SimpleClaims lookup failure does not make a companion invulnerable.
 
-These gates accept build metadata (for example, `1.3.1+vendor.2`) but reject prerelease
-versions until that prerelease's reflected contract has been verified.
+The ordinary Tamework owner cap is separate. It counts canonical owned
+profiles in its configured global/per-world scope and uses durable positive
+reservations; it does not use claims or provider selection. There is no
+provider-neutral claims bridge or persistent reflected provider cache.
 
-The provider is resolved once per top-level operation, not retained permanently by tame, spawn, or breeding services. Provider probes read live PluginManager state on each operation, cache reflected ready contracts only through weak references bound to the plugin/classloader/reflection generation, and invalidate the matching provider on plugin setup. A `/tw settings` or lifecycle change therefore affects the next operation while an already-prepared operation keeps its original settings revision and provider generation. There is no generation-blind bridge fallback after a reload or replacement.
+## Bonded capture completion
 
-QuestLines Claims extent lookup accepts only a complete, non-empty `getChunks()` result from the verified `1.3.1` contract. Supported collection, map, and array results are snapshotted, and every element must expose X, Z, and the requested world. Claim and coordinate accessor discovery caches both found and missing methods for the current bridge generation; malformed or incomplete extents fail closed without falling back to scalar extent fields.
+Integrations that use `StoreBondedCompanion` receive a
+`BondedCompanionCaptureResolvedEvent` after the stored bonded profile and its
+exact source-cleanup intent commit. The event contains one
+`BondedCompanionCaptureEvidenceView` with stable operation, attempt, owner,
+roster, family, source NPC, profile, role, item/config, policy, disposition,
+outcome, reason, world, and commit-time evidence.
 
-Before a prepared mutation is applied, Tamework performs a targeted provider/topology and
-occupancy refresh. The short apply lock validates the refreshed snapshot revision and recomputes
-headroom while excluding only the operation's own pending slots, so movement or another admission
-that consumes capacity after preparation cannot be overwritten by a stale decision.
+The event proves bonded profile durability. It does not claim that physical
+source cleanup or capture-item finalization has finished; those steps occur
+after the commit and remain independently recoverable.
 
-Provider selection is strict:
-
-- An explicit provider is never substituted.
-- `Auto` tries QuestLines Claims first and tries SimpleClaims only when QuestLines Claims is absent or disabled.
-- If QuestLines Claims is installed but not ready, incompatible, or errors during probing, `Auto` does not fall through to SimpleClaims.
-- Active population-rule errors fail closed. SimpleClaims damage lookup/invocation errors fail open.
-
-Claim population and SimpleClaims damage are independent capabilities. The legacy `SimpleClaimsEnabled` value is the master claim-integration switch, but population also requires a non-`Off` provider plus a relevant population rule, while damage also requires `ProtectTamedFromNonMembers`. QuestLines Claims supplies population policy only; damage protection remains SimpleClaims-specific.
+Event subscriptions are live notifications. Restart-sensitive integrations
+must also call
+`BondedCompanionApi.findCapture(ownerUuid, rosterId, sourceNpcUuid)`. That
+lookup reads dedicated capture-source authority retained for the bonded
+profile's lifetime; pruning bounded operation history cannot release the
+source NPC identity or erase replay evidence. `NOT_FOUND` means no matching
+profile-lifetime capture proof; `UNAVAILABLE` or `INTERNAL_FAILURE` must be
+treated as unknown, not as proof that capture did not occur. Deleting the
+bonded profile also removes its capture proof through the same transactionally
+enforced lifecycle.

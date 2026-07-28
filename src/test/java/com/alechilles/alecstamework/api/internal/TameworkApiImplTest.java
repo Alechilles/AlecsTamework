@@ -1,35 +1,38 @@
 package com.alechilles.alecstamework.api.internal;
 
-import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityRequest;
-import com.alechilles.alecstamework.api.PersistenceMutationDirection;
-import com.alechilles.alecstamework.api.PersistenceMutationDomain;
-import com.alechilles.alecstamework.api.PersistenceScopeKind;
-import com.alechilles.alecstamework.api.PersistenceScopeReference;
-import com.alechilles.alecstamework.api.TameworkApi;
-import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.api.NpcProfilesApi;
+import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
+import com.alechilles.alecstamework.api.ProfileDataApi;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
-import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
-import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
-import org.joml.Vector3d;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
-import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
-
+import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.companion.identity.CompanionIdentity;
+import com.alechilles.alecstamework.companion.identity.CompanionToolLink;
+import com.alechilles.alecstamework.companion.identity.NpcAlias;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import com.alechilles.alecstamework.companion.profile.CompanionProfileMutation;
+import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.persistence.kernel.Sha256Hash;
+import com.alechilles.alecstamework.persistence.operation.IdempotencyKey;
+import com.alechilles.alecstamework.persistence.operation.LiveOperationResult;
+import com.alechilles.alecstamework.persistence.operation.OperationId;
+import com.alechilles.alecstamework.persistence.operation.OperationWorkflowResult;
+import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceLiveBoundaries;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceRuntimeConfiguration;
+import com.alechilles.alecstamework.persistence.runtime.PublicPersistenceWorldReconciliation;
 import java.nio.file.Path;
-import java.util.List;
+import java.time.Duration;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
-
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,212 +42,209 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkApiImplTest {
+    private static final ProfileId PROFILE_ID = ProfileId.parse(
+            "30000000-0000-0000-0000-000000000001");
+    private static final UUID NPC_UUID = UUID.fromString(
+            "30000000-0000-0000-0000-000000000002");
+    private static final UUID OWNER_UUID = UUID.fromString(
+            "30000000-0000-0000-0000-000000000003");
+    private static final UUID TOOL_UUID = UUID.fromString(
+            "30000000-0000-0000-0000-000000000004");
     @TempDir
     Path tempDir;
-
     @Test
-    void exposesVersionCapabilitiesProfilesEventsAndProfileData() throws Exception {
-        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
-            TameworkEventBus bus = new TameworkEventBus(null);
-            runtime.getNpcProfileRepository().setChangeObserver(bus);
-            CommandLinkedNpcStateSnapshotService stateSnapshotService =
-                    new CommandLinkedNpcStateSnapshotService(runtime.getNpcProfileRepository());
-            TameworkApi api = new TameworkApiImpl(
-                    runtime,
-                    bus,
-                    stateSnapshotService,
+    void replacementCompositionExposesStableReleasedApiContracts()
+            throws Exception {
+        AtomicLong clock = new AtomicLong(-10_000L);
+        TameworkEventBus events = new TameworkEventBus(null);
+        try (PersistenceBootstrap persistence =
+                     new PersistenceBootstrap(configuration(clock, events))) {
+            assertTrue(persistence.start().toCompletableFuture().join().complete());
+            var created = persistence.facades().operations().mutateProfile(
+                    OperationId.create(),
+                    new IdempotencyKey("api-profile-adoption"),
+                    profileAdoption(clock.incrementAndGet())
+            );
+            assertTrue(created.accepted());
+            assertEquals(
+                    OperationWorkflowResult.Status.PUBLISHED,
+                    created.completion().toCompletableFuture()
+                            .get(5, TimeUnit.SECONDS).status()
+            );
+
+            try (TameworkApiImpl api = ReplacementTameworkApiFactory.create(
+                    persistence,
+                    Duration.ofSeconds(5),
+                    clock::incrementAndGet,
+                    events,
+                    null,
                     new InteractionExtensionRegistry(null),
-                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
-            );
+                    new TraitEffectRegistry(null, null),
+                    new SimpleClaimsTamedDamagePolicy()
+            )) {
+                assertEquals("0.9.0", api.getApiVersion());
+                assertEquals(expectedCapabilities(), api.getCapabilities());
 
-            assertEquals("0.8.0", api.getApiVersion());
-            assertEquals(
-                    EnumSet.of(
-                            TameworkApiCapability.PROFILES,
-                            TameworkApiCapability.COMMAND_LINKS,
-                            TameworkApiCapability.PROGRESSION,
-                            TameworkApiCapability.PROGRESSION_MUTATIONS,
-                            TameworkApiCapability.POLICY,
-                            TameworkApiCapability.INTERACTION_EXTENSIONS,
-                            TameworkApiCapability.TRAIT_EFFECTS,
-                            TameworkApiCapability.PROFILE_DATA,
-                            TameworkApiCapability.EVENTS,
-                            TameworkApiCapability.COMPANION_XP_EVENTS,
-                            TameworkApiCapability.CONFIG_READ,
-                            TameworkApiCapability.DIAGNOSTICS,
-                            TameworkApiCapability.PERSISTENCE_RESILIENCE
-                    ),
-                    api.getCapabilities()
-            );
+                assertEquals(
+                        PROFILE_ID.toString(),
+                        api.profiles().resolveProfileId(NPC_UUID).orElseThrow()
+                );
+                NpcProfileView profile = api.profiles()
+                        .getByProfileId(PROFILE_ID.toString())
+                        .orElseThrow();
+                assertEquals(OWNER_UUID, profile.ownerUuid());
+                assertEquals("Owner A", profile.ownerName());
+                assertEquals("Custom A", profile.customName());
+                assertTrue(profile.tamed());
+                assertTrue(api.profiles().getByNpcUuid(NPC_UUID).isPresent());
 
-            UUID npcUuid = UUID.randomUUID();
-            UUID ownerUuid = UUID.randomUUID();
-            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                    npcUuid,
-                    ownerUuid,
-                    "Owner A",
-                    "Mob_Test",
-                    "Display A",
-                    "Custom A",
-                    true,
-                    null,
-                    null,
-                    null,
-                    new String[]{"tool-a"}
-            )));
+                assertTrue(api.progression()
+                        .getByProfileId(PROFILE_ID.toString()).isEmpty());
+                assertEquals(
+                        ProgressionMutationStatus.NOT_LOADED,
+                        api.progression().setHappiness(
+                                PROFILE_ID.toString(), 75.0
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.INVALID_ARGUMENT,
+                        api.progression().setNeeds(
+                                PROFILE_ID.toString(), null, null
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.INVALID_ARGUMENT,
+                        api.progression().setHappiness(
+                                PROFILE_ID.toString(), Double.NaN
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.INVALID_ARGUMENT,
+                        api.progression().applyHappinessDelta(
+                                PROFILE_ID.toString(),
+                                Double.POSITIVE_INFINITY
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.INVALID_ARGUMENT,
+                        api.progression().setTraits(
+                                PROFILE_ID.toString(), null
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.INVALID_ARGUMENT,
+                        api.progression().setStoredAttachments(
+                                PROFILE_ID.toString(), null
+                        ).status()
+                );
+                assertEquals(
+                        ProgressionMutationStatus.NOT_FOUND,
+                        api.progression().setHappiness(
+                                UUID.randomUUID(), 10.0
+                        ).status()
+                );
 
-            assertTrue(awaitUntil(() -> api.profiles().resolveProfileId(npcUuid).isPresent()));
-            String profileId = api.profiles().resolveProfileId(npcUuid).orElseThrow();
-            Optional<NpcProfileView> byProfileId = api.profiles().getByProfileId(profileId);
-            Optional<NpcProfileView> byNpcUuid = api.profiles().getByNpcUuid(npcUuid);
-            assertTrue(byProfileId.isPresent());
-            assertTrue(byNpcUuid.isPresent());
-            assertEquals(profileId, byNpcUuid.orElseThrow().profileId());
-            assertTrue(api.progression().getByProfileId(profileId).isEmpty());
-            assertTrue(api.progression().getByNpcUuid(npcUuid).isEmpty());
-            assertNotNull(api.traitEffects());
-            assertEquals(
-                    ProgressionMutationStatus.NOT_LOADED,
-                    api.progression().setHappiness(profileId, 75.0).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.NOT_LOADED,
-                    api.progression().setNeeds(profileId, 10.0, 20.0).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.INVALID_ARGUMENT,
-                    api.progression().setNeeds(profileId, null, null).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.INVALID_ARGUMENT,
-                    api.progression().setHappiness(profileId, Double.NaN).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.INVALID_ARGUMENT,
-                    api.progression().applyHappinessDelta(profileId, Double.POSITIVE_INFINITY).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.INVALID_ARGUMENT,
-                    api.progression().setTraits(profileId, null).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.INVALID_ARGUMENT,
-                    api.progression().setStoredAttachments(profileId, null).status()
-            );
-            assertEquals(
-                    ProgressionMutationStatus.NOT_FOUND,
-                    api.progression().setHappiness(UUID.randomUUID(), 10.0).status()
-            );
-            assertTrue(api.policies().getOwnershipByProfileId(profileId).isPresent());
-            assertTrue(api.policies().isOwner(profileId, ownerUuid));
-            assertTrue(api.commandLinks().getByProfileId(profileId).isPresent());
-            assertEquals(Set.of("tool-a"), api.commandLinks().listLinkedToolIds(profileId));
-            assertFalse(api.commandLinks().hasHomePosition(profileId));
+                assertTrue(api.policies()
+                        .getOwnershipByProfileId(PROFILE_ID.toString())
+                        .isPresent());
+                assertTrue(api.policies().isOwner(
+                        PROFILE_ID.toString(), OWNER_UUID
+                ));
+                assertEquals(
+                        Set.of(TOOL_UUID.toString()),
+                        api.commandLinks().listLinkedToolIds(
+                                PROFILE_ID.toString()
+                        )
+                );
+                assertFalse(api.commandLinks()
+                        .hasHomePosition(PROFILE_ID.toString()));
 
-            UUID remappedUuid = UUID.randomUUID();
-            assertTrue(runtime.getNpcProfileRepository().remapCurrentUuidAsync(npcUuid, remappedUuid));
-            assertTrue(awaitUntil(() -> api.profiles().resolveProfileId(remappedUuid).orElse("").equals(profileId)));
+                assertTrue(api.profileData().put(
+                        PROFILE_ID.toString(),
+                        "example.plugin",
+                        "state",
+                        "{\"level\":2}"
+                ));
+                awaitProfileData(api, "{\"level\":2}");
+                assertFalse(api.profileData().put(
+                        PROFILE_ID.toString(),
+                        "example.plugin",
+                        "state",
+                        "not json"
+                ));
+                assertFalse(api.profileData().put(
+                        PROFILE_ID.toString(),
+                        "Alechilles:Tamework",
+                        "state",
+                        "{\"level\":3}"
+                ));
 
-            assertTrue(runtime.getCaptureRepository().upsertAsync(new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
-                    remappedUuid,
-                    ownerUuid,
-                    new String[]{"tool-a"},
-                    "Mob_Test",
-                    "Display A",
-                    new Vector3d(9.0, 8.0, 7.0),
-                    new Vector3d(3.0, 4.0, 5.0),
-                    System.currentTimeMillis()
-            )));
-            assertTrue(awaitUntil(() -> api.commandLinks().hasHomePosition(profileId)));
-            assertEquals(3.0, api.commandLinks().getHomePosition(profileId).orElseThrow().x());
-            assertEquals(4.0, api.commandLinks().getHomePosition(profileId).orElseThrow().y());
-            assertEquals(5.0, api.commandLinks().getHomePosition(profileId).orElseThrow().z());
-            assertTrue(api.commandLinks().getByNpcUuid(remappedUuid).isPresent());
-            assertEquals(
-                    9.0,
-                    api.commandLinks().getByProfileId(profileId).orElseThrow().lastKnownPosition().x()
-            );
-
-            assertTrue(api.profileData().put(profileId, "example.plugin", "state", "{\"level\":2}"));
-            assertTrue(awaitUntil(() -> api.profileData().get(profileId, "example.plugin", "state")
-                    .orElse("")
-                    .equals("{\"level\":2}")));
-            assertFalse(api.profileData().put(profileId, "example.plugin", "state", "not json"));
-            assertFalse(api.profileData().put(profileId, "Alechilles:Tamework", "state", "{\"level\":3}"));
-
-            AtomicInteger profileChangeEvents = new AtomicInteger();
-            AutoCloseable subscription = api.events().subscribe(NpcProfileChangedEvent.class, event -> {
-                if (profileId.equals(event.profileId())) {
-                    profileChangeEvents.incrementAndGet();
-                }
-            });
-            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                    remappedUuid,
-                    ownerUuid,
-                    "Owner A",
-                    "Mob_Test",
-                    "Display B",
-                    "Custom A",
-                    true,
-                    null,
-                    null,
-                    null,
-                    new String[]{"tool-a"}
-            )));
-            assertTrue(awaitUntil(() -> profileChangeEvents.get() >= 1));
-
-            subscription.close();
-            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                    remappedUuid,
-                    ownerUuid,
-                    "Owner A",
-                    "Mob_Test",
-                    "Display C",
-                    "Custom C",
-                    true,
-                    null,
-                    null,
-                    null,
-                    new String[]{"tool-a"}
-            )));
-            Thread.sleep(150L);
-            assertEquals(1, profileChangeEvents.get());
-
-            assertNotNull(api.configs().getGlobalConfig());
-            assertNotNull(api.diagnostics().getPersistenceDiagnostics());
-            assertEquals("HEALTHY", api.diagnostics().getPersistenceResilience().storageState());
-            assertTrue(api.diagnostics().queryPersistenceAvailability(
-                    new PersistenceMutationAvailabilityRequest(
-                            PersistenceMutationDomain.OWNER_MUTATION,
-                            "integration-read-only-check",
-                            List.of(new PersistenceScopeReference(
-                                    PersistenceScopeKind.PROFILE, profileId,
-                                    "canonical_profile_catalog")),
-                            Set.of(), PersistenceMutationDirection.ZERO,
-                            null, null, false, false)).allowed());
-
-            String rawScopeKey = "profile-raw-api-test";
-            var reported = runtime.getIncidentReporter().report(new PersistenceFailureContext(
-                    "api_publication_failure", PersistenceDomain.OWNER_MUTATION,
-                    PersistenceOperationPhase.PUBLICATION, PersistenceTransactionOutcome.COMMITTED,
-                    List.of(runtime.getPersistenceScopeFactory().profile(rawScopeKey)),
-                    true, true, false, false, false,
-                    false, false, true, "operation-api-test",
-                    new IllegalStateException("publish")));
-            assertTrue(reported.durableCompletion().get(5, TimeUnit.SECONDS));
-            var incident = api.diagnostics().findPersistenceIncident(
-                    reported.incidentId().substring(0, 8)).orElseThrow();
-            assertEquals(reported.incidentId(), incident.incidentId());
-            assertEquals("PROFILE", incident.scopes().getFirst().kind());
-            assertFalse(rawScopeKey.equals(incident.scopes().getFirst().scopeHash()));
+                assertNotNull(api.traitEffects());
+                assertNotNull(api.configs().getGlobalConfig());
+                assertNotNull(api.diagnostics().getPersistenceDiagnostics());
+            }
+        } finally {
+            events.close();
         }
     }
-
+    @Test
+    void commandLinksReadCanonicalSnapshotProjectionWithoutLegacyStore() {
+        NpcProfileView profile = new NpcProfileView(
+                PROFILE_ID.toString(),
+                NPC_UUID,
+                OWNER_UUID,
+                "Owner A",
+                "Mob_Test",
+                "Display A",
+                "Custom A",
+                true,
+                null,
+                null,
+                Set.of(TOOL_UUID.toString()),
+                Set.of("capture"),
+                -10L
+        );
+        NpcProfilesApi profiles = snapshotProfiles(profile);
+        try (TameworkApiImpl api = new TameworkApiImpl(
+                profiles,
+                emptyProfileData(),
+                emptyDiagnostics(),
+                new TameworkEventBus(null),
+                null,
+                new InteractionExtensionRegistry(null),
+                new TraitEffectRegistry(null, profiles),
+                new SimpleClaimsTamedDamagePolicy()
+        )) {
+            assertTrue(api.commandLinks()
+                    .getByProfileId(PROFILE_ID.toString()).isPresent());
+            assertTrue(api.commandLinks().getByNpcUuid(NPC_UUID).isPresent());
+            assertEquals(
+                    Set.of(TOOL_UUID.toString()),
+                    api.commandLinks().listLinkedToolIds(
+                            PROFILE_ID.toString()
+                    )
+            );
+            assertEquals(
+                    3.0,
+                    api.commandLinks().getHomePosition(
+                            PROFILE_ID.toString()
+                    ).orElseThrow().x()
+            );
+            assertEquals(
+                    9.0,
+                    api.commandLinks().getByProfileId(
+                            PROFILE_ID.toString()
+                    ).orElseThrow().lastKnownPosition().x()
+            );
+        }
+    }
     @Test
     void buildsUsefulRoleIdCandidatesFromNonCanonicalInputs() {
         assertEquals(
                 List.of("npcRoles.Tamed_Cow.name", "Tamed_Cow"),
-                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(" npcRoles.Tamed_Cow.name "))
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(
+                        " npcRoles.Tamed_Cow.name "
+                ))
         );
         assertEquals(
                 List.of(
@@ -258,22 +258,215 @@ class TameworkApiImplTest {
         );
         assertEquals(
                 List.of("AnimalHusbandry:Cow", "Cow"),
-                List.copyOf(TameworkApiImpl.buildRoleIdCandidates("AnimalHusbandry:Cow"))
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(
+                        "AnimalHusbandry:Cow"
+                ))
         );
         assertEquals(
                 List.of("Creature.Livestock.Cow", "Cow"),
-                List.copyOf(TameworkApiImpl.buildRoleIdCandidates("Creature.Livestock.Cow"))
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(
+                        "Creature.Livestock.Cow"
+                ))
+        );
+    }
+    private PublicPersistenceRuntimeConfiguration configuration(
+            AtomicLong clock,
+            TameworkEventBus events
+    ) {
+        return new PublicPersistenceRuntimeConfiguration(
+                tempDir,
+                "replacement-api-impl-test",
+                clock::incrementAndGet,
+                (claim, operation) -> confirmed("refund"),
+                events::publishProfileChanged,
+                boundaries(),
+                PublicPersistenceWorldReconciliation.alreadyComplete(),
+                Duration.ofSeconds(5)
+        );
+    }
+    private PublicPersistenceLiveBoundaries boundaries() {
+        return new PublicPersistenceLiveBoundaries(
+                (request, operation) -> confirmed("capture"),
+                (request, operation) -> confirmed("capture_release"),
+                (request, operation) -> confirmed("restoration"),
+                (request, operation) -> confirmed("coop_capture"),
+                (request, operation) -> confirmed("coop_release")
+        );
+    }
+    private java.util.concurrent.CompletionStage<LiveOperationResult> confirmed(
+            String code
+    ) {
+        return LiveOperationResult.confirmed(code).completed();
+    }
+    private CompanionProfileMutation.AdoptLive profileAdoption(long now) {
+        String metadata = """
+                {"owner_name":"Owner A","custom_name":"Custom A","tamed":true}
+                """.trim();
+        CompanionIdentity identity = new CompanionIdentity(
+                PROFILE_ID,
+                "Display A",
+                "Mob_Test",
+                metadata,
+                Sha256Hash.ofUtf8(metadata),
+                "world",
+                now,
+                now,
+                now,
+                0L
+        );
+        return new CompanionProfileMutation.AdoptLive(
+                identity,
+                new NpcAlias(NPC_UUID),
+                new OwnerId(OWNER_UUID),
+                "world",
+                List.of(new CompanionToolLink(
+                        PROFILE_ID,
+                        TOOL_UUID,
+                        "command",
+                        now,
+                        now
+                )),
+                now
         );
     }
 
-    private boolean awaitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 3_000L;
-        while (System.currentTimeMillis() < deadline) {
-            if (condition.getAsBoolean()) {
-                return true;
+    private EnumSet<TameworkApiCapability> expectedCapabilities() {
+        return EnumSet.of(
+                TameworkApiCapability.PROFILES,
+                TameworkApiCapability.COMMAND_LINKS,
+                TameworkApiCapability.PROGRESSION,
+                TameworkApiCapability.PROGRESSION_MUTATIONS,
+                TameworkApiCapability.POLICY,
+                TameworkApiCapability.INTERACTION_EXTENSIONS,
+                TameworkApiCapability.TRAIT_EFFECTS,
+                TameworkApiCapability.PROFILE_DATA,
+                TameworkApiCapability.EVENTS,
+                TameworkApiCapability.COMPANION_XP_EVENTS,
+                TameworkApiCapability.CONFIG_READ,
+                TameworkApiCapability.DIAGNOSTICS,
+                TameworkApiCapability.PROFILE_DATA_TRANSACTIONS
+        );
+    }
+
+    private void awaitProfileData(TameworkApiImpl api, String expected)
+            throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (api.profileData().get(
+                    PROFILE_ID.toString(),
+                    "example.plugin",
+                    "state"
+            ).filter(expected::equals).isPresent()) {
+                return;
             }
-            Thread.sleep(20L);
+            Thread.sleep(10L);
         }
-        return condition.getAsBoolean();
+        throw new AssertionError("Profile data did not reach expected state");
+    }
+
+    private NpcProfilesApi snapshotProfiles(NpcProfileView profile) {
+        return new NpcProfilesApi() {
+            @Override
+            public Optional<String> resolveProfileId(UUID npcUuid) {
+                return NPC_UUID.equals(npcUuid)
+                        ? Optional.of(PROFILE_ID.toString())
+                        : Optional.empty();
+            }
+
+            @Override
+            public Optional<NpcProfileView> getByProfileId(String profileId) {
+                return PROFILE_ID.toString().equals(profileId)
+                        ? Optional.of(profile)
+                        : Optional.empty();
+            }
+
+            @Override
+            public Optional<NpcProfileView> getByNpcUuid(UUID npcUuid) {
+                return NPC_UUID.equals(npcUuid)
+                        ? Optional.of(profile)
+                        : Optional.empty();
+            }
+
+            @Override
+            public Optional<String> getActiveSnapshot(
+                    String profileId,
+                    String snapshotType
+            ) {
+                if (!PROFILE_ID.toString().equals(profileId)
+                        || !"capture".equals(snapshotType)) {
+                    return Optional.empty();
+                }
+                return Optional.of("""
+                        {
+                          "lastKnownPosition":{"x":9.0,"y":8.0,"z":7.0},
+                          "homePosition":{"x":3.0,"y":4.0,"z":5.0}
+                        }
+                        """);
+            }
+
+            @Override
+            public Set<String> listActiveSnapshotTypes(String profileId) {
+                return PROFILE_ID.toString().equals(profileId)
+                        ? Set.of("capture")
+                        : Set.of();
+            }
+        };
+    }
+
+    private ProfileDataApi emptyProfileData() {
+        return new ProfileDataApi() {
+            @Override
+            public Optional<String> get(
+                    String profileId,
+                    String namespace,
+                    String key
+            ) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, String> list(
+                    String profileId,
+                    String namespace
+            ) {
+                return Map.of();
+            }
+
+            @Override
+            public boolean put(
+                    String profileId,
+                    String namespace,
+                    String key,
+                    String jsonPayload
+            ) {
+                return false;
+            }
+
+            @Override
+            public boolean delete(
+                    String profileId,
+                    String namespace,
+                    String key
+            ) {
+                return false;
+            }
+        };
+    }
+
+    private DiagnosticsApi emptyDiagnostics() {
+        return () -> new PersistenceDiagnosticsView(
+                "",
+                0L,
+                0L,
+                0L,
+                0L,
+                new PersistenceDiagnosticsView.QueueMetricsView(
+                        0, 0, 0, 0L, 0L, 0L, 0L,
+                        0.0, 0.0, 0.0, null, 0L
+                ),
+                new PersistenceDiagnosticsView.HealthView(
+                        "UNAVAILABLE", null, 0L
+                )
+        );
     }
 }

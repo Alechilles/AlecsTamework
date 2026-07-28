@@ -1,0 +1,120 @@
+package com.alechilles.alecstamework.persistence.operation;
+
+import com.alechilles.alecstamework.companion.command.CommandFamilyKey;
+import com.alechilles.alecstamework.companion.identity.OwnerId;
+import com.alechilles.alecstamework.companion.identity.ProfileId;
+import javax.annotation.Nonnull;
+
+/**
+ * Typed participant scope used to fence an operation and contain failures.
+ *
+ * @param type scope category
+ * @param key stable category-specific key
+ */
+public record OperationScope(@Nonnull OperationScopeType type, @Nonnull String key)
+        implements Comparable<OperationScope> {
+    private static final String GLOBAL_KEY = "*";
+
+    public OperationScope {
+        if (type == null) {
+            throw new IllegalArgumentException("Operation scope type is required");
+        }
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("Operation scope key is required");
+        }
+        key = key.trim();
+        if (type == OperationScopeType.GLOBAL && !GLOBAL_KEY.equals(key)) {
+            throw new IllegalArgumentException("Global operation scope must use '*'");
+        }
+        if (type != OperationScopeType.GLOBAL && GLOBAL_KEY.equals(key)) {
+            throw new IllegalArgumentException("Only global operation scope may use '*'");
+        }
+    }
+
+    /** Creates an operation scope. */
+    public static OperationScope operation(@Nonnull OperationId operationId) {
+        return new OperationScope(OperationScopeType.OPERATION, require(operationId, "Operation ID").toString());
+    }
+
+    /** Creates a companion profile scope. */
+    public static OperationScope profile(@Nonnull ProfileId profileId) {
+        return new OperationScope(OperationScopeType.PROFILE, require(profileId, "Profile ID").toString());
+    }
+
+    /** Creates a companion owner scope. */
+    public static OperationScope owner(@Nonnull OwnerId ownerId) {
+        return new OperationScope(OperationScopeType.OWNER, require(ownerId, "Owner ID").toString());
+    }
+
+    /** Creates one owner-scoped command-family participant. */
+    public static OperationScope commandFamily(
+            @Nonnull CommandFamilyKey familyKey
+    ) {
+        CommandFamilyKey key = require(
+                familyKey, "Command family"
+        );
+        return new OperationScope(
+                OperationScopeType.COMMAND_FAMILY,
+                key.ownerId() + ":" + key.familyId()
+        );
+    }
+
+    /** Parses one canonical persisted owner-scoped command-family key. */
+    public static OperationScope commandFamily(
+            @Nonnull String persistedKey
+    ) {
+        if (persistedKey == null || persistedKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Command family scope key is required"
+            );
+        }
+        String key = persistedKey.trim();
+        int separator = key.indexOf(':');
+        if (separator <= 0 || separator == key.length() - 1) {
+            throw new IllegalArgumentException(
+                    "Canonical command family scope key is required"
+            );
+        }
+        return commandFamily(new CommandFamilyKey(
+                OwnerId.parse(key.substring(0, separator)),
+                key.substring(separator + 1)
+        ));
+    }
+
+    /** Creates one exact persisted tool scope. */
+    public static OperationScope tool(@Nonnull String toolKey) {
+        if (toolKey == null || toolKey.isBlank()) {
+            throw new IllegalArgumentException("Tool scope key is required");
+        }
+        return new OperationScope(OperationScopeType.TOOL, toolKey);
+    }
+
+    /** Creates one normalized coop slot scope. */
+    public static OperationScope coop(@Nonnull String coopSlotKey) {
+        if (coopSlotKey == null || coopSlotKey.isBlank()) {
+            throw new IllegalArgumentException("Coop slot key is required");
+        }
+        return new OperationScope(OperationScopeType.COOP, coopSlotKey);
+    }
+
+    /** Creates the singleton global scope. */
+    public static OperationScope global() {
+        return new OperationScope(OperationScopeType.GLOBAL, GLOBAL_KEY);
+    }
+
+    @Override
+    public int compareTo(OperationScope other) {
+        if (other == null) {
+            throw new NullPointerException("Other operation scope is required");
+        }
+        int typeOrder = Integer.compare(type.ordinal(), other.type.ordinal());
+        return typeOrder != 0 ? typeOrder : key.compareTo(other.key);
+    }
+
+    private static <T> T require(T value, String label) {
+        if (value == null) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+        return value;
+    }
+}

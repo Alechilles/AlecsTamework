@@ -1,15 +1,22 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.CaptureRequirementContext;
+import com.alechilles.alecstamework.api.CaptureRequirementDecision;
+import com.alechilles.alecstamework.api.CaptureRequirementPhase;
+import com.alechilles.alecstamework.api.CaptureRequirementSpec;
 import com.alechilles.alecstamework.api.InteractionEffectContext;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -119,5 +126,96 @@ class InteractionExtensionRegistryTest {
                 "other:set_attachment",
                 (context, spec) -> true
         ));
+    }
+
+    @Test
+    void captureRequirementsAreGenerationFencedAndFailClosed() throws Exception {
+        InteractionExtensionRegistry registry = new InteractionExtensionRegistry(null);
+        CaptureRequirementSpec spec = new CaptureRequirementSpec(
+                "hydragon:special_encounter_capture_ready", "grounded_phase", List.of(), null
+        );
+        CaptureRequirementContext context = captureContext();
+
+        long emptyGeneration = registry.captureRequirementGeneration();
+        AutoCloseable registration = registry.registerCaptureRequirement(spec.id(), (candidate, configured) ->
+                CaptureRequirementDecision.allow()
+        );
+        long registeredGeneration = registry.captureRequirementGeneration();
+
+        assertTrue(registeredGeneration > emptyGeneration);
+        assertEquals(
+                "capture-requirement-generation-changed",
+                registry.evaluateCaptureRequirement(spec, context, emptyGeneration).reason()
+        );
+        assertTrue(registry.evaluateCaptureRequirement(spec, context, registeredGeneration).allowed());
+        assertTrue(registry.listCaptureRequirementIds().contains(spec.id()));
+
+        registration.close();
+        assertEquals(
+                "capture-requirement-handler-missing",
+                registry.evaluateCaptureRequirement(
+                        spec, context, registry.captureRequirementGeneration()
+                ).reason()
+        );
+    }
+
+    @Test
+    void captureRequirementMutationOrFailureDuringEvaluationDenies() throws Exception {
+        InteractionExtensionRegistry registry = new InteractionExtensionRegistry(null);
+        CaptureRequirementSpec spec = new CaptureRequirementSpec("hydragon:changing", null, List.of(), null);
+        AtomicReference<AutoCloseable> registration = new AtomicReference<>();
+        registration.set(registry.registerCaptureRequirement(spec.id(), (context, configured) -> {
+            try {
+                registration.get().close();
+            } catch (Exception error) {
+                throw new IllegalStateException(error);
+            }
+            return CaptureRequirementDecision.allow();
+        }));
+
+        CaptureRequirementDecision changed = registry.evaluateCaptureRequirement(
+                spec, captureContext(), registry.captureRequirementGeneration()
+        );
+        assertFalse(changed.allowed());
+        assertEquals("capture-requirement-generation-changed", changed.reason());
+
+        registry.registerCaptureRequirement("hydragon:throwing", (context, configured) -> {
+            throw new IllegalStateException("boom");
+        });
+        CaptureRequirementDecision failed = registry.evaluateCaptureRequirement(
+                new CaptureRequirementSpec("hydragon:throwing", null, List.of(), null),
+                captureContext(),
+                registry.captureRequirementGeneration()
+        );
+        assertFalse(failed.allowed());
+        assertEquals("capture-requirement-handler-failed", failed.reason());
+    }
+
+    @Test
+    void captureRequirementRegistrationRequiresUniqueNamespacedIds() throws Exception {
+        InteractionExtensionRegistry registry = new InteractionExtensionRegistry(null);
+        assertThrows(IllegalArgumentException.class, () ->
+                registry.registerCaptureRequirement("not_namespaced", (context, spec) -> CaptureRequirementDecision.allow()));
+        try (AutoCloseable ignored = registry.registerCaptureRequirement(
+                "hydragon:ready", (context, spec) -> CaptureRequirementDecision.allow())) {
+            assertThrows(IllegalArgumentException.class, () ->
+                    registry.registerCaptureRequirement(
+                            "HYDRAGON:READY", (context, spec) -> CaptureRequirementDecision.allow()));
+        }
+    }
+
+    private static CaptureRequirementContext captureContext() {
+        return new CaptureRequirementContext(
+                UUID.randomUUID(),
+                CaptureRequirementPhase.FINAL_REVALIDATION,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                "Hydra",
+                "default",
+                "Draconic_Stone",
+                0.2D,
+                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
+        );
     }
 }

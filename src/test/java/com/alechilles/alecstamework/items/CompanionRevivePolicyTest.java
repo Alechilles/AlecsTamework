@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionRevivePolicyTest {
     @Test
-    void reviveRequiresBothEffectiveFeatureAndAtLeastOneCommandLink() {
+    void reviveRequiresEffectiveFeatureAndCommandLink() {
         UUID owner = UUID.randomUUID();
         TameworkCommandLinksComponent linked =
                 new TameworkCommandLinksComponent(owner, new String[]{"tool-a"});

@@ -9,6 +9,8 @@ public enum PersistenceScopeKind {
     CLAIM,
     COOP_AUTHORITY,
     COOP_SLOT,
+    COMMAND_FAMILY,
+    TOOL,
     BREEDING_ATTEMPT,
     BREEDING_PARENT,
     WORLD,

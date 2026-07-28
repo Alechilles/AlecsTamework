@@ -26,7 +26,6 @@ class TameworkSettingsStoreTest {
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = new TameworkSettingsStore.GlobalSettingsSnapshot(
                 17,
                 "Global",
-                "Auto",
                 true,
                 3,
                 12,
@@ -287,7 +286,6 @@ class TameworkSettingsStoreTest {
         ResolvedTameworkSettings custom = new ResolvedTameworkSettings(
                 settings.populationLimitPerPlayerOwnedTotal(),
                 settings.populationPerPlayerLimitScope(),
-                settings.simpleClaimsProvider(),
                 settings.simpleClaimsEnabled(),
                 settings.simpleClaimsLimitPerClaimChunk(),
                 settings.simpleClaimsLimitPerClaimTotal(),

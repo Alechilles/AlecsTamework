@@ -73,8 +73,10 @@ This section holds shared command infrastructure. Revive enablement is controlle
 - `RelocationRetryIntervalMs`: retry interval for queued off-screen relocations.
 - `RelocationMaxWaitMs`: total relocation wait budget before the runtime gives up. The shipped default is `10000` milliseconds.
 - `RelocationMaxRetryAttempts`: cap on relocation retry attempts.
-- `DeadRespawnCooldownMs`: respawn cooldown in milliseconds.
-- `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are present, the minutes key wins.
+- `DeadRespawnCooldownMs`: fallback respawn cooldown in milliseconds when no
+  enabled role-scoped `TwCompanionConfig` matches.
+- `DeadRespawnCooldownMins`: human-friendly alias for the same fallback
+  cooldown. If both are present, the minutes key wins.
 - `DeadRespawnFollowRetryDelayMs`: delay before follow retry after respawn.
 - `DeadRespawnDistanceClose`: first candidate revive placement ring.
 - `DeadRespawnDistanceNear`: second candidate revive placement ring.
@@ -83,6 +85,10 @@ This section holds shared command infrastructure. Revive enablement is controlle
 - `PlacementMinRelativeY`: minimum vertical offset allowed during relocation placement.
 - `PlacementMaxRelativeY`: maximum vertical offset allowed during relocation placement.
 - `LinkedPanelRequireUnlinkConfirm`: requires explicit unlink confirmation in the linked panel.
+
+Giving up on a relocation removes that pending attempt and logs a warning. It
+does not mark the companion `LOST`; relocation timeout is not destructive
+evidence.
 
 ### `AssetSets`
 These toggles opt bundled Tamework assets into the live game. Any loaded active global config can enable them.
@@ -95,32 +101,38 @@ These toggles opt bundled Tamework assets into the live game. Any loaded active 
 - `CarnivoreFeed`
 
 ### `SimpleClaims`
-The namespace is retained for backward compatibility even when QuestLines Claims supplies population policy. Runtime master/provider/cap/protection policy is owned by `/tw settings`. `AllowDamagePermissionKey` remains config-owned so servers can keep a stable permission contract.
+This optional integration directly controls breeding claim limits and
+SimpleClaims-native tamed-companion damage protection.
 
 - `Damage.AllowDamagePermissionKey`: Hytale server permission that bypasses SimpleClaims tamed-target damage restriction before native policy runs. The shipped default is `tamework.damage_tamed_claim_npc`.
 
 For the current compatibility release only, the same configured key is also checked through the old raw SimpleClaims claim-party permission route using the attacker's player UUID. A grant logs a throttled deprecation warning; migrate it to the Hytale server permission because the raw-party route is scheduled for removal in the next major release. This custom key is not SimpleClaims' native `simpleclaims.party.protection.tamed_damage` permission.
 
-### Settings-owned population and claim fields
+### Settings-owned population and SimpleClaims fields
 
 These legacy fields are still decoded but `/tw settings` is authoritative:
 
-- `Population.LimitPerPlayerOwnedTotal`: maximum canonical owned companion profiles per owner; `0` disables denial while tracking continues.
-- `Population.PerPlayerLimitScope`: `PerWorld` or `Global`. Dormant profiles retain their last authoritative ownership world.
-- `SimpleClaims.Provider`: `Auto`, `QuestLinesClaims`, `SimpleClaims`, or `Off`. Unknown nonblank values are invalid and do not silently become `Auto`.
+- `Population.LimitPerPlayerOwnedTotal`: maximum canonical owned profiles per
+  player; `0` disables the cap.
+- `Population.PerPlayerLimitScope`: `PerWorld` or `Global` scope for that
+  durable count.
 - `SimpleClaims.SimpleClaimsEnabled`: backward-compatible master claim-integration gate.
-- `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: claim placement-admission caps.
-- `SimpleClaims.Breeding.BreedingRequiresClaim`: applies only to breeding when no positive cap otherwise activates population policy.
+- `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: live
+  SimpleClaims capacity limits used by taming and breeding.
+- `SimpleClaims.Breeding.BreedingRequiresClaim`: requires breeding to occur in
+  a SimpleClaims claim.
 - `SimpleClaims.Damage.ProtectTamedFromNonMembers`: enables SimpleClaims native damage policy for eligible live tamed targets.
 
-`Auto` selects ready QuestLines Claims first. SimpleClaims is considered only if QuestLines Claims is absent or disabled; an installed but broken/incompatible QuestLines Claims causes active population admissions to fail closed. Explicit providers never fall back. Settings and plugin lifecycle changes affect the next operation without rewriting an in-flight reservation.
+There is no provider selector or QuestLines Claims bridge.
 
 ## Legacy Settings-Owned Fields Accepted
 Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Global/TwGlobalConfig_Default.json` is the best reference for shipped baseline values.
-- `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes priority when both are authored.
+- `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes
+  priority when both are authored. A matching role-scoped companion config
+  still owns the effective cooldown.
 - Settings-owned legacy sections remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
 
 ## Minimal Example
@@ -174,8 +186,10 @@ Older packs may still contain ownership protection, ownership requirement, popul
 - `AssetSets` are global gates, not per-role toggles.
 - Explicit maps and arrays replace parent values. Do not expect append behavior.
 - Use `TwCompanionConfig` for role-scoped command distances and travel behavior. `TwGlobalConfig` is the shared infrastructure layer.
-- Claim caps gate explicit placement. They do not prevent natural companion movement across claim boundaries.
-- Population policy failures fail closed for positive admissions; SimpleClaims damage integration failures fail open.
+- SimpleClaims capacity limits gate eligible taming and breeding. They do not
+  gate filled-spawner release, Recall, direct-live coop release, or natural
+  movement.
+- SimpleClaims damage integration failures fail open.
 
 ## Related Pages
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)

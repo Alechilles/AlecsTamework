@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
@@ -23,7 +22,11 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -35,12 +38,11 @@ import javax.annotation.Nullable;
  */
 public final class PassiveBreedingSweepService {
     private final BreedingOffspringService offspringService;
+    private final BreedingPopulationTypeService populationTypeService;
 
     public PassiveBreedingSweepService() {
-        this.offspringService = new BreedingOffspringService(
-                new BreedingPartnerService(),
-                TameworkBreedingServices.shared()
-        );
+        this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
+        this.populationTypeService = new BreedingPopulationTypeService();
     }
 
     public void runSweep(@Nullable Store<EntityStore> store, long nowMs) {
@@ -54,7 +56,11 @@ public final class PassiveBreedingSweepService {
             return;
         }
 
-        BreedingPopulationSweepContext populationContext = new BreedingPopulationSweepContext();
+        List<PassiveBreedingBirthReservation> birthReservations = new ArrayList<>();
+        Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> claimReservations =
+                new HashMap<>();
+        Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> ownerReservations =
+                new HashMap<>();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
@@ -66,7 +72,9 @@ public final class PassiveBreedingSweepService {
                                 breedingType,
                                 store,
                                 nowMs,
-                                populationContext
+                                birthReservations,
+                                claimReservations,
+                                ownerReservations
                         )
         );
     }
@@ -78,7 +86,11 @@ public final class PassiveBreedingSweepService {
                               @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
                               @Nonnull Store<EntityStore> store,
                               long nowMs,
-                              @Nonnull BreedingPopulationSweepContext populationContext) {
+                              @Nonnull List<PassiveBreedingBirthReservation> birthReservations,
+                              @Nonnull Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer>
+                                      claimReservations,
+                              @Nonnull Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer>
+                                      ownerReservations) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Ref<EntityStore> ref = chunk.getReferenceTo(i);
@@ -115,14 +127,35 @@ public final class PassiveBreedingSweepService {
             if (!breeding.isEnabled() || !shouldBeReady || cooldownActive) {
                 continue;
             }
-            offspringService.tryCompletePairing(
+            if (isOvercrowded(candidate, store, birthReservations)) {
+                continue;
+            }
+            boolean paired = offspringService.tryCompletePairing(
                     ref,
                     store,
                     breeding,
                     config,
-                    commandBuffer,
-                    populationContext
+                    claimReservations,
+                    ownerReservations,
+                    commandBuffer
             );
+            if (paired) {
+                reserveNearbyBirth(candidate, birthReservations);
+            }
+        }
+    }
+
+    private void reserveNearbyBirth(
+            @Nonnull PassiveBreedingSweepCandidate candidate,
+            @Nonnull List<PassiveBreedingBirthReservation> reservations
+    ) {
+        String typeKey = populationTypeService.resolveTypeKey(
+                candidate.roleId(), candidate.config()
+        );
+        if (typeKey != null && !typeKey.isBlank()) {
+            reservations.add(new PassiveBreedingBirthReservation(
+                    typeKey, new Vector3d(candidate.position())
+            ));
         }
     }
 
@@ -167,6 +200,60 @@ public final class PassiveBreedingSweepService {
                 eligibility.isRequireNotSleeping(),
                 eligibility.isRequireNotInCombat()
         );
+    }
+
+    private boolean isOvercrowded(
+            @Nonnull PassiveBreedingSweepCandidate candidate,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull List<PassiveBreedingBirthReservation> reservations
+    ) {
+        TwBreedingConfig.PairingSettings pairing =
+                candidate.config().resolvePairing(candidate.roleId());
+        if (pairing == null) {
+            return false;
+        }
+        int maxNearby = pairing.resolveMaxNearbySameType(candidate.roleId());
+        String typeKey = populationTypeService.resolveTypeKey(
+                candidate.roleId(), candidate.config()
+        );
+        if (maxNearby <= 0 || typeKey == null || typeKey.isBlank()) {
+            return false;
+        }
+        double radius = sanitizeRadius(pairing.getBreedRadius());
+        int existing = populationTypeService.countNearbyOfType(
+                store, candidate.position(), radius, candidate.config(), typeKey
+        );
+        int pending = countNearbyReservations(
+                typeKey, candidate.position(), radius, reservations
+        );
+        return existing + pending >= maxNearby;
+    }
+
+    private static int countNearbyReservations(
+            @Nonnull String typeKey,
+            @Nonnull Vector3d center,
+            double radius,
+            @Nonnull List<PassiveBreedingBirthReservation> reservations
+    ) {
+        double radiusSq = radius * radius;
+        int count = 0;
+        for (PassiveBreedingBirthReservation reservation : reservations) {
+            if (reservation == null
+                    || !typeKey.equalsIgnoreCase(reservation.typeKey())) {
+                continue;
+            }
+            double distanceSq = new Vector3d(reservation.position())
+                    .sub(center)
+                    .lengthSquared();
+            if (Double.isFinite(distanceSq) && distanceSq <= radiusSq) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static double sanitizeRadius(double radius) {
+        return !Double.isFinite(radius) || radius <= 0.0 ? 10.0 : radius;
     }
 
     @Nullable
@@ -214,4 +301,7 @@ record PassiveBreedingSweepCandidate(Ref<EntityStore> ref,
                                      String roleId,
                                      Vector3d position,
                                      TwBreedingConfig config) {
+}
+
+record PassiveBreedingBirthReservation(String typeKey, Vector3d position) {
 }

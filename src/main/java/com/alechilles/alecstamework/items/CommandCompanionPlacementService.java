@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.companion.placement.CompanionSpawnPlacement;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
@@ -17,25 +18,22 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Computes companion placement positions for recall and respawn flows.
  */
-final class CommandCompanionPlacementService {
+public final class CommandCompanionPlacementService {
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
     private static final double RESPAWN_DISTANCE_MID = 12.0;
     private static final double RESPAWN_DISTANCE_FAR = 16.0;
-    private static final double OUT_OF_VIEW_MIN_ANGLE_DEGREES = 70.0;
+    /** Front arc first; side and rear positions are terrain fallbacks only. */
     private static final double[] PLACEMENT_ANGLE_OFFSETS = {
-            180.0, -180.0, 150.0, -150.0, 120.0, -120.0, 90.0, -90.0, 60.0, -60.0, 45.0, -45.0, 30.0, -30.0, 0.0
+            0.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0,
+            90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0
     };
     private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
@@ -69,6 +67,45 @@ final class CommandCompanionPlacementService {
                 safeSpawnDistance,
                 sourcePosition,
                 settings
+        );
+    }
+
+    /**
+     * Freezes one exact canonical restoration placement from current world-thread state.
+     */
+    @Nullable
+    public CompanionSpawnPlacement computeRestorationPlacement(
+            Ref<EntityStore> playerRef,
+            Store<EntityStore> store,
+            double safeSpawnDistance,
+            @Nullable String roleId,
+            @Nullable Vector3d sourcePosition
+    ) {
+        Vector3d position = computeSafeRespawnPosition(
+                playerRef,
+                store,
+                safeSpawnDistance,
+                roleId,
+                sourcePosition
+        );
+        World world = store != null && store.getExternalData() != null
+                ? store.getExternalData().getWorld()
+                : null;
+        if (position == null || world == null || world.getName() == null
+                || world.getName().isBlank()) {
+            return null;
+        }
+        Rotation3f rotation = resolvePlacementRotation(
+                store, playerRef, position
+        );
+        return new CompanionSpawnPlacement(
+                world.getName(),
+                position.x,
+                position.y,
+                position.z,
+                rotation.pitch(),
+                rotation.yaw(),
+                rotation.roll()
         );
     }
 
@@ -195,28 +232,8 @@ final class CommandCompanionPlacementService {
         };
     }
 
-    private double[] resolvePlacementAngleOffsets() {
-        List<Double> offCamera = new ArrayList<>();
-        List<Double> fallback = new ArrayList<>();
-        for (double angleOffset : PLACEMENT_ANGLE_OFFSETS) {
-            if (Math.abs(angleOffset) >= OUT_OF_VIEW_MIN_ANGLE_DEGREES) {
-                offCamera.add(angleOffset);
-                continue;
-            }
-            fallback.add(angleOffset);
-        }
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        Collections.shuffle(offCamera, random);
-        Collections.shuffle(fallback, random);
-        double[] ordered = new double[offCamera.size() + fallback.size()];
-        int index = 0;
-        for (double value : offCamera) {
-            ordered[index++] = value;
-        }
-        for (double value : fallback) {
-            ordered[index++] = value;
-        }
-        return ordered;
+    static double[] resolvePlacementAngleOffsets() {
+        return PLACEMENT_ANGLE_OFFSETS.clone();
     }
 
     private double resolvePlacementMinRelativeY(@Nullable TwCompanionConfig.EffectiveSettings companionSettings) {
@@ -267,6 +284,31 @@ final class CommandCompanionPlacementService {
         }
         out.normalize();
         return out;
+    }
+
+    private Rotation3f resolvePlacementRotation(
+            Store<EntityStore> store,
+            Ref<EntityStore> playerRef,
+            Vector3d spawnPosition
+    ) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return new Rotation3f();
+        }
+        TransformComponent transform = store.getComponent(
+                playerRef, TransformComponent.getComponentType()
+        );
+        if (transform == null) {
+            return new Rotation3f();
+        }
+        Vector3d playerPosition = new Vector3d(transform.getPosition());
+        Vector3d relative = new Vector3d(
+                playerPosition.x - spawnPosition.x,
+                0.0,
+                playerPosition.z - spawnPosition.z
+        );
+        return relative.lengthSquared() > 0.0001
+                ? Rotation3f.lookAt(relative)
+                : new Rotation3f(transform.getRotation());
     }
 
     private Vector3d projectToSurface(World world,

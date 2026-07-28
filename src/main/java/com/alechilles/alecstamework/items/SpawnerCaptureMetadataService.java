@@ -498,10 +498,9 @@ final class SpawnerCaptureMetadataService {
         if (trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_NAME) || trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_KEY)) {
             return null;
         }
-        if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
-            return null;
-        }
-        if (roleNameKey != null && !roleNameKey.isBlank() && trimmed.equalsIgnoreCase(roleNameKey)) {
+        if (RoleNameResolver.isRoleIdentityDisplayName(
+                trimmed, roleId, roleNameKey
+        )) {
             return null;
         }
         return trimmed;

@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import java.util.List;
+import com.alechilles.alecstamework.ownership.live.OwnerPopulationLiveIndex;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -81,36 +81,30 @@ class OwnerPopulationCapServiceTest {
     }
 
     @Test
-    void perWorldLegacyCountWithoutWorldContextReturnsConservativeSentinel() {
+    void liveCountHonorsGlobalAndPerWorldScopeWithoutBlocking() {
         UUID ownerId = UUID.fromString("00000000-0000-0000-0000-000000000731");
-        OwnerPopulationIndex index = new OwnerPopulationIndex();
-        index.replaceCommittedEntries(List.of(
-                new OwnerPopulationEntry(
-                        "profile-a",
-                        ownerId,
-                        "alpha",
-                        CompanionLifecycleState.ACTIVE,
-                        1L
-                )
-        ), OwnerPopulationReadiness.READY);
+        OwnerPopulationLiveIndex index = new OwnerPopulationLiveIndex();
+        index.observe(UUID.randomUUID(), ownerId, "alpha");
+        index.observe(UUID.randomUUID(), ownerId, "beta");
 
-        assertEquals(
-                Integer.MAX_VALUE,
-                OwnerPopulationCapService.countOwnedPopulation(
-                        index,
-                        OwnerPopulationLimitScope.PER_WORLD,
-                        null,
-                        ownerId
-                )
-        );
         assertEquals(
                 1,
                 OwnerPopulationCapService.countOwnedPopulation(
                         index,
-                        OwnerPopulationLimitScope.GLOBAL,
+                        TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
+                        "alpha",
+                        ownerId
+                )
+        );
+        assertEquals(
+                2,
+                OwnerPopulationCapService.countOwnedPopulation(
+                        index,
+                        TwGlobalConfig.PerPlayerLimitScope.GLOBAL,
                         null,
                         ownerId
                 )
         );
     }
+
 }

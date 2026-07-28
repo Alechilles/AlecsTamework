@@ -1,60 +1,156 @@
 package com.alechilles.alecstamework.config;
 
+import com.alechilles.alecstamework.api.SpawnerCaptureMechanicsView;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import javax.annotation.Nonnull;
 
 /**
- * Registry for item feature configs, including defaults and overrides.
+ * Atomic registry for item feature configs and their compiled capture projections.
  */
 public final class ItemFeatureRegistry {
-    private final Map<String, ItemFeatureConfig> configsByItemId = new HashMap<>();
+    private volatile State state = State.empty();
 
-    public void register(String itemId, ItemFeatureConfig config) {
+    /** Legacy/test registration path. Production reloads use {@link #replaceSpawnerConfigs}. */
+    public synchronized void register(String itemId, ItemFeatureConfig config) {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(config, "config");
-        configsByItemId.put(itemId, config);
+        State current = state;
+        Map<String, ItemFeatureConfig> updated = new HashMap<>(current.configsByItemId());
+        if (updated.putIfAbsent(itemId, config) != null) {
+            throw new IllegalArgumentException("Duplicate item feature binding for item ID: " + itemId);
+        }
+        state = current.withItemConfigs(updated);
     }
 
     public ItemFeatureConfig get(String itemId) {
-        if (itemId == null) {
-            return null;
-        }
-        ItemFeatureConfig config = configsByItemId.get(itemId);
-        if (config != null) {
-            return config;
-        }
-        // Normalize state variants ("*_State_*" or "*" prefix) back to base item IDs.
+        if (itemId == null) return null;
+        Map<String, ItemFeatureConfig> configs = state.configsByItemId();
+        ItemFeatureConfig config = configs.get(itemId);
+        if (config != null) return config;
+        // Preserve legacy disposable captured-item state normalization.
         String normalized = normalizeStateItemId(itemId);
-        if (normalized != null && !normalized.equals(itemId)) {
-            return configsByItemId.get(normalized);
+        return normalized != null && !normalized.equals(itemId) ? configs.get(normalized) : null;
+    }
+
+    @Nonnull
+    public Optional<SpawnerCaptureMechanicsView> getCaptureByConfigId(@Nonnull String configId) {
+        Objects.requireNonNull(configId, "configId");
+        return Optional.ofNullable(state.captureByConfigId().get(configId));
+    }
+
+    @Nonnull
+    public Optional<SpawnerCaptureMechanicsView> resolveCaptureForItemId(@Nonnull String itemId) {
+        Objects.requireNonNull(itemId, "itemId");
+        return itemId.isBlank()
+                ? Optional.empty() : Optional.ofNullable(state.captureByItemId().get(itemId));
+    }
+
+    /**
+     * Installs one fully compiled generation. A stale compiler cannot overwrite a newer reload.
+     */
+    public synchronized boolean replaceSpawnerConfigs(long expectedRevision,
+                                                       @Nonnull Collection<CompiledSpawnerConfig> configs) {
+        Objects.requireNonNull(configs, "configs");
+        State current = state;
+        if (current.revision() != expectedRevision) return false;
+        long nextRevision = Math.addExact(expectedRevision, 1L);
+        Map<String, ItemFeatureConfig> byEmptyItem = new LinkedHashMap<>();
+        Map<String, SpawnerCaptureMechanicsView> captureByConfig = new LinkedHashMap<>();
+        Map<String, SpawnerCaptureMechanicsView> captureByItem = new LinkedHashMap<>();
+        for (CompiledSpawnerConfig compiled : configs) {
+            if (compiled.capture().configRevision() != nextRevision) {
+                throw new IllegalArgumentException("Compiled spawner revision does not match install generation.");
+            }
+            putUnique(byEmptyItem, compiled.emptyItemId(), compiled.itemFeature(),
+                    "Duplicate item feature binding for item ID: ");
+            putUnique(captureByConfig, compiled.configId(), compiled.capture(),
+                    "Duplicate spawner config ID: ");
+            captureByItem.putIfAbsent(compiled.emptyItemId(), compiled.capture());
+            String filledItemId = compiled.itemFeature().getSpawnerFilledItemId();
+            if (filledItemId != null && !filledItemId.isBlank()) {
+                captureByItem.putIfAbsent(filledItemId, compiled.capture());
+            }
         }
-        return null;
+        state = new State(nextRevision, byEmptyItem, captureByConfig, captureByItem);
+        return true;
+    }
+
+    private static <T> void putUnique(Map<String, T> target, String id, T value, String message) {
+        if (target.putIfAbsent(id, value) != null) throw new IllegalArgumentException(message + id);
     }
 
     public static String normalizeStateItemId(String itemId) {
-        if (itemId == null) {
-            return null;
-        }
+        if (itemId == null) return null;
         String trimmed = itemId.startsWith("*") ? itemId.substring(1) : itemId;
         int stateIndex = trimmed.indexOf("_State_");
-        if (stateIndex > 0) {
-            return trimmed.substring(0, stateIndex);
-        }
-        return itemId;
+        return stateIndex > 0 ? trimmed.substring(0, stateIndex) : itemId;
     }
 
     public Map<String, ItemFeatureConfig> snapshot() {
-        return Collections.unmodifiableMap(new HashMap<>(configsByItemId));
+        return state.configsByItemId();
     }
 
-    public void clear() {
-        configsByItemId.clear();
+    public synchronized void clear() {
+        state = State.empty(Math.addExact(state.revision(), 1L));
+    }
+
+    /** Monotonic item-config generation pinned by durable operations. */
+    public long revision() {
+        return state.revision();
     }
 
     public void registerDefaults() {
         // No code-driven defaults; all item feature configs come from JSON.
     }
-}
 
+    public record CompiledSpawnerConfig(@Nonnull String configId,
+                                        @Nonnull String emptyItemId,
+                                        @Nonnull ItemFeatureConfig itemFeature,
+                                        @Nonnull SpawnerCaptureMechanicsView capture) {
+        public CompiledSpawnerConfig {
+            configId = requireText(configId, "configId");
+            emptyItemId = requireText(emptyItemId, "emptyItemId");
+            Objects.requireNonNull(itemFeature, "itemFeature");
+            Objects.requireNonNull(capture, "capture");
+        }
+    }
+
+    private record State(long revision,
+                         @Nonnull Map<String, ItemFeatureConfig> configsByItemId,
+                         @Nonnull Map<String, SpawnerCaptureMechanicsView> captureByConfigId,
+                         @Nonnull Map<String, SpawnerCaptureMechanicsView> captureByItemId) {
+        private State {
+            if (revision < 0L) throw new IllegalArgumentException("revision cannot be negative");
+            configsByItemId = immutable(configsByItemId);
+            captureByConfigId = immutable(captureByConfigId);
+            captureByItemId = immutable(captureByItemId);
+        }
+
+        private static State empty() {
+            return empty(0L);
+        }
+
+        private static State empty(long revision) {
+            return new State(revision, Map.of(), Map.of(), Map.of());
+        }
+
+        private State withItemConfigs(Map<String, ItemFeatureConfig> configs) {
+            return new State(revision, configs, captureByConfigId, captureByItemId);
+        }
+
+        private static <K, V> Map<K, V> immutable(Map<K, V> values) {
+            return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+        }
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
+        return value.trim();
+    }
+}

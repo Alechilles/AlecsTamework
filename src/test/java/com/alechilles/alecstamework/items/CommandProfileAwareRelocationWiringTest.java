@@ -16,30 +16,44 @@ class CommandProfileAwareRelocationWiringTest {
     @Test
     void commandAndWorldChangeRelocationResolveProfileBeforeQueueing() throws Exception {
         String handler = read(ITEMS.resolve("CommandItemFeatureHandler.java"));
+        String travel = read(ITEMS.resolve(
+                "CommandWorldChangeTravelCoordinator.java"));
+        String useOrchestrator = read(ITEMS.resolve("CommandItemUseOrchestrator.java"));
         String recipients = read(ITEMS.resolve("CommandRecipientService.java"));
         String menu = read(ITEMS.resolve("CommandMenuMoveService.java"));
         String inventory = read(ITEMS.resolve("CommandToolInventoryService.java"));
 
         assertTrue(handler.contains("new CommandNpcProfileActionResolver(npcIdentityService)"));
-        assertTrue(handler.contains("resolveRelocationRecord(cachedRecord)"));
-        assertTrue(handler.contains("linkMutationService.writeLinkedNpcRecords(stack, linkedRecords)"));
+        assertTrue(travel.contains("resolveRelocationRecord(cachedRecord)"));
+        assertTrue(travel.contains("linkMutationService.writeLinkedNpcRecords("));
         assertTrue(recipients.contains("resolveRelocationRecord(cachedRecord)"));
         assertTrue(recipients.contains(
                 "linkedNpcRecordStore.write(context.workingItem, canonical.records())"));
         assertTrue(menu.contains("resolveRelocationTarget(record)"));
         assertTrue(menu.contains("replaceResolvedSelection("));
         assertTrue(menu.contains("linkMutationService.writeLinkedNpcRecords(stack, repairedRecords)"));
-        assertTrue(handler.contains("transaction != null && transaction.succeeded()"));
+        assertTrue(travel.contains("transaction != null && transaction.succeeded()"));
         assertTrue(menu.contains("transaction != null && transaction.succeeded()"));
         assertTrue(inventory.contains("transaction != null && transaction.succeeded()"));
 
-        int genericCommit = handler.indexOf(
-                "if (!canonicalRecordCommitGate.commitBeforeAction(",
-                handler.indexOf("queryUnloadedLinkedRecords"));
-        int loadedExecution = handler.indexOf("int affected = 0", genericCommit);
-        int genericQueue = handler.indexOf("queueRelocationsForUnloaded", genericCommit);
-        assertTrue(genericCommit >= 0 && genericCommit < loadedExecution);
-        assertTrue(genericCommit < genericQueue);
+        int unloadedQuery = useOrchestrator.indexOf(
+                "recipientService.queryUnloadedLinkedRecords(context, recipients)");
+        int genericCommit = useOrchestrator.indexOf(
+                "if (!commitCanonicalItemIfNeeded(use, context))", unloadedQuery);
+        int dispatch = useOrchestrator.indexOf(
+                "return dispatchRecipients(use, context, recipients, unloaded, cooldownMs)",
+                genericCommit
+        );
+        assertTrue(unloadedQuery >= 0 && unloadedQuery < genericCommit);
+        assertTrue(genericCommit < dispatch);
+
+        int loadedExecution = useOrchestrator.indexOf(
+                "LoadedDispatch loaded = executeLoadedRecipients(");
+        int genericQueue = useOrchestrator.indexOf(
+                "relocationDispatchService.queueRelocationsForUnloaded(",
+                loadedExecution
+        );
+        assertTrue(loadedExecution >= 0 && loadedExecution < genericQueue);
 
         assertFalse(menu.contains("profileActionResolver.canonicalizeRecords(linkedRecords)"),
                 "A selected companion action must not be blocked by unrelated damaged links.");
@@ -49,18 +63,26 @@ class CommandProfileAwareRelocationWiringTest {
     }
 
     @Test
-    void terminalDropRevalidatesProfileButRetryLoopDoesNotReadPersistence() throws Exception {
-        String lost = read(ITEMS.resolve("CommandLinkedNpcLostService.java"));
+    void terminalDropCannotReadPersistenceOrInferLost() throws Exception {
         String relocation = read(ITEMS.resolve("CommandNpcRelocationService.java"));
-        String plugin = read(Path.of(
-                "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"));
+        String retry = read(ITEMS.resolve("CommandRelocationRetryCoordinator.java"));
+        String handler = read(ITEMS.resolve("CommandItemFeatureHandler.java"));
+        String reporter = read(ITEMS.resolve(
+                "CommandRelocationDropReporter.java"
+        ));
 
-        assertTrue(lost.contains("profileActionResolver.resolveLostTransition(droppedNpcUuid)"));
-        assertTrue(plugin.contains("persistenceRuntime.getNpcIdentityRepository()"));
-        assertTrue(plugin.contains(
-                "commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()"));
+        assertTrue(Files.notExists(
+                ITEMS.resolve("CommandLinkedNpcLostService.java")
+        ));
+        assertFalse(handler.contains("CommandLinkedNpcLostService"));
         assertFalse(relocation.contains("NpcIdentityRepository"));
         assertFalse(relocation.contains("CommandNpcProfileActionResolver"));
+        assertFalse(retry.contains("CommandPersistenceView"));
+        assertFalse(retry.contains("CommandNpcProfileActionResolver"));
+        assertFalse(reporter.contains("lostTransitionSubmitted"));
+        assertTrue(reporter.contains(
+                "no lifecycle transition was inferred"
+        ));
     }
 
     private String read(Path path) throws Exception {

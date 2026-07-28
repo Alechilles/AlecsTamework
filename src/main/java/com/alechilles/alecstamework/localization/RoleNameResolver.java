@@ -195,6 +195,39 @@ public final class RoleNameResolver {
         return value != null && !value.isBlank() && value.indexOf('.') >= 0;
     }
 
+    /**
+     * Returns whether a stored display value is only another spelling of the
+     * role identity rather than a player-assigned NPC name.
+     */
+    public static boolean isRoleIdentityDisplayName(
+            @Nullable String displayName,
+            @Nullable String roleId,
+            @Nullable String roleNameKey
+    ) {
+        if (displayName == null || displayName.isBlank()) {
+            return false;
+        }
+        String candidate = displayName.trim();
+        if (equalsIgnoreCase(candidate, roleId)
+                || equalsIgnoreCase(candidate, roleNameKey)
+                || equalsIgnoreCase(
+                candidate,
+                extractRoleIdFromNameKey(roleNameKey)
+        )) {
+            return true;
+        }
+        if (roleId == null || roleId.isBlank()
+                || !roleId.regionMatches(
+                true, 0, "Tamed_", 0, "Tamed_".length()
+        )) {
+            return false;
+        }
+        return equalsIgnoreCase(
+                candidate,
+                roleId.trim().substring("Tamed_".length())
+        );
+    }
+
     private static void addCandidate(List<String> candidates, @Nullable String key) {
         if (key == null || key.isBlank()) {
             return;
@@ -202,6 +235,15 @@ public final class RoleNameResolver {
         if (!candidates.contains(key)) {
             candidates.add(key);
         }
+    }
+
+    private static boolean equalsIgnoreCase(
+            String candidate,
+            @Nullable String expected
+    ) {
+        return expected != null
+                && !expected.isBlank()
+                && candidate.equalsIgnoreCase(expected.trim());
     }
 
     private static void addRoleIdNameCandidates(List<String> candidates, @Nullable String roleId) {

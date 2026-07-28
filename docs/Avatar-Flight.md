@@ -94,9 +94,9 @@ Normal avatar flight does not enable the client's native `canFly` movement setti
 
 When `RiderVisual.ShowRider` is enabled, the fake rider is attached to the transformed model. If the transformed model's animation tracks use player-like node names such as `Pelvis`, `Chest`, `Head`, `L-Arm`, or `R-Arm`, those animations can also affect the fake rider. Use the AvatarFlight namespace generator to create a model variant whose rider-colliding rig nodes are prefixed while unrelated nodes such as mount anchors are left unchanged. `Origin` remains unchanged for Tamework's injected pitch/bank poses:
 
-Tamework sends the transformed dragon model first, then adds the fake rider attachment after a one-second settling period. This keeps the client's first transformed-model update separate from the larger rider-bearing update. Equipment changes after that initial attachment continue to refresh the rider normally.
+Tamework attaches the reconstructed rider in the same model update as the transformed dragon. Skin, cosmetic, and equipment attachments are included by default, and equipment changes refresh the rider while flight remains active.
 
-`RiderVisual.IncludeAppearanceAttachments` controls whether the rider also receives reconstructed skin, cosmetic, and equipment model attachments. It defaults to `false` because full attachment lists can crash the current client on some transformed models. Body-only mode still uses the player's body texture and skin gradient. Enable full appearance only for models that have been verified stable with it.
+`RiderVisual.IncludeAppearanceAttachments` controls whether the rider receives those reconstructed skin, cosmetic, and equipment model attachments in addition to its body model. It defaults to `true`; set it to `false` only when an integration intentionally needs a body-only rider.
 
 ```powershell
 python scripts/tools/avatarflight_namespace_assets.py --mod-root "C:\Path\To\Mod" --model-id MyDragon
@@ -105,6 +105,8 @@ python scripts/tools/avatarflight_namespace_assets.py --mod-root "C:\Path\To\Mod
 The script creates a `<ModelId>_AvatarFlight` server model, a copied `.blockymodel`, and copied `.blockyanim` files with matching node names. By default it only renames nodes that collide with Tamework's fake-rider/player rig. Pass `--rename-mode all` only when a fully namespaced model is intentionally needed. It rewrites animation paths in the generated server model, but leaves server-model enum fields such as camera targets unchanged. Use the generated model id from `Model.ModelId` in the AvatarFlight config.
 
 The generator warns when player-style locomotion sets that the native transformed-player client can request while grounded are missing: `Sprint`, `JumpSprint`, and `StepSprint`. Keep real asset-level keys for these aliases in static avatar models, usually by mapping them to the model's `Run`, `JumpRun`, and `StepRun` sets when no dedicated sprint variants exist. The generator does not add them automatically because animation choice belongs to the model author. Runtime animation injection adds only forced flight pose clips and preserves every model-authored grounded locomotion set unchanged; native grounded walk/run/sprint selection can consult those declared animation set ids before Tamework sends any custom movement animation.
+
+Do not define nonempty `FootstepIntervals` arrays on transformed-player model animations. The current client retains its footstep interval index across model and movement-animation swaps without checking it against the new array length, so changing from an ordinary player animation to a shorter AvatarFlight interval array can crash the client on the next grounded step. The namespace generator strips these arrays from generated model variants and reports each correction. Use the AvatarFlight audio fields for timed wing sounds instead of model-animation footsteps.
 
 ## Config Fields
 
@@ -133,7 +135,7 @@ Omitting `Mounting` inherits the complete parent section. An explicit `Mounting`
 - `IdleAnimation`: movement-slot animation used while hovering or horizontally idle.
 - `FlightAnimation`: movement-slot animation used during ordinary forward flight.
 - `FastFlightAnimation`: movement-slot animation used while forward boost speed is active.
-- `ResendIntervalMs`: interval for defensively resending an unchanged movement animation. Set this to `0` for models that attach `SoundEventId` and `FootstepIntervals` to looping flight animations; repeated play packets restart those sound events before the model-authored timing can complete.
+- `ResendIntervalMs`: interval for defensively resending an unchanged movement animation. Set this to `0` for models that attach a looping `SoundEventId` to flight animations; repeated play packets restart those sound events before the model-authored timing can complete.
 
 Omitting `Animation` inherits the complete parent section. An explicit `Animation` object overrides only its explicit nested keys and inherits the remaining values.
 

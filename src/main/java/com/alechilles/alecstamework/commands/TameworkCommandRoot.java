@@ -1,6 +1,13 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.persistence.runtime
+        .PersistenceDiagnosticsReader;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .PersistenceDiagnosticExporter;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .BondedCompanionDiagnosticContributor;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
+import javax.annotation.Nullable;
 
 /**
  * Root /tw command dispatcher.
@@ -9,6 +16,27 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
     public static final String ROOT_PERMISSION = "tamework.command.tw";
 
     public TameworkCommandRoot() {
+        this(null, null);
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics
+    ) {
+        this(persistenceDiagnostics, null);
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter
+    ) {
+        this(persistenceDiagnostics, persistenceExporter, null);
+    }
+
+    public TameworkCommandRoot(
+            @Nullable PersistenceDiagnosticsReader persistenceDiagnostics,
+            @Nullable PersistenceDiagnosticExporter persistenceExporter,
+            @Nullable BondedCompanionDiagnosticContributor bondedDiagnostics
+    ) {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
@@ -31,7 +59,6 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkGetFlockDebugCommand());
         addSubCommand(new TameworkApiCommandCollection());
         addSubCommand(new TameworkConfigCommand());
-        addSubCommand(new TameworkCoopCommand());
         addSubCommand(new TameworkPatchesCommand());
         addSubCommand(new TameworkSettingsCommand());
         addSubCommand(new TameworkNewsCommand());
@@ -59,9 +86,11 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkShowHitboxesCommand());
         addSubCommand(new TameworkShowSpawnMarkersCommand());
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());
-        addSubCommand(new TameworkDebugDbCommand());
-        addSubCommand(new TameworkPersistenceCircuitCommand());
+        addSubCommand(new TameworkDebugDbCommand(
+                persistenceDiagnostics,
+                persistenceExporter,
+                bondedDiagnostics
+        ));
         addSubCommand(new TameworkDebugCrashTelemetryCommand());
-        addSubCommand(new TameworkDebugReviveReadyCommand());
     }
 }

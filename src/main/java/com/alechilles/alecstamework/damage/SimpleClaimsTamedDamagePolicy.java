@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
@@ -190,7 +188,7 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
 
         SimpleClaimsDamageCapabilityResolver.Resolution resolution = resolveCapability();
         SimpleClaimsDamageGeneration capability = resolution.capability();
-        if (resolution.state() != ClaimProviderState.READY
+        if (resolution.state() != SimpleClaimsPluginState.READY
                 || capability == null) {
             return failOpen(
                     false,
@@ -285,8 +283,8 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     private SimpleClaimsDamageCapabilityResolver.Resolution resolveCapability() {
         if (closed.get()) {
             return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                    ClaimProviderState.ERROR,
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginState.ERROR,
+                    SimpleClaimsPluginGeneration.NONE,
                     null,
                     "SimpleClaims damage policy is shut down."
             );
@@ -296,15 +294,15 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
             return resolution != null
                     ? resolution
                     : SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                    ClaimProviderState.ERROR,
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginState.ERROR,
+                    SimpleClaimsPluginGeneration.NONE,
                     null,
                     "SimpleClaims damage capability resolver returned null."
             );
         } catch (Throwable throwable) {
             return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
-                    ClaimProviderState.ERROR,
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginState.ERROR,
+                    SimpleClaimsPluginGeneration.NONE,
                     null,
                     "SimpleClaims damage capability resolution failed: " + message(throwable)
             );
@@ -333,7 +331,7 @@ public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
         SimpleClaimsDamageGeneration generation = SimpleClaimsDamageGeneration.fixed(nativeAccess, legacyPartyBypass);
         SimpleClaimsDamageCapabilityResolver.Resolution resolution =
                 SimpleClaimsDamageCapabilityResolver.Resolution.ready(
-                        ClaimProviderGeneration.NONE,
+                        SimpleClaimsPluginGeneration.NONE,
                         null,
                         generation
                 );

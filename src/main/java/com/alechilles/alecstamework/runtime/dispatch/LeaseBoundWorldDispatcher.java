@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.runtime.dispatch;
 
-import com.alechilles.alecstamework.ownership.OwnerPopulationTransitionRequest;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -17,9 +16,10 @@ import javax.annotation.Nonnull;
  * becomes a no-op so the task and rejection callback remain mutually exclusive.
  */
 public final class LeaseBoundWorldDispatcher {
+    private static final long START_TIMEOUT_SECONDS = 10L;
     private static final Executor START_TIMEOUT_EXECUTOR = CompletableFuture.delayedExecutor(
-            OwnerPopulationTransitionRequest.DEFAULT_LEASE_DURATION.toNanos(),
-            TimeUnit.NANOSECONDS
+            START_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
     );
 
     private LeaseBoundWorldDispatcher() {

@@ -365,7 +365,7 @@ public final class TwAvatarFlightConfig implements
             .<Boolean>append(new KeyedCodec<>("IncludeAppearanceAttachments", Codec.BOOLEAN),
                     (settings, value) -> settings.includeAppearanceAttachments = value != null && value,
                     settings -> settings.includeAppearanceAttachments)
-            .documentation("Whether the fake rider includes skin, cosmetic, and equipment attachments in addition to its body model. Disabled by default because full rider attachment sets can crash the current client on some transformed models. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether the fake rider includes skin, cosmetic, and equipment attachments in addition to its body model. Enabled by default; disable only when an integration intentionally needs a body-only rider. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("SeatOffsetX", Codec.DOUBLE),
                     (settings, value) -> settings.seatOffsetX = finiteOrDefault(value, 0.0),
@@ -789,7 +789,7 @@ public final class TwAvatarFlightConfig implements
         boolean hideOwnerArmor;
         boolean hideOwnerHands;
         boolean showRider;
-        boolean includeAppearanceAttachments;
+        boolean includeAppearanceAttachments = true;
         double seatOffsetX;
         double seatOffsetY = 1.35;
         double seatOffsetZ = -0.25;

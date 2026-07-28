@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -100,7 +101,6 @@ final class TameworkApiSelfTestCommandSupport {
 
     static void sendReport(@Nonnull CommandContext commandContext,
                            @Nonnull Tamework plugin,
-                           @Nonnull Player player,
                            @Nonnull ApiSelfTestRunReport report,
                            @Nonnull ApiSelfTestRunner.Suite suite,
                            boolean verbose) {
@@ -113,8 +113,6 @@ final class TameworkApiSelfTestCommandSupport {
         plugin.getLogger().at(Level.INFO).log(
                 "[tw api test] run suite="
                         + suiteName
-                        + " requester="
-                        + player.getUuid()
                         + " chatVerbose="
                         + verbose
                         + " totals="
@@ -125,5 +123,27 @@ final class TameworkApiSelfTestCommandSupport {
         for (String line : logLines) {
             plugin.getLogger().at(Level.INFO).log("[tw api test] " + line);
         }
+    }
+
+    /** Runs only fixture-free, non-world-mutating suites when invoked by the server console. */
+    @Nullable
+    static ApiSelfTestRunReport runConsoleSafe(@Nonnull ApiSelfTestRunner runner,
+                                               @Nonnull Tamework plugin,
+                                               @Nonnull TameworkApi api,
+                                               @Nonnull ApiSelfTestRunner.Suite suite) {
+        ApiSelfTestContext context = new ApiSelfTestContext(
+                plugin, api, null, null, null, null, null);
+        if (suite == ApiSelfTestRunner.Suite.CORE
+                || suite == ApiSelfTestRunner.Suite.DIAGNOSTICS
+                || suite == ApiSelfTestRunner.Suite.HYDRAGON_INTEGRATIONS) {
+            return runner.run(context, suite);
+        }
+        if (suite != ApiSelfTestRunner.Suite.ALL) return null;
+        ArrayList<com.alechilles.alecstamework.selftest.ApiSelfTestSuiteResult> suites =
+                new ArrayList<>();
+        suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.CORE).suites());
+        suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.DIAGNOSTICS).suites());
+        suites.addAll(runner.run(context, ApiSelfTestRunner.Suite.HYDRAGON_INTEGRATIONS).suites());
+        return new ApiSelfTestRunReport(suites);
     }
 }

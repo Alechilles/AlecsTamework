@@ -182,6 +182,54 @@ final class CommandToolInventoryService {
         return List.of();
     }
 
+    /**
+     * Resolves one coherent command-panel refresh snapshot for the current
+     * physical access item.
+     */
+    CommandPanelEntrySourceService.CommandPanelSnapshot
+    buildLinkedPanelSnapshotForTool(
+            Player player,
+            String toolId,
+            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config
+    ) {
+        if (player == null || toolId == null || toolId.isBlank()
+                || panelEntrySourceService == null) {
+            return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                    List.of(), java.util.Map.of()
+            );
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                    List.of(), java.util.Map.of()
+            );
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING
+            );
+            if (!toolId.equals(stackToolId)) {
+                continue;
+            }
+            World world = player.getWorld();
+            if (world == null || world.getEntityStore().getStore() == null) {
+                break;
+            }
+            return panelEntrySourceService.buildSnapshot(
+                    player, world.getEntityStore().getStore(), stack, config,
+                    toolId
+            );
+        }
+        return new CommandPanelEntrySourceService.CommandPanelSnapshot(
+                List.of(), java.util.Map.of()
+        );
+    }
+
     boolean mutateToolStack(Player player, String toolId, UnaryOperator<ItemStack> mutator) {
         if (player == null || toolId == null || toolId.isBlank() || mutator == null) {
             return false;
@@ -304,6 +352,57 @@ final class CommandToolInventoryService {
             }
         }
         return null;
+    }
+
+    /**
+     * Resolves an unambiguous physical command stack for destructive callback
+     * authority. Duplicate tool ids are corrupt/stale state and must not let
+     * whichever hotbar slot is encountered first choose the authority path.
+     */
+    ItemStack findUniqueToolStack(Player player, String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return null;
+        }
+        ArrayList<ToolCandidate> candidates = new ArrayList<>();
+        ItemContainer hotbar = inventory.getHotbar();
+        for (short slot = 0; slot < hotbar.getCapacity(); slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(
+                    TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            candidates.add(new ToolCandidate(stack, stackToolId));
+        }
+        return selectUniqueToolStack(toolId, candidates);
+    }
+
+    /** Pure ambiguity rule shared by runtime inventory scanning and tests. */
+    static ItemStack selectUniqueToolStack(
+            String toolId, Iterable<ToolCandidate> candidates
+    ) {
+        if (toolId == null || toolId.isBlank() || candidates == null) {
+            return null;
+        }
+        ItemStack resolved = null;
+        for (ToolCandidate candidate : candidates) {
+            if (candidate == null || candidate.stack() == null
+                    || !toolId.equals(candidate.toolId())) {
+                continue;
+            }
+            if (resolved != null) {
+                return null;
+            }
+            resolved = candidate.stack();
+        }
+        return resolved;
+    }
+
+    record ToolCandidate(ItemStack stack, String toolId) {
     }
 
     static final class ToolResolution {

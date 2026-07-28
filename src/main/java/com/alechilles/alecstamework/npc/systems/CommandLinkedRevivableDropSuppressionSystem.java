@@ -70,9 +70,10 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
 
     static boolean shouldSuppressDrops(@Nullable TameworkCommandLinksComponent links,
                                        boolean deadRespawnEnabled) {
-        if (!deadRespawnEnabled || links == null) {
+        if (!deadRespawnEnabled) {
             return false;
         }
+        if (links == null) return false;
         String[] toolIds = links.getToolIds();
         return toolIds != null && toolIds.length > 0;
     }

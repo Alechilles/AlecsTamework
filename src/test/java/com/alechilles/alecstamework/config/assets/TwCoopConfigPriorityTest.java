@@ -46,19 +46,17 @@ class TwCoopConfigPriorityTest {
     }
 
     @Test
-    void preserveUuidDisablesManagedAuthorityResolution() throws Exception {
-        TwCoopConfig invalid = createConfig("Coop_Invalid", 100, "Coop_Chicken");
-        setField(invalid.getIdentityRules(), "preserveUUID", true);
+    void preserveUuidDoesNotDisableReleasedCoopResolution() throws Exception {
+        TwCoopConfig config = createConfig("Coop_Preserve", 100, "Coop_Chicken");
+        setField(config.getIdentityRules(), "preserveUUID", true);
         DefaultAssetMap<String, TwCoopConfig> assetMap = new DefaultAssetMap<>();
-        seedAssetMap(assetMap, Map.of("invalid", invalid));
+        seedAssetMap(assetMap, Map.of("preserve", config));
 
         Map<String, TwCoopConfig> coopCache = buildCoopCache(assetMap);
         Map<String, TwCoopConfig> blockCache = TwCoopConfigResolver.buildBlockTypeCache(assetMap);
 
-        assertFalse(invalid.isManagedAuthorityEnabled());
-        assertNotNull(invalid.getManagedAuthorityValidationError());
-        assertNull(coopCache.get("coop_chicken"));
-        assertNull(blockCache.get("coop_chicken"));
+        assertSame(config, coopCache.get("coop_chicken"));
+        assertSame(config, blockCache.get("coop_chicken"));
     }
 
     private TwCoopConfig createConfig(String id, int priority, String coopId) throws Exception {

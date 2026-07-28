@@ -303,10 +303,9 @@ final class SpawnerItemDisplayMetadataService {
         if (roleDisplay != null && !roleDisplay.isBlank() && trimmed.equalsIgnoreCase(roleDisplay)) {
             return null;
         }
-        if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
-            return null;
-        }
-        if (roleNameKey != null && !roleNameKey.isBlank() && trimmed.equalsIgnoreCase(roleNameKey)) {
+        if (RoleNameResolver.isRoleIdentityDisplayName(
+                trimmed, roleId, roleNameKey
+        )) {
             return null;
         }
         return trimmed;

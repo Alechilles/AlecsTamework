@@ -6,12 +6,10 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
-import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.concurrent.CompletableFuture;
@@ -21,7 +19,7 @@ import javax.annotation.Nonnull;
 /**
  * Reloads Tamework item feature configs from disk.
  */
-public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
+public final class TameworkReloadConfigCommand extends AbstractWorldCommand {
     private static final String COMMAND_NAME = "/tw reloadconfig";
 
     public TameworkReloadConfigCommand() {
@@ -31,10 +29,8 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));

@@ -48,5 +48,22 @@ public interface TameworkConfigReadApi {
     Optional<RoleScopedConfigView> getTalentConfigById(String id);
 
     Optional<RoleScopedConfigView> resolveTalentConfigForRole(String roleId);
+
+    /** API 0.9 item-side capture mechanics without changing {@link SpawnerConfigView}. */
+    default Optional<SpawnerCaptureMechanicsView> getSpawnerCaptureMechanicsById(String id) {
+        return Optional.empty();
+    }
+
+    default Optional<SpawnerCaptureMechanicsView> resolveSpawnerCaptureMechanicsForItemId(String itemId) {
+        return Optional.empty();
+    }
+
+    default Optional<CapturePolicyConfigView> getCapturePolicyById(String id) {
+        return Optional.empty();
+    }
+
+    default Optional<CapturePolicyConfigView> resolveCapturePolicyForRole(String roleId) {
+        return Optional.empty();
+    }
 }
 

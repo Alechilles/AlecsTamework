@@ -182,7 +182,7 @@ class TwConfigEditorFieldPolicyTest {
     @Test
     void settingsOwnedFieldMatrixNormalizesConfiguredPaths() {
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "OwnershipProtection.BlockOwnerDamage"));
-        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Provider"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Provider"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Breeding.LimitPerClaimChunk"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Enabled"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Damage.StarvationDamagePerMinute"));

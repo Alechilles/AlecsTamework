@@ -50,6 +50,7 @@ public final class LoadedNpcIdentityBootstrapService {
     private CompletableFuture<LoadedNpcIdentitySnapshot> bootstrapReady = new CompletableFuture<>();
 
     private long attemptGeneration;
+    private boolean hasScannedLocation;
     private boolean unresolvedGlobalFailure;
     private boolean warningLogged;
 
@@ -197,6 +198,7 @@ public final class LoadedNpcIdentityBootstrapService {
         pendingLocations.clear();
         failedLocations.clear();
         mutationRetries.clear();
+        hasScannedLocation = false;
         unresolvedGlobalFailure = false;
         warningLogged = false;
         markCoverageIncompleteLocked();
@@ -289,6 +291,7 @@ public final class LoadedNpcIdentityBootstrapService {
             }
             pendingLocations.remove(location);
             mutationRetries.remove(location);
+            hasScannedLocation = true;
             completeIfReadyLocked(generation);
             return ScanCommitOutcome.COMMITTED;
         }
@@ -318,6 +321,7 @@ public final class LoadedNpcIdentityBootstrapService {
     private void completeIfReadyLocked(long generation) {
         if (generation <= 0
                 || generation != attemptGeneration
+                || !hasScannedLocation
                 || !pendingLocations.isEmpty()
                 || !failedLocations.isEmpty()
                 || unresolvedGlobalFailure) {

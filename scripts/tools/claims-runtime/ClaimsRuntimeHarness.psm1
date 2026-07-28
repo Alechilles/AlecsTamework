@@ -139,6 +139,7 @@ function Get-ClaimsRuntimePreV6ProfileBaseline {
     param([psobject] $Evidence)
     if ($Evidence.integrityCheck -cne "ok" -or $Evidence.profileRows -lt 0 -or
             $Evidence.migrationV6Count -ne 0 -or $Evidence.migrationV7Count -ne 0 -or
+            $Evidence.migrationV8Count -ne 0 -or
             $Evidence.canonicalRows -ne -1) {
         throw "UpgradeSaveSource must be an integrity-clean pre-v6 Tamework population database."
     }
@@ -158,7 +159,7 @@ function Get-ClaimsRuntimeUpgradeBackupEvidence {
     )
 
     $dataRoot = Split-Path -Path $DatabasePath -Parent
-    $files = @(Get-ChildItem -LiteralPath $dataRoot -File -Filter "tamework_pre_v7_*.sqlite.bak" |
+    $files = @(Get-ChildItem -LiteralPath $dataRoot -File -Filter "tamework_pre_v8_*.sqlite.bak" |
         Sort-Object FullName)
     $backups = [System.Collections.Generic.List[object]]::new()
     $preexistingPaths = @($PreexistingBackups | ForEach-Object { [IO.Path]::GetFullPath($_.path) })
@@ -178,6 +179,7 @@ function Get-ClaimsRuntimeUpgradeBackupEvidence {
             integrityCheck = if ($null -eq $sqlite) { $null } else { $sqlite.integrityCheck }
             migrationV6Count = if ($null -eq $sqlite) { $null } else { $sqlite.migrationV6Count }
             migrationV7Count = if ($null -eq $sqlite) { $null } else { $sqlite.migrationV7Count }
+            migrationV8Count = if ($null -eq $sqlite) { $null } else { $sqlite.migrationV8Count }
             migrationVersions = if ($null -eq $sqlite) { $null } else { $sqlite.migrationVersions }
             profileRows = if ($null -eq $sqlite) { $null } else { $sqlite.profileRows }
             canonicalRows = if ($null -eq $sqlite) { $null } else { $sqlite.canonicalRows }
@@ -185,13 +187,14 @@ function Get-ClaimsRuntimeUpgradeBackupEvidence {
             passed = $file.Length -gt 0 -and $null -ne $sqlite -and
                 $sqlite.integrityCheck -ceq "ok" -and $sqlite.migrationV6Count -eq 0 -and
                 $sqlite.migrationV7Count -eq 0 -and
+                $sqlite.migrationV8Count -eq 0 -and
                 $sqlite.migrationVersions -ceq $ExpectedMigrationVersions -and
                 $sqlite.profileRows -eq $ExpectedProfileRows -and $sqlite.canonicalRows -eq -1
         })
     }
     $created = @($backups | Where-Object createdByThisRun)
     return [pscustomobject][ordered]@{
-        pattern = "tamework_pre_v7_*.sqlite.bak"
+        pattern = "tamework_pre_v8_*.sqlite.bak"
         passed = $created.Count -gt 0 -and -not ($created | Where-Object { -not $_.passed })
         preexistingBeforeStartup = @($PreexistingBackups)
         createdByThisRun = $created
@@ -398,8 +401,8 @@ function Invoke-ClaimsRuntimeVerification {
                     -BuiltArtifact $inputs.builtArtifact -ProbeSource $probeSource `
                     -ExpectedProfileRows $expectedUpgradeRows `
                     -ExpectedMigrationVersions $sourceEvidence.migrationVersions `
-                    -PreexistingBackups $context.preexistingPreV6Backups
-                Write-ClaimsRuntimeJson -Path (Join-Path $context.evidence "pre-v6-backup-evidence.json") `
+                    -PreexistingBackups $context.preexistingPreV8Backups
+                Write-ClaimsRuntimeJson -Path (Join-Path $context.evidence "pre-v8-backup-evidence.json") `
                     -Value $backupEvidence
             }
         } catch {
@@ -429,7 +432,7 @@ function Invoke-ClaimsRuntimeVerification {
             logAnalysis = $logAnalysis
             sqliteEvidence = $sqliteEvidence
             sqliteValidation = $sqliteValidation
-            preV6BackupEvidence = $backupEvidence
+            preV8BackupEvidence = $backupEvidence
             error = $errorText
             evidenceRoot = $context.evidence
         }

@@ -23,8 +23,7 @@ public final class CompanionRevivePolicy {
 
     static boolean supportsRevive(@Nullable TameworkCommandLinksComponent links,
                                   boolean featureEnabled) {
-        return featureEnabled
-                && links != null
+        return featureEnabled && links != null
                 && links.getToolIds() != null
                 && links.getToolIds().length > 0;
     }

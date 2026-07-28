@@ -5,10 +5,13 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
+import com.alechilles.alecstamework.companion.capture.runtime.TameworkCaptureSourceReceiptsComponent;
+import com.alechilles.alecstamework.companion.coop.runtime.TameworkCoopCaptureReceiptsComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
+import com.alechilles.alecstamework.items.components.TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -25,6 +28,7 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateCompo
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirementComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
@@ -32,6 +36,8 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
+import com.alechilles.alecstamework.persistence.runtime.player
+        .TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -161,6 +167,32 @@ final class TameworkComponentRegistrar {
                         "TameworkProjectionIdentity",
                         TameworkProjectionIdentityComponent.CODEC
                 );
+        ComponentType<EntityStore, TameworkPersistenceRetirementComponent> persistenceRetirement =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkPersistenceRetirementComponent.class,
+                        "TameworkPersistenceRetirement",
+                        TameworkPersistenceRetirementComponent.CODEC
+                );
+        ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent> captureSourceReceipts =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkCaptureSourceReceiptsComponent.class,
+                        "TameworkCaptureSourceReceipts",
+                        TameworkCaptureSourceReceiptsComponent.CODEC
+                );
+        ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+                inventoryOperationReceipts =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkInventoryOperationReceiptsComponent.class,
+                        "TameworkInventoryOperationReceipts",
+                        TameworkInventoryOperationReceiptsComponent.CODEC
+                );
+        ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+                bondedReviveEscrow =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkBondedReviveEscrowComponent.class,
+                        "TameworkBondedReviveEscrow",
+                        TameworkBondedReviveEscrowComponent.CODEC
+                );
         ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile =
                 plugin.getEntityStoreRegistry().registerComponent(
                         HomingVisualProjectileComponent.class,
@@ -173,6 +205,12 @@ final class TameworkComponentRegistrar {
                         "TameworkFeedTroughWaterCharges",
                         TameworkFeedTroughWaterChargesComponent.CODEC
                 );
+        ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> coopCaptureReceipts =
+                plugin.getChunkStoreRegistry().registerComponent(
+                        TameworkCoopCaptureReceiptsComponent.class,
+                        "TameworkCoopCaptureReceipts",
+                        TameworkCoopCaptureReceiptsComponent.CODEC
+                );
         return new RegisteredComponents(
                 owner, tamed, hook, npcName, mountedNameplate, commandLinks, happiness, needs,
                 breeding, alarm, flyingCompanion, rideMount, rideRider, mountedGlide,
@@ -180,7 +218,10 @@ final class TameworkComponentRegistrar {
                 avatarFlightMountSession, avatarFlightSource,
                 leveling, traits, talents, tranquilizerPeak, attachments, dynamicAttachments,
                 lifeStage, projectileImpactEffect, lingeringHazardProjectile, lingeringHazard,
-                apiSelfTestFixtureMarker, projectionIdentity, homingVisualProjectile, feedTroughWaterCharges
+                apiSelfTestFixtureMarker, projectionIdentity, persistenceRetirement,
+                captureSourceReceipts, inventoryOperationReceipts,
+                bondedReviveEscrow,
+                homingVisualProjectile, feedTroughWaterCharges, coopCaptureReceipts
         );
     }
 
@@ -217,7 +258,14 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazard,
             ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarker,
             ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentity,
+            ComponentType<EntityStore, TameworkPersistenceRetirementComponent> persistenceRetirement,
+            ComponentType<EntityStore, TameworkCaptureSourceReceiptsComponent> captureSourceReceipts,
+            ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+                    inventoryOperationReceipts,
+            ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+                    bondedReviveEscrow,
             ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile,
-            ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges) {
+            ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges,
+            ComponentType<ChunkStore, TameworkCoopCaptureReceiptsComponent> coopCaptureReceipts) {
     }
 }

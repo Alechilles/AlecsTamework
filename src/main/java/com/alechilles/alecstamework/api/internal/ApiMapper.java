@@ -6,9 +6,7 @@ import com.alechilles.alecstamework.api.GlobalConfigView;
 import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
-import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.ProgressionView;
-import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.Vector3View;
@@ -32,11 +30,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
-import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
-import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
@@ -47,7 +41,6 @@ import org.joml.Vector3d;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -87,33 +80,15 @@ final class ApiMapper {
     }
 
     @Nonnull
-    static NpcProfileView mapProfile(@Nonnull NpcProfileRepository.ProfileRecord profile) {
-        return new NpcProfileView(
-                profile.profileId(),
-                profile.currentNpcUuid(),
-                profile.ownerUuid(),
-                profile.ownerName(),
-                profile.roleId(),
-                profile.displayName(),
-                profile.customName(),
-                Boolean.TRUE.equals(profile.tamed()),
-                profile.coopId(),
-                profile.coopSlot(),
-                toOrderedSet(profile.toolIds()),
-                toOrderedSet(profile.activeSnapshotTypes()),
-                profile.updatedAtMs()
-        );
-    }
-
-    @Nonnull
-    static CommandLinkView mapCommandLink(@Nonnull NpcProfileRepository.ProfileRecord profile,
-                                          @Nullable String[] toolIds,
-                                          @Nullable Vector3View homePosition,
-                                          @Nullable Vector3View lastKnownPosition) {
-        LinkedHashSet<String> resolvedToolIds = toOrderedSet(toolIds);
-        if (resolvedToolIds.isEmpty()) {
-            resolvedToolIds = toOrderedSet(profile.toolIds());
-        }
+    static CommandLinkView mapCommandLink(
+            @Nonnull NpcProfileView profile,
+            @Nonnull Set<String> toolIds,
+            @Nullable Vector3View homePosition,
+            @Nullable Vector3View lastKnownPosition
+    ) {
+        Set<String> resolvedToolIds = toolIds.isEmpty()
+                ? profile.toolIds()
+                : toolIds;
         return new CommandLinkView(
                 profile.profileId(),
                 profile.currentNpcUuid(),
@@ -122,8 +97,8 @@ final class ApiMapper {
                 homePosition != null,
                 homePosition,
                 lastKnownPosition,
-                toOrderedSet(profile.activeSnapshotTypes()),
-                profile.updatedAtMs()
+                profile.activeSnapshotTypes(),
+                profile.lastUpdatedAtMs()
         );
     }
 
@@ -275,59 +250,6 @@ final class ApiMapper {
                 Collections.unmodifiableMap(stored),
                 Collections.unmodifiableMap(current)
         );
-    }
-
-    @Nonnull
-    static EnumSet<ProfileChangeType> diffProfileChanges(@Nullable NpcProfileRepository.ProfileRecord before,
-                                                         @Nullable NpcProfileRepository.ProfileRecord after) {
-        EnumSet<ProfileChangeType> changes = EnumSet.noneOf(ProfileChangeType.class);
-        if (before == null && after == null) {
-            return changes;
-        }
-        if (before == null) {
-            changes.add(ProfileChangeType.CREATED);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::currentNpcUuid),
-                value(after, NpcProfileRepository.ProfileRecord::currentNpcUuid))) {
-            changes.add(ProfileChangeType.CURRENT_NPC_UUID);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::ownerUuid),
-                value(after, NpcProfileRepository.ProfileRecord::ownerUuid))
-                || !Objects.equals(value(before, NpcProfileRepository.ProfileRecord::ownerName),
-                value(after, NpcProfileRepository.ProfileRecord::ownerName))) {
-            changes.add(ProfileChangeType.OWNER);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::roleId),
-                value(after, NpcProfileRepository.ProfileRecord::roleId))) {
-            changes.add(ProfileChangeType.ROLE);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::displayName),
-                value(after, NpcProfileRepository.ProfileRecord::displayName))) {
-            changes.add(ProfileChangeType.DISPLAY_NAME);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::customName),
-                value(after, NpcProfileRepository.ProfileRecord::customName))) {
-            changes.add(ProfileChangeType.CUSTOM_NAME);
-        }
-        if (!Objects.equals(Boolean.TRUE.equals(value(before, NpcProfileRepository.ProfileRecord::tamed)),
-                Boolean.TRUE.equals(value(after, NpcProfileRepository.ProfileRecord::tamed)))) {
-            changes.add(ProfileChangeType.TAMED);
-        }
-        if (!Objects.equals(value(before, NpcProfileRepository.ProfileRecord::coopId),
-                value(after, NpcProfileRepository.ProfileRecord::coopId))
-                || !Objects.equals(value(before, NpcProfileRepository.ProfileRecord::coopSlot),
-                value(after, NpcProfileRepository.ProfileRecord::coopSlot))) {
-            changes.add(ProfileChangeType.COOP_ASSIGNMENT);
-        }
-        if (!toOrderedSet(value(before, NpcProfileRepository.ProfileRecord::toolIds))
-                .equals(toOrderedSet(value(after, NpcProfileRepository.ProfileRecord::toolIds)))) {
-            changes.add(ProfileChangeType.TOOL_LINKS);
-        }
-        if (!toOrderedSet(value(before, NpcProfileRepository.ProfileRecord::activeSnapshotTypes))
-                .equals(toOrderedSet(value(after, NpcProfileRepository.ProfileRecord::activeSnapshotTypes)))) {
-            changes.add(ProfileChangeType.ACTIVE_SNAPSHOTS);
-        }
-        return changes;
     }
 
     @Nonnull
@@ -560,48 +482,6 @@ final class ApiMapper {
         );
     }
 
-    @Nonnull
-    static PersistenceDiagnosticsView mapPersistenceDiagnostics(
-            @Nonnull TameworkPersistenceRuntime.PersistenceDiagnostics diagnostics) {
-        return new PersistenceDiagnosticsView(
-                diagnostics.databasePath().toString(),
-                diagnostics.sqliteBytes(),
-                diagnostics.walBytes(),
-                diagnostics.shmBytes(),
-                diagnostics.totalBytes(),
-                mapQueueMetrics(diagnostics.queueMetrics()),
-                mapHealth(diagnostics.healthState())
-        );
-    }
-
-    @Nonnull
-    static PersistenceDiagnosticsView.QueueMetricsView mapQueueMetrics(
-            @Nonnull PersistenceWriteQueue.QueueMetrics metrics) {
-        return new PersistenceDiagnosticsView.QueueMetricsView(
-                metrics.queueDepth(),
-                metrics.lastBatchSize(),
-                metrics.maxBatchSize(),
-                metrics.batchesProcessed(),
-                metrics.operationsProcessed(),
-                metrics.retryAttempts(),
-                metrics.failedBatches(),
-                metrics.averageBatchSize(),
-                metrics.averageWriteMs(),
-                metrics.lastBatchWriteMs(),
-                metrics.lastFailureReason(),
-                metrics.lastFailureAtMs()
-        );
-    }
-
-    @Nonnull
-    static PersistenceDiagnosticsView.HealthView mapHealth(@Nonnull PersistenceHealthService.HealthState healthState) {
-        return new PersistenceDiagnosticsView.HealthView(
-                healthState.status().name(),
-                healthState.reason(),
-                healthState.lastFailureAtMs()
-        );
-    }
-
     @Nullable
     static Vector3View mapVector(@Nullable Vector3d vector) {
         if (vector == null) {
@@ -670,15 +550,6 @@ final class ApiMapper {
             }
             return gson.toJson(fallback);
         }
-    }
-
-    @Nullable
-    private static <T> T value(@Nullable NpcProfileRepository.ProfileRecord profile,
-                               @Nonnull java.util.function.Function<NpcProfileRepository.ProfileRecord, T> getter) {
-        if (profile == null) {
-            return null;
-        }
-        return getter.apply(profile);
     }
 
     @Nonnull

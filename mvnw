@@ -11,8 +11,12 @@ if [ ! -f "$WRAPPER_JAR" ]; then
     exit 1
 fi
 
-# Use bundled JDK from Hytale Toolkit
-JAVACMD="C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot/bin/java"
+# Resolve Java from the invoking environment so JDK patch upgrades do not break the wrapper.
+JAVACMD=$(command -v java 2>/dev/null)
+if [ -z "$JAVACMD" ]; then
+    echo "Error: java was not found on PATH"
+    exit 1
+fi
 
 # Set MAVEN_PROJECTBASEDIR for multi-module support
 export MAVEN_PROJECTBASEDIR="$BASEDIR"

@@ -191,6 +191,9 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                     throw new IllegalArgumentException("LIFECYCLE_CHANGE cannot change owners.");
                 }
             }
+            case PROVISION_DORMANT -> throw new IllegalArgumentException(
+                    "PROVISION_DORMANT is available only through CompanionProvisioningApi."
+            );
             case ADMIN_FORCE -> requirePresent(destination, "destination", operation);
         }
     }

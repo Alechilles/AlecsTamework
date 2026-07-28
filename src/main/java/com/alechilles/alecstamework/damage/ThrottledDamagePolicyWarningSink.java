@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.integration.claims.ClaimWarningThrottle;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
@@ -9,7 +8,7 @@ import javax.annotation.Nonnull;
  * Emits at most one warning per category/provider/context key per minute through the active logger.
  */
 final class ThrottledDamagePolicyWarningSink implements DamagePolicyWarningSink {
-    private final ClaimWarningThrottle warningThrottle = new ClaimWarningThrottle();
+    private final DamagePolicyWarningThrottle warningThrottle = new DamagePolicyWarningThrottle();
 
     @Override
     public void warn(@Nonnull String category, @Nonnull String message) {

@@ -88,9 +88,10 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.recallPending(),
                     entry.recallLostRemainingMs()
             );
-            out.add(entry.recoveryHeld()
-                    ? snapshot.withRecoveryHold(entry.recoveryIncidentId())
-                    : snapshot);
+            if (entry.recoveryHeld()) {
+                snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());
+            }
+            out.add(snapshot);
         }
         return out.toArray(new LinkedNpcEntry[0]);
     }

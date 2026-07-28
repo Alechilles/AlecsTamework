@@ -28,5 +28,7 @@ class HomingVisualProjectileArchitectureTest {
         assertTrue(spawner.contains("DespawnComponent.despawnInSeconds"));
         assertTrue(system.contains("new DespawnComponent(time.getNow().minusNanos(1L))"));
         assertFalse(system.contains("commandBuffer.removeEntity"));
+        assertTrue(system.contains("transform.setPosition(step.position())"));
+        assertFalse(system.contains("new TransformComponent(step.position()"));
     }
 }

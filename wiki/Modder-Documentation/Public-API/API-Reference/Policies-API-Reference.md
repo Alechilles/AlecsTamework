@@ -1,6 +1,6 @@
 ---
 title: "Policies API Reference"
-order: 7
+order: 6
 published: true
 draft: false
 ---
@@ -8,44 +8,39 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.8.0`)**
-> This reference tracks the current `policies()` contract in `TameworkApi`.
-
 Capability: `POLICY`
 
-## Entry Point
-`TameworkApi.policies() -> PolicyApi`
+Entry point: `TameworkApi.policies()`.
 
 ## Methods
-- `Optional<OwnershipPolicyView> getOwnershipByProfileId(String profileId)`
-- `Optional<OwnershipPolicyView> getOwnershipByNpcUuid(UUID npcUuid)`
-- `boolean isOwner(String profileId, UUID playerUuid)`
-- `ClaimAccessDecisionView evaluateClaimAccess(String profileId, UUID playerUuid)`
-- `DamagePolicyDecisionView evaluateDamage(String profileId, UUID attackerPlayerUuid)`
-- `PopulationCapDecisionView evaluatePopulationCap(UUID ownerUuid)` (deprecated in `0.7.0`)
-- `OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(OwnerPopulationCapRequestV2 request)`
-- `PopulationAdmissionApi populationAdmissions()`
 
-## Decision DTOs
-- `OwnershipPolicyView`: owner/tame/coop state + effective protection flags.
-- `ClaimAccessDecisionView`: claim availability, allow/deny result, status, reason, and position context.
-- `DamagePolicyDecisionView`: effective damage allow/deny status with ownership + optional claim decision.
-- `PopulationCapDecisionView`: legacy owner-only cap view. It is authoritative only for `GLOBAL`; in `PER_WORLD` it returns denied, `currentCount=-1`, zero headroom, and `owner-cap-world-context-required`.
-- `OwnerPopulationCapRequestV2`: owner UUID, optional world name, and exact requested slots for informational preflight.
-- `OwnerPopulationCapDecisionViewV2`: scope/readiness, authoritative flag, committed and pending counts, and remaining headroom. Unknown counts use `-1`, never a misleading zero.
-- `PopulationAdmissionApi`: mutation-bound owner-and-claim admission. See [Population Admission API Reference](/mod/alecs-tamework/population-admission-api-reference).
+- `getOwnershipByProfileId(profileId)`
+- `getOwnershipByNpcUuid(npcUuid)`
+- `isOwner(profileId, playerUuid)`
+- `evaluateClaimAccess(profileId, playerUuid)`
+- `evaluateDamage(profileId, attackerPlayerUuid)`
+- `evaluatePopulationCap(ownerUuid)`
+- `evaluatePopulationCap(requestV2)`
+- `populationAdmissions()`
 
-## Notes
-- `evaluateClaimAccess` is a raw, live SimpleClaims relationship/access diagnostic retained for compatibility; it is not the runtime damage policy switch.
-- For a live target, `evaluateDamage` uses the same owner-policy resolver as runtime combat: live owner component first, command-link owner second, and persisted NPC-name owner last, followed by the role-effective ownership protection settings. A dormant target uses persisted profile policy only for owner-specific protection. It cannot prove live tamed eligibility, so its claim detail returns `UNAVAILABLE` with `live-target-required` instead of guessing. The master/protection toggles and shared SimpleClaims policy are identical in both entry points.
-- Active owner/claim population rules fail closed when their index, persistence, provider, or lookup is not authoritative. SimpleClaims damage lookup/integration errors fail open.
-- Plain cap evaluation is informational and cannot reserve capacity. Use the admission API before any mutation that creates, restores, transfers, or explicitly places a companion.
-- Use this API instead of duplicating ownership/claim policy logic in downstream mods.
+## Owner cap
 
-## Related Pages
-- [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
-- [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
-- [Population Admission API Reference](/mod/alecs-tamework/population-admission-api-reference)
+The legacy `evaluatePopulationCap(ownerUuid)` remains a compatibility view.
+`evaluatePopulationCap(requestV2)` reads the durable canonical owner count for
+an explicit global/per-world scope. Both are informational preflights.
 
+Use `populationAdmissions()` when a custom gameplay mutation must bind a
+positive acquisition to durable capacity. Its try/claim-for-apply/commit/cancel
+protocol prevents another concurrent mutation from consuming the same slot.
+Do not treat a read-only preflight as a reservation.
 
+## SimpleClaims
+
+Claim access, direct breeding limits, and tamed-NPC damage use the SimpleClaims
+bridge. Damage integration errors fail open. QuestLines Claims is not a
+supported policy provider.
+
+`evaluateClaimAccess` and `evaluateDamage` return explicit unavailable,
+skipped, and fail-open states. Honor the returned `allowed` value as the
+decision and use `status`/`reason` to explain why a policy did or did not run;
+do not infer the decision from availability alone.

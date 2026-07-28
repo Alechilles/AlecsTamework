@@ -92,7 +92,8 @@ Config-driven:
 - item cooldown and selection rules
 
 Runtime-driven:
-- linked row status such as loaded, unloaded, dead, or lost
+- linked row status such as active, unloaded, captured, cooped, roster-stored,
+  provisioned-dormant, dead, or Lost
 - per-row actions such as recall, set home, return home, unlink, revive, release, or cull
 - group assignment and sorting/filter state
 - current health, cooldown, breeding, and trait indicators
@@ -110,6 +111,12 @@ Confirm the target role or template includes the pieces needed by your commands:
 Put role-specific behavior in [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference):
 - revive enablement
 - revive cooldown
+
+For dead companions, the linked panel reads the exact deadline saved in the
+canonical death snapshot. Its countdown and Revive action therefore use the
+same timing fact as restoration admission. Role-scoped `TwCompanionConfig`
+owns the cooldown duration when one matches; the global value is only a
+fallback.
 - return-home and recall distance rules
 - cross-world follow policy
 

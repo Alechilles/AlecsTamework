@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * Opens and populates the command-group manager page for a specific command tool.
@@ -30,7 +31,11 @@ final class CommandGroupManagerPageService {
         this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
-    void openGroupManagerPage(Player player, String toolId, Runnable backCallback) {
+    /**
+     * Opens the generic group page with a callback-time tool authority check.
+     */
+    void openGroupManagerPage(Player player, String toolId, Runnable backCallback,
+                              BooleanSupplier genericCallbackAuthority) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return;
         }
@@ -47,13 +52,24 @@ final class CommandGroupManagerPageService {
         if (store == null || playerRef == null || !playerRef.isValid() || uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return;
         }
+        BooleanSupplier authority = genericCallbackAuthority != null
+                ? genericCallbackAuthority : () -> false;
         TameworkCommandGroupManagerPage page = new TameworkCommandGroupManagerPage(
                 uiPlayerRef,
-                () -> resolveGroupEntriesForTool(player, toolId),
-                (name, colorHex) -> panelActionService.applyCreateGroup(player, toolId, name, colorHex),
-                (groupId, name) -> panelActionService.applyRenameGroup(player, toolId, groupId, name),
-                (groupId, colorHex) -> panelActionService.applyRecolorGroup(player, toolId, groupId, colorHex),
-                groupId -> panelActionService.applyDeleteGroup(player, toolId, groupId),
+                () -> authority.getAsBoolean()
+                        ? resolveGroupEntriesForTool(player, toolId) : List.of(),
+                (name, colorHex) -> runIfAllowed(authority,
+                        () -> panelActionService.applyCreateGroup(
+                                player, toolId, name, colorHex)),
+                (groupId, name) -> runIfAllowed(authority,
+                        () -> panelActionService.applyRenameGroup(
+                                player, toolId, groupId, name)),
+                (groupId, colorHex) -> runIfAllowed(authority,
+                        () -> panelActionService.applyRecolorGroup(
+                                player, toolId, groupId, colorHex)),
+                groupId -> runIfAllowed(authority,
+                        () -> panelActionService.applyDeleteGroup(
+                                player, toolId, groupId)),
                 backCallback != null ? backCallback : () -> { },
                 () -> { }
         );
@@ -70,6 +86,13 @@ final class CommandGroupManagerPageService {
                             "Failed to open command group manager page."
                     ).build()
             );
+        }
+    }
+
+    private static void runIfAllowed(BooleanSupplier authority,
+                                     Runnable action) {
+        if (authority.getAsBoolean()) {
+            action.run();
         }
     }
 

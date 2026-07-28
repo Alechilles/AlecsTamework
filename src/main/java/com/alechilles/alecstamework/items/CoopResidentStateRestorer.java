@@ -96,7 +96,8 @@ public final class CoopResidentStateRestorer {
                         copy.attachments().getAttachmentIds()
                 )
                 : null;
-        return new PostAddWork(displayName, copy.healthPercent(), attachments);
+        return new PostAddWork(displayName, copy.currentHealth(),
+                copy.maximumHealth(), copy.healthPercent(), attachments);
     }
 
     private void write(@Nonnull ComponentWriter writer,
@@ -190,6 +191,8 @@ public final class CoopResidentStateRestorer {
      * Effects that cannot safely run until the new entity has been added to its store.
      */
     public record PostAddWork(@Nullable String displayName,
+                              @Nullable Double currentHealth,
+                              @Nullable Double maximumHealth,
                               @Nullable Double healthPercent,
                               @Nullable TameworkAttachmentsComponent attachments) {
         public boolean hasDisplayNameWork() {
@@ -197,7 +200,7 @@ public final class CoopResidentStateRestorer {
         }
 
         public boolean hasHealthWork() {
-            return healthPercent != null;
+            return currentHealth != null || healthPercent != null;
         }
 
         public boolean hasAttachmentWork() {

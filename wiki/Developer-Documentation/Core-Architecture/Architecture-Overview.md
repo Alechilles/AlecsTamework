@@ -13,21 +13,43 @@ Tamework is split into two broad layers:
 - plugin layer: Java code for actions, sensors, services, systems, persistence, UI, and commands
 
 ## Major subsystems
+
 - NPC action, sensor, and filter builder registration under `npc/`
 - Optimized interaction runtime under `interactions/` plus config assets under `config/assets/`
 - Item runtimes under `items/`
 - Linked-panel and command UI under `ui/`
 - Progression systems under `npc/progression/` and `npc/systems/`
 - Ownership and damage behavior under `ownership/` and `damage/`
-- Persistence under `persistence/sqlite/`
+- Replacement persistence contracts and runtime under `persistence/`, SQLite
+  adapters under `persistence/adapter/sqlite/`, and gameplay authors under
+  `items/persistence/`
 - Commands under `commands/`
 - Metrics and integrations under `metrics/` and `integration/`
 
 ## Main design pattern
-The codebase prefers a thin orchestrator plus focused collaborator services. That pattern is most visible in the spawner, naming, and command runtimes.
+
+The codebase prefers a thin orchestrator plus focused collaborator services.
+That pattern is most visible in the spawner, naming, command, and persistence
+runtimes.
+
+Persistence has one production composition and one facade bundle. Gameplay
+authors submit canonical capture, release, coop, population, roster,
+timed-summon, provisioning, revival, dormant, restoration, and profile-data
+operations through those facades; tick and ECS systems freeze live facts and
+do not own storage.
+
+The persistence database is `tamework-state.sqlite`, beginning with a fresh
+schema-v1 lineage. Released v2-v4 SQLite sources and the released DAT bundle are
+read-only import inputs. Unreleased v5-v9 databases are refused unchanged.
 
 ## Where to start
+
 - Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Persistence composition:
+  `src/main/java/com/alechilles/alecstamework/TameworkPersistenceComposition.java`
+- Persistence decisions: `docs/decisions/0001-0007`
+- Restored feature inventory:
+  `docs/Required-Persistence-Feature-Inventory.md`
 - Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Config assets: `src/main/java/com/alechilles/alecstamework/config/assets`
 - Bundled examples: `src/main/resources/Server/Tamework`

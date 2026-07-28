@@ -41,13 +41,17 @@ The exact list depends on the command item config and on the mod using Tamework.
 - If the companion is already loaded, commands often apply immediately.
 - If it is far away or unloaded, Tamework can queue relocation and retry it over time.
 - Very distant or cross-world recovery may use stricter travel rules configured by the mod.
+- A retry window ending stops that relocation attempt. It does not by itself
+  mark the companion `LOST`.
 
 ## Why a command might fail
 - The NPC is not linked.
 - The NPC is inactive on that tool.
 - Ownership or tame checks fail.
 - The relevant movement or hook wiring is missing in the mod.
-- The NPC is dead or marked `LOST`.
+- The companion is dead, `LOST`, captured in a filled item, or housed in a
+  configured coop. The linked panel shows which saved state currently blocks
+  live commands.
 
 ## Related Pages
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)

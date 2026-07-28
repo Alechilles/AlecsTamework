@@ -1,11 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
-import com.alechilles.alecstamework.integration.claims.ClaimPluginLocator;
-import com.alechilles.alecstamework.integration.claims.ClaimPluginVersionCompatibility;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
-import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
-import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,11 +15,10 @@ import javax.annotation.Nonnull;
  */
 final class SimpleClaimsDamageCapabilityRegistry
         implements SimpleClaimsDamageCapabilityResolver, AutoCloseable {
-    private static final String PROVIDER_ID = "simpleclaims-damage";
-    private final ClaimPluginLocator locator;
+    private final SimpleClaimsPluginLocator locator;
     private final Function<Object, SimpleClaimsDamageGeneration> generationFactory;
     private final AtomicLong observationSequence = new AtomicLong();
-    private ClaimProviderGeneration cachedLocationGeneration = ClaimProviderGeneration.NONE;
+    private SimpleClaimsPluginGeneration cachedLocationGeneration = SimpleClaimsPluginGeneration.NONE;
     private WeakReference<Resolution> cachedReady;
     private long reflectedGeneration;
     private long cacheEpoch;
@@ -34,15 +27,12 @@ final class SimpleClaimsDamageCapabilityRegistry
 
     SimpleClaimsDamageCapabilityRegistry() {
         this(
-                new HytaleClaimPluginLocator(
-                        PROVIDER_ID,
-                        HytaleClaimPluginLocator.SIMPLE_CLAIMS_PLUGIN_IDENTIFIER
-                ),
+                new HytaleSimpleClaimsPluginLocator(),
                 SimpleClaimsDamageGeneration::reflect
         );
     }
 
-    SimpleClaimsDamageCapabilityRegistry(@Nonnull ClaimPluginLocator locator,
+    SimpleClaimsDamageCapabilityRegistry(@Nonnull SimpleClaimsPluginLocator locator,
                                          @Nonnull Function<Object, SimpleClaimsDamageGeneration> generationFactory) {
         this.locator = Objects.requireNonNull(locator, "locator");
         this.generationFactory = Objects.requireNonNull(generationFactory, "generationFactory");
@@ -53,15 +43,15 @@ final class SimpleClaimsDamageCapabilityRegistry
     public Resolution resolve() {
         if (isClosed()) {
             return Resolution.unavailable(
-                    ClaimProviderState.ERROR,
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginState.ERROR,
+                    SimpleClaimsPluginGeneration.NONE,
                     null,
                     "SimpleClaims damage capability registry is shut down."
             );
         }
         long observation = observationSequence.incrementAndGet();
-        ClaimPluginLocation location = locate();
-        if (location.state() != ClaimProviderState.READY || location.pluginInstance() == null) {
+        SimpleClaimsPluginLocation location = locate();
+        if (location.state() != SimpleClaimsPluginState.READY || location.pluginInstance() == null) {
             clearObserved(observation);
             return unavailable(location, location.state(), location.reason());
         }
@@ -69,7 +59,7 @@ final class SimpleClaimsDamageCapabilityRegistry
             clearObserved(observation);
             return unavailable(
                     location,
-                    ClaimProviderState.INCOMPATIBLE,
+                    SimpleClaimsPluginState.INCOMPATIBLE,
                     "SimpleClaims version " + displayVersion(location.pluginVersion())
                             + " is unsupported; expected >=1.0.38 and <1.1.0."
             );
@@ -87,7 +77,7 @@ final class SimpleClaimsDamageCapabilityRegistry
             clearObserved(observation);
             return unavailable(
                     location,
-                    ClaimProviderState.INCOMPATIBLE,
+                    SimpleClaimsPluginState.INCOMPATIBLE,
                     "SimpleClaims damage reflection failed: " + message(throwable)
             );
         }
@@ -95,7 +85,7 @@ final class SimpleClaimsDamageCapabilityRegistry
             clearObserved(observation);
             return unavailable(
                     location,
-                    ClaimProviderState.INCOMPATIBLE,
+                    SimpleClaimsPluginState.INCOMPATIBLE,
                     capability == null
                             ? "SimpleClaims damage reflection returned no capability."
                             : capability.unavailableReason()
@@ -133,16 +123,15 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     @Nonnull
-    private ClaimPluginLocation locate() {
+    private SimpleClaimsPluginLocation locate() {
         try {
             return locator.locate();
         } catch (Throwable throwable) {
-            return new ClaimPluginLocation(
-                    PROVIDER_ID,
-                    ClaimProviderState.ERROR,
+            return new SimpleClaimsPluginLocation(
+                    SimpleClaimsPluginState.ERROR,
                     null,
                     "SimpleClaims plugin lookup failed: " + message(throwable),
-                    ClaimProviderGeneration.NONE,
+                    SimpleClaimsPluginGeneration.NONE,
                     null
             );
         }
@@ -150,7 +139,7 @@ final class SimpleClaimsDamageCapabilityRegistry
 
     @Nonnull
     private synchronized Snapshot snapshot(long observation,
-                                           @Nonnull ClaimProviderGeneration locationGeneration) {
+                                           @Nonnull SimpleClaimsPluginGeneration locationGeneration) {
         if (closed) {
             return new Snapshot(cacheEpoch, null);
         }
@@ -168,7 +157,7 @@ final class SimpleClaimsDamageCapabilityRegistry
     @Nonnull
     private synchronized Resolution publishReady(long observation,
                                                  long observedEpoch,
-                                                 @Nonnull ClaimPluginLocation location,
+                                                 @Nonnull SimpleClaimsPluginLocation location,
                                                  @Nonnull SimpleClaimsDamageGeneration capability) {
         long contractGeneration = increment(reflectedGeneration);
         reflectedGeneration = contractGeneration;
@@ -195,7 +184,7 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     private void clearCached() {
-        cachedLocationGeneration = ClaimProviderGeneration.NONE;
+        cachedLocationGeneration = SimpleClaimsPluginGeneration.NONE;
         if (cachedReady != null) {
             cachedReady.clear();
         }
@@ -203,8 +192,8 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     @Nonnull
-    private static Resolution unavailable(@Nonnull ClaimPluginLocation location,
-                                          @Nonnull ClaimProviderState state,
+    private static Resolution unavailable(@Nonnull SimpleClaimsPluginLocation location,
+                                          @Nonnull SimpleClaimsPluginState state,
                                           String reason) {
         return Resolution.unavailable(
                 state,
@@ -215,7 +204,7 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     private static boolean supported(String version) {
-        return ClaimPluginVersionCompatibility.supportsSimpleClaims(version);
+        return SimpleClaimsPluginVersion.isSupported(version);
     }
 
     @Nonnull
@@ -224,9 +213,10 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     @Nonnull
-    private static ClaimProviderGeneration reflectedGeneration(@Nonnull ClaimPluginLocation location,
-                                                                long reflectedGeneration) {
-        return new ClaimProviderGeneration(
+    private static SimpleClaimsPluginGeneration reflectedGeneration(
+            @Nonnull SimpleClaimsPluginLocation location,
+            long reflectedGeneration) {
+        return new SimpleClaimsPluginGeneration(
                 location.generation().pluginInstanceToken(),
                 location.generation().classLoaderToken(),
                 reflectedGeneration

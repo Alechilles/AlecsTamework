@@ -1,55 +1,68 @@
 ---
-title: "API Bootstrap and Capability Checks Recipe"
-order: 20
+title: "API Bootstrap and Capability Checks"
+order: 1
 published: true
 draft: false
 ---
-# API Bootstrap and Capability Checks Recipe
+# API Bootstrap and Capability Checks
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
+Resolve `TameworkApi`, then test every capability needed by your feature.
 
-Goal: safely acquire `TameworkApi`, verify version/capabilities, and fail closed when unavailable.
-
-## Pattern
 ```java
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.api.TameworkApi;
-import com.alechilles.alecstamework.api.TameworkApiCapability;
-import java.util.EnumSet;
-
 Tamework plugin = Tamework.getInstance();
-TameworkApi api = plugin != null ? plugin.getApi() : null;
+TameworkApi api = plugin == null ? null : plugin.getApi();
 if (api == null) {
-    return; // Tamework not loaded or API unavailable
-}
-
-if (!"0.8.0".equals(api.getApiVersion())) {
-    // Optional: warn, then continue with capability-based gating
-}
-
-EnumSet<TameworkApiCapability> caps = api.getCapabilities();
-if (!caps.contains(TameworkApiCapability.COMMAND_LINKS)) {
     return;
 }
 
-// Optional: ask the same read-only gate used by Tamework before beginning
-// persistence-backed integration work.
-if (caps.contains(TameworkApiCapability.PERSISTENCE_RESILIENCE)) {
-    var state = api.diagnostics().getPersistenceResilience();
-    if (!"HEALTHY".equals(state.storageState())) {
-        return;
-    }
+EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
+if (!capabilities.contains(TameworkApiCapability.PROFILE_DATA_TRANSACTIONS)) {
+    return;
 }
 ```
 
-## Recommendations
-- Always null-check both `Tamework.getInstance()` and `getApi()`.
-- Gate each feature by capability instead of only version equality.
-- Treat persistence availability as a denial-only preflight. It does not reserve capacity and a later authoritative admission may still reject the operation.
-- Keep integration behavior optional; do not crash if Tamework is missing.
+`getApiVersion()` is useful for logs and compatibility diagnostics, but it is
+not a capability check. Do not infer an optional feature from the Tamework
+version or from DTO classes being present.
 
-## Related Pages
-- [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
+For durable integration state, resolve a canonical ID through `profiles()` and
+store namespaced data through `profileData()`. Never write Tamework persistence
+directly.
 
+Replacement persistence features are advertised independently. Check the exact
+set your action needs before taking an item, charging a cost, spawning an NPC,
+or changing live state:
 
+```java
+EnumSet<TameworkApiCapability> required = EnumSet.of(
+        TameworkApiCapability.POPULATION_GROUPS,
+        TameworkApiCapability.COMMAND_FAMILY_ROSTERS,
+        TameworkApiCapability.COMMAND_TIMED_SUMMONING
+);
+if (!capabilities.containsAll(required)) {
+    return; // Fail closed before player cost or live mutation.
+}
+
+CommandFamilyRosterApi rosters = api.commandFamilyRosters();
+CommandTimedSummoningApi timed = api.commandTimedSummoning();
+PopulationGroupApi groups = api.populationGroups();
+```
+
+The readiness-gated persistence capabilities are:
+
+| Capability | API or contract |
+| --- | --- |
+| `POPULATION_GROUPS` | `populationGroups()` |
+| `COMMAND_FAMILY_ROSTERS` | `commandFamilyRosters()` |
+| `COMMAND_TIMED_SUMMONING` | `commandTimedSummoning()` |
+| `COMPANION_PROVISIONING` | `companionProvisioning()` |
+| `PAID_COMMAND_REVIVAL` | `paidCommandRevival()` |
+| `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION` | resolved capture-attempt contract |
+| `CAPTURE_TAME_AND_LINK` | successful capture tame/link contract |
+| `PERSISTENCE_RESILIENCE` | replacement persistence health and resilience |
+
+Capabilities can become available after startup readiness completes or become
+unavailable when their own persistence scope is quarantined. Resolve the
+capability and API for each player action; do not cache startup availability as
+a permanent answer. The default API implementations remain fail-closed for
+older Tamework versions.

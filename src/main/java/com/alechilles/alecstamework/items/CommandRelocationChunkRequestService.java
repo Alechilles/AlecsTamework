@@ -1,7 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import java.util.Map;
@@ -14,8 +12,8 @@ import org.joml.Vector3d;
 /**
  * Loads and leases the exact source and destination chunks needed by one queued relocation.
  *
- * <p>Canonical claim occupancy is preferred over position hints. Hints remain a compatibility
- * fallback only when durable source occupancy is unavailable.</p>
+ * <p>Source hints and the last observed location identify chunks worth loading while the live
+ * entity remains authoritative.</p>
  */
 final class CommandRelocationChunkRequestService implements AutoCloseable {
     private static final long CHUNK_REQUEST_COOLDOWN_MS = 1500L;
@@ -25,7 +23,6 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
     private final CommandRelocationWorldAccess worldAccess;
     private final CommandRelocationDiagnostics diagnostics;
     private final ApplyScheduler applyScheduler;
-    private final WorldLookup worldLookup;
     private final CommandRelocationChunkLeaseService<PendingRelocation, WorldChunk> chunkLeases;
 
     CommandRelocationChunkRequestService(
@@ -35,30 +32,11 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
             @Nonnull CommandRelocationDiagnostics diagnostics,
             @Nonnull ApplyScheduler applyScheduler
     ) {
-        this(
-                pendingByNpc,
-                lastKnownByNpc,
-                worldAccess,
-                diagnostics,
-                applyScheduler,
-                CommandRelocationChunkRequestService::loadedWorld
-        );
-    }
-
-    CommandRelocationChunkRequestService(
-            @Nonnull Map<UUID, PendingRelocation> pendingByNpc,
-            @Nonnull Map<UUID, Vector3d> lastKnownByNpc,
-            @Nonnull CommandRelocationWorldAccess worldAccess,
-            @Nonnull CommandRelocationDiagnostics diagnostics,
-            @Nonnull ApplyScheduler applyScheduler,
-            @Nonnull WorldLookup worldLookup
-    ) {
         this.pendingByNpc = Objects.requireNonNull(pendingByNpc, "pendingByNpc");
         this.lastKnownByNpc = Objects.requireNonNull(lastKnownByNpc, "lastKnownByNpc");
         this.worldAccess = Objects.requireNonNull(worldAccess, "worldAccess");
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.applyScheduler = Objects.requireNonNull(applyScheduler, "applyScheduler");
-        this.worldLookup = Objects.requireNonNull(worldLookup, "worldLookup");
         this.chunkLeases = new CommandRelocationChunkLeaseService<>(
                 WorldChunk::addKeepLoaded,
                 WorldChunk::removeKeepLoaded
@@ -80,23 +58,11 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         requestChunk(destinationWorld, destinationWorld, pending,
                 worldAccess.toChunk(pending.destination.x),
                 worldAccess.toChunk(pending.destination.z));
-        World canonicalSourceWorld = resolveCanonicalSourceWorld(destinationWorld, pending);
-        if (pending.canonicalSource != null) {
-            if (canonicalSourceWorld != null) {
-                requestCanonicalSource(canonicalSourceWorld, destinationWorld, pending);
-            }
-            return;
-        }
         requestSourceHints(destinationWorld, destinationWorld, pending);
     }
 
     void requestSource(World sourceWorld, World destinationWorld, PendingRelocation pending) {
         if (sourceWorld == null || destinationWorld == null || pending == null) {
-            return;
-        }
-        if (pending.canonicalSource != null
-                && Objects.equals(pending.canonicalSource.worldName(), sourceWorld.getName())) {
-            requestCanonicalSource(sourceWorld, destinationWorld, pending);
             return;
         }
         requestSourceHints(sourceWorld, destinationWorld, pending);
@@ -111,26 +77,6 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
                 worldAccess.toChunk(pending.destination.x),
                 worldAccess.toChunk(pending.destination.z)
         );
-    }
-
-    @Nullable
-    World resolveCanonicalSourceWorld(World destinationWorld, PendingRelocation pending) {
-        if (destinationWorld == null || pending == null || pending.canonicalSource == null) {
-            return null;
-        }
-        String sourceWorldName = pending.canonicalSource.worldName();
-        return Objects.equals(sourceWorldName, destinationWorld.getName())
-                ? destinationWorld : worldLookup.resolve(sourceWorldName);
-    }
-
-    private void requestCanonicalSource(World sourceWorld,
-                                        World destinationWorld,
-                                        PendingRelocation pending) {
-        ClaimChunkCoordinate source = pending.canonicalSource;
-        if (source == null) {
-            return;
-        }
-        requestChunk(sourceWorld, destinationWorld, pending, source.chunkX(), source.chunkZ());
     }
 
     private void requestSourceHints(World sourceWorld,
@@ -191,12 +137,6 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         });
     }
 
-    @Nullable
-    private static World loadedWorld(String worldName) {
-        Universe universe = Universe.get();
-        return universe == null ? null : universe.getWorld(worldName);
-    }
-
     @Override
     public void close() {
         chunkLeases.close();
@@ -207,9 +147,4 @@ final class CommandRelocationChunkRequestService implements AutoCloseable {
         void schedule(@Nonnull World world, @Nonnull UUID npcUuid, long delayMs);
     }
 
-    @FunctionalInterface
-    interface WorldLookup {
-        @Nullable
-        World resolve(@Nonnull String worldName);
-    }
 }

@@ -9,7 +9,8 @@ Spawner runtime is split into an orchestrator plus focused services:
 - Policy + validation: `SpawnerCapturePolicyService`, `SpawnerRolePolicyService`, `SpawnerOwnershipPolicyService`
 - Metadata + identity/state: `SpawnerCaptureMetadataService`, `SpawnerNpcIdentityService`, `SpawnerNpcStateService`, `SpawnerItemStackMetadataService`
 - Placement/effects/inventory: `SpawnerSpawnPositionService`, `SpawnerEffectService`, `SpawnerPlayerInventoryService`
-- Capture finalization and linked-companion sync: `SpawnerCaptureFinalizerService`, `SpawnerLinkedNpcSyncService`
+- Source-item finalization: `SpawnerCaptureFinalizerService`, `SpawnerSourceItemTransaction`
+- Canonical persistence: `SpawnerCaptureAuthor`, `SpawnerCapturedArtifactReleaseAuthor`
 
 When extending spawner behavior, add logic to these service domains instead of centralizing it in the orchestrator.
 
@@ -39,6 +40,7 @@ Fields:
 - `MaxHealthPercent` (optional, `0-100`). Requires target health to be at or below this percentage at both channel start and completion.
 - `RequiredEffectId` (optional). Requires this entity effect to be active at both channel start and completion (for example, `Tw_Status_Tranquilized`).
 - `ChannelAuraEffectId` (optional). Entity effect applied to the target by the `Begin` channel phase and removed by `Cancel` or `Complete`.
+- `ChannelSoundEvent` (optional). A one-shot sound event played at the target when the `Begin` channel phase succeeds.
 - `TamedRoleOverrides` (optional map). Maps each capturable wild role to the role stored in the filled item. A mapped role is required when `TamesTarget` is enabled.
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
@@ -46,6 +48,67 @@ Fields:
 - `SoundEvent` (optional). Sound event to play on capture.
 - `CooldownMs` (optional). Per item capture cooldown.
 - `MaxDistance` (optional). Max distance for capture.
+- `ChanceMode` (default `Guaranteed`). `Guaranteed` preserves deterministic
+  capture and bypasses role capture policy; `Probability` opts into API 0.9
+  capture-policy resolution.
+- `Power` (default `0`). Non-negative generic capture-item power.
+- `BaseChance` (default `1.0`). Base probability in `[0,1]`.
+- `ChancePerPower` (default `0.0`). Non-negative additive chance for each power
+  point above the role's minimum.
+- `MinimumChance` / `MaximumChance` (defaults `0.0` / `1.0`). Inclusive
+  probability clamps.
+- `FailureCooldownMs` (default `0`). Cooldown applied after one resolved failed
+  probability roll.
+- `FailureParticleSystem` / `FailureSoundEvent` (optional). Failure feedback.
+- `SourceConsumption` (default `SuccessOnly`). `SuccessOnly` spends the source
+  only on success; `ResolvedAttempt` spends it after either terminal success or
+  terminal failed roll.
+- `SuccessDisposition` (default `CapturedItem`). Supported values are
+  `CapturedItem`, `TameAndCommandLink`, and `StoreBondedCompanion`.
+- `BondedRosterId` (required only for `StoreBondedCompanion`). Names the
+  separate bonded roster receiving the stored profile.
+- `CommandFamilyId` (required only for `TameAndCommandLink`). Names the generic
+  owner/command-family roster.
+- `RequiredCommandConfigId` and `RequireCommandAccessItem`. Fence the capture
+  to a compatible command access item. `StoreBondedCompanion` requires both a
+  command-config ID and `RequireCommandAccessItem: true`.
+Role-side minimum power, resistance, multiplier, missing-health bonus,
+guaranteed power, and custom requirements live in
+`Server/Tamework/CapturePolicies/*.json`. See the
+[TwCapturePolicyConfig reference](../wiki/Modder-Documentation/Config-Reference/TwCapturePolicyConfig-Reference.md).
+
+### StoreBondedCompanion
+
+`StoreBondedCompanion` is the capture entry point for an ephemeral bonded
+roster. It is separate from filled spawners and generic tame/link capture.
+
+The route validates the command-access item, owner policy, allowed source and
+tamed roles, resolved bonded family, capacity, capture policy, distance,
+required effect, and exact config generation before rolling or spending the
+source. On success it:
+
+1. freezes the complete NPC snapshot and capture evidence;
+2. durably creates one `STORED` bonded profile in the separate bonded database;
+3. records the original source NPC identity so replay cannot create another
+   profile;
+4. queues/removes that exact source NPC through bounded cleanup;
+5. finalizes source-item consumption according to `SourceConsumption`; and
+6. emits the completion feedback once.
+
+The durable profile commit happens before source retirement. The operation
+does not create a filled spawner, generic profile, command-family membership,
+population-group record, timed-summon lease, or generic outbox operation.
+Retrying the same attempt uses its original idempotency/capture evidence.
+
+When `TamesTarget` is enabled, every eligible source role must have a
+`TamedRoleOverrides` target role. The target role must select exactly one
+family in `BondedRosterId`, and that family's `Features.Capture` must be
+enabled.
+
+Capture success particles and sounds are post-commit feedback. For a channeled
+item, author the sustained aura/sound in the Begin phase and one completion
+effect in the Complete path. Do not duplicate the same completion effect in
+both the item interaction and spawner success fields.
 
 ## Spawn settings
 Fields:
@@ -60,22 +123,18 @@ Captured Tamework NPC names are stored on the spawner item and restored on spawn
 Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
 `TwAttachmentDisplayConfig`.
 
-Filled spawners also carry the canonical companion profile identity used by population accounting. Capture moves an owned companion to `CAPTURED`: it keeps consuming one owner slot unless capture clears ownership, but it stops occupying a physical claim. Spawn/release reserves destination owner and claim capacity before creating the NPC. The exact source stack is finalized only after a live NPC with the planned canonical identity exists; a denial or pre-spawn failure keeps the filled item intact, while a late durability failure is reported as degraded.
-
-Older filled items without a canonical profile ID are adopted through their stable legacy identity. Adoption is cap-checked and cannot create a second active representation of the same companion. Existing over-cap legacy companions are preserved during upgrade reconciliation, but a copied or newly restored item cannot bypass later admissions. A provisional legacy identity is promoted when its owner admission commits or released exactly once after denial/cancellation; retries and late callbacks cannot double-release it.
-
 `Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
 
-The spawn transition follows all four runtime-setting combinations:
+Releasing a filled spawner recreates the stored NPC through the canonical
+captured-spawner release operation and consumes the filled item only after the
+release succeeds. Ordinary use follows that shared release path. A supported
+managed-coop interaction can instead admit an eligible canonical filled item
+directly; it retires the item only after durable coop residency publishes.
 
-| `CaptureClearsOwner` | `SpawnSetsOwner` | Spawned owner | Spawn owner delta | Spawn claim delta |
-| --- | --- | --- | ---: | ---: |
-| `false` | `false` | Stored owner, or unowned if none was stored | Stored owner `0`; unowned `0` | Stored owner `+1`; unowned `0` |
-| `false` | `true` | Stored owner when non-null; otherwise spawning player | Stored owner `0`; null-to-owner `+1` | `+1` when owned |
-| `true` | `false` | Unowned | `0` | `0` |
-| `true` | `true` | Spawning player | `+1` | `+1` |
-
-The deltas assume the captured source itself occupies no physical claim. A canonical unowned profile restored to a non-null owner always uses normal cap-checked null-to-owner admission; it is never treated as an existing-owner zero delta. Conversely, a canonical non-null stored owner cannot be silently transferred or cleared by restore.
+Configured capture/spawn particles and sounds are success feedback. Tamework
+freezes their asset IDs and position with the operation intent, then emits them
+only after the canonical operation publishes. A rejected, retryable, or failed
+operation does not play success effects.
 
 For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 
@@ -107,6 +166,7 @@ The current spawner icon tooling guide lives in the wiki:
     "Allowlist": [ "Mob_Tamework_Interact_Test" ]
   },
   "Capture": {
+    "ChanceMode": "Guaranteed",
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
@@ -123,6 +183,41 @@ The current spawner icon tooling guide lives in the wiki:
 }
 ```
 
+Bonded capture example:
+
+```json
+{
+  "EmptyItemId": "Example_Bonding_Stone",
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [ "Example_Wild_Companion" ]
+  },
+  "Capture": {
+    "RequireTamed": false,
+    "TamesTarget": true,
+    "RequiredEffectId": "Tw_Status_Tranquilized",
+    "TamedRoleOverrides": {
+      "Example_Wild_Companion": "Tamed_Example_Companion"
+    },
+    "ChanceMode": "Probability",
+    "SourceConsumption": "ResolvedAttempt",
+    "SuccessDisposition": "StoreBondedCompanion",
+    "BondedRosterId": "example:shared_roster",
+    "RequiredCommandConfigId": "ExampleBondedController",
+    "RequireCommandAccessItem": true
+  }
+}
+```
+
 ## Reloading
 Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
 Captured spawner display text is written into base Hytale `ItemDisplay` metadata when the NPC is captured.
+
+Bonded roster policies reload with their dependent command configs as one
+coherent generation. A bonded capture against a missing, ambiguous, disabled,
+or stale family fails closed and does not fall back to `CapturedItem` or
+`TameAndCommandLink`.
+
+The API 0.9 `CAPTURE_POLICY` capability is a separate runtime gate. Loading the
+fields or resolving their immutable config views does not prove that the
+authoritative probabilistic capture path is active.

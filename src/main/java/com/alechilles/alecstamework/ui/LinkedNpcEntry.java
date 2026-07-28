@@ -453,7 +453,7 @@ public final class LinkedNpcEntry {
         this.captured = captured;
         this.inCoop = inCoop;
         this.lost = lost;
-        this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
+        this.deadRespawnRemainingMs = deadRespawnRemainingMs < 0L ? -1L : deadRespawnRemainingMs;
         this.deathCauseHint = deathCauseHint;
         this.speciesId = speciesId;
         this.speciesLabel = speciesLabel;
@@ -665,7 +665,7 @@ public final class LinkedNpcEntry {
 
     /** Returns an immutable presentation copy marked with its scoped recovery incident. */
     public LinkedNpcEntry withRecoveryHold(String incidentId) {
-        return new LinkedNpcEntry(this, incidentId);
+        return new LinkedNpcEntry(this, true, incidentId);
     }
 
     public double healthRatio() {
@@ -765,7 +765,9 @@ public final class LinkedNpcEntry {
         return out.isEmpty() ? LinkedNpcTraitIndicator.EMPTY : out.toArray(new LinkedNpcTraitIndicator[0]);
     }
 
-    private LinkedNpcEntry(LinkedNpcEntry source, String incidentId) {
+    private LinkedNpcEntry(LinkedNpcEntry source,
+                           boolean recoveryHeld,
+                           String incidentId) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -813,8 +815,8 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = source.traitsActionEnabled;
         this.talentsActionVisible = source.talentsActionVisible;
         this.talentsActionEnabled = source.talentsActionEnabled;
-        this.recoveryHeld = true;
-        this.recoveryIncidentId = normalizeIncidentId(incidentId);
+        this.recoveryHeld = recoveryHeld;
+        this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
     }
 
     private static String normalizeIncidentId(String incidentId) {

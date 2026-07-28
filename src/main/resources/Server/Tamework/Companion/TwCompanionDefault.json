@@ -20,6 +20,13 @@
         "Aggressive"
       ]
     },
+    "Summon": {
+      "Enabled": false,
+      "ActiveDurationMs": 0,
+      "ResummonCooldownMs": 0,
+      "AutoStoreOnOwnerLogout": true,
+      "ExpiryWarningThresholdsMs": []
+    },
     "DeadRespawnCooldownMins": 10,
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,

@@ -225,15 +225,13 @@ These legacy fields are still decoded for old packs, but they are hidden from `/
 - Passive breeding enablement, breeding happiness requirement, and the global breeding-gender gate are settings-owned runtime policy.
 - `InheritTraits` only matters if a compatible [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference) is also present.
 
-## Litter and Birth-Job Semantics
-- One fertility roll creates one immutable litter plan before the delayed sequence begins.
+## Litter Semantics
+- One fertility roll determines the litter before the delayed sequence begins.
 - Expected offspring is the product of both resolved parent fertility multipliers, clamped to `0..4`.
 - The whole-number portion is guaranteed, and one fractional roll can add at most one child. The intentional result is zero through four offspring.
-- Similar-looking siblings created by the same admitted litter are expected; they are distinct planned children, not repeated callback output.
-- Manual and passive breeding use the same job registry. A parent can belong to only one active job in that world, and a delayed callback can claim the spawn transition only once.
-- Capturing either parent into a managed coop cancels the job. Execution also validates both parents again before any child spawns.
-- Pending children count against nearby, claim, and player capacity while the job is active.
-- Technical cancellation restores only the exact provisional parent state written by that job, preventing an old callback from erasing a newer cooldown or manual selection.
+- Similar-looking siblings from one litter are expected.
+- Manual and passive breeding apply the same eligibility, nearby-count, and
+  direct SimpleClaims breeding rules.
 
 ## Signed-Time Contract
 Hytale world-time epoch values can be negative. `Timing` and `PassiveBreeding` scheduling preserve signed deadlines and compare by ordering; only `0` is the unset sentinel. Do not use positive-value checks when integrating with breeding cooldown or sweep state.

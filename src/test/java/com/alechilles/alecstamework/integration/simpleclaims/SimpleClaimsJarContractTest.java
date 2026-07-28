@@ -10,7 +10,6 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
@@ -59,7 +58,7 @@ class SimpleClaimsJarContractTest {
             assertTrue(Modifier.isStatic(getInstance.getModifiers()), "getInstance() must remain static.");
             assertPublicMethod(manager, "getChunkRawCoords", chunk, String.class, int.class, int.class);
             assertPublicMethod(manager, "getPartyById", party, UUID.class);
-            assertPublicMethod(manager, "getChunks", HashMap.class);
+            assertPublicMethod(manager, "getAmountOfClaims", int.class, party);
             assertPublicMethod(
                     manager,
                     "isAllowedToInteract",
@@ -73,8 +72,6 @@ class SimpleClaimsJarContractTest {
             );
 
             assertPublicMethod(chunk, "getPartyOwner", UUID.class);
-            assertPublicMethod(chunk, "getChunkX", int.class);
-            assertPublicMethod(chunk, "getChunkZ", int.class);
             assertPublicMethod(party, "isTamedDamageEnabled", boolean.class);
         }
     }

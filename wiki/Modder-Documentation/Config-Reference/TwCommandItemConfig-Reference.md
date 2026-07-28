@@ -32,6 +32,10 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "ItemIds": [],
   "Radius": -1,
   "MembershipMode": "LinkedOnly",
+  "RosterStorage": "ItemMetadata",
+  "CommandFamilyId": null,
+  "BondedRosterId": null,
+  "ProjectRosterToItemMetadata": true,
   "LinkEnabled": true,
   "LinkUseTogglesMembership": true,
   "RequireTamed": true,
@@ -52,6 +56,15 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `ItemIds`: item ids that resolve this config.
 - `Radius`: recipient search radius. Use `-1` for unrestricted radius.
 - `MembershipMode`: target-selection mode.
+- `RosterStorage`: `ItemMetadata` for the legacy/default per-item authority or
+  `OwnerCommandFamily` for a durable owner/family roster, or
+  `BondedCompanions` for the separate bonded profile-and-lease authority.
+- `CommandFamilyId`: stable namespaced family shared by equivalent access
+  items; required for `OwnerCommandFamily`.
+- `BondedRosterId`: stable namespaced roster referenced by
+  `BondedCompanions`; it must exist in the accepted bonded roster generation.
+- `ProjectRosterToItemMetadata`: optionally writes a disposable item cache for
+  presentation/compatibility. The cache never becomes roster authority.
 - `LinkEnabled`: allows persistent link and unlink actions for the tool.
 - `LinkUseTogglesMembership`: makes the link action toggle whether the NPC is in the active membership set.
 - `RequireTamed`: requires targets to be tamed.
@@ -69,6 +82,26 @@ Accepted `MembershipMode` values:
 - `OwnerScope`: owned companions in scope can be targeted even if they are not linked.
 - `MasterTarget`: target only the current resolved master target.
 - `LinkedOrMasterTarget`: linked companions plus the current master target.
+
+With `RosterStorage: ItemMetadata`, linked membership remains on that command
+item. With `OwnerCommandFamily`, membership and stable slots are durable for
+the owner/family and equivalent access items see the same roster. Optional item
+metadata is only a disposable projection. Both modes resolve canonical profile
+IDs and read lifecycle status from replacement persistence; neither item cache
+may invent death, Lost, captured, coop, stored, or provisioned state.
+
+With `RosterStorage: BondedCompanions`, the command item is only an access,
+panel, and live-command surface for `BondedRosterId`. Cards are keyed by stable
+bonded profile ID and are loaded from the separate bonded database. The public
+states are exactly `STORED`, `ACTIVE`, and `DEAD`; only an exact current
+projection can receive normal NPC commands.
+
+A bonded config must not declare `CommandFamilyId` or
+`ProjectRosterToItemMetadata`, even as explicit `false`. It does not create
+generic links, item-cache roster rows, relocation work, or generic lifecycle
+aliases. Multiple policy assets may contribute different families to the same
+`BondedRosterId`; all appear in the same panel while retaining family-specific
+limits, timers, cooldowns, revival recipes, and action toggles.
 
 ## `AllowedRoles`
 Accepted `Mode` values:
@@ -174,6 +207,51 @@ Fields:
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 - `RequireOwner` can be left unset to inherit global linking-owner policy.
+- `OwnerCommandFamily` requires `RequireOwner: true` and a non-blank
+  `CommandFamilyId`.
+- `BondedCompanions` requires a non-blank, currently defined
+  `BondedRosterId`, rejects generic family/projection fields, and routes
+  summon/store/revive actions by profile ID plus expected revision.
+
+## Bonded roster example
+
+```json
+{
+  "Parent": "TwCommandExample",
+  "Enabled": true,
+  "ItemIds": [ "Example_Bonded_Controller" ],
+  "RosterStorage": "BondedCompanions",
+  "BondedRosterId": "example:shared_roster",
+  "MembershipMode": "LinkedOnly",
+  "LinkEnabled": false,
+  "LinkUseTogglesMembership": false,
+  "RequireTamed": true,
+  "RequireOwner": true,
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [
+      "Tamed_Example_Large",
+      "Tamed_Example_Small"
+    ]
+  }
+}
+```
+
+The role allowlist controls live command recipients and presentation access;
+the bonded roster family policies remain the lifecycle and capacity authority.
+
+## Bundled Example Is Not a Player Acquisition Flow
+
+`Tamework_Command_Whistle_Example` and `TwCommandExample` are development and
+configuration examples. The example covers the HyDragon-relevant `Follow`,
+`Hold`, `Recall`, and `AttackTarget` command path, but Tamework ships no recipe
+or other polished acquisition path for that item. It must be given by an
+operator or development workflow.
+
+A production downstream mod should provide its own item identity, localized
+presentation, command config, and recipe or other explicit acquisition
+mechanic. Treat the bundled example as reference material, not as a finished
+player-facing tool.
 
 ## Minimal Example
 ```json
@@ -285,12 +363,16 @@ Fields:
 - `MaxActive: 0` means unlimited, not zero active companions.
 - `ModeMapping` is UI-facing metadata. It does not replace the `Steps` that actually perform the command.
 - `/tw reloadconfig` is required after editing command-item configs during development.
+- Bonded roster and dependent command configs reload atomically. An invalid
+  bonded reference leaves the prior coherent generation active.
 
 ## Related Pages
 - [Command System and Linked Panel Guide](/mod/alecs-tamework/command-system-and-linked-panel-guide)
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+- [TwBondedCompanionRosterConfig Reference](/mod/alecs-tamework/twbondedcompanionrosterconfig-reference)
+- [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)
 
 
 

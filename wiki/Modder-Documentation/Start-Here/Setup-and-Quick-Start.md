@@ -64,7 +64,8 @@ Optional prompt updater:
 - Naming items: create `TwNameItemConfig` and wire `TameworkNameNpc`
 - Name pools: create `TwNamesConfig` and point naming items at `Naming.RandomNamesId`
 - Command items: create `TwCommandItemConfig` and wire `TameworkCommand`
-- Managed coops: create `TwCoopConfig` for the target `CoopId`
+- Configured coop capture/release: create `TwCoopConfig` for the target
+  `CoopId`
 
 ## 6. Add translations
 Add prompt, item, and UI keys in:

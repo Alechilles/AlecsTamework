@@ -4,9 +4,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractWorldCommand;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -21,7 +20,7 @@ import javax.annotation.Nonnull;
 /**
  * Command to display alarm status for the targeted NPC.
  */
-public final class TameworkGetAlarmCommand extends AbstractPlayerCommand {
+public final class TameworkGetAlarmCommand extends AbstractWorldCommand {
     private static final String DEFAULT_ALARM_NAME = "Harvest_Ready";
 
     public TameworkGetAlarmCommand() {
@@ -31,14 +30,15 @@ public final class TameworkGetAlarmCommand extends AbstractPlayerCommand {
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+                           @Nonnull World world,
+                           @Nonnull Store<EntityStore> store) {
         ParsedArgs args = parseArgs(commandContext);
-        Ref<EntityStore> npcRef = resolveTarget(store, ref, world, args);
+        Ref<EntityStore> senderRef = commandContext.isPlayer() ? commandContext.senderAsPlayerRef() : null;
+        Ref<EntityStore> npcRef = resolveTarget(store, senderRef, world, args);
         if (npcRef == null || !npcRef.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
+            commandContext.sender().sendMessage(Message.raw(commandContext.isPlayer()
+                    ? "No NPC found in view."
+                    : "No NPC resolved. Console usage requires an NPC UUID."));
             return;
         }
 
@@ -93,6 +93,9 @@ public final class TameworkGetAlarmCommand extends AbstractPlayerCommand {
             if (target != null && target.isValid()) {
                 return target;
             }
+            return null;
+        }
+        if (playerRef == null) {
             return null;
         }
         TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, playerRef);

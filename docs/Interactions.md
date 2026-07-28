@@ -63,9 +63,10 @@ Common fields:
 
 Behavior:
 - Requires untamed NPC and matching held item.
-- Reserves the destination owner's slot and, when configured, the destination claim's physical slot before changing ownership.
-- Counts one canonical owned companion profile even if that companion is later unloaded, captured, cooped, dead-but-revivable, lost, restoring, or dormant.
-- Sets tamed + owner, consumes the held item, and performs an optional role swap only after admission succeeds. A denied or failed mutation cancels its reservation and does not consume the item.
+- Checks durable owner-population and matching group admission before changing
+  ownership.
+- Sets tamed + owner, consumes the held item, and performs an optional role
+  swap only after the live mutation succeeds.
 
 ### Feed
 Common fields:
@@ -144,32 +145,33 @@ Behavior:
 - Manual breeding is independent from `TwBreedingConfig.PassiveBreeding.Enabled`, the `/tw settings` passive breeding toggle, and the per-NPC breeding enable toggle. Cooldowns and eligibility gates such as tame, adult, ownership, gender, and role compatibility still apply.
 - `MinHappiness` is ignored when the happiness system or breeding happiness requirement is disabled.
 - When a manually selected pair is found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
-- Manual and passive pairing enter the same birth-job pipeline. A parent can belong to only one active job, and delayed execution can claim that job's spawn transition only once.
 - Fertility intentionally resolves a litter of zero through four offspring. Tamework multiplies the two resolved parent fertility factors, clamps the expected litter to four, guarantees the whole-number portion, and uses one fractional roll for at most one additional child. Similar-looking siblings from one admitted litter are not duplicate callbacks.
-- `Pairing.MaxNearbySameType` is a hard execution-time limit shared by manual and passive breeding. Live nearby NPCs and already-pending admitted children both consume headroom, so a planned litter may be reduced or rejected rather than exceeding the cap.
-- Capturing either parent into a managed coop cancels the pending job. The delayed callback also revalidates both parents before spawning.
-- Manual and passive offspring use the same exact, reservation-backed owner/claim admission path. A child with `InheritOwner=false` is unowned and consumes no owner slot; `BreedingRequiresClaim` can still require its physical destination to be claimed.
-- One logical breeding attempt derives a stable pair job from the parents and their persisted cooldown generations, then derives each planned child's profile/NPC identities from that attempt. A restart or duplicate callback therefore retries the same child identities, and every admitted unit ends in commit or cancellation exactly once.
+- `Pairing.MaxNearbySameType` is checked against nearby live NPCs.
+- Direct SimpleClaims rules may require a claim and apply per-chunk or
+  total-claim breeding limits.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
 - If `TwBreedingConfig.Gender.Enabled` and `RequireDifferentGender` are enabled, partner selection also requires one male and one female companion.
 - Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing. `TwBreedingConfig.Inheritance.AttachmentInheritance.ExcludedSets` can leave equipment or other non-genetic attachment sets at the child's model-generated default.
 - World-time deadlines are signed. Negative timestamps are valid; only `0` means unset.
 
-## Ownership and claim admission rules
+## Ownership rules
 
-All `SetOwner` effects that add or transfer a non-null owner use Tamework's shared admission authority. Transfers reserve the destination owner before releasing the source owner, so a denial leaves the previous owner unchanged. The same authority is used by tame actions, legacy ownership adoption, spawner and coop restores, recall/teleport, revive, lost recovery, and breeding.
+`SetOwner` and Tame check durable owner-population admission when adding a
+non-null owner. The configured global/per-world cap counts canonical owned
+profiles, and positive acquisitions reserve capacity inside the same operation.
+This is independent from SimpleClaims placement and does not create a
+feature-local provisioning or population journal.
 
-The standalone `TameworkSetOwner` NPC action is asynchronous. When a vanilla instruction list must also tame the NPC, consume its interaction item, change state, or play success presentation, configure those behaviors through the action's `*OnApplied` fields. The bundle runs against a freshly resolved NPC/player only after the reservation is revalidated and claimed and the canonical owner write reports that it was applied. It runs before the journal's final asynchronous population commit, so `*OnApplied` is an applied-mutation continuation, not a post-commit event. A continuation or finalization failure leaves the operation degraded and recoverable instead of reporting ordinary success. `ConsumeHeldItemOnApplied` removes one item only when the live active item still has the item ID captured when the action was scheduled. Ordinary sibling actions execute eagerly and are not safe for irreversible tame success work.
-
-If an applied owner mutation must roll back, Tamework first records `COMPENSATING` durably while both reservations remain held. Derived authority and source state are restored before the canonical owner component; only an exact restored state can close the journal and release capacity. A partial or ambiguous rollback stays quarantined for startup recovery.
-
-`TameworkOwnerComponent` is the canonical live authorization source for ownership mutation and command access. A canonical clear invalidates command-tool links and clears name ownership; a transfer invalidates the prior owner's links and retargets retained name metadata. Command authorization never treats stale link/name owner IDs as ownership. Runtime and Public API damage evaluation use those components only as read-only fallback policy context while the canonical component is unavailable, in the order owner component, command-link owner, then persisted NPC-name owner; this fallback does not transfer ownership or change the population ledger.
+`TameworkOwnerComponent` is the canonical live authorization source for
+ownership mutation and command access. A clear invalidates command-tool links
+and clears name ownership; a transfer invalidates the prior owner's links and
+retargets retained name metadata.
 
 `SetOwner` with `Source: Custom` requires a syntactically valid UUID in `Uuid`. `Name` is optional display metadata, not an identity; a blank or malformed UUID rejects the effect instead of being interpreted as an ownership clear.
 
-Claim limits are placement-admission caps, not movement barriers. Owned `ACTIVE` and durably `UNLOADED` profiles occupy their physical claim. `CAPTURED`, `COOP`, `DEAD_REVIVABLE`, and `LOST` profiles retain their owner slot but do not occupy a claim until restored. Natural movement across a claim boundary is allowed; if an unavoidable cross-world move creates a per-world over-cap condition, Tamework preserves the companion, emits a throttled admin warning, increments the `unavoidablePerWorldOverCapRelocations` diagnostic counter, and blocks later positive admissions until occupancy falls.
-
-`DEAD_REVIVABLE` keeps its owner slot but releases physical claim occupancy immediately when revivable death is observed. A permanent cull/release or death with no supported revive path is recorded as an explicit release and frees the slot only when that durable transition commits.
+SimpleClaims placement does not gate Tame, SetOwner, spawn, Recall, coop
+release, death restoration, or Lost restoration. Its Tamework breeding limits
+apply only to breeding.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.
@@ -473,7 +475,7 @@ Common effect families:
 
 - `Phase: Begin` validates the empty spawner, target role/state, ownership, cooldown, and distance, then applies `Capture.ChannelAuraEffectId`. Health and required-effect gates are intentionally deferred until completion so channel feedback can begin before the target is capture-ready.
 - `Phase: Cancel` removes the channel aura without capturing.
-- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture. If configured, `CaptureBurstParticleSystem` plays only after that capture applies successfully.
+- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture. A missing required effect produces player-facing feedback; `Tw_Status_Tranquilized` uses a specific tranquilization warning. If configured, `CaptureBurstParticleSystem` plays only after that capture applies successfully.
 
 Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Configure `BeamParticleSystem` on `Begin` and `CaptureBurstParticleSystem` on `Complete`; Tamework emits bounded world-space segments between the player and the locked target only while that server-tracked channel is active.
 

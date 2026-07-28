@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -60,11 +59,12 @@ record SimpleClaimsDamageGeneration(
     }
 
     @Nonnull
-    private static SimpleClaimsClaimIdentityAccess.Result mapLookup(@Nonnull ClaimLookupResult result) {
+    private static SimpleClaimsClaimIdentityAccess.Result mapLookup(
+            @Nonnull SimpleClaimsBreedingBridge.LookupResult result) {
         return switch (result.status()) {
             case CLAIM_FOUND -> new SimpleClaimsClaimIdentityAccess.Result(
                     SimpleClaimsClaimIdentityAccess.Status.CLAIM_FOUND,
-                    result.key() != null ? result.key().ownerId() : null,
+                    result.claimInfo() != null ? result.claimInfo().partyId() : null,
                     result.message()
             );
             case NO_CLAIM -> new SimpleClaimsClaimIdentityAccess.Result(

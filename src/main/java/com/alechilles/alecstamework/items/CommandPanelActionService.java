@@ -47,7 +47,9 @@ final class CommandPanelActionService {
                    String toolId,
                    TwCommandItemConfig config,
                    UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || config == null || npcUuid == null) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                || player == null || toolId == null || toolId.isBlank()
+                || npcUuid == null) {
             return;
         }
         World world = player.getWorld();
@@ -141,7 +143,9 @@ final class CommandPanelActionService {
                            String toolId,
                            TwCommandItemConfig config,
                            UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                || player == null || toolId == null || toolId.isBlank()
+                || npcUuid == null) {
             return;
         }
         CommandLinkMutationService.ActiveToggleResult[] resultHolder =
@@ -171,8 +175,11 @@ final class CommandPanelActionService {
 
     void applyToggleBreeding(Player player,
                              String toolId,
+                             TwCommandItemConfig config,
                              UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)
+                || player == null || toolId == null || toolId.isBlank()
+                || npcUuid == null) {
             return;
         }
         CommandLinkMutationService.BreedingToggleResult[] resultHolder =
@@ -225,7 +232,11 @@ final class CommandPanelActionService {
 
     void applySetAutoLinkEnabled(Player player,
                                  String toolId,
+                                 TwCommandItemConfig config,
                                  boolean enabled) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+            return;
+        }
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
                 toolId,
@@ -340,8 +351,12 @@ final class CommandPanelActionService {
 
     void applySetLinkedNpcGroup(Player player,
                                 String toolId,
+                                TwCommandItemConfig config,
                                 UUID npcUuid,
                                 String groupId) {
+        if (!CommandRosterStorageBoundary.allowsGenericRosterActions(config)) {
+            return;
+        }
         groupActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
     }
 

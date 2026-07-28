@@ -1,0 +1,40 @@
+$C = "Common.ui";
+
+Group {
+    Anchor: (Height: 44, Left: 0, Right: 0);
+    Background: #0b1728;
+
+    ItemGrid #CostItem {
+        Anchor: (Top: 6, Left: 7, Width: 32, Height: 32);
+        SlotsPerRow: 1;
+        RenderItemQualityBackground: false;
+        InfoDisplay: None;
+    }
+
+    Label #CostName {
+        Anchor: (Top: 5, Left: 47, Width: 178, Height: 18);
+        Text: "";
+        Style: (FontSize: 12, TextColor: #eef5ff, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Label #CostSatisfied {
+        Anchor: (Top: 5, Right: 9, Width: 82, Height: 18);
+        Text: "0 / 0";
+        Style: (FontSize: 12, RenderBold: true, TextColor: #71e887, HorizontalAlignment: End, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Label #CostInsufficient {
+        Anchor: (Top: 5, Right: 9, Width: 82, Height: 18);
+        Text: "0 / 0";
+        Style: (FontSize: 12, RenderBold: true, TextColor: #ff7777, HorizontalAlignment: End, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Label #CostShortage {
+        Anchor: (Top: 23, Left: 47, Right: 9, Height: 15);
+        Text: "";
+        Style: (FontSize: 10, TextColor: #ff9f9f, HorizontalAlignment: Start, VerticalAlignment: Center);
+        Visible: false;
+    }
+}

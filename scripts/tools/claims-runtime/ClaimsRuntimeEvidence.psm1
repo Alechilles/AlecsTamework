@@ -286,6 +286,8 @@ public final class ClaimsRuntimeSqliteProbe {
                 "SELECT COUNT(*) FROM schema_migrations WHERE version = 6 AND name = 'schema_v6_companion_population_integrity'"));
             emit("migration_v7_count", tableScalar(connection, "schema_migrations",
                 "SELECT COUNT(*) FROM schema_migrations WHERE version = 7 AND name = 'schema_v7_persistence_resilience'"));
+            emit("migration_v8_count", tableScalar(connection, "schema_migrations",
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 8 AND name = 'schema_v8_hydragon_integration_foundations'"));
             emit("migration_versions", tableScalar(connection, "schema_migrations",
                 "SELECT group_concat(version || ':' || name, ',') FROM (SELECT version, name FROM schema_migrations ORDER BY version)"));
             emit("coverage_total", tableScalar(connection, "companion_population_reconciliation",
@@ -386,7 +388,7 @@ function Invoke-ClaimsRuntimeSqliteProbe {
     }
     $required = @(
         "database_path", "integrity_check", "journal_mode", "synchronous",
-        "migration_v6_count", "migration_v7_count", "migration_versions", "coverage_total", "coverage_ready", "coverage_error_count",
+        "migration_v6_count", "migration_v7_count", "migration_v8_count", "migration_versions", "coverage_total", "coverage_ready", "coverage_error_count",
         "coverage_distinct_dimensions", "coverage_dimensions", "coverage_rows", "per_world_owner_error",
         "scan_session_state",
         "nonterminal_operations", "retryable_operations", "retryable_breeding_operations", "canonical_rows", "profile_rows", "missing_canonical_rows",
@@ -404,6 +406,7 @@ function Invoke-ClaimsRuntimeSqliteProbe {
         synchronous = [long]$values.synchronous
         migrationV6Count = [long]$values.migration_v6_count
         migrationV7Count = [long]$values.migration_v7_count
+        migrationV8Count = [long]$values.migration_v8_count
         migrationVersions = $values.migration_versions
         coverageTotal = [long]$values.coverage_total
         coverageReady = [long]$values.coverage_ready
@@ -444,6 +447,7 @@ function Test-ClaimsRuntimeSqliteEvidence {
     Add-Check "synchronous" ($Evidence.synchronous -eq 2) $Evidence.synchronous "2 (FULL)"
     Add-Check "schema-v6" ($Evidence.migrationV6Count -eq 1) $Evidence.migrationV6Count 1
     Add-Check "schema-v7" ($Evidence.migrationV7Count -eq 1) $Evidence.migrationV7Count 1
+    Add-Check "schema-v8" ($Evidence.migrationV8Count -eq 1) $Evidence.migrationV8Count 1
     $fullyReady = $Evidence.coverageReady -eq $Evidence.coverageTotal `
         -and $Evidence.coverageErrorCount -eq 0 `
         -and $Evidence.scanSessionState -ceq "READY"
