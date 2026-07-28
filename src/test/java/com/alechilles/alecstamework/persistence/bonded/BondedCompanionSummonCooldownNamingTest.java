@@ -26,18 +26,14 @@ class BondedCompanionSummonCooldownNamingTest {
                 StandardCharsets.UTF_8);
         String v1 = Files.readString(BONDED_SCHEMA.resolve("v1.sql"),
                 StandardCharsets.UTF_8);
-        String v2 = Files.readString(BONDED_SCHEMA.resolve("v2.sql"),
-                StandardCharsets.UTF_8);
 
         assertTrue(record.contains("summonCooldownUntilMs"));
         assertTrue(row.contains("summonCooldownUntilMs"));
         assertTrue(v1.contains("summon_cooldown_until_ms"));
-        assertTrue(v2.contains("summon_cooldown_until_ms"));
         String legacyJavaName = "revive" + "CooldownUntilMs";
         String legacyColumnName = "revive_" + "cooldown_until_ms";
         assertFalse(record.contains(legacyJavaName));
         assertFalse(row.contains(legacyJavaName));
         assertFalse(v1.contains(legacyColumnName));
-        assertFalse(v2.contains(legacyColumnName));
     }
 }

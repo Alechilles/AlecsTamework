@@ -12,47 +12,47 @@ import java.sql.Statement;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Behavioral tamper tests for exact capture-source index authority. */
+/** Behavioral tamper tests for durable capture-source index authority. */
 class BondedCompanionSchemaAuthorityTamperTest {
-    private static final String PREFIX = """
-            CREATE UNIQUE INDEX bonded_capture_source_once_idx
-            ON bonded_companion_operation(%s)
-            WHERE operation_type = 'CAPTURE'
-              AND operation_state = 'SUCCEEDED'
-              AND json_type(
-                  result_json, '$.captureEvidence.sourceNpcUuid'
-              ) = 'text'
-            """;
     @TempDir Path tempDir;
 
     @Test
-    void inertAdditionalPredicateInvalidatesSourceFence() throws Exception {
-        assertRejected(PREFIX.formatted("json_extract(result_json, "
-                + "'$.captureEvidence.sourceNpcUuid')") + " AND 0");
+    void missingDurableSourceFenceIsRejected() throws Exception {
+        assertRejected("DROP INDEX bonded_capture_source_uuid_uq",
+                "bonded-schema-ddl-mismatch");
     }
 
     @Test
-    void wrongIndexedJsonExpressionInvalidatesSourceFence() throws Exception {
-        assertRejected(PREFIX.formatted("json_extract(result_json, "
-                + "'$.captureEvidence.profileId')"));
-    }
-
-    @Test
-    void missingSuccessPredicateInvalidatesSourceFence() throws Exception {
+    void operationTableWithoutTerminalTypeAndStateChecksIsRejected()
+            throws Exception {
         assertRejected("""
-                CREATE UNIQUE INDEX bonded_capture_source_once_idx
-                ON bonded_companion_operation(
-                    json_extract(result_json,
-                                 '$.captureEvidence.sourceNpcUuid')
+                DROP TABLE bonded_companion_operation;
+                CREATE TABLE bonded_companion_operation (
+                    caller_namespace TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    owner_uuid TEXT NOT NULL,
+                    roster_id TEXT NOT NULL,
+                    profile_id TEXT,
+                    operation_type TEXT NOT NULL,
+                    request_hash TEXT NOT NULL,
+                    operation_state TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    expires_at_ms INTEGER NOT NULL,
+                    expected_revision INTEGER,
+                    PRIMARY KEY(caller_namespace, idempotency_key)
                 )
-                WHERE operation_type = 'CAPTURE'
-                  AND json_type(
-                      result_json, '$.captureEvidence.sourceNpcUuid'
-                  ) = 'text'
-                """);
+                """, "bonded-schema-ddl-mismatch");
     }
 
-    private void assertRejected(String replacementSql) throws Exception {
+    @Test
+    void operationTableWithoutRetentionIndexIsRejected() throws Exception {
+        assertRejected("DROP INDEX bonded_operation_retention_idx",
+                "bonded-schema-ddl-mismatch");
+    }
+
+    private void assertRejected(String tamperSql, String expectedCode) throws Exception {
         Path path = tempDir.resolve(UUIDName.next() + ".sqlite");
         BondedCompanionSchemaManager manager =
                 new BondedCompanionSchemaManager(path, () -> 10L);
@@ -60,17 +60,15 @@ class BondedCompanionSchemaAuthorityTamperTest {
         try (Connection connection = new SqliteConnectionFactory(path)
                 .openWriterConnection();
              Statement statement = connection.createStatement()) {
-            assertEquals(2, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version IN (7, 8)"));
-            statement.execute("DROP TABLE bonded_companion_capture_source");
-            statement.execute(replacementSql);
+            for (String sql : tamperSql.split(";\\s*(?:\\R|\\z)")) {
+                if (!sql.isBlank()) statement.execute(sql);
+            }
         }
 
         BondedCompanionPersistenceReadiness readiness = manager.initialize();
 
         assertFalse(readiness.availability().available());
-        assertEquals("bonded-capture-source-fence-missing",
-                readiness.diagnosticCode());
+        assertEquals(expectedCode, readiness.diagnosticCode());
     }
 
     private static final class UUIDName {

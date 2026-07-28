@@ -65,17 +65,17 @@ command settings, and namespaced extension payloads when those components are
 available. Store merges newly observed state without treating unavailable
 optional components as deletion.
 
-Schema version 7 has seven bonded-only tables:
+Final fresh-world schema v1 has seven bonded-only tables:
 
 | Table | Unique authority |
 | --- | --- |
-| `bonded_schema_history` | Independent lineage, version, and script hashes |
+| `bonded_schema_history` | Final fresh-world v1 lineage, version, and exact schema hash |
 | `bonded_companion_profile` | Stable identity, family, three-state lifecycle, snapshot, policy evidence, death/revive summary |
 | `bonded_companion_lease` | One opaque lease token and exact temporary projection |
 | `bonded_companion_extension_data` | Owner/profile/namespace JSON with optimistic revision |
 | `bonded_companion_cleanup` | Bounded exact source/projection cleanup intents |
-| `bonded_companion_operation` | Idempotent capture/provision/summon/store/revive/cleanup results and payment fencing |
-| `bonded_companion_capture_source` | Profile-lifetime proof that one original source NPC was captured once |
+| `bonded_companion_operation` | Terminal idempotent capture/provision/store/revive results and payment fencing |
+| `bonded_companion_capture_source` | Profile-lifetime proof that one original source NPC was captured once, including its capture snapshot |
 
 The bonded database never registers a generic companion profile, alias,
 lifecycle row, command-family slot, population membership, timed-summon row,

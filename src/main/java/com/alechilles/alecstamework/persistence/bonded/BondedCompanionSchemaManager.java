@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteConnectionFactory;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -12,18 +14,10 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 
-/** Creates, upgrades, and verifies the standalone bonded-companion schema. */
+/** Initializes and verifies the final fresh-world bonded-companion schema. */
 public final class BondedCompanionSchemaManager {
     public static final int VERSION = BondedCompanionSchemaCatalog.VERSION;
     public static final String LINEAGE = "bonded-companions";
-    private static final Set<String> LEGACY_TABLES = Set.of(
-            "bonded_schema_history",
-            "bonded_companion_profile",
-            "bonded_companion_lease",
-            "bonded_companion_extension_data",
-            "bonded_companion_cleanup",
-            "bonded_companion_operation"
-    );
     private static final Set<String> REQUIRED_TABLES = Set.of(
             "bonded_schema_history",
             "bonded_companion_profile",
@@ -37,9 +31,8 @@ public final class BondedCompanionSchemaManager {
     private final SqliteConnectionFactory connections;
     private final LongSupplier clock;
     private final BondedCompanionSchemaCatalog catalog;
-    BondedCompanionSchemaManager(
-            @Nonnull SqliteConnectionFactory connections
-    ) {
+
+    BondedCompanionSchemaManager(@Nonnull SqliteConnectionFactory connections) {
         this(connections, System::currentTimeMillis);
     }
 
@@ -49,7 +42,7 @@ public final class BondedCompanionSchemaManager {
     ) {
         this.connections = Objects.requireNonNull(connections, "connections");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.catalog = new BondedCompanionSchemaCatalog();
+        catalog = new BondedCompanionSchemaCatalog();
     }
 
     /** Creates a manager that owns connections to the supplied database path. */
@@ -66,35 +59,45 @@ public final class BondedCompanionSchemaManager {
                 Objects.requireNonNull(databasePath, "databasePath")), clock);
     }
 
-    /** Initializes an empty bonded database or verifies the existing exact lineage. */
+    /** Initializes only an empty database; nonempty legacy databases fail closed. */
     @Nonnull
     public BondedCompanionPersistenceReadiness initialize() {
+        try {
+            if (hasExistingContent()) {
+                try (Connection connection = openImmutableReadConnection()) {
+                    if (!tables(connection).isEmpty()) {
+                        verify(connection);
+                        return BondedCompanionPersistenceReadiness.ready();
+                    }
+                }
+            }
+        } catch (Exception failure) {
+            return failure(failure);
+        }
         try (Connection connection = connections.openWriterConnection()) {
             setForeignKeys(connection, false);
             connection.setAutoCommit(false);
             try {
-                Set<String> existingTables = tables(connection);
-                if (existingTables.isEmpty()) {
+                if (tables(connection).isEmpty()) {
                     createCurrent(connection);
                 } else {
-                    initializeExisting(connection, existingTables);
+                    verify(connection);
                 }
                 connection.commit();
-                connection.setAutoCommit(true);
-                setForeignKeys(connection, true);
                 return BondedCompanionPersistenceReadiness.ready();
             } catch (Exception failure) {
                 connection.rollback();
+                return failure(failure);
+            } finally {
                 connection.setAutoCommit(true);
                 setForeignKeys(connection, true);
-                return failure(failure);
             }
         } catch (Exception failure) {
             return failure(failure);
         }
     }
 
-    /** Verifies schema history, table isolation, integrity, and lease/profile consistency. */
+    /** Verifies the final schema, history, integrity, and persisted row contracts. */
     @Nonnull
     public BondedCompanionPersistenceReadiness verify() {
         try (Connection connection = connections.openReadConnection()) {
@@ -105,10 +108,10 @@ public final class BondedCompanionSchemaManager {
         }
     }
 
-    /** Returns the SHA-256 of the exact bundled current bonded schema. */
+    /** Returns the SHA-256 of the exact bundled final bonded schema. */
     @Nonnull
     public String schemaHash() {
-        return catalog.hash(VERSION);
+        return catalog.hash();
     }
 
     /** Returns the exact bonded-only user-table set. */
@@ -118,125 +121,30 @@ public final class BondedCompanionSchemaManager {
     }
 
     private void createCurrent(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(1));
-        insertHistory(connection, 1, catalog.hash(1));
-        upgradeV1(connection);
-    }
-
-    private void initializeExisting(
-            Connection connection,
-            Set<String> existingTables
-    ) throws Exception {
-        int version = latestVersion(connection);
-        Set<String> expected = version <= 6 ? LEGACY_TABLES : REQUIRED_TABLES;
-        if (!existingTables.equals(expected)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        switch (version) {
-            case 1 -> { verifyV1(connection); upgradeV1(connection); }
-            case 2 -> { verifyV2(connection); upgradeV2(connection); }
-            case 3 -> { verifyV3(connection); applyV4(connection); }
-            case 4 -> { verifyV4(connection); applyV5(connection); }
-            case 5 -> { verifyV5(connection); applyV6(connection); }
-            case 6 -> { verifyV6(connection); applyV7(connection); }
-            case 7 -> { verifyV7(connection); applyV8(connection); }
-            case VERSION -> verify(connection);
-            default -> throw historyMismatch();
-        }
-    }
-
-    private void upgradeV1(Connection connection) throws Exception {
-        prepareV1OperationBackup(connection);
-        executeScript(connection, catalog.script(2));
-        insertHistory(connection, 2, catalog.hash(2));
-        applyV3(connection);
-    }
-
-    private void upgradeV2(Connection connection) throws Exception {
-        convertV2NoValueOperationTypes(connection);
-        prepareEmptyOperationBackup(connection);
-        applyV3(connection);
-    }
-
-    private void convertV2NoValueOperationTypes(Connection connection)
-            throws Exception {
-        try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("""
-                    UPDATE bonded_companion_operation
-                    SET result_json = json_set(
-                        result_json,
-                        '$.valueType',
-                        CASE operation_type
-                            WHEN 'SUMMON' THEN 'LEASE'
-                            WHEN 'CLEANUP' THEN 'CLEANUP'
-                            ELSE 'PROFILE'
-                        END
-                    )
-                    WHERE operation_state <> 'PENDING'
-                      AND json_type(result_json, '$.valueType') = 'text'
-                      AND json_extract(result_json, '$.valueType') = 'NONE'
-                      AND json_type(result_json, '$.value') = 'null'
-                    """);
-        }
-    }
-
-    private void applyV3(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(3));
-        insertHistory(connection, 3, catalog.hash(3));
-        applyV4(connection);
-    }
-
-    private void applyV4(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(4));
-        insertHistory(connection, 4, catalog.hash(4));
-        applyV5(connection);
-    }
-
-    private void applyV5(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(5));
-        insertHistory(connection, 5, catalog.hash(5));
-        applyV6(connection);
-    }
-
-    private void applyV6(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(6));
-        insertHistory(connection, 6, catalog.hash(6));
-        verifyV6(connection);
-        applyV7(connection);
-    }
-
-    private void applyV7(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(7));
-        insertHistory(connection, 7, catalog.hash(7));
-        applyV8(connection);
-    }
-
-    private void applyV8(Connection connection) throws Exception {
-        executeScript(connection, catalog.script(8));
-        insertHistory(connection, 8, catalog.hash(8));
-        verify(connection);
-    }
-
-    private void insertHistory(Connection connection, int version, String hash)
-            throws Exception {
+        executeScript(connection, catalog.script());
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO bonded_schema_history(
                     version, lineage, applied_at_ms, schema_hash
                 ) VALUES (?, ?, ?, ?)
                 """)) {
-            statement.setInt(1, version);
+            statement.setInt(1, VERSION);
             statement.setString(2, LINEAGE);
             statement.setLong(3, clock.getAsLong());
-            statement.setString(4, hash);
+            statement.setString(4, catalog.hash());
             statement.executeUpdate();
         }
+        verify(connection);
     }
 
     private void verify(Connection connection) throws Exception {
         if (!tables(connection).equals(REQUIRED_TABLES)) {
             throw new VerificationFailure("bonded-schema-table-mismatch");
         }
-        verifyHistory(connection, catalog.hashesThrough(VERSION));
+        if (!BondedCompanionSchemaAuthorityVerifier.hasExactFinalSchema(
+                connection, catalog.script())) {
+            throw new VerificationFailure("bonded-schema-ddl-mismatch");
+        }
+        verifyHistory(connection);
         if (!BondedCompanionSchemaAuthorityVerifier
                 .hasDurableCaptureSourceFence(connection)) {
             throw new VerificationFailure("bonded-capture-source-fence-missing");
@@ -251,177 +159,36 @@ public final class BondedCompanionSchemaManager {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("PRAGMA foreign_key_check")) {
             if (rows.next()) {
-                throw new VerificationFailure(
-                        "bonded-foreign-key-check-failed"
-                );
+                throw new VerificationFailure("bonded-foreign-key-check-failed");
             }
         }
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("""
                      SELECT p.profile_id
                      FROM bonded_companion_profile p
-                     LEFT JOIN bonded_companion_lease l
-                       ON l.profile_id = p.profile_id
+                     LEFT JOIN bonded_companion_lease l ON l.profile_id = p.profile_id
                      WHERE (p.state = 'ACTIVE' AND l.profile_id IS NULL)
                         OR (p.state <> 'ACTIVE' AND l.profile_id IS NOT NULL)
                      LIMIT 1
                      """)) {
             if (rows.next()) {
-                throw new VerificationFailure(
-                        "bonded-orphaned-active-lease"
-                );
+                throw new VerificationFailure("bonded-orphaned-active-lease");
             }
         }
     }
 
-    private void verifyV1(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(1));
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("PRAGMA foreign_key_check")) {
-            if (rows.next()) {
-                throw new VerificationFailure("bonded-foreign-key-check-failed");
-            }
-        }
-    }
-
-    private void verifyV2(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(2));
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-        try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("PRAGMA foreign_key_check")) {
-            if (rows.next()) {
-                throw new VerificationFailure("bonded-foreign-key-check-failed");
-            }
-        }
-    }
-
-    private void verifyV3(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(3));
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-    }
-
-    private void verifyV4(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(4));
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-    }
-
-    private void verifyV5(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(5));
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-    }
-
-    private void verifyV6(Connection connection) throws Exception {
-        if (!tables(connection).equals(LEGACY_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(6));
-        if (!BondedCompanionSchemaAuthorityVerifier
-                .hasLegacyCaptureSourceFence(connection)) {
-            throw new VerificationFailure("bonded-capture-source-fence-missing");
-        }
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-    }
-
-    private void verifyV7(Connection connection) throws Exception {
-        if (!tables(connection).equals(REQUIRED_TABLES)) {
-            throw new VerificationFailure("bonded-schema-table-mismatch");
-        }
-        verifyHistory(connection, catalog.hashesThrough(7));
-        if (!BondedCompanionSchemaAuthorityVerifier
-                .hasDurableCaptureSourceFence(connection)) {
-            throw new VerificationFailure("bonded-capture-source-fence-missing");
-        }
-        assertSingleValue(connection, "PRAGMA integrity_check", "ok",
-                "bonded-integrity-check-failed");
-    }
-
-    private void verifyHistory(Connection connection, String... hashes)
-            throws Exception {
+    private void verifyHistory(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("""
                      SELECT version, lineage, schema_hash
-                     FROM bonded_schema_history ORDER BY version
+                     FROM bonded_schema_history
                      """)) {
-            for (int index = 0; index < hashes.length; index++) {
-                verifyHistoryRow(rows, index + 1, hashes[index]);
+            if (!rows.next() || rows.getInt("version") != VERSION
+                    || !LINEAGE.equals(rows.getString("lineage"))
+                    || !catalog.hash().equals(rows.getString("schema_hash"))
+                    || rows.next()) {
+                throw new VerificationFailure("bonded-schema-history-mismatch");
             }
-            if (rows.next()) throw historyMismatch();
-        }
-    }
-
-    private void prepareV1OperationBackup(Connection connection) throws Exception {
-        prepareEmptyOperationBackup(connection);
-        try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("""
-                    INSERT INTO temp.bonded_v1_terminal_operation(
-                        caller_namespace, idempotency_key, operation_type,
-                        operation_state, result_json
-                    )
-                    SELECT caller_namespace, idempotency_key, operation_type,
-                           operation_state, result_json
-                    FROM bonded_companion_operation
-                    WHERE operation_state <> 'PENDING'
-                    """);
-        }
-    }
-
-    private void prepareEmptyOperationBackup(Connection connection) throws Exception {
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS temp.bonded_v1_terminal_operation");
-            statement.execute("""
-                    CREATE TEMP TABLE bonded_v1_terminal_operation(
-                        caller_namespace TEXT NOT NULL,
-                        idempotency_key TEXT NOT NULL,
-                        operation_type TEXT NOT NULL,
-                        operation_state TEXT NOT NULL,
-                        result_json TEXT,
-                        PRIMARY KEY(caller_namespace, idempotency_key)
-                    )
-                    """);
-        }
-    }
-
-    private void verifyHistoryRow(ResultSet rows, int version, String hash)
-            throws Exception {
-        if (!rows.next() || rows.getInt("version") != version
-                || !LINEAGE.equals(rows.getString("lineage"))
-                || !hash.equals(rows.getString("schema_hash"))) {
-            throw historyMismatch();
-        }
-    }
-
-    private VerificationFailure historyMismatch() {
-        return new VerificationFailure("bonded-schema-history-mismatch");
-    }
-
-    private int latestVersion(Connection connection) throws Exception {
-        try (Statement statement = connection.createStatement();
-             ResultSet row = statement.executeQuery(
-                     "SELECT MAX(version) FROM bonded_schema_history")) {
-            if (!row.next()) throw historyMismatch();
-            return row.getInt(1);
         }
     }
 
@@ -432,15 +199,36 @@ public final class BondedCompanionSchemaManager {
                      SELECT name FROM sqlite_master
                      WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
                      """)) {
-            while (rows.next()) {
-                names.add(rows.getString(1));
-            }
+            while (rows.next()) names.add(rows.getString(1));
         }
         return Set.copyOf(names);
     }
 
-    private void executeScript(Connection connection, String script)
-            throws Exception {
+    /**
+     * Classifies existing databases without acquiring write locks, changing journal mode,
+     * or creating WAL shared-memory sidecars. Only a missing or table-empty target may proceed
+     * to the writer used for fresh v1 creation.
+     */
+    private boolean hasExistingContent() throws Exception {
+        Path databasePath = connections.databasePath();
+        return Files.isRegularFile(databasePath) && Files.size(databasePath) > 0;
+    }
+
+    private Connection openImmutableReadConnection() throws Exception {
+        Class.forName("org.sqlite.JDBC");
+        String uri = connections.databasePath().toUri() + "?mode=ro&immutable=1";
+        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + uri);
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA query_only=ON");
+            statement.execute("PRAGMA foreign_keys=ON");
+        } catch (Exception failure) {
+            connection.close();
+            throw failure;
+        }
+        return connection;
+    }
+
+    private void executeScript(Connection connection, String script) throws Exception {
         for (String sql : script.split(";\\s*(?:\\R|\\z)")) {
             if (!sql.isBlank()) {
                 try (Statement statement = connection.createStatement()) {
@@ -450,18 +238,14 @@ public final class BondedCompanionSchemaManager {
         }
     }
 
-    private void setForeignKeys(Connection connection, boolean enabled)
-            throws Exception {
+    private void setForeignKeys(Connection connection, boolean enabled) throws Exception {
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA foreign_keys=" + (enabled ? "ON" : "OFF"));
         }
     }
 
     private void assertSingleValue(
-            Connection connection,
-            String sql,
-            String expected,
-            String failureCode
+            Connection connection, String sql, String expected, String failureCode
     ) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet row = statement.executeQuery(sql)) {
@@ -474,8 +258,7 @@ public final class BondedCompanionSchemaManager {
 
     private BondedCompanionPersistenceReadiness failure(Throwable failure) {
         String code = failure instanceof VerificationFailure
-                ? failure.getMessage()
-                : "bonded-persistence-startup-failed";
+                ? failure.getMessage() : "bonded-persistence-startup-failed";
         return BondedCompanionPersistenceReadiness.failed(code);
     }
 

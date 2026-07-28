@@ -4,39 +4,32 @@ import com.alechilles.alecstamework.persistence.adapter.sqlite
         .SqliteBondedCompanionProfileRow;
 import com.google.gson.Gson;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /** Verifies exact schema objects that enforce capture-source authority. */
 final class BondedCompanionSchemaAuthorityVerifier {
     private static final Gson GSON = new Gson();
-    private static final String LEGACY_INDEX =
-            "bonded_capture_source_once_idx";
     private static final String DURABLE_INDEX =
             "bonded_capture_source_uuid_uq";
-    private static final String LEGACY_SQL = """
-            CREATE UNIQUE INDEX bonded_capture_source_once_idx
-            ON bonded_companion_operation(
-                json_extract(result_json, '$.captureEvidence.sourceNpcUuid')
-            )
-            WHERE operation_type = 'CAPTURE'
-              AND operation_state = 'SUCCEEDED'
-              AND json_type(
-                  result_json, '$.captureEvidence.sourceNpcUuid'
-              ) = 'text'
-            """;
 
-    static boolean hasLegacyCaptureSourceFence(Connection connection)
+    /**
+     * Compares the database's complete table and named-index DDL with a schema freshly built
+     * from the bundled v1 authority. Table SQL includes every column, primary/unique key,
+     * foreign key, and CHECK constraint; named index SQL covers all required query indexes.
+     */
+    static boolean hasExactFinalSchema(Connection connection, String script)
             throws Exception {
         Objects.requireNonNull(connection, "connection");
-        Index index = index(connection, "bonded_companion_operation",
-                LEGACY_INDEX);
-        return index != null && index.unique && index.partial
-                && normalize(LEGACY_SQL).equals(normalize(index.sql));
+        Objects.requireNonNull(script, "script");
+        return schemaObjects(connection).equals(expectedSchemaObjects(script));
     }
 
     static boolean hasDurableCaptureSourceFence(Connection connection)
@@ -252,10 +245,46 @@ final class BondedCompanionSchemaAuthorityVerifier {
         }
     }
 
-    private static String normalize(String sql) {
-        return sql == null ? "" : sql.toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", "")
-                .replaceAll(";+$", "");
+    private static Map<String, String> expectedSchemaObjects(String script)
+            throws Exception {
+        try (Connection authority = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+            for (String sql : script.split(";\\s*(?:\\R|\\z)")) {
+                if (!sql.isBlank()) {
+                    try (Statement statement = authority.createStatement()) {
+                        statement.execute(sql);
+                    }
+                }
+            }
+            return schemaObjects(authority);
+        }
+    }
+
+    private static Map<String, String> schemaObjects(Connection connection)
+            throws Exception {
+        HashMap<String, String> objects = new HashMap<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("""
+                     SELECT type, name, sql FROM sqlite_master
+                     WHERE type IN ('table', 'index')
+                       AND name NOT LIKE 'sqlite_%'
+                     ORDER BY type, name
+                     """)) {
+            while (rows.next()) {
+                String sql = rows.getString("sql");
+                if (sql == null) return Map.of();
+                objects.put(rows.getString("type") + ":" + rows.getString("name"),
+                        normalizeDdl(sql));
+            }
+        }
+        return Map.copyOf(objects);
+    }
+
+    private static String normalizeDdl(String sql) {
+        String normalized = sql.trim().replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
+        return normalized.endsWith(";")
+                ? normalized.substring(0, normalized.length() - 1).trim()
+                : normalized;
     }
 
     private record Index(boolean unique, boolean partial, String sql) {

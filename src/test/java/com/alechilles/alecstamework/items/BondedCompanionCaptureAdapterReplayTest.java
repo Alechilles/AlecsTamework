@@ -245,24 +245,6 @@ class BondedCompanionCaptureAdapterReplayTest {
     }
 
     @Test
-    void v5StartupAppliesCaptureSourceFenceMigration() throws Exception {
-        Path path = tempDir.resolve("v5-source-index-upgrade.sqlite");
-        BondedCompanionSchemaManager manager =
-                new BondedCompanionSchemaManager(path, () -> 10L);
-        assertTrue(manager.initialize().availability().available());
-        try (Connection connection = new SqliteConnectionFactory(path)
-                .openWriterConnection();
-             Statement statement = connection.createStatement()) {
-            assertEquals(2, statement.executeUpdate(
-                    "DELETE FROM bonded_schema_history WHERE version IN (6, 7)"));
-            statement.execute("DROP TABLE bonded_companion_capture_source");
-        }
-
-        assertTrue(manager.initialize().availability().available());
-        assertFalse(indexSql(path).isBlank());
-    }
-
-    @Test
     void droppedCaptureSourceFenceMakesReadinessFailClosed() throws Exception {
         Fixture fixture = fixture("source-index-tamper.sqlite",
                 rosterRegistry());
