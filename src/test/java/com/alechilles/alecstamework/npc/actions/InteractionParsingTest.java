@@ -2,15 +2,19 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.bson.BsonDocument;
 import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction parsing. */
 class InteractionParsingTest {
@@ -51,6 +55,21 @@ class InteractionParsingTest {
         assertNull(items[0].getHeal());
         assertEquals("ItemB", items[1].getItem());
         assertEquals(4.0, items[1].getHeal());
+    }
+
+    @Test
+    void setRoleChangeAppearanceDecodesAndDefaultsToFalse() {
+        TwInteractionConfig.SetRoleEffect visualSwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\",\"ChangeAppearance\":true}"),
+                new ExtraInfo()
+        );
+        TwInteractionConfig.SetRoleEffect legacySwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\"}"),
+                new ExtraInfo()
+        );
+
+        assertTrue(visualSwap.getChangeAppearance());
+        assertFalse(legacySwap.getChangeAppearance());
     }
 
     @Test

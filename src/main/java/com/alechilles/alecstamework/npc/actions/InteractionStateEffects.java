@@ -52,8 +52,6 @@ final class InteractionStateEffects {
      * state/substate names from the source role. Interaction-driven role changes should
      * start from the target role's default state.
      */
-    private static final boolean PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE = false;
-
     // Marks the NPC as tamed and assigns owner based on the interacting player.
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
@@ -320,7 +318,7 @@ final class InteractionStateEffects {
     }
 
     // Swaps the NPC role using the role change system.
-    boolean applySetRole(String roleId, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+    boolean applySetRole(String roleId, boolean changeAppearance, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
         if (role == null || npcRef == null || store == null) {
             return false;
         }
@@ -340,7 +338,7 @@ final class InteractionStateEffects {
                 npcRef,
                 role,
                 roleIndex,
-                PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE,
+                changeAppearance,
                 store
         );
         applyDisableSpawnDrivenDespawn(npcRef, store);

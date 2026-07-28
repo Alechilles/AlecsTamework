@@ -32,6 +32,14 @@ class InteractionBehaviorTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "actions", "InteractionHarvestEffects.java"
     );
+    private static final Path INTERACTION_EFFECTS = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractEffects.java"
+    );
+    private static final Path INTERACTION_STATE_EFFECTS = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionStateEffects.java"
+    );
 
     @Test
     void roleParamResolutionUsesFirstScopeWithValue() throws Exception {
@@ -87,6 +95,29 @@ class InteractionBehaviorTest {
         entryCooldown.set(entry, null);
         int fallback = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(10, fallback);
+    }
+
+    @Test
+    void setRoleEffectForwardsVisualChangeFlagWhileLegacyRoleSwapsRemainFalse() throws Exception {
+        String interactionEffects = Files.readString(INTERACTION_EFFECTS, StandardCharsets.UTF_8);
+        String stateEffects = Files.readString(INTERACTION_STATE_EFFECTS, StandardCharsets.UTF_8);
+
+        assertTrue(interactionEffects.contains(
+                "stateEffects.applySetRole(roleId, effect.getChangeAppearance(), npcRef, role, store)"),
+                "SetRole must forward its opt-in visual-change flag."
+        );
+        assertTrue(interactionEffects.contains(
+                "stateEffects.applySetRole(roleId, false, npcRef, role, store)"),
+                "Existing tame role swaps must retain the false visual-change default."
+        );
+        assertTrue(stateEffects.contains(
+                "boolean changeAppearance, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store)"),
+                "Role changes must accept the interaction visual-change flag."
+        );
+        assertTrue(stateEffects.contains(
+                "roleIndex,\n                changeAppearance,\n                store"),
+                "RoleChangeSystem must receive the requested visual-change flag."
+        );
     }
 
     @Test

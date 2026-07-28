@@ -264,7 +264,7 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        boolean changed = stateEffects.applySetRole(roleId, npcRef, role, store);
+        boolean changed = stateEffects.applySetRole(roleId, false, npcRef, role, store);
         if (changed) {
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store, roleId);
         }
@@ -283,7 +283,7 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        return stateEffects.applySetRole(roleId, npcRef, role, store);
+        return stateEffects.applySetRole(roleId, effect.getChangeAppearance(), npcRef, role, store);
     }
 
     private String resolveRoleId(String roleId, String roleParam, Role role, InteractionContextSnapshot ctx) {

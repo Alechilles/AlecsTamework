@@ -1061,6 +1061,13 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Role param to resolve a role asset ID (overrides Role).")
         .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ChangeAppearance", Codec.BOOLEAN),
+            (effect, value) -> effect.changeAppearance = value,
+            effect -> effect.changeAppearance
+        )
+        .documentation("Whether this role swap updates the NPC appearance. Defaults to false when omitted.")
+        .add()
         .build();
 
     public static final BuilderCodec<RemoveItemsHandEffect> REMOVE_ITEMS_HAND_EFFECT_CODEC = BuilderCodec.builder(
