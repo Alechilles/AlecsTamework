@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 final class BondedCompanionCardPresenter {
     static final String CARD_UI_PATH = "TameworkBondedCompanionPanelCard.ui";
-    private static final int HEALTH_FILL_WIDTH = 363;
+    private static final int HEALTH_FILL_WIDTH = 351;
     private static final int METRIC_LEFT = 14;
     private static final int METRIC_WIDTH = 66;
     private static final int METRIC_GAP = 6;
@@ -248,9 +248,9 @@ final class BondedCompanionCardPresenter {
             CardLayout layout
     ) {
         commands.setObject(entrySelector + " #BondedStateDetail.Anchor",
-                horizontalAnchor(14, layout.detailTop(), 150, 14));
+                horizontalAnchor(20, layout.detailTop(), 150, 14));
         commands.setObject(entrySelector + " #BondedStateDetailValue.Anchor",
-                horizontalAnchor(14, layout.detailTop() + 14, 150, 18));
+                horizontalAnchor(20, layout.detailTop() + 14, 150, 18));
         Anchor action = rightAnchor(layout.actionTop(), 14, 94, 28);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
         commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",

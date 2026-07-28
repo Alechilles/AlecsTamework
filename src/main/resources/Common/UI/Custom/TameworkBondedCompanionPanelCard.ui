@@ -80,25 +80,25 @@ Group {
     }
 
     Group #BondedGenderMaleIcon {
-        Anchor: (Top: 33, Left: 82, Width: 14, Height: 14);
+        Anchor: (Top: 33, Left: 68, Width: 14, Height: 14);
         Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png");
         Visible: false;
     }
 
     Group #BondedGenderFemaleIcon {
-        Anchor: (Top: 33, Left: 82, Width: 14, Height: 14);
+        Anchor: (Top: 33, Left: 68, Width: 14, Height: 14);
         Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png");
         Visible: false;
     }
 
     Label #BondedSpecies {
-        Anchor: (Top: 30, Left: 100, Width: 108, Height: 18);
+        Anchor: (Top: 30, Left: 86, Width: 122, Height: 18);
         Text: "";
         Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #BondedLevelText {
-        Anchor: (Top: 30, Left: 22, Width: 54, Height: 18);
+        Anchor: (Top: 30, Left: 22, Width: 42, Height: 18);
         Text: "";
         Style: (FontSize: 11, RenderBold: true, TextColor: #f3d775, HorizontalAlignment: Start, VerticalAlignment: Center);
         Visible: false;
@@ -186,11 +186,11 @@ Group {
     }
 
     Group #BondedHealthFrame {
-        Anchor: (Top: 56, Left: 20, Right: 20, Height: 18);
+        Anchor: (Top: 56, Left: 20, Right: 32, Height: 18);
         Background: #08121f;
 
         Group #BondedHealthFill {
-            Anchor: (Top: 1, Left: 1, Width: 363, Height: 16);
+            Anchor: (Top: 1, Left: 1, Width: 351, Height: 16);
             Background: #69c77b;
         }
 
@@ -311,13 +311,13 @@ Group {
     }
 
     Label #BondedStateDetail {
-        Anchor: (Top: 82, Left: 14, Right: 150, Height: 14);
+        Anchor: (Top: 82, Left: 20, Right: 150, Height: 14);
         Text: "";
         Style: (FontSize: 10, RenderBold: true, TextColor: #a9c1d7, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #BondedStateDetailValue {
-        Anchor: (Top: 96, Left: 14, Right: 150, Height: 18);
+        Anchor: (Top: 96, Left: 20, Right: 150, Height: 18);
         Text: "";
         Style: (FontSize: 13, TextColor: #e8f1fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }

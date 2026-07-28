@@ -36,7 +36,7 @@ class BondedCompanionCardPresenterTest {
                 "Lifecycle state is informational text, not a button-like badge.");
         assertTrue(asset.contains("#BondedHealthFrame"));
         assertTrue(asset.contains("#BondedHealthFill")
-                        && asset.contains("Top: 1, Left: 1, Width: 363, Height: 16"),
+                        && asset.contains("Top: 1, Left: 1, Width: 351, Height: 16"),
                 "The static health fill begins inside the track; runtime sizing preserves its right inset.");
         assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
                 "Health treatment should be easier to read than the compact original.");
@@ -158,6 +158,8 @@ class BondedCompanionCardPresenterTest {
 
         assertCommandSelector(commands, "#Card.Anchor");
         assertCommandSelector(commands, "#Card #BondedStateDetail.Anchor");
+        assertCommand(commands, "#Card #BondedStateDetail.Anchor", "20");
+        assertCommand(commands, "#Card #BondedStateDetailValue.Anchor", "20");
         assertCommandSelector(commands, "#Card #BondedPrimaryAction.Anchor");
         assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
         assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
@@ -348,15 +350,15 @@ class BondedCompanionCardPresenterTest {
                 "Common", "UI", "Custom",
                 "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
 
-        assertTrue(asset.contains("#BondedLevelText {\n        Anchor: (Top: 30, Left: 22"),
+        assertTrue(asset.contains("#BondedLevelText {\n        Anchor: (Top: 30, Left: 22, Width: 42"),
                 "Level should lead the compact identity row.");
-        assertTrue(asset.contains("#BondedGenderFemaleIcon {\n        Anchor: (Top: 33, Left: 82"),
+        assertTrue(asset.contains("#BondedGenderFemaleIcon {\n        Anchor: (Top: 33, Left: 68"),
                 "Gender icon should follow the level text.");
-        assertTrue(asset.contains("#BondedSpecies {\n        Anchor: (Top: 30, Left: 100"),
+        assertTrue(asset.contains("#BondedSpecies {\n        Anchor: (Top: 30, Left: 86"),
                 "Species should follow the gender icon.");
         assertTrue(asset.contains("#BondedTalentPointAction {\n        Anchor: (Top: 82, Right: 118"),
                 "The stats button belongs beside the primary bottom-right action.");
-        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 20"),
+        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 32"),
                 "Health should retain equal visible inset on both sides of the card.");
     }
 
