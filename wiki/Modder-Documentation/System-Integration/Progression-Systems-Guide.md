@@ -44,7 +44,7 @@ Avatar-flight species can also award companion XP by configuring `TwLevelingConf
 }
 ```
 
-`Enabled`, `XpPerQualifiedSecond`, `AwardIntervalSeconds`, and `MaxXpPerMinute` are the complete field set. The defaults are inert: flight awards require `Enabled: true`, a positive rate, interval, and cap; the default interval is `10.0` seconds while the default rate and cap are zero. Tamework qualifies only time that the controller reports as active fast flight, so this is independent of distance travelled, input held, or idle time. It accumulates at most `0.25` seconds per server tick, awards completed 10-second batches in the example above, and enforces the configured rolling `9 XP` per minute limit.
+`Enabled`, `XpPerQualifiedSecond`, `AwardIntervalSeconds`, and `MaxXpPerMinute` are the complete field set. The defaults are inert: flight awards require `Enabled: true`, a positive rate, interval, and cap; the default interval is `10.0` seconds while the default rate and cap are zero. Tamework qualifies only time that the controller reports as active fast flight, so this is independent of distance travelled, input held, or idle time. It accumulates at most `0.25` seconds per server tick and awards completed 10-second batches in the example above. The first award starts a source-anchored 60-second accounting window; the example permits up to `9 XP` in that window, and the allowance resets when the window expires.
 
 The source bucket is `AVATAR_FLIGHT`, which is normal companion XP, not player XP. Awards target the valid parked source companion using its original role's leveling config. A missing, stale, mismatched, or otherwise invalid flight session receives no XP rather than attempting a fallback recipient.
 

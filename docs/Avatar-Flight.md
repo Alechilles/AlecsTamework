@@ -69,7 +69,7 @@ Avatar flight can award ordinary companion XP to the parked source companion thr
 }
 ```
 
-All four fields are required for awards to occur. The default is inert: `Enabled` is false, the XP rate and cap are zero, and the default batch interval is `10.0` seconds. Qualified time is output time, not distance travelled, movement input, or idle time: the avatar must be applying custom flight velocity and meet the configured fast-flight speed threshold. Tamework samples no more than `0.25` qualified seconds per server tick, batches awards every 10 seconds with the example above, and enforces the configured rolling `9 XP` per minute cap.
+All four fields are required for awards to occur. The default is inert: `Enabled` is false, the XP rate and cap are zero, and the default batch interval is `10.0` seconds. Qualified time is output time, not distance travelled, movement input, or idle time: the avatar must be applying custom flight velocity and meet the configured fast-flight speed threshold. Tamework samples no more than `0.25` qualified seconds per server tick and batches awards every 10 seconds with the example above. The first award starts a source-anchored 60-second accounting window; the example permits up to `9 XP` in that window, and the allowance resets when the window expires.
 
 The player never receives this XP. Tamework validates the active player/source session, runtime epoch, rider UUID, source world, and reverse rider link before resolving the original parked source companion and its role-specific leveling config. A stale, missing, or otherwise invalid session is a safe no-award path.
 
