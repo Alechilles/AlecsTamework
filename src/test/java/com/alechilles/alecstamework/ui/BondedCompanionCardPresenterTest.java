@@ -255,6 +255,10 @@ class BondedCompanionCardPresenterTest {
                         .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
                                 && command.data.contains("POINTS AVAILABLE")),
                 "Zero available points must not add redundant identity text.");
+        assertFalse(java.util.Arrays.stream(commands.getCommands())
+                        .anyMatch(command -> "#Card #BondedSpecies.Text".equals(command.selector)
+                                && command.data.contains("<color")),
+                "Runtime label text is literal; colored spans must not be sent as markup.");
     }
 
     @Test
@@ -287,6 +291,20 @@ class BondedCompanionCardPresenterTest {
                 "The inline level text must open this bonded companion's talent page.");
         assertTrue(progression.contains("row.status().state() == BondedCompanionStateView.ACTIVE"),
                 "Only a live companion can open a mutable talent page.");
+    }
+
+    @Test
+    void bondedCardAssetHasAFullCardOutline() throws Exception {
+        String asset = Files.readString(Path.of("src", "main", "resources",
+                "Common", "UI", "Custom",
+                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
+
+        assertTrue(asset.contains("#BondedFrameInWorld"));
+        assertTrue(asset.contains("#BondedFrameStored"));
+        assertTrue(asset.contains("#BondedFrameDead"));
+        assertTrue(asset.contains("#BondedFrameReady"));
+        assertTrue(asset.contains("OutlineColor:") && asset.contains("OutlineSize:"),
+                "The companion card frame should be a subtle outline, not a second opaque panel.");
     }
 
     private static BondedCompanionPanelPresentation presentation(

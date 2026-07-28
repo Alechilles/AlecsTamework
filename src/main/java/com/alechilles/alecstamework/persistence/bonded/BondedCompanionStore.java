@@ -82,6 +82,24 @@ public interface BondedCompanionStore {
             @Nonnull BondedCompanionOperation operation, long expectedRevision,
             long updatedAtMs);
 
+    /**
+     * Replaces one complete profile snapshot under its exact revision fence.
+     * Implementations that do not own complete profile snapshots may return a
+     * storage failure; production storage must implement this mutation.
+     */
+    @Nonnull
+    default BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            updateSnapshot(
+                    @Nonnull BondedCompanionOperation operation,
+                    long expectedRevision,
+                    @Nonnull BondedCompanionPayload snapshot,
+                    long updatedAtMs
+            ) {
+        return new BondedCompanionStoreResult<>(
+                BondedCompanionStoreResult.Code.STORAGE_FAILURE, null,
+                "bonded-snapshot-update-unavailable", false);
+    }
+
     /** Finds one namespaced extension within the exact owner roster scope. */
     @Nonnull Optional<BondedCompanionRecord.ExtensionData> findExtensionData(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId,

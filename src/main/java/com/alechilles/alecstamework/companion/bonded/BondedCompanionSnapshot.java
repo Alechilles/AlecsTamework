@@ -2,11 +2,13 @@ package com.alechilles.alecstamework.companion.bonded;
 
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotCodec;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.google.gson.JsonParser;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Complete state that follows a stable bonded profile.
@@ -94,6 +96,24 @@ public final class BondedCompanionSnapshot {
                 exactMaximum ? maximum : null, restoredPercent,
                 fullState.capturedAtMs());
         return new BondedCompanionSnapshot(restored, extensionData);
+    }
+
+    /** Returns this snapshot with only its persisted talent component replaced. */
+    @Nonnull
+    public BondedCompanionSnapshot withTalents(
+            @Nullable TameworkTalentsComponent talents
+    ) {
+        CoopResidentStateSnapshot state = fullState;
+        CoopResidentStateSnapshot updated = new CoopResidentStateSnapshot(
+                state.npcUuid(), state.coopId(), state.residentSlot(),
+                state.roleId(), state.commandLinks(), state.owner(),
+                state.tamed(), state.npcName(), state.happiness(),
+                state.needs(), state.breeding(), state.leveling(),
+                state.traits(), talents, state.lifeStage(),
+                state.attachments(), state.currentHealth(),
+                state.maximumHealth(), state.healthPercent(),
+                state.capturedAtMs());
+        return new BondedCompanionSnapshot(updated, extensionData);
     }
 
     CoopResidentStateSnapshot fullStateInternal() {

@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.api.BondedCompanionExtensionData;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataKey;
 import com.alechilles.alecstamework.api.BondedCompanionExtensionDataUpdate;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionProvisionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
@@ -194,6 +195,13 @@ public final class BondedCompanionApiFacade
             revive(BondedCompanionReviveRequest request) {
         Objects.requireNonNull(request, "request");
         return executeAsync(() -> operations.reviveAsync(request));
+    }
+
+    @Override
+    public CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
+            updateTalents(BondedCompanionTalentActionRequest request) {
+        Objects.requireNonNull(request, "request");
+        return execute(() -> operations.updateTalents(request));
     }
 
     @Override

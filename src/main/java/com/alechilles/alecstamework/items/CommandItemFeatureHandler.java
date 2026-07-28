@@ -92,6 +92,7 @@ public final class CommandItemFeatureHandler {
     private final CommandGroupAssignPageService groupAssignPageService;
     private final CommandGroupActivationService groupActivationService;
     private final CommandTalentPageService talentPageService;
+    private final BondedCompanionTalentPageService bondedTalentPageService;
     private final CommandSelectionPageService selectionPageService;
     private final CommandItemUseOrchestrator itemUseOrchestrator;
     private final CommandWorldChangeTravelCoordinator worldChangeTravel;
@@ -254,6 +255,8 @@ public final class CommandItemFeatureHandler {
                 feedbackService,
                 npcNameResolver
         );
+        this.bondedTalentPageService = new BondedCompanionTalentPageService(
+                bondedCompanions, feedbackService);
         this.companionPlacementService = new CommandCompanionPlacementService();
         this.stepExecutionService = new CommandStepExecutionService(
                 relocationService,
@@ -381,7 +384,8 @@ public final class CommandItemFeatureHandler {
                 featureActions,
                 BondedCompanionPanelActionRouter.production(
                         feedbackService, bondedCompanions,
-                        panelEntrySourceService.bondedReadModel())
+                        panelEntrySourceService.bondedReadModel()),
+                bondedTalentPageService
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

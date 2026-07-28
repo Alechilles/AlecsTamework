@@ -204,6 +204,27 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
                         profileId, expectedRevision, updatedAtMs), mapper::toDomain);
     }
 
+    @Override
+    public BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            updateSnapshot(
+                    BondedCompanionOperation operation,
+                    long expectedRevision,
+                    BondedCompanionPayload snapshot,
+                    long updatedAtMs
+            ) {
+        Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(snapshot, "snapshot");
+        String profileId = Objects.requireNonNull(
+                operation.profileId(), "operation.profileId");
+        return mutate(operation, expectedRevision,
+                SqliteBondedCompanionProfileRow.class,
+                store -> store.updateSnapshot(
+                        operation.ownerUuid(), operation.rosterId(), profileId,
+                        expectedRevision, mapper.payloadJson(snapshot),
+                        updatedAtMs),
+                mapper::toDomain);
+    }
+
     @Override public Optional<BondedCompanionRecord.ExtensionData>
             findExtensionData(UUID ownerUuid, String rosterId,
                               String profileId, String namespace) {

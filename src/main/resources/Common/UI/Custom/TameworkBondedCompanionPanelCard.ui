@@ -17,6 +17,38 @@ Group {
     Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
     Padding: (Left: 0, Right: 0, Top: 0, Bottom: 0);
 
+    Group #BondedFrameInWorld {
+        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Background: #000000(0.0);
+        OutlineColor: #3c8b57;
+        OutlineSize: 1;
+        Visible: false;
+    }
+
+    Group #BondedFrameStored {
+        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Background: #000000(0.0);
+        OutlineColor: #396c91;
+        OutlineSize: 1;
+        Visible: false;
+    }
+
+    Group #BondedFrameDead {
+        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Background: #000000(0.0);
+        OutlineColor: #863d42;
+        OutlineSize: 1;
+        Visible: false;
+    }
+
+    Group #BondedFrameReady {
+        Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+        Background: #000000(0.0);
+        OutlineColor: #946f36;
+        OutlineSize: 1;
+        Visible: false;
+    }
+
     Group #BondedAccentInWorld {
         Anchor: (Top: 0, Left: 0, Width: 6, Bottom: 0);
         Background: #6fc576;

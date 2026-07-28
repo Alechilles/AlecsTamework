@@ -158,6 +158,16 @@ final class BondedCompanionCardPresenter {
         commands.set(entrySelector + " #BondedAccentReady.Visible",
                 status.state() == BondedCompanionStateView.DEAD
                         && copy.reviveReady());
+        commands.set(entrySelector + " #BondedFrameInWorld.Visible",
+                status.state() == BondedCompanionStateView.ACTIVE);
+        commands.set(entrySelector + " #BondedFrameStored.Visible",
+                status.state() == BondedCompanionStateView.STORED);
+        commands.set(entrySelector + " #BondedFrameDead.Visible",
+                status.state() == BondedCompanionStateView.DEAD
+                        && !copy.reviveReady());
+        commands.set(entrySelector + " #BondedFrameReady.Visible",
+                status.state() == BondedCompanionStateView.DEAD
+                        && copy.reviveReady());
     }
 
     private static void bindHealth(
@@ -542,8 +552,7 @@ final class BondedCompanionCardPresenter {
                 "tamework.ui.linkedPanel.bonded.talents.points",
                 progression.availablePoints())
                 : "";
-        return species + "  •  <color is=\"#f3d775\">" + level + points
-                + "</color>";
+        return species + "  •  " + level + points;
     }
 
     private static String progressionTooltip(

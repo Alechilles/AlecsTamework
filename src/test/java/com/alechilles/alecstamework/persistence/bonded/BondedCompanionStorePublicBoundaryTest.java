@@ -1,7 +1,12 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.persistence.adapter.sqlite.SqliteBondedCompanionDatabase;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
@@ -63,6 +68,24 @@ class BondedCompanionStorePublicBoundaryTest {
     }
 
     @Test
+    void completeSnapshotUpdateIsOwnerScopedAndRevisionFenced() {
+        BondedCompanionPayload replacement = completeSnapshotPayload();
+
+        var applied = store.updateSnapshot(operation("talents", '9',
+                        BondedCompanionOperation.Type.STORE, "profile-a", 10_000L),
+                0L, replacement, -8_000L);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED, applied.code());
+        assertEquals(1L, applied.value().revision());
+        assertEquals(replacement, applied.value().snapshot());
+
+        var stale = store.updateSnapshot(operation("talents-stale", 'a',
+                        BondedCompanionOperation.Type.STORE, "profile-a", 10_000L),
+                0L, replacement, -7_000L);
+        assertEquals(BondedCompanionStoreResult.Code.REVISION_CONFLICT,
+                stale.code());
+    }
+
+    @Test
     void permanentDeletionIsOwnerAndRevisionFencedAndCascadesExtensions() {
         var extension = new BondedCompanionRecord.ExtensionData(
                 "profile-a", "example:stats", payload("xp=1"), 0, -9_000L);
@@ -107,6 +130,17 @@ class BondedCompanionStorePublicBoundaryTest {
 
     private BondedCompanionPayload payload(String value) {
         return BondedCompanionPayload.of(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private BondedCompanionPayload completeSnapshotPayload() {
+        CoopResidentStateSnapshot state = new CoopResidentStateSnapshot(
+                NPC, null, -1, "role:companion", null,
+                new TameworkOwnerComponent(OWNER, "Owner"),
+                new TameworkTamedComponent(true), null, null, null, null,
+                null, null, null, null, null, null, null, null, -9_000L);
+        String encoded = new BondedCompanionSnapshotCodec().encode(
+                BondedCompanionSnapshot.of(state, Map.of()));
+        return BondedCompanionPayload.of(encoded.getBytes(StandardCharsets.UTF_8));
     }
 
     private BondedCompanionOperation operation(

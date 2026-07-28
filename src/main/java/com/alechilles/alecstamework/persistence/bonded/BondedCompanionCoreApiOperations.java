@@ -28,8 +28,9 @@ public final class BondedCompanionCoreApiOperations {
     private final BondedCompanionProvisioningSupport provisioning = new BondedCompanionProvisioningSupport();
     private final BondedCompanionReviveQuoteSupport reviveQuotes = new BondedCompanionReviveQuoteSupport();
     private final BondedCompanionExtensionOperations extensions;
+    private final BondedCompanionTalentMutationService talents;
     private final BondedCompanionSnapshotCodec snapshots = new BondedCompanionSnapshotCodec();
-    private final BondedCompanionViewFactory views = new BondedCompanionViewFactory();
+    private final BondedCompanionProfileViewService profileViews;
 
     public BondedCompanionCoreApiOperations(
             BondedCompanionStore store,
@@ -50,6 +51,9 @@ public final class BondedCompanionCoreApiOperations {
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.clock = Objects.requireNonNull(clock, "clock");
         extensions = new BondedCompanionExtensionOperations(store, clock);
+        talents = new BondedCompanionTalentMutationService(store, clock);
+        profileViews = new BondedCompanionProfileViewService(
+                store, rosters, policies, reviveQuotes, clock);
         revives = new BondedCompanionReviveOperationService(
                 store, rosters, policies, transitions, clock,
                 new BondedCompanionCoreReviveSupport(this));
@@ -280,47 +284,24 @@ public final class BondedCompanionCoreApiOperations {
         return revives.revive(request);
     }
 
+    BondedCompanionResult<BondedCompanionProfileView> updateTalents(
+            BondedCompanionTalentActionRequest request
+    ) {
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> saved = talents.apply(request);
+        if (saved.code() != BondedCompanionStoreResult.Code.APPLIED || saved.value() == null)
+            return storeFailure(saved);
+        BondedCompanionRecord.Profile profile = saved.value();
+        publish(profile, profile.state(), profile.state(), "talents-updated",
+                BondedCompanionChangePublisher.WorldEffectOutcome.NOT_REQUIRED);
+        return success(view(profile));
+    }
+
     BondedCompanionProfileView view(
             BondedCompanionRecord.Profile profile,
             BondedCompanionRecord.Lease lease,
             List<BondedCompanionRecord.Profile> rosterProfiles
     ) {
-        BondedCompanionPolicyResolver.Resolution resolved = policies.resolve(
-                profile.rosterId(), profile.familyId(),
-                rosters.snapshot().revision());
-        BondedCompanionPolicy policy = resolved.policy();
-        boolean matches = policy != null
-                && policy.rosterId().equals(profile.rosterId())
-                && policy.familyId().equals(profile.familyId())
-                && policy.allowedRoles().contains(profile.roleId());
-        int active = counts(rosterProfiles, profile.familyId()).active();
-        Map<String, String> extensions = new LinkedHashMap<>();
-        List<BondedCompanionRecord.ExtensionData> storedExtensions =
-                store.listExtensionData(
-                        profile.ownerUuid(), profile.rosterId(),
-                        profile.profileId());
-        if (storedExtensions != null) {
-            storedExtensions.forEach(extension -> extensions.put(
-                    extension.namespace(),
-                    new String(extension.payload().bytes(),
-                            StandardCharsets.UTF_8)));
-        }
-        boolean reviveAvailable = matches
-                && profile.state() == BondedCompanionState.DEAD
-                && policy.features().revive();
-        return views.view(profile, lease,
-                matches && profile.state() == BondedCompanionState.STORED
-                        && policy.features().summon()
-                        && cooldownRemaining(
-                                profile.summonCooldownUntilMs(),
-                                clock.getAsLong()) == 0L
-                        && BondedCompanionFamilyScope.hasActiveCapacity(
-                                active, policy.maximumActive()),
-                matches && profile.state() == BondedCompanionState.ACTIVE
-                        && policy.features().dismiss(),
-                reviveAvailable, extensions,
-                reviveAvailable ? reviveQuotes.profileQuote(profile, policy) : null,
-                BondedCompanionFamilyCapacityPresentation.attributes(policy, active));
+        return profileViews.view(profile, lease, rosterProfiles);
     }
 
     BondedCompanionResult<BondedCompanionExtensionData> extension(

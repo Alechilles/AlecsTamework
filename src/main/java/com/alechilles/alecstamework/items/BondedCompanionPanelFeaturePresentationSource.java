@@ -112,6 +112,11 @@ final class BondedCompanionPanelFeaturePresentationSource {
             attributes.put("sessionRemainingMs", Long.toString(remaining(
                     profile.activeLease().expiresAtMs(), nowMs)));
         }
+        if (profile.activeLease() != null
+                && profile.activeLease().liveNpcUuid() != null) {
+            attributes.put("bonded.liveNpcUuid",
+                    profile.activeLease().liveNpcUuid().toString());
+        }
         long cooldown = remaining(profile.summonCooldownUntilMs(), nowMs);
         BondedCompanionStatusPresentation.Action action = switch (profile.state()) {
             case STORED -> BondedCompanionStatusPresentation.Action.SUMMON;

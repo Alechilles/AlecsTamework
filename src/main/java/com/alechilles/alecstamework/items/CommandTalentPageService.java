@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -53,6 +54,18 @@ final class CommandTalentPageService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        openTalentPage(player,
+                () -> resolveLinkedCompanionTalentContext(player, toolId, npcUuid),
+                backCallback);
+    }
+
+    /** Opens the shared talent page for a caller-authorized live companion. */
+    void openTalentPage(@Nullable Player player,
+                        @Nonnull TalentTargetResolver targetResolver,
+                        @Nonnull Runnable backCallback) {
+        if (player == null) {
+            return;
+        }
         World world = player.getWorld();
         if (world == null || player.getPageManager() == null) {
             feedbackService.showWarning(player, "Talent page is unavailable right now.");
@@ -67,9 +80,9 @@ final class CommandTalentPageService {
         }
         TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
                 uiPlayerRef,
-                () -> buildTalentPageData(player, toolId, npcUuid),
-                talentId -> applyTalentPurchase(player, toolId, npcUuid, talentId),
-                () -> applyTalentReset(player, toolId, npcUuid),
+                () -> buildTalentPageData(player, targetResolver),
+                talentId -> applyTalentPurchase(player, targetResolver, talentId),
+                () -> applyTalentReset(player, targetResolver),
                 backCallback
         );
         try {
@@ -90,11 +103,12 @@ final class CommandTalentPageService {
     }
 
     @Nonnull
-    private TameworkCompanionTalentsPage.PageData buildTalentPageData(@Nonnull Player player,
-                                                                      @Nonnull String toolId,
-                                                                      @Nonnull UUID npcUuid) {
+    private TameworkCompanionTalentsPage.PageData buildTalentPageData(
+            @Nonnull Player player,
+            @Nonnull TalentTargetResolver targetResolver
+    ) {
         String language = resolveLanguage(player);
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
+        TalentTarget context = targetResolver.resolve();
         if (context == null) {
             return TameworkCompanionTalentsPage.PageData.empty();
         }
@@ -323,10 +337,9 @@ final class CommandTalentPageService {
 
     @Nonnull
     private String applyTalentPurchase(@Nonnull Player player,
-                                       @Nonnull String toolId,
-                                       @Nonnull UUID npcUuid,
+                                       @Nonnull TalentTargetResolver targetResolver,
                                        @Nullable String talentId) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
+        TalentTarget context = targetResolver.resolve();
         if (context == null) {
             String message = "Companion is no longer loaded.";
             feedbackService.showWarning(player, message);
@@ -347,9 +360,8 @@ final class CommandTalentPageService {
 
     @Nonnull
     private String applyTalentReset(@Nonnull Player player,
-                                    @Nonnull String toolId,
-                                    @Nonnull UUID npcUuid) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
+                                    @Nonnull TalentTargetResolver targetResolver) {
+        TalentTarget context = targetResolver.resolve();
         if (context == null) {
             String message = "Companion is no longer loaded.";
             feedbackService.showWarning(player, message);
@@ -394,9 +406,9 @@ final class CommandTalentPageService {
     }
 
     @Nullable
-    private LoadedCompanionTalentContext resolveLoadedCompanionTalentContext(@Nonnull Player player,
-                                                                             @Nonnull String toolId,
-                                                                             @Nonnull UUID npcUuid) {
+    private TalentTarget resolveLinkedCompanionTalentContext(@Nonnull Player player,
+                                                             @Nonnull String toolId,
+                                                             @Nonnull UUID npcUuid) {
         if (toolId == null || toolId.isBlank()) {
             return null;
         }
@@ -443,12 +455,30 @@ final class CommandTalentPageService {
         if (displayName == null || displayName.isBlank()) {
             displayName = "Companion";
         }
-        return new LoadedCompanionTalentContext(npcRef, store, displayName, roleId);
+        return new TalentTarget(npcRef, store, displayName, roleId);
     }
 
-    private record LoadedCompanionTalentContext(@Nonnull Ref<EntityStore> npcRef,
-                                                @Nonnull Store<EntityStore> store,
-                                                @Nonnull String displayName,
-                                                @Nullable String roleId) {
+    @FunctionalInterface
+    interface TalentTargetResolver extends Supplier<TalentTarget> {
+        @Override
+        @Nullable TalentTarget get();
+
+        @Nullable
+        default TalentTarget resolve() {
+            return get();
+        }
+    }
+
+    record TalentTarget(@Nonnull Ref<EntityStore> npcRef,
+                        @Nonnull Store<EntityStore> store,
+                        @Nonnull String displayName,
+                        @Nullable String roleId) {
+        TalentTarget {
+            java.util.Objects.requireNonNull(npcRef, "npcRef");
+            java.util.Objects.requireNonNull(store, "store");
+            if (displayName == null || displayName.isBlank()) {
+                displayName = "Companion";
+            }
+        }
     }
 }

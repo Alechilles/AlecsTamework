@@ -69,6 +69,15 @@ public interface BondedCompanionApi {
     CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             revive(@Nonnull BondedCompanionReviveRequest request);
 
+    /** Applies a validated talent purchase or reset to the durable profile. */
+    @Nonnull
+    default CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
+            updateTalents(@Nonnull BondedCompanionTalentActionRequest request) {
+        Objects.requireNonNull(request, "request");
+        return CompletableFuture.completedFuture(BondedCompanionResult.unavailable(
+                "bonded-talent-updates-unavailable"));
+    }
+
     @Nonnull
     CompletableFuture<BondedCompanionResult<BondedCompanionExtensionData>>
             getExtensionData(@Nonnull BondedCompanionExtensionDataKey key);

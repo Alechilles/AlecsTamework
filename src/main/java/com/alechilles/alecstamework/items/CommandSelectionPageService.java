@@ -31,6 +31,7 @@ final class CommandSelectionPageService {
     private final CommandTalentPageService talentPageService;
     private final CommandPanelFeatureActionService featureActions;
     private final BondedCompanionPanelActionRouter bondedActions;
+    private final BondedCompanionTalentPageService bondedTalentPages;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -43,6 +44,7 @@ final class CommandSelectionPageService {
                 resolutionService,
                 panelActionService,
                 talentPageService,
+                null,
                 null,
                 null,
                 null
@@ -60,7 +62,7 @@ final class CommandSelectionPageService {
     ) {
         this(toolInventoryService, groupAssignPageService, resolutionService,
                 panelActionService, talentPageService, featurePresentations,
-                featureActions, null);
+                featureActions, null, null);
     }
 
     CommandSelectionPageService(
@@ -73,6 +75,22 @@ final class CommandSelectionPageService {
             CommandPanelFeatureActionService featureActions,
             BondedCompanionPanelActionRouter bondedActions
     ) {
+        this(toolInventoryService, groupAssignPageService, resolutionService,
+                panelActionService, talentPageService, featurePresentations,
+                featureActions, bondedActions, null);
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions,
+            BondedCompanionPanelActionRouter bondedActions,
+            BondedCompanionTalentPageService bondedTalentPages
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
@@ -80,6 +98,7 @@ final class CommandSelectionPageService {
         this.talentPageService = talentPageService;
         this.featureActions = featureActions;
         this.bondedActions = bondedActions;
+        this.bondedTalentPages = bondedTalentPages;
     }
 
     /**
@@ -234,10 +253,14 @@ final class CommandSelectionPageService {
         Consumer<String> ignoredString = ignored -> { };
         BooleanSupplier authority = context.genericAuthority();
         if (!context.genericRosterActions()) {
+            Consumer<UUID> openBondedTalents = context.config()
+                    .usesBondedCompanionRoster()
+                    ? uuid -> openBondedTalentPage(context, uuid)
+                    : ignoredUuid;
             return new NpcCallbacks(ignoredUuid, ignoredUuid, ignoredUuid,
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
-                    ignoredUuid, ignoredString);
+                    openBondedTalents, ignoredString);
         }
         Player player = context.player();
         String toolId = context.toolId();
@@ -257,6 +280,18 @@ final class CommandSelectionPageService {
                 guardedUuid(authority, uuid -> talentPageService.openTalentPage(
                         player, toolId, uuid, context.actions().reopenMenu())),
                 guardedString(authority, context.actions().selectCommand()));
+    }
+
+    private void openBondedTalentPage(PageContext context, UUID presentationUuid) {
+        if (bondedTalentPages == null || presentationUuid == null) {
+            return;
+        }
+        CommandPanelFeaturePresentation feature = context.snapshot()
+                .presentation(presentationUuid);
+        if (feature != null && feature.bonded() != null) {
+            bondedTalentPages.open(context.player(), feature.bonded(),
+                    context.actions().reopenMenu());
+        }
     }
 
     private FeatureCallbacks buildFeatureCallbacks(PageContext context) {
