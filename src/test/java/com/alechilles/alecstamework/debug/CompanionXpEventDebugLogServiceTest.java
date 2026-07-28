@@ -88,6 +88,22 @@ class CompanionXpEventDebugLogServiceTest {
         assertTrue(logs.stream().anyMatch(line -> line.contains("reason=not-tamed-or-owned")));
     }
 
+    @Test
+    void enabledServiceLabelsAvatarFlightXpEvents() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        List<String> logs = new ArrayList<>();
+        CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
+                () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
+                logs::add
+        );
+
+        assertTrue(service.setEnabled(true));
+        bus.emitCompanionXpAwarded(event(CompanionXpSource.AVATAR_FLIGHT, 1.5));
+
+        assertEquals(1L, service.getEventCount());
+        assertTrue(logs.stream().anyMatch(line -> line.contains("source=AVATAR_FLIGHT")));
+    }
+
     private static CompanionXpAwardedEvent event(CompanionXpSource source, double awardedXp) {
         return new CompanionXpAwardedEvent(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),

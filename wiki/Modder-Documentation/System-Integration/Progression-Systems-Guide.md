@@ -32,6 +32,22 @@ This gives you a shared advancement layer that combat, feed, harvest, and breedi
 
 Tamework ships `Server/Tamework/Leveling/TwLevelingExample.json` for the bundled example mobs. Use it as a small working baseline for enabled feed, harvest, breeding, and combat XP sources before tuning a real species.
 
+### Avatar-flight XP
+Avatar-flight species can also award companion XP by configuring `TwLevelingConfig.XpSources.Flight` on the original parked source role:
+
+```json
+"Flight": {
+  "Enabled": true,
+  "XpPerQualifiedSecond": 0.15,
+  "AwardIntervalSeconds": 10.0,
+  "MaxXpPerMinute": 9.0
+}
+```
+
+`Enabled`, `XpPerQualifiedSecond`, `AwardIntervalSeconds`, and `MaxXpPerMinute` are the complete field set. The defaults are inert: flight awards require `Enabled: true`, a positive rate, interval, and cap; the default interval is `10.0` seconds while the default rate and cap are zero. Tamework qualifies only time that the controller reports as active fast flight, so this is independent of distance travelled, input held, or idle time. It accumulates at most `0.25` seconds per server tick, awards completed 10-second batches in the example above, and enforces the configured rolling `9 XP` per minute limit.
+
+The source bucket is `AVATAR_FLIGHT`, which is normal companion XP, not player XP. Awards target the valid parked source companion using its original role's leveling config. A missing, stale, mismatched, or otherwise invalid flight session receives no XP rather than attempting a fallback recipient.
+
 ### 2. Add talents when level-ups should unlock player choices
 Add `TwTalentConfig` after the level curve is stable.
 
@@ -42,6 +58,8 @@ Decide:
 - which shared effect keys each node grants
 
 Tamework ships `Server/Tamework/Talents/TwTalentsExample.json` for the bundled example mobs. It is intentionally passive-only and demonstrates health, movement, combat, toughness, and harvest-bonus effect keys.
+
+Avatar-flight talent trees can additionally use the six flight effect keys documented in the [TwTalentConfig Reference](/mod/alecs-tamework/twtalentconfig-reference). They are resolved from the parked source companion for a valid flight session; invalid sessions remain neutral.
 
 The in-game talent page presents these nodes as a scrollable branch/tier tree. Keep node names compact, put long explanations in `Description`, and use `RequiresTalentIds[]` for every visible dependency line you expect players to follow.
 
