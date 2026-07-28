@@ -82,7 +82,7 @@ class TameworkCommandSelectionPageNavigationTest {
     void replacementPageNavigationWaitsForQueuedUiCommandsToDrain() throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
         int helperStart = content.indexOf("private void navigateAfterUiDrain");
-        int helperEnd = content.indexOf("private void dispatchNavigationAction", helperStart);
+        int helperEnd = content.indexOf("private void bindLinkedNpcCard", helperStart);
 
         assertTrue(helperStart >= 0, "Deferred page navigation helper should exist.");
         assertTrue(helperEnd > helperStart, "Deferred page navigation helper should be bounded by the dispatcher.");
@@ -112,7 +112,7 @@ class TameworkCommandSelectionPageNavigationTest {
         int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
         int updateEnd = content.indexOf("private boolean isPendingUnlink", updateStart);
         int dismissStart = content.indexOf("public void onDismiss(");
-        int dismissEnd = content.indexOf("private void buildCommandButtons", dismissStart);
+        int dismissEnd = content.indexOf("private void buildLinkedNpcPanel", dismissStart);
 
         assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
         assertTrue(updateEnd > updateStart, "Linked-panel refresh sender should be bounded by the next helper.");
@@ -173,6 +173,28 @@ class TameworkCommandSelectionPageNavigationTest {
     }
 
     @Test
+    void talentNavigationHasOptInBoundaryTracingForLiveDiagnosis()
+            throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int eventStart = content.indexOf("public void handleDataEvent(");
+        int helperStart = content.indexOf("private static void logTalentNavigation");
+
+        assertTrue(eventStart >= 0, "The page event handler should exist.");
+        assertTrue(helperStart > eventStart,
+                "Talent navigation diagnostics should be isolated in a helper.");
+
+        String eventHandler = content.substring(eventStart, helperStart);
+        assertTrue(eventHandler.contains("event received command="),
+                "Live traces must establish whether the click reached the server page.");
+        assertTrue(eventHandler.contains("navigation queued npc="),
+                "Live traces must establish whether the decoded click reaches page navigation.");
+        assertTrue(eventHandler.contains("navigation dispatch npc="),
+                "Live traces must establish whether the deferred page open actually runs.");
+        assertTrue(content.contains("plugin.isDebugSpawnerEnabled()"),
+                "Temporary per-click diagnostics must remain opt-in.");
+    }
+
+    @Test
     void refreshTickPatchesUnchangedPanelChromeOnlyWhenItsValueChanges()
             throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
@@ -193,8 +215,9 @@ class TameworkCommandSelectionPageNavigationTest {
     void delayedRefreshGuardsWorldExecute() throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
 
-        assertTrue(content.contains("safeExecuteOnWorld("), "delayed refreshes should use safe world execution helper");
-        assertTrue(content.contains("world.isAlive()"), "world execution helper should check world liveness");
-        assertTrue(content.contains("catch (RuntimeException ignored)"), "world execution helper should absorb unload races");
+        assertTrue(content.contains("CommandPageWorldDispatcher.dispatch("),
+                "delayed refreshes should return to the world-thread dispatcher");
+        assertTrue(content.contains("activeRef != null && activeRef.isValid()"),
+                "delayed navigation should verify the player reference before applying UI work");
     }
 }
