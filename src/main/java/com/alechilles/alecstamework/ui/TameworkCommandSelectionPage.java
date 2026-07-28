@@ -933,14 +933,13 @@ public final class TameworkCommandSelectionPage
         );
     }
 
-    /** Emits short, opt-in traces while the existing spawner debug toggle is enabled. */
+    /** Emits short-lived diagnostics while tracing bonded talent navigation. */
     private static void logTalentNavigation(boolean talentEvent, @Nonnull String message) {
         if (!talentEvent) {
             return;
         }
         Tamework plugin = Tamework.getInstance();
-        if (plugin != null && plugin.isDebugSpawnerEnabled()
-                && plugin.getLogger() != null) {
+        if (plugin != null && plugin.getLogger() != null) {
             plugin.getLogger().at(Level.INFO).log("Bonded talent navigation: " + message);
         }
     }

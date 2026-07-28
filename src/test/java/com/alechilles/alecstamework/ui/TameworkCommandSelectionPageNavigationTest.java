@@ -190,8 +190,8 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Live traces must establish whether the decoded click reaches page navigation.");
         assertTrue(eventHandler.contains("navigation dispatch npc="),
                 "Live traces must establish whether the deferred page open actually runs.");
-        assertTrue(content.contains("plugin.isDebugSpawnerEnabled()"),
-                "Temporary per-click diagnostics must remain opt-in.");
+        assertTrue(content.contains("Bonded talent navigation:"),
+                "Temporary tracing must identify the navigation boundary in the server log.");
     }
 
     @Test
