@@ -35,6 +35,16 @@ public interface BondedCompanionStore {
             @Nonnull UUID ownerUuid, @Nonnull String profileId);
 
     /**
+     * Permanently deletes one non-active profile under its exact owner,
+     * roster, and revision fence. Dependent durable rows are removed by the
+     * database foreign-key contract.
+     */
+    @Nonnull BondedCompanionStoreResult<BondedCompanionRecord.Profile>
+            deleteProfile(
+                    @Nonnull UUID ownerUuid, @Nonnull String rosterId,
+                    @Nonnull String profileId, long expectedRevision);
+
+    /**
      * Probes an existing profile-operation result without claiming or mutating.
      *
      * <p>This is the canonical replay fence used before a payment is reserved.

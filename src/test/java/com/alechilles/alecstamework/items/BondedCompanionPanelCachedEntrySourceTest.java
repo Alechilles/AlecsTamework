@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -104,12 +105,39 @@ class BondedCompanionPanelCachedEntrySourceTest {
         assertTrue(current.status().actionEnabled());
     }
 
+    @Test
+    void passiveRefreshKeepsACompleteCardInteractive() {
+        QueueExecutor worker = new QueueExecutor();
+        AtomicLong now = new AtomicLong();
+        MutableApi api = new MutableApi(profile(
+                4L, BondedCompanionStateView.ACTIVE));
+        BondedCompanionPanelEntrySourceService source = source(api, worker,
+                now::get, 1L);
+        source.buildSnapshot(OWNER, ROSTER, "world-a");
+        worker.runNext();
+
+        now.set(2L);
+        var refreshing = source.buildSnapshot(OWNER, ROSTER, "world-a");
+        var card = refreshing.featurePresentations().values().iterator().next()
+                .bonded();
+
+        assertTrue(card.status().actionEnabled(),
+                "a scheduled cache refresh must not revoke the last safe action");
+        assertNull(card.status().blockReason());
+    }
+
     private BondedCompanionPanelEntrySourceService source(
             MutableApi api, QueueExecutor worker) {
+        return source(api, worker, System::nanoTime, Long.MAX_VALUE);
+    }
+
+    private BondedCompanionPanelEntrySourceService source(
+            MutableApi api, QueueExecutor worker, java.util.function.LongSupplier clock,
+            long refreshAfterNanos) {
         var cache = new BondedCompanionPanelSnapshotCache(
-                () -> api, worker, System::nanoTime,
+                () -> api, worker, clock,
                 new BondedCompanionPanelSnapshotCache.Settings(
-                        8, Long.MAX_VALUE, Long.MAX_VALUE, 1L, 8L));
+                        8, refreshAfterNanos, Long.MAX_VALUE, 1L, 8L));
         return new BondedCompanionPanelEntrySourceService(
                 cache, new BondedCompanionPanelRecordSource(),
                 new BondedCompanionPanelFeaturePresentationSource(() -> 0L));

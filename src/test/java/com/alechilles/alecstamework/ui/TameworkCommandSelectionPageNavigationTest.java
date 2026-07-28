@@ -140,6 +140,40 @@ class TameworkCommandSelectionPageNavigationTest {
     }
 
     @Test
+    void timerPresentationChangesDoNotClearAndRecreateTheLinkedPanelList()
+            throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
+        int updateEnd = content.indexOf("private boolean isPendingUnlink", updateStart);
+
+        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
+        assertTrue(updateEnd > updateStart, "Linked-panel refresh sender should be bounded by the next helper.");
+
+        String update = content.substring(updateStart, updateEnd);
+        assertFalse(update.contains("renderedFeatureRevision != featureController.revision()"),
+                "countdown updates must not clear and recreate every card");
+        assertTrue(update.contains("refreshDynamicState"),
+                "countdown updates should patch the existing bonded card in place");
+    }
+
+    @Test
+    void refreshTickPatchesUnchangedPanelChromeOnlyWhenItsValueChanges()
+            throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
+        int updateEnd = content.indexOf("CommandSelectionPageEventBinder.bindOptionEvents", updateStart);
+
+        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
+        assertTrue(updateEnd > updateStart, "Refresh sender should include panel chrome updates.");
+
+        String update = content.substring(updateStart, updateEnd);
+        assertTrue(update.contains("refreshValues.set(commandBuilder, \"#TameworkLinkedPanelTitle.Text\""),
+                "unchanged panel title must not be resent each second");
+        assertTrue(update.contains("refreshValues.set(commandBuilder, \"#TameworkLinkedPanelModeDropdown.Value\""),
+                "unchanged panel controls must not be rebuilt each second");
+    }
+
+    @Test
     void delayedRefreshGuardsWorldExecute() throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
 

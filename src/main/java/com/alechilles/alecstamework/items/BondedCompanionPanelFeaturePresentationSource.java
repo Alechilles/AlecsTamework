@@ -107,6 +107,11 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 attributes.put(key, value);
             }
         });
+        if (profile.activeLease() != null
+                && profile.activeLease().expiresAtMs() != 0L) {
+            attributes.put("sessionRemainingMs", Long.toString(remaining(
+                    profile.activeLease().expiresAtMs(), nowMs)));
+        }
         long cooldown = remaining(profile.summonCooldownUntilMs(), nowMs);
         BondedCompanionStatusPresentation.Action action = switch (profile.state()) {
             case STORED -> BondedCompanionStatusPresentation.Action.SUMMON;

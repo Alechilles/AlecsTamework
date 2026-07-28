@@ -480,12 +480,6 @@ final class SqliteBondedCompanionStore {
         return new IllegalStateException(operation, failure);
     }
 
-    private void requirePositiveLimit(int limit) {
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit must be positive");
-        }
-    }
-
     private String requireText(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) {

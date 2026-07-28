@@ -16,6 +16,10 @@ final class CommandSelectionRosterEventBoundary {
                 && config.usesBondedCompanionRoster();
     }
 
+    boolean bondedRoster() {
+        return bondedRoster;
+    }
+
     boolean blocks(@Nonnull CommandSelectionEventData data,
                    @Nonnull String commandId) {
         if (!bondedRoster) return false;

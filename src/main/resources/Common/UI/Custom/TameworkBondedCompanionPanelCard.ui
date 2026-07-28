@@ -1,0 +1,267 @@
+$C = "Common.ui";
+
+@BondedCardButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #eaf4ff, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedCardMutedButtonLabel = LabelStyle(FontSize: 12, RenderBold: true, TextColor: #94a7ba, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedCardButtonStyle = TextButtonStyle(Default: (Background: (Color: #2a5b76), LabelStyle: @BondedCardButtonLabel), Hovered: (Background: (Color: #347391), LabelStyle: @BondedCardButtonLabel), Pressed: (Background: (Color: #20465d), LabelStyle: @BondedCardButtonLabel), Disabled: (Background: (Color: #2a5b76), LabelStyle: @BondedCardButtonLabel), Sounds: $C.@ButtonSounds);
+@BondedCardDisabledButtonStyle = TextButtonStyle(Default: (Background: (Color: #293341), LabelStyle: @BondedCardMutedButtonLabel), Hovered: (Background: (Color: #293341), LabelStyle: @BondedCardMutedButtonLabel), Pressed: (Background: (Color: #293341), LabelStyle: @BondedCardMutedButtonLabel), Disabled: (Background: (Color: #293341), LabelStyle: @BondedCardMutedButtonLabel));
+@BondedReviveButtonStyle = TextButtonStyle(Default: (Background: (Color: #b96116), LabelStyle: @BondedCardButtonLabel), Hovered: (Background: (Color: #d27a25), LabelStyle: @BondedCardButtonLabel), Pressed: (Background: (Color: #914710), LabelStyle: @BondedCardButtonLabel), Disabled: (Background: (Color: #b96116), LabelStyle: @BondedCardButtonLabel), Sounds: $C.@ButtonSounds);
+@BondedCardDangerButtonStyle = TextButtonStyle(Default: (Background: (Color: #7a2d36), LabelStyle: @BondedCardButtonLabel), Hovered: (Background: (Color: #9b3c46), LabelStyle: @BondedCardButtonLabel), Pressed: (Background: (Color: #5d2028), LabelStyle: @BondedCardButtonLabel), Disabled: (Background: (Color: #7a2d36), LabelStyle: @BondedCardButtonLabel), Sounds: $C.@ButtonSounds);
+@BondedCardDangerIconLabel = LabelStyle(FontSize: 16, RenderBold: true, TextColor: #dc727a, HorizontalAlignment: Center, VerticalAlignment: Center);
+@BondedCardDangerIconStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedCardDangerIconLabel), Hovered: (Background: (Color: #702b34(0.42)), LabelStyle: @BondedCardDangerIconLabel), Pressed: (Background: (Color: #9b3c46(0.58)), LabelStyle: @BondedCardDangerIconLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedCardDangerIconLabel), Sounds: $C.@ButtonSounds);
+@BondedCardTextTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 280, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
+@BondedTransparentButtonLabel = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@BondedTransparentButton = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Hovered: (Background: (Color: #ffffff(0.06)), LabelStyle: @BondedTransparentButtonLabel), Pressed: (Background: (Color: #ffffff(0.12)), LabelStyle: @BondedTransparentButtonLabel), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @BondedTransparentButtonLabel), Sounds: $C.@ButtonSounds);
+
+Group {
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 118);
+    Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+    Padding: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+
+    Group #BondedAccentInWorld {
+        Anchor: (Top: 0, Left: 0, Width: 6, Bottom: 0);
+        Background: #6fc576;
+        Visible: false;
+    }
+
+    Group #BondedAccentStored {
+        Anchor: (Top: 0, Left: 0, Width: 6, Bottom: 0);
+        Background: #5d9fd4;
+        Visible: false;
+    }
+
+    Group #BondedAccentDead {
+        Anchor: (Top: 0, Left: 0, Width: 6, Bottom: 0);
+        Background: #d66a6a;
+        Visible: false;
+    }
+
+    Group #BondedAccentReady {
+        Anchor: (Top: 0, Left: 0, Width: 6, Bottom: 0);
+        Background: #dfae59;
+        Visible: false;
+    }
+
+    Label #BondedName {
+        Anchor: (Top: 8, Left: 22, Right: 174, Height: 22);
+        Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
+        Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Group #BondedGenderMaleIcon {
+        Anchor: (Top: 33, Left: 22, Width: 14, Height: 14);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png");
+        Visible: false;
+    }
+
+    Group #BondedGenderFemaleIcon {
+        Anchor: (Top: 33, Left: 22, Width: 14, Height: 14);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png");
+        Visible: false;
+    }
+
+    Label #BondedSpecies {
+        Anchor: (Top: 30, Left: 40, Right: 174, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Group #BondedStateInWorld {
+        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
+        Background: #145632;
+        Visible: false;
+
+        Label #BondedStateText {
+            Anchor: (Left: 6, Right: 6, Height: 28);
+            Text: "";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #b9f1c3, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedStateStored {
+        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
+        Background: #244d7e;
+        Visible: false;
+
+        Label #BondedStateText {
+            Anchor: (Left: 6, Right: 6, Height: 28);
+            Text: "";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #b9d8fb, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedStateDead {
+        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
+        Background: #742225;
+        Visible: false;
+
+        Label #BondedStateText {
+            Anchor: (Left: 6, Right: 6, Height: 28);
+            Text: "";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #ffb2ae, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedStateReady {
+        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
+        Background: #7d4b0e;
+        Visible: false;
+
+        Label #BondedStateText {
+            Anchor: (Left: 6, Right: 6, Height: 28);
+            Text: "";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #ffe29a, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    TextButton #BondedUnlinkButton {
+        Anchor: (Top: 7, Right: 164, Width: 20, Height: 22);
+        Style: @BondedCardDangerIconStyle;
+        Text: "X";
+        TooltipText: %server.tamework.ui.linkedPanel.bonded.unlink.tooltip;
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
+    Group #BondedHealthFrame {
+        Anchor: (Top: 56, Left: 14, Right: 14, Height: 18);
+        Background: #08121f;
+
+        Group #BondedHealthFill {
+            Anchor: (Top: 1, Left: 1, Width: 375, Height: 16);
+            Background: #69c77b;
+        }
+
+        Label #BondedHealthText {
+            Anchor: (Top: 1, Left: 0, Right: 0, Height: 16);
+            Text: "? / ?";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #eef4fa, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedMetricHappiness {
+        Anchor: (Top: 82, Left: 14, Width: 66, Height: 18);
+        Background: #152334;
+        Visible: false;
+
+        Label #MetricLabel {
+            Anchor: (Top: 1, Left: 5, Width: 36, Height: 16);
+            Text: "";
+            Style: (FontSize: 9, TextColor: #b9cadb, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Label #MetricValue {
+            Anchor: (Top: 1, Right: 5, Width: 26, Height: 16);
+            Text: "0%";
+            Style: (FontSize: 9, RenderBold: true, TextColor: #f0f6fb, HorizontalAlignment: End, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedMetricHunger {
+        Anchor: (Top: 82, Left: 86, Width: 66, Height: 18);
+        Background: #152334;
+        Visible: false;
+
+        Label #MetricLabel {
+            Anchor: (Top: 1, Left: 5, Width: 36, Height: 16);
+            Text: "";
+            Style: (FontSize: 9, TextColor: #b9cadb, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Label #MetricValue {
+            Anchor: (Top: 1, Right: 5, Width: 26, Height: 16);
+            Text: "0%";
+            Style: (FontSize: 9, RenderBold: true, TextColor: #f0f6fb, HorizontalAlignment: End, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedMetricThirst {
+        Anchor: (Top: 82, Left: 158, Width: 66, Height: 18);
+        Background: #152334;
+        Visible: false;
+
+        Label #MetricLabel {
+            Anchor: (Top: 1, Left: 5, Width: 36, Height: 16);
+            Text: "";
+            Style: (FontSize: 9, TextColor: #b9cadb, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Label #MetricValue {
+            Anchor: (Top: 1, Right: 5, Width: 26, Height: 16);
+            Text: "0%";
+            Style: (FontSize: 9, RenderBold: true, TextColor: #f0f6fb, HorizontalAlignment: End, VerticalAlignment: Center);
+        }
+    }
+
+    Group #BondedTalentAction {
+        Anchor: (Top: 82, Left: 14, Width: 188, Height: 22);
+        Background: #172b40;
+        Visible: false;
+
+        Group {
+            Anchor: (Top: 3, Left: 5, Width: 16, Height: 16);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
+        }
+
+        Label #BondedTalentText {
+            Anchor: (Top: 1, Left: 26, Right: 5, Height: 20);
+            Text: "";
+            Style: (FontSize: 10, RenderBold: true, TextColor: #f3d775, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        TextButton #BondedTalentButton {
+            Anchor: (Top: 0, Left: 0, Width: 188, Height: 22);
+            Style: @BondedTransparentButton;
+            Text: "";
+            TooltipText: %server.tamework.ui.linkedPanel.bonded.talents.tooltip;
+            TextTooltipStyle: @BondedCardTextTooltipStyle;
+            Visible: false;
+        }
+    }
+
+    TextButton #BondedPrimaryAction {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedCardButtonStyle;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #BondedPrimaryActionDisabled {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedCardDisabledButtonStyle;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #BondedReviveAction {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedReviveButtonStyle;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #BondedUnlinkConfirmButton {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedCardDangerButtonStyle;
+        Text: %server.tamework.ui.linkedPanel.bonded.unlink.confirm;
+        Visible: false;
+    }
+
+    Label #BondedStateDetail {
+        Anchor: (Top: 82, Left: 14, Right: 118, Height: 14);
+        Text: "";
+        Style: (FontSize: 10, RenderBold: true, TextColor: #a9c1d7, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Label #BondedStateDetailValue {
+        Anchor: (Top: 96, Left: 14, Right: 118, Height: 18);
+        Text: "";
+        Style: (FontSize: 13, TextColor: #e8f1fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+}

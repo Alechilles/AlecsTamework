@@ -429,6 +429,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
                 (ignored, ignoredRef, ignoredStore) -> { },
                 (uuid, ignoredRef, ignoredStore) -> dismiss.accept(uuid),
+                (ignored, ignoredRef, ignoredStore) -> { },
                 (ignored, ignoredRef, ignoredStore) -> { }, noUuid,
                 recall, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
@@ -458,7 +459,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 () -> "Default", () -> "None", () -> "",
                 List::of, () -> "", List::of, ignored -> true, true,
                 noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
-                capture, capture, capture, noUuid, noUuid, noUuid, noUuid,
+                capture, capture, capture, capture, noUuid, noUuid, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
                 noString, noString, noString, noRun, noString,
                 (uuid, group) -> { }, noString);

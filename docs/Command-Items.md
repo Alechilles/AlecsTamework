@@ -207,6 +207,20 @@ Linked panel supports:
 - Bonded roster rows use their own profile-first view. They show complete
   durable details immediately after capture, summon, store, revive, and relog;
   a live projection is optional enrichment, not the source of the card.
+- Bonded rows use the dedicated final companion card: state accents distinguish
+  `IN WORLD`, `STORED`, `DEAD`, and revive-ready states; health is always
+  shown from the durable snapshot; and happiness, hunger, and thirst appear
+  only when that saved role state actually has the corresponding component.
+  Level and available talent points are shown from durable progression data;
+  the talent shortcut opens the existing talent page while the companion is
+  active. Dead cards retain their complete compact revive-cost list, including
+  owned/required quantities, while the existing confirmation overlay remains
+  the payment authority.
+- The red unlink control is a two-click permanent abandonment confirmation.
+  It deletes the complete bonded profile and its retained extensions. An active
+  companion is only deleted after its exact live projection has been removed in
+  the current world; if that removal cannot be confirmed, the profile remains
+  intact.
 - Bonded revival quotes every configured cost line and reserves the complete
   recipe atomically. A successful revive produces a stored card and no live
   projection.

@@ -48,6 +48,19 @@ public interface BondedCompanionApi {
     CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>>
             store(@Nonnull BondedCompanionActionRequest request);
 
+    /**
+     * Permanently abandons one bonded profile after any live projection has
+     * been confirmed removed. This intentionally has no recovery path.
+     */
+    @Nonnull
+    default CompletableFuture<BondedCompanionResult<Void>> abandon(
+            @Nonnull BondedCompanionActionRequest request
+    ) {
+        Objects.requireNonNull(request, "request");
+        return CompletableFuture.completedFuture(
+                BondedCompanionResult.unavailable("bonded-abandon-unavailable"));
+    }
+
     @Nonnull
     CompletableFuture<BondedCompanionResult<BondedCompanionReviveQuote>>
             quoteRevive(@Nonnull BondedCompanionActionRequest request);

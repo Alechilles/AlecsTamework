@@ -107,6 +107,10 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                         .status());
         BondedCompanionProfileView dead = runtime.api.list(OWNER, ROSTER)
                 .join().value().getFirst();
+        assertTrue(dead.reviveAvailable());
+        assertEquals("Ingredient_Life_Essence",
+                dead.reviveQuote().costs().getFirst().itemId());
+        assertEquals(2, dead.reviveQuote().costs().getFirst().requiredQuantity());
         BondedCompanionReviveQuote quote = runtime.api.quoteRevive(action(
                 "quote", dead, context)).join().value();
         assertTrue(quote.affordable());
@@ -292,6 +296,12 @@ class BondedCompanionPanelLifecycleIntegrationTest {
                 .filter(value -> value.state() == BondedCompanionStateView.ACTIVE)
                 .findFirst().orElseThrow();
         assertFalse(stillStored.summonAvailable());
+        assertEquals("1", stillStored.snapshotPresentationData().get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT));
+        assertEquals("1", stillStored.snapshotPresentationData().get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT));
+        assertEquals("Dragon", stillStored.snapshotPresentationData().get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL));
         assertFalse(BondedCompanionPanelFeaturePresentationSource.presentation(
                 active, clock.get(), null, context, "world-b")
                 .status().actionEnabled());

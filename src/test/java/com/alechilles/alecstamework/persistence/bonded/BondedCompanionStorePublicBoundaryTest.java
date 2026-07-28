@@ -63,6 +63,24 @@ class BondedCompanionStorePublicBoundaryTest {
     }
 
     @Test
+    void permanentDeletionIsOwnerAndRevisionFencedAndCascadesExtensions() {
+        var extension = new BondedCompanionRecord.ExtensionData(
+                "profile-a", "example:stats", payload("xp=1"), 0, -9_000L);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.compareAndSetExtensionData(operation("extension-delete", '8',
+                        BondedCompanionOperation.Type.STORE, "profile-a", 10_000L),
+                        extension, -1).code());
+
+        assertEquals(BondedCompanionStoreResult.Code.REVISION_CONFLICT,
+                store.deleteProfile(OWNER, "roster-a", "profile-a", 1).code());
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.deleteProfile(OWNER, "roster-a", "profile-a", 0).code());
+        assertTrue(store.findProfile(OWNER, "roster-a", "profile-a").isEmpty());
+        assertTrue(store.findExtensionData(OWNER, "roster-a", "profile-a",
+                "example:stats").isEmpty());
+    }
+
+    @Test
     void finiteFamilyCapacityCannotFallBackToAnUncheckedDefaultMutation()
             throws Exception {
         assertFalse(BondedCompanionStore.class.getMethod(

@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.PaidCommandRevivalQuote;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.List;
@@ -13,10 +14,19 @@ import javax.annotation.Nullable;
 /** Holds and renders the complete server-authoritative revival quote. */
 final class LinkedNpcPanelReviveOverlayState {
     static final String COST_LINE_UI_PATH = "TameworkReviveCostLine.ui";
+    private static final int MODAL_WIDTH = 382;
+    private static final int MODAL_HEIGHT_LIMIT = 592;
+    private static final int MODAL_TOP_LIMIT = 24;
+    private static final int OVERLAY_HEIGHT = 640;
+    private static final int COST_ROW_HEIGHT = 44;
+    private static final int COST_VIEWPORT_TOP = 44;
+    private static final int COST_VIEWPORT_MAX_HEIGHT = 440;
+    private static final int ACTION_GAP = 14;
+    private static final int ACTION_HEIGHT = 24;
+    private static final int MODAL_BOTTOM_PADDING = 10;
 
     private boolean visible;
     private UUID npcUuid;
-    private String npcName;
     private CommandReviveCostPresentation presentation;
 
     boolean isVisible() {
@@ -33,7 +43,6 @@ final class LinkedNpcPanelReviveOverlayState {
         }
         visible = true;
         npcUuid = entry.npcUuid();
-        npcName = entry.displayName();
         presentation = quote;
     }
 
@@ -66,7 +75,6 @@ final class LinkedNpcPanelReviveOverlayState {
     void clear() {
         visible = false;
         npcUuid = null;
-        npcName = null;
         presentation = null;
     }
 
@@ -80,14 +88,7 @@ final class LinkedNpcPanelReviveOverlayState {
         if (!visible || presentation == null) {
             return;
         }
-        commandBuilder.set(
-                "#TameworkLinkedPanelReviveSubtitle.Text",
-                LocalizedText.format(
-                        language,
-                        "tamework.ui.linkedPanel.revive.subtitle",
-                        resolveNpcName(language)
-                )
-        );
+        bindLayout(commandBuilder, presentation.costs().size());
         bindCosts(commandBuilder, language);
         boolean confirmEnabled = presentation.confirmEnabled();
         commandBuilder.set(
@@ -98,10 +99,23 @@ final class LinkedNpcPanelReviveOverlayState {
                 "#TameworkLinkedPanelReviveBlockedButton.Visible",
                 !confirmEnabled
         );
-        commandBuilder.set(
-                "#TameworkLinkedPanelReviveSummary.Text",
-                summary(language)
-        );
+    }
+
+    private void bindLayout(UICommandBuilder commandBuilder, int costCount) {
+        int requestedCostHeight = Math.max(0, costCount) * COST_ROW_HEIGHT;
+        int costViewportHeight = Math.min(requestedCostHeight,
+                COST_VIEWPORT_MAX_HEIGHT);
+        int actionTop = COST_VIEWPORT_TOP + costViewportHeight + ACTION_GAP;
+        int modalHeight = Math.min(MODAL_HEIGHT_LIMIT,
+                actionTop + ACTION_HEIGHT + MODAL_BOTTOM_PADDING);
+        int modalTop = Math.max(MODAL_TOP_LIMIT,
+                (OVERLAY_HEIGHT - modalHeight) / 2);
+        commandBuilder.setObject("#TameworkLinkedPanelReviveModal.Anchor",
+                anchor(modalTop, 24, MODAL_WIDTH, modalHeight));
+        commandBuilder.setObject("#TameworkLinkedPanelReviveCostViewport.Anchor",
+                anchor(COST_VIEWPORT_TOP, 14, 354, costViewportHeight));
+        commandBuilder.setObject("#TameworkLinkedPanelReviveActions.Anchor",
+                anchor(actionTop, 14, 354, ACTION_HEIGHT));
     }
 
     private void bindCosts(
@@ -120,12 +134,14 @@ final class LinkedNpcPanelReviveOverlayState {
             );
             String root = "#TameworkLinkedPanelReviveCostList["
                     + index + "]";
+            String displayName = ReviveCostItemText.resolve(line.itemId(),
+                    line.localizedName(), language);
+            ItemGridSlot slot = itemSlot(line, displayName);
+            if (slot != null) {
+                commandBuilder.set(root + " #CostItem.Slots", List.of(slot));
+            }
             commandBuilder.set(
-                    root + " #CostItem.Slots",
-                    List.of(itemSlot(line))
-            );
-            commandBuilder.set(
-                    root + " #CostName.Text", line.localizedName()
+                    root + " #CostName.Text", displayName
             );
             String ownedRequired = line.ownedQuantity()
                     + " / " + line.requiredQuantity();
@@ -141,73 +157,32 @@ final class LinkedNpcPanelReviveOverlayState {
             commandBuilder.set(
                     root + " #CostInsufficient.Visible", !line.satisfied()
             );
-            commandBuilder.set(
-                    root + " #CostShortage.Visible", !line.satisfied()
-            );
-            commandBuilder.set(
-                    root + " #CostShortage.Text",
-                    line.satisfied()
-                            ? ""
-                            : LocalizedText.format(
-                                    language,
-                                    "tamework.ui.linkedPanel.revive.shortage",
-                                    line.shortageQuantity()
-                            )
-            );
         }
     }
 
-    private String summary(String language) {
-        PaidCommandRevivalQuote.Status status = presentation.status();
-        return switch (status) {
-            case READY -> LocalizedText.resolve(
-                    language,
-                    "tamework.ui.linkedPanel.revive.ready"
-            );
-            case INSUFFICIENT_COST -> LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.revive.missingComponents",
-                    presentation.missingComponentCount()
-            );
-            case COOLDOWN -> LocalizedText.format(
-                    language,
-                    "tamework.ui.linkedPanel.revive.cooldown",
-                    LinkedNpcPanelStatusTextService.formatRemainingTime(
-                            presentation.cooldownRemainingMs(), language
-                    )
-            );
-            case DISABLED -> LocalizedText.resolve(
-                    language,
-                    "tamework.ui.linkedPanel.revive.disabled"
-            );
-            case DENIED -> LocalizedText.resolve(
-                    language,
-                    "tamework.ui.linkedPanel.revive.denied"
-            );
-            case UNAVAILABLE -> LocalizedText.resolve(
-                    language,
-                    "tamework.ui.linkedPanel.revive.unavailable"
-            );
-        };
-    }
-
+    @Nullable
     private ItemGridSlot itemSlot(
-            CommandReviveCostPresentation.CostLine line
+            CommandReviveCostPresentation.CostLine line,
+            String displayName
     ) {
-        ItemGridSlot slot = new ItemGridSlot(
-                new ItemStack(line.itemId(), 1)
-        );
-        slot.setName(line.localizedName());
-        slot.setSkipItemQualityBackground(true);
-        return slot;
+        try {
+            ItemGridSlot slot = new ItemGridSlot(
+                    new ItemStack(line.itemId(), 1)
+            );
+            slot.setName(displayName);
+            slot.setSkipItemQualityBackground(true);
+            return slot;
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
-    private String resolveNpcName(String language) {
-        return npcName == null || npcName.isBlank()
-                ? LocalizedText.resolve(
-                        language,
-                        "tamework.ui.linkedPanel.subtitle.defaultNpcName"
-                )
-                : npcName;
+    private static Anchor anchor(int top, int left, int width, int height) {
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(top));
+        anchor.setLeft(Value.of(left));
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(height));
+        return anchor;
     }
 }

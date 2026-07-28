@@ -24,13 +24,13 @@ final class BondedCompanionPanelRecordSource {
         if (ownerUuid == null || roster == null) return PanelSnapshot.empty();
         if (cached == null) return PanelSnapshot.empty();
         return snapshot(ownerUuid, roster, cached.profiles(),
-                cached.generation(), cached.state());
+                cached.generation(), cached.state(), cached.trusted());
     }
 
     PanelSnapshot ready(UUID owner, String roster,
                         List<BondedCompanionProfileView> profiles) {
         return snapshot(owner, roster, profiles, 1L,
-                BondedCompanionPanelSnapshotCache.State.READY);
+                BondedCompanionPanelSnapshotCache.State.READY, true);
     }
 
     private PanelSnapshot snapshot(
@@ -38,7 +38,8 @@ final class BondedCompanionPanelRecordSource {
             String roster,
             List<BondedCompanionProfileView> profiles,
             long generation,
-            BondedCompanionPanelSnapshotCache.State state) {
+            BondedCompanionPanelSnapshotCache.State state,
+            boolean trusted) {
         LinkedHashMap<String, BondedCompanionProfileView> newest =
                 new LinkedHashMap<>();
         for (BondedCompanionProfileView profile : profiles) {
@@ -53,7 +54,8 @@ final class BondedCompanionPanelRecordSource {
                 .sorted(Comparator.comparing(BondedCompanionProfileView::profileId))
                 .forEach(profile -> records.add(new PanelRecord(
                         presentationUuid(profile.profileId()), profile)));
-        return new PanelSnapshot(List.copyOf(records), generation, state);
+        return new PanelSnapshot(List.copyOf(records), generation, state,
+                trusted);
     }
 
     @Nonnull
@@ -79,19 +81,16 @@ final class BondedCompanionPanelRecordSource {
     record PanelSnapshot(
             @Nonnull List<PanelRecord> records,
             long generation,
-            @Nonnull BondedCompanionPanelSnapshotCache.State state) {
+            @Nonnull BondedCompanionPanelSnapshotCache.State state,
+            boolean trusted) {
         PanelSnapshot {
             records = List.copyOf(records);
             state = Objects.requireNonNull(state, "state");
         }
 
-        boolean trusted() {
-            return state == BondedCompanionPanelSnapshotCache.State.READY;
-        }
-
         static PanelSnapshot empty() {
             return new PanelSnapshot(List.of(), 0L,
-                    BondedCompanionPanelSnapshotCache.State.CLOSED);
+                    BondedCompanionPanelSnapshotCache.State.CLOSED, false);
         }
     }
 }

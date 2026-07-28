@@ -229,9 +229,7 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(panelUi.contains(
                 "Group #TameworkLinkedPanelReviveOverlay"
         ));
-        assertTrue(panelUi.contains(
-                "Group #TameworkLinkedPanelReviveCostList"
-        ));
+        assertTrue(panelUi.contains("Group #TameworkLinkedPanelReviveCostList"));
         assertTrue(panelUi.contains(
                 "#TameworkLinkedPanelReviveConfirmButton"
         ));
@@ -239,6 +237,16 @@ class LinkedNpcPanelCardLayoutTest {
                 "#TameworkLinkedPanelReviveBlockedButton"
         ));
         assertTrue(costLineUi.contains("ItemGrid #CostItem"));
+        assertTrue(panelUi.contains("Group #TameworkLinkedPanelReviveActions"));
+        assertFalse(panelUi.contains("#TameworkLinkedPanelReviveSubtitle"));
+        assertFalse(panelUi.contains("#TameworkLinkedPanelReviveSummary"));
+        assertFalse(panelUi.contains("revive.costHeader"));
+        assertTrue(costLineUi.contains("@ReviveCostItemGridStyle")
+                        && costLineUi.contains("Style: @ReviveCostItemGridStyle;"),
+                "Revive-cost items need an explicit ItemGrid style so their icons render.");
+        assertTrue(costLineUi.contains("Anchor: (Top: 0, Left: 47, Width: 178, Height: 44);"));
+        assertTrue(costLineUi.contains("Anchor: (Top: 0, Right: 9, Width: 82, Height: 44);"));
+        assertFalse(costLineUi.contains("#CostShortage"));
         assertTrue(costLineUi.contains("Label #CostSatisfied"));
         assertTrue(costLineUi.contains("Label #CostInsufficient"));
         assertTrue(overlay.contains(

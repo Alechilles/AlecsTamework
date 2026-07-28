@@ -109,9 +109,10 @@ final class BondedCompanionPanelActionRouter {
         if (player == null) return;
         if (lifecycleAuthority == null || !lifecycleAuthority.allows(player)) return;
         String world = player.getWorld() == null ? null : player.getWorld().getName();
-        var context = contexts.create(
-                player, eventStore, feature.bonded().roleId(),
-                action == BondedCompanionPanelActionService.Action.SUMMON);
+        var context = action == BondedCompanionPanelActionService.Action.ABANDON
+                ? null : contexts.create(
+                        player, eventStore, feature.bonded().roleId(),
+                        action == BondedCompanionPanelActionService.Action.SUMMON);
         var outcome = actions.performAsync(
                 action, ownerUuid, world, context, feature.bonded());
         var owningWorld = player.getWorld();
