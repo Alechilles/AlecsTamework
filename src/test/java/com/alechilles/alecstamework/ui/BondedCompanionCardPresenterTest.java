@@ -32,7 +32,12 @@ class BondedCompanionCardPresenterTest {
         assertTrue(asset.contains("#BondedStateStored"));
         assertTrue(asset.contains("#BondedStateDead"));
         assertTrue(asset.contains("#BondedStateReady"));
+        assertFalse(asset.contains("Group #BondedStateInWorld"),
+                "Lifecycle state is informational text, not a button-like badge.");
         assertTrue(asset.contains("#BondedHealthFrame"));
+        assertTrue(asset.contains("#BondedHealthFill")
+                        && asset.contains("Top: 1, Left: 1, Width: 375, Height: 16"),
+                "The static health fill begins inside the track; runtime sizing preserves its right inset.");
         assertTrue(asset.contains("Height: 18") && asset.contains("FontSize: 11"),
                 "Health treatment should be easier to read than the compact original.");
         assertTrue(asset.contains("#BondedMetricHappiness"));
@@ -40,12 +45,14 @@ class BondedCompanionCardPresenterTest {
         assertTrue(asset.contains("#BondedMetricThirst"));
         assertTrue(asset.contains("#BondedTalentButton"));
         assertTrue(asset.contains("#BondedPrimaryActionDisabled"));
+        assertTrue(asset.contains("#BondedPrimaryActionNoTooltip"));
+        assertTrue(asset.contains("#BondedPrimaryActionDisabledNoTooltip"));
         assertTrue(asset.contains("#BondedReviveAction"));
+        assertTrue(asset.contains("#BondedReviveActionNoTooltip"));
         assertTrue(asset.contains("#BondedUnlinkButton"));
         assertTrue(asset.contains("#BondedUnlinkConfirmButton"));
         assertFalse(asset.contains("#BondedCostList"));
-        assertTrue(asset.contains("#BondedPrimaryAction")
-                        && asset.contains("TooltipText: \"\";")
+        assertTrue(asset.contains("#BondedReviveAction")
                         && asset.contains("TextTooltipStyle: @BondedCardTextTooltipStyle;"),
                 "Revive costs should be available from the compact action tooltip.");
     }
@@ -74,7 +81,7 @@ class BondedCompanionCardPresenterTest {
                 row, false, bindingConfig(), "en-US"
         );
 
-        assertCommand(commands, "#Card #BondedStateInWorld #BondedStateText.Text", "IN WORLD");
+        assertCommand(commands, "#Card #BondedStateInWorld.Text", "IN WORLD");
         assertCommand(commands, "#Card #BondedStateDetail.Text", "SUMMONED");
         assertCommand(commands, "#Card #BondedStateDetailValue.Text", "AT YOUR SIDE");
         assertCommand(commands, "#Card #BondedPrimaryAction.Text", "DISMISS");
@@ -99,7 +106,7 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommand(commands, "#Card #BondedStateStored #BondedStateText.Text", "STORED");
+        assertCommand(commands, "#Card #BondedStateStored.Text", "STORED");
         assertCommand(commands, "#Card #BondedStateDetail.Text", "SUMMON AVAILABLE IN");
         assertCommand(commands, "#Card #BondedStateDetailValue.Text", "1m");
     }
@@ -115,7 +122,7 @@ class BondedCompanionCardPresenterTest {
                 Map.of(
                         "bonded.activeCapacity.count", "1",
                         "bonded.activeCapacity.limit", "1",
-                        "bonded.activeCapacity.label", "Nordic Drakes"
+                        "bonded.activeCapacity.label", "Full Dragons"
                 ), null);
         UICommandBuilder commands = new UICommandBuilder();
 
@@ -125,6 +132,8 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedStateDetail.Text", "\"\"");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",
                 "Max Nordic Drakes already summoned (1/1)");
+        assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
+        assertCommand(commands, "#Card #BondedPrimaryActionDisabledNoTooltip.Visible", "false");
     }
 
     @Test
@@ -141,6 +150,8 @@ class BondedCompanionCardPresenterTest {
         assertCommandSelector(commands, "#Card.Anchor");
         assertCommandSelector(commands, "#Card #BondedStateDetail.Anchor");
         assertCommandSelector(commands, "#Card #BondedPrimaryAction.Anchor");
+        assertCommand(commands, "#Card #BondedPrimaryAction.Visible", "false");
+        assertCommand(commands, "#Card #BondedPrimaryActionNoTooltip.Visible", "true");
     }
 
     @Test
@@ -157,7 +168,7 @@ class BondedCompanionCardPresenterTest {
         BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
                 "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
 
-        assertCommand(commands, "#Card #BondedStateDead #BondedStateText.Text", "DEAD");
+        assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
         assertCommand(commands, "#Card #BondedAccentReady.Visible", "false");
     }
 
@@ -201,7 +212,7 @@ class BondedCompanionCardPresenterTest {
                 row, false, bindingConfig(), "en-US"
         );
 
-        assertCommand(commands, "#Card #BondedStateDead #BondedStateText.Text", "DEAD");
+        assertCommand(commands, "#Card #BondedStateDead.Text", "DEAD");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Visible", "true");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.Text", "REVIVE");
         assertCommand(commands, "#Card #BondedPrimaryActionDisabled.TooltipText",

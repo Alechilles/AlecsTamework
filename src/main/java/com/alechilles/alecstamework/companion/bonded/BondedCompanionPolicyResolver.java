@@ -136,6 +136,7 @@ public final class BondedCompanionPolicyResolver {
                 source.allowedRoles(), source.maximumOwned(),
                 source.maximumActive(), source.sessionDurationSeconds(),
                 source.summonCooldownSeconds(),
+                source.summonAuraEffectId(),
                 price == null ? null : new BondedCompanionPolicy.RevivePrice(
                         price.costs()
                 ),

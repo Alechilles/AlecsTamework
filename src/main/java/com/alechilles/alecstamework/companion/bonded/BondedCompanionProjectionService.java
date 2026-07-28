@@ -65,7 +65,7 @@ public final class BondedCompanionProjectionService {
                 );
         SpawnResult spawned = safeSpawn(new SpawnPlan(
                 lease, request.roleId(), request.snapshot(), marker,
-                request.placement()
+                request.placement(), request.summonAuraEffectId()
         ));
         if (spawned.status() != SpawnStatus.SPAWNED
                 || !npcUuid.equals(spawned.npcUuid())) {
@@ -333,7 +333,8 @@ public final class BondedCompanionProjectionService {
                     .CompanionSpawnPlacement placement,
             long nowMs,
             long expiresAtMs,
-            @Nonnull BondedCompanionActiveCapacity activeCapacity
+            @Nonnull BondedCompanionActiveCapacity activeCapacity,
+            @Nullable String summonAuraEffectId
     ) {
         public SummonRequest {
             ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
@@ -347,6 +348,22 @@ public final class BondedCompanionProjectionService {
             if (expectedRevision < 0L) {
                 throw new IllegalArgumentException("negative expectedRevision");
             }
+            summonAuraEffectId = summonAuraEffectId == null
+                    || summonAuraEffectId.isBlank()
+                    ? null : summonAuraEffectId.trim();
+        }
+
+        public SummonRequest(
+                UUID ownerUuid, String rosterId, String profileId,
+                long expectedRevision, String roleId, BondedCompanionSnapshot snapshot,
+                String worldKey,
+                com.alechilles.alecstamework.companion.placement
+                        .CompanionSpawnPlacement placement,
+                long nowMs, long expiresAtMs,
+                BondedCompanionActiveCapacity activeCapacity
+        ) {
+            this(ownerUuid, rosterId, profileId, expectedRevision, roleId, snapshot,
+                    worldKey, placement, nowMs, expiresAtMs, activeCapacity, null);
         }
     }
 
@@ -381,14 +398,15 @@ public final class BondedCompanionProjectionService {
             @Nonnull BondedCompanionSnapshot snapshot,
             @Nonnull TameworkProjectionIdentityComponent marker,
             @Nullable com.alechilles.alecstamework.companion.placement
-                    .CompanionSpawnPlacement placement
+                    .CompanionSpawnPlacement placement,
+            @Nullable String summonAuraEffectId
     ) {
         public SpawnPlan(
                 BondedCompanionProjectionValidator.LeaseExpectation lease,
                 String roleId, BondedCompanionSnapshot snapshot,
                 TameworkProjectionIdentityComponent marker
         ) {
-            this(lease, roleId, snapshot, marker, null);
+            this(lease, roleId, snapshot, marker, null, null);
         }
 
         public SpawnPlan {
@@ -396,6 +414,19 @@ public final class BondedCompanionProjectionService {
             roleId = text(roleId, "roleId");
             snapshot = Objects.requireNonNull(snapshot, "snapshot");
             marker = Objects.requireNonNull(marker, "marker").clone();
+            summonAuraEffectId = summonAuraEffectId == null
+                    || summonAuraEffectId.isBlank()
+                    ? null : summonAuraEffectId.trim();
+        }
+
+        public SpawnPlan(
+                BondedCompanionProjectionValidator.LeaseExpectation lease,
+                String roleId, BondedCompanionSnapshot snapshot,
+                TameworkProjectionIdentityComponent marker,
+                com.alechilles.alecstamework.companion.placement
+                        .CompanionSpawnPlacement placement
+        ) {
+            this(lease, roleId, snapshot, marker, placement, null);
         }
     }
 

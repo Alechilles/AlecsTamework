@@ -160,7 +160,7 @@ public final class BondedCompanionCoreApiOperations {
                 request.worldKey(), placement(placement), now, lease.expiresAtMs(),
                 new BondedCompanionActiveCapacity(
                         profile.familyId(), resolved.policy().maximumActive()
-                )
+                ), resolved.policy().summonAuraEffectId()
         ));
         BondedCompanionRecord.Profile refreshed = profile(request);
         if (result.status() == BondedCompanionProjectionService.SummonStatus.ACTIVE

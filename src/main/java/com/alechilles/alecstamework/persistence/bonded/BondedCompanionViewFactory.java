@@ -38,14 +38,18 @@ final class BondedCompanionViewFactory {
             BondedCompanionReviveQuote reviveQuote,
             Map<String, String> transientPresentationData
     ) {
-        LinkedHashMap<String, String> presentation = new LinkedHashMap<>();
+        LinkedHashMap<String, String> capturedPresentation = new LinkedHashMap<>();
         profile.policy().entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith("presentation:"))
-                .forEach(entry -> presentation.put(
+                .forEach(entry -> capturedPresentation.put(
                         entry.getKey().substring("presentation:".length()),
                         entry.getValue()));
         SnapshotFields durable = durable(profile);
-        if (durable != null) presentation.putAll(durable.data());
+        if (durable != null) capturedPresentation.putAll(durable.data());
+        LinkedHashMap<String, String> presentation = new LinkedHashMap<>(
+                BondedCompanionProgressionPresentation.enrich(
+                        capturedPresentation, profile.roleId(),
+                        BondedCompanionProgressionPresentation::resolveLive));
         extensionData.forEach((namespace, json) ->
                 presentation.put("extension:" + namespace, json));
         presentation.putAll(transientPresentationData);

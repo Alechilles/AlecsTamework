@@ -227,7 +227,9 @@ final class BondedCompanionPanelFeaturePresentationSource {
             return BondedCompanionActionBlockReason.PLACEMENT_UNAVAILABLE;
         if (profile.state() == BondedCompanionStateView.STORED
                 && !profile.summonAvailable())
-            return BondedCompanionActionBlockReason.POLICY_DENIED;
+            return activeCapacityReached(profile)
+                    ? BondedCompanionActionBlockReason.CAPACITY_REACHED
+                    : BondedCompanionActionBlockReason.POLICY_DENIED;
         if (profile.state() == BondedCompanionStateView.ACTIVE
                 && profile.activeLease() != null
                 && !profile.activeLease().worldKey().equals(world))
@@ -246,6 +248,28 @@ final class BondedCompanionPanelFeaturePresentationSource {
                 || !quote.affordable()))
             return BondedCompanionActionBlockReason.PAYMENT_UNAVAILABLE;
         return null;
+    }
+
+    private static boolean activeCapacityReached(
+            BondedCompanionProfileView profile
+    ) {
+        Map<String, String> data = profile.snapshotPresentationData();
+        int count = nonNegativeInt(data.get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT));
+        int limit = nonNegativeInt(data.get(
+                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT));
+        return limit > 0 && count >= limit;
+    }
+
+    private static int nonNegativeInt(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(raw));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private static boolean validPlacement(

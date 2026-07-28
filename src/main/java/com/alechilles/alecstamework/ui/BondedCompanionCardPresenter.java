@@ -126,14 +126,10 @@ final class BondedCompanionCardPresenter {
         BondedCompanionStatusPresentation status = row.status();
         BondedCompanionCardStatePresentation.StateCopy copy =
                 BondedCompanionCardStatePresentation.resolve(row, language);
-        commands.set(entrySelector + " #BondedStateInWorld #BondedStateText.Text",
-                copy.label());
-        commands.set(entrySelector + " #BondedStateStored #BondedStateText.Text",
-                copy.label());
-        commands.set(entrySelector + " #BondedStateDead #BondedStateText.Text",
-                copy.label());
-        commands.set(entrySelector + " #BondedStateReady #BondedStateText.Text",
-                copy.label());
+        commands.set(entrySelector + " #BondedStateInWorld.Text", copy.label());
+        commands.set(entrySelector + " #BondedStateStored.Text", copy.label());
+        commands.set(entrySelector + " #BondedStateDead.Text", copy.label());
+        commands.set(entrySelector + " #BondedStateReady.Text", copy.label());
         commands.set(entrySelector + " #BondedStateDetail.Text", copy.detail());
         commands.set(entrySelector + " #BondedStateDetailValue.Text",
                 copy.detailValue());
@@ -170,9 +166,8 @@ final class BondedCompanionCardPresenter {
         commands.set(entrySelector + " #BondedHealthText.Text",
                 current + " / " + maximum);
         commands.setObject(entrySelector + " #BondedHealthFill.Anchor",
-                fillAnchor(0, 0,
-                        1 + (int) Math.round((HEALTH_FILL_WIDTH - 1D)
-                                * current / maximum), 16));
+                fillAnchor(1, 1, (int) Math.round(HEALTH_FILL_WIDTH
+                        * current / maximum), 16));
     }
 
     private static void bindLayout(
@@ -186,7 +181,16 @@ final class BondedCompanionCardPresenter {
                 horizontalAnchor(14, layout.detailTop() + 14, 118, 18));
         Anchor action = rightAnchor(layout.actionTop(), 14, 94, 28);
         commands.setObject(entrySelector + " #BondedPrimaryAction.Anchor", action);
+        commands.setObject(entrySelector + " #BondedPrimaryActionNoTooltip.Anchor",
+                rightAnchor(layout.actionTop(), 14, 94, 28));
         commands.setObject(entrySelector + " #BondedPrimaryActionDisabled.Anchor",
+                rightAnchor(layout.actionTop(), 14, 94, 28));
+        commands.setObject(entrySelector
+                        + " #BondedPrimaryActionDisabledNoTooltip.Anchor",
+                rightAnchor(layout.actionTop(), 14, 94, 28));
+        commands.setObject(entrySelector + " #BondedReviveAction.Anchor",
+                rightAnchor(layout.actionTop(), 14, 94, 28));
+        commands.setObject(entrySelector + " #BondedReviveActionNoTooltip.Anchor",
                 rightAnchor(layout.actionTop(), 14, 94, 28));
         commands.setObject(entrySelector + " #BondedUnlinkConfirmButton.Anchor",
                 rightAnchor(layout.actionTop(), 14, 94, 28));
@@ -282,16 +286,36 @@ final class BondedCompanionCardPresenter {
         boolean visible = status.action() != BondedCompanionStatusPresentation.Action.NONE;
         boolean enabled = visible && status.actionEnabled() && !pendingUnlink;
         boolean revive = status.action() == BondedCompanionStatusPresentation.Action.REVIVE;
-        commands.set(entrySelector + " #BondedPrimaryAction.Visible", enabled && !revive);
+        boolean tooltipVisible = !tooltip.isBlank();
+        commands.set(entrySelector + " #BondedPrimaryAction.Visible",
+                enabled && !revive && tooltipVisible);
         commands.set(entrySelector + " #BondedPrimaryAction.Text", label);
-        commands.set(entrySelector + " #BondedPrimaryAction.TooltipText", tooltip);
+        if (tooltipVisible) {
+            commands.set(entrySelector + " #BondedPrimaryAction.TooltipText", tooltip);
+        }
+        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Visible",
+                enabled && !revive && !tooltipVisible);
+        commands.set(entrySelector + " #BondedPrimaryActionNoTooltip.Text", label);
         commands.set(entrySelector + " #BondedPrimaryActionDisabled.Visible",
-                visible && !enabled && !pendingUnlink);
+                visible && !enabled && !pendingUnlink && tooltipVisible);
         commands.set(entrySelector + " #BondedPrimaryActionDisabled.Text", label);
-        commands.set(entrySelector + " #BondedPrimaryActionDisabled.TooltipText", tooltip);
-        commands.set(entrySelector + " #BondedReviveAction.Visible", enabled && revive);
+        if (tooltipVisible) {
+            commands.set(entrySelector + " #BondedPrimaryActionDisabled.TooltipText",
+                    tooltip);
+        }
+        commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Visible",
+                visible && !enabled && !pendingUnlink && !tooltipVisible);
+        commands.set(entrySelector + " #BondedPrimaryActionDisabledNoTooltip.Text",
+                label);
+        commands.set(entrySelector + " #BondedReviveAction.Visible",
+                enabled && revive && tooltipVisible);
         commands.set(entrySelector + " #BondedReviveAction.Text", label);
-        commands.set(entrySelector + " #BondedReviveAction.TooltipText", tooltip);
+        if (tooltipVisible) {
+            commands.set(entrySelector + " #BondedReviveAction.TooltipText", tooltip);
+        }
+        commands.set(entrySelector + " #BondedReviveActionNoTooltip.Visible",
+                enabled && revive && !tooltipVisible);
+        commands.set(entrySelector + " #BondedReviveActionNoTooltip.Text", label);
         if (!enabled) {
             return;
         }
@@ -302,9 +326,13 @@ final class BondedCompanionCardPresenter {
             case NONE -> null;
         };
         if (command != null) {
+            String actionSelector = revive
+                    ? tooltipVisible ? " #BondedReviveAction"
+                    : " #BondedReviveActionNoTooltip"
+                    : tooltipVisible ? " #BondedPrimaryAction"
+                    : " #BondedPrimaryActionNoTooltip";
             events.addEventBinding(CustomUIEventBindingType.Activating,
-                    entrySelector + (revive ? " #BondedReviveAction"
-                            : " #BondedPrimaryAction"),
+                    entrySelector + actionSelector,
                     EventData.of(config.eventCommandId(), command), false);
         }
     }
@@ -370,14 +398,35 @@ final class BondedCompanionCardPresenter {
                 BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_COUNT));
         int limit = positiveRoundedInt(attributes.get(
                 BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LIMIT), 0);
-        String label = attributes.get(
-                BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL);
+        String label = pluralSpecies(row.species());
+        if (label.isBlank()) {
+            label = attributes.get(
+                    BondedCompanionPresentationAttributes.ACTIVE_CAPACITY_LABEL);
+        }
         if (limit == 0 || label == null || label.isBlank()) {
             return "";
         }
         return LocalizedText.format(language,
                 "tamework.ui.linkedPanel.bonded.tooltip.summonCapacity",
                 label, active, limit);
+    }
+
+    @Nonnull
+    private static String pluralSpecies(@Nullable String species) {
+        if (species == null || species.isBlank()) {
+            return "";
+        }
+        String value = species.trim();
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.endsWith("s") || lower.endsWith("x") || lower.endsWith("z")
+                || lower.endsWith("ch") || lower.endsWith("sh")) {
+            return value + "es";
+        }
+        if (lower.endsWith("y") && value.length() > 1
+                && "aeiou".indexOf(lower.charAt(lower.length() - 2)) < 0) {
+            return value.substring(0, value.length() - 1) + "ies";
+        }
+        return value + "s";
     }
 
     private static String actionLabel(

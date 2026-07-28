@@ -18,6 +18,7 @@ public record BondedCompanionPolicy(
         int maximumActive,
         long sessionDurationSeconds,
         long summonCooldownSeconds,
+        @Nullable String summonAuraEffectId,
         @Nullable RevivePrice revivePrice,
         @Nonnull FeatureFlags features
 ) {
@@ -28,11 +29,25 @@ public record BondedCompanionPolicy(
                 allowedRoles, "allowedRoles"
         ));
         features = Objects.requireNonNull(features, "features");
+        summonAuraEffectId = summonAuraEffectId == null
+                || summonAuraEffectId.isBlank()
+                ? null : summonAuraEffectId.trim();
         if (revision < 0L || maximumOwned < 0 || maximumActive < 0
                 || sessionDurationSeconds < 0L
                 || summonCooldownSeconds < 0L) {
             throw new IllegalArgumentException("negative bonded policy value");
         }
+    }
+
+    public BondedCompanionPolicy(
+            long revision, String rosterId, String familyId,
+            Set<String> allowedRoles, int maximumOwned, int maximumActive,
+            long sessionDurationSeconds, long summonCooldownSeconds,
+            @Nullable RevivePrice revivePrice, FeatureFlags features
+    ) {
+        this(revision, rosterId, familyId, allowedRoles, maximumOwned,
+                maximumActive, sessionDurationSeconds, summonCooldownSeconds,
+                null, revivePrice, features);
     }
 
     /** Ordered AND recipe required for one paid bonded revival. */

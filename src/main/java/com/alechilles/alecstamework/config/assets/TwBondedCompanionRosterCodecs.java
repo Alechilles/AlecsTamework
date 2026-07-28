@@ -167,6 +167,16 @@ public final class TwBondedCompanionRosterCodecs {
                             + "An omitted value inherits."
             )
             .add()
+            .<String>append(
+                    new KeyedCodec<>("SummonAuraEffectId", Codec.STRING),
+                    (asset, value) -> asset.summonAuraEffectId = value,
+                    asset -> asset.getSummonAuraEffectId()
+            )
+            .documentation(
+                    "Optional EntityEffect applied after a new projection is "
+                            + "summoned. Omission inherits; blank disables it."
+            )
+            .add()
             .<TwBondedCompanionRosterConfig.RevivePriceDefinition>append(
                     new KeyedCodec<>("RevivePrice", REVIVE_PRICE_CODEC),
                     (asset, value) -> asset.revivePrice = value,

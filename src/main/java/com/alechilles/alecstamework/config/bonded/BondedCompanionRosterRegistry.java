@@ -216,6 +216,7 @@ public final class BondedCompanionRosterRegistry {
                 config.getMaximumActive(),
                 config.getSessionDurationSeconds(),
                 config.getSummonCooldownSeconds(),
+                config.getSummonAuraEffectId(),
                 revivePrice,
                 new FeatureFlags(
                         configuredFeatures.isCapture(),
@@ -403,6 +404,7 @@ public final class BondedCompanionRosterRegistry {
             int maximumActive,
             long sessionDurationSeconds,
             long summonCooldownSeconds,
+            @Nullable String summonAuraEffectId,
             @Nullable RevivePrice revivePrice,
             @Nonnull FeatureFlags features
     ) {
@@ -415,6 +417,20 @@ public final class BondedCompanionRosterRegistry {
                     "allowedRoles"
             ));
             features = Objects.requireNonNull(features, "features");
+            summonAuraEffectId = summonAuraEffectId == null
+                    || summonAuraEffectId.isBlank()
+                    ? null : summonAuraEffectId.trim();
+        }
+
+        public RosterDefinition(
+                String configId, int priority, String rosterId, String familyId,
+                Set<String> allowedRoles, int maximumOwned, int maximumActive,
+                long sessionDurationSeconds, long summonCooldownSeconds,
+                @Nullable RevivePrice revivePrice, FeatureFlags features
+        ) {
+            this(configId, priority, rosterId, familyId, allowedRoles,
+                    maximumOwned, maximumActive, sessionDurationSeconds,
+                    summonCooldownSeconds, null, revivePrice, features);
         }
     }
 

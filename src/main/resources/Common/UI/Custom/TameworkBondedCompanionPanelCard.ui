@@ -42,7 +42,7 @@ Group {
     }
 
     Label #BondedName {
-        Anchor: (Top: 8, Left: 22, Right: 174, Height: 22);
+        Anchor: (Top: 8, Left: 22, Right: 108, Height: 22);
         Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
         Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -60,61 +60,41 @@ Group {
     }
 
     Label #BondedSpecies {
-        Anchor: (Top: 30, Left: 40, Right: 174, Height: 18);
+        Anchor: (Top: 30, Left: 40, Right: 108, Height: 18);
         Text: "";
         Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    Group #BondedStateInWorld {
-        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
-        Background: #145632;
+    Label #BondedStateInWorld {
+        Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #6fc576, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
-
-        Label #BondedStateText {
-            Anchor: (Left: 6, Right: 6, Height: 28);
-            Text: "";
-            Style: (FontSize: 11, RenderBold: true, TextColor: #b9f1c3, HorizontalAlignment: Center, VerticalAlignment: Center);
-        }
     }
 
-    Group #BondedStateStored {
-        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
-        Background: #244d7e;
+    Label #BondedStateStored {
+        Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #78b9ee, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
-
-        Label #BondedStateText {
-            Anchor: (Left: 6, Right: 6, Height: 28);
-            Text: "";
-            Style: (FontSize: 11, RenderBold: true, TextColor: #b9d8fb, HorizontalAlignment: Center, VerticalAlignment: Center);
-        }
     }
 
-    Group #BondedStateDead {
-        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
-        Background: #742225;
+    Label #BondedStateDead {
+        Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #dc727a, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
-
-        Label #BondedStateText {
-            Anchor: (Left: 6, Right: 6, Height: 28);
-            Text: "";
-            Style: (FontSize: 11, RenderBold: true, TextColor: #ffb2ae, HorizontalAlignment: Center, VerticalAlignment: Center);
-        }
     }
 
-    Group #BondedStateReady {
-        Anchor: (Top: 10, Right: 14, Width: 142, Height: 28);
-        Background: #7d4b0e;
+    Label #BondedStateReady {
+        Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
+        Text: "";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #dfae59, HorizontalAlignment: End, VerticalAlignment: Center);
         Visible: false;
-
-        Label #BondedStateText {
-            Anchor: (Left: 6, Right: 6, Height: 28);
-            Text: "";
-            Style: (FontSize: 11, RenderBold: true, TextColor: #ffe29a, HorizontalAlignment: Center, VerticalAlignment: Center);
-        }
     }
 
     TextButton #BondedUnlinkButton {
-        Anchor: (Top: 7, Right: 164, Width: 20, Height: 22);
+        Anchor: (Top: 7, Right: 12, Width: 20, Height: 22);
         Style: @BondedCardDangerIconStyle;
         Text: "X";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.unlink.tooltip;
@@ -227,6 +207,13 @@ Group {
         Visible: false;
     }
 
+    TextButton #BondedPrimaryActionNoTooltip {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedCardButtonStyle;
+        Text: "";
+        Visible: false;
+    }
+
     TextButton #BondedPrimaryActionDisabled {
         Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
         Style: @BondedCardDisabledButtonStyle;
@@ -236,12 +223,26 @@ Group {
         Visible: false;
     }
 
+    TextButton #BondedPrimaryActionDisabledNoTooltip {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedCardDisabledButtonStyle;
+        Text: "";
+        Visible: false;
+    }
+
     TextButton #BondedReviveAction {
         Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
         Style: @BondedReviveButtonStyle;
         Text: "";
         TooltipText: "";
         TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #BondedReviveActionNoTooltip {
+        Anchor: (Top: 82, Right: 14, Width: 94, Height: 28);
+        Style: @BondedReviveButtonStyle;
+        Text: "";
         Visible: false;
     }
 

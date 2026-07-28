@@ -51,6 +51,7 @@ public final class TwBondedCompanionRosterConfig implements
     int maximumActive;
     long sessionDurationSeconds;
     long summonCooldownSeconds;
+    String summonAuraEffectId;
     RevivePriceDefinition revivePrice;
     FeatureToggles features = new FeatureToggles();
 
@@ -158,6 +159,9 @@ public final class TwBondedCompanionRosterConfig implements
         }
         if (!explicitTopLevelKeys.contains("SummonCooldownSeconds")) {
             summonCooldownSeconds = parent.summonCooldownSeconds;
+        }
+        if (!explicitTopLevelKeys.contains("SummonAuraEffectId")) {
+            summonAuraEffectId = parent.summonAuraEffectId;
         }
         inheritRevivePrice(parent, explicitTopLevelKeys,
                 explicitNestedKeysByTopLevel);
@@ -315,6 +319,12 @@ public final class TwBondedCompanionRosterConfig implements
 
     public long getSummonCooldownSeconds() {
         return summonCooldownSeconds;
+    }
+
+    /** Optional visual effect applied after this roster successfully summons. */
+    @Nullable
+    public String getSummonAuraEffectId() {
+        return normalize(summonAuraEffectId);
     }
 
     @Nullable

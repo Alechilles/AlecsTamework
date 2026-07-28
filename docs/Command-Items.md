@@ -216,6 +216,9 @@ Linked panel supports:
   active. Dead cards retain their complete compact revive-cost list, including
   owned/required quantities, while the existing confirmation overlay remains
   the payment authority.
+- A bonded roster may set `SummonAuraEffectId` to an optional `EntityEffect`.
+  Tamework applies it only after a newly created projection is confirmed; it is
+  cosmetic and never changes the durable summon result.
 - The red unlink control is a two-click permanent abandonment confirmation.
   It deletes the complete bonded profile and its retained extensions. An active
   companion is only deleted after its exact live projection has been removed in

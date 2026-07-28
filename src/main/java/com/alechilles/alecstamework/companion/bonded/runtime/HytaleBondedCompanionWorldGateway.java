@@ -115,7 +115,7 @@ public final class HytaleBondedCompanionWorldGateway implements
                 plan.lease().profileId(), plan.lease().leaseToken(),
                 plannedUuid,
                 plan.snapshot().fullState().npcUuid(),
-                plan.placement(), plan.snapshot());
+                plan.placement(), plan.snapshot(), plan.summonAuraEffectId());
         return switch (result) {
             case CONFIRMED -> BondedCompanionProjectionService.SpawnResult
                     .spawned(plannedUuid);
