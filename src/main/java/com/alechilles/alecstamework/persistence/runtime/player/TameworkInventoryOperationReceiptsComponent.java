@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -90,6 +91,17 @@ public final class TameworkInventoryOperationReceiptsComponent
             }
         }
         return null;
+    }
+
+    /** Returns an immutable snapshot of all bounded receipts. */
+    @Nonnull
+    public List<InventoryOperationReceipt> receipts() {
+        ArrayList<InventoryOperationReceipt> snapshot =
+                new ArrayList<>(entries.length);
+        for (ReceiptEntry entry : entries) {
+            snapshot.add(decode(entry));
+        }
+        return List.copyOf(snapshot);
     }
 
     /**

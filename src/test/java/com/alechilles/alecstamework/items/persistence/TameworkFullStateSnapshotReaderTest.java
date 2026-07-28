@@ -37,7 +37,7 @@ class TameworkFullStateSnapshotReaderTest {
                 );
 
         TameworkFullStateSnapshotReader.ReadResult result =
-                reader.read(null, null, SOURCE, "pet");
+                reader.readSourceNeutral(null, null, SOURCE, "pet");
 
         assertTrue(result.successful());
         assertEquals(

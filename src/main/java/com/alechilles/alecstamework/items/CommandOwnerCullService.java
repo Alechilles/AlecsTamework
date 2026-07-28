@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
@@ -29,15 +30,18 @@ final class CommandOwnerCullService {
     private static final float CULL_DAMAGE_AMOUNT = 2.1474836E9F;
 
     private final CommandLinkPolicyService linkPolicyService;
+    private final CommandItemRegistry registry;
     private final CommandLinkMutationService linkMutationService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
 
     CommandOwnerCullService(CommandLinkPolicyService linkPolicyService,
+                            CommandItemRegistry registry,
                             CommandLinkMutationService linkMutationService,
                             CommandFeedbackService feedbackService,
                             CommandNpcNameResolver npcNameResolver) {
         this.linkPolicyService = linkPolicyService;
+        this.registry = registry;
         this.linkMutationService = linkMutationService;
         this.feedbackService = feedbackService;
         this.npcNameResolver = npcNameResolver;
@@ -52,6 +56,11 @@ final class CommandOwnerCullService {
         }
         LiveCullTarget target = resolveTarget(player, npcUuid);
         if (target == null) {
+            return;
+        }
+        if (!CommandGenericTargetAuthority.allowsGenericTargetMutation(
+                target.reference(), target.store()
+        )) {
             return;
         }
         UUID playerUuid = player.getUuid();
@@ -163,6 +172,13 @@ final class CommandOwnerCullService {
                     Codec.STRING
             );
             if (stackToolId == null || stackToolId.isBlank()) {
+                continue;
+            }
+            TwCommandItemConfig currentConfig = registry == null ? null
+                    : registry.get(stack.getItemId());
+            if (!CommandGenericTargetAuthority.allowsGenericCullRepair(
+                    stack, currentConfig
+            )) {
                 continue;
             }
             ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, npcUuid);

@@ -47,7 +47,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     /** Selects the canonical persistence authority for command membership. */
     public enum RosterStorage {
         ItemMetadata,
-        OwnerCommandFamily;
+        OwnerCommandFamily,
+        BondedCompanions;
 
         public static RosterStorage fromString(@Nullable String value) {
             if (value == null || value.isBlank()) {
@@ -58,7 +59,9 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
                     return storage;
                 }
             }
-            return ItemMetadata;
+            throw new IllegalArgumentException(
+                    "Unknown RosterStorage: " + value.trim()
+            );
         }
     }
 
@@ -211,21 +214,35 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .documentation("Stable owner-scoped command family shared by equivalent access items. "
                 + "Required when RosterStorage is OwnerCommandFamily. Inheritance: omitted value inherits.")
         .add()
-        .<String>append(
-            new KeyedCodec<>("RosterStorage", Codec.STRING),
-            (asset, value) -> asset.rosterStorage = RosterStorage.fromString(value),
-            asset -> asset.rosterStorage.name()
+        .<RosterStorage>append(
+            new KeyedCodec<>(
+                    "RosterStorage",
+                    TwCommandItemCodecs.ROSTER_STORAGE_CODEC
+            ),
+            (asset, value) -> asset.rosterStorage = value == null
+                    ? RosterStorage.ItemMetadata
+                    : value,
+            asset -> asset.rosterStorage
         )
-        .documentation("Canonical membership authority: ItemMetadata (legacy/default) or OwnerCommandFamily. "
+        .documentation("Canonical membership authority: ItemMetadata (legacy/default), OwnerCommandFamily, "
+                + "or the separate BondedCompanions authority. Inheritance: omitted value inherits.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("BondedRosterId", Codec.STRING),
+            (asset, value) -> asset.bondedRosterId = normalizeOptional(value),
+            asset -> asset.bondedRosterId
+        )
+        .documentation("Required roster policy ID when RosterStorage is BondedCompanions. "
                 + "Inheritance: omitted value inherits.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("ProjectRosterToItemMetadata", Codec.BOOLEAN),
-            (asset, value) -> asset.projectRosterToItemMetadata = value == null || value,
+            (asset, value) -> asset.projectRosterToItemMetadata = value,
             asset -> asset.projectRosterToItemMetadata
         )
         .documentation("Projects an owner-family roster to item metadata as a disposable cache. "
-                + "Item metadata never becomes the authority. Inheritance: omitted value inherits.")
+                + "Item metadata never becomes the authority. Omission defaults true for legacy/owner storage "
+                + "and false for bonded storage; an inherited or explicit setting is invalid for bonded storage.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("LinkEnabled", Codec.BOOLEAN),
@@ -313,7 +330,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private MembershipMode membershipMode = MembershipMode.LinkedOnly;
     private String commandFamilyId;
     private RosterStorage rosterStorage = RosterStorage.ItemMetadata;
-    private boolean projectRosterToItemMetadata = true;
+    private String bondedRosterId;
+    private Boolean projectRosterToItemMetadata;
     private boolean linkEnabled = true;
     private boolean linkUseTogglesMembership = true;
     private boolean requireTamed = true;
@@ -395,6 +413,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
         if (!explicitTopLevelKeys.contains("CommandFamilyId")) commandFamilyId = parent.commandFamilyId;
         if (!explicitTopLevelKeys.contains("RosterStorage")) rosterStorage = parent.rosterStorage;
+        if (!explicitTopLevelKeys.contains("BondedRosterId")) bondedRosterId = parent.bondedRosterId;
         if (!explicitTopLevelKeys.contains("ProjectRosterToItemMetadata")) {
             projectRosterToItemMetadata = parent.projectRosterToItemMetadata;
         }
@@ -478,12 +497,28 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return rosterStorage;
     }
 
+    @Nullable
+    public String getBondedRosterId() {
+        return bondedRosterId;
+    }
+
     public boolean isProjectRosterToItemMetadata() {
-        return projectRosterToItemMetadata;
+        if (projectRosterToItemMetadata != null) {
+            return projectRosterToItemMetadata;
+        }
+        return !usesBondedCompanionRoster();
+    }
+
+    public boolean hasProjectRosterToItemMetadataSetting() {
+        return projectRosterToItemMetadata != null;
     }
 
     public boolean usesOwnerCommandFamilyRoster() {
         return rosterStorage == RosterStorage.OwnerCommandFamily;
+    }
+
+    public boolean usesBondedCompanionRoster() {
+        return rosterStorage == RosterStorage.BondedCompanions;
     }
 
     public boolean isLinkEnabled() {

@@ -28,6 +28,8 @@ public enum TameworkApiCapability {
     /** Exact source decrement after either terminal capture roll. */
     CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION,
     /** Successful capture can tame the live NPC and commit command-roster membership. */
-    CAPTURE_TAME_AND_LINK
+    CAPTURE_TAME_AND_LINK,
+    /** Separate canonical profile, lease, revive, and extension-data authority. */
+    BONDED_COMPANIONS
 }
 

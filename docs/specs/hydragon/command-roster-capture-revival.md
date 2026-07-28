@@ -1,249 +1,218 @@
-# Command Rosters, Timed Summoning, Capture, and Revival
+# Bonded Horn Roster, Capture, Leases, and Revival
 
-Status: implemented and independently capability-gated; exact live acceptance
-pending
+Status: implementation and automated contract coverage complete; clean package
+verification and fresh-world acceptance pending
 
 ## Goal
 
-Make the Dragon Horn a durable roster interface rather than a companion storage
-item. Preserve one canonical profile across capture, active projection, roster
-storage, unload, loss, death, and paid revival.
+Use one durable Dragon Horn roster for full dragons and bonded Miniwyverns while
+treating every live NPC as a temporary projection. Preserve complete gameplay
+state across capture, summon, dismissal, logout, world transfer, expiration,
+recovery, death, revival, and relog without sending these companions through
+Tamework's permanent-world persistence machinery.
 
-## Command-family roster authority
+## Authority boundary
 
-One roster is identified by `(owner_uuid, family_id)`. One membership contains:
+HyDragon bonded companions use `BondedCompanionApi` and the independent
+`bonded-companions.sqlite` database. They do not create or depend on:
 
-- stable unique slot ID;
-- stable unique profile ID;
-- family owner and ID;
-- membership revision;
-- optional command group;
-- bulk-command selection;
-- optional complete home world/position.
+- generic canonical/dormant profiles or lifecycle aliases;
+- owner/command-family roster memberships;
+- generic population-group evidence or reservations;
+- generic timed-summon leases;
+- generic paid-revival operations;
+- generic profile extension rows; or
+- replacement-persistence outbox/readiness evidence.
 
-Membership does not copy role, display name, alias, owner-world, lifecycle,
-location, active count, lease, operation phase, or recovery state.
+The generic APIs and persistence systems remain unchanged for ordinary
+companions and other integrations. Only HyDragon's old bindings to those
+generic surfaces are superseded.
 
-`command_family` owns only family identity/revision. Canonical profile and
-lifecycle joins supply current presentation and action authority.
+## Shared Horn roster
 
-A profile cannot occupy two roster slots or families. Dead, lost, unloaded,
-active, provisioned, and roster-stored states preserve the same membership
-unless an explicit authorized unlink succeeds.
-
-The Dragon Horn is an access item. Multiple copies held by the same owner expose
-the same roster. A copied/dropped Horn cannot transfer, fork, suppress, or
-delete canonical membership.
-
-HyDragon uses:
+The Horn is configured with:
 
 ```text
 CommandConfigId = HyDragonDragonHorn
-CommandFamilyId = hydragon:dragon_horn
-RosterStorage = OwnerCommandFamily
+RosterStorage = BondedCompanions
+BondedRosterId = hydragon:dragon_horn
 MembershipMode = LinkedOnly
+LinkEnabled = false
+LinkUseTogglesMembership = false
 RequireOwner = true
 RequireTamed = true
 ```
 
-## Roster lifecycle
+It is an access, panel, and live-command surface. It is not the durable roster
+and does not project roster state into item metadata. Multiple Horn copies for
+one owner resolve the same profile set.
 
-Add canonical:
+Two policy families share that roster:
 
-- `PROVISIONED_DORMANT` at `PROVISIONING`;
-- `ROSTER_STORED` at `COMMAND_ROSTER`.
+| Family | Roles | Max owned | Max active | Session | Cooldown |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `hydragon:full_dragons` | tamed Nordic Drake, Hydra, and Rock Drake tiers | unlimited | 1 | 600 s | 300 s |
+| `hydragon:soulbound_mini` | `Tamed_Wyvern_Mini` | 1 | 1 | 900 s | 180 s |
 
-`ROSTER_STORED` means an owned roster profile has no live projection and no
-captured item. Its current full snapshot remains in the shared snapshot
-authority.
+These are declarative current HyDragon values, not hardcoded Tamework rules.
+Either timer can be configured as `0` to disable it. Each profile retains its
+family ID so policy never depends on guessing from a live NPC.
 
-`RESTORING` and `STORING` remain shared operation phases/fences, not lifecycle
-states. During storage, canonical lifecycle remains potentially live until
-source retirement and roster storage commit, so active capacity cannot be
-released early.
+## Profile lifecycle
 
-## Roster operations
+The player-visible lifecycle is exactly:
 
-Two shared operation kinds are sufficient:
-
-1. Membership mutation creates, updates, or removes one exact slot.
-2. Roster transition changes canonical lifecycle for one exact membership and
-   composes positive population admission when required.
-
-Roster mutations, lifecycle changes, group reservations, operation evidence,
-and outbox events commit atomically. There is no roster operation/receipt table,
-feature phase graph, listener-backed committed cache, or independent recovery
-queue.
-
-## Timed summon lease
-
-One `timed_summon_lease` row per profile stores only:
-
-- lease revision;
-- optional active session ID;
-- nonnegative remaining active duration;
-- optional signed cooldown deadline;
-- snapshotted config ID/revision and policy values;
-- durable warning receipts;
-- optional signed checkpoint timestamp;
-- creation/update timestamps.
-
-It does not copy roster, profile, owner, role, alias, lifecycle, location,
-operation phase, active count, or recovery state.
-
-Role-scoped configuration supplies:
-
-```json
-{
-  "Command": {
-    "Summon": {
-      "Enabled": true,
-      "ActiveDurationMs": 600000,
-      "ResummonCooldownMs": 300000,
-      "AutoStoreOnOwnerLogout": true,
-      "ExpiryWarningThresholdsMs": [60000, 30000, 10000]
-    }
-  }
-}
+```text
+STORED --summon--> ACTIVE --non-death exit--> STORED
+                       |
+                  confirmed death
+                       v
+                      DEAD --paid revive--> STORED
 ```
 
-Zero active duration is generic unlimited behavior. HyDragon full dragons use
-a positive duration.
+There is no bonded `UNLOADED`, `LOST`, `CAPTURED`, `COOPED`,
+`ROSTER_STORED`, or `PROVISIONED_DORMANT`. Missing, stale, expired, duplicate,
+logout, and transfer cases converge to `STORED`. Only a positively observed
+death creates `DEAD`.
+
+The stable bonded profile ID is roster and UI identity. An active lease carries
+an opaque lease token, exact live NPC UUID, world key, start, and optional
+expiry only so Tamework can validate and retire that projection.
+
+## Full snapshot rule
+
+Capture stores the complete snapshot before retiring the source. Storing an
+active projection snapshots it before removal and merges state without
+deleting unavailable optional components.
+
+The snapshot retains all supported gameplay data: role/appearance inputs,
+owner and tamed state, custom name, health, needs, happiness, breeding,
+progression, traits, talents, life stage, attachments, command settings, and
+HyDragon namespaced extension data. The panel renders from this durable state
+immediately; relog is not a data-loading prerequisite.
+
+## Draconic Stone capture
+
+HyDragon's Draconic Stone uses:
+
+```text
+SuccessDisposition = StoreBondedCompanion
+BondedRosterId = hydragon:dragon_horn
+RequiredCommandConfigId = HyDragonDragonHorn
+RequireCommandAccessItem = true
+RequiredEffectId = Tw_Status_Tranquilized
+SourceConsumption = ResolvedAttempt
+```
+
+The current capture deliberately requires tranquilized state and does not
+require a health threshold. Wild source roles map to their corresponding tamed
+roles before bonded-family admission.
+
+One durable capture operation owns the resolved roll, source-item spend,
+complete snapshot, stable profile, exact source identity, cleanup intent, and
+result. On success the profile is `STORED`, the source NPC is retired, one
+completion effect is emitted, and no filled Stone is created. On a terminal
+failed probability roll, `ResolvedAttempt` spends the Stone once and applies
+the configured failure result. Denial before the roll spends nothing.
+
+The profile-lifetime source record prevents the same original NPC from being
+captured into a second profile after operation-history retention. Live capture
+events are convenience notifications; restart recovery uses
+`BondedCompanionApi.findCapture`.
 
 ## Summon
 
-Summon:
+Summon validates owner, roster, family, role, profile revision, `STORED` state,
+snapshot, feature toggle, cooldown, family active capacity, destination world,
+and safe placement. It then creates one lease and one exact projection.
 
-1. validates exact owner, membership, `ROSTER_STORED` lifecycle, stored
-   snapshot, lease/cooldown, group policy, config, and destination;
-2. freezes a world-qualified safe placement before preparation;
-3. reserves active capacity and leases a planned alias;
-4. applies one receipt-addressed spawn on the destination world thread;
-5. atomically promotes the alias, retires the stored snapshot, commits
-   `ACTIVE`, starts one session, retires reservations, and emits outbox events.
+A positive session duration produces a signed expiry deadline. `0` is the only
+unlimited sentinel; negative world-time values remain valid timestamps. A
+failed or replayed request cannot create a second lease or projection.
 
-Recovery reuses the frozen placement and same receipt. It does not choose a new
-destination or create a second projection.
+## Store, expiry, logout, and world transfer
 
-## Dismiss, expiry, and logout storage
+Explicit Dismiss, session expiry, logout, world transfer, missing-projection
+recovery, and duplicate cleanup share the same convergence rule:
 
-All storage triggers use the same operation:
+1. validate the exact profile, lease token, live UUID, and world;
+2. capture and durably merge the latest complete state when the projection is
+   available;
+3. retire the exact projection or retain a bounded cleanup intent;
+4. clear the lease and commit `STORED`; and
+5. begin the family's configured summon cooldown.
 
-1. validate exact active/unloaded lifecycle, alias, membership, lease/session,
-   policy, and source world;
-2. checkpoint nonincreasing remaining duration;
-3. capture a complete canonical snapshot;
-4. durably fence and retire the exact live projection;
-5. atomically install the snapshot, retire the alias, commit `ROSTER_STORED`,
-   clear the session, start cooldown, and publish;
-6. release active capacity only in that final commit.
-
-Failure leaves one recoverable operation and occupied active capacity. It cannot
-authorize another summon.
-
-Owner logout stores configured dragons. The next successful summon starts a new
-full lease after cooldown. Downtime does not consume stored or pending time.
-
-## Time semantics
-
-- Remaining duration is elapsed time measured from a monotonic process clock.
-- Server downtime neither consumes nor replenishes it.
-- World timestamp deadlines preserve sign; zero/null semantics are explicit.
-- Recall, relocation, command changes, mounting, chunk unload, and UI refresh do
-  not reset a running lease.
-- Warning thresholds are positive, unique, descending, and durably receipted
-  per session.
-
-## Tame-and-command-link capture
-
-The full operation is defined in
-[capture-policy.md](capture-policy.md). Its successful durable transaction must
-leave:
-
-- one stable profile and current live alias;
-- canonical `ACTIVE` lifecycle;
-- exact owner and tamed role;
-- one population classification/admission;
-- one Dragon Horn membership;
-- one active timed lease;
-- one recorded capture result/source spend;
-- no filled Draconic Stone.
-
-No callback chain may commit roster, lease, and capture independently.
+The system never manufactures Lost or leaves an unloaded alias for these
+events. Duplicate cleanup cannot turn an unselected copy into canonical state.
 
 ## Death
 
-Death preserves profile and roster membership, records the exact death snapshot,
-commits `DEAD_REVIVABLE`, ends active timed projection consistently, and releases
-active capacity only with canonical durable evidence. It does not create or
-damage a stone.
+The death system accepts only an exact matching bonded marker and active lease.
+It captures the final state, retires the lease, and commits `DEAD`. An ordinary
+unload/remove observation without positive death evidence stores the profile
+instead.
 
-## Paid command revival
+Death does not erase the profile, family, Horn card, snapshot, or Miniwyvern
+extension. A dead profile cannot be summoned or dismissed.
 
-Role-scoped configuration supplies an ordered AND-list:
+## Paid revival
 
-```json
-{
-  "Command": {
-    "Revive": {
-      "Enabled": true,
-      "GameplayCooldownMs": 0,
-      "Costs": [
-        { "ItemId": "Revitalizing_Essence", "Quantity": 2 },
-        { "ItemId": "Draconic_Essence", "Quantity": 4 }
-      ]
-    }
-  }
-}
-```
+The full-dragon family currently requires:
 
-The item IDs and quantities are content data. Tamework does not hardcode an
-essence type.
+- 2 `Revitalizing_Essence`; and
+- 4 `Draconic_Essence`.
 
-A quote is read-only and shows every item, required quantity, owned quantity,
-and shortage. Confirmation revalidates:
+The Miniwyvern family currently requires:
 
-- acting owner and exact roster membership;
-- `DEAD_REVIVABLE` lifecycle and death snapshot;
-- config/cost revision;
-- exact inventory sources;
-- population active admission;
-- safe frozen placement;
-- alias and optional timed-lease transition.
+- 1 `Revitalizing_Essence`; and
+- 2 `Draconic_Essence`.
 
-One shared operation owns exact charge plus same-profile restoration. Durable
-success consumes every cost component once, promotes one alias, retires the
-death snapshot, commits `ACTIVE`, starts one lease, and publishes once.
+Each recipe is an ordered AND-list. The panel shows every owned/required line,
+preflights the whole recipe, and reserves it as one atomic escrow operation.
+The durable profile transition either consumes the complete recipe once or
+restores the exact escrow. Interrupted settlement is recovered from durable
+operation evidence and never guessed from inventory absence.
 
-A positively proven charge with positively proven terminal spawn absence may
-create one normalized generic multi-item refund recipe. Absence alone is not
-proof. An ambiguous result remains contained and never guesses a refund or
-authorizes a second revival.
+Successful revival changes the same profile from `DEAD` to `STORED`. It does
+not spawn. The player explicitly summons after revival and after any applicable
+summon cooldown.
 
-Free restoration remains available for ordinary configured Tamework companions
-outside paid command revival.
+## Profile-first panel
+
+Every Horn card is keyed by the stable bonded profile ID and built from
+`BondedCompanionProfileView`. It shows full name/species/gender, state, health
+and other snapshot fields, family extension presentation, availability reason,
+and state-appropriate actions immediately after capture, summon, store,
+revive, duplicate cleanup, and relog.
+
+An exact active projection may enrich volatile health, but missing live lookup
+cannot collapse a valid card to name-and-health-only or remove its buttons.
+Actions carry profile ID and expected revision; they never route through a live
+NPC UUID or generic link row.
 
 ## Public capability behavior
 
-- `COMMAND_FAMILY_ROSTERS` requires canonical roster/query/recovery readiness.
-- `COMMAND_TIMED_SUMMONING` additionally requires population, snapshot, alias,
-  live-boundary, and lease readiness.
-- `PAID_COMMAND_REVIVAL` additionally requires roster, population, death,
-  inventory receipt, refund, placement, alias, and timed readiness.
+HyDragon requires `BONDED_COMPANIONS` for its Horn roster, capture storage,
+Miniwyvern provisioning/extension state, summon/store, revival, abilities, and
+active-full-dragon eligibility. Capture probability continues to require
+`CAPTURE_POLICY` and its resolved-attempt contract.
 
-Unavailable capability disables only dependent positive actions. Existing
-canonical rows remain visible and unrelated safe features remain available.
+If the bonded capability or its own availability is missing, dependent actions
+fail before source spend or payment. HyDragon does not fall back to
+`CommandFamilyRosterApi`, `CommandTimedSummoningApi`,
+`CompanionProvisioningApi`, `PaidCommandRevivalApi`, `PopulationGroupApi`, or
+`ProfileDataApi` for a bonded profile.
 
 ## Acceptance
 
-- copied Horns expose one authoritative roster;
-- one profile cannot occupy two slots;
-- death/loss/unload preserve membership;
-- summon and storage do not duplicate or lose a projection at crash seams;
-- lease time does not reset through reload/restart/world movement;
-- capacity remains occupied until storage commits;
-- failed paid revival charges nothing;
-- successful paid revival charges once and restores the same profile once;
-- proven terminal compensation creates one exact refund;
-- no bonded-vessel item state, roster operation table, timed session table, or
-  paid-revival journal returns.
+- full dragons and Miniwyverns appear in the same Horn;
+- one profile owns at most one active lease/projection;
+- cards remain complete through every transition without relog;
+- capture is durable before source cleanup and cannot partially succeed;
+- every non-death disappearance becomes `STORED`;
+- only confirmed death becomes `DEAD`;
+- revival charges the complete family recipe once and returns to `STORED`;
+- finite sessions expire while `0` duration never expires;
+- negative world timestamps are preserved;
+- generic permanent-animal and command-roster behavior remains unchanged; and
+- no bonded-vessel item state or HyDragon-specific fallback database returns.

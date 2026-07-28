@@ -19,6 +19,14 @@ Command runtime is split to keep the orchestrator thin:
 - Panel entry assembly/filter/sort: `CommandLinkedPanelEntryService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
 - Group metadata + group manager actions: `CommandGroupService`, `CommandGroupManagerPageService`
 - Player feedback: `CommandFeedbackService`
+- Bonded roster/profile entry source: `BondedCompanionPanelRecordSource`,
+  `BondedCompanionPanelEntrySourceService`
+- Bonded presentation/actions: `BondedCompanionPanelFeaturePresentationSource`,
+  `BondedCompanionPanelActionService`, `BondedCompanionPanelActionRouter`
+
+The bonded collaborators are a delegated subsystem. They do not add bonded
+state branches to generic command-roster persistence or use item metadata as
+canonical roster storage.
 
 ## Asset and item wiring
 - Assets: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
@@ -57,7 +65,54 @@ Downstream mods should ship their own named item, command config, localization,
 icon, and recipe/acquisition flow. Do not present the example whistle as a
 player-ready Tamework reward or silently depend on players finding it.
 
+## Roster storage modes
+
+`RosterStorage` selects the authority behind the panel:
+
+- `ItemMetadata`: legacy/default links stored on the particular item;
+- `OwnerCommandFamily`: the owner's durable generic command-family roster; or
+- `BondedCompanions`: the separate bonded profile-and-lease authority.
+
+A bonded command config must declare an existing namespaced `BondedRosterId`.
+It must not declare `CommandFamilyId` or
+`ProjectRosterToItemMetadata`; those belong to the generic family-roster path.
+Several bonded policy assets may contribute different families to the same
+roster ID, so one item can display all of them in one panel while each profile
+retains its family-specific capacity, timer, cooldown, revive recipe, and
+feature switches.
+
+The bonded item is an access and command surface, not companion storage. Its
+cards are keyed by stable bonded profile IDs. Copies of the same access item do
+not fork profiles, leases, or state.
+
 ## Recipient selection and linking
+
+Command items using `RosterStorage: BondedCompanions` have a separate recipient
+authority. A command resolves only `ACTIVE` profiles owned by the player in the
+configured `BondedRosterId` whose current-world live UUID, profile ID, and lease
+token exactly match the NPC's bonded projection marker. Stored, dead, expired,
+other-world, duplicate, or stale projections are not command recipients.
+
+Bonded commands never create generic NPC links, reconcile or project linked rows
+onto the item, or queue generic unloaded/cross-world relocation. Summon, dismiss,
+and revive remain profile-keyed panel actions. Normal commands still operate on
+an exact loaded projection, and live command state such as a stored home position
+travels with the bonded full snapshot. These rules do not change recipient or
+link behavior for `ItemMetadata` and `OwnerCommandFamily` command items.
+
+Bonded profiles expose exactly three panel states:
+
+- `STORED`: show Summon only when policy, cooldown, capacity, and current world
+  context permit it;
+- `ACTIVE`: show Dismiss/Store and dispatch normal commands only to the exact
+  current projection; and
+- `DEAD`: show the complete paid-revive quote when revival is enabled.
+
+Revive returns the card to `STORED`; it never automatically summons. Logout,
+world transfer, expiry, missing-projection recovery, and duplicate cleanup also
+converge to `STORED`. Bonded cards never display generic `UNLOADED`, `LOST`,
+`CAPTURED`, `COOPED`, or `ROSTER_STORED` aliases.
+
 `TwCommandItemConfig` recipient controls:
 - `MembershipMode`: `LinkedOnly`, `OwnerScope`, `MasterTarget`, `LinkedOrMasterTarget`
 - `RequireOwner`
@@ -149,6 +204,12 @@ Linked panel supports:
   owned/required quantity; the replacement paid-revival API performs the
   mutation. Legacy item-metadata links retain their existing free restoration
   behavior.
+- Bonded roster rows use their own profile-first view. They show complete
+  durable details immediately after capture, summon, store, revive, and relog;
+  a live projection is optional enrichment, not the source of the card.
+- Bonded revival quotes every configured cost line and reserves the complete
+  recipe atomically. A successful revive produces a stored card and no live
+  projection.
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying
 
@@ -281,4 +342,8 @@ role-scoped companion config exists.
 Command feedback sounds are delivered as local 2D sound for the using player and in-world 3D sound for nearby others.
 
 ## Reloading
-`/tw reloadconfig` reloads command item assets along with spawner and naming assets.
+`/tw reloadconfig` reloads command item assets along with spawner and naming
+assets. Bonded roster policies and their dependent bonded command configs are
+accepted as one coherent generation. An invalid or missing `BondedRosterId`
+rejects the new generation instead of partially swapping roster or command
+lookups.

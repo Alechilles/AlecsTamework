@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.api.CaptureSuccessDisposition;
 import com.alechilles.alecstamework.api.internal.CaptureRequirementRuntime;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.items.capturepolicy.CapturePolicyRegistry;
 import com.alechilles.alecstamework.items.capturepolicy.SpawnerCaptureChanceService;
@@ -59,6 +61,7 @@ public final class SpawnerFeatureHandler {
     @Nullable
     private final SpawnerCapturedArtifactReleaseAuthor releaseAuthor;
     private final SpawnerCaptureChannelService channels;
+    private final BondedCompanionCaptureRoute bondedCaptureRoute;
 
     /** Creates the released spawner composition over the canonical operation authors. */
     public SpawnerFeatureHandler(
@@ -78,7 +81,8 @@ public final class SpawnerFeatureHandler {
                 releaseAuthor,
                 capturePolicies,
                 captureRequirements,
-                SpawnerTameAndLinkEvidenceSource.unavailable()
+                SpawnerTameAndLinkEvidenceSource.unavailable(),
+                null, null, null
         );
     }
 
@@ -106,8 +110,28 @@ public final class SpawnerFeatureHandler {
                 Objects.requireNonNull(
                         tameAndLinkEvidence, "tameAndLinkEvidence"
                 ),
+                null, null, null,
                 true
         );
+    }
+
+    /** Creates the canonical composition with the isolated bonded capture route. */
+    public SpawnerFeatureHandler(
+            @Nonnull HytaleLogger logger,
+            @Nonnull ItemFeatureRegistry registry,
+            @Nullable TranslationRegistry translations,
+            @Nonnull SpawnerCaptureAuthor captureAuthor,
+            @Nonnull SpawnerCapturedArtifactReleaseAuthor releaseAuthor,
+            @Nonnull CapturePolicyRegistry capturePolicies,
+            @Nonnull CaptureRequirementRuntime captureRequirements,
+            @Nonnull SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
+            @Nonnull BondedCompanionCaptureAuthor bondedCaptureAuthor,
+            @Nonnull BondedCompanionRosterRegistry bondedRosters,
+            @Nonnull CommandItemRegistry commandItems
+    ) {
+        this(logger, registry, translations, captureAuthor, releaseAuthor,
+                capturePolicies, captureRequirements, tameAndLinkEvidence,
+                bondedCaptureAuthor, bondedRosters, commandItems, true);
     }
 
     private SpawnerFeatureHandler(
@@ -119,6 +143,9 @@ public final class SpawnerFeatureHandler {
             CapturePolicyRegistry capturePolicies,
             CaptureRequirementRuntime captureRequirements,
             SpawnerTameAndLinkEvidenceSource tameAndLinkEvidence,
+            BondedCompanionCaptureAuthor bondedCaptureAuthor,
+            BondedCompanionRosterRegistry bondedRosters,
+            CommandItemRegistry commandItems,
             boolean canonicalComposition
     ) {
         this.logger = logger;
@@ -146,6 +173,9 @@ public final class SpawnerFeatureHandler {
                 ownership,
                 npcIdentity
         );
+        BondedCompanionCaptureAdmissionService bondedAdmission =
+                new BondedCompanionCaptureAdmissionService(
+                capturePolicy, commandItems, bondedRosters);
         this.captureRolls = new SpawnerCaptureRollService(
                 capturePolicies,
                 captureRequirements,
@@ -175,6 +205,10 @@ public final class SpawnerFeatureHandler {
                 npcIdentity,
                 tameAndLinkEvidence
         );
+        this.bondedCaptureRoute = new BondedCompanionCaptureRoute(
+                bondedCaptureAuthor, bondedRosters, bondedAdmission,
+                captureRolls, captureIntents,
+                new BondedCompanionCaptureReplayIntentFactory(roles));
         SpawnerSpawnPositionService positions =
                 new SpawnerSpawnPositionService(logger);
         this.releaseIntents = new SpawnerReleaseIntentFactory(
@@ -199,6 +233,7 @@ public final class SpawnerFeatureHandler {
                 new CapturePolicyRegistry(),
                 NoCaptureRequirements.INSTANCE,
                 SpawnerTameAndLinkEvidenceSource.unavailable(),
+                null, null, null,
                 false
         );
     }
@@ -514,6 +549,16 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(
                 config, null
         );
+        if (bondedDisposition(resolved)) {
+            boolean sourceEligible = player != null
+                    && source != null && !source.isEmpty()
+                    && sourceMatches(player, attempt)
+                    && !itemMetadata.isAlreadyCaptured(source);
+            return bondedCaptureRoute.capture(
+                    player, targetRef, source, resolved, attempt,
+                    sourceEligible, captureParticleSystemOverride
+            );
+        }
         String denial = captureAdmissionDenial(
                 player, targetRef, source, resolved, attempt
         );
@@ -587,6 +632,12 @@ public final class SpawnerFeatureHandler {
             return "terminal-policy-revalidation";
         }
         return null;
+    }
+
+    private boolean bondedDisposition(ItemFeatureConfig config) {
+        return config != null && config.getCaptureMechanics()
+                .successDisposition()
+                == CaptureSuccessDisposition.STORE_BONDED_COMPANION;
     }
 
     private boolean spawnFromItem(

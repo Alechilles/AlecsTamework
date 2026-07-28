@@ -25,7 +25,9 @@ final class PlannedNpcProjectionPostAddService {
         }
         if (work.hasHealthWork()) {
             CompanionStatModifierService.applyTraitModifiers(reference, store);
-            CompanionHealthStateService.applyStoredHealthPercent(reference, store, work.healthPercent());
+            CompanionHealthStateService.applyStoredHealth(reference, store,
+                    work.currentHealth(), work.maximumHealth(),
+                    work.healthPercent());
         }
         if (work.hasAttachmentWork()) {
             CompanionModelAttachmentService.applyAttachments(

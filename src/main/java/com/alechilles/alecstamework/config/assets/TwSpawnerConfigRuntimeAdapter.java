@@ -25,6 +25,7 @@ final class TwSpawnerConfigRuntimeAdapter {
                 capture.failureSoundEvent,
                 capture.sourceConsumption,
                 capture.successDisposition,
+                capture.bondedRosterId,
                 capture.commandFamilyId,
                 capture.requiredCommandConfigId,
                 capture.requireCommandAccessItem);

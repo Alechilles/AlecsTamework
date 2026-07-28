@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
 import com.alechilles.alecstamework.persistence.facade.ReplacementCommandFamilyRosterApi;
 import com.alechilles.alecstamework.persistence.facade.ReplacementCommandTimedSummoningApi;
@@ -26,8 +27,40 @@ public record ReplacementFeatureApiDependencies(
         @Nullable ReplacementPersistenceDiagnosticsApi.IncidentLookup
                 incidents,
         boolean captureResolvedEventsReady,
-        boolean captureTameAndLinkReady
+        boolean captureTameAndLinkReady,
+        @Nullable BondedCompanionApi bondedCompanions
 ) {
+    /** Source-compatible constructor for callers without a bonded facade. */
+    public ReplacementFeatureApiDependencies(
+            @Nullable PopulationGroupConfigRegistry populationGroups,
+            @Nullable ReplacementCommandFamilyRosterApi.MutationAuthor
+                    commandRosters,
+            @Nullable ReplacementCommandTimedSummoningApi.TransitionAuthor
+                    timedSummoning,
+            @Nullable ReplacementCompanionProvisioningApi.MutationAuthor
+                    provisioning,
+            @Nullable ReplacementPaidCommandRevivalApi.RequestAuthor paidRevival,
+            @Nullable ReplacementPersistenceDiagnosticsApi.AvailabilityProbe
+                    availability,
+            @Nullable ReplacementPersistenceDiagnosticsApi.IncidentLookup
+                    incidents,
+            boolean captureResolvedEventsReady,
+            boolean captureTameAndLinkReady
+    ) {
+        this(
+                populationGroups,
+                commandRosters,
+                timedSummoning,
+                provisioning,
+                paidRevival,
+                availability,
+                incidents,
+                captureResolvedEventsReady,
+                captureTameAndLinkReady,
+                null
+        );
+    }
+
     public static ReplacementFeatureApiDependencies none() {
         return new ReplacementFeatureApiDependencies(
                 null,
@@ -38,7 +71,8 @@ public record ReplacementFeatureApiDependencies(
                 null,
                 null,
                 false,
-                false
+                false,
+                null
         );
     }
 }

@@ -1,10 +1,16 @@
 # Required Persistence Feature Inventory
 
-This document records the completed persistence feature recovery at
-`f7c3f046`, with the complete live-capability self-test at `fa4191a8`. It is
-the audit record for what was restored, which shared
-authority owns each behavior, and why the result is smaller and more
-consistent than the unreleased donor implementation.
+This document records two deliberately separate persistence boundaries:
+
+1. the generic replacement-persistence recovery completed at `f7c3f046`, with
+   the live-capability self-test at `fa4191a8`; and
+2. the later bonded-companion lease model used by HyDragon's temporary full
+   dragons and Miniwyverns.
+
+The first boundary remains authoritative for permanent world animals, coops,
+ordinary command companions, generic provisioning, population groups,
+command-family rosters, generic timed summoning, and generic paid revival. The
+second boundary does not replace or reuse those authorities.
 
 ## Scope and artifact
 
@@ -18,10 +24,67 @@ consistent than the unreleased donor implementation.
 - Schema-v1 SHA-256:
   `8ad3e6a9783b3fb4f85cf91f14546fd401651249239554ec7f3be76e2b2bf0d5`
 
-The only intentionally excluded systems are profile-scoped virtual companion
-inventories and the obsolete physical bonded-vessel item-state designs.
-Bonded Miniwyvern provisioning, lifecycle, roster membership, and revival are
-included.
+The only intentionally excluded donor systems were profile-scoped virtual
+companion inventories and obsolete physical bonded-vessel item-state designs.
+The generic Miniwyvern path originally recorded below has since been
+superseded for HyDragon by the dedicated bonded authority. The generic APIs and
+schema remain present for other mods and ordinary companions.
+
+## Dedicated bonded-companion authority
+
+Bonded companions are durable profiles with disposable world projections. The
+authority is universe-scoped and stored separately at:
+
+```text
+Tamework/Data/bonded-companions.sqlite
+```
+
+It advertises one public capability, `BONDED_COMPANIONS`, through
+`TameworkApi.bondedCompanions()`. Its readiness depends on its own authority and
+database, not generic replacement-persistence startup, repair, evidence gates,
+incidents, circuits, or outbox state. Individual world-bound operations validate
+their own world and placement context and may return `WORLD_UNAVAILABLE` without
+making the bonded API globally unavailable.
+
+The public lifecycle has exactly three states:
+
+| State | Meaning |
+| --- | --- |
+| `STORED` | Complete durable snapshot, no active projection |
+| `ACTIVE` | One exact lease and at most one matching live projection |
+| `DEAD` | Positively confirmed death; paid revive required |
+
+Every non-death exit converges to `STORED`, including dismissal, session
+expiry, logout, world transfer, missing projection, and duplicate cleanup.
+Only confirmed death creates `DEAD`; revival returns to `STORED` and never
+summons automatically.
+
+The complete snapshot retains role, owner/tamed state, name, health, needs,
+happiness, breeding, progression, traits, talents, life stage, attachments,
+command settings, and namespaced extension payloads when those components are
+available. Store merges newly observed state without treating unavailable
+optional components as deletion.
+
+Final fresh-world schema v1 has seven bonded-only tables:
+
+| Table | Unique authority |
+| --- | --- |
+| `bonded_schema_history` | Final fresh-world v1 lineage, version, and exact schema hash |
+| `bonded_companion_profile` | Stable identity, family, three-state lifecycle, snapshot, policy evidence, death/revive summary |
+| `bonded_companion_lease` | One opaque lease token and exact temporary projection |
+| `bonded_companion_extension_data` | Owner/profile/namespace JSON with optimistic revision |
+| `bonded_companion_cleanup` | Bounded exact source/projection cleanup intents |
+| `bonded_companion_operation` | Terminal idempotent capture/provision/store/revive results and payment fencing |
+| `bonded_companion_capture_source` | Profile-lifetime proof that one original source NPC was captured once, including its capture snapshot |
+
+The bonded database never registers a generic companion profile, alias,
+lifecycle row, command-family slot, population membership, timed-summon row,
+generic extension row, or generic projection outbox operation.
+
+One player-facing roster can contain several policy families. Each profile
+retains a stable roster/family pair, while capacity, timers, revive recipe, and
+feature switches remain family-scoped. UI identity is the stable bonded profile
+ID; a live NPC UUID is lease evidence only.
 
 ## Restored capability ownership
 
@@ -36,7 +99,7 @@ included.
 | Tame and command link | Live target receipt plus profile, owner, role, groups, roster, and initial lease | `companion_capture` variant with shared participants |
 | Paid command revival | Frozen restoration projection, exact recipe receipt, refund authority, admission, roster, groups, and lease | `paid_revival` plus shared restoration and compensation machinery |
 | Captured-item coop intake | Canonical captured artifact and coop residency | `companion_coop_capture` item-source variant |
-| Bonded Miniwyvern lifecycle | Provisioning entitlement, dormant profile, command roster, death/revival semantic events | Shared provisioning/restoration operations; no bonded vessel |
+| Historical pre-lease Miniwyvern path (superseded for HyDragon) | Generic provisioning entitlement, dormant profile, command roster, death/revival semantic events | Shared generic provisioning/restoration operations; retained for generic consumers, no longer HyDragon's bonded route |
 
 All live mutation evidence is frozen on the owning world thread and submitted
 through the same operation engine. Public events are emitted from one
@@ -165,7 +228,7 @@ This means the 82,238-line reduction is feature-normalized architectural
 simplification. The earlier removal of required behavior is not counted as a
 success.
 
-## Automated verification
+## Automated verification of the generic recovery baseline
 
 Tamework:
 
@@ -189,3 +252,15 @@ HyDragon, compiled and verified against the exact Tamework jar:
 Automated verification is complete. Live fresh-world, restart, cross-world,
 cost/consumption, and failure-recovery rehearsals remain mandatory before
 release preparation.
+
+## Bonded verification status
+
+The bonded authority has focused API, configuration, schema, store,
+state-machine, projection, capture, panel, diagnostics, payment, and safety
+tests. HyDragon has focused bridge, capture, Miniwyvern extension/ability,
+encounter-eligibility, and asset contract tests.
+
+Final complete-suite, clean-package, manifest/dependency, packaged-asset, and
+fresh-world acceptance evidence belongs to the bonded implementation handoff;
+it must not be inferred from the historical counts above. Release preparation
+remains out of scope until that acceptance pass is complete.

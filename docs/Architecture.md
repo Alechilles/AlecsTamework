@@ -86,6 +86,14 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   Owner/command-family roster rows use the role-effective exact paid-revival
   quote. Both paths restore the same canonical profile, and the panel uses the
   same saved cooldown fact as restoration admission.
+- Bonded-roster payment is isolated in a hidden, operation-specific player
+  escrow. The source inventory and escrow are saved together before the SQLite
+  lifecycle mutation; terminal success consumes only that escrow and terminal
+  rejection returns only its contents. The escrow is temporary payment
+  evidence, not companion inventory or a second lifecycle authority. Terminal
+  revive-operation rows remain outside ordinary pruning until the matching
+  escrow outcome is durably acknowledged. A post-attachment player ECS system
+  reconciles interrupted reservations from that exact terminal SQLite result.
 - Dormant transitions require positive evidence: a saved death, an explicit
   destructive `REMOVE`, or terminal removal of a delete-on-remove world.
   Unload, absence, and timeout are not evidence that a companion is dead or

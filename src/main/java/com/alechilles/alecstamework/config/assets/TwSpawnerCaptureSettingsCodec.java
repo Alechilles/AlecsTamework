@@ -102,12 +102,20 @@ final class TwSpawnerCaptureSettingsCodec {
         .<String>append(new KeyedCodec<>("SuccessDisposition", Codec.STRING),
             (settings, value) -> settings.successDisposition =
                     parseSuccessDisposition(value),
-            settings -> settings.successDisposition
-                    == CaptureSuccessDisposition.TAME_AND_COMMAND_LINK
-                    ? "TameAndCommandLink" : "CapturedItem")
+            settings -> switch (settings.successDisposition) {
+                case TAME_AND_COMMAND_LINK -> "TameAndCommandLink";
+                case STORE_BONDED_COMPANION -> "StoreBondedCompanion";
+                default -> "CapturedItem";
+            })
         .documentation("Successful capture result. Omitted values inherit the parent; "
                 + "CapturedItem creates the configured filled item, while "
-                + "TameAndCommandLink keeps the NPC live and links its canonical profile.").add()
+                + "TameAndCommandLink keeps the NPC live and links its canonical profile, "
+                + "and StoreBondedCompanion stores it in a separate bonded roster.").add()
+        .<String>append(new KeyedCodec<>("BondedRosterId", Codec.STRING),
+            (settings, value) -> settings.bondedRosterId = value,
+            settings -> settings.bondedRosterId)
+        .documentation("Separate bonded roster used by StoreBondedCompanion. "
+                + "An omitted value inherits the parent; an explicit scalar replaces it.").add()
         .<String>append(new KeyedCodec<>("CommandFamilyId", Codec.STRING),
             (settings, value) -> settings.commandFamilyId = value,
             settings -> settings.commandFamilyId)
@@ -158,12 +166,10 @@ final class TwSpawnerCaptureSettingsCodec {
                 || value.equalsIgnoreCase("CapturedItem")) {
             return CaptureSuccessDisposition.CAPTURED_ITEM;
         }
-        if (value.equalsIgnoreCase("TameAndCommandLink")) {
-            return CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
-        }
+        if (value.equalsIgnoreCase("TameAndCommandLink")) return CaptureSuccessDisposition.TAME_AND_COMMAND_LINK;
+        if (value.equalsIgnoreCase("StoreBondedCompanion")) return CaptureSuccessDisposition.STORE_BONDED_COMPANION;
         throw new IllegalArgumentException(
                 "Unknown capture SuccessDisposition: " + value
         );
     }
-
 }

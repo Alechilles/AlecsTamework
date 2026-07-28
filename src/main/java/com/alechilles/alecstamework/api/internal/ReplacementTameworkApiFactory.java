@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -81,6 +82,27 @@ public final class ReplacementTameworkApiFactory {
             @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
             @Nonnull ReplacementFeatureApiDependencies dependencies
     ) {
+        return compose(
+                persistence, readTimeout, clock, eventBus, snapshots,
+                interactionExtensions, traitEffects, damagePolicy,
+                dependencies, dependencies.bondedCompanions()
+        );
+    }
+
+    /** Composes bonded authority independently of generic feature readiness. */
+    @Nonnull
+    public static Composition compose(
+            @Nonnull PersistenceBootstrap persistence,
+            @Nonnull Duration readTimeout,
+            @Nonnull LongSupplier clock,
+            @Nonnull TameworkEventBus eventBus,
+            @Nullable CommandLinkedNpcStateSnapshotService snapshots,
+            @Nonnull InteractionExtensionApi interactionExtensions,
+            @Nonnull TraitEffectApi traitEffects,
+            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
+            @Nonnull ReplacementFeatureApiDependencies dependencies,
+            @Nullable BondedCompanionApi bondedCompanions
+    ) {
         Objects.requireNonNull(dependencies, "dependencies");
         PersistenceDomainFacades facades = persistence.facades();
         DiagnosticsApi diagnostics = dependencies.availability() != null
@@ -153,6 +175,10 @@ public final class ReplacementTameworkApiFactory {
                         facades.operations(),
                         dependencies.paidRevival()
                 );
+        BondedCompanionApi bondedApi =
+                bondedCompanions == null
+                        ? BondedCompanionApi.unavailable()
+                        : bondedCompanions;
         ReplacementTameworkApi api = new ReplacementTameworkApi(
                 base,
                 persistence,
@@ -162,7 +188,8 @@ public final class ReplacementTameworkApiFactory {
                 rosters,
                 timed,
                 provisioning,
-                paidRevival
+                paidRevival,
+                bondedApi
         );
         AutoCloseable timedEventBridge = timedFacade == null
                 ? () -> { }

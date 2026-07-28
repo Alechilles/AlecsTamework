@@ -95,9 +95,11 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
         commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
-        // Owner-family roster membership is canonical. Its feature actions
-        // must never fall back to legacy per-item link metadata.
-        boolean legacyLinked = isLinked && !config.ownerCommandFamilyRoster();
+        // Feature-managed roster membership is canonical. Its synthetic card
+        // identity must never fall through to legacy per-item link actions.
+        boolean managedRoster = config.ownerCommandFamilyRoster()
+                || feature != null && feature.managesRosterRow();
+        boolean legacyLinked = isLinked && !managedRoster;
         boolean paidRevivalManaged = feature != null
                 && feature.managesPaidRevival();
         boolean showReviveAction = !paidRevivalManaged && legacyLinked
@@ -128,9 +130,9 @@ final class LinkedNpcPanelCardBinder {
                         && entry.hasHome()
                         && !pendingUnlink;
         boolean canOpenReleaseActions =
-                !legacyLinked && !config.ownerCommandFamilyRoster()
+                !legacyLinked && !managedRoster
                         && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
-        boolean showLink = !legacyLinked && !config.ownerCommandFamilyRoster() && !pendingUnlink;
+        boolean showLink = !legacyLinked && !managedRoster && !pendingUnlink;
         boolean showUnlink = legacyLinked || canOpenReleaseActions;
         boolean showRelease = pendingUnlink && canOpenReleaseActions;
         boolean showCull = pendingUnlink && canOpenReleaseActions;

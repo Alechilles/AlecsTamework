@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.api.TameworkConfigFamily;
 import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.api.internal.BondedOnlyTameworkApi;
 import com.alechilles.alecstamework.api.internal.ReplacementTameworkApiFactory;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
@@ -42,6 +43,8 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.SpawnerItemConfigReloadService;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionConfigReloadService;
+import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.population.PopulationGroupAssetRegistrar;
 import com.alechilles.alecstamework.config.population.PopulationGroupConfigRegistry;
@@ -49,6 +52,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -116,6 +120,7 @@ import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
+import com.alechilles.alecstamework.items.components.TameworkBondedReviveEscrowComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -127,6 +132,7 @@ import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
+import com.alechilles.alecstamework.persistence.runtime.player.TameworkInventoryOperationReceiptsComponent;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -156,6 +162,13 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.facade.ReplacementNpcProfilesApi;
 import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
+import com.alechilles.alecstamework.persistence.diagnostics
+        .PersistenceDiagnosticExporter;
+import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionMaintenanceSystem;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionDeathSystem;
 import com.alechilles.alecstamework.persistence.runtime
         .PublicPersistenceShutdownReport;
 import com.alechilles.alecstamework.ownership.live.OwnerPopulationEntitySystem;
@@ -239,6 +252,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
+import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
@@ -271,6 +285,8 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private Path runtimeDataDirectory;
     private TameworkPersistenceComposition persistenceComposition;
+    private TameworkBondedCompanionComposition bondedCompanionComposition;
+    private AutoCloseable bondedDiagnosticRegistration;
     private PersistenceBootstrap persistenceBootstrap;
     private TameworkApi api;
     private ReplacementTameworkApiFactory.Composition apiComposition;
@@ -278,6 +294,8 @@ public class Tamework extends JavaPlugin {
     private InteractionExtensionRegistry interactionExtensionRegistry;
     private TraitEffectRegistry traitEffectRegistry;
     private CapturePolicyRegistry capturePolicyRegistry;
+    private BondedCompanionRosterRegistry bondedCompanionRosterRegistry;
+    private BondedCompanionConfigReloadService bondedCompanionConfigReloadService;
     private PopulationGroupConfigRegistry populationGroupConfigRegistry;
     private PopulationGroupAssetRegistrar populationGroupAssetRegistrar;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
@@ -311,6 +329,7 @@ public class Tamework extends JavaPlugin {
     private boolean debugAssetsRegistered;
     private boolean capturePolicyAssetsRegistered;
     private long capturePolicyAssetRevision;
+    private boolean bondedCompanionRosterAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -354,6 +373,10 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazardComponentType;
     private ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarkerComponentType;
     private ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectileComponentType;
+    private ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+            inventoryOperationReceiptsComponentType;
+    private ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+            bondedReviveEscrowComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -462,7 +485,15 @@ public class Tamework extends JavaPlugin {
                             : java.util.OptionalInt.of(item.getMaxStack());
                 });
         nameItemRegistry = new NameItemRegistry();
-        commandItemRegistry = new CommandItemRegistry();
+        bondedCompanionRosterRegistry = new BondedCompanionRosterRegistry();
+        commandItemRegistry = new CommandItemRegistry(
+                bondedCompanionRosterRegistry
+        );
+        bondedCompanionConfigReloadService =
+                new BondedCompanionConfigReloadService(
+                        bondedCompanionRosterRegistry,
+                        commandItemRegistry
+                );
         capturePolicyRegistry = new CapturePolicyRegistry();
         populationGroupConfigRegistry = new PopulationGroupConfigRegistry();
         populationGroupAssetRegistrar = new PopulationGroupAssetRegistrar(
@@ -533,6 +564,7 @@ public class Tamework extends JavaPlugin {
         registerGlobalConfigAssets();
         registerCompanionAssets();
         registerCapturePolicyAssets();
+        registerBondedCompanionRosterAssets();
         populationGroupAssetRegistrar.register();
         registerCoopAssets();
         registerSpawnerItemAssets();
@@ -597,6 +629,9 @@ public class Tamework extends JavaPlugin {
         lingeringHazardComponentType = components.lingeringHazard();
         apiSelfTestFixtureMarkerComponentType = components.apiSelfTestFixtureMarker();
         homingVisualProjectileComponentType = components.homingVisualProjectile();
+        inventoryOperationReceiptsComponentType =
+                components.inventoryOperationReceipts();
+        bondedReviveEscrowComponentType = components.bondedReviveEscrow();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         getEntityStoreRegistry().registerSystem(
@@ -841,14 +876,56 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         apiEventBus = new TameworkEventBus(getLogger());
-        persistenceComposition = TameworkPersistenceComposition.create(
-                this,
-                components,
-                apiEventBus,
-                itemFeatureRegistry,
-                commandItemRegistry,
-                populationGroupConfigRegistry
+        runtimeDataDirectory = new TameworkDataPathService(getLogger())
+                .resolveAndInitializeDataPathLayout(getDataDirectory())
+                .targetDirectory();
+        bondedCompanionComposition = TameworkBondedCompanionComposition.open(
+                runtimeDataDirectory,
+                bondedCompanionRosterRegistry,
+                getLogger(),
+                System::currentTimeMillis,
+                apiEventBus::publishPersistenceEvent
         );
+        getEntityStoreRegistry().registerSystem(
+                new BondedCompanionMaintenanceSystem(
+                        bondedCompanionComposition
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new BondedCompanionDeathSystem(
+                        bondedCompanionComposition,
+                        projectionIdentityComponentType,
+                        UUIDComponent.getComponentType()
+                )
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, StartWorldEvent.class,
+                bondedCompanionComposition::onWorldLoad,
+                "bonded companion world-load reconciliation"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, AddPlayerToWorldEvent.class,
+                bondedCompanionComposition::onPlayerAdded,
+                "bonded companion player join/transfer reconciliation"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this, PlayerDisconnectEvent.class,
+                bondedCompanionComposition::onPlayerLogout,
+                "bonded companion logout reconciliation"
+        );
+        try {
+            persistenceComposition = TameworkPersistenceComposition.create(
+                    this,
+                    components,
+                    apiEventBus,
+                    itemFeatureRegistry,
+                    commandItemRegistry,
+                    populationGroupConfigRegistry
+            );
+        } catch (RuntimeException genericStartupFailure) {
+            activateBondedOnlyFallback(genericStartupFailure);
+            return;
+        }
         commandNpcRelocationService = new CommandNpcRelocationService(
                 getLogger(),
                 new ImportedCompanionRecallRecovery(
@@ -857,6 +934,10 @@ public class Tamework extends JavaPlugin {
                 )
         );
         runtimeDataDirectory = persistenceComposition.dataDirectory();
+        bondedDiagnosticRegistration =
+                persistenceComposition.registerBondedDiagnostics(
+                        bondedCompanionComposition.diagnostics()
+                );
         persistenceBootstrap = persistenceComposition.persistence();
         commandLinkedNpcStateSnapshotService =
                 persistenceComposition.snapshots();
@@ -912,7 +993,8 @@ public class Tamework extends JavaPlugin {
                 interactionExtensionRegistry,
                 traitEffectRegistry,
                 damagePolicy,
-                persistenceComposition.featureApiDependencies()
+                persistenceComposition.featureApiDependencies(),
+                bondedCompanionComposition.api()
         );
         api = apiComposition.api();
         apiComposition.activateCapturePolicyRuntime(
@@ -998,7 +1080,10 @@ public class Tamework extends JavaPlugin {
                 persistenceComposition.releaseAuthor(),
                 capturePolicyRegistry,
                 interactionExtensionRegistry,
-                persistenceComposition.tameAndLinkEvidence()
+                persistenceComposition.tameAndLinkEvidence(),
+                bondedCompanionComposition.captureAuthor(),
+                bondedCompanionRosterRegistry,
+                commandItemRegistry
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1011,7 +1096,8 @@ public class Tamework extends JavaPlugin {
                 persistenceComposition.restorationAuthor(),
                 api::commandTimedSummoning,
                 api::paidCommandRevival,
-                api::populationGroups
+                api::populationGroups,
+                api::bondedCompanions
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
@@ -1040,7 +1126,8 @@ public class Tamework extends JavaPlugin {
             getCommandRegistry().registerCommand(
                     new TameworkCommandRoot(
                             persistenceComposition.diagnosticsReader(),
-                            persistenceComposition.diagnosticsExporter()
+                            persistenceComposition.diagnosticsExporter(),
+                            bondedCompanionComposition.diagnostics()
                     )
             );
         }
@@ -1273,11 +1360,16 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
+        if (commandItemFeatureHandler != null) {
+            commandItemFeatureHandler.close();
+            commandItemFeatureHandler = null;
+        }
         if (apiComposition != null) {
             apiComposition.close();
             apiComposition = null;
         }
         api = null;
+        closeBondedCompanions();
         if (commandNpcRelocationService != null) {
             commandNpcRelocationService.close();
             commandNpcRelocationService = null;
@@ -1669,7 +1761,6 @@ public class Tamework extends JavaPlugin {
             loadedNaming += loadNameItemAssets();
         }
         if (commandItemRegistry != null) {
-            commandItemRegistry.clear();
             registerCommandItemAssets();
             loadedCommands += loadCommandItemAssets();
         }
@@ -1749,6 +1840,71 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
         commandAssetsRegistered = true;
+    }
+
+    /** Keeps the isolated bonded authority reachable after generic startup aborts. */
+    private void activateBondedOnlyFallback(RuntimeException failure) {
+        api = new BondedOnlyTameworkApi(bondedCompanionComposition.api());
+        if (getCommandRegistry() != null) {
+            PersistenceDiagnosticExporter exporter =
+                    PersistenceDiagnosticExporter.bondedOnly(
+                            runtimeDataDirectory,
+                            bondedCompanionComposition.diagnostics()
+                    );
+            getCommandRegistry().registerCommand(new TameworkCommandRoot(
+                    null, exporter, bondedCompanionComposition.diagnostics()
+            ));
+        }
+        getLogger().at(Level.SEVERE).withCause(failure).log(
+                "Generic persistence composition failed; bonded companion "
+                        + "persistence remains isolated and available."
+        );
+    }
+
+    private void closeBondedCompanions() {
+        if (bondedDiagnosticRegistration != null) {
+            try {
+                bondedDiagnosticRegistration.close();
+            } catch (Exception failure) {
+                getLogger().at(Level.WARNING).withCause(failure).log(
+                        "Bonded diagnostic aggregation teardown failed."
+                );
+            }
+            bondedDiagnosticRegistration = null;
+        }
+        if (bondedCompanionComposition != null) {
+            bondedCompanionComposition.close();
+            bondedCompanionComposition = null;
+        }
+    }
+
+    private void registerBondedCompanionRosterAssets() {
+        if (bondedCompanionRosterAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(
+                                TwBondedCompanionRosterConfig.class,
+                                new DefaultAssetMap<>()
+                        )
+                        .setPath("Tamework/BondedCompanions/Rosters")
+                        .setCodec(TwBondedCompanionRosterConfig.CODEC)
+                        .setKeyFunction(
+                                TwBondedCompanionRosterConfig::getId
+                        )
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwBondedCompanionRosterConfig.class,
+                this::onBondedCompanionRosterAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwBondedCompanionRosterConfig.class,
+                this::onBondedCompanionRosterAssetsRemoved
+        );
+        bondedCompanionRosterAssetsRegistered = true;
     }
 
     private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
@@ -2309,6 +2465,45 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    private void onBondedCompanionRosterAssetsLoaded(
+            LoadedAssetsEvent<
+                    String,
+                    TwBondedCompanionRosterConfig,
+                    DefaultAssetMap<String, TwBondedCompanionRosterConfig>
+                    > event
+    ) {
+        rebuildBondedCompanionRosterIndex();
+    }
+
+    private void onBondedCompanionRosterAssetsRemoved(
+            RemovedAssetsEvent<
+                    String,
+                    TwBondedCompanionRosterConfig,
+                    DefaultAssetMap<String, TwBondedCompanionRosterConfig>
+                    > event
+    ) {
+        rebuildBondedCompanionRosterIndex();
+    }
+
+    private boolean rebuildBondedCompanionRosterIndex() {
+        TwBondedCompanionRosterConfig.clearInheritanceFallbackCache();
+        TwCommandItemConfig.clearInheritanceFallbackCache();
+        BondedCompanionConfigReloadService.ReloadResult result =
+                reloadBondedCompanionConfigGeneration();
+        if (!result.applied()) {
+            for (String error : result.errors()) {
+                getLogger().at(Level.WARNING).log(
+                        "Bonded companion config reload rejected; retaining "
+                                + "roster revision " + result.rosterRevision()
+                                + " and command revision "
+                                + result.commandRevision() + ": " + error
+                );
+            }
+            return false;
+        }
+        return true;
+    }
+
     private boolean rebuildCapturePolicyIndex() {
         TwCapturePolicyConfig.clearInheritanceFallbackCache();
         if (capturePolicyRegistry == null) {
@@ -2609,31 +2804,42 @@ public class Tamework extends JavaPlugin {
     }
 
     private int loadCommandItemAssets() {
-        if (commandItemRegistry == null) {
+        BondedCompanionConfigReloadService.ReloadResult result =
+                reloadBondedCompanionConfigGeneration();
+        if (!result.applied()) {
+            for (String error : result.errors()) {
+                getLogger().at(Level.WARNING).log(
+                        "Command/bonded roster config reload rejected; "
+                                + "retaining last coherent generation: "
+                                + error
+                );
+            }
             return 0;
         }
-        DefaultAssetMap<String, TwCommandItemConfig> assetMap = TwCommandItemConfig.getAssetMap();
-        if (assetMap == null) {
-            return 0;
+        return result.commandCount();
+    }
+
+    private BondedCompanionConfigReloadService.ReloadResult
+            reloadBondedCompanionConfigGeneration() {
+        if (bondedCompanionConfigReloadService == null) {
+            return new BondedCompanionConfigReloadService.ReloadResult(
+                    false, 0, 0, 0L, 0L,
+                    java.util.List.of("bonded-config-reload-service-unavailable")
+            );
         }
-        int loaded = 0;
-        for (TwCommandItemConfig asset : assetMap.getAssetMap().values()) {
-            if (asset == null || !asset.isEnabled()) {
-                continue;
-            }
-            String[] itemIds = asset.getItemIds();
-            if (itemIds == null || itemIds.length == 0) {
-                continue;
-            }
-            for (String itemId : itemIds) {
-                if (itemId == null || itemId.isBlank()) {
-                    continue;
-                }
-                commandItemRegistry.register(asset.getId(), itemId, asset);
-                loaded++;
-            }
-        }
-        return loaded;
+        DefaultAssetMap<String, TwBondedCompanionRosterConfig> rosterAssets =
+                TwBondedCompanionRosterConfig.getAssetMap();
+        DefaultAssetMap<String, TwCommandItemConfig> commandAssets =
+                TwCommandItemConfig.getAssetMap();
+        java.util.Collection<TwBondedCompanionRosterConfig> rosters =
+                rosterAssets == null || rosterAssets.getAssetMap() == null
+                        ? java.util.List.of()
+                        : rosterAssets.getAssetMap().values();
+        java.util.Collection<TwCommandItemConfig> commands =
+                commandAssets == null || commandAssets.getAssetMap() == null
+                        ? java.util.List.of()
+                        : commandAssets.getAssetMap().values();
+        return bondedCompanionConfigReloadService.reload(rosters, commands);
     }
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {
@@ -2783,6 +2989,16 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, HomingVisualProjectileComponent> getHomingVisualProjectileComponentType() {
         return homingVisualProjectileComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkInventoryOperationReceiptsComponent>
+            getInventoryOperationReceiptsComponentType() {
+        return inventoryOperationReceiptsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkBondedReviveEscrowComponent>
+            getBondedReviveEscrowComponentType() {
+        return bondedReviveEscrowComponentType;
     }
 
     public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {

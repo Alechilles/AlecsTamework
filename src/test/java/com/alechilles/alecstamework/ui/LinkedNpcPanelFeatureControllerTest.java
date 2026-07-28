@@ -138,6 +138,33 @@ class LinkedNpcPanelFeatureControllerTest {
         assertNotEquals(firstRevision, controller.revision());
     }
 
+    @Test
+    void staleBondedSummonEventCannotActAfterCardBecomesActive() {
+        AtomicInteger summons = new AtomicInteger();
+        BondedCompanionPanelPresentation active =
+                new BondedCompanionPanelPresentation(
+                        "profile-1", "hydragon:dragons",
+                        "Bonded_Miniwyvern_Storm", 5L, "Nimbus",
+                        "Miniwyvern", "Male", "Storm Miniwyvern",
+                        Map.of(), Map.of(),
+                        new BondedCompanionStatusPresentation(
+                                com.alechilles.alecstamework.api
+                                        .BondedCompanionStateView.ACTIVE,
+                                BondedCompanionStatusPresentation.Action.DISMISS,
+                                true, null, 0L), null);
+        LinkedNpcPanelFeatureController controller =
+                new LinkedNpcPanelFeatureController(
+                        () -> Map.of(NPC_UUID,
+                                CommandPanelFeaturePresentation.bonded(active)),
+                        ignored -> summons.incrementAndGet(),
+                        ignored -> {}, ignored -> {});
+        controller.refresh();
+
+        controller.handle("__roster_summon__:" + NPC_UUID, ignored -> entry());
+
+        assertEquals(0, summons.get());
+    }
+
     private static LinkedNpcPanelFeatureController controller(
             CommandPanelFeaturePresentation row,
             AtomicInteger revivals

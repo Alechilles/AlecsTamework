@@ -6,6 +6,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
@@ -41,19 +42,45 @@ public final class SpawnerEffectService {
     }
 
     /** Emits one immutable effect plan after its canonical workflow publishes. */
-    public void playPublishedEffect(
+    public boolean playPublishedEffect(
             World world,
             SpawnerPublishedEffect effect
     ) {
         if (world == null || effect == null) {
-            return;
+            return false;
         }
-        playEffects(
+        return playPublishedEffects(
                 world,
                 new Vector3d(effect.x(), effect.y(), effect.z()),
                 effect.particleSystem(),
                 effect.soundEvent()
         );
+    }
+
+    private boolean playPublishedEffects(
+            World world,
+            Vector3d position,
+            String particleSystem,
+            String soundEvent
+    ) {
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        boolean invoked = false;
+        if (particleSystem != null && !particleSystem.isBlank()) {
+            if (ParticleSystem.getAssetMap() == null
+                    || ParticleSystem.getAssetMap().getAsset(
+                    particleSystem) == null) return false;
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+            invoked = true;
+        }
+        if (soundEvent == null || soundEvent.isBlank()) {
+            return invoked;
+        }
+        if (SoundEvent.getAssetMap() == null) return false;
+        int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEvent);
+        if (soundEventIndex <= 0) return false;
+        SoundUtil.playSoundEvent3d(
+                soundEventIndex, SoundCategory.SFX, position, store);
+        return true;
     }
 
     /** Emits the configured non-durable feedback for one terminal failed roll. */

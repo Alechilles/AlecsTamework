@@ -88,7 +88,9 @@ public final class PlannedNpcProjectionSpawner {
                     || TameworkProjectionIdentityComponent.KIND_CAPTURE_RELEASE.equals(kind)
                     || TameworkProjectionIdentityComponent.KIND_COMMAND_ROSTER.equals(kind)
                     || TameworkProjectionIdentityComponent
-                    .KIND_PROVISIONING_ACTIVATION.equals(kind));
+                    .KIND_PROVISIONING_ACTIVATION.equals(kind)
+                    || TameworkProjectionIdentityComponent
+                    .KIND_BONDED_COMPANION.equals(kind));
     }
 
     private boolean matchesExpectedIdentity(@Nullable SpawnedProjection spawned,

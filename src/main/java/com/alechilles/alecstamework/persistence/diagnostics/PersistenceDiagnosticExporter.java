@@ -22,9 +22,11 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Writes bounded, redacted replacement-persistence support bundles.
@@ -43,7 +45,9 @@ public final class PersistenceDiagnosticExporter {
             .create();
 
     private final Path bundleDirectory;
-    private final PersistenceDiagnosticsReader diagnostics;
+    @Nullable private final PersistenceDiagnosticsReader diagnostics;
+    private final AtomicReference<BondedCompanionDiagnosticContributor>
+            bondedContributor = new AtomicReference<>();
 
     public PersistenceDiagnosticExporter(
             @Nonnull Path dataDirectory,
@@ -59,17 +63,97 @@ public final class PersistenceDiagnosticExporter {
         );
     }
 
+    private PersistenceDiagnosticExporter(@Nonnull Path dataDirectory) {
+        this.bundleDirectory = Objects.requireNonNull(
+                dataDirectory, "dataDirectory"
+        ).toAbsolutePath().normalize().resolve("diagnostics");
+        this.diagnostics = null;
+    }
+
+    /** Creates an exporter that remains useful without generic persistence. */
+    @Nonnull
+    public static PersistenceDiagnosticExporter bondedOnly(
+            @Nonnull Path dataDirectory,
+            @Nonnull BondedCompanionDiagnosticContributor contributor
+    ) {
+        PersistenceDiagnosticExporter exporter =
+                new PersistenceDiagnosticExporter(dataDirectory);
+        exporter.bondedContributor.set(Objects.requireNonNull(
+                contributor, "contributor"
+        ));
+        return exporter;
+    }
+
     /**
      * Collects the isolated diagnostic snapshot and writes the bundle away
      * from the caller's thread.
      */
     @Nonnull
     public CompletionStage<ExportResult> export() {
-        PublicPersistenceOperationalStatus status = diagnostics.status();
-        PublicPersistenceMetricsSnapshot metrics = diagnostics.metrics();
+        if (diagnostics == null) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(
+                    this::exportBondedOnly
+            );
+        }
+        final PublicPersistenceOperationalStatus status;
+        final PublicPersistenceMetricsSnapshot metrics;
+        try {
+            status = diagnostics.status();
+            metrics = diagnostics.metrics();
+        } catch (RuntimeException unavailable) {
+            return java.util.concurrent.CompletableFuture.supplyAsync(
+                    this::exportBondedOnly
+            );
+        }
         return diagnostics.details().toCompletableFuture()
                 .orTimeout(MAX_COLLECTION_SECONDS, TimeUnit.SECONDS)
-                .thenApplyAsync(read -> export(status, metrics, read));
+                .handleAsync((read, failure) -> failure == null
+                        && read instanceof PersistenceReadResult.Found<?>
+                        ? export(status, metrics, read)
+                        : exportBondedOnly());
+    }
+
+    private ExportResult exportBondedOnly() {
+        LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        if (contributor == null) {
+            throw new IllegalStateException("No diagnostic source is available");
+        }
+        appendBondedEntry(members, contributor);
+        String supportId = UUID.randomUUID().toString().replace("-", "");
+        try {
+            return writeBundle(bundleDirectory, supportId, Instant.now(), members);
+        } catch (IOException failure) {
+            throw new IllegalStateException(
+                    "Could not write persistence diagnostic bundle", failure
+            );
+        }
+    }
+
+    /** Registers the isolated bonded diagnostic source at this aggregation boundary. */
+    @Nonnull
+    public AutoCloseable registerBondedContributor(
+            @Nonnull BondedCompanionDiagnosticContributor contributor
+    ) {
+        Objects.requireNonNull(contributor, "contributor");
+        if (!bondedContributor.compareAndSet(null, contributor)) {
+            throw new IllegalStateException(
+                    "A bonded diagnostic contributor is already registered"
+            );
+        }
+        return () -> bondedContributor.compareAndSet(contributor, null);
+    }
+
+    /** Returns the optional aggregate-only bonded status used by debugdb. */
+    @Nonnull
+    public java.util.Optional<BondedCompanionDiagnosticSnapshot>
+    bondedSnapshot() {
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        return contributor == null
+                ? java.util.Optional.empty()
+                : java.util.Optional.of(contributor.snapshot());
     }
 
     private ExportResult export(
@@ -89,6 +173,11 @@ public final class PersistenceDiagnosticExporter {
         members.put("operational-status.json", json(statusJson(status)));
         members.put("metrics.json", json(metrics));
         members.put("diagnostic-detail.json", json(found.value()));
+        BondedCompanionDiagnosticContributor contributor =
+                bondedContributor.get();
+        if (contributor != null) {
+            appendBondedEntry(members, contributor);
+        }
         try {
             return writeBundle(
                     bundleDirectory,
@@ -102,6 +191,22 @@ public final class PersistenceDiagnosticExporter {
                     failure
             );
         }
+    }
+
+    static void appendBondedEntry(
+            Map<String, byte[]> members,
+            BondedCompanionDiagnosticContributor contributor
+    ) {
+        Objects.requireNonNull(members, "members");
+        BondedCompanionDiagnosticContributor.ExportEntry entry =
+                Objects.requireNonNull(contributor, "contributor")
+                        .exportEntry();
+        if (!"bonded-companions.json".equals(entry.name())) {
+            throw new IllegalArgumentException(
+                    "Unexpected bonded diagnostic member name"
+            );
+        }
+        members.put(entry.name(), entry.content());
     }
 
     static ExportResult writeBundle(

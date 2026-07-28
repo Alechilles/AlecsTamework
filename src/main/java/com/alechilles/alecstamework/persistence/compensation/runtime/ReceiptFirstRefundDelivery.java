@@ -11,11 +11,11 @@ import javax.annotation.Nonnull;
  * <p>Each recipe line owns a deterministic receipt. Existing positive receipts are resolved
  * before any add, and every write is classified by immediate exact readback.</p>
  */
-final class ReceiptFirstRefundDelivery {
+public final class ReceiptFirstRefundDelivery {
 
     /** Applies or resolves the exact recipe against one current recipient inventory. */
     @Nonnull
-    LiveOperationResult applyOrResolve(
+    public LiveOperationResult applyOrResolve(
             @Nonnull RefundClaim claim,
             @Nonnull ReceiptInventory inventory
     ) {
@@ -149,7 +149,7 @@ final class ReceiptFirstRefundDelivery {
     }
 
     @Nonnull
-    static String lineReceipt(@Nonnull RefundClaim claim, int lineIndex) {
+    public static String lineReceipt(@Nonnull RefundClaim claim, int lineIndex) {
         if (claim == null || lineIndex < 0
                 || lineIndex >= claim.items().size()) {
             throw new IllegalArgumentException(
@@ -164,7 +164,7 @@ final class ReceiptFirstRefundDelivery {
     }
 
     /** Minimal inventory contract kept independent from Hytale runtime types. */
-    interface ReceiptInventory {
+    public interface ReceiptInventory {
         @Nonnull
         ReceiptObservation observe(
                 @Nonnull String expectedItemId,
@@ -179,18 +179,18 @@ final class ReceiptFirstRefundDelivery {
         );
     }
 
-    enum AddResult {
+    public enum AddResult {
         APPLIED,
         REJECTED
     }
 
     /** Exact readback for every stack carrying one deterministic line receipt. */
-    record ReceiptObservation(
+    public record ReceiptObservation(
             int quantity,
             boolean conflicting,
             Throwable failure
     ) {
-        ReceiptObservation {
+        public ReceiptObservation {
             if (quantity < 0) {
                 throw new IllegalArgumentException(
                         "Observed refund quantity cannot be negative"
@@ -204,7 +204,7 @@ final class ReceiptFirstRefundDelivery {
         }
 
         @Nonnull
-        static ReceiptObservation readable(
+        public static ReceiptObservation readable(
                 int quantity,
                 boolean conflicting
         ) {
@@ -212,7 +212,7 @@ final class ReceiptFirstRefundDelivery {
         }
 
         @Nonnull
-        static ReceiptObservation unreadable(@Nonnull Throwable failure) {
+        public static ReceiptObservation unreadable(@Nonnull Throwable failure) {
             return new ReceiptObservation(0, false, failure);
         }
     }

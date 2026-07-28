@@ -1,8 +1,12 @@
 package com.hypixel.hytale.component;
 
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.component.query.Query;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -41,6 +45,21 @@ public final class TestEntityComponentStore extends Store<EntityStore> implement
         }
     }
 
+    @Override
+    public <T extends Component<EntityStore>> void putComponent(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull ComponentType<EntityStore, T> type,
+            @Nonnull T component) {
+        put(reference, type, component);
+    }
+
+    @Override
+    public <T extends Component<EntityStore>> void removeComponent(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull ComponentType<EntityStore, T> type) {
+        put(reference, type, null);
+    }
+
     @Nonnull
     @Override
     @SuppressWarnings("unchecked")
@@ -71,6 +90,15 @@ public final class TestEntityComponentStore extends Store<EntityStore> implement
     }
 
     @Override
+    public void forEachChunk(
+            @Nonnull Query<EntityStore> query,
+            @Nonnull BiConsumer<ArchetypeChunk<EntityStore>,
+                    CommandBuffer<EntityStore>> consumer) {
+        consumer.accept(new TestChunk(this,
+                new ArrayList<>(components.keySet())), null);
+    }
+
+    @Override
     public void close() {
         getRegistry().shutdown();
     }
@@ -83,6 +111,35 @@ public final class TestEntityComponentStore extends Store<EntityStore> implement
         @Override
         public boolean isValid() {
             return true;
+        }
+    }
+
+    /** Read-only chunk projection for behavior tests that scan Query.any(). */
+    private static final class TestChunk extends ArchetypeChunk<EntityStore> {
+        private final TestEntityComponentStore store;
+        private final List<Ref<EntityStore>> references;
+
+        private TestChunk(TestEntityComponentStore store,
+                          List<Ref<EntityStore>> references) {
+            super(store, Archetype.of());
+            this.store = store;
+            this.references = List.copyOf(references);
+        }
+
+        @Override
+        public int size() {
+            return references.size();
+        }
+
+        @Override
+        public Ref<EntityStore> getReferenceTo(int index) {
+            return references.get(index);
+        }
+
+        @Override
+        public <T extends Component<EntityStore>> T getComponent(
+                int index, ComponentType<EntityStore, T> type) {
+            return store.getComponent(references.get(index), type);
         }
     }
 }

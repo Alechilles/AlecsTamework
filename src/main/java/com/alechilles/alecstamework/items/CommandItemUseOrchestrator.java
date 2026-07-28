@@ -118,9 +118,10 @@ final class CommandItemUseOrchestrator {
         if (tool.toolId == null || tool.toolId.isBlank()) {
             return null;
         }
-        ItemStack working = linkedRecordReconciler.reconcile(
-                player, store, config, tool.stack, tool.toolId
-        );
+        ItemStack working = usesGenericLinkedRecords(config)
+                ? linkedRecordReconciler.reconcile(
+                        player, store, config, tool.stack, tool.toolId)
+                : tool.stack;
         boolean changed = tool.changed || working != tool.stack;
         return new CommandPreparedUse(
                 player, playerRef, store, config, tool.toolId, working, changed, toolInventoryService
@@ -165,7 +166,8 @@ final class CommandItemUseOrchestrator {
     }
 
     private Interception interceptLinkToggle(CommandPreparedUse use, Ref<EntityStore> targetRef) {
-        if (targetRef == null || !use.config.isLinkEnabled()
+        if (!usesGenericLinkedRecords(use.config)
+                || targetRef == null || !use.config.isLinkEnabled()
                 || !use.config.isLinkUseTogglesMembership()) {
             return Interception.unhandled();
         }
@@ -350,6 +352,9 @@ final class CommandItemUseOrchestrator {
                                         Context context,
                                         List<Candidate> recipients,
                                         Map<UUID, String> appliedStates) {
+        if (!usesGenericLinkedRecords(context.config)) {
+            return;
+        }
         ItemStack refreshed = linkMutationService.refreshLinkedNpcPositions(
                 context.workingItem, recipients, use.store, appliedStates
         );
@@ -427,6 +432,10 @@ final class CommandItemUseOrchestrator {
 
     private long positive(long configured, long fallback) {
         return configured > 0L ? configured : fallback;
+    }
+
+    private boolean usesGenericLinkedRecords(TwCommandItemConfig config) {
+        return config != null && !config.usesBondedCompanionRoster();
     }
 
     @FunctionalInterface

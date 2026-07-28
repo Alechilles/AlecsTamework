@@ -162,6 +162,29 @@ class PlannedNpcProjectionSpawnerTest {
     }
 
     @Test
+    void bondedMarkerWithStableProfileAndOpaqueLeaseIsAllowed() {
+        RecordingGateway gateway = new RecordingGateway();
+        PlannedNpcProjectionSpawner spawner = new PlannedNpcProjectionSpawner(
+                new PlannedNpcProjectionSpawnPlanner(), gateway
+        );
+        TameworkProjectionIdentityComponent marker =
+                TameworkProjectionIdentityComponent.bondedCompanion(
+                        "stable-profile-a", "opaque-lease-a"
+                );
+
+        PlannedNpcProjectionSpawner.SpawnResult result = spawner.spawn(
+                request("tamed_test", uuid(7), marker)
+        );
+
+        assertEquals(PlannedNpcProjectionSpawner.Status.SPAWNED, result.status());
+        assertEquals(1, gateway.spawnCalls);
+        assertEquals("stable-profile-a", marker.getProfileId());
+        assertEquals("opaque-lease-a", marker.getBondedLeaseToken());
+        assertEquals(TameworkProjectionIdentityComponent.KIND_BONDED_COMPANION,
+                marker.getProjectionKind());
+    }
+
+    @Test
     void spawnFailureReturnsNoHandlesOrPostAddWork() {
         RecordingGateway gateway = new RecordingGateway();
         gateway.resultStatus = PlannedNpcProjectionSpawner.Status.SPAWN_FAILED;

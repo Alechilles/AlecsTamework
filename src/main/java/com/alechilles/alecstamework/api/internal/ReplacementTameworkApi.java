@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.api.internal;
 
+import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandFamilyRosterApi;
 import com.alechilles.alecstamework.api.CommandLinksApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
@@ -41,6 +42,7 @@ public final class ReplacementTameworkApi
     private final CommandTimedSummoningApi timedSummoning;
     private final CompanionProvisioningApi provisioning;
     private final PaidCommandRevivalApi paidRevival;
+    private final BondedCompanionApi bondedCompanions;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     ReplacementTameworkApi(
@@ -52,7 +54,8 @@ public final class ReplacementTameworkApi
             @Nonnull CommandFamilyRosterApi rosters,
             @Nonnull CommandTimedSummoningApi timedSummoning,
             @Nonnull CompanionProvisioningApi provisioning,
-            @Nonnull PaidCommandRevivalApi paidRevival
+            @Nonnull PaidCommandRevivalApi paidRevival,
+            @Nonnull BondedCompanionApi bondedCompanions
     ) {
         this.base = Objects.requireNonNull(base, "base");
         this.persistence = Objects.requireNonNull(
@@ -76,6 +79,10 @@ public final class ReplacementTameworkApi
         );
         this.paidRevival = Objects.requireNonNull(
                 paidRevival, "paidRevival"
+        );
+        this.bondedCompanions = Objects.requireNonNull(
+                bondedCompanions,
+                "bondedCompanions"
         );
     }
 
@@ -185,6 +192,13 @@ public final class ReplacementTameworkApi
     }
 
     @Override
+    public BondedCompanionApi bondedCompanions() {
+        return bondedCompanions.availability().available()
+                ? bondedCompanions
+                : BondedCompanionApi.unavailable();
+    }
+
+    @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
             base.close();
@@ -225,6 +239,9 @@ public final class ReplacementTameworkApi
                         TameworkApiCapability.CAPTURE_TAME_AND_LINK
                 );
             }
+        }
+        if (bondedCompanions.availability().available()) {
+            capabilities.add(TameworkApiCapability.BONDED_COMPANIONS);
         }
     }
 

@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.config.CommandItemRegistry;
+import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.codec.exception.CodecException;
 import java.lang.reflect.Field;
 import java.util.Set;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,6 +17,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Owner-command-family config and registry contract tests. */
 class TwCommandItemConfigRosterStorageTest {
+    @Test
+    void rejectsUnknownNonBlankRosterStorageInsteadOfSelectingLegacyStorage() {
+        assertEquals(
+                TwCommandItemConfig.RosterStorage.ItemMetadata,
+                TwCommandItemConfig.RosterStorage.fromString(null)
+        );
+        assertEquals(
+                TwCommandItemConfig.RosterStorage.ItemMetadata,
+                TwCommandItemConfig.RosterStorage.fromString("  ")
+        );
+        assertThrows(
+                CodecException.class,
+                () -> TwCommandItemConfig.CODEC.decode(
+                        BsonDocument.parse(
+                                "{\"RosterStorage\":\"OwnerComandFamily\"}"
+                        ),
+                        new ExtraInfo()
+                )
+        );
+    }
+
     @Test
     void defaultsPreserveReleasedItemMetadataBehavior() {
         TwCommandItemConfig config = new TwCommandItemConfig();

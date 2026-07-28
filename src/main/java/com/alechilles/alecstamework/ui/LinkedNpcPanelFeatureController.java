@@ -6,9 +6,12 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 
 /**
@@ -27,9 +30,9 @@ final class LinkedNpcPanelFeatureController {
 
     private final Supplier<Map<UUID, CommandPanelFeaturePresentation>>
             presentationSupplier;
-    private final Consumer<UUID> summon;
-    private final Consumer<UUID> dismiss;
-    private final Consumer<UUID> revive;
+    private final LinkedNpcPanelFeatureAction summon;
+    private final LinkedNpcPanelFeatureAction dismiss;
+    private final LinkedNpcPanelFeatureAction revive;
     private final LinkedNpcPanelReviveOverlayState reviveOverlay =
             new LinkedNpcPanelReviveOverlayState();
     private Map<UUID, CommandPanelFeaturePresentation> presentations =
@@ -42,6 +45,19 @@ final class LinkedNpcPanelFeatureController {
             @Nonnull Consumer<UUID> summon,
             @Nonnull Consumer<UUID> dismiss,
             @Nonnull Consumer<UUID> revive
+    ) {
+        this(presentationSupplier,
+                (npcUuid, ignoredRef, ignoredStore) -> summon.accept(npcUuid),
+                (npcUuid, ignoredRef, ignoredStore) -> dismiss.accept(npcUuid),
+                (npcUuid, ignoredRef, ignoredStore) -> revive.accept(npcUuid));
+    }
+
+    LinkedNpcPanelFeatureController(
+            @Nonnull Supplier<Map<UUID, CommandPanelFeaturePresentation>>
+                    presentationSupplier,
+            @Nonnull LinkedNpcPanelFeatureAction summon,
+            @Nonnull LinkedNpcPanelFeatureAction dismiss,
+            @Nonnull LinkedNpcPanelFeatureAction revive
     ) {
         this.presentationSupplier = Objects.requireNonNull(
                 presentationSupplier, "Presentation supplier is required"
@@ -108,7 +124,8 @@ final class LinkedNpcPanelFeatureController {
     }
 
     Outcome handle(
-            String commandId,
+            String commandId, Ref<EntityStore> playerRef,
+            Store<EntityStore> store,
             Function<UUID, LinkedNpcEntry> entryResolver
     ) {
         if (REVIVE_CANCEL_COMMAND_ID.equals(commandId)) {
@@ -119,7 +136,7 @@ final class LinkedNpcPanelFeatureController {
             refresh();
             UUID selected = reviveOverlay.consumeIfConfirmed();
             if (selected != null) {
-                revive.accept(selected);
+                revive.accept(selected, playerRef, store);
             }
             return Outcome.REFRESH;
         }
@@ -132,12 +149,14 @@ final class LinkedNpcPanelFeatureController {
         }
         if (commandId.startsWith(SUMMON_COMMAND_PREFIX)) {
             return invoke(
-                    commandId, SUMMON_COMMAND_PREFIX, summon
+                    commandId, playerRef, store, SUMMON_COMMAND_PREFIX,
+                    summon, Action.SUMMON
             );
         }
         if (commandId.startsWith(DISMISS_COMMAND_PREFIX)) {
             return invoke(
-                    commandId, DISMISS_COMMAND_PREFIX, dismiss
+                    commandId, playerRef, store, DISMISS_COMMAND_PREFIX,
+                    dismiss, Action.DISMISS
             );
         }
         if (!commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
@@ -161,18 +180,49 @@ final class LinkedNpcPanelFeatureController {
     }
 
     private Outcome invoke(
-            String commandId,
+            String commandId, Ref<EntityStore> playerRef,
+            Store<EntityStore> store,
             String prefix,
-            Consumer<UUID> action
+            LinkedNpcPanelFeatureAction action,
+            Action expected
     ) {
         UUID npcUuid = CommandUiIdParser.parseNpcUuid(
                 commandId, prefix
         );
-        if (npcUuid != null && presentation(npcUuid) != null) {
-            action.accept(npcUuid);
+        if (npcUuid != null && actionAvailable(
+                presentation(npcUuid), expected)) {
+            action.accept(npcUuid, playerRef, store);
         }
         return Outcome.REFRESH;
     }
+
+    Outcome handle(
+            String commandId,
+            Function<UUID, LinkedNpcEntry> entryResolver
+    ) {
+        return handle(commandId, null, null, entryResolver);
+    }
+
+    private boolean actionAvailable(
+            CommandPanelFeaturePresentation row,
+            Action expected
+    ) {
+        if (row == null) return false;
+        if (row.bonded() != null) {
+            BondedCompanionStatusPresentation.Action action =
+                    row.bonded().status().action();
+            return row.bonded().status().actionEnabled()
+                    && (expected == Action.SUMMON
+                            ? action == BondedCompanionStatusPresentation.Action.SUMMON
+                            : action == BondedCompanionStatusPresentation.Action.DISMISS);
+        }
+        if (row.roster() == null) return false;
+        return expected == Action.SUMMON
+                ? row.roster().summonEnabled()
+                : row.roster().dismissEnabled();
+    }
+
+    private enum Action { SUMMON, DISMISS }
 
     enum Outcome {
         NOT_HANDLED,

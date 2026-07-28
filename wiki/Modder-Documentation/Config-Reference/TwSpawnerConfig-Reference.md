@@ -75,6 +75,8 @@ Fields:
   completion.
 - `RequiredEffectId`: optional entity effect required at start and completion.
 - `ChannelAuraEffectId`: optional effect applied for a capture channel.
+- `ChannelSoundEvent`: optional one-shot sound played when the Begin channel
+  phase succeeds.
 - `TamedRoleOverrides`: source-role to stored/tamed-role map used with
   `TamesTarget`.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
@@ -98,12 +100,16 @@ Fields:
 - `SuccessDisposition`: `CapturedItem` creates the configured filled item;
   `TameAndCommandLink` keeps the target live and atomically establishes its
   canonical tame/owner/role/profile, population groups, roster membership, and
-  first timed lease.
+  first timed lease; `StoreBondedCompanion` creates a durable `STORED` profile
+  in the separate bonded authority before retiring the source NPC.
+- `BondedRosterId`: required only for `StoreBondedCompanion`; names the
+  receiving bonded roster.
 - `CommandFamilyId`: required stable owner-scoped family for
-  `TameAndCommandLink`.
-- `RequiredCommandConfigId`: optional exact command-config access fence.
-- `RequireCommandAccessItem`: requires a compatible owner/family access item
-  before the probability roll.
+  `TameAndCommandLink`; prohibited for `StoreBondedCompanion`.
+- `RequiredCommandConfigId`: exact command-config access fence. It is required
+  for `StoreBondedCompanion`.
+- `RequireCommandAccessItem`: requires a compatible access item before the
+  probability roll. It must be `true` for `StoreBondedCompanion`.
 
 `ChanceMode: Guaranteed` preserves deterministic capture and bypasses
 `TwCapturePolicyConfig`, including its custom requirements. `Probability`
@@ -111,6 +117,19 @@ requires the `CAPTURE_POLICY` capability before an integration treats the flow
 as available. `ResolvedAttempt` additionally requires
 `CAPTURE_RESOLVED_ATTEMPT_CONSUMPTION`, and `TameAndCommandLink` requires
 `CAPTURE_TAME_AND_LINK` plus its population/roster/timed dependencies.
+
+`StoreBondedCompanion` instead requires `BONDED_COMPANIONS`. The selected
+target role must resolve to exactly one enabled family inside
+`BondedRosterId`. A successful operation stores the full snapshot and exact
+capture evidence before source cleanup, creates no filled item, and does not
+touch the generic command-family, population, timed-summon, generic profile,
+or outbox authorities. Missing or ambiguous bonded policy fails closed before
+the roll or source spend.
+
+For a channeled bonded-capture item, use `ChannelAuraEffectId` and
+`ChannelSoundEvent` for Begin-phase feedback and author one completion effect.
+Completion feedback is dispatched only after the durable result publishes;
+do not author the same completion particle/sound in two paths.
 
 ### `Spawn`
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
@@ -216,6 +235,10 @@ Accepted values:
 - `/tw reloadconfig` is required after editing spawner configs during development.
 - Role-side probability policy belongs in `TwCapturePolicyConfig`, not copied
   into every capture item.
+- `BondedRosterId` is valid only with
+  `SuccessDisposition: StoreBondedCompanion`.
+- Bonded capture never falls back to a filled item or generic tame/link result
+  when the bonded authority is unavailable.
 
 ## Related Pages
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
@@ -223,6 +246,8 @@ Accepted values:
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwCapturePolicyConfig Reference](/mod/alecs-tamework/twcapturepolicyconfig-reference)
+- [TwBondedCompanionRosterConfig Reference](/mod/alecs-tamework/twbondedcompanionrosterconfig-reference)
+- [Bonded Companion API Reference](/mod/alecs-tamework/bonded-companion-api-reference)
 - [Capture Policy API Reference](/mod/alecs-tamework/capture-policy-api-reference)
 
 

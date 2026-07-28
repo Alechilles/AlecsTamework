@@ -60,10 +60,55 @@ Fields:
 - `FailureCooldownMs` (default `0`). Cooldown applied after one resolved failed
   probability roll.
 - `FailureParticleSystem` / `FailureSoundEvent` (optional). Failure feedback.
+- `SourceConsumption` (default `SuccessOnly`). `SuccessOnly` spends the source
+  only on success; `ResolvedAttempt` spends it after either terminal success or
+  terminal failed roll.
+- `SuccessDisposition` (default `CapturedItem`). Supported values are
+  `CapturedItem`, `TameAndCommandLink`, and `StoreBondedCompanion`.
+- `BondedRosterId` (required only for `StoreBondedCompanion`). Names the
+  separate bonded roster receiving the stored profile.
+- `CommandFamilyId` (required only for `TameAndCommandLink`). Names the generic
+  owner/command-family roster.
+- `RequiredCommandConfigId` and `RequireCommandAccessItem`. Fence the capture
+  to a compatible command access item. `StoreBondedCompanion` requires both a
+  command-config ID and `RequireCommandAccessItem: true`.
 Role-side minimum power, resistance, multiplier, missing-health bonus,
 guaranteed power, and custom requirements live in
 `Server/Tamework/CapturePolicies/*.json`. See the
 [TwCapturePolicyConfig reference](../wiki/Modder-Documentation/Config-Reference/TwCapturePolicyConfig-Reference.md).
+
+### StoreBondedCompanion
+
+`StoreBondedCompanion` is the capture entry point for an ephemeral bonded
+roster. It is separate from filled spawners and generic tame/link capture.
+
+The route validates the command-access item, owner policy, allowed source and
+tamed roles, resolved bonded family, capacity, capture policy, distance,
+required effect, and exact config generation before rolling or spending the
+source. On success it:
+
+1. freezes the complete NPC snapshot and capture evidence;
+2. durably creates one `STORED` bonded profile in the separate bonded database;
+3. records the original source NPC identity so replay cannot create another
+   profile;
+4. queues/removes that exact source NPC through bounded cleanup;
+5. finalizes source-item consumption according to `SourceConsumption`; and
+6. emits the completion feedback once.
+
+The durable profile commit happens before source retirement. The operation
+does not create a filled spawner, generic profile, command-family membership,
+population-group record, timed-summon lease, or generic outbox operation.
+Retrying the same attempt uses its original idempotency/capture evidence.
+
+When `TamesTarget` is enabled, every eligible source role must have a
+`TamedRoleOverrides` target role. The target role must select exactly one
+family in `BondedRosterId`, and that family's `Features.Capture` must be
+enabled.
+
+Capture success particles and sounds are post-commit feedback. For a channeled
+item, author the sustained aura/sound in the Begin phase and one completion
+effect in the Complete path. Do not duplicate the same completion effect in
+both the item interaction and spawner success fields.
 
 ## Spawn settings
 Fields:
@@ -138,9 +183,40 @@ The current spawner icon tooling guide lives in the wiki:
 }
 ```
 
+Bonded capture example:
+
+```json
+{
+  "EmptyItemId": "Example_Bonding_Stone",
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [ "Example_Wild_Companion" ]
+  },
+  "Capture": {
+    "RequireTamed": false,
+    "TamesTarget": true,
+    "RequiredEffectId": "Tw_Status_Tranquilized",
+    "TamedRoleOverrides": {
+      "Example_Wild_Companion": "Tamed_Example_Companion"
+    },
+    "ChanceMode": "Probability",
+    "SourceConsumption": "ResolvedAttempt",
+    "SuccessDisposition": "StoreBondedCompanion",
+    "BondedRosterId": "example:shared_roster",
+    "RequiredCommandConfigId": "ExampleBondedController",
+    "RequireCommandAccessItem": true
+  }
+}
+```
+
 ## Reloading
 Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
 Captured spawner display text is written into base Hytale `ItemDisplay` metadata when the NPC is captured.
+
+Bonded roster policies reload with their dependent command configs as one
+coherent generation. A bonded capture against a missing, ambiguous, disabled,
+or stale family fails closed and does not fall back to `CapturedItem` or
+`TameAndCommandLink`.
 
 The API 0.9 `CAPTURE_POLICY` capability is a separate runtime gate. Loading the
 fields or resolving their immutable config views does not prove that the

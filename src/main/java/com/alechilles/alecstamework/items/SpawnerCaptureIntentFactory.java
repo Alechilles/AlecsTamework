@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.items.persistence.SpawnerCaptureIntent;
 import com.alechilles.alecstamework.items.persistence.SpawnerPublishedEffect;
 import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkEvidenceSource;
 import com.alechilles.alecstamework.items.persistence.SpawnerTameAndLinkIntentFactory;
+import com.alechilles.alecstamework.items.persistence.TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -19,7 +20,9 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Translates one accepted live roll into the exact canonical capture-author intent. */
@@ -31,6 +34,10 @@ final class SpawnerCaptureIntentFactory {
     private final SpawnerNpcStateService npcState;
     private final SpawnerNpcIdentityService npcIdentity;
     private final SpawnerTameAndLinkIntentFactory tameAndLinkIntents;
+    private final CommandNpcNameResolver npcNames = new CommandNpcNameResolver();
+    private final TameworkFullStateSnapshotReader bondedSnapshots =
+            new TameworkFullStateSnapshotReader(
+                    new CoopResidentStateSnapshotService());
 
     SpawnerCaptureIntentFactory(
             SpawnerCaptureMetadataService captureMetadata,
@@ -137,6 +144,140 @@ final class SpawnerCaptureIntentFactory {
     @Nullable
     String lastEvidenceFailureReason() {
         return tameAndLinkIntents.lastEvidenceFailureReason();
+    }
+
+    /** Freezes only the explicit bonded disposition into its isolated intent. */
+    @Nullable
+    BondedCompanionCaptureIntent createBonded(
+            Player player,
+            Ref<EntityStore> targetRef,
+            ItemStack source,
+            ItemFeatureConfig config,
+            CaptureAttemptHandle attempt,
+            SpawnerCaptureRollService.Resolution roll,
+            long rosterRevision,
+            boolean toolAccess,
+            boolean tranquilized,
+            boolean ownerAllowed,
+            boolean roleAllowed,
+            @Nullable String authoritativeRoleId,
+            @Nullable String familyId,
+            @Nullable String particleSystemOverride
+    ) {
+        World world = player == null ? null : player.getWorld();
+        Store<EntityStore> store = world == null || world.getEntityStore() == null
+                ? null : world.getEntityStore().getStore();
+        if (world == null || store == null || targetRef == null || source == null
+                || config == null || attempt == null || roll == null
+                || roll.terminal() == null || authoritativeRoleId == null
+                || authoritativeRoleId.isBlank()) return null;
+        var captured = bondedSnapshots.readSourceNeutral(
+                targetRef, store, new NpcAlias(roll.targetUuid()),
+                authoritativeRoleId);
+        var snapshot = captured.successful()
+                ? com.alechilles.alecstamework.companion.bonded
+                .BondedCompanionSnapshot.of(captured.snapshot(), Map.of())
+                : null;
+        String particle = particleSystemOverride == null
+                || particleSystemOverride.isBlank()
+                ? config.getCaptureParticleSystem() : particleSystemOverride;
+        NPCEntity npc = store.getComponent(
+                targetRef, NPCEntity.getComponentType());
+        String species = npcNames.resolveRoleDisplayName(
+                null, npcNames.resolveNpcNameKey(npc));
+        return freezeBonded(new FrozenBondedCapture(
+                "spawner-bonded-capture:v1",
+                player.getUuid() + ":" + config.getCaptureMechanics()
+                        .bondedRosterId() + ":" + roll.targetUuid(),
+                player.getUuid(), world.getName(), attempt.hotbarSlot(),
+                attempt.sourceFingerprint(), roll.targetUuid(),
+                authoritativeRoleId,
+                BondedCompanionCaptureAttemptEvidence.from(
+                        source.getItemId(), roll.terminal()), species,
+                config.getCaptureMechanics().bondedRosterId(), rosterRevision,
+                snapshot, publishedEffect(targetRef, store, particle,
+                config.getCaptureSoundEvent()), targetRef.isValid(),
+                roll.terminal().successful(), tranquilized, toolAccess,
+                ownerAllowed, roleAllowed, familyId));
+    }
+
+    /** Maps already-frozen live evidence without replacing denial bits. */
+    static BondedCompanionCaptureIntent freezeBonded(
+            FrozenBondedCapture frozen
+    ) {
+        var snapshot = BondedCompanionCaptureRoleResolver.alignSnapshotRole(
+                frozen.snapshot(), frozen.roleId());
+        return new BondedCompanionCaptureIntent(
+                frozen.callerNamespace(), frozen.idempotencyKey(),
+                frozen.actorUuid(), frozen.worldKey(), frozen.hotbarSlot(),
+                frozen.sourceFingerprint(), frozen.sourceNpcUuid(),
+                frozen.attemptEvidence(), frozen.roleId(), frozen.species(),
+                frozen.rosterId(),
+                frozen.rosterRevision(),
+                snapshot, frozen.completionEffect(),
+                frozen.targetValid(), frozen.chanceSuccessful(),
+                frozen.tranquilized(), frozen.toolAccess(),
+                frozen.ownerAllowed(), frozen.roleAllowed(), frozen.familyId(),
+                BondedCompanionCaptureIntent.FamilySelection.ROLE_INFERRED
+        );
+    }
+
+    record FrozenBondedCapture(
+            String callerNamespace, String idempotencyKey, UUID actorUuid,
+            String worldKey, int hotbarSlot, String sourceFingerprint,
+            UUID sourceNpcUuid, String roleId,
+            BondedCompanionCaptureAttemptEvidence attemptEvidence,
+            String species, String rosterId,
+            long rosterRevision,
+            com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot
+                    snapshot,
+            SpawnerPublishedEffect completionEffect,
+            boolean targetValid, boolean chanceSuccessful,
+            boolean tranquilized, boolean toolAccess,
+            boolean ownerAllowed, boolean roleAllowed,
+            String familyId
+    ) {
+        FrozenBondedCapture(
+                String callerNamespace, String idempotencyKey, UUID actorUuid,
+                String worldKey, int hotbarSlot, String sourceFingerprint,
+                UUID sourceNpcUuid, String roleId, String species,
+                String rosterId, long rosterRevision,
+                com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionSnapshot snapshot,
+                SpawnerPublishedEffect completionEffect,
+                boolean targetValid, boolean chanceSuccessful,
+                boolean tranquilized, boolean toolAccess,
+                boolean ownerAllowed, boolean roleAllowed
+        ) {
+            this(callerNamespace, idempotencyKey, actorUuid, worldKey,
+                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId,
+                    BondedCompanionCaptureIntent.legacyEvidence(
+                            idempotencyKey, chanceSuccessful),
+                    species, rosterId, rosterRevision, snapshot,
+                    completionEffect, targetValid, chanceSuccessful,
+                    tranquilized, toolAccess, ownerAllowed, roleAllowed, null);
+        }
+
+        FrozenBondedCapture(
+                String callerNamespace, String idempotencyKey, UUID actorUuid,
+                String worldKey, int hotbarSlot, String sourceFingerprint,
+                UUID sourceNpcUuid, String roleId, String rosterId,
+                long rosterRevision,
+                com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionSnapshot snapshot,
+                SpawnerPublishedEffect completionEffect,
+                boolean targetValid, boolean chanceSuccessful,
+                boolean tranquilized, boolean toolAccess,
+                boolean ownerAllowed, boolean roleAllowed
+        ) {
+            this(callerNamespace, idempotencyKey, actorUuid, worldKey,
+                    hotbarSlot, sourceFingerprint, sourceNpcUuid, roleId,
+                    BondedCompanionCaptureIntent.legacyEvidence(
+                            idempotencyKey, chanceSuccessful), null,
+                    rosterId, rosterRevision, snapshot, completionEffect,
+                    targetValid, chanceSuccessful, tranquilized, toolAccess,
+                    ownerAllowed, roleAllowed, null);
+        }
     }
 
     private SpawnerCaptureIntent tameAndLinkIntent(

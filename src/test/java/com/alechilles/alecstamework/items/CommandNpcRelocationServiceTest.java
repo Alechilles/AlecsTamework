@@ -123,6 +123,6 @@ class CommandNpcRelocationServiceTest {
         return Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework",
                 "items", fileName
-        ), StandardCharsets.UTF_8);
+        ), StandardCharsets.UTF_8).replace("\r\n", "\n");
     }
 }

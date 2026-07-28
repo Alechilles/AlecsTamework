@@ -39,6 +39,8 @@ import com.alechilles.alecstamework.persistence.control
 import com.alechilles.alecstamework.persistence.control
         .PersistenceStartupReport;
 import com.alechilles.alecstamework.persistence.diagnostics
+        .BondedCompanionDiagnosticContributor;
+import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.runtime
         .HytalePersistenceLiveBoundariesFactory;
@@ -404,6 +406,14 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     @Nonnull
     PersistenceDiagnosticExporter diagnosticsExporter() {
         return diagnosticsExporter;
+    }
+
+    /** Aggregates bonded diagnostics without owning bonded lifecycle/readiness. */
+    @Nonnull
+    AutoCloseable registerBondedDiagnostics(
+            @Nonnull BondedCompanionDiagnosticContributor contributor
+    ) {
+        return diagnosticsExporter.registerBondedContributor(contributor);
     }
 
     @Nonnull
