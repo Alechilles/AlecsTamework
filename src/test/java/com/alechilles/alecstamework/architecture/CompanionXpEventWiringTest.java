@@ -21,6 +21,10 @@ class CompanionXpEventWiringTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkHarvestDrop.java"
     );
+    private static final Path AVATAR_FLIGHT_MOVEMENT_SYSTEM = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "avatarflight", "AvatarFlightMovementSystem.java"
+    );
 
     @Test
     void simpleXpSourcesUsePublicSourceBuckets() throws IOException {
@@ -102,6 +106,14 @@ class CompanionXpEventWiringTest {
         assertTrue(markDropped > itemDrop, "Drop tracking should mark success only after an item is thrown.");
         assertTrue(awardXp > markDropped, "Harvest XP should be awarded after TameworkHarvestDrop succeeds.");
         assertTrue(debugLog > awardXp, "Harvest XP debug diagnostics should log the award outcome.");
+    }
+
+    @Test
+    void avatarFlightAwardsOnlyThroughTheDedicatedCompanionXpSource() throws IOException {
+        String content = Files.readString(AVATAR_FLIGHT_MOVEMENT_SYSTEM, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("CompanionXpSource.AVATAR_FLIGHT"));
+        assertTrue(content.contains("AvatarFlightExperienceService"));
     }
 
     private static String readService() throws IOException {

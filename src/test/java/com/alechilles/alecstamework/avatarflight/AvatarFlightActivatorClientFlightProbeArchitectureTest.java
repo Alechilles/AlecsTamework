@@ -56,6 +56,17 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     }
 
     @Test
+    void disablingAvatarFlightResetsFlightXpTrackerImmediatelyBeforeComponentRemoval() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
+
+        int reset = disableBody.indexOf("resetFlightXpTracker(flight, System.currentTimeMillis())");
+        int remove = disableBody.indexOf("store.tryRemoveComponent(ref, flightType)");
+        assertTrue(reset >= 0, "every activation teardown must reset persisted flight XP state");
+        assertTrue(remove > reset, "flight XP state must reset before the flight component is removed");
+    }
+
+    @Test
     void enablingValidatesSessionAndHeldTalismanBeforeModelReplacement() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String enableBody = methodBody(source, "public Result enable", "public Result disable");

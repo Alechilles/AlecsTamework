@@ -26,6 +26,7 @@ public final class AvatarFlightActivator {
     private final AvatarFlightInventoryGuardService inventoryGuard = new AvatarFlightInventoryGuardService();
     private final AvatarFlightGroundMovementService groundMovementService =
             new AvatarFlightGroundMovementService();
+    private final AvatarFlightExperienceService flightExperienceService = new AvatarFlightExperienceService();
 
     @Nonnull
     public Result enable(@Nonnull Store<EntityStore> store,
@@ -87,6 +88,7 @@ public final class AvatarFlightActivator {
             groundMovementService.restore(store, ref, flight);
         }
         if (flightType != null) {
+            resetFlightXpTracker(flight, System.currentTimeMillis());
             store.tryRemoveComponent(ref, flightType);
         }
         AvatarFlightHudSystem.hideHud(playerUuid, player);
@@ -106,6 +108,13 @@ public final class AvatarFlightActivator {
         return restored
                 ? Result.ok("Avatar flight disabled" + (restoreModel ? " and model restored." : "."))
                 : Result.fail("Avatar flight disabled, but no saved model or skin fallback was available.");
+    }
+
+    private void resetFlightXpTracker(@Nullable AvatarFlightComponent flight, long nowMs) {
+        if (flight == null) {
+            return;
+        }
+        AvatarFlightMovementSystem.applyFlightXpState(flight, flightExperienceService.reset(nowMs));
     }
 
     /**

@@ -137,6 +137,29 @@ class AvatarFlightMovementSystemTest {
                 movementInput(1.0, 0.0, false), config));
     }
 
+    @Test
+    void flightXpSourceRequiresCurrentSessionWorldAndValidParkedSource() {
+        AvatarFlightMountSessionComponent validSession = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+
+        assertTrue(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(null, "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-b", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-a", false));
+    }
+
+    @Test
+    void flightXpQualificationRequiresAppliedFastFlightAndValidSource() {
+        AvatarFlightController.Output fastOutput = output(false, true);
+        AvatarFlightController.Output slowOutput = new AvatarFlightController.Output(
+                AvatarFlightMode.FORWARD_FLIGHT, 0.0, 0.0, 0.0, 0L, 0L,
+                true, false, false, false, false, 0.0, 0.0);
+
+        assertTrue(AvatarFlightMovementSystem.qualifiesForFlightXp(fastOutput, true));
+        assertFalse(AvatarFlightMovementSystem.qualifiesForFlightXp(slowOutput, true));
+        assertFalse(AvatarFlightMovementSystem.qualifiesForFlightXp(fastOutput, false));
+    }
+
     private static AvatarFlightController.Input authorizeVigour(AvatarFlightController.Input input,
                                                                AvatarFlightComponent flight,
                                                                TwAvatarFlightConfig config,
