@@ -689,6 +689,9 @@ public class Tamework extends JavaPlugin {
                 new AvatarFlightHudSystem(
                         avatarFlightComponentType,
                         avatarFlightInputComponentType,
+                        avatarFlightMountSessionComponentType,
+                        avatarFlightSourceComponentType,
+                        UUIDComponent.getComponentType(),
                         Player.getComponentType()
                 )
         );

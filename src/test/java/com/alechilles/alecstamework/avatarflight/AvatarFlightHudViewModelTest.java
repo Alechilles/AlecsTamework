@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,6 +75,39 @@ class AvatarFlightHudViewModelTest {
     }
 
     @Test
+    void expandedVigourCapacityKeepsTheBonusVisibleInSixPipHud() {
+        AvatarFlightHudViewModel partial = AvatarFlightHudViewModel.visible(
+                0.0, 6.0, 6.9, true, "GROUNDED");
+        AvatarFlightHudViewModel full = AvatarFlightHudViewModel.visible(
+                0.0, 6.9, 6.9, true, "GROUNDED");
+
+        assertEquals(6.9, partial.maxVigourCharges(), EPSILON);
+        assertEquals(6.0, partial.vigourCharges(), EPSILON);
+        assertFalse(partial.dimmed(), "six base charges must not appear full when capacity is 6.9");
+        assertTrue(partial.pipFill(5) > 0.0 && partial.pipFill(5) < 1.0,
+                "the final pip must retain the visible fractional capacity bonus");
+        assertTrue(full.dimmed());
+        assertEquals(1.0, full.pipFill(5), EPSILON);
+    }
+
+    @Test
+    void hudModelUsesTunedCapacityForFullState() {
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1000L);
+        flight.setMode(AvatarFlightMode.GROUNDED);
+        flight.setVigourCharges(6.0);
+        AvatarFlightHudViewModel model = AvatarFlightHudSystem.buildModel(
+                flight,
+                new AvatarFlightInputComponent(),
+                TwAvatarFlightConfig.defaultConfig(),
+                new AvatarFlightProgressionTuning(1.15, 1.0, 1.0, 1.0, 1.0, 1.0),
+                1000L
+        );
+
+        assertEquals(6.9, model.maxVigourCharges(), EPSILON);
+        assertFalse(model.dimmed());
+    }
+
+    @Test
     void clampingKeepsInitialSixPipAssetInBounds() {
         AvatarFlightHudViewModel high = AvatarFlightHudViewModel.visible(
                 2.0,
@@ -84,8 +118,8 @@ class AvatarFlightHudViewModelTest {
         );
 
         assertEquals(1.0, high.speedRatio(), EPSILON);
-        assertEquals(6.0, high.vigourCharges(), EPSILON);
-        assertEquals(6.0, high.maxVigourCharges(), EPSILON);
+        assertEquals(10.0, high.vigourCharges(), EPSILON);
+        assertEquals(10.0, high.maxVigourCharges(), EPSILON);
         assertEquals(1.0, high.pipFill(5), EPSILON);
         assertEquals(0.0, high.pipFill(6), EPSILON);
         assertTrue(high.dimmed());
