@@ -27,6 +27,16 @@ public final class AvatarFlightController {
                                 @Nonnull TwAvatarFlightConfig config,
                                 double dt,
                                 long nowMs) {
+        return update(state, input, config, AvatarFlightProgressionTuning.neutral(), dt, nowMs);
+    }
+
+    @Nonnull
+    public static Output update(@Nonnull State state,
+                                @Nonnull Input input,
+                                @Nonnull TwAvatarFlightConfig config,
+                                @Nonnull AvatarFlightProgressionTuning tuning,
+                                double dt,
+                                long nowMs) {
         dt = Math.max(0.0, dt);
         TwAvatarFlightConfig.MovementSettings movement = config.getMovement();
         double yaw = input.yawRadians();
@@ -174,7 +184,7 @@ public final class AvatarFlightController {
             jumpApplied = true;
         }
         if (!explicitAirbrakeIntent && boostIntent && boostReady) {
-            double boost = config.getBoost().getForwardImpulse();
+            double boost = config.getBoost().getForwardImpulse() * tuning.forwardBoostImpulseMultiplier();
             if (config.getBoost().isDirectional()) {
                 double absPitch = Math.abs(effectivePitchRadians);
                 double horizontalImpulse = boost * Math.cos(absPitch);
@@ -219,13 +229,15 @@ public final class AvatarFlightController {
             mode = AvatarFlightMode.DESCENDING;
         } else if (!boostApplied && targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE && !neutralPitch) {
             PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
-                    config, boostActive ? boostedHorizontalCap : glideHorizontalCap, diveLoad, climbLoad, dt);
+                    config, boostActive ? boostedHorizontalCap : glideHorizontalCap, diveLoad, climbLoad,
+                    tuning.climbLiftMultiplier(), dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
         } else if (mode == AvatarFlightMode.FORWARD_FLIGHT) {
             if (neutralPitch && !jumpApplied) {
                 double plannedHorizontalSpeed = Math.hypot(targetForwardSpeed, targetStrafeSpeed);
-                vertical = approach(vertical, -glideSinkSpeed(movement, plannedHorizontalSpeed),
+                double sinkMultiplier = boostActive ? 1.0 : tuning.glideSinkMultiplier();
+                vertical = approach(vertical, -glideSinkSpeed(movement, plannedHorizontalSpeed) * sinkMultiplier,
                         movement.getGlideSinkAcceleration() * dt);
             }
         } else if (!jumpApplied) {
@@ -404,6 +416,7 @@ public final class AvatarFlightController {
                                               double glideHorizontalCap,
                                               double diveLoad,
                                               double climbLoad,
+                                              double climbLiftMultiplier,
                                               double dt) {
         TwAvatarFlightConfig.MovementSettings movement = config.getMovement();
         if (pitchRadians > 0.0) {
@@ -432,7 +445,7 @@ public final class AvatarFlightController {
             double turnDelta = movement.getPitchUpLiftScale() * Math.max(1.0, glideSpeed) * turnAmount * dt;
             return new PitchAdjustment(
                     Math.max(0.0, approach(forwardSpeed, targetForwardSpeed, turnDelta)),
-                    approach(verticalSpeed, targetVerticalSpeed, turnDelta)
+                    approach(verticalSpeed, targetVerticalSpeed, turnDelta * climbLiftMultiplier)
             );
         }
         if (pitchRadians < 0.0) {

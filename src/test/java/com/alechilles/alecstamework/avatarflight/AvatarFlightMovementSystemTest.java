@@ -141,6 +141,21 @@ class AvatarFlightMovementSystemTest {
     }
 
     @Test
+    void boostCostMultiplierChangesOnlyForwardBoostSpend() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.0, 1.0, 0.88, 1.0, 1.0, 1.0);
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1000L);
+        flight.setVigourCharges(config.getVigour().getMaxCharges());
+
+        spendAppliedVigour(flight, config, tuning, output(true, true), 1000L);
+
+        assertEquals(config.getVigour().getMaxCharges()
+                        - config.getVigour().getUpwardFlapCost()
+                        - config.getVigour().getForwardBoostCost() * 0.88,
+                flight.getVigourCharges(), EPSILON);
+    }
+
+    @Test
     void flightXpSourceRequiresCurrentSessionWorldAndValidParkedSource() {
         AvatarFlightMountSessionComponent validSession = new AvatarFlightMountSessionComponent(
                 "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
@@ -256,6 +271,23 @@ class AvatarFlightMovementSystemTest {
         );
         method.setAccessible(true);
         method.invoke(null, flight, config, output, now);
+    }
+
+    private static void spendAppliedVigour(AvatarFlightComponent flight,
+                                           TwAvatarFlightConfig config,
+                                           AvatarFlightProgressionTuning tuning,
+                                           AvatarFlightController.Output output,
+                                           long now) throws Exception {
+        Method method = AvatarFlightMovementSystem.class.getDeclaredMethod(
+                "spendAppliedVigour",
+                AvatarFlightComponent.class,
+                TwAvatarFlightConfig.class,
+                AvatarFlightProgressionTuning.class,
+                AvatarFlightController.Output.class,
+                long.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, flight, config, tuning, output, now);
     }
 
     private static AvatarFlightController.Input input(boolean jump, boolean sprint, boolean airbrake) {
