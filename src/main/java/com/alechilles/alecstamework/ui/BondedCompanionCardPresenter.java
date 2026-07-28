@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.items.BondedCompanionActionFeedbackMapper;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
@@ -47,17 +48,18 @@ final class BondedCompanionCardPresenter {
             @Nullable String language
     ) {
         BondedCompanionStatusPresentation status = row.status();
+        ProgressionSummary progression = progressionSummary(row.attributes());
         CardLayout layout = layout(row.attributes());
         commands.setObject(entrySelector + ".Anchor", layout.cardAnchor());
-        bindIdentity(commands, entrySelector, row);
+        bindIdentity(commands, entrySelector, row, progression, language);
         bindState(commands, entrySelector, row, language);
         bindLayout(commands, entrySelector, layout);
         bindUnlink(commands, events, entrySelector, cardUuid, pendingUnlink,
                 config, language);
         bindHealth(commands, entrySelector, row.attributes());
         bindMetrics(commands, entrySelector, row.attributes(), layout, language);
-        bindTalents(commands, events, entrySelector, cardUuid, row, pendingUnlink,
-                config, layout, language);
+        bindProgression(commands, events, entrySelector, cardUuid, row,
+                progression, pendingUnlink, config, language);
         bindPrimaryAction(commands, events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
     }
@@ -107,10 +109,13 @@ final class BondedCompanionCardPresenter {
     private static void bindIdentity(
             UICommandBuilder commands,
             String entrySelector,
-            BondedCompanionPanelPresentation row
+            BondedCompanionPanelPresentation row,
+            ProgressionSummary progression,
+            @Nullable String language
     ) {
         commands.set(entrySelector + " #BondedName.Text", displayName(row));
-        commands.set(entrySelector + " #BondedSpecies.Text", identityLine(row));
+        commands.set(entrySelector + " #BondedSpecies.Text",
+                identityLine(row, progression, language));
         commands.set(entrySelector + " #BondedGenderMaleIcon.Visible",
                 "male".equalsIgnoreCase(row.gender()));
         commands.set(entrySelector + " #BondedGenderFemaleIcon.Visible",
@@ -238,33 +243,30 @@ final class BondedCompanionCardPresenter {
         return visibleIndex + 1;
     }
 
-    private static void bindTalents(
+    private static void bindProgression(
             UICommandBuilder commands,
             UIEventBuilder events,
             String entrySelector,
             UUID cardUuid,
             BondedCompanionPanelPresentation row,
+            ProgressionSummary progression,
             boolean pendingUnlink,
             LinkedNpcPanelCardBinder.CardBindingConfig config,
-            CardLayout layout,
             @Nullable String language
     ) {
-        TalentSummary talents = talentSummary(row.attributes());
-        commands.set(entrySelector + " #BondedTalentAction.Visible", talents.visible());
-        if (!talents.visible()) {
+        commands.set(entrySelector + " #BondedProgressionButton.Visible",
+                progression.visible());
+        if (!progression.visible()) {
             return;
         }
-        commands.setObject(entrySelector + " #BondedTalentAction.Anchor",
-                fillAnchor(METRIC_LEFT, layout.talentTop(), 188, 22));
-        commands.set(entrySelector + " #BondedTalentText.Text", LocalizedText.format(
-                language, "tamework.ui.linkedPanel.bonded.talents.summary",
-                talents.level(), talents.availablePoints()));
-        boolean canOpen = row.status().state() == BondedCompanionStateView.ACTIVE
+        commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
+                progressionTooltip(progression, row.attributes()));
+        boolean canOpen = progression.talentsConfigured()
+                && row.status().state() == BondedCompanionStateView.ACTIVE
                 && !pendingUnlink;
-        commands.set(entrySelector + " #BondedTalentButton.Visible", canOpen);
         if (canOpen) {
             events.addEventBinding(CustomUIEventBindingType.Activating,
-                    entrySelector + " #BondedTalentButton",
+                    entrySelector + " #BondedProgressionButton",
                     EventData.of(config.eventCommandId(),
                             config.openTalentsCommandPrefix() + cardUuid), false);
         }
@@ -444,28 +446,31 @@ final class BondedCompanionCardPresenter {
         };
     }
 
-    private static TalentSummary talentSummary(Map<String, String> attributes) {
+    private static ProgressionSummary progressionSummary(
+            Map<String, String> attributes
+    ) {
         int level = positiveRoundedInt(attributes.get("level"), 0);
+        String levelingConfig = attributes.get("levelingConfigId");
         String talentConfig = attributes.get("talentConfigId");
-        if (level == 0 || talentConfig == null || talentConfig.isBlank()) {
-            return TalentSummary.hidden();
+        if (level == 0 || levelingConfig == null || levelingConfig.isBlank()) {
+            return ProgressionSummary.hidden();
         }
         int spent = nonNegativeInt(attributes.get("talentSpentPoints"));
         int earned = CompanionLevelingService.resolveEarnedTalentPoints(level,
-                attributes.get("levelingConfigId"));
-        return new TalentSummary(true, level, Math.max(0, earned - spent));
+                levelingConfig);
+        boolean talentsConfigured = talentConfig != null && !talentConfig.isBlank();
+        int available = talentsConfigured ? Math.max(0, earned - spent) : 0;
+        return new ProgressionSummary(true, talentsConfigured, level, available);
     }
 
     private static CardLayout layout(Map<String, String> attributes) {
         boolean metrics = hasMetric(attributes, "happiness")
                 || hasMetric(attributes, "hunger")
                 || hasMetric(attributes, "thirst");
-        boolean talents = talentSummary(attributes).visible();
         int metricTop = 86;
-        int talentTop = metrics ? 110 : 86;
-        int detailTop = talents ? talentTop + 26 : metrics ? 110 : 82;
+        int detailTop = metrics ? 110 : 82;
         int actionTop = detailTop + 3;
-        return new CardLayout(metricTop, talentTop, detailTop, actionTop);
+        return new CardLayout(metricTop, detailTop, actionTop);
     }
 
     private static boolean hasMetric(Map<String, String> attributes,
@@ -520,8 +525,54 @@ final class BondedCompanionCardPresenter {
                 "tamework.ui.linkedPanel.subtitle.defaultNpcName");
     }
 
-    private static String identityLine(BondedCompanionPanelPresentation row) {
-        return row.species() == null ? "" : row.species();
+    private static String identityLine(
+            BondedCompanionPanelPresentation row,
+            ProgressionSummary progression,
+            @Nullable String language
+    ) {
+        String species = row.species() == null ? "" : row.species();
+        if (!progression.visible()) {
+            return species;
+        }
+        String level = LocalizedText.format(language,
+                "tamework.ui.linkedPanel.bonded.talents.level",
+                progression.level());
+        String points = progression.availablePoints() > 0
+                ? "  •  " + LocalizedText.format(language,
+                "tamework.ui.linkedPanel.bonded.talents.points",
+                progression.availablePoints())
+                : "";
+        return species + "  •  <color is=\"#f3d775\">" + level + points
+                + "</color>";
+    }
+
+    private static String progressionTooltip(
+            ProgressionSummary progression,
+            Map<String, String> attributes
+    ) {
+        TwLevelingConfig config = TwLevelingConfig.resolveById(
+                attributes.get("levelingConfigId"));
+        if (config == null || !config.isEnabled()) {
+            return "Level: " + progression.level();
+        }
+        int maxLevel = Math.max(1, config.getLevels().getMaxLevel());
+        int level = Math.min(progression.level(), maxLevel);
+        if (level >= maxLevel) {
+            return LinkedNpcPanelProgressionBinder.resolveXpTooltip(
+                    new LinkedNpcEntry.FutureStat("Level " + level + " MAX",
+                            1, 1,
+                            "Level: " + level + "/" + maxLevel + " - MAX XP",
+                            null));
+        }
+        int currentXp = nonNegativeRoundedInt(attributes.get("currentXp"));
+        int requiredXp = (int) Math.max(1L, Math.round(
+                config.getLevels().getBaseXp()
+                        * Math.pow(config.getLevels().getGrowthFactor(), level - 1)));
+        return LinkedNpcPanelProgressionBinder.resolveXpTooltip(
+                new LinkedNpcEntry.FutureStat("Level " + level + " XP",
+                        currentXp, requiredXp,
+                        "Level: " + level + "/" + maxLevel + " - "
+                                + currentXp + "/" + requiredXp + " XP", null));
     }
 
     private static int positiveRoundedInt(@Nullable String value, int fallback) {
@@ -595,15 +646,19 @@ final class BondedCompanionCardPresenter {
         }
     }
 
-    private record TalentSummary(boolean visible, int level, int availablePoints) {
-        private static TalentSummary hidden() {
-            return new TalentSummary(false, 0, 0);
+    private record ProgressionSummary(
+            boolean visible,
+            boolean talentsConfigured,
+            int level,
+            int availablePoints
+    ) {
+        private static ProgressionSummary hidden() {
+            return new ProgressionSummary(false, false, 0, 0);
         }
     }
 
-    /** Compact vertical allocation that omits absent metrics and talent rows. */
-    private record CardLayout(int metricTop, int talentTop, int detailTop,
-                              int actionTop) {
+    /** Compact vertical allocation that omits absent metrics. */
+    private record CardLayout(int metricTop, int detailTop, int actionTop) {
         private int baseHeight() {
             return actionTop + 36;
         }

@@ -65,6 +65,15 @@ Group {
         Style: (FontSize: 11, TextColor: #9fb3c8, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
+    TextButton #BondedProgressionButton {
+        Anchor: (Top: 30, Left: 40, Right: 108, Height: 18);
+        Style: @BondedTransparentButton;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
     Label #BondedStateInWorld {
         Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
         Text: "";
@@ -169,32 +178,6 @@ Group {
             Anchor: (Top: 1, Right: 5, Width: 26, Height: 16);
             Text: "0%";
             Style: (FontSize: 9, RenderBold: true, TextColor: #f0f6fb, HorizontalAlignment: End, VerticalAlignment: Center);
-        }
-    }
-
-    Group #BondedTalentAction {
-        Anchor: (Top: 82, Left: 14, Width: 188, Height: 22);
-        Background: #172b40;
-        Visible: false;
-
-        Group {
-            Anchor: (Top: 3, Left: 5, Width: 16, Height: 16);
-            Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
-        }
-
-        Label #BondedTalentText {
-            Anchor: (Top: 1, Left: 26, Right: 5, Height: 20);
-            Text: "";
-            Style: (FontSize: 10, RenderBold: true, TextColor: #f3d775, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-
-        TextButton #BondedTalentButton {
-            Anchor: (Top: 0, Left: 0, Width: 188, Height: 22);
-            Style: @BondedTransparentButton;
-            Text: "";
-            TooltipText: %server.tamework.ui.linkedPanel.bonded.talents.tooltip;
-            TextTooltipStyle: @BondedCardTextTooltipStyle;
-            Visible: false;
         }
     }
 

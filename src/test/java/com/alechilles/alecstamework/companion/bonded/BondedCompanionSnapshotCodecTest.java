@@ -171,6 +171,7 @@ class BondedCompanionSnapshotCodecTest {
         assertEquals("storm", presentation.data().get("variant"));
         assertEquals("7", presentation.data().get("level"));
         assertEquals("level", presentation.data().get("levelingConfigId"));
+        assertEquals("20.0", presentation.data().get("currentXp"));
         assertEquals("talents", presentation.data().get("talentConfigId"));
         assertEquals("1", presentation.data().get("talentSpentPoints"));
         assertEquals("63.25", presentation.data().get("healthPercent"));

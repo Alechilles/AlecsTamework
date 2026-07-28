@@ -65,7 +65,7 @@ final class LinkedNpcPanelProgressionBinder {
         return "?";
     }
 
-    private static String resolveXpTooltip(LinkedNpcEntry.FutureStat stat) {
+    static String resolveXpTooltip(LinkedNpcEntry.FutureStat stat) {
         String detail = stat.tooltipText();
         String suffix = detail == null || detail.isBlank() ? "" : "\n" + detail.trim();
         String header = stat.tooltipHeaderText();
