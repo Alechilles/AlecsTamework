@@ -38,7 +38,7 @@ public record AvatarFlightHudViewModel(boolean visible,
             speedRatio = clamp01(speedRatio);
             targetSpeedRatio = clamp01(targetSpeedRatio);
             pitchDegrees = finiteOrZero(pitchDegrees);
-            maxVigourCharges = clamp(finiteOrZero(maxVigourCharges), 0.0, MAX_DISPLAY_PIPS);
+            maxVigourCharges = Math.max(0.0, finiteOrZero(maxVigourCharges));
             vigourCharges = clamp(finiteOrZero(vigourCharges), 0.0, maxVigourCharges);
             rechargeMode = normalizeRechargeMode(rechargeMode);
             launchChargeRatio = clamp01(launchChargeRatio);
@@ -84,7 +84,7 @@ public record AvatarFlightHudViewModel(boolean visible,
                                                    boolean launchChargeVisible,
                                                    double launchChargeRatio,
                                                    double launchMinChargeRatio) {
-        double displayMax = clamp(finiteOrZero(maxCharges), 0.0, MAX_DISPLAY_PIPS);
+        double displayMax = Math.max(0.0, finiteOrZero(maxCharges));
         double displayCharges = clamp(finiteOrZero(charges), 0.0, displayMax);
         boolean dimmed = groundedAtFull && displayMax > 0.0 && displayCharges >= displayMax - FULL_EPSILON;
         return new AvatarFlightHudViewModel(
@@ -118,7 +118,10 @@ public record AvatarFlightHudViewModel(boolean visible,
         if (!visible || index < 0 || index >= MAX_DISPLAY_PIPS || index >= maxVigourCharges) {
             return 0.0;
         }
-        return clamp(vigourCharges - index, 0.0, Math.min(1.0, maxVigourCharges - index));
+        double scale = maxVigourCharges > MAX_DISPLAY_PIPS ? MAX_DISPLAY_PIPS / maxVigourCharges : 1.0;
+        double displayedMax = maxVigourCharges * scale;
+        double displayedCharges = vigourCharges * scale;
+        return clamp(displayedCharges - index, 0.0, Math.min(1.0, displayedMax - index));
     }
 
     private static double finiteOrZero(double value) {

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvatarFlightControllerTest {
     private static final TwAvatarFlightConfig CONFIG = TwAvatarFlightConfig.defaultConfig();
+    private static final double EPSILON = 0.00001;
 
     @Test
     void groundedWithoutJumpDoesNotApplyVelocity() {
@@ -19,6 +20,64 @@ class AvatarFlightControllerTest {
 
         assertEquals(AvatarFlightMode.GROUNDED, output.mode());
         assertFalse(output.applyVelocity());
+    }
+
+    @Test
+    void neutralTuningPreservesPriorControllerOutput() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L);
+        AvatarFlightController.Input input = input(1.0, false, false, true, false, Math.toRadians(30.0));
+
+        AvatarFlightController.Output prior = AvatarFlightController.update(state, input, CONFIG, 0.1, 1000L);
+        AvatarFlightController.Output tuned = AvatarFlightController.update(
+                state, input, CONFIG, AvatarFlightProgressionTuning.neutral(), 0.1, 1000L);
+
+        assertEquals(prior.velocityX(), tuned.velocityX(), EPSILON);
+        assertEquals(prior.velocityY(), tuned.velocityY(), EPSILON);
+        assertEquals(prior.velocityZ(), tuned.velocityZ(), EPSILON);
+        assertEquals(prior.mode(), tuned.mode());
+    }
+
+    @Test
+    void boostImpulseMultiplierChangesOnlyAppliedBoostImpulse() {
+        AvatarFlightController.State state = groundedState(0.0, 0.0, 0.0);
+        AvatarFlightController.Input input = input(0.0, false, false, true, true, 0.0);
+
+        AvatarFlightController.Output neutral = update(state, input, AvatarFlightProgressionTuning.neutral());
+        AvatarFlightController.Output boosted = update(
+                state, input, new AvatarFlightProgressionTuning(1.0, 1.0, 1.0, 1.15, 1.0, 1.0));
+
+        assertTrue(boosted.boostApplied());
+        assertEquals(neutral.velocityX(), boosted.velocityX(), EPSILON);
+        assertEquals(neutral.velocityY(), boosted.velocityY(), EPSILON);
+        assertTrue(boosted.velocityZ() < neutral.velocityZ());
+    }
+
+    @Test
+    void glideSinkMultiplierReducesOnlyUnpoweredGlideSink() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L);
+        AvatarFlightController.Input input = input(1.0, false, false, false, false, 0.0);
+
+        AvatarFlightController.Output neutral = AvatarFlightController.update(
+                state, input, CONFIG, AvatarFlightProgressionTuning.neutral(), 5.0, 1000L);
+        AvatarFlightController.Output reducedSink = AvatarFlightController.update(
+                state, input, CONFIG, new AvatarFlightProgressionTuning(1.0, 1.0, 1.0, 1.0, 0.86, 1.0),
+                5.0, 1000L);
+
+        assertTrue(reducedSink.velocityY() > neutral.velocityY());
+        assertEquals(neutral.velocityX(), reducedSink.velocityX(), EPSILON);
+        assertEquals(neutral.velocityZ(), reducedSink.velocityZ(), EPSILON);
+    }
+
+    @Test
+    void climbLiftMultiplierChangesPitchUpLift() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L);
+        AvatarFlightController.Input input = input(1.0, false, false, false, false, Math.toRadians(45.0));
+
+        AvatarFlightController.Output neutral = update(state, input, AvatarFlightProgressionTuning.neutral());
+        AvatarFlightController.Output lifted = update(
+                state, input, new AvatarFlightProgressionTuning(1.0, 1.0, 1.0, 1.0, 1.0, 1.12));
+
+        assertTrue(lifted.velocityY() > neutral.velocityY());
     }
 
     @Test
@@ -1272,5 +1331,11 @@ class AvatarFlightControllerTest {
         return new AvatarFlightController.Input(
                 0.0, 0.0, 0.0, false, false, false, true, onGround, 0.0, 0.0,
                 true, true, true, 0L, activated);
+    }
+
+    private static AvatarFlightController.Output update(AvatarFlightController.State state,
+                                                        AvatarFlightController.Input input,
+                                                        AvatarFlightProgressionTuning tuning) {
+        return AvatarFlightController.update(state, input, CONFIG, tuning, 0.1, 1000L);
     }
 }

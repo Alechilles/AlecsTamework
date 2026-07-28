@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -18,6 +21,7 @@ import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesSystems;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
@@ -27,6 +31,7 @@ import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -39,6 +44,9 @@ public final class AvatarFlightMovementSystem
         implements IVelocityModifyingSystem {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
     private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
+    private final ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType;
+    private final ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType;
+    private final ComponentType<EntityStore, UUIDComponent> uuidType;
     private final ComponentType<EntityStore, Velocity> velocityType;
     private final ComponentType<EntityStore, MovementStatesComponent> movementStatesType;
     private final ComponentType<EntityStore, HeadRotation> headRotationType;
@@ -54,6 +62,7 @@ public final class AvatarFlightMovementSystem
     private final AvatarFlightTrailService trailService = new AvatarFlightTrailService();
     private final AvatarFlightGroundMovementService groundMovementService =
             new AvatarFlightGroundMovementService();
+    private final AvatarFlightExperienceService experienceService = new AvatarFlightExperienceService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.AFTER, MovementStatesSystems.TickingSystem.class),
@@ -64,12 +73,18 @@ public final class AvatarFlightMovementSystem
     public AvatarFlightMovementSystem(
             @Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
             @Nonnull ComponentType<EntityStore, AvatarFlightInputComponent> inputType,
+            @Nonnull ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType,
+            @Nonnull ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType,
+            @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType,
             @Nullable ComponentType<EntityStore, Velocity> velocityType,
             @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesType,
             @Nonnull ComponentType<EntityStore, HeadRotation> headRotationType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformType) {
         this.flightType = flightType;
         this.inputType = inputType;
+        this.mountSessionType = mountSessionType;
+        this.mountSourceType = mountSourceType;
+        this.uuidType = uuidType;
         this.velocityType = velocityType == null ? Velocity.getComponentType() : velocityType;
         this.movementStatesType = movementStatesType;
         this.headRotationType = headRotationType;
@@ -98,16 +113,19 @@ public final class AvatarFlightMovementSystem
             commandBuffer.putComponent(ref, inputType, input);
         }
         long now = System.currentTimeMillis();
-        rechargeVigour(flight, config, rawControllerInput, now);
-        AvatarFlightController.Input controllerInput = authorizeVigour(rawControllerInput, flight, config, now);
+        AvatarFlightProgressionTuning tuning = resolveProgressionTuning(ref, store, commandBuffer);
+        rechargeVigour(flight, config, tuning, rawControllerInput, now);
+        AvatarFlightController.Input controllerInput = authorizeVigour(rawControllerInput, flight, config, tuning, now);
         AvatarFlightController.State state = AvatarFlightController.State.from(flight);
         AvatarFlightController.Output output = AvatarFlightController.update(
                 state,
                 controllerInput,
                 config,
+                tuning,
                 Math.max(0.0, dt),
                 now
         );
+        awardFlightXp(flight, output, ref, store, commandBuffer, now);
         groundMovementService.sync(
                 ref,
                 commandBuffer,
@@ -117,7 +135,7 @@ public final class AvatarFlightMovementSystem
                         && controllerInput.onGround()
                         && !controllerInput.inFluid()
         );
-        spendAppliedVigour(flight, config, output, now);
+        spendAppliedVigour(flight, config, tuning, output, now);
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);
         boostVfxService.emitApplied(
                 output,
@@ -201,8 +219,153 @@ public final class AvatarFlightMovementSystem
         );
     }
 
+    private void awardFlightXp(@Nonnull AvatarFlightComponent flight,
+                               @Nonnull AvatarFlightController.Output output,
+                               @Nonnull Ref<EntityStore> playerRef,
+                               @Nonnull Store<EntityStore> store,
+                               @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                               long now) {
+        AvatarFlightMountSessionComponent session = commandBuffer.getComponent(playerRef, mountSessionType);
+        Ref<EntityStore> sourceRef = resolveFlightXpSource(store, session);
+        AvatarFlightSourceComponent source = sourceRef == null ? null : store.getComponent(sourceRef, mountSourceType);
+        UUIDComponent playerUuid = commandBuffer.getComponent(playerRef, uuidType);
+        FlightXpSourceResolution sourceResolution = sourceRef == null || !sourceRef.isValid()
+                ? null : resolveValidatedFlightXpSource(
+                session,
+                sourceRef,
+                source,
+                playerUuid == null || playerUuid.getUuid() == null ? null : playerUuid.getUuid().toString(),
+                store.getExternalData().getWorld().getName()
+        );
+        boolean sourceValid = sourceResolution != null;
+        String roleId = sourceValid ? sourceResolution.originalRoleId() : null;
+        TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
+        AvatarFlightExperienceService.Result result = experienceService.tick(
+                new AvatarFlightExperienceService.State(
+                        flight.getFlightXpQualifiedSeconds(),
+                        flight.getFlightXpWindowAwardedXp(),
+                        flight.getFlightXpWindowStartedAtMs(),
+                        flight.getFlightXpLastSampleAtMs()
+                ),
+                config == null ? null : config.getXpSources().getFlight(),
+                qualifiesForFlightXp(output, sourceValid),
+                now
+        );
+        applyFlightXpState(flight, result.state());
+        if (result.awardedXp() > 0.0d && sourceValid) {
+            awardQualifiedFlightXp(sourceResolution.recipient(), roleId, result.awardedXp(),
+                    (recipient, roleIdHint, sourceBucket, amount) -> CompanionLevelingService.awardXp(
+                            recipient, store, commandBuffer, roleIdHint, sourceBucket, amount));
+        }
+    }
+
+    @Nonnull
+    private AvatarFlightProgressionTuning resolveProgressionTuning(
+            @Nonnull Ref<EntityStore> playerRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        AvatarFlightMountSessionComponent session = commandBuffer.getComponent(playerRef, mountSessionType);
+        Ref<EntityStore> sourceRef = resolveFlightXpSource(store, session);
+        AvatarFlightSourceComponent source = sourceRef == null ? null : store.getComponent(sourceRef, mountSourceType);
+        UUIDComponent playerUuid = commandBuffer.getComponent(playerRef, uuidType);
+        FlightXpSourceResolution sourceResolution = sourceRef == null || !sourceRef.isValid()
+                ? null : resolveValidatedFlightXpSource(
+                session,
+                sourceRef,
+                source,
+                playerUuid == null || playerUuid.getUuid() == null ? null : playerUuid.getUuid().toString(),
+                store.getExternalData().getWorld().getName()
+        );
+        return sourceResolution == null
+                ? AvatarFlightProgressionTuning.neutral()
+                : AvatarFlightProgressionTuning.resolve(sourceResolution.recipient(), store);
+    }
+
+    static boolean qualifiesForFlightXp(@Nonnull AvatarFlightController.Output output, boolean sourceValid) {
+        return output.applyVelocity() && output.fastFlight() && sourceValid;
+    }
+
+    static boolean hasValidFlightXpSource(@Nullable AvatarFlightMountSessionComponent session,
+                                          @Nullable AvatarFlightSourceComponent source,
+                                          @Nullable String playerUuid,
+                                          @Nullable String activeWorld,
+                                          boolean sourceRefValid) {
+        return session != null
+                && source != null
+                && sourceRefValid
+                && session.getPhase() == AvatarFlightMountPhase.ACTIVE
+                && source.getPhase() == AvatarFlightMountPhase.ACTIVE
+                && AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch())
+                && AvatarFlightRuntimeEpoch.isCurrent(source.getRuntimeEpoch())
+                && playerUuid != null
+                && playerUuid.equals(source.getRiderUuid())
+                && activeWorld != null
+                && activeWorld.equals(session.getSourceWorld())
+                && !session.getSourceNpcUuid().isBlank();
+    }
+
+    @Nullable
+    static FlightXpSourceResolution resolveValidatedFlightXpSource(
+            @Nullable AvatarFlightMountSessionComponent session,
+            @Nonnull Ref<EntityStore> sourceRef,
+            @Nullable AvatarFlightSourceComponent source,
+            @Nullable String playerUuid,
+            @Nullable String activeWorld) {
+        if (!hasValidFlightXpSource(session, source, playerUuid, activeWorld, true)) {
+            return null;
+        }
+        return new FlightXpSourceResolution(sourceRef, source.getOriginalRoleId());
+    }
+
+    @Nullable
+    private static Ref<EntityStore> resolveFlightXpSource(@Nonnull Store<EntityStore> store,
+                                                           @Nullable AvatarFlightMountSessionComponent session) {
+        String activeWorld = store.getExternalData().getWorld().getName();
+        if (session == null || activeWorld == null || !activeWorld.equals(session.getSourceWorld())
+                || session.getSourceNpcUuid().isBlank()) {
+            return null;
+        }
+        try {
+            Ref<EntityStore> sourceRef = store.getExternalData().getWorld().getEntityRef(
+                    UUID.fromString(session.getSourceNpcUuid()));
+            return sourceRef != null && sourceRef.isValid() ? sourceRef : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    static void awardQualifiedFlightXp(@Nonnull Ref<EntityStore> sourceRef,
+                                       @Nonnull String originalRoleId,
+                                       double amount,
+                                       @Nonnull FlightXpAwardSink awardSink) {
+        if (amount > 0.0d && !originalRoleId.isBlank()) {
+            awardSink.award(sourceRef, originalRoleId, CompanionXpSource.AVATAR_FLIGHT, amount);
+        }
+    }
+
+    @FunctionalInterface
+    interface FlightXpAwardSink {
+        void award(@Nonnull Ref<EntityStore> recipient,
+                   @Nonnull String roleIdHint,
+                   @Nonnull CompanionXpSource source,
+                   double amount);
+    }
+
+    record FlightXpSourceResolution(@Nonnull Ref<EntityStore> recipient,
+                                    @Nonnull String originalRoleId) {
+    }
+
+    static void applyFlightXpState(@Nonnull AvatarFlightComponent flight,
+                                   @Nonnull AvatarFlightExperienceService.State state) {
+        flight.setFlightXpQualifiedSeconds(state.qualifiedSeconds());
+        flight.setFlightXpWindowAwardedXp(state.windowAwardedXp());
+        flight.setFlightXpWindowStartedAtMs(state.windowStartedAtMs());
+        flight.setFlightXpLastSampleAtMs(state.lastSampleAtMs());
+    }
+
     private static void rechargeVigour(@Nonnull AvatarFlightComponent flight,
                                        @Nonnull TwAvatarFlightConfig config,
+                                       @Nonnull AvatarFlightProgressionTuning tuning,
                                        @Nonnull AvatarFlightController.Input input,
                                        long now) {
         double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
@@ -212,11 +375,12 @@ public final class AvatarFlightMovementSystem
         );
         AvatarFlightVigourService.Result recharge = AvatarFlightVigourService.recharge(
                 new AvatarFlightVigourService.State(
-                        initialVigourCharges(flight, config),
+                        initialVigourCharges(flight, config, tuning),
                         flight.getLastVigourUpdateAtMs(),
                         flight.getVigourRechargeBlockedUntilMs()
                 ),
                 config,
+                tuning,
                 input.onGround(),
                 horizontalSpeed,
                 now
@@ -237,11 +401,20 @@ public final class AvatarFlightMovementSystem
                                                                @Nonnull AvatarFlightComponent flight,
                                                                @Nonnull TwAvatarFlightConfig config,
                                                                long now) {
+        return authorizeVigour(input, flight, config, AvatarFlightProgressionTuning.neutral(), now);
+    }
+
+    @Nonnull
+    private static AvatarFlightController.Input authorizeVigour(@Nonnull AvatarFlightController.Input input,
+                                                               @Nonnull AvatarFlightComponent flight,
+                                                               @Nonnull TwAvatarFlightConfig config,
+                                                               @Nonnull AvatarFlightProgressionTuning tuning,
+                                                               long now) {
         if (!config.getVigour().isEnabled()) {
             return withVigourAuthorization(input, true, true, true);
         }
         double flapCost = config.getVigour().getUpwardFlapCost();
-        double boostCost = config.getVigour().getForwardBoostCost();
+        double boostCost = config.getVigour().getForwardBoostCost() * tuning.forwardBoostCostMultiplier();
         double launchCost = AvatarFlightLaunchCurve.cost(config.getLaunch(), input.launchHoldMs());
         AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
                 flight.getVigourCharges(),
@@ -251,22 +424,25 @@ public final class AvatarFlightMovementSystem
         boolean flapAllowed = AvatarFlightVigourService.canSpend(
                 state,
                 config,
+                tuning,
                 flapCost
         );
         boolean boostAllowed = AvatarFlightVigourService.canSpend(
                 state,
                 config,
+                tuning,
                 boostCost
         );
         boolean launchAllowed = AvatarFlightVigourService.canSpend(
                 state,
                 config,
+                tuning,
                 launchCost
         );
         if (flapAllowed
                 && flapEligibleThisTick(input, flight, now)
                 && boostEligibleThisTick(input, flight, now)
-                && !AvatarFlightVigourService.canSpend(state, config, combinedCost(flapCost, boostCost))) {
+                && !AvatarFlightVigourService.canSpend(state, config, tuning, combinedCost(flapCost, boostCost))) {
             boostAllowed = false;
         }
         return withVigourAuthorization(input, flapAllowed, boostAllowed, launchAllowed);
@@ -274,6 +450,14 @@ public final class AvatarFlightMovementSystem
 
     private static void spendAppliedVigour(@Nonnull AvatarFlightComponent flight,
                                            @Nonnull TwAvatarFlightConfig config,
+                                           @Nonnull AvatarFlightController.Output output,
+                                           long now) {
+        spendAppliedVigour(flight, config, AvatarFlightProgressionTuning.neutral(), output, now);
+    }
+
+    private static void spendAppliedVigour(@Nonnull AvatarFlightComponent flight,
+                                           @Nonnull TwAvatarFlightConfig config,
+                                           @Nonnull AvatarFlightProgressionTuning tuning,
                                            @Nonnull AvatarFlightController.Output output,
                                            long now) {
         if (!config.getVigour().isEnabled()) {
@@ -289,6 +473,7 @@ public final class AvatarFlightMovementSystem
             state = AvatarFlightVigourService.spend(
                     state,
                     config,
+                    tuning,
                     config.getVigour().getUpwardFlapCost(),
                     now
             );
@@ -298,7 +483,8 @@ public final class AvatarFlightMovementSystem
             state = AvatarFlightVigourService.spend(
                     state,
                     config,
-                    config.getVigour().getForwardBoostCost(),
+                    tuning,
+                    config.getVigour().getForwardBoostCost() * tuning.forwardBoostCostMultiplier(),
                     now
             );
             spent = true;
@@ -307,6 +493,7 @@ public final class AvatarFlightMovementSystem
             state = AvatarFlightVigourService.spend(
                     state,
                     config,
+                    tuning,
                     output.launchCost(),
                     now
             );
@@ -379,8 +566,9 @@ public final class AvatarFlightMovementSystem
     }
 
     private static double initialVigourCharges(@Nonnull AvatarFlightComponent flight,
-                                               @Nonnull TwAvatarFlightConfig config) {
-        double maxCharges = maxVigourCharges(config);
+                                               @Nonnull TwAvatarFlightConfig config,
+                                               @Nonnull AvatarFlightProgressionTuning tuning) {
+        double maxCharges = maxVigourCharges(config, tuning);
         if (!config.getVigour().isEnabled()) {
             return maxCharges;
         }
@@ -391,8 +579,9 @@ public final class AvatarFlightMovementSystem
         return charges;
     }
 
-    private static double maxVigourCharges(@Nonnull TwAvatarFlightConfig config) {
-        double maxCharges = config.getVigour().getMaxCharges();
+    private static double maxVigourCharges(@Nonnull TwAvatarFlightConfig config,
+                                           @Nonnull AvatarFlightProgressionTuning tuning) {
+        double maxCharges = config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier();
         return Double.isFinite(maxCharges) && maxCharges > 0.0 ? maxCharges : 0.0;
     }
 

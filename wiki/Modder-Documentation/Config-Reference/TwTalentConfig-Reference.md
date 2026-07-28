@@ -55,6 +55,12 @@ Common runtime effect keys:
 - `ReviveCooldownMultiplier`: multiplies companion revive cooldown
 - `TraitMutationChanceMultiplier`: multiplies trait mutation chance during inheritance; final chance is clamped to `0.0..1.0`
 - `HarvestCooldownMultiplier`: multiplies harvest reset cooldown when harvest interactions use `TameworkHarvestAlarm`
+- `AvatarFlightVigourCapacityMultiplier`: multiplies avatar-flight Vigour capacity; neutral `1.0`, clamped to `1.0..1.35`, so values above `1.0` increase capacity
+- `AvatarFlightVigourRechargeRateMultiplier`: multiplies avatar-flight Vigour recharge rate; neutral `1.0`, clamped to `1.0..1.35`, so values above `1.0` recharge faster
+- `AvatarFlightForwardBoostCostMultiplier`: multiplies avatar-flight forward-boost Vigour cost; neutral `1.0`, clamped to `0.70..1.0`, so values below `1.0` reduce cost
+- `AvatarFlightForwardBoostImpulseMultiplier`: multiplies avatar-flight forward-boost impulse; neutral `1.0`, clamped to `1.0..1.25`, so values above `1.0` increase impulse
+- `AvatarFlightGlideSinkMultiplier`: multiplies avatar-flight passive glide sink; neutral `1.0`, clamped to `0.70..1.0`, so values below `1.0` reduce sink
+- `AvatarFlightClimbLiftMultiplier`: multiplies avatar-flight climb lift; neutral `1.0`, clamped to `1.0..1.25`, so values above `1.0` increase lift
 
 ## Runtime Notes
 - Talents are passive-only in the current implementation
@@ -62,6 +68,7 @@ Common runtime effect keys:
 - Talent spending is only available while the companion is loaded
 - Spent talent points can be reset from the in-game talents page, which clears purchased nodes and makes the earned points available to spend again
 - Available points come from the active `TwLevelingConfig`
+- Avatar-flight effects resolve from the valid parked source companion during an avatar-flight session. Missing or invalid sessions use neutral `1.0` tuning, and each runtime clamp above still applies after effect resolution.
 
 ## Tree Authoring Guidance
 - Keep node names short; the tree node shows the name, point cost, and state, while the side panel shows the longer description and effect summary.

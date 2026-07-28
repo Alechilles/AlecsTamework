@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.hypixel.hytale.component.Ref;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -137,6 +140,109 @@ class AvatarFlightMovementSystemTest {
                 movementInput(1.0, 0.0, false), config));
     }
 
+    @Test
+    void boostCostMultiplierChangesOnlyForwardBoostSpend() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.0, 1.0, 0.88, 1.0, 1.0, 1.0);
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1000L);
+        flight.setVigourCharges(config.getVigour().getMaxCharges());
+
+        spendAppliedVigour(flight, config, tuning, output(true, true), 1000L);
+
+        assertEquals(config.getVigour().getMaxCharges()
+                        - config.getVigour().getUpwardFlapCost()
+                        - config.getVigour().getForwardBoostCost() * 0.88,
+                flight.getVigourCharges(), EPSILON);
+    }
+
+    @Test
+    void flightXpSourceRequiresCurrentSessionWorldAndValidParkedSource() {
+        AvatarFlightMountSessionComponent validSession = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        validSession.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent validSource = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        validSource.setPhase(AvatarFlightMountPhase.ACTIVE);
+
+        assertTrue(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                null, validSource, "player-uuid", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-b", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "other-player", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-a", false));
+    }
+
+    @Test
+    void flightXpRejectsStaleOrRestoringSessionRelationships() {
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        session.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        source.setPhase(AvatarFlightMountPhase.ACTIVE);
+
+        session.setRuntimeEpoch("stale-runtime");
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+
+        session.setRuntimeEpoch(AvatarFlightRuntimeEpoch.current());
+        source.setRuntimeEpoch("stale-runtime");
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+
+        source.setRuntimeEpoch(AvatarFlightRuntimeEpoch.current());
+        source.setPhase(AvatarFlightMountPhase.RESTORING);
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+    }
+
+    @Test
+    void flightXpAwardUsesParkedSourceAndOriginalRoleBucket() {
+        Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> sourceRef = new Ref<>(null);
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        session.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        source.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightMovementSystem.FlightXpSourceResolution resolved =
+                AvatarFlightMovementSystem.resolveValidatedFlightXpSource(
+                        session, sourceRef, source, "player-uuid", "world-a");
+        AtomicReference<Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore>> awardedRef =
+                new AtomicReference<>();
+        AtomicReference<String> awardedRole = new AtomicReference<>();
+        AtomicReference<CompanionXpSource> awardedSource = new AtomicReference<>();
+
+        AvatarFlightMovementSystem.awardQualifiedFlightXp(
+                resolved.recipient(),
+                resolved.originalRoleId(),
+                2.5d,
+                (recipient, roleId, xpSource, amount) -> {
+                    awardedRef.set(recipient);
+                    awardedRole.set(roleId);
+                    awardedSource.set(xpSource);
+                }
+        );
+
+        assertEquals(sourceRef, resolved.recipient());
+        assertEquals(sourceRef, awardedRef.get());
+        assertEquals("Original_Role", awardedRole.get());
+        assertEquals(CompanionXpSource.AVATAR_FLIGHT, awardedSource.get());
+    }
+
+    @Test
+    void flightXpQualificationRequiresAppliedFastFlightAndValidSource() {
+        AvatarFlightController.Output fastOutput = output(false, true);
+        AvatarFlightController.Output slowOutput = new AvatarFlightController.Output(
+                AvatarFlightMode.FORWARD_FLIGHT, 0.0, 0.0, 0.0, 0L, 0L,
+                true, false, false, false, false, 0.0, 0.0);
+
+        assertTrue(AvatarFlightMovementSystem.qualifiesForFlightXp(fastOutput, true));
+        assertFalse(AvatarFlightMovementSystem.qualifiesForFlightXp(slowOutput, true));
+        assertFalse(AvatarFlightMovementSystem.qualifiesForFlightXp(fastOutput, false));
+    }
+
     private static AvatarFlightController.Input authorizeVigour(AvatarFlightController.Input input,
                                                                AvatarFlightComponent flight,
                                                                TwAvatarFlightConfig config,
@@ -165,6 +271,23 @@ class AvatarFlightMovementSystemTest {
         );
         method.setAccessible(true);
         method.invoke(null, flight, config, output, now);
+    }
+
+    private static void spendAppliedVigour(AvatarFlightComponent flight,
+                                           TwAvatarFlightConfig config,
+                                           AvatarFlightProgressionTuning tuning,
+                                           AvatarFlightController.Output output,
+                                           long now) throws Exception {
+        Method method = AvatarFlightMovementSystem.class.getDeclaredMethod(
+                "spendAppliedVigour",
+                AvatarFlightComponent.class,
+                TwAvatarFlightConfig.class,
+                AvatarFlightProgressionTuning.class,
+                AvatarFlightController.Output.class,
+                long.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, flight, config, tuning, output, now);
     }
 
     private static AvatarFlightController.Input input(boolean jump, boolean sprint, boolean airbrake) {

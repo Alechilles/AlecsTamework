@@ -70,6 +70,22 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setEnabledAtMs,
                     AvatarFlightComponent::getEnabledAtMs)
             .add()
+            .<Double>append(new KeyedCodec<>("FlightXpQualifiedSeconds", Codec.DOUBLE),
+                    AvatarFlightComponent::setFlightXpQualifiedSeconds,
+                    AvatarFlightComponent::getFlightXpQualifiedSeconds)
+            .add()
+            .<Double>append(new KeyedCodec<>("FlightXpWindowAwardedXp", Codec.DOUBLE),
+                    AvatarFlightComponent::setFlightXpWindowAwardedXp,
+                    AvatarFlightComponent::getFlightXpWindowAwardedXp)
+            .add()
+            .<Long>append(new KeyedCodec<>("FlightXpWindowStartedAtMs", Codec.LONG),
+                    AvatarFlightComponent::setFlightXpWindowStartedAtMs,
+                    AvatarFlightComponent::getFlightXpWindowStartedAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("FlightXpLastSampleAtMs", Codec.LONG),
+                    AvatarFlightComponent::setFlightXpLastSampleAtMs,
+                    AvatarFlightComponent::getFlightXpLastSampleAtMs)
+            .add()
             .<Double>append(new KeyedCodec<>("VigourCharges", Codec.DOUBLE),
                     AvatarFlightComponent::setVigourCharges,
                     AvatarFlightComponent::getVigourCharges)
@@ -217,6 +233,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextBoostAtMs;
     private long nextLaunchAtMs;
     private long enabledAtMs;
+    private double flightXpQualifiedSeconds;
+    private double flightXpWindowAwardedXp;
+    private long flightXpWindowStartedAtMs;
+    private long flightXpLastSampleAtMs;
     private double vigourCharges;
     private long lastVigourUpdateAtMs;
     private long vigourRechargeBlockedUntilMs;
@@ -386,6 +406,23 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     public void setEnabledAtMs(@Nullable Long enabledAtMs) {
         this.enabledAtMs = enabledAtMs == null ? 0L : enabledAtMs;
+    }
+
+    public double getFlightXpQualifiedSeconds() { return finiteOrZero(flightXpQualifiedSeconds); }
+    public void setFlightXpQualifiedSeconds(@Nullable Double value) {
+        flightXpQualifiedSeconds = finiteOrZero(value);
+    }
+    public double getFlightXpWindowAwardedXp() { return finiteOrZero(flightXpWindowAwardedXp); }
+    public void setFlightXpWindowAwardedXp(@Nullable Double value) {
+        flightXpWindowAwardedXp = finiteOrZero(value);
+    }
+    public long getFlightXpWindowStartedAtMs() { return flightXpWindowStartedAtMs; }
+    public void setFlightXpWindowStartedAtMs(@Nullable Long value) {
+        flightXpWindowStartedAtMs = value == null ? 0L : value;
+    }
+    public long getFlightXpLastSampleAtMs() { return flightXpLastSampleAtMs; }
+    public void setFlightXpLastSampleAtMs(@Nullable Long value) {
+        flightXpLastSampleAtMs = value == null ? 0L : value;
     }
 
     public double getVigourCharges() {
@@ -656,6 +693,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
         clone.nextLaunchAtMs = nextLaunchAtMs;
+        clone.flightXpQualifiedSeconds = getFlightXpQualifiedSeconds();
+        clone.flightXpWindowAwardedXp = getFlightXpWindowAwardedXp();
+        clone.flightXpWindowStartedAtMs = flightXpWindowStartedAtMs;
+        clone.flightXpLastSampleAtMs = flightXpLastSampleAtMs;
         clone.vigourCharges = getVigourCharges();
         clone.lastVigourUpdateAtMs = lastVigourUpdateAtMs;
         clone.vigourRechargeBlockedUntilMs = vigourRechargeBlockedUntilMs;

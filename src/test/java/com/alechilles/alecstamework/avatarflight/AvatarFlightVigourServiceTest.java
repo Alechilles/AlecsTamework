@@ -29,6 +29,37 @@ class AvatarFlightVigourServiceTest {
     }
 
     @Test
+    void capacityMultiplierClampsAllChargeStateToExpandedCapacity() {
+        AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.15, 1.0, 1.0, 1.0, 1.0, 1.0);
+
+        AvatarFlightVigourService.Result result = AvatarFlightVigourService.recharge(
+                new AvatarFlightVigourService.State(99.0, 1000L, 0L), CONFIG, tuning, true, 0.0, 5000L);
+
+        assertEquals(CONFIG.getVigour().getMaxCharges() * 1.15, result.state().charges(), EPSILON);
+    }
+
+    @Test
+    void rechargeRateMultiplierDividesSecondsPerCharge() {
+        AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.0, 1.15, 1.0, 1.0, 1.0, 1.0);
+
+        AvatarFlightVigourService.Result result = AvatarFlightVigourService.recharge(
+                new AvatarFlightVigourService.State(2.0, 1000L, 0L), CONFIG, tuning, true, 0.0, 3000L);
+
+        assertEquals(2.575, result.state().charges(), EPSILON);
+    }
+
+    @Test
+    void boostCostMultiplierAppliesOnlyToForwardBoostCost() {
+        AvatarFlightProgressionTuning tuning = new AvatarFlightProgressionTuning(1.0, 1.0, 0.88, 1.0, 1.0, 1.0);
+        double boostCost = CONFIG.getVigour().getForwardBoostCost() * tuning.forwardBoostCostMultiplier();
+
+        AvatarFlightVigourService.State spent = AvatarFlightVigourService.spend(
+                new AvatarFlightVigourService.State(2.0, 1000L, 0L), CONFIG, tuning, boostCost, 2000L);
+
+        assertEquals(2.0 - boostCost, spent.charges(), EPSILON);
+    }
+
+    @Test
     void fastFlightRechargeRecoversOneDefaultCharge() {
         AvatarFlightVigourService.Result result = AvatarFlightVigourService.recharge(
                 new AvatarFlightVigourService.State(2.0, 1000L, 0L),

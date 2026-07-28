@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.hypixel.hytale.codec.ExtraInfo;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,6 +24,39 @@ class AvatarFlightComponentTest {
         assertEquals(-2500L, clone.getLastVigourUpdateAtMs());
         assertEquals(-1750L, clone.getVigourRechargeBlockedUntilMs());
         assertEquals("FAST_FLIGHT", clone.getVigourRechargeMode());
+    }
+
+    @Test
+    void clonePreservesFlightXpTrackerState() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setFlightXpQualifiedSeconds(12.5d);
+        component.setFlightXpWindowAwardedXp(3.75d);
+        component.setFlightXpWindowStartedAtMs(2000L);
+        component.setFlightXpLastSampleAtMs(2500L);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertEquals(12.5d, clone.getFlightXpQualifiedSeconds(), EPSILON);
+        assertEquals(3.75d, clone.getFlightXpWindowAwardedXp(), EPSILON);
+        assertEquals(2000L, clone.getFlightXpWindowStartedAtMs());
+        assertEquals(2500L, clone.getFlightXpLastSampleAtMs());
+    }
+
+    @Test
+    void codecRoundTripPreservesFlightXpTrackerState() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setFlightXpQualifiedSeconds(12.5d);
+        component.setFlightXpWindowAwardedXp(3.75d);
+        component.setFlightXpWindowStartedAtMs(2000L);
+        component.setFlightXpLastSampleAtMs(2500L);
+
+        AvatarFlightComponent decoded = AvatarFlightComponent.CODEC.decode(
+                AvatarFlightComponent.CODEC.encode(component, new ExtraInfo()), new ExtraInfo());
+
+        assertEquals(12.5d, decoded.getFlightXpQualifiedSeconds(), EPSILON);
+        assertEquals(3.75d, decoded.getFlightXpWindowAwardedXp(), EPSILON);
+        assertEquals(2000L, decoded.getFlightXpWindowStartedAtMs());
+        assertEquals(2500L, decoded.getFlightXpLastSampleAtMs());
     }
 
     @Test

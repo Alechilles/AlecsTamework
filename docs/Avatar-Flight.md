@@ -54,6 +54,34 @@ Fast flight uses the sustainable horizontal cap, calculated as `max(Movement.Max
 
 The recharge delay means a spent charge requires the delay plus the recharge cadence. With defaults, one airborne fast-flight charge after spending requires `0.75 + 8 = 8.75` seconds of continuous qualifying speed.
 
+## Companion Flight Progression
+
+Avatar flight can award ordinary companion XP to the parked source companion through `CompanionXpSource.AVATAR_FLIGHT`. Configure it on the source role's `TwLevelingConfig.XpSources.Flight` object:
+
+```json
+"XpSources": {
+  "Flight": {
+    "Enabled": true,
+    "XpPerQualifiedSecond": 0.15,
+    "AwardIntervalSeconds": 10.0,
+    "MaxXpPerMinute": 9.0
+  }
+}
+```
+
+All four fields are required for awards to occur. The default is inert: `Enabled` is false, the XP rate and cap are zero, and the default batch interval is `10.0` seconds. Qualified time is output time, not distance travelled, movement input, or idle time: the avatar must be applying custom flight velocity and meet the configured fast-flight speed threshold. Tamework samples no more than `0.25` qualified seconds per server tick and batches awards every 10 seconds with the example above. The first award starts a source-anchored 60-second accounting window; the example permits up to `9 XP` in that window, and the allowance resets when the window expires.
+
+The player never receives this XP. Tamework validates the active player/source session, runtime epoch, rider UUID, source world, and reverse rider link before resolving the original parked source companion and its role-specific leveling config. A stale, missing, or otherwise invalid session is a safe no-award path.
+
+Purchased companion talents can also tune the active avatar flight. These effect keys resolve from the same valid parked source companion; their neutral value is `1.0` and invalid sessions use neutral tuning:
+
+- `AvatarFlightVigourCapacityMultiplier`: increases maximum Vigour capacity; runtime range `1.0..1.35`.
+- `AvatarFlightVigourRechargeRateMultiplier`: increases Vigour recharge rate; runtime range `1.0..1.35`.
+- `AvatarFlightForwardBoostCostMultiplier`: reduces forward-boost Vigour cost; runtime range `0.70..1.0`.
+- `AvatarFlightForwardBoostImpulseMultiplier`: increases forward-boost impulse; runtime range `1.0..1.25`.
+- `AvatarFlightGlideSinkMultiplier`: reduces passive glide sink; runtime range `0.70..1.0`.
+- `AvatarFlightClimbLiftMultiplier`: increases climb lift; runtime range `1.0..1.25`.
+
 ## Launch
 
 Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `CrouchHold`, holding crouch while grounded starts charging instead of feeding crouch into descent. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse. If the player leaves the ground during the hold, the release can still apply the launch that began on the ground. Airborne crouch without an active grounded launch charge remains direct downward movement.

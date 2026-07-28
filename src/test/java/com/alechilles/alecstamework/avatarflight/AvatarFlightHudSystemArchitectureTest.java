@@ -45,6 +45,9 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("flight.getHudTargetSpeedRatio()"));
         Assertions.assertTrue(source.contains("flight.getHudPitchRadians()"));
         Assertions.assertTrue(source.contains("config.getVigour().getMaxCharges()"));
+        Assertions.assertTrue(source.contains("tuning.vigourCapacityMultiplier()"));
+        Assertions.assertTrue(source.contains("resolveProgressionTuning(ref, store, commandBuffer)"));
+        Assertions.assertTrue(source.contains("AvatarFlightMovementSystem.resolveValidatedFlightXpSource"));
         Assertions.assertTrue(source.contains("flight.getVigourRechargeMode()"));
         Assertions.assertTrue(source.contains("input.isLaunchCharging()"));
         Assertions.assertTrue(source.contains("input.isOnGround()"));
@@ -86,6 +89,8 @@ class AvatarFlightHudSystemArchitectureTest {
         int visualIndex = source.indexOf("new AvatarFlightEquipmentVisualSystem(");
         int playerTypeIndex = source.indexOf("Player.getComponentType()", hudIndex);
         int inputTypeIndex = source.indexOf("avatarFlightInputComponentType", hudIndex);
+        int sessionTypeIndex = source.indexOf("avatarFlightMountSessionComponentType", hudIndex);
+        int sourceTypeIndex = source.indexOf("avatarFlightSourceComponentType", hudIndex);
 
         Assertions.assertTrue(importIndex >= 0);
         Assertions.assertTrue(movementIndex >= 0);
@@ -93,6 +98,8 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(visualIndex > hudIndex);
         Assertions.assertTrue(playerTypeIndex > hudIndex);
         Assertions.assertTrue(inputTypeIndex > hudIndex);
+        Assertions.assertTrue(sessionTypeIndex > hudIndex);
+        Assertions.assertTrue(sourceTypeIndex > hudIndex);
     }
 
     @Test

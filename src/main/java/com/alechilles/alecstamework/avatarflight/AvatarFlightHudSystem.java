@@ -13,6 +13,7 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.HashMap;
@@ -28,6 +29,9 @@ import javax.annotation.Nullable;
 public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
     private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
+    private final ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType;
+    private final ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType;
+    private final ComponentType<EntityStore, UUIDComponent> uuidType;
     private final ComponentType<EntityStore, Player> playerType;
     private final Query<EntityStore> query;
     // Command and mount activators are not owned by this system, so the main-thread connection cache is shared.
@@ -38,9 +42,15 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
 
     public AvatarFlightHudSystem(@Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
                                  @Nonnull ComponentType<EntityStore, AvatarFlightInputComponent> inputType,
+                                 @Nonnull ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType,
+                                 @Nonnull ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType,
+                                 @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType,
                                  @Nonnull ComponentType<EntityStore, Player> playerType) {
         this.flightType = flightType;
         this.inputType = inputType;
+        this.mountSessionType = mountSessionType;
+        this.mountSourceType = mountSourceType;
+        this.uuidType = uuidType;
         this.playerType = playerType;
         this.query = Query.and(flightType, inputType, playerType);
     }
@@ -68,23 +78,25 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
             return;
         }
         long now = System.currentTimeMillis();
-        AvatarFlightHudViewModel model = buildModel(flight, input, config, now);
+        AvatarFlightProgressionTuning tuning = resolveProgressionTuning(ref, store, commandBuffer);
+        AvatarFlightHudViewModel model = buildModel(flight, input, config, tuning, now);
         showOrRefresh(playerUuid, player, flight.getEnabledAtMs(), model,
                 config.getVigour().getHudResendIntervalMs(), now);
     }
 
     @Nonnull
-    private static AvatarFlightHudViewModel buildModel(@Nonnull AvatarFlightComponent flight,
-                                                       @Nonnull AvatarFlightInputComponent input,
-                                                       @Nonnull TwAvatarFlightConfig config,
-                                                       long nowMs) {
+    static AvatarFlightHudViewModel buildModel(@Nonnull AvatarFlightComponent flight,
+                                               @Nonnull AvatarFlightInputComponent input,
+                                               @Nonnull TwAvatarFlightConfig config,
+                                               @Nonnull AvatarFlightProgressionTuning tuning,
+                                               long nowMs) {
         double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
                 flight.getVelocityX(),
                 flight.getVelocityY(),
                 flight.getVelocityZ()
         );
         double speedRatio = AvatarFlightSpeedMetrics.speedRatio(horizontalSpeed, config);
-        double maxCharges = config.getVigour().getMaxCharges();
+        double maxCharges = config.getVigour().getMaxCharges() * tuning.vigourCapacityMultiplier();
         boolean groundedAtFull = flight.getMode() == AvatarFlightMode.GROUNDED
                 && fullVigour(flight.getVigourCharges(), maxCharges);
         long maxChargeMs = config.getLaunch().getMaxChargeMs();
@@ -110,6 +122,45 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 launchChargeRatio,
                 launchMinChargeRatio
         );
+    }
+
+    @Nonnull
+    private AvatarFlightProgressionTuning resolveProgressionTuning(
+            @Nonnull Ref<EntityStore> playerRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        AvatarFlightMountSessionComponent session = commandBuffer.getComponent(playerRef, mountSessionType);
+        Ref<EntityStore> sourceRef = resolveSourceRef(store, session);
+        AvatarFlightSourceComponent source = sourceRef == null ? null : store.getComponent(sourceRef, mountSourceType);
+        UUIDComponent playerUuid = commandBuffer.getComponent(playerRef, uuidType);
+        AvatarFlightMovementSystem.FlightXpSourceResolution sourceResolution = sourceRef == null || !sourceRef.isValid()
+                ? null : AvatarFlightMovementSystem.resolveValidatedFlightXpSource(
+                session,
+                sourceRef,
+                source,
+                playerUuid == null || playerUuid.getUuid() == null ? null : playerUuid.getUuid().toString(),
+                store.getExternalData().getWorld().getName()
+        );
+        return sourceResolution == null
+                ? AvatarFlightProgressionTuning.neutral()
+                : AvatarFlightProgressionTuning.resolve(sourceResolution.recipient(), store);
+    }
+
+    @Nullable
+    private static Ref<EntityStore> resolveSourceRef(@Nonnull Store<EntityStore> store,
+                                                      @Nullable AvatarFlightMountSessionComponent session) {
+        String activeWorld = store.getExternalData().getWorld().getName();
+        if (session == null || activeWorld == null || !activeWorld.equals(session.getSourceWorld())
+                || session.getSourceNpcUuid().isBlank()) {
+            return null;
+        }
+        try {
+            Ref<EntityStore> sourceRef = store.getExternalData().getWorld().getEntityRef(
+                    UUID.fromString(session.getSourceNpcUuid()));
+            return sourceRef != null && sourceRef.isValid() ? sourceRef : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private void showOrRefresh(@Nonnull UUID playerUuid,
