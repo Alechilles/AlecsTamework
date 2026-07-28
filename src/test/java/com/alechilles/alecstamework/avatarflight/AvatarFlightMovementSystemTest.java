@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.hypixel.hytale.component.Ref;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,11 +144,76 @@ class AvatarFlightMovementSystemTest {
     void flightXpSourceRequiresCurrentSessionWorldAndValidParkedSource() {
         AvatarFlightMountSessionComponent validSession = new AvatarFlightMountSessionComponent(
                 "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        validSession.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent validSource = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        validSource.setPhase(AvatarFlightMountPhase.ACTIVE);
 
-        assertTrue(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-a", true));
-        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(null, "world-a", true));
-        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-b", true));
-        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(validSession, "world-a", false));
+        assertTrue(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                null, validSource, "player-uuid", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-b", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "other-player", "world-a", true));
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                validSession, validSource, "player-uuid", "world-a", false));
+    }
+
+    @Test
+    void flightXpRejectsStaleOrRestoringSessionRelationships() {
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        session.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        source.setPhase(AvatarFlightMountPhase.ACTIVE);
+
+        session.setRuntimeEpoch("stale-runtime");
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+
+        session.setRuntimeEpoch(AvatarFlightRuntimeEpoch.current());
+        source.setRuntimeEpoch("stale-runtime");
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+
+        source.setRuntimeEpoch(AvatarFlightRuntimeEpoch.current());
+        source.setPhase(AvatarFlightMountPhase.RESTORING);
+        assertFalse(AvatarFlightMovementSystem.hasValidFlightXpSource(
+                session, source, "player-uuid", "world-a", true));
+    }
+
+    @Test
+    void flightXpAwardUsesParkedSourceAndOriginalRoleBucket() {
+        Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> sourceRef = new Ref<>(null);
+        AvatarFlightMountSessionComponent session = new AvatarFlightMountSessionComponent(
+                "00000000-0000-0000-0000-000000000001", "world-a", "default", 1000L);
+        session.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightSourceComponent source = new AvatarFlightSourceComponent("player-uuid", "Original_Role", 4);
+        source.setPhase(AvatarFlightMountPhase.ACTIVE);
+        AvatarFlightMovementSystem.FlightXpSourceResolution resolved =
+                AvatarFlightMovementSystem.resolveValidatedFlightXpSource(
+                        session, sourceRef, source, "player-uuid", "world-a");
+        AtomicReference<Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore>> awardedRef =
+                new AtomicReference<>();
+        AtomicReference<String> awardedRole = new AtomicReference<>();
+        AtomicReference<CompanionXpSource> awardedSource = new AtomicReference<>();
+
+        AvatarFlightMovementSystem.awardQualifiedFlightXp(
+                resolved.recipient(),
+                resolved.originalRoleId(),
+                2.5d,
+                (recipient, roleId, xpSource, amount) -> {
+                    awardedRef.set(recipient);
+                    awardedRole.set(roleId);
+                    awardedSource.set(xpSource);
+                }
+        );
+
+        assertEquals(sourceRef, resolved.recipient());
+        assertEquals(sourceRef, awardedRef.get());
+        assertEquals("Original_Role", awardedRole.get());
+        assertEquals(CompanionXpSource.AVATAR_FLIGHT, awardedSource.get());
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
-import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -22,6 +21,7 @@ import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesSystems;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
@@ -45,6 +45,8 @@ public final class AvatarFlightMovementSystem
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
     private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
     private final ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType;
+    private final ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType;
+    private final ComponentType<EntityStore, UUIDComponent> uuidType;
     private final ComponentType<EntityStore, Velocity> velocityType;
     private final ComponentType<EntityStore, MovementStatesComponent> movementStatesType;
     private final ComponentType<EntityStore, HeadRotation> headRotationType;
@@ -72,6 +74,8 @@ public final class AvatarFlightMovementSystem
             @Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
             @Nonnull ComponentType<EntityStore, AvatarFlightInputComponent> inputType,
             @Nonnull ComponentType<EntityStore, AvatarFlightMountSessionComponent> mountSessionType,
+            @Nonnull ComponentType<EntityStore, AvatarFlightSourceComponent> mountSourceType,
+            @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType,
             @Nullable ComponentType<EntityStore, Velocity> velocityType,
             @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesType,
             @Nonnull ComponentType<EntityStore, HeadRotation> headRotationType,
@@ -79,6 +83,8 @@ public final class AvatarFlightMovementSystem
         this.flightType = flightType;
         this.inputType = inputType;
         this.mountSessionType = mountSessionType;
+        this.mountSourceType = mountSourceType;
+        this.uuidType = uuidType;
         this.velocityType = velocityType == null ? Velocity.getComponentType() : velocityType;
         this.movementStatesType = movementStatesType;
         this.headRotationType = headRotationType;
@@ -219,8 +225,18 @@ public final class AvatarFlightMovementSystem
                                long now) {
         AvatarFlightMountSessionComponent session = commandBuffer.getComponent(playerRef, mountSessionType);
         Ref<EntityStore> sourceRef = resolveFlightXpSource(store, session);
-        boolean sourceValid = sourceRef != null && sourceRef.isValid();
-        String roleId = sourceValid ? CompanionRoleIdResolver.resolveRoleId(sourceRef, store) : null;
+        AvatarFlightSourceComponent source = sourceRef == null ? null : store.getComponent(sourceRef, mountSourceType);
+        UUIDComponent playerUuid = commandBuffer.getComponent(playerRef, uuidType);
+        FlightXpSourceResolution sourceResolution = sourceRef == null || !sourceRef.isValid()
+                ? null : resolveValidatedFlightXpSource(
+                session,
+                sourceRef,
+                source,
+                playerUuid == null || playerUuid.getUuid() == null ? null : playerUuid.getUuid().toString(),
+                store.getExternalData().getWorld().getName()
+        );
+        boolean sourceValid = sourceResolution != null;
+        String roleId = sourceValid ? sourceResolution.originalRoleId() : null;
         TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
         AvatarFlightExperienceService.Result result = experienceService.tick(
                 new AvatarFlightExperienceService.State(
@@ -235,9 +251,9 @@ public final class AvatarFlightMovementSystem
         );
         applyFlightXpState(flight, result.state());
         if (result.awardedXp() > 0.0d && sourceValid) {
-            CompanionLevelingService.awardXp(
-                    sourceRef, store, commandBuffer, null,
-                    CompanionXpSource.AVATAR_FLIGHT, result.awardedXp());
+            awardQualifiedFlightXp(sourceResolution.recipient(), roleId, result.awardedXp(),
+                    (recipient, roleIdHint, sourceBucket, amount) -> CompanionLevelingService.awardXp(
+                            recipient, store, commandBuffer, roleIdHint, sourceBucket, amount));
         }
     }
 
@@ -246,20 +262,43 @@ public final class AvatarFlightMovementSystem
     }
 
     static boolean hasValidFlightXpSource(@Nullable AvatarFlightMountSessionComponent session,
+                                          @Nullable AvatarFlightSourceComponent source,
+                                          @Nullable String playerUuid,
                                           @Nullable String activeWorld,
                                           boolean sourceRefValid) {
         return session != null
+                && source != null
                 && sourceRefValid
+                && session.getPhase() == AvatarFlightMountPhase.ACTIVE
+                && source.getPhase() == AvatarFlightMountPhase.ACTIVE
+                && AvatarFlightRuntimeEpoch.isCurrent(session.getRuntimeEpoch())
+                && AvatarFlightRuntimeEpoch.isCurrent(source.getRuntimeEpoch())
+                && playerUuid != null
+                && playerUuid.equals(source.getRiderUuid())
                 && activeWorld != null
                 && activeWorld.equals(session.getSourceWorld())
                 && !session.getSourceNpcUuid().isBlank();
     }
 
     @Nullable
+    static FlightXpSourceResolution resolveValidatedFlightXpSource(
+            @Nullable AvatarFlightMountSessionComponent session,
+            @Nonnull Ref<EntityStore> sourceRef,
+            @Nullable AvatarFlightSourceComponent source,
+            @Nullable String playerUuid,
+            @Nullable String activeWorld) {
+        if (!hasValidFlightXpSource(session, source, playerUuid, activeWorld, true)) {
+            return null;
+        }
+        return new FlightXpSourceResolution(sourceRef, source.getOriginalRoleId());
+    }
+
+    @Nullable
     private static Ref<EntityStore> resolveFlightXpSource(@Nonnull Store<EntityStore> store,
                                                            @Nullable AvatarFlightMountSessionComponent session) {
         String activeWorld = store.getExternalData().getWorld().getName();
-        if (session == null || !hasValidFlightXpSource(session, activeWorld, true)) {
+        if (session == null || activeWorld == null || !activeWorld.equals(session.getSourceWorld())
+                || session.getSourceNpcUuid().isBlank()) {
             return null;
         }
         try {
@@ -269,6 +308,27 @@ public final class AvatarFlightMovementSystem
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    static void awardQualifiedFlightXp(@Nonnull Ref<EntityStore> sourceRef,
+                                       @Nonnull String originalRoleId,
+                                       double amount,
+                                       @Nonnull FlightXpAwardSink awardSink) {
+        if (amount > 0.0d && !originalRoleId.isBlank()) {
+            awardSink.award(sourceRef, originalRoleId, CompanionXpSource.AVATAR_FLIGHT, amount);
+        }
+    }
+
+    @FunctionalInterface
+    interface FlightXpAwardSink {
+        void award(@Nonnull Ref<EntityStore> recipient,
+                   @Nonnull String roleIdHint,
+                   @Nonnull CompanionXpSource source,
+                   double amount);
+    }
+
+    record FlightXpSourceResolution(@Nonnull Ref<EntityStore> recipient,
+                                    @Nonnull String originalRoleId) {
     }
 
     static void applyFlightXpState(@Nonnull AvatarFlightComponent flight,
