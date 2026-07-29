@@ -57,6 +57,7 @@ final class LegacyCapturedArtifactFullStateMapper {
                         profile.currentCoopSlot()
         );
         validateCanonicalEvidence(profile, projected, payload, metadata);
+        boolean tamed = resolveTamedState(profile, projected, metadata);
         LegacyCapturedArtifactProgressionMapper.State progressionState =
                 progression.map(
                         metadata,
@@ -75,7 +76,7 @@ final class LegacyCapturedArtifactFullStateMapper {
                         ownerUuid,
                         projected.ownerName()
                 ),
-                new TameworkTamedComponent(projected.tamed()),
+                new TameworkTamedComponent(tamed),
                 npcName(metadata, projected, payload.capturedAtMs()),
                 progressionState.happiness(),
                 progressionState.needs(),
@@ -113,10 +114,44 @@ final class LegacyCapturedArtifactFullStateMapper {
                     "Legacy capture owner conflicts with canonical lifecycle"
             );
         }
+    }
+
+    private boolean resolveTamedState(
+            CompanionProfileReadModel profile,
+            CompanionProfileProjectionState projected,
+            LegacyCapturedArtifactMetadata metadata
+    ) {
         Boolean itemTamed = metadata.bool(TameworkMetadataKeys.TAMED);
-        if (itemTamed != null && itemTamed != projected.tamed()) {
+        if (itemTamed == null || itemTamed == projected.tamed()) {
+            return projected.tamed();
+        }
+        if (Boolean.TRUE.equals(itemTamed)
+                && canonicalTamedStateMissing(profile)) {
+            return true;
+        }
+        throw new IllegalArgumentException(
+                "Legacy capture tamed state conflicts with canonical profile"
+        );
+    }
+
+    /**
+     * Public v2.16.1 rows could omit state JSON, leaving no canonical tamed value to compare.
+     * Malformed metadata remains a conflict rather than becoming an implicit compatibility path.
+     */
+    private boolean canonicalTamedStateMissing(CompanionProfileReadModel profile) {
+        String metadata = profile.identity().metadataJson();
+        if (metadata == null || metadata.isBlank()) {
+            return true;
+        }
+        try {
+            JsonElement root = JsonParser.parseString(metadata);
+            return root.isJsonObject()
+                    && (!root.getAsJsonObject().has("tamed")
+                    || root.getAsJsonObject().get("tamed").isJsonNull());
+        } catch (RuntimeException invalidMetadata) {
             throw new IllegalArgumentException(
-                    "Legacy capture tamed state conflicts with canonical profile"
+                    "Legacy capture canonical tamed state is invalid",
+                    invalidMetadata
             );
         }
     }
