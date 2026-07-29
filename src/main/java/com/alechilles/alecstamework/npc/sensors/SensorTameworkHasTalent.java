@@ -14,12 +14,20 @@ import javax.annotation.Nonnull;
 /** Sensor that matches when this NPC has purchased a configured talent. */
 public final class SensorTameworkHasTalent extends TameworkSensorBase {
     private final String talentId;
+    private final ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
 
     public SensorTameworkHasTalent(@Nonnull BuilderSensorTameworkHasTalent builder,
                                    @Nonnull BuilderSupport support) {
+        this(builder, support, TameworkTalentsComponent.getComponentType());
+    }
+
+    SensorTameworkHasTalent(@Nonnull BuilderSensorTameworkHasTalent builder,
+                             @Nonnull BuilderSupport support,
+                             ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType) {
         super(builder);
         String configured = builder.getTalentId(support);
         this.talentId = configured == null ? "" : configured.trim();
+        this.talentsComponentType = talentsComponentType;
     }
 
     @Nonnull
@@ -35,12 +43,10 @@ public final class SensorTameworkHasTalent extends TameworkSensorBase {
         if (!super.matches(ref, role, dt, store) || talentId.isBlank()) {
             return false;
         }
-        ComponentType<EntityStore, TameworkTalentsComponent> componentType =
-                TameworkTalentsComponent.getComponentType();
-        if (componentType == null) {
+        if (talentsComponentType == null) {
             return false;
         }
-        TameworkTalentsComponent talents = store.getComponent(ref, componentType);
+        TameworkTalentsComponent talents = store.getComponent(ref, talentsComponentType);
         return matchesTalent(talents, talentId);
     }
 
