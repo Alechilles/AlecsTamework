@@ -49,6 +49,22 @@ final class BondedCompanionCaptureAdmissionService {
         return false;
     }
 
+    String rosterCommandItemName(Player player, ItemFeatureConfig config) {
+        TwCommandItemConfig required = config == null || commandItems == null
+                ? null : commandItems.getByConfigId(
+                config.getCaptureMechanics().requiredCommandConfigId());
+        String itemId = required == null ? null : firstItemId(required);
+        return new CommandItemDisplayResolver().resolveItemDisplayName(player, itemId);
+    }
+
+    @Nullable
+    private static String firstItemId(TwCommandItemConfig config) {
+        for (String itemId : config.getItemIds()) {
+            if (itemId != null && !itemId.isBlank()) return itemId;
+        }
+        return null;
+    }
+
     boolean isTranquilized(Player player, Ref<EntityStore> targetRef) {
         World world = player == null ? null : player.getWorld();
         return world != null && world.getEntityStore() != null
