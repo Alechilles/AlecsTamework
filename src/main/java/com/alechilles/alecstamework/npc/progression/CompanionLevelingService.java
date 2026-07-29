@@ -342,7 +342,17 @@ public final class CompanionLevelingService {
         double totalXp = resolveCumulativeXpForLevel(config, appliedLevel);
         TameworkLevelingComponent previous = store.getComponent(npcRef, type);
         int previousLevel = previous != null ? normalizeComponent(previous, config).getLevel() : 1;
-        TameworkLevelingComponent updated = new TameworkLevelingComponent(config.getId(), appliedLevel, 0.0, totalXp);
+        TameworkLevelingComponent updated = new TameworkLevelingComponent(
+                config.getId(),
+                appliedLevel,
+                0.0,
+                totalXp,
+                previous != null ? previous.getLastFeedXpAwardedAtMs() : 0L,
+                previous != null ? previous.getSummonedActiveSeconds() : 0.0,
+                previous != null ? previous.getSummonedWindowAwardedXp() : 0.0,
+                previous != null ? previous.getSummonedWindowStartedAtMs() : 0L,
+                previous != null ? previous.getSummonedLastSampleAtMs() : 0L
+        );
 
         store.putComponent(npcRef, type, updated);
         applyTraitModifiers(npcRef, store, null);

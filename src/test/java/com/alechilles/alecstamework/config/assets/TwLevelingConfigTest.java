@@ -7,6 +7,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers the generic active-summon XP configuration contract. */
@@ -51,7 +52,7 @@ class TwLevelingConfigTest {
                 } } }
                 """).getXpSources().getSummoned();
 
-        assertTrue(summoned.isEnabled());
+        assertFalse(summoned.isEnabled());
         assertEquals(0.0, summoned.getXpPerActiveSecond(), EPSILON);
         assertEquals(0.0, summoned.getAwardIntervalSeconds(), EPSILON);
         assertEquals(0.0, summoned.getMaxXpPerHour(), EPSILON);

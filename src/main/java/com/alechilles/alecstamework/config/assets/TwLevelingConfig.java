@@ -922,7 +922,10 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         private double maxXpPerHour;
 
         public boolean isEnabled() {
-            return enabled;
+            return enabled
+                    && getXpPerActiveSecond() > 0.0
+                    && getAwardIntervalSeconds() > 0.0
+                    && getMaxXpPerHour() > 0.0;
         }
 
         public double getXpPerActiveSecond() {
