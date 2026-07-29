@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.EntityPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
@@ -108,6 +109,7 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
                 .append(" message=").append(formatProbe(message))
                 .append(" role=").append(role != null ? role.getRoleName() : "<null>")
                 .append(" state=").append(describeState(role))
+                .append(" motion=").append(describeMotion(role))
                 .append(" interactionTarget=").append(describeRef(interactionTarget, store, npcPosition))
                 .append(" infoTarget=").append(describeRef(infoProviderTarget, store, npcPosition))
                 .append(" markedTargets=").append(describeMarkedTargets(role, store, npcPosition))
@@ -142,6 +144,20 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
             subStateName = "<default>";
         }
         return stateName + "[" + stateIndex + "]/" + subStateName + "[" + subStateIndex + "]";
+    }
+
+    @Nonnull
+    private String describeMotion(@Nullable Role role) {
+        if (role == null || role.getActiveMotionController() == null) {
+            return "<none>";
+        }
+        MotionController controller = role.getActiveMotionController();
+        return controller.getType()
+                + "{onGround=" + controller.onGround()
+                + ",roleOnGround=" + role.isOnGround()
+                + ",obstructed=" + controller.isObstructed()
+                + ",nav=" + controller.getNavState()
+                + "}";
     }
 
     @Nonnull
