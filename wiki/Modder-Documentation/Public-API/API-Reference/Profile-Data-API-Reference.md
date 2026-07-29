@@ -14,7 +14,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 Capabilities: `PROFILE_DATA` for basic reads/writes and
 `PROFILE_DATA_TRANSACTIONS` for revision-fenced, restart-visible mutations.
 
-Tamework 3.1.0 advertises `PROFILE_DATA_TRANSACTIONS` when the replacement
+Tamework 3.0.0 advertises `PROFILE_DATA_TRANSACTIONS` when the replacement
 profile-data operations are installed over the canonical facade bundle.
 Consumers must require the capability before using the transactional methods.
 

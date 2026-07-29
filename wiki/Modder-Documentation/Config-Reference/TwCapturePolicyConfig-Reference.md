@@ -8,7 +8,7 @@ draft: false
 
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-> **Tamework 3.1.0 / experimental API 0.9**
+> **Tamework 3.0.0 / experimental API 0.9**
 > Assets can be indexed independently of API availability. A Java integration
 > must still require the `CAPTURE_POLICY` capability before relying on the
 > authoritative probabilistic capture runtime.
