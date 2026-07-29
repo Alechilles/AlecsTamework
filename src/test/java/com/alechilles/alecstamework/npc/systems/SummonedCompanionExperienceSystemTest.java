@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 
@@ -49,23 +50,28 @@ class SummonedCompanionExperienceSystemTest {
         TwLevelingConfig.SummonedXpSourceSettings settings = settings(2.0d, 0.5d, 50.0d);
         AtomicReference<CompanionXpSource> source = new AtomicReference<>();
         AtomicReference<Double> amount = new AtomicReference<>(0.0d);
+        AtomicInteger awards = new AtomicInteger();
 
         TameworkLevelingComponent bondedLeveling = leveling(0.25d, 1_000L);
-        tick(bondedLeveling, bonded, false, settings, source, amount);
+        tick(bondedLeveling, bonded, false, settings, source, amount, awards);
 
         assertEquals(CompanionXpSource.SUMMONED, source.get());
         assertEquals(1.0d, amount.get(), 0.00001d);
+        assertEquals(1, awards.get());
 
         TameworkLevelingComponent ordinaryLeveling = leveling(0.49d, 1_000L);
         amount.set(0.0d);
-        tick(ordinaryLeveling, ordinary, false, settings, source, amount);
+        awards.set(0);
+        tick(ordinaryLeveling, ordinary, false, settings, source, amount, awards);
 
         assertEquals(0.0d, amount.get(), 0.00001d);
         assertEquals(0.0d, ordinaryLeveling.getSummonedActiveSeconds(), 0.00001d);
 
         TameworkLevelingComponent deadLeveling = leveling(0.49d, 1_000L);
-        tick(deadLeveling, bonded, true, settings, source, amount);
+        awards.set(0);
+        tick(deadLeveling, bonded, true, settings, source, amount, awards);
         assertEquals(0.0d, deadLeveling.getSummonedActiveSeconds(), 0.00001d);
+        assertEquals(0, awards.get(), "Dead projections must not invoke the XP awarder.");
     }
 
     private static void tick(TameworkLevelingComponent leveling,
@@ -73,7 +79,8 @@ class SummonedCompanionExperienceSystemTest {
                              boolean dead,
                              TwLevelingConfig.SummonedXpSourceSettings settings,
                              AtomicReference<CompanionXpSource> source,
-                             AtomicReference<Double> amount) throws Exception {
+                             AtomicReference<Double> amount,
+                             AtomicInteger awards) throws Exception {
         ComponentType<EntityStore, NPCEntity> npcType = new ComponentType<>();
         ComponentType<EntityStore, TameworkProjectionIdentityComponent> identityType = new ComponentType<>();
         ComponentType<EntityStore, TameworkLevelingComponent> levelingType = new ComponentType<>();
@@ -92,6 +99,7 @@ class SummonedCompanionExperienceSystemTest {
                     (ref, ignoredStore, commandBuffer, roleId, awardSource, awardAmount) -> {
                         source.set(awardSource);
                         amount.set(awardAmount);
+                        awards.incrementAndGet();
                     },
                     () -> 1_250L);
             store.forEachChunk(Query.any(), (BiConsumer<com.hypixel.hytale.component.ArchetypeChunk<EntityStore>,
