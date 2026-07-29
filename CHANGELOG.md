@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.0 - Miniwyvern Talent and Active Companion Progression - 2026-07-29
+
+### Added
+- Added the `TameworkHasTalent` NPC sensor so role assets can gate behavior on
+  the purchasing NPC's exact talent ID.
+- Added configurable `XpSources.Summoned` settings to `TwLevelingConfig` and
+  the public `SUMMONED` companion-XP source for active bonded companions.
+
+### Fixed
+- Summoned XP now pauses when a bonded projection is inactive and is rejected
+  for dead companions, preserving Avatar Flight XP behavior.
+
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added

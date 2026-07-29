@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection contains the reference contract for each public API family.
 
-> **Experimental API Contract (`0.9.0`, Tamework 3.0.0)**
+> **Experimental API Contract (`0.9.0`, Tamework 3.1.0)**
 > Reference pages describe the current contract and can change while the API remains experimental.
 
 ## Child Pages
