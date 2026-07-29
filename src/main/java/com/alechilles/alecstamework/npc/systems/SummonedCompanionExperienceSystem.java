@@ -55,47 +55,82 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
         Ref<EntityStore> reference = chunk.getReferenceTo(index);
         TameworkProjectionIdentityComponent identity = chunk.getComponent(index, projectionIdentityType);
         boolean dead = reference != null && reference.isValid() && store.getComponent(reference, deathType) != null;
-        if (!isEligibleForSummonedXp(reference != null && reference.isValid(), identity, dead)) {
+        boolean referenceValid = reference != null && reference.isValid();
+        if (!referenceValid) {
             return;
         }
 
-        String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
+        TameworkLevelingComponent leveling = store.getComponent(reference, levelingType);
+        boolean eligible = isEligibleForSummonedXp(true, identity, dead);
+        String roleId = eligible ? CompanionRoleIdResolver.resolveRoleId(reference, store) : null;
         TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
-        if (config == null || !config.isEnabled()) {
-            return;
+        boolean active = eligible && config != null && config.isEnabled();
+        if (active && leveling == null) {
+            leveling = CompanionLevelingService.ensureLevelingComponent(
+                    reference, store, commandBuffer, roleId);
         }
-
-        TameworkLevelingComponent leveling = CompanionLevelingService.ensureLevelingComponent(
-                reference, store, commandBuffer, roleId);
         if (leveling == null) {
             return;
         }
         long nowMs = System.currentTimeMillis();
-        SummonedCompanionExperienceService.Result result = experienceService.advance(
-                new SummonedCompanionExperienceService.State(
-                        leveling.getSummonedActiveSeconds(),
-                        leveling.getSummonedWindowAwardedXp(),
-                        leveling.getSummonedWindowStartedAtMs(),
-                        leveling.getSummonedLastSampleAtMs()
-                ),
-                nowMs,
-                dt,
-                config.getXpSources().getSummoned(),
-                true
-        );
-
-        if (result.awardedXp() > 0.0d) {
-            CompanionLevelingService.awardXp(
-                    reference, store, commandBuffer, roleId, CompanionXpSource.SUMMONED, result.awardedXp());
-        }
+        processProjection(leveling, identity, dead,
+                active ? config.getXpSources().getSummoned() : null,
+                nowMs, dt,
+                (source, amount) -> CompanionLevelingService.awardXp(
+                        reference, store, commandBuffer, roleId, source, amount),
+                experienceService);
         TameworkLevelingComponent updated = commandBuffer.getComponent(reference, levelingType);
-        applyCadence(updated == null ? leveling : updated, result.state());
+        if (updated != null && updated != leveling) {
+            applyCadence(updated, new SummonedCompanionExperienceService.State(
+                    leveling.getSummonedActiveSeconds(),
+                    leveling.getSummonedWindowAwardedXp(),
+                    leveling.getSummonedWindowStartedAtMs(),
+                    leveling.getSummonedLastSampleAtMs()));
+        }
     }
 
     static boolean isEligibleForSummonedXp(boolean referenceValid,
                                            @Nullable TameworkProjectionIdentityComponent identity,
                                            boolean dead) {
         return referenceValid && !dead && identity != null && identity.isBondedCompanion();
+    }
+
+    static void processProjection(@Nonnull TameworkLevelingComponent leveling,
+                                  @Nullable TameworkProjectionIdentityComponent identity,
+                                  boolean dead,
+                                  @Nullable TwLevelingConfig.SummonedXpSourceSettings settings,
+                                  long nowMs,
+                                  double dt,
+                                  @Nonnull AwardSink awardSink) {
+        processProjection(leveling, identity, dead, settings, nowMs, dt, awardSink,
+                new SummonedCompanionExperienceService());
+    }
+
+    private static void processProjection(@Nonnull TameworkLevelingComponent leveling,
+                                          @Nullable TameworkProjectionIdentityComponent identity,
+                                          boolean dead,
+                                          @Nullable TwLevelingConfig.SummonedXpSourceSettings settings,
+                                          long nowMs,
+                                          double dt,
+                                          @Nonnull AwardSink awardSink,
+                                          @Nonnull SummonedCompanionExperienceService experienceService) {
+        boolean active = isEligibleForSummonedXp(true, identity, dead) && settings != null;
+        SummonedCompanionExperienceService.Result result = experienceService.advance(
+                new SummonedCompanionExperienceService.State(
+                        leveling.getSummonedActiveSeconds(),
+                        leveling.getSummonedWindowAwardedXp(),
+                        leveling.getSummonedWindowStartedAtMs(),
+                        leveling.getSummonedLastSampleAtMs()),
+                nowMs, dt, settings, active);
+        applyCadence(leveling, result.state());
+        if (result.awardedXp() > 0.0d) {
+            awardSink.award(CompanionXpSource.SUMMONED, result.awardedXp());
+        }
+    }
+
+    @FunctionalInterface
+    interface AwardSink {
+        void award(@Nonnull CompanionXpSource source, double amount);
     }
 
     private static void applyCadence(@Nonnull TameworkLevelingComponent leveling,

@@ -85,7 +85,7 @@ public final class SummonedCompanionExperienceService {
         double reportedMs = Double.isFinite(dt) && dt > 0.0d ? dt * 1000.0d : 0.0d;
         double expectedMaximumMs = Math.max(MAX_TICK_SECONDS * 1000.0d, reportedMs)
                 + MAX_TICK_SECONDS * 1000.0d;
-        return elapsedMs > expectedMaximumMs;
+        return elapsedMs >= expectedMaximumMs;
     }
 
     private static double nonNegative(double value) {

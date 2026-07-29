@@ -77,6 +77,18 @@ class SummonedCompanionExperienceServiceTest {
     }
 
     @Test
+    void gapAtSchedulingToleranceBoundaryDiscardsPartialProgress() throws Exception {
+        SummonedCompanionExperienceService service = new SummonedCompanionExperienceService();
+
+        SummonedCompanionExperienceService.Result result = service.advance(
+                new SummonedCompanionExperienceService.State(0.49d, 0.0d, 0L, 1_000L),
+                1_500L, 0.25d, settings(2.0d, 0.5d, 50.0d), true);
+
+        assertEquals(0.0d, result.awardedXp(), EPSILON);
+        assertEquals(0.0d, result.state().activeSeconds(), EPSILON);
+    }
+
+    @Test
     void eachAwardIsBoundedByHourlyCap() throws Exception {
         SummonedCompanionExperienceService service = new SummonedCompanionExperienceService();
 
