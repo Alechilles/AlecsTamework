@@ -114,6 +114,40 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
             .add()
             .build();
 
+    private static final BuilderCodec<SummonedXpSourceSettings> SUMMONED_XP_SOURCE_CODEC = BuilderCodec.builder(
+            SummonedXpSourceSettings.class,
+            SummonedXpSourceSettings::new
+    )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.enabled = value != null && value,
+                    settings -> settings.enabled
+            )
+            .documentation("If true, this XP source awards XP while a companion remains actively summoned. Inheritance: when Summoned is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("XpPerActiveSecond", Codec.DOUBLE),
+                    (settings, value) -> settings.xpPerActiveSecond = value,
+                    settings -> settings.xpPerActiveSecond
+            )
+            .documentation("XP awarded per active summoned second. Inheritance: when Summoned is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("AwardIntervalSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.awardIntervalSeconds = value,
+                    settings -> settings.awardIntervalSeconds
+            )
+            .documentation("Seconds between active-summon XP awards. Inheritance: when Summoned is present, an omitted field inherits from the parent setting.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("MaxXpPerHour", Codec.DOUBLE),
+                    (settings, value) -> settings.maxXpPerHour = value,
+                    settings -> settings.maxXpPerHour
+            )
+            .documentation("Maximum XP this source can award each hour. Inheritance: when Summoned is present, an omitted field inherits from the parent setting.")
+            .add()
+            .build();
+
     private static final BuilderCodec<CombatXpSourceSettings> COMBAT_XP_SOURCE_CODEC = BuilderCodec.builder(
             CombatXpSourceSettings.class,
             CombatXpSourceSettings::new
@@ -200,6 +234,13 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
                     settings -> settings.flight
             )
             .documentation("Flight XP source settings. Inheritance: omitted section inherits from parent; when present, only explicitly defined nested fields override parent.")
+            .add()
+            .<SummonedXpSourceSettings>append(
+                    new KeyedCodec<>("Summoned", SUMMONED_XP_SOURCE_CODEC),
+                    (settings, value) -> settings.summoned = value == null ? new SummonedXpSourceSettings() : value,
+                    settings -> settings.summoned
+            )
+            .documentation("Active-summon XP source settings. Inheritance: omitted section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .build();
 
@@ -558,6 +599,11 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         } else {
             inheritFlightSourceSection(parent, nestedExplicitKeys);
         }
+        if (!nestedExplicitKeys.contains("Summoned")) {
+            xpSources.summoned = parent.xpSources.summoned;
+        } else {
+            inheritSummonedSourceSection(parent, nestedExplicitKeys);
+        }
     }
 
     private void inheritSimpleSourceSection(@Nullable SimpleXpSourceSettings child,
@@ -633,6 +679,32 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         }
         if (!nestedExplicitKeys.contains("Flight.MaxXpPerMinute")) {
             xpSources.flight.maxXpPerMinute = parent.xpSources.flight.maxXpPerMinute;
+        }
+    }
+
+    private void inheritSummonedSourceSection(@Nonnull TwLevelingConfig parent,
+                                              @Nonnull Set<String> nestedExplicitKeys) {
+        if (xpSources == null) {
+            return;
+        }
+        if (xpSources.summoned == null) {
+            xpSources.summoned = parent.xpSources != null ? parent.xpSources.summoned : null;
+            return;
+        }
+        if (parent.xpSources == null || parent.xpSources.summoned == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Summoned.Enabled")) {
+            xpSources.summoned.enabled = parent.xpSources.summoned.enabled;
+        }
+        if (!nestedExplicitKeys.contains("Summoned.XpPerActiveSecond")) {
+            xpSources.summoned.xpPerActiveSecond = parent.xpSources.summoned.xpPerActiveSecond;
+        }
+        if (!nestedExplicitKeys.contains("Summoned.AwardIntervalSeconds")) {
+            xpSources.summoned.awardIntervalSeconds = parent.xpSources.summoned.awardIntervalSeconds;
+        }
+        if (!nestedExplicitKeys.contains("Summoned.MaxXpPerHour")) {
+            xpSources.summoned.maxXpPerHour = parent.xpSources.summoned.maxXpPerHour;
         }
     }
 
@@ -738,6 +810,7 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         private SimpleXpSourceSettings breeding = new SimpleXpSourceSettings();
         private CombatXpSourceSettings combat = new CombatXpSourceSettings();
         private FlightXpSourceSettings flight = new FlightXpSourceSettings();
+        private SummonedXpSourceSettings summoned = new SummonedXpSourceSettings();
 
         public SimpleXpSourceSettings getFeed() {
             return feed == null ? new SimpleXpSourceSettings() : feed;
@@ -757,6 +830,10 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
 
         public FlightXpSourceSettings getFlight() {
             return flight == null ? new FlightXpSourceSettings() : flight;
+        }
+
+        public SummonedXpSourceSettings getSummoned() {
+            return summoned == null ? new SummonedXpSourceSettings() : summoned;
         }
     }
 
@@ -834,6 +911,30 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
 
         public double getMaxXpPerMinute() {
             return Double.isFinite(maxXpPerMinute) && maxXpPerMinute > 0.0 ? maxXpPerMinute : 0.0;
+        }
+    }
+
+    /** XP settings for time while a companion is actively summoned. */
+    public static final class SummonedXpSourceSettings {
+        private boolean enabled;
+        private double xpPerActiveSecond;
+        private double awardIntervalSeconds;
+        private double maxXpPerHour;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public double getXpPerActiveSecond() {
+            return Double.isFinite(xpPerActiveSecond) && xpPerActiveSecond > 0.0 ? xpPerActiveSecond : 0.0;
+        }
+
+        public double getAwardIntervalSeconds() {
+            return Double.isFinite(awardIntervalSeconds) && awardIntervalSeconds > 0.0 ? awardIntervalSeconds : 0.0;
+        }
+
+        public double getMaxXpPerHour() {
+            return Double.isFinite(maxXpPerHour) && maxXpPerHour > 0.0 ? maxXpPerHour : 0.0;
         }
     }
 

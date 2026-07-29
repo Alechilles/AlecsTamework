@@ -190,7 +190,11 @@ public final class CompanionLevelingService {
                         component.getLevel(),
                         component.getCurrentXp(),
                         nextTotalXp,
-                        nextFeedXpAwardedAtMs
+                        nextFeedXpAwardedAtMs,
+                        component.getSummonedActiveSeconds(),
+                        component.getSummonedWindowAwardedXp(),
+                        component.getSummonedWindowStartedAtMs(),
+                        component.getSummonedLastSampleAtMs()
                 ),
                 config
         );
@@ -485,7 +489,11 @@ public final class CompanionLevelingService {
                 resolvedLevel,
                 currentXp,
                 totalXp,
-                component.getLastFeedXpAwardedAtMs()
+                component.getLastFeedXpAwardedAtMs(),
+                component.getSummonedActiveSeconds(),
+                component.getSummonedWindowAwardedXp(),
+                component.getSummonedWindowStartedAtMs(),
+                component.getSummonedLastSampleAtMs()
         );
     }
 
@@ -494,7 +502,11 @@ public final class CompanionLevelingService {
         return left.getLevel() != right.getLevel()
                 || Math.abs(left.getCurrentXp() - right.getCurrentXp()) > EPSILON
                 || Math.abs(left.getTotalXp() - right.getTotalXp()) > EPSILON
-                || left.getLastFeedXpAwardedAtMs() != right.getLastFeedXpAwardedAtMs();
+                || left.getLastFeedXpAwardedAtMs() != right.getLastFeedXpAwardedAtMs()
+                || Math.abs(left.getSummonedActiveSeconds() - right.getSummonedActiveSeconds()) > EPSILON
+                || Math.abs(left.getSummonedWindowAwardedXp() - right.getSummonedWindowAwardedXp()) > EPSILON
+                || left.getSummonedWindowStartedAtMs() != right.getSummonedWindowStartedAtMs()
+                || left.getSummonedLastSampleAtMs() != right.getSummonedLastSampleAtMs();
     }
 
     private static boolean configIdChanged(@Nonnull TameworkLevelingComponent left,

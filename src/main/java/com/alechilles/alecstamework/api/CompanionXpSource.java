@@ -10,5 +10,6 @@ public enum CompanionXpSource {
     COMBAT_DAMAGE_DEALT,
     COMBAT_DAMAGE_TAKEN,
     CUSTOM,
-    AVATAR_FLIGHT
+    AVATAR_FLIGHT,
+    SUMMONED
 }
