@@ -27,8 +27,15 @@ final class TimedSummonStoreSourceEvidence {
         if (!expectedAlias.equals(snapshotUuid)) {
             return "snapshot-uuid";
         }
-        return HytaleTimedSummonStoreGateway.sameRole(
-                snapshotRoleId, liveRoleId
-        ) ? null : "role";
+        return sameRole(snapshotRoleId, liveRoleId) ? null : "role";
+    }
+
+    private static boolean sameRole(
+            @Nullable String frozenRoleId,
+            @Nullable String liveRoleId
+    ) {
+        return frozenRoleId != null
+                && liveRoleId != null
+                && frozenRoleId.equalsIgnoreCase(liveRoleId);
     }
 }

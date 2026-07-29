@@ -19,7 +19,7 @@ class TimedSummonStoreSourceEvidenceTest {
                         alias,
                         differentNpc,
                         alias,
-                        "tamed_nordicdrake",
+                        "Tamed_NordicDrake",
                         "Tamed_NordicDrake"
                 )
         );
