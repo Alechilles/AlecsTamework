@@ -226,6 +226,17 @@ final class TalentTreeLayoutService {
                     new HashSet<>()
             );
         }
+        HashMap<String, Integer> rowsByTalentId = new HashMap<>();
+        for (TameworkCompanionTalentsPage.TreeNodeEntry entry : entries) {
+            resolveRow(entry, minTier, entriesById, rowsByTalentId, new HashSet<>());
+        }
+        for (Map.Entry<String, NodePosition> position : positions.entrySet()) {
+            Integer row = rowsByTalentId.get(position.getKey());
+            if (row != null) {
+                position.setValue(new NodePosition(position.getValue().column(), row));
+            }
+        }
+        separateNodesInSharedRows(positions);
         double maxColumn = positions.values().stream()
                 .mapToDouble(NodePosition::column)
                 .max()
@@ -265,7 +276,7 @@ final class TalentTreeLayoutService {
             return startColumn;
         }
         if (!visitingTalentIds.add(talentId)) {
-            positions.put(talentId, new NodePosition(startColumn, resolveRow(entry, minTier)));
+            positions.put(talentId, new NodePosition(startColumn, Math.max(0, entry.tier() - minTier)));
             assignedTalentIds.add(talentId);
             return startColumn + 1.0;
         }
@@ -301,14 +312,67 @@ final class TalentTreeLayoutService {
         double column = firstChildColumn == null || lastChildColumn == null
                 ? startColumn
                 : (firstChildColumn + lastChildColumn) / 2.0;
-        positions.put(talentId, new NodePosition(column, resolveRow(entry, minTier)));
+        positions.put(talentId, new NodePosition(column, Math.max(0, entry.tier() - minTier)));
         assignedTalentIds.add(talentId);
         visitingTalentIds.remove(talentId);
         return Math.max(nextColumn, startColumn + 1.0);
     }
 
-    private static int resolveRow(@Nonnull TameworkCompanionTalentsPage.TreeNodeEntry entry, int minTier) {
-        return Math.max(0, entry.tier() - minTier);
+    private static int resolveRow(
+            @Nonnull TameworkCompanionTalentsPage.TreeNodeEntry entry,
+            int minTier,
+            @Nonnull Map<String, TameworkCompanionTalentsPage.TreeNodeEntry> entriesById,
+            @Nonnull Map<String, Integer> rowsByTalentId,
+            @Nonnull Set<String> visitingTalentIds
+    ) {
+        String talentId = entry.id().toLowerCase(Locale.ROOT);
+        Integer cached = rowsByTalentId.get(talentId);
+        if (cached != null) {
+            return cached;
+        }
+        int row = Math.max(0, entry.tier() - minTier);
+        if (!visitingTalentIds.add(talentId)) {
+            return row;
+        }
+        for (String requiredTalentId : entry.requiredTalentIds()) {
+            if (requiredTalentId == null || requiredTalentId.isBlank()) {
+                continue;
+            }
+            String requiredId = requiredTalentId.toLowerCase(Locale.ROOT);
+            if (requiredId.equals(talentId)) {
+                continue;
+            }
+            TameworkCompanionTalentsPage.TreeNodeEntry required = entriesById.get(requiredId);
+            if (required != null) {
+                row = Math.max(row, resolveRow(required, minTier, entriesById,
+                        rowsByTalentId, visitingTalentIds) + 1);
+            }
+        }
+        visitingTalentIds.remove(talentId);
+        rowsByTalentId.put(talentId, row);
+        return row;
+    }
+
+    private static void separateNodesInSharedRows(@Nonnull Map<String, NodePosition> positionsByTalentId) {
+        HashMap<Integer, ArrayList<String>> talentIdsByRow = new HashMap<>();
+        for (Map.Entry<String, NodePosition> position : positionsByTalentId.entrySet()) {
+            talentIdsByRow.computeIfAbsent(position.getValue().row(), ignored -> new ArrayList<>())
+                    .add(position.getKey());
+        }
+        for (ArrayList<String> talentIds : talentIdsByRow.values()) {
+            talentIds.sort(Comparator
+                    .comparingDouble((String talentId) -> positionsByTalentId.get(talentId).column())
+                    .thenComparing(String::compareTo));
+            double previousColumn = Double.NEGATIVE_INFINITY;
+            for (String talentId : talentIds) {
+                NodePosition position = positionsByTalentId.get(talentId);
+                double column = previousColumn == Double.NEGATIVE_INFINITY
+                        ? position.column()
+                        : Math.max(position.column(), previousColumn + 1.0);
+                positionsByTalentId.put(talentId, new NodePosition(column, position.row()));
+                previousColumn = column;
+            }
+        }
     }
 
     @Nonnull
