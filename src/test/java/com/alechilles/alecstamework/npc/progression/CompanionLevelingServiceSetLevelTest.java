@@ -41,8 +41,11 @@ class CompanionLevelingServiceSetLevelTest {
                 "Set level should place total XP at the target level floor."
         );
         assertTrue(
-                method.contains("new TameworkLevelingComponent(config.getId(), appliedLevel, 0.0, totalXp)"),
-                "Set level should reset current-level XP after moving to the level floor."
+                method.contains("previous.getSummonedActiveSeconds()")
+                        && method.contains("previous.getSummonedWindowAwardedXp()")
+                        && method.contains("previous.getSummonedWindowStartedAtMs()")
+                        && method.contains("previous.getSummonedLastSampleAtMs()"),
+                "Set level must preserve all persisted summon cadence state while resetting current-level XP."
         );
         assertTrue(
                 method.contains("store.putComponent(npcRef, type, updated)"),
