@@ -539,8 +539,19 @@ tamework.ui.linkedLocation.worldLabel=Mundo:
 # (No static localization keys required; message HUD text is runtime-driven.)
 
 # ===== Tamework UI: Notifications =====
-tamework.ui.notifications.capture.effectRequired=O alvo não tem o efeito necessário para a captura.
-tamework.ui.notifications.capture.tranquilizedRequired=O alvo precisa estar tranquilizado antes da captura.
+tamework.ui.notifications.capture.effectRequired={0} não pode capturar {1}. Requer o efeito {2}.
+tamework.ui.notifications.capture.tranquilizedRequired={0} não pode capturar {1} até que seja tranquilizado.
+tamework.ui.notifications.capture.powerTooLow={0} é fraco demais para capturar {1}. Requer poder de captura {2}.
+tamework.ui.notifications.capture.healthTooHigh={0} tem vida demais para ser capturado.
+tamework.ui.notifications.capture.cooldownActive={0} está em tempo de recarga de captura.
+tamework.ui.notifications.capture.outOfRange={0} está fora do alcance de captura.
+tamework.ui.notifications.capture.targetInvalid={0} não está mais disponível para captura.
+tamework.ui.notifications.capture.ownerDenied=Você não pode capturar {0} porque não é o proprietário.
+tamework.ui.notifications.capture.roleDenied={0} não pode ser capturado com este item.
+tamework.ui.notifications.capture.rosterFull=Sua lista de companheiros está cheia.
+tamework.ui.notifications.capture.toolRequired=Uma ferramenta de captura é necessária para usar {0}.
+tamework.ui.notifications.capture.chanceFailed={0} não conseguiu capturar {1}.
+tamework.ui.notifications.capture.unavailable=A captura não está disponível agora.
 tamework.ui.notifications.command.cull.mustBeLoaded=O NPC precisa estar carregado para abater.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Apenas NPCs próximos que pertencem a você podem ser abatidos.
 tamework.ui.notifications.command.cull.success=Abatido: {0}

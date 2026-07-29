@@ -539,8 +539,19 @@ tamework.ui.linkedLocation.worldLabel=World:
 # (No static localization keys required; message HUD text is runtime-driven.)
 
 # ===== Tamework UI: Notifications =====
-tamework.ui.notifications.capture.effectRequired=The target is missing the required capture effect.
-tamework.ui.notifications.capture.tranquilizedRequired=The target must be tranquilized before capture.
+tamework.ui.notifications.capture.effectRequired={0} cannot capture {1}. Requires effect {2}.
+tamework.ui.notifications.capture.tranquilizedRequired={0} cannot capture {1} until it is tranquilized.
+tamework.ui.notifications.capture.powerTooLow={0} is too weak to capture {1}. Requires capture power {2}.
+tamework.ui.notifications.capture.healthTooHigh={0} has too much health to capture.
+tamework.ui.notifications.capture.cooldownActive={0} is on capture cooldown.
+tamework.ui.notifications.capture.outOfRange={0} is out of capture range.
+tamework.ui.notifications.capture.targetInvalid={0} is no longer available to capture.
+tamework.ui.notifications.capture.ownerDenied=You cannot capture {0} because you are not its owner.
+tamework.ui.notifications.capture.roleDenied={0} cannot be captured with this item.
+tamework.ui.notifications.capture.rosterFull=Your companion roster is full.
+tamework.ui.notifications.capture.toolRequired=A capture tool is required to use {0}.
+tamework.ui.notifications.capture.chanceFailed={0} failed to capture {1}.
+tamework.ui.notifications.capture.unavailable=Capture is unavailable right now.
 tamework.ui.notifications.command.cull.mustBeLoaded=NPC must be loaded to cull.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Only owned nearby NPCs can be culled.
 tamework.ui.notifications.command.cull.success=Culled: {0}

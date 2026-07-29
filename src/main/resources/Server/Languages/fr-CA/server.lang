@@ -539,8 +539,19 @@ tamework.ui.linkedLocation.worldLabel=Monde :
 # (No static localization keys required; message HUD text is runtime-driven.)
 
 # ===== Tamework UI: Notifications =====
-tamework.ui.notifications.capture.effectRequired=Il manque à la cible l'effet requis pour la capture.
-tamework.ui.notifications.capture.tranquilizedRequired=La cible doit être tranquillisée avant la capture.
+tamework.ui.notifications.capture.effectRequired={0} ne peut pas capturer {1}. Effet requis : {2}.
+tamework.ui.notifications.capture.tranquilizedRequired={0} ne peut pas capturer {1} avant sa tranquillisation.
+tamework.ui.notifications.capture.powerTooLow={0} est trop faible pour capturer {1}. Puissance de capture requise : {2}.
+tamework.ui.notifications.capture.healthTooHigh={0} a trop de santé pour être capturée.
+tamework.ui.notifications.capture.cooldownActive={0} est en temps de recharge de capture.
+tamework.ui.notifications.capture.outOfRange={0} est hors de portée de capture.
+tamework.ui.notifications.capture.targetInvalid={0} n'est plus disponible pour la capture.
+tamework.ui.notifications.capture.ownerDenied=Vous ne pouvez pas capturer {0}, car vous n'êtes pas son propriétaire.
+tamework.ui.notifications.capture.roleDenied={0} ne peut pas être capturée avec cet objet.
+tamework.ui.notifications.capture.rosterFull=Votre liste de compagnons est pleine.
+tamework.ui.notifications.capture.toolRequired=Un outil de capture est requis pour utiliser {0}.
+tamework.ui.notifications.capture.chanceFailed={0} n'a pas réussi à capturer {1}.
+tamework.ui.notifications.capture.unavailable=La capture est indisponible pour le moment.
 tamework.ui.notifications.command.cull.mustBeLoaded=Le PNJ doit être chargé pour être abattu.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Seuls les PNJ proches qui vous appartiennent peuvent être abattus.
 tamework.ui.notifications.command.cull.success=Abattu : {0}
