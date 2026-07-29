@@ -233,6 +233,45 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         ));
     }
 
+    /**
+     * Protects v2.16.1 captured items whose public profile omitted the optional tamed field.
+     * The filled item remains the only retained evidence that the companion was tamed.
+     */
+    @Test
+    void releasedPublicItemRestoresTamingWhenProfileOmitsTamedState() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile("{\"owner_name\":\"Canonical owner\"}")
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                releasedPublicIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertTrue(result.published());
+        assertTrue(projection(persistence.request).tamed().isTamed());
+    }
+
+    @Test
+    void releasedPublicItemRejectsTamingWhenProfileExplicitlyRecordsFalse() {
+        FakePersistence persistence = new FakePersistence(
+                releasedPublicProfile(
+                        "{\"owner_name\":\"Canonical owner\",\"tamed\":false}"
+                )
+        );
+
+        SpawnerPersistenceAuthorResult result = author(persistence).release(
+                releasedPublicIntent(),
+                ignored -> placement()
+        ).toCompletableFuture().join();
+
+        assertEquals(
+                SpawnerPersistenceAuthorResult.Status.SNAPSHOT_DECODE_FAILED,
+                result.status()
+        );
+        assertNull(persistence.request);
+    }
+
     @Test
     void mixedLegacyAndCurrentIdentityMetadataFailsBeforeRead() {
         FakePersistence persistence = new FakePersistence(
@@ -487,6 +526,10 @@ class SpawnerCapturedArtifactReleaseAuthorTest {
         String metadata = """
                 {"owner_name":"Canonical owner","custom_name":"Legacy name","tamed":true}
                 """.trim();
+        return releasedPublicProfile(metadata);
+    }
+
+    private CompanionProfileReadModel releasedPublicProfile(String metadata) {
         CompanionIdentity identity = new CompanionIdentity(
                 PROFILE,
                 "Captured companion",
