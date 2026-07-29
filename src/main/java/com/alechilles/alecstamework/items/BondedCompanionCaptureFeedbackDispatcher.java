@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -174,7 +175,7 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             @Nullable CompletionContext context,
             @Nonnull BondedCompanionCaptureAuthor.Status status
     ) {
-        return safeMessage(intent, context, message(status));
+        return safeMessage(intent, context, message(status, context));
     }
 
     private boolean safeMessage(
@@ -191,10 +192,24 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
         return false;
     }
 
-    private String message(BondedCompanionCaptureAuthor.Status status) {
+    private String message(BondedCompanionCaptureAuthor.Status status,
+                           CompletionContext context) {
+        if (status == BondedCompanionCaptureAuthor.Status.POWER_TOO_LOW) {
+            return LocalizedText.format(context == null ? null : context.player(),
+                    "tamework.ui.notifications.capture.powerTooLow",
+                    context == null ? "capture item" : context.captureSourceName(),
+                    context == null ? "target" : context.captureTargetName(),
+                    context == null ? 0 : context.requiredPower());
+        }
         return switch (status) {
             case TARGET_INVALID -> "That companion is no longer available to capture.";
             case ADMISSION_DENIED -> "That companion cannot be captured right now. Check range, health, cooldown, and capture requirements.";
+            case POWER_TOO_LOW -> throw new IllegalStateException("handled above");
+            case COOLDOWN_ACTIVE -> "Your capture item is still recharging.";
+            case TARGET_NOT_TAMED -> "That companion must be tamed before it can be captured.";
+            case TARGET_ALREADY_TAMED -> "That capture item can only capture a wild companion.";
+            case HEALTH_TOO_HIGH -> "That companion has too much health to capture.";
+            case OUT_OF_RANGE -> "Move closer to that companion before capturing it.";
             case CHANCE_FAILED -> "The capture failed. Tranquilize the companion and try again.";
             case TRANQUILIZED_REQUIRED -> "The companion must be tranquilized before capture.";
             case TOOL_ACCESS_REQUIRED -> "Keep the configured bonded roster tool in your inventory.";
@@ -248,7 +263,11 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
     public record CompletionContext(
             @Nonnull World world,
             @Nonnull Player player,
-            @Nonnull String rosterCommandItemName
+            @Nonnull String rosterCommandItemName,
+            @Nonnull String captureSourceName,
+            @Nonnull String captureTargetName,
+            int capturePower,
+            int requiredPower
     ) {
         public CompletionContext {
             Objects.requireNonNull(world, "world");
@@ -256,10 +275,21 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             rosterCommandItemName = rosterCommandItemName == null
                     || rosterCommandItemName.isBlank() ? "command roster"
                     : rosterCommandItemName;
+            captureSourceName = captureSourceName == null || captureSourceName.isBlank()
+                    ? "capture item" : captureSourceName;
+            captureTargetName = captureTargetName == null || captureTargetName.isBlank()
+                    ? "target" : captureTargetName;
         }
 
         public CompletionContext(@Nonnull World world, @Nonnull Player player) {
-            this(world, player, "command roster");
+            this(world, player, "command roster", "capture item", "target", 0, 0);
+        }
+
+        CompletionContext withPowerRequirement(
+                @Nullable SpawnerCaptureRollService.Resolution roll, int power) {
+            return roll == null ? this : new CompletionContext(world, player,
+                    rosterCommandItemName, captureSourceName, captureTargetName,
+                    power, roll.minimumPower());
         }
     }
 
