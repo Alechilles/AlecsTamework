@@ -282,19 +282,21 @@ public final class SpawnerCapturePolicyService {
     ) {
         if (isCooldownActive(itemStack,
                 TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL,
-                config.getCaptureCooldownMs())) return admissionDenied();
+                config.getCaptureCooldownMs())) return BondedCompanionCaptureAuthor.Status.COOLDOWN_ACTIVE;
         if (config.isCaptureRequireTamed()
                 && !npcStateService.resolveTamedState(targetRef, world)) {
-            return admissionDenied();
+            return BondedCompanionCaptureAuthor.Status.TARGET_NOT_TAMED;
         }
         if (config.isCaptureTamesTarget()
                 && (npcStateService.resolveTamedState(targetRef, world)
                 || ownerUuid != null)) {
-            return admissionDenied();
+            return BondedCompanionCaptureAuthor.Status.TARGET_ALREADY_TAMED;
         }
         if (!meetsHealthRequirement(targetRef, config, store)
                 || !isWithinCaptureDistance(player, targetRef, config, store)) {
-            return admissionDenied();
+            return !meetsHealthRequirement(targetRef, config, store)
+                    ? BondedCompanionCaptureAuthor.Status.HEALTH_TOO_HIGH
+                    : BondedCompanionCaptureAuthor.Status.OUT_OF_RANGE;
         }
         return null;
     }

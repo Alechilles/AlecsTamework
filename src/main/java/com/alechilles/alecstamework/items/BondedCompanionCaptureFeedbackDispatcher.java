@@ -205,6 +205,11 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             case TARGET_INVALID -> "That companion is no longer available to capture.";
             case ADMISSION_DENIED -> "That companion cannot be captured right now. Check range, health, cooldown, and capture requirements.";
             case POWER_TOO_LOW -> throw new IllegalStateException("handled above");
+            case COOLDOWN_ACTIVE -> "Your capture item is still recharging.";
+            case TARGET_NOT_TAMED -> "That companion must be tamed before it can be captured.";
+            case TARGET_ALREADY_TAMED -> "That capture item can only capture a wild companion.";
+            case HEALTH_TOO_HIGH -> "That companion has too much health to capture.";
+            case OUT_OF_RANGE -> "Move closer to that companion before capturing it.";
             case CHANCE_FAILED -> "The capture failed. Tranquilize the companion and try again.";
             case TRANQUILIZED_REQUIRED -> "The companion must be tranquilized before capture.";
             case TOOL_ACCESS_REQUIRED -> "Keep the configured bonded roster tool in your inventory.";
