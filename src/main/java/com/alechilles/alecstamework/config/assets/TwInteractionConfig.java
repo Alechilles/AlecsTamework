@@ -1022,6 +1022,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final class SetRoleEffect {
         String role;
         String roleParam;
+        Boolean changeAppearance;
 
         public String getRole() {
             return role;
@@ -1029,6 +1030,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getRoleParam() {
             return roleParam;
+        }
+
+        /**
+         * Whether this role swap should update the NPC's appearance.
+         * Legacy role effects omit this option and retain the false default.
+         */
+        public boolean getChangeAppearance() {
+            return Boolean.TRUE.equals(changeAppearance);
         }
     }
 

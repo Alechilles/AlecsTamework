@@ -8,14 +8,17 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.bson.BsonDocument;
 import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,6 +90,38 @@ class InteractionBehaviorTest {
         entryCooldown.set(entry, null);
         int fallback = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(10, fallback);
+    }
+
+    @Test
+    void setRoleEffectForwardsVisualChangeFlagWhileLegacyRoleSwapsRemainFalse() throws Exception {
+        CapturingRoleChangeEffects roleChanges = new CapturingRoleChangeEffects();
+        TameworkInteractEffects effects = newEffects(roleChanges);
+        TwInteractionConfig.SetRoleEffect visualSwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\",\"ChangeAppearance\":true}"),
+                new ExtraInfo()
+        );
+        TwInteractionConfig.SetRoleEffect legacySwap = TwInteractionConfig.SET_ROLE_EFFECT_CODEC.decode(
+                BsonDocument.parse("{\"Role\":\"Tamed_Wyvern_Mini_Fire\"}"),
+                new ExtraInfo()
+        );
+
+        assertTrue(invokeApplySetRole(effects, visualSwap));
+        assertTrue(roleChanges.changeAppearance);
+        assertTrue(invokeApplySetRole(effects, legacySwap));
+        assertFalse(roleChanges.changeAppearance);
+        assertEquals(2, roleChanges.calls);
+    }
+
+    @Test
+    void tameRoleChangeAlwaysForwardsFalseForAppearance() throws Exception {
+        CapturingRoleChangeEffects roleChanges = new CapturingRoleChangeEffects(false);
+        TameworkInteractEffects effects = newEffects(roleChanges);
+        TwInteractionConfig.TameInteraction tame = new TwInteractionConfig.TameInteraction();
+        setField(tame, "role", "Tamed_Wyvern_Mini_Fire");
+
+        assertFalse(effects.applyTameRoleChange(tame, null, null, null, null));
+        assertFalse(roleChanges.changeAppearance);
+        assertEquals(1, roleChanges.calls);
     }
 
     @Test
@@ -442,6 +477,53 @@ class InteractionBehaviorTest {
                 null,
                 new StdScope[0]
         );
+    }
+
+    private static TameworkInteractEffects newEffects(InteractionRoleChangeEffects roleChanges) throws Exception {
+        TameworkInteractEffects effects = (TameworkInteractEffects) getUnsafe().allocateInstance(TameworkInteractEffects.class);
+        Field roleChangeEffectsField = TameworkInteractEffects.class.getDeclaredField("roleChangeEffects");
+        roleChangeEffectsField.setAccessible(true);
+        roleChangeEffectsField.set(effects, roleChanges);
+        return effects;
+    }
+
+    private static boolean invokeApplySetRole(TameworkInteractEffects effects,
+                                              TwInteractionConfig.SetRoleEffect roleEffect) throws Exception {
+        Method method = TameworkInteractEffects.class.getDeclaredMethod(
+                "applySetRole",
+                TwInteractionConfig.SetRoleEffect.class,
+                com.hypixel.hytale.component.Ref.class,
+                Role.class,
+                com.hypixel.hytale.component.Store.class,
+                InteractionContextSnapshot.class
+        );
+        method.setAccessible(true);
+        return (boolean) method.invoke(effects, roleEffect, null, null, null, null);
+    }
+
+    private static final class CapturingRoleChangeEffects implements InteractionRoleChangeEffects {
+        private final boolean result;
+        private boolean changeAppearance;
+        private int calls;
+
+        private CapturingRoleChangeEffects() {
+            this(true);
+        }
+
+        private CapturingRoleChangeEffects(boolean result) {
+            this.result = result;
+        }
+
+        @Override
+        public boolean applySetRole(String roleId,
+                                    boolean changeAppearance,
+                                    com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> npcRef,
+                                    Role role,
+                                    com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store) {
+            this.changeAppearance = changeAppearance;
+            calls++;
+            return result;
+        }
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

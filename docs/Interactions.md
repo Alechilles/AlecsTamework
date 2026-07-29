@@ -463,6 +463,12 @@ Common effect families:
 - Presentation: `ShowFloatingText`, `ShowUiMessage`, `PlaySound`, `SpawnParticles`
 - Utility: `DropItem`, `Mount`, `TriggerNpcHook`
 
+`SetRole` accepts `Role` (or `RoleParam`) and optional `ChangeAppearance`.
+`ChangeAppearance` defaults to `false`, preserving legacy role swaps; set it to
+`true` only when the target role must update the NPC's visible appearance. Role
+configs that offer costed role-change entries must exclude self-targeting entries
+so an NPC cannot pay a cost to swap to its current role.
+
 `SpawnParticles` supports node/attachment targeting:
 - `AttachTarget` (`Position`, `Entity`, `Node`)
 - `AttachNode`

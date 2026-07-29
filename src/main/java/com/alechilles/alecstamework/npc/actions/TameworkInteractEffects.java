@@ -49,6 +49,7 @@ final class TameworkInteractEffects {
     private final InteractionInventoryEffects inventoryEffects;
     private final InteractionPresentationEffects presentationEffects;
     private final InteractionStateEffects stateEffects;
+    private final InteractionRoleChangeEffects roleChangeEffects;
     private final InteractionModeCycleEffects modeCycleEffects;
     private final InteractionMountEffects mountEffects;
     private final InteractionHookEffects hookEffects;
@@ -64,6 +65,7 @@ final class TameworkInteractEffects {
         this.inventoryEffects = new InteractionInventoryEffects(owner);
         this.presentationEffects = new InteractionPresentationEffects(owner);
         this.stateEffects = new InteractionStateEffects();
+        this.roleChangeEffects = stateEffects;
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
         this.mountEffects = new InteractionMountEffects(owner);
         this.hookEffects = new InteractionHookEffects(owner);
@@ -264,7 +266,7 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        boolean changed = stateEffects.applySetRole(roleId, npcRef, role, store);
+        boolean changed = roleChangeEffects.applySetRole(roleId, false, npcRef, role, store);
         if (changed) {
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store, roleId);
         }
@@ -283,7 +285,7 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        return stateEffects.applySetRole(roleId, npcRef, role, store);
+        return roleChangeEffects.applySetRole(roleId, effect.getChangeAppearance(), npcRef, role, store);
     }
 
     private String resolveRoleId(String roleId, String roleParam, Role role, InteractionContextSnapshot ctx) {

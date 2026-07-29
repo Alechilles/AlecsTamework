@@ -39,7 +39,7 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
-final class InteractionStateEffects {
+final class InteractionStateEffects implements InteractionRoleChangeEffects {
     private static final String HEALTH_STAT_ID = "Health";
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
@@ -52,8 +52,6 @@ final class InteractionStateEffects {
      * state/substate names from the source role. Interaction-driven role changes should
      * start from the target role's default state.
      */
-    private static final boolean PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE = false;
-
     // Marks the NPC as tamed and assigns owner based on the interacting player.
     boolean applyStartTaming(Ref<EntityStore> npcRef,
                              Store<EntityStore> store,
@@ -320,7 +318,12 @@ final class InteractionStateEffects {
     }
 
     // Swaps the NPC role using the role change system.
-    boolean applySetRole(String roleId, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+    @Override
+    public boolean applySetRole(String roleId,
+                                boolean changeAppearance,
+                                Ref<EntityStore> npcRef,
+                                Role role,
+                                Store<EntityStore> store) {
         if (role == null || npcRef == null || store == null) {
             return false;
         }
@@ -340,7 +343,7 @@ final class InteractionStateEffects {
                 npcRef,
                 role,
                 roleIndex,
-                PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE,
+                changeAppearance,
                 store
         );
         applyDisableSpawnDrivenDespawn(npcRef, store);

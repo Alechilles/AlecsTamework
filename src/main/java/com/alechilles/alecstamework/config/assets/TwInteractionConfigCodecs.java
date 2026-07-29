@@ -166,6 +166,27 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
+    private static final Codec<Boolean> NULLABLE_BOOLEAN_CODEC = new TwSilentCodec<>() {
+        @Override
+        public Boolean decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (bsonValue == null || Codec.isNullBsonValue(bsonValue)) {
+                return null;
+            }
+            return Codec.BOOLEAN.decode(bsonValue, extraInfo);
+        }
+
+        @Override
+        public BsonValue encode(Boolean value, ExtraInfo extraInfo) {
+            return value == null ? new BsonNull() : Codec.BOOLEAN.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            return Codec.BOOLEAN.toSchema(context);
+        }
+    };
+
     private static final Codec<String[]> ITEM_ASSET_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
@@ -1060,6 +1081,13 @@ public final class TwInteractionConfigCodecs {
             effect -> effect.roleParam
         )
         .documentation("Role param to resolve a role asset ID (overrides Role).")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ChangeAppearance", NULLABLE_BOOLEAN_CODEC),
+            (effect, value) -> effect.changeAppearance = value,
+            effect -> effect.changeAppearance
+        )
+        .documentation("Whether this role swap updates the NPC appearance. Defaults to false when omitted.")
         .add()
         .build();
 
