@@ -46,7 +46,7 @@ final class BondedCompanionCaptureRoute {
         if (author == null || player == null || player.getWorld() == null) {
             return false;
         }
-        var completion = completion(player, config);
+        var completion = completion(player, targetRef, source, config);
         if (targetRef == null || !targetRef.isValid()) {
             author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
                     completion);
@@ -78,7 +78,8 @@ final class BondedCompanionCaptureRoute {
                 () -> rolls.evaluate(
                         player, targetRef, source, config, attempt));
         if (decision.denial() != null) {
-            author.reject(decision.denial(), completion);
+            author.reject(decision.denial(), completion.withPowerRequirement(
+                    decision.roll(), config.getCaptureMechanics().power()));
             return true;
         }
         var roll = decision.roll();
@@ -105,8 +106,12 @@ final class BondedCompanionCaptureRoute {
         var resolved = roll.get();
         if (resolved == null || resolved.evaluation().outcome()
                 == SpawnerCaptureChanceService.Outcome.DENIED) {
-            return new RouteDecision(
-                    BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED, null);
+            BondedCompanionCaptureAuthor.Status status =
+                    "capture-power-below-minimum".equals(
+                            resolved.evaluation().reason())
+                            ? BondedCompanionCaptureAuthor.Status.POWER_TOO_LOW
+                            : BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED;
+            return new RouteDecision(status, resolved);
         }
         return new RouteDecision(null, resolved);
     }
@@ -143,10 +148,21 @@ final class BondedCompanionCaptureRoute {
     }
 
     private BondedCompanionCaptureFeedbackDispatcher.CompletionContext completion(
-            Player player, ItemFeatureConfig config
+            Player player, Ref<EntityStore> targetRef, ItemStack source,
+            ItemFeatureConfig config
     ) {
+        String target = null;
+        if (targetRef != null && targetRef.isValid() && player.getWorld() != null) {
+            var store = player.getWorld().getEntityStore().getStore();
+            target = new SpawnerNpcIdentityService().resolveDisplayName(
+                    targetRef, store, store.getComponent(targetRef,
+                    com.hypixel.hytale.server.npc.entities.NPCEntity.getComponentType()));
+        }
+        String item = new CommandItemDisplayResolver().resolveItemDisplayName(
+                player, source == null ? null : source.getItemId());
         return new BondedCompanionCaptureFeedbackDispatcher.CompletionContext(
                 player.getWorld(), player,
-                admission.rosterCommandItemName(player, config));
+                admission.rosterCommandItemName(player, config), item, target,
+                0, 0);
     }
 }

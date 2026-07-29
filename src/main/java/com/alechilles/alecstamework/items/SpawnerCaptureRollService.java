@@ -177,6 +177,7 @@ final class SpawnerCaptureRollService {
                 roleId,
                 health,
                 generation,
+                policy == null ? 0 : policy.minimumPower(),
                 terminal
         );
     }
@@ -199,6 +200,7 @@ final class SpawnerCaptureRollService {
                 roleId,
                 health,
                 0L,
+                0,
                 null
         );
     }
@@ -224,6 +226,7 @@ final class SpawnerCaptureRollService {
             @Nonnull String roleId,
             @Nullable SpawnerCapturePolicyService.CaptureHealth health,
             long requirementGeneration,
+            int minimumPower,
             @Nullable CaptureAttemptResolution terminal
     ) {
     }
