@@ -17,6 +17,7 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -28,6 +29,9 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
     private final ComponentType<EntityStore, DeathComponent> deathType;
     private final Query<EntityStore> query;
     private final SummonedCompanionExperienceService experienceService = new SummonedCompanionExperienceService();
+    private final ProjectionSettingsResolver settingsResolver;
+    private final CompanionXpAwarder xpAwarder;
+    private final LongSupplier clock;
 
     public SummonedCompanionExperienceSystem(
             @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
@@ -39,6 +43,33 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
         this.levelingType = levelingType;
         this.deathType = deathType;
         this.query = Query.and(npcType, projectionIdentityType);
+        this.settingsResolver = (reference, store) -> {
+            String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
+            TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
+            return config != null && config.isEnabled()
+                    ? new ResolvedSettings(roleId, config.getXpSources().getSummoned())
+                    : null;
+        };
+        this.xpAwarder = CompanionLevelingService::awardXp;
+        this.clock = System::currentTimeMillis;
+    }
+
+    SummonedCompanionExperienceSystem(
+            @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
+            @Nonnull ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentityType,
+            @Nonnull ComponentType<EntityStore, TameworkLevelingComponent> levelingType,
+            @Nonnull ComponentType<EntityStore, DeathComponent> deathType,
+            @Nonnull ProjectionSettingsResolver settingsResolver,
+            @Nonnull CompanionXpAwarder xpAwarder,
+            @Nonnull LongSupplier clock) {
+        this.npcType = npcType;
+        this.projectionIdentityType = projectionIdentityType;
+        this.levelingType = levelingType;
+        this.deathType = deathType;
+        this.query = Query.and(npcType, projectionIdentityType);
+        this.settingsResolver = settingsResolver;
+        this.xpAwarder = xpAwarder;
+        this.clock = clock;
     }
 
     @Override
@@ -62,24 +93,24 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
 
         TameworkLevelingComponent leveling = store.getComponent(reference, levelingType);
         boolean eligible = isEligibleForSummonedXp(true, identity, dead);
-        String roleId = eligible ? CompanionRoleIdResolver.resolveRoleId(reference, store) : null;
-        TwLevelingConfig config = roleId == null ? null : TwLevelingConfig.resolveForRole(roleId);
-        boolean active = eligible && config != null && config.isEnabled();
+        ResolvedSettings resolved = eligible ? settingsResolver.resolve(reference, store) : null;
+        boolean active = resolved != null;
         if (active && leveling == null) {
             leveling = CompanionLevelingService.ensureLevelingComponent(
-                    reference, store, commandBuffer, roleId);
+                    reference, store, commandBuffer, resolved.roleId());
         }
         if (leveling == null) {
             return;
         }
-        long nowMs = System.currentTimeMillis();
+        long nowMs = clock.getAsLong();
         processProjection(leveling, identity, dead,
-                active ? config.getXpSources().getSummoned() : null,
+                active ? resolved.settings() : null,
                 nowMs, dt,
-                (source, amount) -> CompanionLevelingService.awardXp(
-                        reference, store, commandBuffer, roleId, source, amount),
+                (source, amount) -> xpAwarder.award(
+                        reference, store, commandBuffer, resolved.roleId(), source, amount),
                 experienceService);
-        TameworkLevelingComponent updated = commandBuffer.getComponent(reference, levelingType);
+        TameworkLevelingComponent updated = commandBuffer == null ? null
+                : commandBuffer.getComponent(reference, levelingType);
         if (updated != null && updated != leveling) {
             applyCadence(updated, new SummonedCompanionExperienceService.State(
                     leveling.getSummonedActiveSeconds(),
@@ -131,6 +162,26 @@ public final class SummonedCompanionExperienceSystem extends EntityTickingSystem
     @FunctionalInterface
     interface AwardSink {
         void award(@Nonnull CompanionXpSource source, double amount);
+    }
+
+    @FunctionalInterface
+    interface ProjectionSettingsResolver {
+        @Nullable ResolvedSettings resolve(@Nonnull Ref<EntityStore> reference,
+                                           @Nonnull Store<EntityStore> store);
+    }
+
+    @FunctionalInterface
+    interface CompanionXpAwarder {
+        void award(@Nonnull Ref<EntityStore> reference,
+                   @Nonnull Store<EntityStore> store,
+                   @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                   @Nonnull String roleId,
+                   @Nonnull CompanionXpSource source,
+                   double amount);
+    }
+
+    record ResolvedSettings(@Nonnull String roleId,
+                            @Nonnull TwLevelingConfig.SummonedXpSourceSettings settings) {
     }
 
     private static void applyCadence(@Nonnull TameworkLevelingComponent leveling,

@@ -4,8 +4,20 @@ import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.TestEntityComponentStore;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,7 +40,7 @@ class SummonedCompanionExperienceSystemTest {
     }
 
     @Test
-    void liveBondedProjectionRoutesSummonedAwardWhileInactiveProjectionsResetCadence() throws Exception {
+    void tickRoutesLiveBondedProjectionToSummonedAwardAndPausesOthers() throws Exception {
         TameworkProjectionIdentityComponent bonded =
                 TameworkProjectionIdentityComponent.bondedCompanion("profile-a", "lease-a");
         TameworkProjectionIdentityComponent ordinary = new TameworkProjectionIdentityComponent(
@@ -39,33 +51,59 @@ class SummonedCompanionExperienceSystemTest {
         AtomicReference<Double> amount = new AtomicReference<>(0.0d);
 
         TameworkLevelingComponent bondedLeveling = leveling(0.25d, 1_000L);
-        SummonedCompanionExperienceSystem.processProjection(
-                bondedLeveling, bonded, false, settings, 1_250L, 0.25d,
-                (awardSource, awardAmount) -> {
-                    source.set(awardSource);
-                    amount.set(awardAmount);
-                });
+        tick(bondedLeveling, bonded, false, settings, source, amount);
 
         assertEquals(CompanionXpSource.SUMMONED, source.get());
         assertEquals(1.0d, amount.get(), 0.00001d);
 
         TameworkLevelingComponent ordinaryLeveling = leveling(0.49d, 1_000L);
         amount.set(0.0d);
-        SummonedCompanionExperienceSystem.processProjection(
-                ordinaryLeveling, ordinary, false, settings, 1_250L, 0.01d,
-                (awardSource, awardAmount) -> amount.set(awardAmount));
-        SummonedCompanionExperienceSystem.processProjection(
-                ordinaryLeveling, bonded, false, settings, 1_500L, 0.25d,
-                (awardSource, awardAmount) -> amount.set(awardAmount));
+        tick(ordinaryLeveling, ordinary, false, settings, source, amount);
 
         assertEquals(0.0d, amount.get(), 0.00001d);
-        assertEquals(0.25d, ordinaryLeveling.getSummonedActiveSeconds(), 0.00001d);
+        assertEquals(0.0d, ordinaryLeveling.getSummonedActiveSeconds(), 0.00001d);
 
         TameworkLevelingComponent deadLeveling = leveling(0.49d, 1_000L);
-        SummonedCompanionExperienceSystem.processProjection(
-                deadLeveling, bonded, true, settings, 1_250L, 0.01d,
-                (awardSource, awardAmount) -> amount.set(awardAmount));
+        tick(deadLeveling, bonded, true, settings, source, amount);
         assertEquals(0.0d, deadLeveling.getSummonedActiveSeconds(), 0.00001d);
+    }
+
+    private static void tick(TameworkLevelingComponent leveling,
+                             TameworkProjectionIdentityComponent identity,
+                             boolean dead,
+                             TwLevelingConfig.SummonedXpSourceSettings settings,
+                             AtomicReference<CompanionXpSource> source,
+                             AtomicReference<Double> amount) throws Exception {
+        ComponentType<EntityStore, NPCEntity> npcType = new ComponentType<>();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> identityType = new ComponentType<>();
+        ComponentType<EntityStore, TameworkLevelingComponent> levelingType = new ComponentType<>();
+        ComponentType<EntityStore, DeathComponent> deathType = new ComponentType<>();
+        EntityStore entityStore = new EntityStore(null);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            Ref<EntityStore> reference = store.createReference();
+            store.put(reference, identityType, identity);
+            store.put(reference, levelingType, leveling);
+            if (dead) {
+                store.put(reference, deathType, allocate(DeathComponent.class));
+            }
+            SummonedCompanionExperienceSystem system = new SummonedCompanionExperienceSystem(
+                    npcType, identityType, levelingType, deathType,
+                    (ref, ignoredStore) -> new SummonedCompanionExperienceSystem.ResolvedSettings("role", settings),
+                    (ref, ignoredStore, commandBuffer, roleId, awardSource, awardAmount) -> {
+                        source.set(awardSource);
+                        amount.set(awardAmount);
+                    },
+                    () -> 1_250L);
+            store.forEachChunk(Query.any(), (BiConsumer<com.hypixel.hytale.component.ArchetypeChunk<EntityStore>,
+                    CommandBuffer<EntityStore>>) (chunk, ignoredBuffer) ->
+                    system.tick(0.25f, 0, chunk, store, null));
+        }
+    }
+
+    private static <T> T allocate(Class<T> type) throws Exception {
+        Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        return type.cast(((sun.misc.Unsafe) unsafeField.get(null)).allocateInstance(type));
     }
 
     private static TameworkLevelingComponent leveling(double activeSeconds, long lastSampleAtMs) {
