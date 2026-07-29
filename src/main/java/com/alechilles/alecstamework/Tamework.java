@@ -181,6 +181,7 @@ import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.SummonedCompanionExperienceSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
@@ -847,6 +848,14 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new SummonedCompanionExperienceSystem(
+                        NPCEntity.getComponentType(),
+                        projectionIdentityComponentType,
+                        levelingComponentType,
+                        DeathComponent.getComponentType()
+                )
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)

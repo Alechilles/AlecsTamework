@@ -104,6 +104,22 @@ class CompanionXpEventDebugLogServiceTest {
         assertTrue(logs.stream().anyMatch(line -> line.contains("source=AVATAR_FLIGHT")));
     }
 
+    @Test
+    void enabledServiceLabelsSummonedXpEvents() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        List<String> logs = new ArrayList<>();
+        CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
+                () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
+                logs::add
+        );
+
+        assertTrue(service.setEnabled(true));
+        bus.emitCompanionXpAwarded(event(CompanionXpSource.SUMMONED, 3.0));
+
+        assertEquals(1L, service.getEventCount());
+        assertTrue(logs.stream().anyMatch(line -> line.contains("source=SUMMONED")));
+    }
+
     private static CompanionXpAwardedEvent event(CompanionXpSource source, double awardedXp) {
         return new CompanionXpAwardedEvent(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),

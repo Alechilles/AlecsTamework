@@ -71,6 +71,30 @@ class TalentTreeLayoutServiceTest {
     }
 
     @Test
+    void layoutSeparatesMiniwyvernCombatDependenciesThatShareATier() {
+        List<TameworkCompanionTalentsPage.TreeNodeEntry> entries = List.of(
+                entry("projectile", "Combat", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()),
+                entry("range", "Combat", 2, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("projectile")),
+                entry("cadence", "Combat", 2, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("projectile")),
+                entry("guidance", "Combat", 3, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("range")),
+                entry("force", "Combat", 3, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("cadence")),
+                entry("pattern", "Combat", 4, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("guidance")),
+                entry("impact", "Combat", 4, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("force")),
+                entry("assault", "Combat", 5, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("pattern", "impact")),
+                entry("utility", "Combat", 5, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("assault")),
+                entry("mastery", "Combat", 5, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("assault")),
+                entry("apex", "Combat", 6, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("utility", "mastery"))
+        );
+
+        TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, null);
+
+        assertTrue(node(canvas, "utility").topY() > node(canvas, "assault").topY());
+        assertTrue(node(canvas, "mastery").topY() > node(canvas, "assault").topY());
+        assertTrue(node(canvas, "apex").topY() > node(canvas, "mastery").topY());
+        assertNoNodeOverlaps(canvas);
+    }
+
+    @Test
     void longBranchConnectorRunsAboveInterveningSiblingNodes() {
         List<TameworkCompanionTalentsPage.TreeNodeEntry> entries = List.of(
                 entry("gentle_disposition", "Breeding", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()),
@@ -181,6 +205,23 @@ class TalentTreeLayoutServiceTest {
                         && anchorValue(slot.endAnchor(), "top") + anchorValue(slot.endAnchor(), "height") == child.topY())
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static void assertNoNodeOverlaps(TalentTreeViewModel.TreeCanvas canvas) {
+        for (int leftIndex = 0; leftIndex < canvas.nodes().size(); leftIndex++) {
+            TalentTreeViewModel.NodeSlot left = canvas.nodes().get(leftIndex);
+            for (int rightIndex = leftIndex + 1; rightIndex < canvas.nodes().size(); rightIndex++) {
+                TalentTreeViewModel.NodeSlot right = canvas.nodes().get(rightIndex);
+                int leftX = left.centerX() - TalentTreeLayoutService.NODE_WIDTH / 2;
+                int rightX = right.centerX() - TalentTreeLayoutService.NODE_WIDTH / 2;
+                boolean separatedHorizontally = leftX + TalentTreeLayoutService.NODE_WIDTH <= rightX
+                        || rightX + TalentTreeLayoutService.NODE_WIDTH <= leftX;
+                boolean separatedVertically = left.bottomY() <= right.topY()
+                        || right.bottomY() <= left.topY();
+                assertTrue(separatedHorizontally || separatedVertically,
+                        () -> left.entry().id() + " overlaps " + right.entry().id());
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

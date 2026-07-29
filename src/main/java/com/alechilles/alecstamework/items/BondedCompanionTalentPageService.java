@@ -227,7 +227,7 @@ final class BondedCompanionTalentPageService {
                 Arrays.stream(talent.getRequiresTalentIds())
                         .filter(value -> value != null && !value.isBlank()).toList(),
                 prerequisiteNames(language, config, talent),
-                effectSummary(language, talent.getEffects()), canPurchase);
+                effectSummary(language, talent), canPurchase);
     }
 
     private int availablePoints(State state) {
@@ -268,15 +268,54 @@ final class BondedCompanionTalentPageService {
         return names;
     }
 
-    private String effectSummary(String language, TwTalentConfig.PassiveEffect[] effects) {
+    private String effectSummary(String language, TwTalentConfig.TalentDefinition talent) {
+        TwTalentConfig.PassiveEffect[] effects = talent.getEffects();
         if (effects == null || effects.length == 0) return "";
         ArrayList<String> summaries = new ArrayList<>();
         for (TwTalentConfig.PassiveEffect effect : effects) {
-            if (effect != null && effect.getEffectKey() != null) {
-                summaries.add(effect.getEffectKey());
+            if (effect == null || effect.getEffectKey() == null || effect.getEffectKey().isBlank()) {
+                continue;
             }
+            if (effect.getEffectKey().equalsIgnoreCase(talent.getId())
+                    && Math.abs(effect.getMultiplier() - 1.0) < 0.0001) {
+                String description = LocalizedText.resolveConfigValue(language,
+                        talent.getDescription(), "");
+                if (!description.isBlank() && !summaries.contains(description)) {
+                    summaries.add(description);
+                }
+                continue;
+            }
+            summaries.add(formatEffectSummary(language, effect));
         }
         return String.join("\n", summaries);
+    }
+
+    private String formatEffectSummary(String language, TwTalentConfig.PassiveEffect effect) {
+        String label = formatEffectKey(language, effect.getEffectKey());
+        String change = formatMultiplierChange(effect.getMultiplier());
+        return change.isBlank() ? label : LocalizedText.format(language,
+                "tamework.ui.talents.effects.line", label, change);
+    }
+
+    private String formatEffectKey(String language, String effectKey) {
+        String spaced = effectKey.replace("Multiplier", "")
+                .replaceAll("([a-z])([A-Z])", "$1 $2")
+                .trim();
+        return LocalizedText.resolveConfigValue(language,
+                "tamework.ui.talents.effect." + effectKey,
+                spaced.isBlank() ? effectKey : spaced);
+    }
+
+    private String formatMultiplierChange(double multiplier) {
+        double percent = (multiplier - 1.0) * 100.0;
+        if (Math.abs(percent) < 0.05) {
+            return "";
+        }
+        double rounded = Math.rint(Math.abs(percent));
+        String magnitude = Math.abs(Math.abs(percent) - rounded) < 0.05
+                ? Long.toString(Math.round(rounded))
+                : String.format(Locale.ROOT, "%.1f", Math.abs(percent));
+        return (percent > 0.0 ? "+" : "-") + magnitude + "%";
     }
 
     private String normalizeBranch(String branch) {

@@ -46,6 +46,30 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
                     TameworkLevelingComponent::getLastFeedXpAwardedAtMs
             )
             .add()
+            .append(
+                    new KeyedCodec<>("SummonedActiveSeconds", Codec.DOUBLE),
+                    TameworkLevelingComponent::setSummonedActiveSeconds,
+                    TameworkLevelingComponent::getSummonedActiveSeconds
+            )
+            .add()
+            .append(
+                    new KeyedCodec<>("SummonedWindowAwardedXp", Codec.DOUBLE),
+                    TameworkLevelingComponent::setSummonedWindowAwardedXp,
+                    TameworkLevelingComponent::getSummonedWindowAwardedXp
+            )
+            .add()
+            .append(
+                    new KeyedCodec<>("SummonedWindowStartedAtMs", Codec.LONG),
+                    TameworkLevelingComponent::setSummonedWindowStartedAtMs,
+                    TameworkLevelingComponent::getSummonedWindowStartedAtMs
+            )
+            .add()
+            .append(
+                    new KeyedCodec<>("SummonedLastSampleAtMs", Codec.LONG),
+                    TameworkLevelingComponent::setSummonedLastSampleAtMs,
+                    TameworkLevelingComponent::getSummonedLastSampleAtMs
+            )
+            .add()
             .build();
 
     private String configId;
@@ -53,6 +77,10 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
     private double currentXp;
     private double totalXp;
     private long lastFeedXpAwardedAtMs;
+    private double summonedActiveSeconds;
+    private double summonedWindowAwardedXp;
+    private long summonedWindowStartedAtMs;
+    private long summonedLastSampleAtMs;
 
     public TameworkLevelingComponent() {
     }
@@ -62,11 +90,22 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
     }
 
     public TameworkLevelingComponent(String configId, int level, double currentXp, double totalXp, long lastFeedXpAwardedAtMs) {
+        this(configId, level, currentXp, totalXp, lastFeedXpAwardedAtMs, 0.0, 0.0, 0L, 0L);
+    }
+
+    public TameworkLevelingComponent(String configId, int level, double currentXp, double totalXp,
+                                     long lastFeedXpAwardedAtMs, double summonedActiveSeconds,
+                                     double summonedWindowAwardedXp, long summonedWindowStartedAtMs,
+                                     long summonedLastSampleAtMs) {
         this.configId = configId;
         setLevel(level);
         setCurrentXp(currentXp);
         setTotalXp(totalXp);
         setLastFeedXpAwardedAtMs(lastFeedXpAwardedAtMs);
+        setSummonedActiveSeconds(summonedActiveSeconds);
+        setSummonedWindowAwardedXp(summonedWindowAwardedXp);
+        setSummonedWindowStartedAtMs(summonedWindowStartedAtMs);
+        setSummonedLastSampleAtMs(summonedLastSampleAtMs);
     }
 
     public static ComponentType<EntityStore, TameworkLevelingComponent> getComponentType() {
@@ -114,9 +153,44 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
         this.lastFeedXpAwardedAtMs = Math.max(0L, lastFeedXpAwardedAtMs);
     }
 
+    public double getSummonedActiveSeconds() {
+        return summonedActiveSeconds;
+    }
+
+    public void setSummonedActiveSeconds(double summonedActiveSeconds) {
+        this.summonedActiveSeconds = sanitizeXp(summonedActiveSeconds);
+    }
+
+    public double getSummonedWindowAwardedXp() {
+        return summonedWindowAwardedXp;
+    }
+
+    public void setSummonedWindowAwardedXp(double summonedWindowAwardedXp) {
+        this.summonedWindowAwardedXp = sanitizeXp(summonedWindowAwardedXp);
+    }
+
+    public long getSummonedWindowStartedAtMs() {
+        return summonedWindowStartedAtMs;
+    }
+
+    public void setSummonedWindowStartedAtMs(long summonedWindowStartedAtMs) {
+        this.summonedWindowStartedAtMs = Math.max(0L, summonedWindowStartedAtMs);
+    }
+
+    public long getSummonedLastSampleAtMs() {
+        return summonedLastSampleAtMs;
+    }
+
+    public void setSummonedLastSampleAtMs(long summonedLastSampleAtMs) {
+        this.summonedLastSampleAtMs = Math.max(0L, summonedLastSampleAtMs);
+    }
+
     @Override
     public TameworkLevelingComponent clone() {
-        return new TameworkLevelingComponent(configId, level, currentXp, totalXp, lastFeedXpAwardedAtMs);
+        return new TameworkLevelingComponent(
+                configId, level, currentXp, totalXp, lastFeedXpAwardedAtMs,
+                summonedActiveSeconds, summonedWindowAwardedXp, summonedWindowStartedAtMs, summonedLastSampleAtMs
+        );
     }
 
     private static double sanitizeXp(double value) {

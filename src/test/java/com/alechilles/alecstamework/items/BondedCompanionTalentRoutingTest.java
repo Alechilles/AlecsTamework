@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
@@ -43,5 +44,18 @@ class BondedCompanionTalentRoutingTest {
         assertEquals(0, integer.invoke(null,
                 Map.of("talentSpentPoints", "0"),
                 "talentSpentPoints", 0));
+    }
+
+    @Test
+    void talentEffectsUsePlayerFacingDescriptionsInsteadOfRawEffectKeys()
+            throws Exception {
+        String service = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "items",
+                "BondedCompanionTalentPageService.java"), StandardCharsets.UTF_8);
+
+        assertTrue(service.contains("effectSummary(language, talent)"));
+        assertTrue(service.contains("talent.getDescription()"));
+        assertTrue(service.contains("formatEffectKey(language, effect.getEffectKey())"));
+        assertFalse(service.contains("summaries.add(effect.getEffectKey())"));
     }
 }

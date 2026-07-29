@@ -190,7 +190,11 @@ public final class CompanionLevelingService {
                         component.getLevel(),
                         component.getCurrentXp(),
                         nextTotalXp,
-                        nextFeedXpAwardedAtMs
+                        nextFeedXpAwardedAtMs,
+                        component.getSummonedActiveSeconds(),
+                        component.getSummonedWindowAwardedXp(),
+                        component.getSummonedWindowStartedAtMs(),
+                        component.getSummonedLastSampleAtMs()
                 ),
                 config
         );
@@ -338,7 +342,17 @@ public final class CompanionLevelingService {
         double totalXp = resolveCumulativeXpForLevel(config, appliedLevel);
         TameworkLevelingComponent previous = store.getComponent(npcRef, type);
         int previousLevel = previous != null ? normalizeComponent(previous, config).getLevel() : 1;
-        TameworkLevelingComponent updated = new TameworkLevelingComponent(config.getId(), appliedLevel, 0.0, totalXp);
+        TameworkLevelingComponent updated = new TameworkLevelingComponent(
+                config.getId(),
+                appliedLevel,
+                0.0,
+                totalXp,
+                previous != null ? previous.getLastFeedXpAwardedAtMs() : 0L,
+                previous != null ? previous.getSummonedActiveSeconds() : 0.0,
+                previous != null ? previous.getSummonedWindowAwardedXp() : 0.0,
+                previous != null ? previous.getSummonedWindowStartedAtMs() : 0L,
+                previous != null ? previous.getSummonedLastSampleAtMs() : 0L
+        );
 
         store.putComponent(npcRef, type, updated);
         applyTraitModifiers(npcRef, store, null);
@@ -485,7 +499,11 @@ public final class CompanionLevelingService {
                 resolvedLevel,
                 currentXp,
                 totalXp,
-                component.getLastFeedXpAwardedAtMs()
+                component.getLastFeedXpAwardedAtMs(),
+                component.getSummonedActiveSeconds(),
+                component.getSummonedWindowAwardedXp(),
+                component.getSummonedWindowStartedAtMs(),
+                component.getSummonedLastSampleAtMs()
         );
     }
 
@@ -494,7 +512,11 @@ public final class CompanionLevelingService {
         return left.getLevel() != right.getLevel()
                 || Math.abs(left.getCurrentXp() - right.getCurrentXp()) > EPSILON
                 || Math.abs(left.getTotalXp() - right.getTotalXp()) > EPSILON
-                || left.getLastFeedXpAwardedAtMs() != right.getLastFeedXpAwardedAtMs();
+                || left.getLastFeedXpAwardedAtMs() != right.getLastFeedXpAwardedAtMs()
+                || Math.abs(left.getSummonedActiveSeconds() - right.getSummonedActiveSeconds()) > EPSILON
+                || Math.abs(left.getSummonedWindowAwardedXp() - right.getSummonedWindowAwardedXp()) > EPSILON
+                || left.getSummonedWindowStartedAtMs() != right.getSummonedWindowStartedAtMs()
+                || left.getSummonedLastSampleAtMs() != right.getSummonedLastSampleAtMs();
     }
 
     private static boolean configIdChanged(@Nonnull TameworkLevelingComponent left,

@@ -32,6 +32,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkAlarm` (mirrors base `Alarm` sensor syntax for Tamework alarms: `Name`, `State`, optional `Clear`)
 - `TameworkHook`
 - `TameworkEffectActive` (checks active `EntityEffect` with optional `MinRemainingSeconds`)
+- `TameworkHasTalent` (checks this NPC's purchased talent ID, for example `{ "Type": "TameworkHasTalent", "TalentId": "DraconicProjectile" }`)
 - `TameworkNeedBelow`
 - `TameworkNeedsResourceFastMode`: Matches while `/tw settings` has active needs fast-consume behavior.
 - `TameworkNeedsResourceTarget`
