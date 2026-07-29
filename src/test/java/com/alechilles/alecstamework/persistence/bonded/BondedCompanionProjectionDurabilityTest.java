@@ -481,7 +481,7 @@ class BondedCompanionProjectionDurabilityTest {
                 rejected.status()
         );
 
-        var wrongRole = planner.plan(
+        var roleSwapped = planner.plan(
                 new BondedCompanionProjectionStorePlanner.PlanningRequest(
                         fixture.lease(), 1L, -80L,
                         plannerSnapshot(OWNER, "role:other", null, Map.of()),
@@ -489,9 +489,11 @@ class BondedCompanionProjectionDurabilityTest {
                 ));
         assertEquals(
                 BondedCompanionProjectionStorePlanner.Status
-                        .SNAPSHOT_IDENTITY_MISMATCH,
-                wrongRole.status()
+                        .PLANNED,
+                roleSwapped.status()
         );
+        assertEquals("role:other", roleSwapped.plan().snapshot()
+                .fullState().roleId());
     }
 
     @Test

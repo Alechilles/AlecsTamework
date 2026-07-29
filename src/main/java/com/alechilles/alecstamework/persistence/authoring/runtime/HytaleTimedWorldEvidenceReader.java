@@ -132,16 +132,14 @@ final class HytaleTimedWorldEvidenceReader {
                 npcRef, NPCEntity.getComponentType()
         );
         if (npc == null || npc.getRoleName() == null
-                || !npc.getRoleName().equals(
-                intent.profile().identity().roleId()
-        )) {
+                || npc.getRoleName().isBlank()) {
             return null;
         }
         TameworkFullStateSnapshotReader.ReadResult read = snapshots.read(
                 npcRef,
                 access.store(),
                 intent.expectedAlias(),
-                intent.profile().identity().roleId()
+                npc.getRoleName()
         );
         if (!read.successful() || read.snapshot() == null) {
             return null;

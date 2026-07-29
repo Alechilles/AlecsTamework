@@ -89,6 +89,20 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
                 }
                 return false;
             }
+
+            @Override
+            public boolean successNotification(
+                    BondedCompanionCaptureIntent intent,
+                    CompletionContext context
+            ) {
+                if (!worldThread(context) || intent == null) return false;
+                String companion = intent.species() == null || intent.species().isBlank()
+                        ? "Companion" : intent.species();
+                String roster = context.rosterCommandItemName();
+                return messages.show(context.player(), companion + " captured",
+                        companion + " has been added to your " + roster,
+                        NotificationStyle.Success);
+            }
         }, new ThrottledDiagnostics(logger));
     }
 
@@ -134,7 +148,13 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
             return new SuccessResult(
                     SuccessStatus.FINALIZATION_FAILED, delivered);
         }
-        return new SuccessResult(SuccessStatus.APPLIED, true);
+        boolean notified;
+        try {
+            notified = sink.successNotification(intent, context);
+        } catch (RuntimeException | LinkageError failure) {
+            notified = false;
+        }
+        return new SuccessResult(SuccessStatus.APPLIED, notified);
     }
 
     private boolean hasCompletionOutput(BondedCompanionCaptureIntent intent) {
@@ -199,6 +219,11 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
         boolean message(@Nullable BondedCompanionCaptureIntent intent,
                         @Nullable CompletionContext context,
                         @Nonnull String message);
+
+        default boolean successNotification(@Nullable BondedCompanionCaptureIntent intent,
+                                            @Nullable CompletionContext context) {
+            return true;
+        }
     }
 
     enum SuccessStatus { APPLIED, EFFECT_FAILED, FINALIZATION_FAILED }
@@ -222,11 +247,19 @@ public final class BondedCompanionCaptureFeedbackDispatcher {
     /** Live context retained only for this synchronous world-thread call. */
     public record CompletionContext(
             @Nonnull World world,
-            @Nonnull Player player
+            @Nonnull Player player,
+            @Nonnull String rosterCommandItemName
     ) {
         public CompletionContext {
             Objects.requireNonNull(world, "world");
             Objects.requireNonNull(player, "player");
+            rosterCommandItemName = rosterCommandItemName == null
+                    || rosterCommandItemName.isBlank() ? "command roster"
+                    : rosterCommandItemName;
+        }
+
+        public CompletionContext(@Nonnull World world, @Nonnull Player player) {
+            this(world, player, "command roster");
         }
     }
 

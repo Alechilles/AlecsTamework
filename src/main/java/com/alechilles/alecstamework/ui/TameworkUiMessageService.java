@@ -39,4 +39,19 @@ public final class TameworkUiMessageService {
         NotificationUtil.sendNotification(packetHandler, Message.raw(message), resolvedStyle);
         return true;
     }
+
+    /** Displays a two-line built-in notification. */
+    public boolean show(Player player, String message, String secondaryMessage,
+                        NotificationStyle style) {
+        if (player == null || message == null || message.isBlank()
+                || secondaryMessage == null || secondaryMessage.isBlank()) {
+            return false;
+        }
+        PacketHandler packetHandler = player.getPlayerConnection();
+        if (packetHandler == null) return false;
+        NotificationUtil.sendNotification(packetHandler, Message.raw(message),
+                Message.raw(secondaryMessage),
+                style != null ? style : NotificationStyle.Default);
+        return true;
+    }
 }

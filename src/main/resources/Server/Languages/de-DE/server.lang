@@ -570,8 +570,19 @@ tamework.ui.linkedLocation.worldLabel=Welt:
 # (Keine statischen Übersetzungsschlüssel erforderlich; HUD-Text wird dynamisch generiert.)
 
 # ===== Tamework UI: Benachrichtigungen =====
-tamework.ui.notifications.capture.effectRequired=Dem Ziel fehlt der erforderliche Einfangeffekt.
-tamework.ui.notifications.capture.tranquilizedRequired=Das Ziel muss vor dem Einfangen betäubt sein.
+tamework.ui.notifications.capture.effectRequired={0} kann {1} nicht einfangen. Benötigt Effekt {2}.
+tamework.ui.notifications.capture.tranquilizedRequired={0} kann {1} erst nach Betäubung einfangen.
+tamework.ui.notifications.capture.powerTooLow={0} ist zu schwach, um {1} einzufangen. Benötigt Einfangstärke {2}.
+tamework.ui.notifications.capture.healthTooHigh={0} hat zu viel Gesundheit zum Einfangen.
+tamework.ui.notifications.capture.cooldownActive={0} hat eine Einfangabklingzeit.
+tamework.ui.notifications.capture.outOfRange={0} ist außerhalb der Einfangreichweite.
+tamework.ui.notifications.capture.targetInvalid={0} kann nicht mehr eingefangen werden.
+tamework.ui.notifications.capture.ownerDenied=Du kannst {0} nicht einfangen, weil du nicht der Besitzer bist.
+tamework.ui.notifications.capture.roleDenied={0} kann mit diesem Gegenstand nicht eingefangen werden.
+tamework.ui.notifications.capture.rosterFull=Deine Begleiterliste ist voll.
+tamework.ui.notifications.capture.toolRequired=Zum Verwenden von {0} wird ein Einfangwerkzeug benötigt.
+tamework.ui.notifications.capture.chanceFailed={0} konnte {1} nicht einfangen.
+tamework.ui.notifications.capture.unavailable=Einfangen ist derzeit nicht verfügbar.
 tamework.ui.notifications.command.cull.mustBeLoaded=NPC muss geladen sein, um geschlachtet zu werden.
 tamework.ui.notifications.command.cull.ownedNearbyOnly=Nur eigene NPCs in der Nähe können geschlachtet werden.
 tamework.ui.notifications.command.cull.success=Geschlachtet: {0}

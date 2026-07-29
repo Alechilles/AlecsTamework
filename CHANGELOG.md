@@ -103,6 +103,9 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed timed command-roster and bonded companions reverting to their original
+  role after an interaction role swap when their summon session ended. Their
+  current role now saves with the companion snapshot for the next summon.
 - Fixed bonded-roster revival payments being recoverable only from changing
   inventory totals. Each payment now moves into a hidden operation-specific
   escrow, saves with the player before revival commits, and is consumed or

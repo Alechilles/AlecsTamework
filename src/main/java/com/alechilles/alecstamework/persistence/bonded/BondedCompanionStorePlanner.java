@@ -197,7 +197,8 @@ public final class BondedCompanionStorePlanner implements
         var state = snapshot.fullState();
         return state.owner() != null
                 && profile.ownerUuid().equals(state.owner().getOwnerId())
-                && profile.roleId().equals(state.roleId());
+                && state.roleId() != null
+                && !state.roleId().isBlank();
     }
 
     private PlanningResult rejected(Status status) {

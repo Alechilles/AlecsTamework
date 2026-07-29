@@ -46,7 +46,7 @@ final class BondedCompanionCaptureRoute {
         if (author == null || player == null || player.getWorld() == null) {
             return false;
         }
-        var completion = completion(player);
+        var completion = completion(player, config);
         if (targetRef == null || !targetRef.isValid()) {
             author.reject(BondedCompanionCaptureAuthor.Status.ADMISSION_DENIED,
                     completion);
@@ -143,9 +143,10 @@ final class BondedCompanionCaptureRoute {
     }
 
     private BondedCompanionCaptureFeedbackDispatcher.CompletionContext completion(
-            Player player
+            Player player, ItemFeatureConfig config
     ) {
         return new BondedCompanionCaptureFeedbackDispatcher.CompletionContext(
-                player.getWorld(), player);
+                player.getWorld(), player,
+                admission.rosterCommandItemName(player, config));
     }
 }

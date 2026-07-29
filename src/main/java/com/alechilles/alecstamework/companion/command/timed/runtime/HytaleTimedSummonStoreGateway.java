@@ -248,12 +248,6 @@ final class HytaleTimedSummonStoreGateway {
         );
     }
 
-    /** Accepts only the tester-era case damage, never a different role ID. */
-    static boolean sameRole(String frozenRoleId, String liveRoleId) {
-        return frozenRoleId != null && liveRoleId != null
-                && frozenRoleId.equalsIgnoreCase(liveRoleId);
-    }
-
     @Nullable
     private WorldChunk currentChunk(
             @Nullable TransformComponent transform
