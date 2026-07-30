@@ -79,6 +79,12 @@ public final class NativeMountMovementSettingsService {
         return new ActiveWorldRiderLookup(world, store).resolve(ownerUuid);
     }
 
+    /** Resolves the original mounted role's configured parameter scope for a later rider refresh. */
+    @Nullable
+    public static StdScope[] resolveMountedSourceRoleScopes(@Nullable NPCMountComponent mount) {
+        return new NativeMountMovementScopeResolver().resolve(mount);
+    }
+
     @Nullable
     static String resolveManagedRoleId(boolean nativeMountPresent,
                                        @Nullable String originalMountedRoleId,
