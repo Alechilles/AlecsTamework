@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,10 +35,10 @@ public final class CompanionMovementSpeedResolver {
         double multiplier = neutralIfInvalid(movement.baseMoveSpeedMultiplier());
         for (TwCompanionMovementConfig.AttachmentModifier modifier : movement.attachmentModifiers()) {
             if (matches(modifier, effectiveAttachments)) {
-                multiplier = neutralIfInvalid(multiplier * modifier.multiplier());
+                multiplier = multiplyByFactor(multiplier, modifier.multiplier());
             }
         }
-        multiplier = neutralIfInvalid(multiplier * progressionMultiplier);
+        multiplier = multiplyByFactor(multiplier, progressionMultiplier);
         double min = normalizedBound(movement.minMoveSpeedMultiplier(), MIN_SUPPORTED_MULTIPLIER);
         double max = normalizedBound(movement.maxMoveSpeedMultiplier(), MAX_SUPPORTED_MULTIPLIER);
         if (min > max) {
@@ -82,8 +84,15 @@ public final class CompanionMovementSpeedResolver {
         return Double.isFinite(value) && value > 0.0 ? value : 1.0;
     }
 
+    private static double multiplyByFactor(double multiplier, double factor) {
+        return neutralIfInvalid(multiplier * neutralIfInvalid(factor));
+    }
+
     private static double quantize(double value) {
-        int hundredths = (int) Math.round(value * 100.0);
+        int hundredths = BigDecimal.valueOf(value)
+                .movePointRight(2)
+                .setScale(0, RoundingMode.HALF_UP)
+                .intValueExact();
         int snappedHundredths = Math.round(hundredths / (float) STEP_HUNDREDTHS) * STEP_HUNDREDTHS;
         return snappedHundredths / 100.0;
     }

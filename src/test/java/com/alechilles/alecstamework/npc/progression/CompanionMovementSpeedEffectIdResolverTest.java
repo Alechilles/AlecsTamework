@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.progression;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,14 @@ class CompanionMovementSpeedEffectIdResolverTest {
     @Test
     void resolvesExactlyNeutralMultiplierToNoManagedEffect() {
         assertNull(resolver.resolveManagedEffectId(1.00));
+    }
+
+    @Test
+    void rejectsInvalidOrOffStepInputsInsteadOfTreatingThemAsNeutral() {
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveManagedEffectId(1.00000005));
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveManagedEffectId(1.07));
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveManagedEffectId(0.45));
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveManagedEffectId(Double.NaN));
     }
 
     @Test

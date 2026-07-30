@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import java.math.BigDecimal;
 import java.util.Locale;
 import javax.annotation.Nullable;
 
@@ -15,15 +16,20 @@ public final class CompanionMovementSpeedEffectIdResolver {
     /**
      * Resolves an already quantized multiplier to its managed static effect ID.
      *
-     * @return {@code null} for neutral 1.00 or unsupported values
+     * @return {@code null} only for exactly neutral 1.00
+     * @throws IllegalArgumentException when the caller supplies a non-neutral value outside this resolver's
+     *                                  quantized managed-effect range
      */
     @Nullable
     public String resolveManagedEffectId(double quantizedMultiplier) {
-        int percent = exactPercent(quantizedMultiplier);
-        if (!isSupportedPercent(percent, MIN_MANAGED_PERCENT, MAX_MANAGED_PERCENT)) {
+        if (Double.compare(quantizedMultiplier, 1.0) == 0) {
             return null;
         }
-        return percent == 100 ? null : MANAGED_PREFIX + String.format(Locale.ROOT, "%03d", percent);
+        int percent = exactPercent(quantizedMultiplier);
+        if (!isSupportedPercent(percent, MIN_MANAGED_PERCENT, MAX_MANAGED_PERCENT)) {
+            throw new IllegalArgumentException("Unsupported quantized movement multiplier: " + quantizedMultiplier);
+        }
+        return MANAGED_PREFIX + String.format(Locale.ROOT, "%03d", percent);
     }
 
     /** Returns whether an ID belongs to the managed movement-speed asset family. */
@@ -55,8 +61,11 @@ public final class CompanionMovementSpeedEffectIdResolver {
         if (!Double.isFinite(multiplier)) {
             return -1;
         }
-        int percent = (int) Math.round(multiplier * 100.0);
-        return Math.abs(multiplier - (percent / 100.0)) < 0.0000001 ? percent : -1;
+        try {
+            return BigDecimal.valueOf(multiplier).movePointRight(2).intValueExact();
+        } catch (ArithmeticException exception) {
+            return -1;
+        }
     }
 
     private static boolean isSupportedPercent(int percent, int min, int max) {

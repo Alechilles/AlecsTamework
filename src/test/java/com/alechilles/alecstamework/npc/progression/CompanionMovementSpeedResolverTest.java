@@ -49,6 +49,19 @@ class CompanionMovementSpeedResolverTest {
     }
 
     @Test
+    void treatsInvalidMatchingModifierAndProgressionFactorsAsNeutralWithoutDiscardingValidFactors() {
+        var invalidModifier = resolver.resolve(config("mod:moose", 1.10, 0.50, 2.00,
+                saddle("Leather", Double.NaN)), attachments("Saddle", "Leather"), 1.05);
+        var invalidProgression = resolver.resolve(config("mod:moose", 1.10, 0.50, 2.00,
+                saddle("Leather", 1.10)), attachments("Saddle", "Leather"), Double.NEGATIVE_INFINITY);
+
+        assertEquals(1.155, invalidModifier.rawMultiplier(), 0.0000001);
+        assertEquals(1.15, invalidModifier.quantizedMultiplier());
+        assertEquals(1.21, invalidProgression.rawMultiplier(), 0.0000001);
+        assertEquals(1.20, invalidProgression.quantizedMultiplier());
+    }
+
+    @Test
     void clampsToSupportedBoundsBeforeQuantizing() {
         var low = resolver.resolve(config("mod:moose", 0.10, 0.10, 9.0), Map.of(), 1.0);
         var high = resolver.resolve(config("mod:moose", 9.0, 0.10, 9.0), Map.of(), 1.0);
@@ -66,6 +79,17 @@ class CompanionMovementSpeedResolverTest {
 
         assertEquals(1.10, down.quantizedMultiplier());
         assertEquals(1.15, up.quantizedMultiplier());
+    }
+
+    @Test
+    void quantizesDecimalMidpointsUpWithoutBinaryRoundingLoss() {
+        var low = resolver.resolve(config("mod:moose", 0.575, 0.50, 2.00), Map.of(), 1.0);
+        var middle = resolver.resolve(config("mod:moose", 1.025, 0.50, 2.00), Map.of(), 1.0);
+        var high = resolver.resolve(config("mod:moose", 1.275, 0.50, 2.00), Map.of(), 1.0);
+
+        assertEquals(0.60, low.quantizedMultiplier());
+        assertEquals(1.05, middle.quantizedMultiplier());
+        assertEquals(1.30, high.quantizedMultiplier());
     }
 
     private static TwCompanionMovementConfig.ResolvedMovement config(String id, double base, double min, double max,
