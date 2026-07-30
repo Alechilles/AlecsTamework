@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
+import com.alechilles.alecstamework.npc.movement.NativeMountMovementScopeResolver;
+import com.alechilles.alecstamework.npc.movement.NativeMountSourceRole;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
@@ -30,6 +32,7 @@ final class NativeMountMovementApplication {
 
     private final ActionTameworkInteract owner;
     private final NativeMountMovementSettingsService movementSettings = new NativeMountMovementSettingsService();
+    private final NativeMountMovementScopeResolver movementScopeResolver = new NativeMountMovementScopeResolver();
     private final CompanionMovementSpeedResolver speedResolver = new CompanionMovementSpeedResolver();
 
     NativeMountMovementApplication(ActionTameworkInteract owner) {
@@ -60,12 +63,15 @@ final class NativeMountMovementApplication {
         if (riderPlayerRef == null) {
             return fail(role, "missing_player_ref_component");
         }
-        int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
+        int actionRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
+        NativeMountSourceRole sourceRole = NativeMountSourceRole.resolve(
+                npc.getRoleName(), npc.getRoleIndex(), role.getRoleName(), actionRoleIndex);
+        int originalRoleIndex = sourceRole.index();
         int emptyRoleIndex = NPCPlugin.get().getIndex(EMPTY_ROLE_ID);
         if (originalRoleIndex < 0 || emptyRoleIndex < 0) {
             return fail(role, "missing_role_index");
         }
-        String sourceRoleId = role.getRoleName();
+        String sourceRoleId = sourceRole.id();
         double multiplier = selectNativeMountMultiplier(resolveMovementMultiplier(npcRef, sourceRoleId, store));
         float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
@@ -79,7 +85,8 @@ final class NativeMountMovementApplication {
         mount.setAnchor(anchorX, anchorY, anchorZ);
         npc.playAnimation(npcRef, AnimationSlot.Status, null, store);
         movementSettings.applyScaledSettings(
-                sourceRoleId, owner.resolveRoleScopes(role), riderRef, riderPlayerRef, rider, store, multiplier);
+                sourceRoleId, movementScopeResolver.resolveForRoleIndex(originalRoleIndex),
+                riderRef, riderPlayerRef, rider, store, multiplier);
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         logApplied(role, anchorX, anchorY, anchorZ);
         return true;
