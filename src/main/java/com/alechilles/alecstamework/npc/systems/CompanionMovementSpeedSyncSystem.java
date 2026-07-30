@@ -2,7 +2,8 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
-import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedEffectService;
@@ -12,6 +13,7 @@ import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -109,25 +111,29 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         if (!npcRef.isValid() || store.getComponent(npcRef, NPCEntity.getComponentType()) == null) {
             return false;
         }
+        if (shouldSkipManagedMovement(
+                hasComponent(npcRef, store, TameworkMountedGlideComponent.getComponentType()),
+                hasComponent(npcRef, store, AvatarFlightSourceComponent.getComponentType()))) {
+            return true;
+        }
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         boolean nativeMountPresent = mount != null;
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
         double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
         boolean controllerAvailable = store.getComponent(npcRef, EffectControllerComponent.getComponentType()) != null;
-        if (controllerAvailable) {
-            CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
-        }
+        boolean effectApplied = controllerAvailable
+                && CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
         Ref<EntityStore> riderRef = nativeMountPresent
                 ? NativeMountMovementSettingsService.resolveMountedRiderRef(mount, store) : null;
         Player rider = riderRef == null ? null : store.getComponent(riderRef, Player.getComponentType());
         PlayerRef riderPlayerRef = riderRef == null ? null : store.getComponent(riderRef, PlayerRef.getComponentType());
         boolean activeRiderAvailable = riderRef != null && riderRef.isValid()
                 && rider != null && riderPlayerRef != null;
-        boolean riderSettingsApplied = activeRiderAvailable && controllerAvailable && riderSettings.applyScaledSettings(
+        boolean riderSettingsApplied = activeRiderAvailable && effectApplied && riderSettings.applyScaledSettings(
                 sourceRoleId, NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount), riderRef,
                 riderPlayerRef, rider, store, multiplier);
         return isRefreshComplete(new RefreshCompletion(
-                controllerAvailable, nativeMountPresent, activeRiderAvailable, riderSettingsApplied));
+                effectApplied, nativeMountPresent, activeRiderAvailable, riderSettingsApplied));
     }
 
     @Nullable
@@ -165,11 +171,6 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     @Nonnull
     private Map<String, String> resolveEffectiveAttachments(@Nonnull Ref<EntityStore> npcRef,
                                                             @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
-                TameworkAttachmentsComponent.getComponentType();
-        if (attachmentsType == null || store.getComponent(npcRef, attachmentsType) == null) {
-            return Map.of();
-        }
         return CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
     }
 
@@ -196,6 +197,17 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         return completion.controllerAvailable()
                 && (!completion.nativeMountPresent()
                 || (completion.activeRiderAvailable() && completion.riderSettingsApplied()));
+    }
+
+    /** Keeps Tamework glide and avatar-flight sessions outside native mount movement ownership. */
+    static boolean shouldSkipManagedMovement(boolean mountedGlideActive, boolean avatarFlightActive) {
+        return mountedGlideActive || avatarFlightActive;
+    }
+
+    private static <T extends Component<EntityStore>> boolean hasComponent(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull Store<EntityStore> store,
+                                            @Nullable ComponentType<EntityStore, T> type) {
+        return type != null && store.getComponent(ref, type) != null;
     }
 
     private static void commitFingerprint(@Nonnull TickState state, @Nullable MovementSpeedFingerprint fingerprint) {

@@ -54,28 +54,32 @@ public final class CompanionMovementSpeedEffectService {
     /**
      * Applies a movement effect from a source role and multiplier already resolved by a native mount lifecycle path.
      */
-    public static void applyResolvedMultiplier(@Nullable Ref<EntityStore> npcRef,
+    public static boolean applyResolvedMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                @Nullable Store<EntityStore> store,
                                                @Nullable String sourceRoleId,
                                                double quantizedMultiplier) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
-            return;
+            return false;
         }
         ComponentType<EntityStore, EffectControllerComponent> effectType = EffectControllerComponent.getComponentType();
         if (effectType == null) {
-            return;
+            return false;
         }
         EffectControllerComponent controller = store.getComponent(npcRef, effectType);
         if (controller == null) {
-            return;
+            return false;
         }
 
         String desiredEffectId = EFFECT_ID_RESOLVER.resolveManagedEffectId(quantizedMultiplier);
+        if (!isDesiredEffectAvailable(desiredEffectId)) {
+            return false;
+        }
         boolean removed = removeOwnedEffects(controller, npcRef, store, desiredEffectId);
         boolean added = addDesiredEffect(controller, npcRef, store, desiredEffectId);
         if (removed || added) {
             invalidateNpcSpeedCache(npcRef, store);
         }
+        return true;
     }
 
     static List<String> effectIdsToRemove(@Nullable Collection<String> activeEffectIds,
@@ -154,6 +158,18 @@ public final class CompanionMovementSpeedEffectService {
             return false;
         }
         return controller.addEffect(npcRef, effectIndex, effect, store);
+    }
+
+    private static boolean isDesiredEffectAvailable(@Nullable String desiredEffectId) {
+        if (desiredEffectId == null) {
+            return true;
+        }
+        IndexedLookupTableAssetMap<String, EntityEffect> assetMap = EntityEffect.getAssetMap();
+        if (assetMap == null) {
+            return false;
+        }
+        int effectIndex = assetMap.getIndex(desiredEffectId);
+        return effectIndex != Integer.MIN_VALUE && assetMap.getAsset(effectIndex) != null;
     }
 
     private static void invalidateNpcSpeedCache(Ref<EntityStore> npcRef, Store<EntityStore> store) {

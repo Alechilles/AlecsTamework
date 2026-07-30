@@ -24,6 +24,13 @@ class CompanionMovementSpeedSyncSystemTest {
     }
 
     @Test
+    void glideOrAvatarFlightMarkerExcludesNativeMovementRefresh() {
+        assertTrue(CompanionMovementSpeedSyncSystem.shouldSkipManagedMovement(true, false));
+        assertTrue(CompanionMovementSpeedSyncSystem.shouldSkipManagedMovement(false, true));
+        assertFalse(CompanionMovementSpeedSyncSystem.shouldSkipManagedMovement(false, false));
+    }
+
+    @Test
     void fingerprintChangesForEveryManagedLifecycleInput() {
         UUID npcId = UUID.randomUUID();
         CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint baseline =
