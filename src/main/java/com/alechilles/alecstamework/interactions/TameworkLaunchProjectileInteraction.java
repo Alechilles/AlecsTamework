@@ -75,6 +75,14 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
             )
             .add()
             .<Double>appendInherited(
+                    new KeyedCodec<>("LookTargetDistance", Codec.DOUBLE),
+                    (interaction, value) -> interaction.lookTargetDistance = value == null ? 0.0 : value,
+                    interaction -> interaction.lookTargetDistance,
+                    (interaction, parent) -> interaction.lookTargetDistance = parent.lookTargetDistance
+            )
+            .documentation("Optional positive distance along the source look direction used instead of Target or TargetSlot. This supports transformed players and other actors without an NPC marked-target role.")
+            .add()
+            .<Double>appendInherited(
                     new KeyedCodec<>("YawSpreadDegrees", Codec.DOUBLE),
                     (interaction, value) -> interaction.yawSpreadDegrees = value,
                     interaction -> interaction.yawSpreadDegrees,
@@ -150,6 +158,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private InteractionTarget target = InteractionTarget.TARGET;
     @Nullable
     private String targetSlot;
+    private double lookTargetDistance = 0.0;
     private double yawSpreadDegrees = 0.0;
     private double pitchSpreadDegrees = 0.0;
     private boolean failIfNoSolution = true;
@@ -294,6 +303,8 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                                            @Nonnull Ref<EntityStore> sourceRef,
                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                            @Nonnull Transform sourceLook) {
+        Vector3d lookTarget = resolveLookTargetPosition(sourceLook);
+        if (lookTarget != null) return lookTarget;
         if (this.randomAroundSourceMaxRadius > 0.0) {
             return resolveRandomAroundSourceTarget(sourceRef, commandBuffer, sourceLook);
         }
@@ -303,6 +314,18 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
             return null;
         }
         return resolveAimPosition(targetRef, commandBuffer);
+    }
+
+    @Nullable
+    private Vector3d resolveLookTargetPosition(@Nonnull Transform sourceLook) {
+        if (!Double.isFinite(this.lookTargetDistance) || this.lookTargetDistance <= 0.0) return null;
+        Vector3d origin = sourceLook.getPosition();
+        Vector3d direction = sourceLook.getDirection();
+        return new Vector3d(
+                origin.x + direction.x * this.lookTargetDistance,
+                origin.y + direction.y * this.lookTargetDistance,
+                origin.z + direction.z * this.lookTargetDistance
+        );
     }
 
     @Nullable
