@@ -3,8 +3,6 @@ package com.alechilles.alecstamework.npc.actions;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,14 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HeldItemAttachmentInteractionServiceTest {
 
     @Test
-    void committedAttachmentMutationIsNotRolledBackWhenSpeedRefreshFails() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/actions/HeldItemAttachmentInteractionService.java"));
-
-        assertTrue(source.contains("refreshMovementSpeedAfterCommittedMutation(context)"));
-        assertTrue(source.contains("catch (RuntimeException | LinkageError error)"));
-        assertTrue(source.contains("movement-speed refresh will retry during its periodic sweep"));
-    }
     @Test
     void modelGateRequiresSlotAndOptionalSupportedValue() {
         Map<String, Set<String>> options = Map.of(

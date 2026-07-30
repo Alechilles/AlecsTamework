@@ -359,7 +359,8 @@ public final class HeldItemAttachmentInteractionService {
         try {
             movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
         } catch (RuntimeException | LinkageError error) {
-            logFailure("Attachment mutation completed; movement-speed refresh will retry during its periodic sweep.", error);
+            logFailure("Attachment mutation completed for NPC=" + context.npcRef()
+                    + "; movement-speed refresh will retry during its periodic sweep.", error);
         }
     }
 
