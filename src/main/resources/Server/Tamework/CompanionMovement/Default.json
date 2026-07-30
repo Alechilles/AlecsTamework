@@ -1,0 +1,9 @@
+{
+  "Enabled": true,
+  "Priority": -1000,
+  "RoleIds": [],
+  "BaseMoveSpeedMultiplier": 1.0,
+  "MinMoveSpeedMultiplier": 0.5,
+  "MaxMoveSpeedMultiplier": 2.0,
+  "AttachmentModifiers": []
+}

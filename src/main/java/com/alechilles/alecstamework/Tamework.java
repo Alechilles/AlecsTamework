@@ -56,6 +56,7 @@ import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
@@ -324,6 +325,7 @@ public class Tamework extends JavaPlugin {
     private boolean attachmentMigrationAssetsRegistered;
     private boolean attachmentDisplayAssetsRegistered;
     private boolean dynamicAttachmentsAssetsRegistered;
+    private boolean companionMovementAssetsRegistered;
     private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
@@ -582,6 +584,7 @@ public class Tamework extends JavaPlugin {
         registerAttachmentMigrationAssets();
         registerAttachmentDisplayAssets();
         registerDynamicAttachmentsAssets();
+        registerCompanionMovementAssets();
         registerLevelingAssets();
         registerTraitAssets();
         registerTalentAssets();
@@ -2209,6 +2212,30 @@ public class Tamework extends JavaPlugin {
         dynamicAttachmentsAssetsRegistered = true;
     }
 
+    private void registerCompanionMovementAssets() {
+        if (companionMovementAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCompanionMovementConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/CompanionMovement")
+                        .setCodec(TwCompanionMovementConfig.CODEC)
+                        .setKeyFunction(TwCompanionMovementConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwCompanionMovementConfig.class,
+                this::onCompanionMovementAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwCompanionMovementConfig.class,
+                this::onCompanionMovementAssetsRemoved
+        );
+        companionMovementAssetsRegistered = true;
+    }
+
     private void registerLevelingAssets() {
         if (levelingAssetsRegistered) {
             return;
@@ -2712,6 +2739,22 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwDynamicAttachmentsConfig, DefaultAssetMap<String, TwDynamicAttachmentsConfig>> event) {
         TwDynamicAttachmentsConfig.clearRoleRuleIndexCache();
         emitExperimentalConfigReload(TameworkConfigFamily.DYNAMIC_ATTACHMENTS, event.getRemovedAssets());
+    }
+
+    private void onCompanionMovementAssetsLoaded(
+            LoadedAssetsEvent<String, TwCompanionMovementConfig,
+                    DefaultAssetMap<String, TwCompanionMovementConfig>> event) {
+        TwCompanionMovementConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.COMPANION_MOVEMENT, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onCompanionMovementAssetsRemoved(
+            RemovedAssetsEvent<String, TwCompanionMovementConfig,
+                    DefaultAssetMap<String, TwCompanionMovementConfig>> event) {
+        TwCompanionMovementConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.COMPANION_MOVEMENT, event.getRemovedAssets());
     }
 
     private void onLevelingAssetsLoaded(
