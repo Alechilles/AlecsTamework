@@ -13,18 +13,23 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Resolves the original native mount role's configured parameter scope without rebuilding a live role. */
-final class NativeMountMovementScopeResolver {
+public final class NativeMountMovementScopeResolver {
     @Nullable
     StdScope[] resolve(@Nullable NPCMountComponent mount) {
         if (mount == null) {
             return null;
         }
+        return resolveForRoleIndex(mount.getOriginalRoleIndex());
+    }
+
+    @Nullable
+    public StdScope[] resolveForRoleIndex(int roleIndex) {
         NPCPlugin plugin = NPCPlugin.get();
         if (plugin == null) {
             return null;
         }
         try {
-            Builder<Role> builder = plugin.tryGetCachedValidRole(mount.getOriginalRoleIndex());
+            Builder<Role> builder = plugin.tryGetCachedValidRole(roleIndex);
             BuilderManager builders = plugin.getBuilderManager();
             Scope scope = resolveScope(builder, builders, new ExecutionContext());
             return scope instanceof StdScope standard ? new StdScope[] {standard} : null;
