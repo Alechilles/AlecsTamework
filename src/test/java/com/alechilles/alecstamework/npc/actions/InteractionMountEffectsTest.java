@@ -67,6 +67,21 @@ class InteractionMountEffectsTest {
     }
 
     @Test
+    void nativeMountApplicationKeepsReasonSpecificFailureDiagnostics() throws Exception {
+        String applicationSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/NativeMountMovementApplication.java"
+        ));
+
+        assertTrue(applicationSource.contains("npc_mount_component_type_unavailable"));
+        assertTrue(applicationSource.contains("npc_already_has_mount_component"));
+        assertTrue(applicationSource.contains("missing_npc_component"));
+        assertTrue(applicationSource.contains("missing_player_component"));
+        assertTrue(applicationSource.contains("missing_player_ref_component"));
+        assertTrue(applicationSource.contains("missing_role_index"));
+        assertTrue(applicationSource.contains("ensure_npc_mount_failed"));
+    }
+
+    @Test
     void mountedGlideMountReportsActionableDebugStages() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
