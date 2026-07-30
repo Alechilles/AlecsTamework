@@ -9,9 +9,13 @@ import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementCo
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
@@ -19,10 +23,12 @@ import javax.annotation.Nullable;
  */
 public final class NativeMountMovementSettingsService {
     public static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
+    private static final String MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
+    private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
 
     /** Applies the selected source-role movement profile to the active rider without mutating its asset. */
     public boolean applyScaledSettings(@Nullable String sourceRoleId,
-                                       @Nullable String configuredMovementConfigId,
+                                       @Nullable StdScope[] sourceRoleScopes,
                                        @Nullable Ref<EntityStore> riderRef,
                                        @Nullable PlayerRef riderPlayerRef,
                                        @Nullable Player rider,
@@ -34,7 +40,8 @@ public final class NativeMountMovementSettingsService {
         }
         PhysicsValues physics = store.getComponent(riderRef, PhysicsValues.getComponentType());
         MovementManager manager = store.getComponent(riderRef, MovementManager.getComponentType());
-        MovementConfig profile = MovementConfig.getAssetMap().getAsset(resolveMovementConfigId(configuredMovementConfigId));
+        MovementConfig profile = MovementConfig.getAssetMap().getAsset(
+                resolveMovementConfigId(sourceRoleId, sourceRoleScopes));
         if (physics == null || manager == null || profile == null) {
             return false;
         }
@@ -59,6 +66,7 @@ public final class NativeMountMovementSettingsService {
             if (originalRoleId != null && !originalRoleId.isBlank()) {
                 return originalRoleId;
             }
+            return null;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         return npc == null ? null : npc.getRoleName();
@@ -69,7 +77,10 @@ public final class NativeMountMovementSettingsService {
     public static Ref<EntityStore> resolveMountedRiderRef(@Nullable NPCMountComponent mount,
                                                            @Nullable Store<EntityStore> store) {
         PlayerRef owner = mount == null ? null : mount.getOwnerPlayerRef();
-        Ref<EntityStore> riderRef = owner == null ? null : owner.getReference();
+        UUID ownerUuid = owner == null ? null : owner.getUuid();
+        World world = store == null || store.getExternalData() == null
+                ? null : store.getExternalData().getWorld();
+        Ref<EntityStore> riderRef = world == null || ownerUuid == null ? null : world.getEntityRef(ownerUuid);
         if (riderRef == null || !riderRef.isValid() || store == null) {
             return null;
         }
@@ -83,9 +94,16 @@ public final class NativeMountMovementSettingsService {
         return copy;
     }
 
-    private static String resolveMovementConfigId(@Nullable String configuredMovementConfigId) {
-        return configuredMovementConfigId == null || configuredMovementConfigId.isBlank()
-                ? DEFAULT_MOUNT_MOVEMENT_CONFIG_ID
-                : configuredMovementConfigId.trim();
+    private String resolveMovementConfigId(@Nullable String sourceRoleId, @Nullable StdScope[] sourceRoleScopes) {
+        if (sourceRoleId == null || sourceRoleId.isBlank() || sourceRoleScopes == null) {
+            return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
+        }
+        for (StdScope scope : sourceRoleScopes) {
+            String configured = scopeLookupCache.getString(scope, MOUNT_MOVEMENT_CONFIG_PARAM);
+            if (configured != null && !configured.isBlank()) {
+                return configured.trim();
+            }
+        }
+        return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
     }
 }

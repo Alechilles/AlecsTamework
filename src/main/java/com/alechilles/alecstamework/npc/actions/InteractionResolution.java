@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedIntera
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 
 /** Resolves interaction configs and role-scoped parameters. */
 final class InteractionResolution {
@@ -32,6 +33,10 @@ final class InteractionResolution {
     // Resolves a string param from role scopes.
     String getRoleStringParam(Role role, InteractionContextSnapshot ctx, String paramName) {
         return paramAccess.getRoleStringParam(role, ctx, paramName);
+    }
+
+    StdScope[] resolveRoleScopes(Role role) {
+        return paramAccess.resolveRoleScopes(role);
     }
 
     // Resolves a string array param from role scopes.

@@ -7,11 +7,6 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComp
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
-import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
-import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
-import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
-import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
-import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
@@ -52,7 +47,6 @@ final class InteractionMountEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final String MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = "MountGlideMovementConfig";
     private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
-    private static final String MOVE_SPEED_MULTIPLIER_EFFECT_KEY = "MoveSpeedMultiplier";
     private static final String MOUNT_MODE_PARAM = "MountMode";
     static final String AVATAR_FLIGHT_CONFIG_PARAM = "AvatarFlightConfig";
     private static final String MOUNT_RIDE_STATE_PARAM = "MountRideState";
@@ -63,14 +57,12 @@ final class InteractionMountEffects {
 
     private final ActionTameworkInteract owner;
     private final AvatarFlightMountStarter avatarFlightStarter = new AvatarFlightMountStarter();
-    private final NativeMountMovementSettingsService nativeMountMovementSettings =
-            new NativeMountMovementSettingsService();
-    private final CompanionMovementSpeedResolver companionMovementSpeedResolver =
-            new CompanionMovementSpeedResolver();
+    private final NativeMountMovementApplication nativeMountMovementApplication;
     private final InteractionMountModeDispatcher dispatcher;
 
     InteractionMountEffects(ActionTameworkInteract owner) {
         this.owner = owner;
+        this.nativeMountMovementApplication = new NativeMountMovementApplication(owner);
         this.dispatcher = new InteractionMountModeDispatcher(
                 this::applyNativeMount,
                 request -> applyTameworkRideMount(
@@ -120,80 +112,7 @@ final class InteractionMountEffects {
     }
 
     private boolean applyNativeMount(InteractionMountRequest request) {
-        Ref<EntityStore> npcRef = request.npcRef();
-        Ref<EntityStore> playerRef = request.playerRef();
-        Role role = request.role();
-        Store<EntityStore> store = request.store();
-        ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
-        if (mountType == null) {
-            return failMount(role, "native", "npc_mount_component_type_unavailable");
-        }
-        NPCMountComponent mountComponent = store.getComponent(npcRef, mountType);
-        if (mountComponent != null) {
-            return failMount(role, "native", "npc_already_has_mount_component");
-        }
-        NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npcComponent == null) {
-            return failMount(role, "native", "missing_npc_component");
-        }
-        int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
-        int emptyRoleIndex = NPCPlugin.get().getIndex(EMPTY_ROLE_ID);
-        if (originalRoleIndex < 0 || emptyRoleIndex < 0) {
-            return failMount(role, "native", "missing_role_index",
-                    "originalRoleIndex=%s emptyRoleIndex=%s",
-                    originalRoleIndex,
-                    emptyRoleIndex);
-        }
-        Player playerComponent = store.getComponent(playerRef, Player.getComponentType());
-        if (playerComponent == null) {
-            return failMount(role, "native", "missing_player_component");
-        }
-        PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
-        if (playerRefComponent == null) {
-            return failMount(role, "native", "missing_player_ref_component");
-        }
-        float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
-        float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
-        float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
-        String movementConfigId = owner.getRoleStringParam(role, DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM);
-        if (movementConfigId == null || movementConfigId.isBlank()) {
-            movementConfigId = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
-        }
-        String sourceRoleId = role.getRoleName();
-        TwCompanionMovementConfig.ResolvedMovement movement =
-                TwCompanionMovementConfig.resolveForRole(sourceRoleId);
-        double progressionMultiplier = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
-        double quantizedMultiplier = companionMovementSpeedResolver.resolve(
-                movement,
-                CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
-                progressionMultiplier
-        ).quantizedMultiplier();
-        NPCMountComponent createdMount = store.ensureAndGetComponent(npcRef, mountType);
-        if (createdMount == null) {
-            return failMount(role, "native", "ensure_npc_mount_failed");
-        }
-        createdMount.setOriginalRoleIndex(originalRoleIndex);
-        createdMount.setOwnerPlayerRef(playerRefComponent);
-        createdMount.setAnchor(anchorX, anchorY, anchorZ);
-        clearStatusAnimation(npcRef, npcComponent, store);
-        nativeMountMovementSettings.applyScaledSettings(
-                sourceRoleId,
-                movementConfigId,
-                playerRef,
-                playerRefComponent,
-                playerComponent,
-                store,
-                quantizedMultiplier
-        );
-        RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
-        logMountDebug(role, "native", "applied",
-                "anchor=%s/%s/%s movementConfig=%s",
-                anchorX,
-                anchorY,
-                anchorZ,
-                movementConfigId);
-        return true;
+        return nativeMountMovementApplication.apply(request);
     }
 
     private void logUnknownMountMode(@Nullable Role role, @Nullable String mountMode) {
