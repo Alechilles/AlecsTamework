@@ -75,11 +75,12 @@ public final class CompanionMovementSpeedEffectService {
             return false;
         }
         boolean removed = removeOwnedEffects(controller, npcRef, store, desiredEffectId);
+        boolean desiredEffectWasActive = hasActiveEffect(controller, desiredEffectId);
         boolean added = addDesiredEffect(controller, npcRef, store, desiredEffectId);
         if (removed || added) {
             invalidateNpcSpeedCache(npcRef, store);
         }
-        return true;
+        return isApplicationSuccessful(desiredEffectId, desiredEffectWasActive, added);
     }
 
     static List<String> effectIdsToRemove(@Nullable Collection<String> activeEffectIds,
@@ -100,6 +101,28 @@ public final class CompanionMovementSpeedEffectService {
     @Nullable
     static String effectIdToAdd(@Nullable String desiredEffectId, boolean assetAvailable) {
         return assetAvailable ? desiredEffectId : null;
+    }
+
+    /**
+     * Reports whether this refresh reached its desired effect state, so callers retry rejected effect additions.
+     */
+    static boolean isApplicationSuccessful(@Nullable String desiredEffectId,
+                                           boolean desiredEffectWasActive,
+                                           boolean effectAdded) {
+        return desiredEffectId == null || desiredEffectWasActive || effectAdded;
+    }
+
+    private static boolean hasActiveEffect(EffectControllerComponent controller, @Nullable String desiredEffectId) {
+        if (desiredEffectId == null) {
+            return false;
+        }
+        IndexedLookupTableAssetMap<String, EntityEffect> assetMap = EntityEffect.getAssetMap();
+        if (assetMap == null) {
+            return false;
+        }
+        int effectIndex = assetMap.getIndex(desiredEffectId);
+        Int2ObjectMap<ActiveEntityEffect> activeEffects = controller.getActiveEffects();
+        return effectIndex != Integer.MIN_VALUE && activeEffects != null && activeEffects.containsKey(effectIndex);
     }
 
     private static boolean removeOwnedEffects(EffectControllerComponent controller,

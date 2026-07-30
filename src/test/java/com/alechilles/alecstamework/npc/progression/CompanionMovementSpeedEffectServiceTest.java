@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,5 +72,14 @@ class CompanionMovementSpeedEffectServiceTest {
                 null,
                 CompanionMovementSpeedEffectService.effectIdToAdd("Tw_MovementSpeed_125", false)
         );
+    }
+
+    @Test
+    void rejectedDesiredEffectAdditionKeepsTheRefreshIncompleteForRetry() {
+        assertFalse(CompanionMovementSpeedEffectService.isApplicationSuccessful(
+                "Tw_MovementSpeed_125", false, false));
+        assertTrue(CompanionMovementSpeedEffectService.isApplicationSuccessful(null, false, false));
+        assertTrue(CompanionMovementSpeedEffectService.isApplicationSuccessful(
+                "Tw_MovementSpeed_125", true, false));
     }
 }
