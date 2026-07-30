@@ -7,6 +7,11 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComp
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
@@ -47,6 +52,7 @@ final class InteractionMountEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final String MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = "MountGlideMovementConfig";
     private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
+    private static final String MOVE_SPEED_MULTIPLIER_EFFECT_KEY = "MoveSpeedMultiplier";
     private static final String MOUNT_MODE_PARAM = "MountMode";
     static final String AVATAR_FLIGHT_CONFIG_PARAM = "AvatarFlightConfig";
     private static final String MOUNT_RIDE_STATE_PARAM = "MountRideState";
@@ -57,6 +63,10 @@ final class InteractionMountEffects {
 
     private final ActionTameworkInteract owner;
     private final AvatarFlightMountStarter avatarFlightStarter = new AvatarFlightMountStarter();
+    private final NativeMountMovementSettingsService nativeMountMovementSettings =
+            new NativeMountMovementSettingsService();
+    private final CompanionMovementSpeedResolver companionMovementSpeedResolver =
+            new CompanionMovementSpeedResolver();
     private final InteractionMountModeDispatcher dispatcher;
 
     InteractionMountEffects(ActionTameworkInteract owner) {
@@ -149,6 +159,16 @@ final class InteractionMountEffects {
         if (movementConfigId == null || movementConfigId.isBlank()) {
             movementConfigId = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
         }
+        String sourceRoleId = role.getRoleName();
+        TwCompanionMovementConfig.ResolvedMovement movement =
+                TwCompanionMovementConfig.resolveForRole(sourceRoleId);
+        double progressionMultiplier = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
+        double quantizedMultiplier = companionMovementSpeedResolver.resolve(
+                movement,
+                CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
+                progressionMultiplier
+        ).quantizedMultiplier();
         NPCMountComponent createdMount = store.ensureAndGetComponent(npcRef, mountType);
         if (createdMount == null) {
             return failMount(role, "native", "ensure_npc_mount_failed");
@@ -157,8 +177,16 @@ final class InteractionMountEffects {
         createdMount.setOwnerPlayerRef(playerRefComponent);
         createdMount.setAnchor(anchorX, anchorY, anchorZ);
         clearStatusAnimation(npcRef, npcComponent, store);
+        nativeMountMovementSettings.applyScaledSettings(
+                sourceRoleId,
+                movementConfigId,
+                playerRef,
+                playerRefComponent,
+                playerComponent,
+                store,
+                quantizedMultiplier
+        );
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
-        applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         logMountDebug(role, "native", "applied",
                 "anchor=%s/%s/%s movementConfig=%s",
                 anchorX,

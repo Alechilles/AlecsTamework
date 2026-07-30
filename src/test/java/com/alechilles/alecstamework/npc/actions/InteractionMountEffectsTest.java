@@ -28,6 +28,23 @@ class InteractionMountEffectsTest {
     }
 
     @Test
+    void nativeMountDelegatesScaledRiderSettingsBeforeEmptyRoleChange() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        int nativeStart = mountSource.indexOf("private boolean applyNativeMount");
+        int nativeEnd = mountSource.indexOf("private void logUnknownMountMode");
+        String nativeMountSource = mountSource.substring(nativeStart, nativeEnd);
+
+        assertTrue(mountSource.contains("NativeMountMovementSettingsService"));
+        assertTrue(mountSource.contains("CompanionMovementSpeedResolver"));
+        assertTrue(nativeMountSource.contains("CompanionProgressionModifierService.resolveMultiplier"));
+        assertTrue(nativeMountSource.indexOf("applyScaledSettings")
+                < nativeMountSource.indexOf("RoleChangeSystem.requestRoleChange"));
+        assertFalse(nativeMountSource.contains("applyMovementConfig("));
+    }
+
+    @Test
     void mountedGlideMountReportsActionableDebugStages() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
