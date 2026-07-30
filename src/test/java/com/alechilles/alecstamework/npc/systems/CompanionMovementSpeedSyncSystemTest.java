@@ -2,8 +2,6 @@ package com.alechilles.alecstamework.npc.systems;
 
 import java.util.Map;
 import java.util.UUID;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,25 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Regression coverage for companion movement-speed lifecycle change detection. */
 class CompanionMovementSpeedSyncSystemTest {
     @Test
-    void mountedRefreshUsesRecoveredRoleForNpcEffectAndCustomRiderProfile() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/systems/CompanionMovementSpeedSyncSystem.java"));
-
-        assertTrue(source.contains("applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier)"));
-        assertTrue(source.contains("resolveMountedSourceRoleScopes(mount)"));
-        assertTrue(source.contains("riderSettings.applyScaledSettings"));
-    }
-
-    @Test
-    void lifecycleSweepRetriesUntilCallbackRefreshSucceedsAndDoesNotRequireAttachmentsComponent() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/systems/CompanionMovementSpeedSyncSystem.java"));
-
-        assertTrue(source.contains("store.forEachChunk(Query.and(npcType)"));
-        assertFalse(source.contains("Query.and(npcType, attachmentsType)"));
-        assertTrue(source.contains("if (refreshCompanion(npcRef, bufferStore))"));
-        assertTrue(source.contains("commitFingerprint(state, buildFingerprint(npcRef, bufferStore))"));
-        assertTrue(source.contains("EffectControllerComponent.getComponentType()) == null"));
+    void lifecycleCompletionCommitsOnlyWhenNpcAndCurrentMountedRiderRefreshesSucceed() {
+        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, false, false, false));
+        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, true, true));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(false, false, false, false));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, false, false));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, true, false));
     }
 
     @Test

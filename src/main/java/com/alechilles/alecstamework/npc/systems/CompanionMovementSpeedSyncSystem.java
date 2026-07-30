@@ -55,12 +55,8 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
-        try {
-            if (refreshCompanion(npcRef, store)) {
-                commitFingerprint(statesByStore.get(store), buildFingerprint(npcRef, store));
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-            // A periodic sweep will retry transient model/effect/rider availability failures.
+        if (refreshCompanion(npcRef, store)) {
+            commitFingerprint(statesByStore.get(store), buildFingerprint(npcRef, store));
         }
     }
 
@@ -116,7 +112,8 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
         double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
-        if (store.getComponent(npcRef, EffectControllerComponent.getComponentType()) == null) {
+        boolean controllerAvailable = store.getComponent(npcRef, EffectControllerComponent.getComponentType()) != null;
+        if (!controllerAvailable) {
             return false;
         }
         CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
@@ -132,7 +129,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         if (rider == null || riderPlayerRef == null) {
             return false;
         }
-        return riderSettings.applyScaledSettings(
+        boolean riderSettingsApplied = riderSettings.applyScaledSettings(
                 sourceRoleId,
                 NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount),
                 riderRef,
@@ -141,6 +138,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 store,
                 multiplier
         );
+        return isRefreshComplete(controllerAvailable, true, true, riderSettingsApplied);
     }
 
     @Nullable
@@ -202,6 +200,14 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     static boolean hasChanged(@Nullable MovementSpeedFingerprint previous,
                               @Nullable MovementSpeedFingerprint current) {
         return current != null && !current.equals(previous);
+    }
+
+    /** Pure lifecycle completion rule used by the deferred callback before it commits a fingerprint. */
+    static boolean isRefreshComplete(boolean controllerAvailable,
+                                     boolean nativeMountPresent,
+                                     boolean activeRiderAvailable,
+                                     boolean riderSettingsApplied) {
+        return controllerAvailable && (!nativeMountPresent || (activeRiderAvailable && riderSettingsApplied));
     }
 
     private static void commitFingerprint(@Nonnull TickState state, @Nullable MovementSpeedFingerprint fingerprint) {
