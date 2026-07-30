@@ -29,6 +29,21 @@ class TwCompanionFlightToggleSettingsTest {
         assertFalse(configured(true, "").isConfigured());
     }
 
+    @Test
+    void hookIdNormalizesNullAndWhitespace() {
+        TwCompanionFlightToggleSettings settings =
+                new TwCompanionFlightToggleSettings();
+
+        settings.setHookId(null);
+        assertEquals("", settings.getHookId());
+
+        settings.setHookId("  HyDragon.Command.ToggleAirborneMode  ");
+        assertEquals(
+                "HyDragon.Command.ToggleAirborneMode",
+                settings.getHookId()
+        );
+    }
+
     private TwCompanionFlightToggleSettings configured(
             boolean enabled,
             String hookId
