@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.TestEntityComponentStore;
@@ -152,6 +153,73 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     ignored -> { }, recall);
             generic.handleDataEvent(actor, store, event("__recall__:" + CARD));
             assertEquals(1, recalls.get());
+        }
+    }
+
+    /** A bonded Horn command choice is a tool preference, not a generic NPC action. */
+    @Test
+    void bondedPageCommandChoiceInvokesTheToolSelectionCallback() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            putObject(player, Player.class, "playerRef", playerRef());
+            player.loadIntoWorld(world);
+            player.setReference(actor);
+            AtomicReference<String> selected = new AtomicReference<>();
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    null, null, null, null, null, null, null, null);
+
+            TameworkCommandSelectionPage page = createBoundPage(
+                    service, player, store, bondedConfig(), commandStack(
+                            "test:horn", "horn-tool"), () -> false,
+                    ignored -> true, selected::set);
+
+            page.handleDataEvent(actor, store, event("Follow"));
+
+            assertEquals("Follow", selected.get());
+        }
+    }
+
+    /** A bonded Horn command choice must persist on its physical tool stack. */
+    @Test
+    void bondedMenuChoicePersistsTheSelectedCommandOnTheHorn() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER);
+            putObject(player, Player.class, "playerRef", silentPlayerRef());
+            player.loadIntoWorld(world);
+            player.setReference(store.createReference());
+            ItemStack horn = metadataCommandStack("test:horn", "horn-tool");
+            installInventory(player, horn);
+            TwCommandItemConfig config = bondedConfigWithHold();
+            com.alechilles.alecstamework.config.bonded
+                    .BondedCompanionRosterRegistry rosters = bondedRosters();
+            com.alechilles.alecstamework.config.CommandItemRegistry registry =
+                    new com.alechilles.alecstamework.config.CommandItemRegistry(
+                            rosters);
+            registry.register("test:horn", config);
+            CommandItemFeatureHandler handler = new CommandItemFeatureHandler(
+                    registry, null, null);
+            var apply = CommandItemFeatureHandler.class.getDeclaredMethod(
+                    "applyMenuSelection", Player.class, String.class,
+                    TwCommandItemConfig.class, String.class);
+            apply.setAccessible(true);
+
+            apply.invoke(handler, player, "horn-tool", config, "Hold");
+
+            ItemStack updated = player.getInventory().getHotbar().getItemStack((short) 0);
+            assertEquals("Hold", updated.getFromMetadataOrNull(
+                    com.alechilles.alecstamework.config.TameworkMetadataKeys
+                            .COMMAND_SELECTED_ID, Codec.STRING));
         }
     }
 
@@ -363,6 +431,20 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             BooleanSupplier genericAuthority,
             CommandSelectionPageService.BondedLifecycleAuthority bondedAuthority)
             throws Exception {
+        return createBoundPage(service, player, store, config, working,
+                genericAuthority, bondedAuthority, ignored -> { });
+    }
+
+    private TameworkCommandSelectionPage createBoundPage(
+            CommandSelectionPageService service,
+            Player player,
+            TestEntityComponentStore store,
+            TwCommandItemConfig config,
+            ItemStack working,
+            BooleanSupplier genericAuthority,
+            CommandSelectionPageService.BondedLifecycleAuthority bondedAuthority,
+            java.util.function.Consumer<String> selectCommand)
+            throws Exception {
         var createPage = java.util.Arrays.stream(
                         CommandSelectionPageService.class.getDeclaredMethods())
                 .filter(method -> method.getName().equals("createPage"))
@@ -373,7 +455,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         CommandSelectionPageService.Actions actions = new CommandSelectionPageService.Actions(
                 ignored -> { }, ignored -> { }, ignored -> { }, ignored -> { },
                 ignored -> { }, ignored -> { }, ignored -> { }, ignored -> { },
-                () -> { }, () -> { }, ignored -> { });
+                () -> { }, () -> { }, selectCommand);
         Object[] fixed = {
                 player, store, player.getPlayerRef(), config, working,
                 "horn-tool", actions, genericAuthority
@@ -409,6 +491,12 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 com.alechilles.alecstamework.config.TameworkMetadataKeys
                         .COMMAND_TOOL_ID, new BsonString(toolId)));
         return stack;
+    }
+
+    private ItemStack metadataCommandStack(String itemId, String toolId) {
+        return new MetadataItemStack(itemId, null).withMetadata(
+                com.alechilles.alecstamework.config.TameworkMetadataKeys
+                        .COMMAND_TOOL_ID, Codec.STRING, toolId);
     }
 
     private TameworkCommandSelectionPage page(
@@ -510,6 +598,37 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 """), new ExtraInfo());
     }
 
+    private TwCommandItemConfig bondedConfigWithHold() {
+        return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("""
+                {
+                  "RosterStorage": "BondedCompanions",
+                  "BondedRosterId": "hydragon:dragons",
+                  "CommandList": [
+                    {"Id":"Follow", "DisplayName":"Follow", "Steps":[]},
+                    {"Id":"Hold", "DisplayName":"Hold", "Steps":[]}
+                  ]
+                }
+                """), new ExtraInfo());
+    }
+
+    private com.alechilles.alecstamework.config.bonded
+            .BondedCompanionRosterRegistry bondedRosters() throws Exception {
+        var roster = com.alechilles.alecstamework.config.assets
+                .TwBondedCompanionRosterConfig.CODEC.decode(BsonDocument.parse("""
+                {
+                  "RosterId": "hydragon:dragons",
+                  "FamilyId": "hydragon:dragon",
+                  "AllowedRoles": ["Tamed_Dragon_Fire"]
+                }
+                """), new ExtraInfo());
+        putObject(roster, com.alechilles.alecstamework.config.assets
+                .TwBondedCompanionRosterConfig.class, "id", "TestRoster");
+        var rosters = new com.alechilles.alecstamework.config.bonded
+                .BondedCompanionRosterRegistry();
+        rosters.replace(List.of(roster), 1L);
+        return rosters;
+    }
+
     private TwCommandItemConfig genericConfig() {
         return TwCommandItemConfig.CODEC.decode(
                 BsonDocument.parse("{}"), new ExtraInfo());
@@ -608,6 +727,14 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         return ref;
     }
 
+    private PlayerRef silentPlayerRef() throws Exception {
+        PlayerRef ref = (PlayerRef) unsafe().allocateInstance(PlayerRef.class);
+        putObject(ref, PlayerRef.class, "uuid", OWNER);
+        putObject(ref, PlayerRef.class, "username", "BondedTester");
+        putObject(ref, PlayerRef.class, "language", "en-US");
+        return ref;
+    }
+
     private void refresh(TameworkCommandSelectionPage page) throws Exception {
         var method = TameworkCommandSelectionPage.class.getDeclaredMethod(
                 "refreshLinkedNpcEntries");
@@ -646,6 +773,26 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
         @Override public String getIdentifier() { return "bonded-test"; }
         @Override public void accept(ToServerPacket packet) { }
         @Override public void write(ToClientPacket packet) { }
+    }
+
+    /** Asset-store-free stack that preserves the metadata write under test. */
+    private static final class MetadataItemStack extends ItemStack {
+        private MetadataItemStack(String itemId, BsonDocument metadata) {
+            super();
+            this.itemId = itemId;
+            this.quantity = 1;
+            this.metadata = metadata;
+        }
+
+        @Override
+        public <T> ItemStack withMetadata(String key, Codec<T> codec, T value) {
+            BsonDocument next = metadata == null
+                    ? new BsonDocument() : metadata.clone();
+            if (value == null) next.remove(key);
+            else next.put(key, codec.encode(value));
+            return new MetadataItemStack(itemId,
+                    next.isEmpty() ? null : next);
+        }
     }
 
     private static final class TestEntityStore extends EntityStore {

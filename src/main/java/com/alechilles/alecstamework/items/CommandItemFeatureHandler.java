@@ -540,7 +540,7 @@ public final class CommandItemFeatureHandler {
                                     String toolId,
                                     TwCommandItemConfig config,
                                     String commandId) {
-        if (!callbackAuthority.allowsGeneric(player, toolId, config)
+        if (!allowsMenuSelection(player, toolId, config)
                 || commandId == null || commandId.isBlank()) {
             return;
         }
@@ -556,6 +556,23 @@ public final class CommandItemFeatureHandler {
         }
         String label = resolveCommandLabel(player, selected);
         feedbackService.showDefaultKey(player, "tamework.ui.notifications.command.selection.selected", label);
+    }
+
+    /**
+     * Command selection only updates the player's physical tool, so bonded
+     * rosters use their own callback authority instead of the generic-NPC one.
+     */
+    private boolean allowsMenuSelection(Player player,
+                                        String toolId,
+                                        TwCommandItemConfig config) {
+        if (config != null && config.usesBondedCompanionRoster()) {
+            ItemStack stack = toolInventoryService.findUniqueToolStack(
+                    player, toolId);
+            return stack != null && callbackAuthority.allowsBonded(
+                    player, toolId, stack.getItemId(), config,
+                    callbackAuthority.revision());
+        }
+        return callbackAuthority.allowsGeneric(player, toolId, config);
     }
 
     private void applyMenuUnlink(Player player,

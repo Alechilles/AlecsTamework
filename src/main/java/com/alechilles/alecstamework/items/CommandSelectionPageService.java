@@ -260,7 +260,7 @@ final class CommandSelectionPageService {
             return new NpcCallbacks(ignoredUuid, ignoredUuid, ignoredUuid,
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
                     ignoredUuid, ignoredUuid, ignoredUuid, ignoredUuid,
-                    openBondedTalents, ignoredString);
+                    openBondedTalents, context.actions().selectCommand());
         }
         Player player = context.player();
         String toolId = context.toolId();
