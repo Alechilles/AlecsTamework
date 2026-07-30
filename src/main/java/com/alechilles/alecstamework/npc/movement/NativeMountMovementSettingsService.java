@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.movement;
 
+import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -16,6 +17,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nullable;
 
 /**
@@ -40,15 +42,17 @@ public final class NativeMountMovementSettingsService {
         }
         PhysicsValues physics = store.getComponent(riderRef, PhysicsValues.getComponentType());
         MovementManager manager = store.getComponent(riderRef, MovementManager.getComponentType());
-        MovementConfig profile = MovementConfig.getAssetMap().getAsset(
-                resolveMovementConfigId(sourceRoleId, sourceRoleScopes));
+        String movementConfigId = resolveMovementConfigId(sourceRoleId, sourceRoleScopes);
+        MovementConfig profile = MovementConfig.getAssetMap().getAsset(movementConfigId);
         if (physics == null || manager == null || profile == null) {
             return false;
         }
-        MovementSettings settings = copyWithScaledBaseSpeed(profile.toPacket(), quantizedMultiplier);
+        MovementSettings profileSettings = profile.toPacket();
+        MovementSettings settings = copyWithScaledBaseSpeed(profileSettings, quantizedMultiplier);
         manager.setDefaultSettings(settings, physics, rider.getGameMode());
         manager.applyDefaultSettings();
         manager.update(riderPlayerRef.getPacketHandler());
+        logAppliedSettings(sourceRoleId, movementConfigId, profileSettings.baseSpeed, settings.baseSpeed);
         return true;
     }
 
@@ -113,5 +117,20 @@ public final class NativeMountMovementSettingsService {
             }
         }
         return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
+    }
+
+    private static void logAppliedSettings(String sourceRoleId,
+                                           String movementConfigId,
+                                           float profileBaseSpeed,
+                                           float appliedBaseSpeed) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkMount debug: stage=native_settings sourceRole=%s movementConfig=%s "
+                        + "profileBaseSpeed=%s appliedBaseSpeed=%s",
+                sourceRoleId, movementConfigId, profileBaseSpeed, appliedBaseSpeed
+        );
     }
 }
