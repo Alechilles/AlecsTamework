@@ -119,10 +119,13 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         boolean nativeMountPresent = mount != null;
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
-        double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
+        CompanionMovementSpeedResolver.Result resolved = resolveMovementMultiplier(npcRef, sourceRoleId, store);
+        double effectMultiplier = selectAppliedMultiplier(false, resolved);
+        double riderMultiplier = selectAppliedMultiplier(nativeMountPresent, resolved);
         boolean controllerAvailable = store.getComponent(npcRef, EffectControllerComponent.getComponentType()) != null;
         boolean effectApplied = controllerAvailable
-                && CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
+                && CompanionMovementSpeedEffectService.applyResolvedMultiplier(
+                        npcRef, store, sourceRoleId, nativeMountPresent ? 1.0 : effectMultiplier);
         Ref<EntityStore> riderRef = nativeMountPresent
                 ? NativeMountMovementSettingsService.resolveMountedRiderRef(mount, store) : null;
         Player rider = riderRef == null ? null : store.getComponent(riderRef, Player.getComponentType());
@@ -131,7 +134,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 && rider != null && riderPlayerRef != null;
         boolean riderSettingsApplied = activeRiderAvailable && effectApplied && riderSettings.applyScaledSettings(
                 sourceRoleId, NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount), riderRef,
-                riderPlayerRef, rider, store, multiplier);
+                riderPlayerRef, rider, store, riderMultiplier);
         return isRefreshComplete(new RefreshCompletion(
                 effectApplied, nativeMountPresent, activeRiderAvailable, riderSettingsApplied));
     }
@@ -150,22 +153,29 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 npc.getUuid(),
                 sourceRoleId,
                 resolveEffectiveAttachments(npcRef, store),
-                resolveQuantizedMultiplier(npcRef, sourceRoleId, store),
+                selectAppliedMultiplier(mount != null, resolveMovementMultiplier(npcRef, sourceRoleId, store)),
                 CONFIG_REVISION.get(),
                 mount != null,
                 owner == null ? null : owner.getUuid()
         );
     }
 
-    private double resolveQuantizedMultiplier(@Nonnull Ref<EntityStore> npcRef,
-                                              @Nullable String sourceRoleId,
-                                              @Nonnull Store<EntityStore> store) {
+    @Nonnull
+    private CompanionMovementSpeedResolver.Result resolveMovementMultiplier(@Nonnull Ref<EntityStore> npcRef,
+                                                                             @Nullable String sourceRoleId,
+                                                                             @Nonnull Store<EntityStore> store) {
         return speedResolver.resolve(
                 TwCompanionMovementConfig.resolveForRole(sourceRoleId),
                 resolveEffectiveAttachments(npcRef, store),
                 CompanionProgressionModifierService.resolveMultiplier(
-                        npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0)
-        ).quantizedMultiplier();
+                        npcRef, store, sourceRoleId, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0)
+        );
+    }
+
+    /** Uses exact values for native riders and static-effect-compatible values for unmounted companions. */
+    static double selectAppliedMultiplier(boolean nativeMountPresent,
+                                          @Nonnull CompanionMovementSpeedResolver.Result resolved) {
+        return nativeMountPresent ? resolved.clampedMultiplier() : resolved.quantizedMultiplier();
     }
 
     @Nonnull

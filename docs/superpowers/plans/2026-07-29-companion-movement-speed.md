@@ -1,5 +1,9 @@
 # Companion Movement Speed Implementation Plan
 
+> **Superseded behavior (2026-07-30):** The implemented native mount path uses
+> the exact clamped multiplier through runtime `MovementSettings`. The 5% static
+> entity-effect quantization in this historical plan now applies only to unmounted NPCs.
+
 > **For Codex:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task.
 
 **Goal:** Give companions one configurable, quantized movement-speed multiplier that applies equally to unmounted NPC motion and native mounted-player movement, with species, attachment, trait, level-growth, and talent inputs.

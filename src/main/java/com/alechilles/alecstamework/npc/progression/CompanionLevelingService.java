@@ -264,13 +264,27 @@ public final class CompanionLevelingService {
                                                       @Nullable Store<EntityStore> store,
                                                       @Nullable String effectKey,
                                                       double defaultMultiplier) {
+        return resolveLevelGrowthMultiplier(npcRef, store, null, effectKey, defaultMultiplier);
+    }
+
+    /**
+     * Resolves level growth using an explicit source role when a native mount temporarily replaces the NPC role.
+     */
+    public static double resolveLevelGrowthMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                                      @Nullable Store<EntityStore> store,
+                                                      @Nullable String sourceRoleId,
+                                                      @Nullable String effectKey,
+                                                      double defaultMultiplier) {
         if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
             return defaultMultiplier;
         }
         if (!CompanionProgressionSettings.isLevelingEnabled()) {
             return defaultMultiplier;
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        String roleId = sourceRoleId;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
         if (roleId == null || roleId.isBlank()) {
             return defaultMultiplier;
         }
