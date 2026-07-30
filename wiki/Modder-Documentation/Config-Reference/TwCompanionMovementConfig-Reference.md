@@ -51,10 +51,11 @@ BaseMoveSpeedMultiplier
   x progression MoveSpeedMultiplier (traits, level growth, and talents)
   = raw multiplier
   -> clamp to MinMoveSpeedMultiplier..MaxMoveSpeedMultiplier
-  -> quantize to the nearest 0.05 (5%) step
 ```
 
-The supported effective range is `0.50` through `2.00`. Authored minimum and maximum bounds are themselves normalized into that range; if they are reversed, Tamework swaps them before clamping. Non-finite or non-positive factors are treated as neutral `1.00`. Quantization happens after clamping, so both walking companions and natively mounted riders receive the same stable 5% step.
+The supported effective range is `0.50` through `2.00`. Authored minimum and maximum bounds are themselves normalized into that range; if they are reversed, Tamework swaps them before clamping. Non-finite or non-positive factors are treated as neutral `1.00`.
+
+Unmounted companions quantize the clamped multiplier to the nearest `0.05` (5%) step so the runtime can use static entity effects. Native mounts instead apply the exact clamped multiplier to the rider's runtime movement settings, so smaller level, trait, talent, and attachment changes are visible immediately without additional entity-effect assets.
 
 ## Saddle example
 
@@ -70,4 +71,4 @@ This example gives the `Horse` role a 10% base increase and another 10% when its
 }
 ```
 
-With a progression multiplier of `1.05`, that saddle example resolves `1.10 x 1.10 x 1.05 = 1.2705`, then quantizes to `1.25`.
+With a progression multiplier of `1.05`, that saddle example resolves `1.10 x 1.10 x 1.05 = 1.2705`. An unmounted companion receives the nearest static-effect step, `1.25`; a native rider receives the exact `1.2705` multiplier.

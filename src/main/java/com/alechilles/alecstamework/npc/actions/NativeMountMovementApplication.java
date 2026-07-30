@@ -66,7 +66,7 @@ final class NativeMountMovementApplication {
             return fail(role, "missing_role_index");
         }
         String sourceRoleId = role.getRoleName();
-        double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
+        double multiplier = selectNativeMountMultiplier(resolveMovementMultiplier(npcRef, sourceRoleId, store));
         float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
         float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
@@ -85,9 +85,9 @@ final class NativeMountMovementApplication {
         return true;
     }
 
-    private double resolveQuantizedMultiplier(Ref<EntityStore> npcRef,
-                                              String sourceRoleId,
-                                              Store<EntityStore> store) {
+    private CompanionMovementSpeedResolver.Result resolveMovementMultiplier(Ref<EntityStore> npcRef,
+                                                                             String sourceRoleId,
+                                                                             Store<EntityStore> store) {
         TwCompanionMovementConfig.ResolvedMovement movement = TwCompanionMovementConfig.resolveForRole(sourceRoleId);
         double progression = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef, store, sourceRoleId, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
@@ -95,7 +95,12 @@ final class NativeMountMovementApplication {
                 movement,
                 CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
                 progression
-        ).quantizedMultiplier();
+        );
+    }
+
+    /** Native rider settings support the exact clamped multiplier without an entity-effect asset. */
+    static double selectNativeMountMultiplier(CompanionMovementSpeedResolver.Result resolved) {
+        return resolved.clampedMultiplier();
     }
 
     private static void logApplied(Role role, float anchorX, float anchorY, float anchorZ) {

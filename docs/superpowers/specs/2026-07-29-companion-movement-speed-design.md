@@ -1,5 +1,9 @@
 # Companion Movement Speed Design
 
+> **Superseded behavior (2026-07-30):** Native riders now use the exact clamped
+> multiplier through runtime `MovementSettings`; only unmounted NPC movement uses
+> the historical 5% static-effect quantization described below.
+
 ## Goal
 
 Give every companion one consistent movement-speed calculation that applies both

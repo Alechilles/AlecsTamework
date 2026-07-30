@@ -53,8 +53,8 @@ Resolved by role id + `Priority`:
 
 ### Companion movement family
 - `TwCompanionMovementConfig` selects one enabled config per normalized role id: higher `Priority`, then case-insensitive lowest asset id.
-- Its multiplier starts with `BaseMoveSpeedMultiplier`, multiplies matching attachment modifiers and the shared progression `MoveSpeedMultiplier`, then clamps and quantizes to 5% steps.
-- `MountMovementConfig` supplies native mount controls; companion movement config scales the resulting speed while walking and while natively ridden.
+- Its multiplier starts with `BaseMoveSpeedMultiplier`, multiplies matching attachment modifiers and the shared progression `MoveSpeedMultiplier`, then clamps to the configured bounds.
+- Unmounted companions use the clamped value quantized to 5% steps through a static entity effect. `MountMovementConfig` supplies native mount controls; natively ridden companions instead scale the rider's runtime movement settings with the exact clamped value.
 
 ### Attachment display family
 - `TwAttachmentDisplayConfig` resolves friendly attachment names from all enabled configs and entries.

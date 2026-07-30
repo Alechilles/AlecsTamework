@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,5 +60,17 @@ class CompanionMovementSpeedSyncSystemTest {
         assertTrue(CompanionMovementSpeedSyncSystem.hasChanged(baseline,
                 CompanionMovementSpeedSyncSystem.createFingerprint(
                         npcId, "Wolf_Default", Map.of("Saddle", "Plain"), 1.10, 3L, false, UUID.randomUUID())));
+    }
+
+    @Test
+    void nativeMountRefreshUsesExactSpeedWhileUnmountedRefreshKeepsEffectQuantization() throws Exception {
+        var resolved = new CompanionMovementSpeedResolver().resolve(
+                new TwCompanionMovementConfig.ResolvedMovement("test:cow", 1.0, 0.5, 2.0, List.of()),
+                Map.of(),
+                1.024
+        );
+
+        assertEquals(1.024, CompanionMovementSpeedSyncSystem.selectAppliedMultiplier(true, resolved), 0.0000001);
+        assertEquals(1.0, CompanionMovementSpeedSyncSystem.selectAppliedMultiplier(false, resolved), 0.0000001);
     }
 }

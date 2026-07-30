@@ -19,7 +19,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Applies a native mount's copied rider profile with its already-quantized companion speed multiplier.
+ * Applies a native mount's copied rider profile with its exact clamped companion speed multiplier.
  */
 public final class NativeMountMovementSettingsService {
     public static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
