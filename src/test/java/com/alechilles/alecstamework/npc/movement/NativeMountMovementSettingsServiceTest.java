@@ -1,13 +1,25 @@
 package com.alechilles.alecstamework.npc.movement;
 
+import com.alechilles.alecstamework.damage.SimpleClaimsDamageHytaleFixture;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.TestEntityComponentStore;
 import com.hypixel.hytale.protocol.MovementSettings;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /** Tests the isolated native-mount rider movement-settings scaling rule. */
 class NativeMountMovementSettingsServiceTest {
@@ -53,7 +65,7 @@ class NativeMountMovementSettingsServiceTest {
         String method = source.substring(methodStart, methodEnd);
 
         assertEquals(true, method.contains("if (mount != null)"));
-        assertEquals(true, method.contains("resolveMountedRoleId("));
+        assertEquals(true, method.contains("new NativeMountedRoleLookup(NPCPlugin.get()).resolve(mount)"));
         assertEquals(true, method.contains("resolveManagedRoleId(false, null"));
     }
 
@@ -67,7 +79,7 @@ class NativeMountMovementSettingsServiceTest {
         String method = source.substring(methodStart, methodEnd);
 
         assertEquals(true, method.contains("owner.getUuid()"));
-        assertEquals(true, method.contains("resolveActiveRider("));
+        assertEquals(true, method.contains("new ActiveWorldRiderLookup(world, store).resolve(ownerUuid)"));
         assertEquals(false, method.contains("owner.getReference()"));
     }
 
@@ -78,89 +90,107 @@ class NativeMountMovementSettingsServiceTest {
     }
 
     @Test
-    void mappedMountedRoleRecoveryReturnsOriginalRole() {
-        RecordingRoleNames names = new RecordingRoleNames("Horse_Default");
+    void mountedRoleLookupPassesTheMountOriginalIndexToNpcPlugin() throws Exception {
+        NPCMountComponent mount = new NPCMountComponent();
+        mount.setOriginalRoleIndex(42);
+        RecordingNpcPlugin plugin = allocate(RecordingNpcPlugin.class);
+        plugin.roleName = "Horse_Default";
 
-        assertEquals("Horse_Default", NativeMountMovementSettingsService.resolveMountedRoleId(42, names));
-        assertEquals(42, names.requestedIndex);
+        assertEquals("Horse_Default", new NativeMountedRoleLookup(plugin).resolve(mount));
+        assertEquals(42, plugin.requestedIndex);
     }
 
     @Test
-    void unmappableMountedRoleRecoveryReturnsNull() {
-        RecordingRoleNames names = new RecordingRoleNames(null);
+    void mountedRoleLookupReturnsNullWhenNpcPluginCannotMapOriginalIndex() throws Exception {
+        NPCMountComponent mount = new NPCMountComponent();
+        mount.setOriginalRoleIndex(99);
+        RecordingNpcPlugin plugin = allocate(RecordingNpcPlugin.class);
 
-        assertEquals(null, NativeMountMovementSettingsService.resolveMountedRoleId(99, names));
-        assertEquals(99, names.requestedIndex);
+        assertNull(new NativeMountedRoleLookup(plugin).resolve(mount));
+        assertEquals(99, plugin.requestedIndex);
     }
 
     @Test
-    void riderResolutionReturnsTheActiveWorldEntity() {
+    void activeRiderLookupUsesSuppliedUuidAndReturnsPlayerEntity() throws Exception {
         UUID riderId = UUID.randomUUID();
-        RecordingRiderLookup lookup = new RecordingRiderLookup("active-store-rider", true);
-        String resolved = NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup);
+        RecordingWorld world = allocate(RecordingWorld.class);
+        EntityStore entityStore = new EntityStore(world);
+        try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
+                     SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            Ref<EntityStore> riderRef = store.createReference();
+            store.put(riderRef, Player.getComponentType(), allocate(Player.class));
+            world.result = riderRef;
 
-        assertEquals("active-store-rider", resolved);
-        assertEquals(riderId, lookup.requestedUuid);
-        assertEquals(1, lookup.playerValidationCalls);
+            Ref<EntityStore> resolved = new ActiveWorldRiderLookup(world, store).resolve(riderId);
+
+            assertSame(riderRef, resolved);
+            assertEquals(riderId, world.requestedUuid);
+        }
     }
 
     @Test
-    void riderResolutionRejectsMissingActiveWorldEntity() {
+    void activeRiderLookupRejectsMissingWorldEntity() throws Exception {
         UUID riderId = UUID.randomUUID();
-        RecordingRiderLookup lookup = new RecordingRiderLookup(null, true);
-
-        assertEquals(null, NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup));
-        assertEquals(riderId, lookup.requestedUuid);
-        assertEquals(0, lookup.playerValidationCalls);
+        RecordingWorld world = allocate(RecordingWorld.class);
+        EntityStore entityStore = new EntityStore(world);
+        try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
+                     SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            assertNull(new ActiveWorldRiderLookup(world, store).resolve(riderId));
+            assertEquals(riderId, world.requestedUuid);
+        }
     }
 
     @Test
-    void riderResolutionRejectsEntityWithoutActivePlayer() {
+    void activeRiderLookupRejectsEntityWithoutPlayerComponent() throws Exception {
         UUID riderId = UUID.randomUUID();
-        RecordingRiderLookup lookup = new RecordingRiderLookup("wrong-store-or-not-player", false);
+        RecordingWorld world = allocate(RecordingWorld.class);
+        EntityStore entityStore = new EntityStore(world);
+        try (SimpleClaimsDamageHytaleFixture.HytaleModuleScope ignored =
+                     SimpleClaimsDamageHytaleFixture.HytaleModuleScope.install();
+             TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            world.result = store.createReference();
 
-        assertEquals(null, NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup));
-        assertEquals(riderId, lookup.requestedUuid);
-        assertEquals(1, lookup.playerValidationCalls);
+            assertNull(new ActiveWorldRiderLookup(world, store).resolve(riderId));
+            assertEquals(riderId, world.requestedUuid);
+        }
     }
 
-    private static final class RecordingRoleNames implements NativeMountMovementSettingsService.RoleNameLookup {
-        private final String name;
+    private static final class RecordingNpcPlugin extends NPCPlugin {
+        private String roleName;
         private int requestedIndex = Integer.MIN_VALUE;
 
-        private RecordingRoleNames(String name) {
-            this.name = name;
+        private RecordingNpcPlugin() {
+            super(null);
         }
 
         @Override
         public String getName(int originalRoleIndex) {
             requestedIndex = originalRoleIndex;
-            return name;
+            return roleName;
         }
     }
 
-    private static final class RecordingRiderLookup
-            implements NativeMountMovementSettingsService.ActiveRiderLookup<String> {
-        private final String result;
-        private final boolean activePlayer;
+    private static final class RecordingWorld extends World {
         private UUID requestedUuid;
-        private int playerValidationCalls;
+        private Ref<EntityStore> result;
 
-        private RecordingRiderLookup(String result, boolean activePlayer) {
-            this.result = result;
-            this.activePlayer = activePlayer;
+        private RecordingWorld() throws java.io.IOException {
+            super("unused", Path.of("."),
+                    new com.hypixel.hytale.server.core.universe.world.WorldConfig());
         }
 
         @Override
-        public String findInActiveWorld(UUID riderUuid) {
+        public Ref<EntityStore> getEntityRef(UUID riderUuid) {
             requestedUuid = riderUuid;
             return result;
         }
+    }
 
-        @Override
-        public boolean isActivePlayer(String rider) {
-            playerValidationCalls++;
-            return activePlayer;
-        }
+    private static <T> T allocate(Class<T> type) throws Exception {
+        Field field = Unsafe.class.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        return type.cast(((Unsafe) field.get(null)).allocateInstance(type));
     }
 }

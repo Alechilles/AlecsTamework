@@ -61,11 +61,8 @@ public final class NativeMountMovementSettingsService {
         }
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         if (mount != null) {
-            NPCPlugin plugin = NPCPlugin.get();
-            return resolveMountedRoleId(
-                    mount.getOriginalRoleIndex(),
-                    plugin == null ? null : plugin::getName
-            );
+            String originalRoleId = new NativeMountedRoleLookup(NPCPlugin.get()).resolve(mount);
+            return resolveManagedRoleId(true, originalRoleId, null);
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         return resolveManagedRoleId(false, null, npc == null ? null : npc.getRoleName());
@@ -79,18 +76,7 @@ public final class NativeMountMovementSettingsService {
         UUID ownerUuid = owner == null ? null : owner.getUuid();
         World world = store == null || store.getExternalData() == null
                 ? null : store.getExternalData().getWorld();
-        return resolveActiveRider(ownerUuid, new ActiveRiderLookup<>() {
-            @Override
-            public Ref<EntityStore> findInActiveWorld(UUID riderUuid) {
-                return world == null ? null : world.getEntityRef(riderUuid);
-            }
-
-            @Override
-            public boolean isActivePlayer(Ref<EntityStore> riderRef) {
-                return riderRef != null && riderRef.isValid() && store != null
-                        && store.getComponent(riderRef, Player.getComponentType()) != null;
-            }
-        });
+        return new ActiveWorldRiderLookup(world, store).resolve(ownerUuid);
     }
 
     @Nullable
@@ -101,24 +87,6 @@ public final class NativeMountMovementSettingsService {
             return originalMountedRoleId == null || originalMountedRoleId.isBlank() ? null : originalMountedRoleId;
         }
         return currentRoleId == null || currentRoleId.isBlank() ? null : currentRoleId;
-    }
-
-    @Nullable
-    static String resolveMountedRoleId(int originalRoleIndex, @Nullable RoleNameLookup roleNames) {
-        if (roleNames == null) {
-            return null;
-        }
-        String originalRoleId = roleNames.getName(originalRoleIndex);
-        return resolveManagedRoleId(true, originalRoleId, null);
-    }
-
-    @Nullable
-    static <T> T resolveActiveRider(@Nullable UUID riderUuid, @Nullable ActiveRiderLookup<T> lookup) {
-        if (riderUuid == null || lookup == null) {
-            return null;
-        }
-        T rider = lookup.findInActiveWorld(riderUuid);
-        return rider != null && lookup.isActivePlayer(rider) ? rider : null;
     }
 
     static MovementSettings copyWithScaledBaseSpeed(@Nullable MovementSettings source, double multiplier) {
@@ -139,15 +107,5 @@ public final class NativeMountMovementSettingsService {
             }
         }
         return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
-    }
-
-    interface RoleNameLookup {
-        @Nullable String getName(int originalRoleIndex);
-    }
-
-    interface ActiveRiderLookup<T> {
-        @Nullable T findInActiveWorld(UUID riderUuid);
-
-        boolean isActivePlayer(T rider);
     }
 }
