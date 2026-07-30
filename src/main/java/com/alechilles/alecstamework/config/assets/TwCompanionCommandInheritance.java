@@ -17,6 +17,7 @@ final class TwCompanionCommandInheritance {
         inheritRevive(parent, current, explicit);
         inheritSummon(parent, current, explicit);
         inheritTravel(parent, current, explicit);
+        inheritFlightToggle(parent, current, explicit);
     }
 
     private static void inheritCommandScalars(
@@ -193,6 +194,27 @@ final class TwCompanionCommandInheritance {
             );
         }
         currentSummon.validate();
+    }
+
+    private static void inheritFlightToggle(
+            TwCompanionCommandSettings parent,
+            TwCompanionCommandSettings current,
+            Set<String> explicit
+    ) {
+        if (!explicit.contains("FlightToggle")) {
+            current.flightToggle = parent.getFlightToggle().copy();
+            return;
+        }
+        if (!explicit.contains("FlightToggle.Enabled")) {
+            current.getMutableFlightToggle().setEnabled(
+                    parent.getFlightToggle().isEnabled()
+            );
+        }
+        if (!explicit.contains("FlightToggle.HookId")) {
+            current.getMutableFlightToggle().setHookId(
+                    parent.getFlightToggle().getHookId()
+            );
+        }
     }
 
     private static boolean hasLegacyCooldownOverride(

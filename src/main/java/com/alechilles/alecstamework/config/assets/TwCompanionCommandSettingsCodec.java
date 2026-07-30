@@ -211,6 +211,27 @@ final class TwCompanionCommandSettingsCodec {
             .add()
             .build();
 
+    private static final BuilderCodec<TwCompanionFlightToggleSettings>
+            FLIGHT_TOGGLE_CODEC = BuilderCodec.builder(
+                    TwCompanionFlightToggleSettings.class,
+                    TwCompanionFlightToggleSettings::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.setEnabled(value != null && value),
+                    TwCompanionFlightToggleSettings::isEnabled
+            )
+            .documentation("Enables this role's flight-toggle capability.")
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("HookId", Codec.STRING),
+                    TwCompanionFlightToggleSettings::setHookId,
+                    TwCompanionFlightToggleSettings::getHookId
+            )
+            .documentation("Hook dispatched to toggle this role's flight mode.")
+            .add()
+            .build();
+
     static final BuilderCodec<TwCompanionCommandSettings> CODEC =
             BuilderCodec.builder(
                     TwCompanionCommandSettings.class,
@@ -422,6 +443,19 @@ final class TwCompanionCommandSettingsCodec {
                     "Travel/recall behavior settings for companions. "
                             + "Inheritance: omitted section inherits; when "
                             + "present, only explicit nested fields override."
+            )
+            .add()
+            .<TwCompanionFlightToggleSettings>append(
+                    new KeyedCodec<>("FlightToggle", FLIGHT_TOGGLE_CODEC),
+                    (settings, value) -> settings.flightToggle = value == null
+                            ? new TwCompanionFlightToggleSettings()
+                            : value,
+                    TwCompanionCommandSettings::getFlightToggle
+            )
+            .documentation(
+                    "Flight-toggle hook capability. Inheritance: omitted "
+                            + "section inherits; when present, explicit nested "
+                            + "fields override and missing nested fields inherit."
             )
             .add()
             .build();
