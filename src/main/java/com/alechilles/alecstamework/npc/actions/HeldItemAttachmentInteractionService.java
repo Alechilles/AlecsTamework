@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -155,8 +156,12 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (InteractionItemConsumption.removeHeldItemQuantity(context.player(), heldItemId, 1)) {
-                refreshMovementSpeedAfterCommittedMutation(context);
-                return true;
+                return completeCommittedMutation(
+                        true,
+                        String.valueOf(context.npcRef()),
+                        () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
+                        this::logPostCommitRefreshFailure
+                );
             }
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to apply held-item attachment mutation.", error);
@@ -208,8 +213,12 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (exchangeInventory.apply(context.player(), plan)) {
-                refreshMovementSpeedAfterCommittedMutation(context);
-                return true;
+                return completeCommittedMutation(
+                        true,
+                        String.valueOf(context.npcRef()),
+                        () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
+                        this::logPostCommitRefreshFailure
+                );
             }
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to apply attachment exchange mutation.", error);
@@ -355,13 +364,25 @@ public final class HeldItemAttachmentInteractionService {
         }
     }
 
-    private void refreshMovementSpeedAfterCommittedMutation(@Nonnull InteractionEffectContext context) {
+    /** Preserves a completed item/attachment transaction when its best-effort movement refresh fails. */
+    static boolean completeCommittedMutation(boolean committed,
+                                             @Nonnull String npcContext,
+                                             @Nonnull Runnable refresher,
+                                             @Nonnull BiConsumer<String, Throwable> warningSink) {
+        if (!committed) {
+            return false;
+        }
         try {
-            movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
+            refresher.run();
         } catch (RuntimeException | LinkageError error) {
-            logFailure("Attachment mutation completed for NPC=" + context.npcRef()
+            warningSink.accept("Attachment mutation completed for NPC=" + npcContext
                     + "; movement-speed refresh will retry during its periodic sweep.", error);
         }
+        return true;
+    }
+
+    private void logPostCommitRefreshFailure(@Nonnull String message, @Nonnull Throwable error) {
+        logFailure(message, error);
     }
 
     private void logFailure(@Nonnull String message, @Nonnull Throwable error) {
