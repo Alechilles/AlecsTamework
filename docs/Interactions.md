@@ -348,7 +348,7 @@ Behavior:
 - Random-around-source targeting samples a uniform point in the authored radius band, which is useful for source-centered area denial barrages.
 - `ImpactEffect` applies on projectile removal, which lets a single authored effect cover direct hits and explosion splashes.
 - `LingeringHazard` damage is driven server-side from the projectile's final transform position when the projectile is removed.
-- Player movement effects are handled by the base game; Tamework does not resync player `HorizontalSpeedMultiplier` values.
+- Independent player movement effects are handled by the base game; Tamework does not resync player `HorizontalSpeedMultiplier` values. Companion movement configuration can still scale a rider's native `BaseSpeed` while mounted on that companion.
 
 Example:
 ```json
