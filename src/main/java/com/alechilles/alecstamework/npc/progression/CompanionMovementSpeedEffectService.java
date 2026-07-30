@@ -39,15 +39,6 @@ public final class CompanionMovementSpeedEffectService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
-        ComponentType<EntityStore, EffectControllerComponent> effectType = EffectControllerComponent.getComponentType();
-        if (effectType == null) {
-            return;
-        }
-        EffectControllerComponent controller = store.getComponent(npcRef, effectType);
-        if (controller == null) {
-            return;
-        }
-
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwCompanionMovementConfig.ResolvedMovement movement = TwCompanionMovementConfig.resolveForRole(roleId);
         double progressionMultiplier = CompanionProgressionModifierService.resolveMultiplier(
@@ -57,6 +48,28 @@ public final class CompanionMovementSpeedEffectService {
                 CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
                 progressionMultiplier
         ).quantizedMultiplier();
+        applyResolvedMultiplier(npcRef, store, roleId, quantizedMultiplier);
+    }
+
+    /**
+     * Applies a movement effect from a source role and multiplier already resolved by a native mount lifecycle path.
+     */
+    public static void applyResolvedMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               @Nullable String sourceRoleId,
+                                               double quantizedMultiplier) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        ComponentType<EntityStore, EffectControllerComponent> effectType = EffectControllerComponent.getComponentType();
+        if (effectType == null) {
+            return;
+        }
+        EffectControllerComponent controller = store.getComponent(npcRef, effectType);
+        if (controller == null) {
+            return;
+        }
+
         String desiredEffectId = EFFECT_ID_RESOLVER.resolveManagedEffectId(quantizedMultiplier);
         boolean removed = removeOwnedEffects(controller, npcRef, store, desiredEffectId);
         boolean added = addDesiredEffect(controller, npcRef, store, desiredEffectId);

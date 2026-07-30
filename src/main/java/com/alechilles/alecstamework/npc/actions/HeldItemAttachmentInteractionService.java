@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -33,6 +34,7 @@ public final class HeldItemAttachmentInteractionService {
     @Nullable
     private final HytaleLogger logger;
     private final AttachmentExchangeInventoryService exchangeInventory = new AttachmentExchangeInventoryService();
+    private final CompanionMovementSpeedSyncSystem movementSpeedSync = new CompanionMovementSpeedSyncSystem();
 
     public HeldItemAttachmentInteractionService(@Nullable HytaleLogger logger) {
         this.logger = logger;
@@ -153,6 +155,7 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (InteractionItemConsumption.removeHeldItemQuantity(context.player(), heldItemId, 1)) {
+                movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
                 return true;
             }
         } catch (RuntimeException | LinkageError error) {
@@ -205,6 +208,7 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (exchangeInventory.apply(context.player(), plan)) {
+                movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
                 return true;
             }
         } catch (RuntimeException | LinkageError error) {

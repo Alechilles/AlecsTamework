@@ -186,6 +186,7 @@ import com.alechilles.alecstamework.npc.systems.SummonedCompanionExperienceSyste
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
 import com.alechilles.alecstamework.npc.systems.DynamicAttachmentEvaluationSystem;
@@ -864,7 +865,6 @@ public class Tamework extends JavaPlugin {
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
         registerOptionalCommandLinkedRevivableDropSuppressionSystem();
-        getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(
                 new DynamicAttachmentEvaluationSystem(
                         NPCEntity.getComponentType(),
@@ -879,6 +879,8 @@ public class Tamework extends JavaPlugin {
                         commandLinksComponentType
                 )
         );
+        getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
+        getEntityStoreRegistry().registerSystem(new CompanionMovementSpeedSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(new FlyingCompanionControlSystem());
         getEntityStoreRegistry().registerSystem(
@@ -2745,6 +2747,7 @@ public class Tamework extends JavaPlugin {
             LoadedAssetsEvent<String, TwCompanionMovementConfig,
                     DefaultAssetMap<String, TwCompanionMovementConfig>> event) {
         TwCompanionMovementConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COMPANION_MOVEMENT, event.getLoadedAssets().keySet());
         }
@@ -2754,6 +2757,7 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwCompanionMovementConfig,
                     DefaultAssetMap<String, TwCompanionMovementConfig>> event) {
         TwCompanionMovementConfig.clearRoleCache();
+        CompanionMovementSpeedSyncSystem.invalidateConfigRevision();
         emitExperimentalConfigReload(TameworkConfigFamily.COMPANION_MOVEMENT, event.getRemovedAssets());
     }
 
