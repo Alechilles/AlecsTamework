@@ -1,0 +1,61 @@
+package com.alechilles.alecstamework.npc.progression;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class CompanionMovementSpeedEffectServiceTest {
+
+    @Test
+    void neutralPlanRemovesEveryOwnedMovementSpeedEffect() {
+        assertEquals(
+                List.of("Tw_MovementSpeed_105", "Tw_Trait_MoveSpeed_110"),
+                CompanionMovementSpeedEffectService.effectIdsToRemove(
+                        List.of("Tw_MovementSpeed_105", "Tw_Trait_MoveSpeed_110", "Base_Swiftness"),
+                        null
+                )
+        );
+    }
+
+    @Test
+    void replacementPlanKeepsDesiredManagedEffectAndRemovesOlderManagedEffect() {
+        assertEquals(
+                List.of("Tw_MovementSpeed_105"),
+                CompanionMovementSpeedEffectService.effectIdsToRemove(
+                        List.of("Tw_MovementSpeed_105", "Tw_MovementSpeed_125", "ThirdParty_Haste"),
+                        "Tw_MovementSpeed_125"
+                )
+        );
+    }
+
+    @Test
+    void replacementPlanRemovesLegacyTraitSpeedEffects() {
+        assertEquals(
+                List.of("Tw_Trait_MoveSpeed_110"),
+                CompanionMovementSpeedEffectService.effectIdsToRemove(
+                        List.of("Tw_Trait_MoveSpeed_110", "Tw_MovementSpeed_125"),
+                        "Tw_MovementSpeed_125"
+                )
+        );
+    }
+
+    @Test
+    void replacementPlanPreservesUnrelatedAndMalformedEffectIds() {
+        assertEquals(
+                List.of(),
+                CompanionMovementSpeedEffectService.effectIdsToRemove(
+                        List.of("Base_Swiftness", "ThirdParty_MoveSpeed", "Tw_MovementSpeed_107", "Tw_Trait_MoveSpeed_131"),
+                        "Tw_MovementSpeed_125"
+                )
+        );
+    }
+
+    @Test
+    void missingDesiredAssetPlanDoesNotScheduleAnAddition() {
+        assertEquals(
+                null,
+                CompanionMovementSpeedEffectService.effectIdToAdd("Tw_MovementSpeed_125", false)
+        );
+    }
+}
