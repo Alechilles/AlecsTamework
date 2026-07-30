@@ -164,7 +164,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 TwCompanionMovementConfig.resolveForRole(sourceRoleId),
                 resolveEffectiveAttachments(npcRef, store),
                 CompanionProgressionModifierService.resolveMultiplier(
-                        npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0)
+                        npcRef, store, sourceRoleId, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0)
         ).quantizedMultiplier();
     }
 

@@ -42,7 +42,7 @@ public final class CompanionMovementSpeedEffectService {
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwCompanionMovementConfig.ResolvedMovement movement = TwCompanionMovementConfig.resolveForRole(roleId);
         double progressionMultiplier = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
+                npcRef, store, roleId, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
         double quantizedMultiplier = SPEED_RESOLVER.resolve(
                 movement,
                 CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),

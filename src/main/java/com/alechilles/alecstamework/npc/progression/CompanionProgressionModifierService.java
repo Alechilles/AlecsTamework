@@ -18,11 +18,21 @@ public final class CompanionProgressionModifierService {
                                            @Nullable Store<EntityStore> store,
                                            @Nullable String effectKey,
                                            double defaultMultiplier) {
+        return resolveMultiplier(npcRef, store, null, effectKey, defaultMultiplier);
+    }
+
+    /** Resolves progression using a stable source role while native mounting temporarily changes the visible role. */
+    public static double resolveMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store,
+                                           @Nullable String sourceRoleId,
+                                           @Nullable String effectKey,
+                                           double defaultMultiplier) {
         if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
             return defaultMultiplier;
         }
         double trait = TraitModifierService.resolveMultiplier(npcRef, store, effectKey, 1.0);
-        double leveling = CompanionLevelingService.resolveLevelGrowthMultiplier(npcRef, store, effectKey, 1.0);
+        double leveling = CompanionLevelingService.resolveLevelGrowthMultiplier(
+                npcRef, store, sourceRoleId, effectKey, 1.0);
         double talents = CompanionTalentService.resolvePurchasedEffectMultiplier(npcRef, store, effectKey, 1.0);
         boolean matched = Math.abs(trait - 1.0) > EPSILON
                 || Math.abs(leveling - 1.0) > EPSILON

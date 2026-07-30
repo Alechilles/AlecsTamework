@@ -90,7 +90,7 @@ final class NativeMountMovementApplication {
                                               Store<EntityStore> store) {
         TwCompanionMovementConfig.ResolvedMovement movement = TwCompanionMovementConfig.resolveForRole(sourceRoleId);
         double progression = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
+                npcRef, store, sourceRoleId, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0);
         return speedResolver.resolve(
                 movement,
                 CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
