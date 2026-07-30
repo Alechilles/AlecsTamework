@@ -22,6 +22,18 @@ class CompanionMovementSpeedSyncSystemTest {
     }
 
     @Test
+    void lifecycleSweepRetriesUntilCallbackRefreshSucceedsAndDoesNotRequireAttachmentsComponent() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/CompanionMovementSpeedSyncSystem.java"));
+
+        assertTrue(source.contains("store.forEachChunk(Query.and(npcType)"));
+        assertFalse(source.contains("Query.and(npcType, attachmentsType)"));
+        assertTrue(source.contains("if (refreshCompanion(npcRef, bufferStore))"));
+        assertTrue(source.contains("commitFingerprint(state, buildFingerprint(npcRef, bufferStore))"));
+        assertTrue(source.contains("EffectControllerComponent.getComponentType()) == null"));
+    }
+
+    @Test
     void fingerprintChangesForEveryManagedLifecycleInput() {
         UUID npcId = UUID.randomUUID();
         CompanionMovementSpeedSyncSystem.MovementSpeedFingerprint baseline =

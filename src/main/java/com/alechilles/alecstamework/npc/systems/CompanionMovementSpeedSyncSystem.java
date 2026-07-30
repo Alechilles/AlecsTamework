@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -17,6 +18,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -53,10 +55,12 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
-        refreshCompanion(npcRef, store);
-        MovementSpeedFingerprint fingerprint = buildFingerprint(npcRef, store);
-        if (fingerprint != null) {
-            statesByStore.get(store).lastFingerprintByNpc.put(fingerprint.npcUuid(), fingerprint);
+        try {
+            if (refreshCompanion(npcRef, store)) {
+                commitFingerprint(statesByStore.get(store), buildFingerprint(npcRef, store));
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // A periodic sweep will retry transient model/effect/rider availability failures.
         }
     }
 
@@ -70,18 +74,19 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         state.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
-                TameworkAttachmentsComponent.getComponentType();
-        if (npcType == null || attachmentsType == null) {
+        if (npcType == null) {
             return;
         }
         HashSet<UUID> activeIds = new HashSet<>();
-        store.forEachChunk(Query.and(npcType, attachmentsType),
+        store.forEachChunk(Query.and(npcType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> buffer) -> {
             for (int index = 0; index < chunk.size(); index++) {
                 Ref<EntityStore> npcRef = chunk.getReferenceTo(index);
                 NPCEntity npc = chunk.getComponent(index, npcType);
                 if (npcRef == null || !npcRef.isValid() || npc == null || npc.getUuid() == null) {
+                    continue;
+                }
+                if (!TamedStateResolver.isTamed(npcRef, store)) {
                     continue;
                 }
                 UUID npcId = npc.getUuid();
@@ -90,34 +95,44 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                 if (!hasChanged(state.lastFingerprintByNpc.get(npcId), fingerprint)) {
                     continue;
                 }
-                state.lastFingerprintByNpc.put(npcId, fingerprint);
-                buffer.run(bufferStore -> refreshCompanion(npcRef, bufferStore));
-            }
+                buffer.run(bufferStore -> {
+                    try {
+                        if (refreshCompanion(npcRef, bufferStore)) {
+                            commitFingerprint(state, buildFingerprint(npcRef, bufferStore));
+                        }
+                    } catch (RuntimeException | LinkageError ignored) {
+                        // Keep the prior fingerprint so the next sweep retries this transient state.
+                    }
                 });
+            }
+        });
         pruneInactiveKeys(state.lastFingerprintByNpc, activeIds);
     }
 
-    private void refreshCompanion(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
+    private boolean refreshCompanion(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
         if (!npcRef.isValid() || store.getComponent(npcRef, NPCEntity.getComponentType()) == null) {
-            return;
+            return false;
         }
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
         double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
+        if (store.getComponent(npcRef, EffectControllerComponent.getComponentType()) == null) {
+            return false;
+        }
         CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
         if (mount == null) {
-            return;
+            return true;
         }
         Ref<EntityStore> riderRef = NativeMountMovementSettingsService.resolveMountedRiderRef(mount, store);
         if (riderRef == null || !riderRef.isValid()) {
-            return;
+            return false;
         }
         Player rider = store.getComponent(riderRef, Player.getComponentType());
         PlayerRef riderPlayerRef = store.getComponent(riderRef, PlayerRef.getComponentType());
         if (rider == null || riderPlayerRef == null) {
-            return;
+            return false;
         }
-        riderSettings.applyScaledSettings(
+        return riderSettings.applyScaledSettings(
                 sourceRoleId,
                 NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount),
                 riderRef,
@@ -141,7 +156,7 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
         return createFingerprint(
                 npc.getUuid(),
                 sourceRoleId,
-                CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
+                resolveEffectiveAttachments(npcRef, store),
                 resolveQuantizedMultiplier(npcRef, sourceRoleId, store),
                 CONFIG_REVISION.get(),
                 mount != null,
@@ -154,10 +169,21 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                                               @Nonnull Store<EntityStore> store) {
         return speedResolver.resolve(
                 TwCompanionMovementConfig.resolveForRole(sourceRoleId),
-                CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store),
+                resolveEffectiveAttachments(npcRef, store),
                 CompanionProgressionModifierService.resolveMultiplier(
                         npcRef, store, MOVE_SPEED_MULTIPLIER_EFFECT_KEY, 1.0)
         ).quantizedMultiplier();
+    }
+
+    @Nonnull
+    private Map<String, String> resolveEffectiveAttachments(@Nonnull Ref<EntityStore> npcRef,
+                                                            @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        if (attachmentsType == null || store.getComponent(npcRef, attachmentsType) == null) {
+            return Map.of();
+        }
+        return CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
     }
 
     static MovementSpeedFingerprint createFingerprint(@Nonnull UUID npcUuid,
@@ -176,6 +202,12 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     static boolean hasChanged(@Nullable MovementSpeedFingerprint previous,
                               @Nullable MovementSpeedFingerprint current) {
         return current != null && !current.equals(previous);
+    }
+
+    private static void commitFingerprint(@Nonnull TickState state, @Nullable MovementSpeedFingerprint fingerprint) {
+        if (fingerprint != null) {
+            state.lastFingerprintByNpc.put(fingerprint.npcUuid(), fingerprint);
+        }
     }
 
     static <T> void pruneInactiveKeys(@Nonnull Map<UUID, T> valuesByNpc, @Nonnull HashSet<UUID> activeNpcIds) {

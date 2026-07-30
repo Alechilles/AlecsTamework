@@ -155,7 +155,7 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (InteractionItemConsumption.removeHeldItemQuantity(context.player(), heldItemId, 1)) {
-                movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
+                refreshMovementSpeedAfterCommittedMutation(context);
                 return true;
             }
         } catch (RuntimeException | LinkageError error) {
@@ -208,7 +208,7 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (exchangeInventory.apply(context.player(), plan)) {
-                movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
+                refreshMovementSpeedAfterCommittedMutation(context);
                 return true;
             }
         } catch (RuntimeException | LinkageError error) {
@@ -352,6 +352,14 @@ public final class HeldItemAttachmentInteractionService {
             }
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to roll back held-item attachment mutation.", error);
+        }
+    }
+
+    private void refreshMovementSpeedAfterCommittedMutation(@Nonnull InteractionEffectContext context) {
+        try {
+            movementSpeedSync.refreshImmediately(context.npcRef(), context.store());
+        } catch (RuntimeException | LinkageError error) {
+            logFailure("Attachment mutation completed; movement-speed refresh will retry during its periodic sweep.", error);
         }
     }
 
