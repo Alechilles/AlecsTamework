@@ -139,6 +139,12 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>25</release>
+                    <!--
+                        clear-stale-output deletes target/classes before each build. Disable
+                        incremental compilation so Maven repopulates that directory instead
+                        of trusting stale compiler status entries and packaging a partial jar.
+                    -->
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
                 </configuration>
             </plugin>
             <plugin>
