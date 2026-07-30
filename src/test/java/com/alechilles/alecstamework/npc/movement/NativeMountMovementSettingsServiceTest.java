@@ -53,7 +53,7 @@ class NativeMountMovementSettingsServiceTest {
         String method = source.substring(methodStart, methodEnd);
 
         assertEquals(true, method.contains("if (mount != null)"));
-        assertEquals(true, method.contains("resolveManagedRoleId(true, originalRoleId, null)"));
+        assertEquals(true, method.contains("resolveMountedRoleId("));
         assertEquals(true, method.contains("resolveManagedRoleId(false, null"));
     }
 
@@ -79,25 +79,88 @@ class NativeMountMovementSettingsServiceTest {
 
     @Test
     void mappedMountedRoleRecoveryReturnsOriginalRole() {
-        assertEquals("Horse_Default", NativeMountMovementSettingsService.resolveManagedRoleId(
-                true, "Horse_Default", "Empty_Role"));
+        RecordingRoleNames names = new RecordingRoleNames("Horse_Default");
+
+        assertEquals("Horse_Default", NativeMountMovementSettingsService.resolveMountedRoleId(42, names));
+        assertEquals(42, names.requestedIndex);
     }
 
     @Test
     void unmappableMountedRoleRecoveryReturnsNull() {
-        assertEquals(null, NativeMountMovementSettingsService.resolveManagedRoleId(
-                true, null, "Empty_Role"));
+        RecordingRoleNames names = new RecordingRoleNames(null);
+
+        assertEquals(null, NativeMountMovementSettingsService.resolveMountedRoleId(99, names));
+        assertEquals(99, names.requestedIndex);
     }
 
     @Test
     void riderResolutionReturnsTheActiveWorldEntity() {
         UUID riderId = UUID.randomUUID();
-        String resolved = NativeMountMovementSettingsService.resolveActiveRider(
-                riderId,
-                id -> id.equals(riderId) ? "active-store-rider" : null,
-                "active-store-rider"::equals
-        );
+        RecordingRiderLookup lookup = new RecordingRiderLookup("active-store-rider", true);
+        String resolved = NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup);
 
         assertEquals("active-store-rider", resolved);
+        assertEquals(riderId, lookup.requestedUuid);
+        assertEquals(1, lookup.playerValidationCalls);
+    }
+
+    @Test
+    void riderResolutionRejectsMissingActiveWorldEntity() {
+        UUID riderId = UUID.randomUUID();
+        RecordingRiderLookup lookup = new RecordingRiderLookup(null, true);
+
+        assertEquals(null, NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup));
+        assertEquals(riderId, lookup.requestedUuid);
+        assertEquals(0, lookup.playerValidationCalls);
+    }
+
+    @Test
+    void riderResolutionRejectsEntityWithoutActivePlayer() {
+        UUID riderId = UUID.randomUUID();
+        RecordingRiderLookup lookup = new RecordingRiderLookup("wrong-store-or-not-player", false);
+
+        assertEquals(null, NativeMountMovementSettingsService.resolveActiveRider(riderId, lookup));
+        assertEquals(riderId, lookup.requestedUuid);
+        assertEquals(1, lookup.playerValidationCalls);
+    }
+
+    private static final class RecordingRoleNames implements NativeMountMovementSettingsService.RoleNameLookup {
+        private final String name;
+        private int requestedIndex = Integer.MIN_VALUE;
+
+        private RecordingRoleNames(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getName(int originalRoleIndex) {
+            requestedIndex = originalRoleIndex;
+            return name;
+        }
+    }
+
+    private static final class RecordingRiderLookup
+            implements NativeMountMovementSettingsService.ActiveRiderLookup<String> {
+        private final String result;
+        private final boolean activePlayer;
+        private UUID requestedUuid;
+        private int playerValidationCalls;
+
+        private RecordingRiderLookup(String result, boolean activePlayer) {
+            this.result = result;
+            this.activePlayer = activePlayer;
+        }
+
+        @Override
+        public String findInActiveWorld(UUID riderUuid) {
+            requestedUuid = riderUuid;
+            return result;
+        }
+
+        @Override
+        public boolean isActivePlayer(String rider) {
+            playerValidationCalls++;
+            return activePlayer;
+        }
     }
 }

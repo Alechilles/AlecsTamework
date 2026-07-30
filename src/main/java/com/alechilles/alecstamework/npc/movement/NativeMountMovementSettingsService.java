@@ -16,8 +16,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 /**
@@ -64,8 +62,10 @@ public final class NativeMountMovementSettingsService {
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
         if (mount != null) {
             NPCPlugin plugin = NPCPlugin.get();
-            String originalRoleId = plugin == null ? null : plugin.getName(mount.getOriginalRoleIndex());
-            return resolveManagedRoleId(true, originalRoleId, null);
+            return resolveMountedRoleId(
+                    mount.getOriginalRoleIndex(),
+                    plugin == null ? null : plugin::getName
+            );
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         return resolveManagedRoleId(false, null, npc == null ? null : npc.getRoleName());
@@ -79,12 +79,18 @@ public final class NativeMountMovementSettingsService {
         UUID ownerUuid = owner == null ? null : owner.getUuid();
         World world = store == null || store.getExternalData() == null
                 ? null : store.getExternalData().getWorld();
-        return resolveActiveRider(
-                ownerUuid,
-                uuid -> world == null ? null : world.getEntityRef(uuid),
-                ref -> ref != null && ref.isValid() && store != null
-                        && store.getComponent(ref, Player.getComponentType()) != null
-        );
+        return resolveActiveRider(ownerUuid, new ActiveRiderLookup<>() {
+            @Override
+            public Ref<EntityStore> findInActiveWorld(UUID riderUuid) {
+                return world == null ? null : world.getEntityRef(riderUuid);
+            }
+
+            @Override
+            public boolean isActivePlayer(Ref<EntityStore> riderRef) {
+                return riderRef != null && riderRef.isValid() && store != null
+                        && store.getComponent(riderRef, Player.getComponentType()) != null;
+            }
+        });
     }
 
     @Nullable
@@ -98,14 +104,21 @@ public final class NativeMountMovementSettingsService {
     }
 
     @Nullable
-    static <T> T resolveActiveRider(@Nullable UUID riderUuid,
-                                    Function<UUID, T> activeWorldLookup,
-                                    Predicate<T> activePlayerCheck) {
-        if (riderUuid == null || activeWorldLookup == null || activePlayerCheck == null) {
+    static String resolveMountedRoleId(int originalRoleIndex, @Nullable RoleNameLookup roleNames) {
+        if (roleNames == null) {
             return null;
         }
-        T rider = activeWorldLookup.apply(riderUuid);
-        return rider != null && activePlayerCheck.test(rider) ? rider : null;
+        String originalRoleId = roleNames.getName(originalRoleIndex);
+        return resolveManagedRoleId(true, originalRoleId, null);
+    }
+
+    @Nullable
+    static <T> T resolveActiveRider(@Nullable UUID riderUuid, @Nullable ActiveRiderLookup<T> lookup) {
+        if (riderUuid == null || lookup == null) {
+            return null;
+        }
+        T rider = lookup.findInActiveWorld(riderUuid);
+        return rider != null && lookup.isActivePlayer(rider) ? rider : null;
     }
 
     static MovementSettings copyWithScaledBaseSpeed(@Nullable MovementSettings source, double multiplier) {
@@ -126,5 +139,15 @@ public final class NativeMountMovementSettingsService {
             }
         }
         return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
+    }
+
+    interface RoleNameLookup {
+        @Nullable String getName(int originalRoleIndex);
+    }
+
+    interface ActiveRiderLookup<T> {
+        @Nullable T findInActiveWorld(UUID riderUuid);
+
+        boolean isActivePlayer(T rider);
     }
 }
