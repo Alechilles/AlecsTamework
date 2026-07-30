@@ -24,7 +24,7 @@ public final class TwCompanionMovementConfig
         TwParentFallbackAsset<TwCompanionMovementConfig> {
     private static final AttachmentModifier[] EMPTY_ATTACHMENT_MODIFIERS = new AttachmentModifier[0];
     private static final ResolvedMovement NEUTRAL_MOVEMENT =
-            new ResolvedMovement(1.0, 0.5, 2.0, List.of());
+            new ResolvedMovement(null, 1.0, 0.5, 2.0, List.of());
 
     public static final AssetBuilderCodec<String, TwCompanionMovementConfig> CODEC =
             TwCompanionMovementConfigCodec.CODEC;
@@ -148,6 +148,7 @@ public final class TwCompanionMovementConfig
     @Nonnull
     private ResolvedMovement toResolvedMovement() {
         return new ResolvedMovement(
+                normalizeKey(id),
                 valueOrDefault(baseMoveSpeedMultiplier, 1.0),
                 valueOrDefault(minMoveSpeedMultiplier, 0.5),
                 valueOrDefault(maxMoveSpeedMultiplier, 2.0),
@@ -267,11 +268,16 @@ public final class TwCompanionMovementConfig
     }
 
     /** Immutable effective movement settings selected for a companion role. */
-    public record ResolvedMovement(double baseMoveSpeedMultiplier,
+    public record ResolvedMovement(@Nullable String configId,
+                                   double baseMoveSpeedMultiplier,
                                    double minMoveSpeedMultiplier,
                                    double maxMoveSpeedMultiplier,
                                    @Nonnull List<AttachmentModifier> attachmentModifiers) {
         public ResolvedMovement {
+            configId = normalizeKey(configId);
+            if (configId.isEmpty()) {
+                configId = null;
+            }
             attachmentModifiers = attachmentModifiers == null ? List.of() : List.copyOf(attachmentModifiers);
         }
     }

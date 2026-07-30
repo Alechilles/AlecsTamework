@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,7 @@ class TwCompanionMovementConfigTest {
                 );
 
         assertEquals(1.15, resolved.baseMoveSpeedMultiplier());
+        assertEquals("mod:alpha", resolved.configId());
         assertTrue(resolved.attachmentModifiers().isEmpty());
     }
 
@@ -82,6 +84,7 @@ class TwCompanionMovementConfigTest {
                 TwCompanionMovementConfig.resolveForRoleForTest(List.of(), "No_Match");
 
         assertEquals(1.0, unresolved.baseMoveSpeedMultiplier());
+        assertNull(unresolved.configId());
         assertEquals(0.50, unresolved.minMoveSpeedMultiplier());
         assertEquals(2.0, unresolved.maxMoveSpeedMultiplier());
         assertTrue(unresolved.attachmentModifiers().isEmpty());
