@@ -42,19 +42,28 @@ final class NativeMountMovementApplication {
         Role role = request.role();
         Store<EntityStore> store = request.store();
         ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
-        if (mountType == null || store.getComponent(npcRef, mountType) != null) {
-            return false;
+        if (mountType == null) {
+            return fail(role, "npc_mount_component_type_unavailable");
+        }
+        if (store.getComponent(npcRef, mountType) != null) {
+            return fail(role, "npc_already_has_mount_component");
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         Player rider = store.getComponent(riderRef, Player.getComponentType());
         PlayerRef riderPlayerRef = store.getComponent(riderRef, PlayerRef.getComponentType());
-        if (npc == null || rider == null || riderPlayerRef == null) {
-            return false;
+        if (npc == null) {
+            return fail(role, "missing_npc_component");
+        }
+        if (rider == null) {
+            return fail(role, "missing_player_component");
+        }
+        if (riderPlayerRef == null) {
+            return fail(role, "missing_player_ref_component");
         }
         int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
         int emptyRoleIndex = NPCPlugin.get().getIndex(EMPTY_ROLE_ID);
         if (originalRoleIndex < 0 || emptyRoleIndex < 0) {
-            return false;
+            return fail(role, "missing_role_index");
         }
         String sourceRoleId = role.getRoleName();
         double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
@@ -63,7 +72,7 @@ final class NativeMountMovementApplication {
         float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
         NPCMountComponent mount = store.ensureAndGetComponent(npcRef, mountType);
         if (mount == null) {
-            return false;
+            return fail(role, "ensure_npc_mount_failed");
         }
         mount.setOriginalRoleIndex(originalRoleIndex);
         mount.setOwnerPlayerRef(riderPlayerRef);
@@ -98,5 +107,16 @@ final class NativeMountMovementApplication {
                 "TameworkMount debug: stage=native role=%s reason=applied anchor=%s/%s/%s",
                 role == null ? "<null>" : role.getRoleName(), anchorX, anchorY, anchorZ
         );
+    }
+
+    private static boolean fail(Role role, String reason) {
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.isDebugRideEnabled() && instance.getLogger() != null) {
+            instance.getLogger().at(Level.INFO).log(
+                    "TameworkMount debug: stage=native role=%s reason=%s",
+                    role == null ? "<null>" : role.getRoleName(), reason
+            );
+        }
+        return false;
     }
 }

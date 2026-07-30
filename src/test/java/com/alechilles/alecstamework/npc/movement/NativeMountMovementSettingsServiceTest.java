@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.movement;
 import com.hypixel.hytale.protocol.MovementSettings;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,9 +53,8 @@ class NativeMountMovementSettingsServiceTest {
         String method = source.substring(methodStart, methodEnd);
 
         assertEquals(true, method.contains("if (mount != null)"));
-        assertEquals(true, method.contains("return originalRoleId"));
-        assertEquals(true, method.contains("return null;"));
-        assertEquals(true, method.contains("return null;\n        }\n        NPCEntity"));
+        assertEquals(true, method.contains("resolveManagedRoleId(true, originalRoleId, null)"));
+        assertEquals(true, method.contains("resolveManagedRoleId(false, null"));
     }
 
     @Test
@@ -67,7 +67,37 @@ class NativeMountMovementSettingsServiceTest {
         String method = source.substring(methodStart, methodEnd);
 
         assertEquals(true, method.contains("owner.getUuid()"));
-        assertEquals(true, method.contains("world.getEntityRef(ownerUuid)"));
+        assertEquals(true, method.contains("resolveActiveRider("));
         assertEquals(false, method.contains("owner.getReference()"));
+    }
+
+    @Test
+    void unmountedRoleRecoveryReturnsCurrentRole() {
+        assertEquals("Wolf_Default", NativeMountMovementSettingsService.resolveManagedRoleId(
+                false, null, "Wolf_Default"));
+    }
+
+    @Test
+    void mappedMountedRoleRecoveryReturnsOriginalRole() {
+        assertEquals("Horse_Default", NativeMountMovementSettingsService.resolveManagedRoleId(
+                true, "Horse_Default", "Empty_Role"));
+    }
+
+    @Test
+    void unmappableMountedRoleRecoveryReturnsNull() {
+        assertEquals(null, NativeMountMovementSettingsService.resolveManagedRoleId(
+                true, null, "Empty_Role"));
+    }
+
+    @Test
+    void riderResolutionReturnsTheActiveWorldEntity() {
+        UUID riderId = UUID.randomUUID();
+        String resolved = NativeMountMovementSettingsService.resolveActiveRider(
+                riderId,
+                id -> id.equals(riderId) ? "active-store-rider" : null,
+                "active-store-rider"::equals
+        );
+
+        assertEquals("active-store-rider", resolved);
     }
 }
