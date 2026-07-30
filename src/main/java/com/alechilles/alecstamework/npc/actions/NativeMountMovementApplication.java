@@ -84,11 +84,11 @@ final class NativeMountMovementApplication {
         mount.setOwnerPlayerRef(riderPlayerRef);
         mount.setAnchor(anchorX, anchorY, anchorZ);
         npc.playAnimation(npcRef, AnimationSlot.Status, null, store);
-        movementSettings.applyScaledSettings(
+        boolean riderSettingsApplied = movementSettings.applyScaledSettings(
                 sourceRoleId, movementScopeResolver.resolveForRoleIndex(originalRoleIndex),
                 riderRef, riderPlayerRef, rider, store, multiplier);
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
-        logApplied(role, anchorX, anchorY, anchorZ);
+        logApplied(role, sourceRoleId, originalRoleIndex, multiplier, riderSettingsApplied, anchorX, anchorY, anchorZ);
         return true;
     }
 
@@ -110,14 +110,23 @@ final class NativeMountMovementApplication {
         return resolved.clampedMultiplier();
     }
 
-    private static void logApplied(Role role, float anchorX, float anchorY, float anchorZ) {
+    private static void logApplied(Role role,
+                                   String sourceRoleId,
+                                   int sourceRoleIndex,
+                                   double multiplier,
+                                   boolean riderSettingsApplied,
+                                   float anchorX,
+                                   float anchorY,
+                                   float anchorZ) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
             return;
         }
         instance.getLogger().at(Level.INFO).log(
-                "TameworkMount debug: stage=native role=%s reason=applied anchor=%s/%s/%s",
-                role == null ? "<null>" : role.getRoleName(), anchorX, anchorY, anchorZ
+                "TameworkMount debug: stage=native actionRole=%s sourceRole=%s sourceRoleIndex=%s "
+                        + "multiplier=%s riderSettingsApplied=%s anchor=%s/%s/%s",
+                role == null ? "<null>" : role.getRoleName(), sourceRoleId, sourceRoleIndex,
+                multiplier, riderSettingsApplied, anchorX, anchorY, anchorZ
         );
     }
 
