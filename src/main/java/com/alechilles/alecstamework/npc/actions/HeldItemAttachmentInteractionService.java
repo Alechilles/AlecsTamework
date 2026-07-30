@@ -160,7 +160,8 @@ public final class HeldItemAttachmentInteractionService {
                         true,
                         String.valueOf(context.npcRef()),
                         () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
-                        this::logPostCommitRefreshFailure
+                        this::logPostCommitRefreshFailure,
+                        () -> rollback(context.npcRef(), context.store(), attachmentsType, previousStored, previousLive)
                 );
             }
         } catch (RuntimeException | LinkageError error) {
@@ -217,7 +218,8 @@ public final class HeldItemAttachmentInteractionService {
                         true,
                         String.valueOf(context.npcRef()),
                         () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
-                        this::logPostCommitRefreshFailure
+                        this::logPostCommitRefreshFailure,
+                        () -> rollback(context.npcRef(), context.store(), attachmentsType, previousStored, previousLive)
                 );
             }
         } catch (RuntimeException | LinkageError error) {
@@ -368,8 +370,10 @@ public final class HeldItemAttachmentInteractionService {
     static boolean completeCommittedMutation(boolean committed,
                                              @Nonnull String npcContext,
                                              @Nonnull Runnable refresher,
-                                             @Nonnull BiConsumer<String, Throwable> warningSink) {
+                                             @Nonnull BiConsumer<String, Throwable> warningSink,
+                                             @Nonnull Runnable rollback) {
         if (!committed) {
+            rollback.run();
             return false;
         }
         try {
