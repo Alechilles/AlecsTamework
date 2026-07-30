@@ -3,6 +3,7 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
+- Companion species, equipment, traits, levels, and talents can now influence travel speed on foot and while natively ridden.
 - Added durable owner-population limits, role-based population groups, and
   command-family rosters. Companion capacity and command membership now remain
   consistent across capture, release, death, storage, world travel, and server

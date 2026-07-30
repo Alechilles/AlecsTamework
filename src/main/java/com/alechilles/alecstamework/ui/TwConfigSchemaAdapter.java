@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
@@ -158,6 +159,7 @@ final class TwConfigSchemaAdapter {
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
             case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;
+            case COMPANION_MOVEMENT -> TwCompanionMovementConfig.CODEC;
             case LEVELING -> TwLevelingConfig.CODEC;
             case TRAIT -> TwTraitConfig.CODEC;
             case TALENT -> TwTalentConfig.CODEC;

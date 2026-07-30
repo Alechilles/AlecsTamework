@@ -452,6 +452,10 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return resolution.getRoleStringParam(role, ctx, paramName);
     }
 
+    StdScope[] resolveRoleScopes(Role role) {
+        return resolution.resolveRoleScopes(role);
+    }
+
     String[] getRoleStringArrayParam(Role role, String paramName) {
         return resolution.getRoleStringArrayParam(role, null, paramName);
     }

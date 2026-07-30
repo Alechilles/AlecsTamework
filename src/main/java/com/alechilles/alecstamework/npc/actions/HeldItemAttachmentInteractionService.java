@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.systems.CompanionMovementSpeedSyncSystem;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -19,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -33,6 +35,7 @@ public final class HeldItemAttachmentInteractionService {
     @Nullable
     private final HytaleLogger logger;
     private final AttachmentExchangeInventoryService exchangeInventory = new AttachmentExchangeInventoryService();
+    private final CompanionMovementSpeedSyncSystem movementSpeedSync = new CompanionMovementSpeedSyncSystem();
 
     public HeldItemAttachmentInteractionService(@Nullable HytaleLogger logger) {
         this.logger = logger;
@@ -153,7 +156,13 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (InteractionItemConsumption.removeHeldItemQuantity(context.player(), heldItemId, 1)) {
-                return true;
+                return completeCommittedMutation(
+                        true,
+                        String.valueOf(context.npcRef()),
+                        () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
+                        this::logPostCommitRefreshFailure,
+                        () -> rollback(context.npcRef(), context.store(), attachmentsType, previousStored, previousLive)
+                );
             }
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to apply held-item attachment mutation.", error);
@@ -205,7 +214,13 @@ public final class HeldItemAttachmentInteractionService {
                     )
             );
             if (exchangeInventory.apply(context.player(), plan)) {
-                return true;
+                return completeCommittedMutation(
+                        true,
+                        String.valueOf(context.npcRef()),
+                        () -> movementSpeedSync.refreshImmediately(context.npcRef(), context.store()),
+                        this::logPostCommitRefreshFailure,
+                        () -> rollback(context.npcRef(), context.store(), attachmentsType, previousStored, previousLive)
+                );
             }
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to apply attachment exchange mutation.", error);
@@ -349,6 +364,29 @@ public final class HeldItemAttachmentInteractionService {
         } catch (RuntimeException | LinkageError error) {
             logFailure("Failed to roll back held-item attachment mutation.", error);
         }
+    }
+
+    /** Preserves a completed item/attachment transaction when its best-effort movement refresh fails. */
+    static boolean completeCommittedMutation(boolean committed,
+                                             @Nonnull String npcContext,
+                                             @Nonnull Runnable refresher,
+                                             @Nonnull BiConsumer<String, Throwable> warningSink,
+                                             @Nonnull Runnable rollback) {
+        if (!committed) {
+            rollback.run();
+            return false;
+        }
+        try {
+            refresher.run();
+        } catch (RuntimeException | LinkageError error) {
+            warningSink.accept("Attachment mutation completed for NPC=" + npcContext
+                    + "; movement-speed refresh will retry during its periodic sweep.", error);
+        }
+        return true;
+    }
+
+    private void logPostCommitRefreshFailure(@Nonnull String message, @Nonnull Throwable error) {
+        logFailure(message, error);
     }
 
     private void logFailure(@Nonnull String message, @Nonnull Throwable error) {

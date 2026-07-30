@@ -5,6 +5,7 @@ This document explains where Tamework config assets live and how each family res
 ## Asset locations
 - `TwGlobalConfig`: `<ModRoot>/Server/Tamework/Global/*.json`
 - `TwCompanionConfig`: `<ModRoot>/Server/Tamework/Companion/*.json`
+- `TwCompanionMovementConfig`: `<ModRoot>/Server/Tamework/CompanionMovement/*.json`
 - `TwInteractionConfig`: `<ModRoot>/Server/Tamework/Interactions/*.json`
 - `TwSpawnerConfig`: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
@@ -30,6 +31,7 @@ This document explains where Tamework config assets live and how each family res
 ### Role-scoped families
 Resolved by role id + `Priority`:
 - `TwCompanionConfig`
+- `TwCompanionMovementConfig`
 - `TwInteractionConfig`
 - `TwFoodConfig`
 - `TwHappinessConfig`
@@ -48,6 +50,11 @@ Resolved by role id + `Priority`:
 - `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
 - Matching rules can either permanently update stored attachment selections or temporarily apply reversible overlays while the rule keeps matching.
 - Runtime evaluation is intentionally low-frequency and fingerprinted so crowded worlds avoid per-tick attachment work.
+
+### Companion movement family
+- `TwCompanionMovementConfig` selects one enabled config per normalized role id: higher `Priority`, then case-insensitive lowest asset id.
+- Its multiplier starts with `BaseMoveSpeedMultiplier`, multiplies matching attachment modifiers and the shared progression `MoveSpeedMultiplier`, then clamps and quantizes to 5% steps.
+- `MountMovementConfig` supplies native mount controls; companion movement config scales the resulting speed while walking and while natively ridden.
 
 ### Attachment display family
 - `TwAttachmentDisplayConfig` resolves friendly attachment names from all enabled configs and entries.
@@ -118,6 +125,8 @@ Recipe visibility reconciliation removes disabled gated tranquilizer recipes fro
 - `TwCommandItemConfig`
 
 Other families are asset-registry driven and update through normal loaded/removed asset events.
+
+`TwCompanionMovementConfig` is asset-registry driven. Its loaded/removed events invalidate active companion speed fingerprints so live walking and native-mount speed values converge to the revised config.
 
 This includes `TwCapturePolicyConfig`. A failed rebuild retains the last valid
 compiled index and does not publish the invalid revision.

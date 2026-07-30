@@ -28,6 +28,60 @@ class InteractionMountEffectsTest {
     }
 
     @Test
+    void nativeMountDelegatesScaledRiderSettingsBeforeEmptyRoleChange() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        String applicationSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/NativeMountMovementApplication.java"
+        ));
+        int nativeStart = mountSource.indexOf("private boolean applyNativeMount");
+        int nativeEnd = mountSource.indexOf("private void logUnknownMountMode");
+        String nativeMountSource = mountSource.substring(nativeStart, nativeEnd);
+
+        assertTrue(mountSource.contains("NativeMountMovementApplication"));
+        assertTrue(applicationSource.contains("CompanionMovementSpeedResolver"));
+        assertTrue(applicationSource.contains("CompanionProgressionModifierService.resolveMultiplier"));
+        assertTrue(applicationSource.indexOf("applyScaledSettings")
+                < applicationSource.indexOf("RoleChangeSystem.requestRoleChange"));
+        assertFalse(nativeMountSource.contains("applyMovementConfig("));
+    }
+
+    @Test
+    void nativeMountMovementWiringIsExtractedFromInteractionMountEffects() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        String applicationSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/NativeMountMovementApplication.java"
+        ));
+
+        assertTrue(mountSource.contains("nativeMountMovementApplication.apply(request)"));
+        assertTrue(applicationSource.contains("CompanionMovementSpeedResolver"));
+        assertTrue(applicationSource.contains("applyScaledSettings"));
+        assertTrue(applicationSource.indexOf("applyScaledSettings")
+                < applicationSource.indexOf("RoleChangeSystem.requestRoleChange"));
+        assertTrue(Files.readAllLines(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        )).size() <= 800);
+    }
+
+    @Test
+    void nativeMountApplicationKeepsReasonSpecificFailureDiagnostics() throws Exception {
+        String applicationSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/NativeMountMovementApplication.java"
+        ));
+
+        assertTrue(applicationSource.contains("npc_mount_component_type_unavailable"));
+        assertTrue(applicationSource.contains("npc_already_has_mount_component"));
+        assertTrue(applicationSource.contains("missing_npc_component"));
+        assertTrue(applicationSource.contains("missing_player_component"));
+        assertTrue(applicationSource.contains("missing_player_ref_component"));
+        assertTrue(applicationSource.contains("missing_role_index"));
+        assertTrue(applicationSource.contains("ensure_npc_mount_failed"));
+    }
+
+    @Test
     void mountedGlideMountReportsActionableDebugStages() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"

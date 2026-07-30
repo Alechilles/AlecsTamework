@@ -13,6 +13,7 @@ This subsection contains one page per `Tw*Config` asset family.
 ## Child Pages
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
+- [TwCompanionMovementConfig Reference](/mod/alecs-tamework/twcompanionmovementconfig-reference)
 - [TwPopulationGroupConfig Reference](/mod/alecs-tamework/twpopulationgroupconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)

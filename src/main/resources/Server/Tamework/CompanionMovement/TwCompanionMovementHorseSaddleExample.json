@@ -1,0 +1,8 @@
+{
+  "Enabled": false,
+  "RoleIds": ["Horse"],
+  "BaseMoveSpeedMultiplier": 1.10,
+  "AttachmentModifiers": [
+    { "Slot": "Saddle", "Values": ["Yes"], "Multiplier": 1.10 }
+  ]
+}
