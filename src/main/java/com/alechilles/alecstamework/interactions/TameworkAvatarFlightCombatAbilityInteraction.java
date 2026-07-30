@@ -14,6 +14,7 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Roo
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.function.Consumer;
 
 /** Delegates a native item ability slot to the active avatar-flight config's root interaction. */
 public final class TameworkAvatarFlightCombatAbilityInteraction extends SimpleInteraction {
@@ -73,12 +74,17 @@ public final class TameworkAvatarFlightCombatAbilityInteraction extends SimpleIn
 
     private void executeConfiguredAbility(@Nonnull InteractionContext context) {
         AvatarFlightCombatAbilityResolver.Resolution resolution = resolver.resolve(context, slot);
-        if (!resolution.isAvailable()) {
+        if (!delegate(resolution,
+                rootId -> context.execute(RootInteraction.getRootInteractionOrUnknown(rootId)))) {
             context.getState().state = InteractionState.Failed;
-            return;
         }
-        String rootId = resolution.rootInteractionId();
-        context.execute(RootInteraction.getRootInteractionOrUnknown(rootId));
+    }
+
+    static boolean delegate(@Nonnull AvatarFlightCombatAbilityResolver.Resolution resolution,
+                            @Nonnull Consumer<String> rootExecutor) {
+        if (!resolution.isAvailable()) return false;
+        rootExecutor.accept(resolution.rootInteractionId());
+        return true;
     }
 
     private void setSlot(@Nullable String serializedSlot) {

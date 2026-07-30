@@ -2,8 +2,9 @@ package com.alechilles.alecstamework.interactions;
 
 import com.hypixel.hytale.codec.ExtraInfo;
 import org.bson.BsonDocument;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightCombatAbilityResolver;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,35 +14,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Guards the native interaction bridge's single delegated root execution. */
 class TameworkAvatarFlightCombatAbilityInteractionTest {
-    private static final Path SOURCE = Path.of(
-            "src/main/java/com/alechilles/alecstamework/interactions/"
-                    + "TameworkAvatarFlightCombatAbilityInteraction.java");
-
     @Test
-    void unavailableAbilityFinishesWithoutLookingUpOrExecutingARoot() throws Exception {
-        String source = Files.readString(SOURCE);
+    void unavailableAbilityDoesNotDelegate() {
+        AtomicInteger delegationCount = new AtomicInteger();
 
-        assertTrue(source.contains("if (!resolution.isAvailable())"));
-        assertTrue(source.contains("InteractionState.Failed"));
-        assertTrue(source.indexOf("if (!resolution.isAvailable())")
-                < source.indexOf("RootInteraction.getRootInteractionOrUnknown"));
+        assertFalse(TameworkAvatarFlightCombatAbilityInteraction.delegate(
+                AvatarFlightCombatAbilityResolver.Resolution.unavailable(),
+                ignored -> delegationCount.incrementAndGet()));
+        assertEquals(0, delegationCount.get());
     }
 
     @Test
-    void configuredAbilityDelegatesToOneNestedRoot() throws Exception {
-        String source = Files.readString(SOURCE);
+    void configuredAbilityDelegatesItsRootExactlyOnce() {
+        AtomicInteger delegationCount = new AtomicInteger();
+        AtomicReference<String> delegatedRoot = new AtomicReference<>();
 
-        assertEquals(1, occurrences(source, "context.execute("));
-        assertTrue(source.contains("context.execute(RootInteraction.getRootInteractionOrUnknown(rootId))"));
-    }
-
-    @Test
-    void acceptsOnlyAbility2AndAbility3AssetValues() throws Exception {
-        String source = Files.readString(SOURCE);
-
-        assertTrue(source.contains("AvatarFlightCombatAbilitySlot.fromSerializedKey"));
-        assertTrue(source.contains("Ability2 or Ability3"));
-        assertFalse(source.contains("KeyCode"));
+        assertTrue(TameworkAvatarFlightCombatAbilityInteraction.delegate(
+                AvatarFlightCombatAbilityResolver.Resolution.available("Root_Test"),
+                rootId -> {
+                    delegationCount.incrementAndGet();
+                    delegatedRoot.set(rootId);
+                }));
+        assertEquals(1, delegationCount.get());
+        assertEquals("Root_Test", delegatedRoot.get());
     }
 
     @Test
@@ -51,9 +46,5 @@ class TameworkAvatarFlightCombatAbilityInteractionTest {
                         BsonDocument.parse("{ \"Slot\": \"Ability1\" }"), new ExtraInfo()));
 
         assertTrue(error.getMessage().contains("TameworkAvatarFlightCombatAbility"));
-    }
-
-    private static int occurrences(String value, String needle) {
-        return value.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
     }
 }

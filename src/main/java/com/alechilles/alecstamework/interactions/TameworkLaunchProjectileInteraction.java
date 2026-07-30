@@ -35,6 +35,7 @@ import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -303,8 +304,15 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                                            @Nonnull Ref<EntityStore> sourceRef,
                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                            @Nonnull Transform sourceLook) {
-        Vector3d lookTarget = resolveLookTargetPosition(sourceLook);
-        if (lookTarget != null) return lookTarget;
+        return resolveLookTargetPosition(sourceLook, this.lookTargetDistance,
+                () -> resolveFallbackTargetPosition(context, sourceRef, commandBuffer, sourceLook));
+    }
+
+    @Nullable
+    private Vector3d resolveFallbackTargetPosition(@Nonnull InteractionContext context,
+                                                   @Nonnull Ref<EntityStore> sourceRef,
+                                                   @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                   @Nonnull Transform sourceLook) {
         if (this.randomAroundSourceMaxRadius > 0.0) {
             return resolveRandomAroundSourceTarget(sourceRef, commandBuffer, sourceLook);
         }
@@ -317,14 +325,16 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     }
 
     @Nullable
-    private Vector3d resolveLookTargetPosition(@Nonnull Transform sourceLook) {
-        if (!Double.isFinite(this.lookTargetDistance) || this.lookTargetDistance <= 0.0) return null;
+    static Vector3d resolveLookTargetPosition(@Nonnull Transform sourceLook,
+                                              double lookTargetDistance,
+                                              @Nonnull Supplier<Vector3d> fallback) {
+        if (!Double.isFinite(lookTargetDistance) || lookTargetDistance <= 0.0) return fallback.get();
         Vector3d origin = sourceLook.getPosition();
         Vector3d direction = sourceLook.getDirection();
         return new Vector3d(
-                origin.x + direction.x * this.lookTargetDistance,
-                origin.y + direction.y * this.lookTargetDistance,
-                origin.z + direction.z * this.lookTargetDistance
+                origin.x + direction.x * lookTargetDistance,
+                origin.y + direction.y * lookTargetDistance,
+                origin.z + direction.z * lookTargetDistance
         );
     }
 

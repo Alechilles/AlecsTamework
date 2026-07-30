@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.avatarflight;
 import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.codec.ExtraInfo;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,34 @@ class AvatarFlightCombatAbilityResolverTest {
     @Test
     void configuredButBlankRootIsUnavailable() {
         assertFalse(resolver.resolve(activeFlight(), blankAbility(), AvatarFlightCombatAbilitySlot.ABILITY_2).isAvailable());
+    }
+
+    @Test
+    void staleCapturedConfigDoesNotFallBackToAnotherActiveProfile() {
+        AtomicReference<String> requestedId = new AtomicReference<>();
+        AvatarFlightCombatAbilityResolver exactResolver = new AvatarFlightCombatAbilityResolver(configId -> {
+            requestedId.set(configId);
+            return "CapturedFlight".equals(configId) ? configuredAbility() : null;
+        });
+
+        AvatarFlightComponent staleFlight = new AvatarFlightComponent("StaleFlight", 1L);
+        AvatarFlightCombatAbilityResolver.Resolution resolution = exactResolver.resolve(
+                staleFlight, AvatarFlightCombatAbilitySlot.ABILITY_2);
+
+        assertEquals("StaleFlight", requestedId.get());
+        assertFalse(resolution.isAvailable());
+    }
+
+    @Test
+    void disabledCapturedConfigIsUnavailable() {
+        TwAvatarFlightConfig disabledConfig = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
+                { "Enabled": false, "CombatAbilities": {
+                  "Ability2": { "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball" }
+                } }
+                """), new ExtraInfo());
+
+        assertFalse(resolver.resolve(activeFlight(), disabledConfig,
+                AvatarFlightCombatAbilitySlot.ABILITY_2).isAvailable());
     }
 
     private static AvatarFlightComponent activeFlight() {

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
@@ -13,6 +14,16 @@ import javax.annotation.Nullable;
 
 /** Resolves a configured avatar-flight combat root without executing gameplay effects. */
 public final class AvatarFlightCombatAbilityResolver {
+    private final ConfigLookup configLookup;
+
+    public AvatarFlightCombatAbilityResolver() {
+        this(AvatarFlightCombatAbilityResolver::findCapturedConfig);
+    }
+
+    AvatarFlightCombatAbilityResolver(@Nonnull ConfigLookup configLookup) {
+        this.configLookup = configLookup;
+    }
+
     /** Resolves the active interaction entity's configured combat ability on the main interaction thread. */
     @Nonnull
     public Resolution resolve(@Nonnull InteractionContext context, @Nullable AvatarFlightCombatAbilitySlot slot) {
@@ -23,7 +34,14 @@ public final class AvatarFlightCombatAbilityResolver {
 
         AvatarFlightComponent flight = commandBuffer.getComponent(playerRef, flightType);
         if (flight == null) return Resolution.unavailable();
-        return resolve(flight, TwAvatarFlightConfig.resolve(flight.getConfigId()), slot);
+        return resolve(flight, slot);
+    }
+
+    /** Resolves only the exact config captured when the flight state was enabled. */
+    @Nonnull
+    Resolution resolve(@Nullable AvatarFlightComponent flight, @Nullable AvatarFlightCombatAbilitySlot slot) {
+        if (flight == null) return Resolution.unavailable();
+        return resolve(flight, configLookup.findExact(flight.getConfigId()), slot);
     }
 
     /** Resolves a supplied live flight state and its effective config for focused unit tests. */
@@ -31,9 +49,23 @@ public final class AvatarFlightCombatAbilityResolver {
     public Resolution resolve(@Nullable AvatarFlightComponent flight,
                               @Nullable TwAvatarFlightConfig config,
                               @Nullable AvatarFlightCombatAbilitySlot slot) {
-        if (flight == null || config == null || slot == null) return Resolution.unavailable();
+        if (flight == null || config == null || !config.isEnabled() || slot == null) return Resolution.unavailable();
         AvatarFlightCombatAbilitySettings ability = config.getCombatAbility(slot);
         return ability == null ? Resolution.unavailable() : Resolution.available(ability.getRootInteraction());
+    }
+
+    @Nullable
+    private static TwAvatarFlightConfig findCapturedConfig(@Nullable String configId) {
+        if (configId == null || configId.isBlank()) return null;
+        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap = TwAvatarFlightConfig.getAssetMap();
+        if (assetMap == null) return null;
+        TwAvatarFlightConfig config = assetMap.getAsset(configId);
+        return config != null && config.isEnabled() ? config : null;
+    }
+
+    @FunctionalInterface
+    interface ConfigLookup {
+        @Nullable TwAvatarFlightConfig findExact(@Nonnull String configId);
     }
 
     /** Immutable outcome that intentionally contains no executable interaction object. */
