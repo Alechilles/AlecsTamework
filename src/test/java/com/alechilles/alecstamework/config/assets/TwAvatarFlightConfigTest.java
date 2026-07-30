@@ -53,6 +53,37 @@ class TwAvatarFlightConfigTest {
     }
 
     @Test
+    void combatAbilityCodecRoundTripPreservesKnownSlotsAndRejectsUnknownSlotLookup() {
+        TwAvatarFlightConfig decoded = combatAbilityConfig("""
+                {
+                  "CombatAbilities": {
+                    "Ability2": {
+                      "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                      "Glyph": "FIRE"
+                    },
+                    "Ability3": {
+                      "RootInteraction": "Root_NPC_NordicDrake_Avatar_Flying_Flame_Breath",
+                      "Glyph": "BREATH"
+                    }
+                  }
+                }
+                """);
+
+        TwAvatarFlightConfig roundTripped = TwAvatarFlightConfig.CODEC.decode(
+                TwAvatarFlightConfig.CODEC.encode(decoded, new ExtraInfo()),
+                new ExtraInfo()
+        );
+
+        assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                roundTripped.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getRootInteraction());
+        assertEquals("FIRE", roundTripped.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getGlyph());
+        assertEquals("Root_NPC_NordicDrake_Avatar_Flying_Flame_Breath",
+                roundTripped.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3).getRootInteraction());
+        assertEquals("BREATH", roundTripped.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3).getGlyph());
+        assertNull(AvatarFlightCombatAbilitySlot.fromSerializedKey("Unknown"));
+    }
+
+    @Test
     void combatAbilityMapInheritanceCopiesOmittedMapAndReplacesExplicitMap() throws Exception {
         TwAvatarFlightConfig parent = combatAbilityConfig("""
                 {

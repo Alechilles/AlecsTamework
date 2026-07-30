@@ -28,6 +28,28 @@ class AvatarFlightCombatAbilitySettingsTest {
     }
 
     @Test
+    void codecRoundTripPreservesConfiguredAbility() {
+        AvatarFlightCombatAbilitySettings decoded = AvatarFlightCombatAbilitySettings.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                          "Glyph": "FIRE"
+                        }
+                        """),
+                new ExtraInfo()
+        );
+
+        AvatarFlightCombatAbilitySettings roundTripped = AvatarFlightCombatAbilitySettings.CODEC.decode(
+                AvatarFlightCombatAbilitySettings.CODEC.encode(decoded, new ExtraInfo()),
+                new ExtraInfo()
+        );
+
+        assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", roundTripped.getRootInteraction());
+        assertEquals("FIRE", roundTripped.getGlyph());
+        assertTrue(roundTripped.isConfigured());
+    }
+
+    @Test
     void blankOrMissingRootInteractionIsUnavailable() {
         AvatarFlightCombatAbilitySettings blank = AvatarFlightCombatAbilitySettings.CODEC.decode(
                 BsonDocument.parse("{ \"RootInteraction\": \"   \", \"Glyph\": \"FIRE\" }"),
