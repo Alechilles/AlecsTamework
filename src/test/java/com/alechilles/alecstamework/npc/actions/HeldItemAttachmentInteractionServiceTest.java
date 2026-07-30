@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HeldItemAttachmentInteractionServiceTest {
 
     @Test
-    @Test
     void modelGateRequiresSlotAndOptionalSupportedValue() {
         Map<String, Set<String>> options = Map.of(
                 "Saddle", Set.of("None", "Yes"),

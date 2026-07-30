@@ -11,11 +11,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CompanionMovementSpeedSyncSystemTest {
     @Test
     void lifecycleCompletionCommitsOnlyWhenNpcAndCurrentMountedRiderRefreshesSucceed() {
-        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, false, false, false));
-        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, true, true));
-        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(false, false, false, false));
-        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, false, false));
-        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(true, true, true, false));
+        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(
+                new CompanionMovementSpeedSyncSystem.RefreshCompletion(true, false, false, false)));
+        assertTrue(CompanionMovementSpeedSyncSystem.isRefreshComplete(
+                new CompanionMovementSpeedSyncSystem.RefreshCompletion(true, true, true, true)));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(
+                new CompanionMovementSpeedSyncSystem.RefreshCompletion(false, false, false, false)));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(
+                new CompanionMovementSpeedSyncSystem.RefreshCompletion(true, true, false, false)));
+        assertFalse(CompanionMovementSpeedSyncSystem.isRefreshComplete(
+                new CompanionMovementSpeedSyncSystem.RefreshCompletion(true, true, true, false)));
     }
 
     @Test

@@ -110,35 +110,24 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
             return false;
         }
         NPCMountComponent mount = store.getComponent(npcRef, NPCMountComponent.getComponentType());
+        boolean nativeMountPresent = mount != null;
         String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(npcRef, store);
         double multiplier = resolveQuantizedMultiplier(npcRef, sourceRoleId, store);
         boolean controllerAvailable = store.getComponent(npcRef, EffectControllerComponent.getComponentType()) != null;
-        if (!controllerAvailable) {
-            return false;
+        if (controllerAvailable) {
+            CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
         }
-        CompanionMovementSpeedEffectService.applyResolvedMultiplier(npcRef, store, sourceRoleId, multiplier);
-        if (mount == null) {
-            return true;
-        }
-        Ref<EntityStore> riderRef = NativeMountMovementSettingsService.resolveMountedRiderRef(mount, store);
-        if (riderRef == null || !riderRef.isValid()) {
-            return false;
-        }
-        Player rider = store.getComponent(riderRef, Player.getComponentType());
-        PlayerRef riderPlayerRef = store.getComponent(riderRef, PlayerRef.getComponentType());
-        if (rider == null || riderPlayerRef == null) {
-            return false;
-        }
-        boolean riderSettingsApplied = riderSettings.applyScaledSettings(
-                sourceRoleId,
-                NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount),
-                riderRef,
-                riderPlayerRef,
-                rider,
-                store,
-                multiplier
-        );
-        return isRefreshComplete(controllerAvailable, true, true, riderSettingsApplied);
+        Ref<EntityStore> riderRef = nativeMountPresent
+                ? NativeMountMovementSettingsService.resolveMountedRiderRef(mount, store) : null;
+        Player rider = riderRef == null ? null : store.getComponent(riderRef, Player.getComponentType());
+        PlayerRef riderPlayerRef = riderRef == null ? null : store.getComponent(riderRef, PlayerRef.getComponentType());
+        boolean activeRiderAvailable = riderRef != null && riderRef.isValid()
+                && rider != null && riderPlayerRef != null;
+        boolean riderSettingsApplied = activeRiderAvailable && controllerAvailable && riderSettings.applyScaledSettings(
+                sourceRoleId, NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(mount), riderRef,
+                riderPlayerRef, rider, store, multiplier);
+        return isRefreshComplete(new RefreshCompletion(
+                controllerAvailable, nativeMountPresent, activeRiderAvailable, riderSettingsApplied));
     }
 
     @Nullable
@@ -203,11 +192,10 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
     }
 
     /** Pure lifecycle completion rule used by the deferred callback before it commits a fingerprint. */
-    static boolean isRefreshComplete(boolean controllerAvailable,
-                                     boolean nativeMountPresent,
-                                     boolean activeRiderAvailable,
-                                     boolean riderSettingsApplied) {
-        return controllerAvailable && (!nativeMountPresent || (activeRiderAvailable && riderSettingsApplied));
+    static boolean isRefreshComplete(@Nonnull RefreshCompletion completion) {
+        return completion.controllerAvailable()
+                && (!completion.nativeMountPresent()
+                || (completion.activeRiderAvailable() && completion.riderSettingsApplied()));
     }
 
     private static void commitFingerprint(@Nonnull TickState state, @Nullable MovementSpeedFingerprint fingerprint) {
@@ -235,6 +223,13 @@ public final class CompanionMovementSpeedSyncSystem extends TickingSystem<Entity
                                     long configRevision,
                                     boolean nativeMounted,
                                     @Nullable UUID riderUuid) {
+    }
+
+    /** Captures the current callback-time dependencies needed before a fingerprint may be committed. */
+    record RefreshCompletion(boolean controllerAvailable,
+                             boolean nativeMountPresent,
+                             boolean activeRiderAvailable,
+                             boolean riderSettingsApplied) {
     }
 
     private static final class TickState {
