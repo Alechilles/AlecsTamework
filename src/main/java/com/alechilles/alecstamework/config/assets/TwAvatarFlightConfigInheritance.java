@@ -35,6 +35,7 @@ final class TwAvatarFlightConfigInheritance {
         inheritRiderVisual(target, parent, nested(nestedByTop, "RiderVisual"), top);
         inheritMounting(target, parent, nested(nestedByTop, "Mounting"), top);
         inheritDebug(target, parent, nested(nestedByTop, "Debug"), top);
+        inheritCombatAbilities(target, parent, top);
     }
 
     private static void inheritModel(TwAvatarFlightConfig target, TwAvatarFlightConfig parent,
@@ -260,6 +261,14 @@ final class TwAvatarFlightConfigInheritance {
             if (!keys.contains("LogControllerTicks")) target.debug.logControllerTicks = parent.debug.logControllerTicks;
             if (!keys.contains("LogInputTransitions")) target.debug.logInputTransitions = parent.debug.logInputTransitions;
         }
+    }
+
+    private static void inheritCombatAbilities(TwAvatarFlightConfig target,
+                                               TwAvatarFlightConfig parent,
+                                               Set<String> top) {
+        target.combatAbilities = top.contains("CombatAbilities")
+                ? Map.copyOf(target.getCombatAbilities())
+                : Map.copyOf(parent.getCombatAbilities());
     }
 
     @Nullable

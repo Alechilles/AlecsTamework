@@ -11,9 +11,81 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwAvatarFlightConfigTest {
+
+    @Test
+    void codecDecodesCombatAbilitiesAndIgnoresUnknownSlots() {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "CombatAbilities": {
+                            "Ability2": {
+                              "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                              "Glyph": "FIRE"
+                            },
+                            "Ability3": {
+                              "RootInteraction": "Root_NPC_NordicDrake_Avatar_Flying_Flame_Breath",
+                              "Glyph": "BREATH"
+                            },
+                            "Unknown": {
+                              "RootInteraction": "Ignored",
+                              "Glyph": "IGNORED"
+                            }
+                          }
+                        }
+                        """),
+                new ExtraInfo()
+        );
+
+        assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getRootInteraction());
+        assertEquals("FIRE", config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getGlyph());
+        assertEquals("Root_NPC_NordicDrake_Avatar_Flying_Flame_Breath",
+                config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3).getRootInteraction());
+        assertEquals("BREATH", config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3).getGlyph());
+        assertNull(config.getCombatAbility(null));
+        assertEquals(3, config.getCombatAbilities().size());
+        assertThrows(UnsupportedOperationException.class,
+                () -> config.getCombatAbilities().put("Ability2", null));
+    }
+
+    @Test
+    void combatAbilityMapInheritanceCopiesOmittedMapAndReplacesExplicitMap() throws Exception {
+        TwAvatarFlightConfig parent = combatAbilityConfig("""
+                {
+                  "CombatAbilities": {
+                    "Ability2": { "RootInteraction": "ParentFire", "Glyph": "FIRE" },
+                    "Ability3": { "RootInteraction": "ParentBreath", "Glyph": "BREATH" }
+                  }
+                }
+                """);
+        TwAvatarFlightConfig omitted = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig explicit = combatAbilityConfig("""
+                {
+                  "CombatAbilities": {
+                    "Ability2": { "RootInteraction": "ChildFire", "Glyph": "FIRE" }
+                  }
+                }
+                """);
+        TwAvatarFlightConfig empty = combatAbilityConfig("{ \"CombatAbilities\": {} }");
+
+        omitted.inheritMissingTopLevelFrom(parent, Set.of());
+        explicit.inheritMissingTopLevelFrom(parent, Set.of("CombatAbilities"));
+        empty.inheritMissingTopLevelFrom(parent, Set.of("CombatAbilities"));
+
+        assertEquals("ParentFire", omitted.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getRootInteraction());
+        assertEquals("ParentBreath", omitted.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3).getRootInteraction());
+        assertEquals("ChildFire", explicit.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2).getRootInteraction());
+        assertNull(explicit.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3));
+        assertTrue(empty.getCombatAbilities().isEmpty());
+    }
+
+    private static TwAvatarFlightConfig combatAbilityConfig(String json) {
+        return TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse(json), new ExtraInfo());
+    }
 
     @Test
     void defaultConfigExposesSafePrototypeValues() {
