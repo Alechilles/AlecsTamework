@@ -39,6 +39,18 @@ class TameworkCommandRadialMenuAssetsTest {
         assertFalse(ui.contains("Tamework/RadialMenu/Default/CommandWheelSlice"));
     }
 
+    @Test
+    void closeButtonUsesFooterSpaceBelowTheWheelContent() throws Exception {
+        String ui = Files.readString(UI, StandardCharsets.UTF_8);
+
+        assertTrue(ui.contains("Anchor: (Width: 920, Height: 832);"));
+        assertTrue(ui.contains("Group #TameworkCommandMenuContent {"));
+        assertTrue(ui.contains("Anchor: (Top: 36, Width: 920, Height: 760);"));
+        assertTrue(ui.contains("TextButton #CommandMenuCloseButton {"));
+        assertTrue(ui.contains("Anchor: (Bottom: 0, Width: 180, Height: 44, Left: 370);"));
+        assertTrue(ui.contains("Style: $C.@SecondaryTextButtonStyle;"));
+    }
+
     private static Path cropped(int sourceSlice, String state) {
         return ASSET_ROOT.resolve("Cropped")
                 .resolve("CommandWheelSlice" + sourceSlice + "_" + state + ".png");

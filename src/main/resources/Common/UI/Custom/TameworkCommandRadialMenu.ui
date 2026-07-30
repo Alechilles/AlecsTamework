@@ -93,8 +93,11 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 920, Height: 760);
+    Anchor: (Width: 920, Height: 832);
     Visible: false;
+
+    Group #TameworkCommandMenuContent {
+      Anchor: (Top: 36, Width: 920, Height: 760);
 
     Label #TameworkCommandMenuTitle {
       Anchor: (Top: 18, Width: 620, Height: 42, Left: 150);
@@ -262,8 +265,11 @@ $C.@PageOverlay {
       Visible: false;
     }
 
-    $C.@SecondaryTextButton #CommandMenuCloseButton {
-      @Anchor = (Bottom: -16, Width: 180, Left: 370);
+    }
+
+    TextButton #CommandMenuCloseButton {
+      Anchor: (Bottom: 0, Width: 180, Height: 44, Left: 370);
+      Style: $C.@SecondaryTextButtonStyle;
       Text: %server.tamework.ui.shared.button.close;
     }
   }
