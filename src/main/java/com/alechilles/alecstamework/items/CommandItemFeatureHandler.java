@@ -385,7 +385,8 @@ public final class CommandItemFeatureHandler {
                 BondedCompanionPanelActionRouter.production(
                         feedbackService, bondedCompanions,
                         panelEntrySourceService.bondedReadModel()),
-                bondedTalentPageService
+                bondedTalentPageService,
+                new BondedCompanionFlightToggleActionService()
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

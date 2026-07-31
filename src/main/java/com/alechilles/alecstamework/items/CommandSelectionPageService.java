@@ -32,6 +32,7 @@ final class CommandSelectionPageService {
     private final CommandPanelFeatureActionService featureActions;
     private final BondedCompanionPanelActionRouter bondedActions;
     private final BondedCompanionTalentPageService bondedTalentPages;
+    private final BondedCompanionFlightToggleActionService flightToggleActions;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -91,6 +92,23 @@ final class CommandSelectionPageService {
             BondedCompanionPanelActionRouter bondedActions,
             BondedCompanionTalentPageService bondedTalentPages
     ) {
+        this(toolInventoryService, groupAssignPageService, resolutionService,
+                panelActionService, talentPageService, featurePresentations,
+                featureActions, bondedActions, bondedTalentPages, null);
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions,
+            BondedCompanionPanelActionRouter bondedActions,
+            BondedCompanionTalentPageService bondedTalentPages,
+            BondedCompanionFlightToggleActionService flightToggleActions
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
@@ -99,6 +117,7 @@ final class CommandSelectionPageService {
         this.featureActions = featureActions;
         this.bondedActions = bondedActions;
         this.bondedTalentPages = bondedTalentPages;
+        this.flightToggleActions = flightToggleActions;
     }
 
     /**
@@ -236,6 +255,7 @@ final class CommandSelectionPageService {
                 npcCallbacks.cull(), npcCallbacks.respawn(),
                 featureCallbacks.summon(), featureCallbacks.dismiss(),
                 featureCallbacks.revive(), featureCallbacks.abandon(),
+                featureCallbacks.flightToggle(),
                 npcCallbacks.locate(),
                 npcCallbacks.recall(), npcCallbacks.setHome(),
                 npcCallbacks.returnHome(), npcCallbacks.openTalents(),
@@ -299,7 +319,24 @@ final class CommandSelectionPageService {
                 featureCallback(context, FeatureAction.SUMMON),
                 featureCallback(context, FeatureAction.DISMISS),
                 featureCallback(context, FeatureAction.REVIVE),
-                featureCallback(context, FeatureAction.ABANDON));
+                featureCallback(context, FeatureAction.ABANDON),
+                flightToggleCallback(context));
+    }
+
+    private LinkedNpcPanelFeatureAction flightToggleCallback(PageContext context) {
+        return (uuid, eventRef, eventStore) -> {
+            if (!context.config().usesBondedCompanionRoster()
+                    || flightToggleActions == null) return;
+            CommandPanelFeaturePresentation feature = context.snapshot().presentation(uuid);
+            if (feature == null || feature.bonded() == null
+                    || !BondedCompanionFlightToggleActionService
+                    .isFlightToggleAvailable(feature.bonded())) return;
+            Player player = BondedCompanionPanelActionRouter.resolvePlayerFromEvent(
+                    context.ownerUuid(), eventRef, eventStore);
+            if (player == null || !context.bondedLifecycleAuthority().allows(player)) return;
+            flightToggleActions.toggle(context.ownerUuid(), eventRef, eventStore,
+                    context.toolId(), feature.bonded());
+        };
     }
 
     private LinkedNpcPanelFeatureAction featureCallback(
@@ -572,7 +609,8 @@ final class CommandSelectionPageService {
             LinkedNpcPanelFeatureAction summon,
             LinkedNpcPanelFeatureAction dismiss,
             LinkedNpcPanelFeatureAction revive,
-            LinkedNpcPanelFeatureAction abandon) {
+            LinkedNpcPanelFeatureAction abandon,
+            LinkedNpcPanelFeatureAction flightToggle) {
     }
 
     private record PanelCallbacks(

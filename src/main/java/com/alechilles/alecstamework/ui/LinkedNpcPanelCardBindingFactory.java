@@ -14,6 +14,7 @@ final class LinkedNpcPanelCardBindingFactory {
                 CULL_COMMAND_PREFIX, RESPAWN_COMMAND_PREFIX, LinkedNpcPanelFeatureController.SUMMON_COMMAND_PREFIX,
                 LinkedNpcPanelFeatureController.DISMISS_COMMAND_PREFIX, LOCATE_COMMAND_PREFIX,
                 RECALL_COMMAND_PREFIX, SET_HOME_COMMAND_PREFIX, RETURN_HOME_COMMAND_PREFIX,
-                OPEN_TALENTS_COMMAND_PREFIX, recall, ownerRoster);
+                OPEN_TALENTS_COMMAND_PREFIX, BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX,
+                recall, ownerRoster);
     }
 }

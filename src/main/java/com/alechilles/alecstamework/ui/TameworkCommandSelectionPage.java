@@ -88,6 +88,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> cullCallback;
     private final Consumer<UUID> respawnCallback;
     private final LinkedNpcPanelFeatureAction rosterAbandonCallback;
+    private final LinkedNpcPanelFeatureAction flightToggleCallback;
     private final Consumer<UUID> locateCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -141,6 +142,7 @@ public final class TameworkCommandSelectionPage
                                          @Nonnull LinkedNpcPanelFeatureAction rosterDismissCallback,
                                          @Nonnull LinkedNpcPanelFeatureAction paidReviveCallback,
                                          @Nonnull LinkedNpcPanelFeatureAction rosterAbandonCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction flightToggleCallback,
                                          @Nonnull Consumer<UUID> locateCallback,
                                          @Nonnull Consumer<UUID> recallCallback,
                                          @Nonnull Consumer<UUID> setHomeCallback,
@@ -205,6 +207,7 @@ public final class TameworkCommandSelectionPage
         this.cullCallback = cullCallback;
         this.respawnCallback = respawnCallback;
         this.rosterAbandonCallback = rosterAbandonCallback;
+        this.flightToggleCallback = flightToggleCallback;
         this.locateCallback = locateCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
@@ -304,6 +307,9 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (handleBondedFlightToggle(commandId, ref, store)) {
+            return;
+        }
         if (handleBondedAbandon(commandId, ref, store)) {
             return;
         }
@@ -643,6 +649,28 @@ public final class TameworkCommandSelectionPage
         pendingUnlinkNpcUuid = null;
         closePage();
         selectionCallback.accept(commandId);
+    }
+
+    /** Refreshes after a profile-scoped toggle request without predicting its result. */
+    private boolean handleBondedFlightToggle(
+            String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
+        if (!commandId.startsWith(BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
+            return false;
+        }
+        UUID cardUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX);
+        CommandPanelFeaturePresentation feature = cardUuid == null ? null
+                : featureController.presentation(cardUuid);
+        if (rosterEventBoundary.bondedRoster()
+                && cardUuid != null && feature != null && feature.bonded() != null
+                && "true".equalsIgnoreCase(feature.bonded().attributes().get(
+                com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes
+                        .FLIGHT_TOGGLE_AVAILABLE))) {
+            flightToggleCallback.accept(cardUuid, ref, store);
+        }
+        refreshLinkedNpcEntries();
+        sendCardRefreshUpdate();
+        return true;
     }
 
     /** Handles the bonded card's destructive unlink before legacy callbacks. */

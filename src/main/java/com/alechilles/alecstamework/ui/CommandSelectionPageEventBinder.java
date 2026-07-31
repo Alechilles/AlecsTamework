@@ -38,6 +38,8 @@ final class CommandSelectionPageEventBinder {
     static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
     static final String OPEN_TALENTS_COMMAND_PREFIX = "__talents__:";
+    static final String BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX =
+            "__bonded_flight_toggle__:";
     static final String PANEL_RADIUS_DECREASE_COMMAND_ID =
             "__panel_radius_dec__";
     static final String PANEL_RADIUS_INCREASE_COMMAND_ID =

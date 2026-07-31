@@ -403,6 +403,7 @@ final class LinkedNpcPanelCardBinder {
                              String setHomeCommandPrefix,
                              String returnHomeCommandPrefix,
                              String openTalentsCommandPrefix,
+                             String bondedFlightToggleCommandPrefix,
                              boolean recallActionEnabled,
                              boolean ownerCommandFamilyRoster) {
     }

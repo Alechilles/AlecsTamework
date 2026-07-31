@@ -171,6 +171,21 @@ class TameworkCommandSelectionPageNavigationTest {
     }
 
     @Test
+    void flightToggleRefreshesWithoutStartingNavigationOrClosingThePage()
+            throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int start = content.indexOf("private boolean handleBondedFlightToggle");
+        int end = content.indexOf("private boolean handleBondedAbandon", start);
+        assertTrue(start >= 0, "Flight-toggle action branch should exist.");
+        assertTrue(end > start, "Flight-toggle branch should be self-contained.");
+        String branch = content.substring(start, end);
+        assertTrue(branch.contains("refreshLinkedNpcEntries()"));
+        assertTrue(branch.contains("sendCardRefreshUpdate()"));
+        assertFalse(branch.contains("beginPageNavigation()"));
+        assertFalse(branch.contains("closePage()"));
+    }
+
+    @Test
     void lightweightRefreshesRebindBondedCardInput() throws IOException {
         String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
         int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
