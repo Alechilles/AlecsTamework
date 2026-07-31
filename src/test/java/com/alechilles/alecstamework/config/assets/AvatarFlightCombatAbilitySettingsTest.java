@@ -16,7 +16,8 @@ class AvatarFlightCombatAbilitySettingsTest {
                 BsonDocument.parse("""
                         {
                           "RootInteraction": " Root_NPC_NordicDrake_Avatar_Fire_Ball ",
-                          "Glyph": " FIRE "
+                          "Glyph": " FIRE ",
+                          "GlyphTexturePath": " MyDragon/AvatarFlightIcons/Fireball.png "
                         }
                         """),
                 new ExtraInfo()
@@ -24,6 +25,7 @@ class AvatarFlightCombatAbilitySettingsTest {
 
         assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", settings.getRootInteraction());
         assertEquals("FIRE", settings.getGlyph());
+        assertEquals("MyDragon/AvatarFlightIcons/Fireball.png", settings.getGlyphTexturePath());
         assertTrue(settings.isConfigured());
     }
 
@@ -33,7 +35,8 @@ class AvatarFlightCombatAbilitySettingsTest {
                 BsonDocument.parse("""
                         {
                           "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
-                          "Glyph": "FIRE"
+                          "Glyph": "FIRE",
+                          "GlyphTexturePath": "MyDragon/AvatarFlightIcons/Fireball.png"
                         }
                         """),
                 new ExtraInfo()
@@ -46,6 +49,7 @@ class AvatarFlightCombatAbilitySettingsTest {
 
         assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", roundTripped.getRootInteraction());
         assertEquals("FIRE", roundTripped.getGlyph());
+        assertEquals("MyDragon/AvatarFlightIcons/Fireball.png", roundTripped.getGlyphTexturePath());
         assertTrue(roundTripped.isConfigured());
     }
 

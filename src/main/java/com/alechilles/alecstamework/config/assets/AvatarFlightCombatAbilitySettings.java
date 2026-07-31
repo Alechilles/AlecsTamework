@@ -20,18 +20,30 @@ public final class AvatarFlightCombatAbilitySettings {
             .<String>append(new KeyedCodec<>("Glyph", Codec.STRING),
                     (settings, value) -> settings.glyph = normalized(value),
                     settings -> settings.glyph)
-            .documentation("Glyph name shown for this ability.")
+            .documentation("Fallback glyph text shown when no GlyphTexturePath is configured.")
+            .add()
+            .<String>append(new KeyedCodec<>("GlyphTexturePath", Codec.STRING),
+                    (settings, value) -> settings.glyphTexturePath = normalized(value),
+                    settings -> settings.glyphTexturePath)
+            .documentation("Optional UI texture path for this glyph. It can display the HUD control without fallback text. "
+                    + "Blank uses a bundled glyph texture or text fallback. "
+                    + "CombatAbilities is a map: an explicit map replaces the parent map; an omitted map inherits it.")
             .add()
             .build();
 
     private String rootInteraction = "";
     private String glyph = "";
+    private String glyphTexturePath = "";
 
     @Nonnull
     public String getRootInteraction() { return normalized(rootInteraction); }
 
     @Nonnull
     public String getGlyph() { return normalized(glyph); }
+
+    /** Returns the optional per-avatar UI texture path for this combat glyph. */
+    @Nonnull
+    public String getGlyphTexturePath() { return normalized(glyphTexturePath); }
 
     public boolean isConfigured() { return !getRootInteraction().isEmpty(); }
 

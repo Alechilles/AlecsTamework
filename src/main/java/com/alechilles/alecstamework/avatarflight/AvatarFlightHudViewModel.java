@@ -178,31 +178,40 @@ public record AvatarFlightHudViewModel(boolean visible,
     }
 
     /** Immutable render values for one optional native combat-ability slot. */
-    public record CombatGlyph(boolean visible, @Nonnull String glyph, @Nonnull String bindingLabel) {
+    public record CombatGlyph(boolean visible,
+                              @Nonnull String glyph,
+                              @Nonnull String bindingLabel,
+                              @Nonnull String customIconTexturePath) {
         private static final String FIREBALL_TEXTURE_PATH = "Tamework/AvatarFlightControls/Fireball.png";
         private static final String FIRE_BREATH_TEXTURE_PATH = "Tamework/AvatarFlightControls/FireBreath.png";
 
         @Nonnull
         public static CombatGlyph from(@Nullable AvatarFlightCombatAbilitySettings settings,
                                        @Nonnull AvatarFlightCombatAbilitySlot slot) {
-            if (settings == null || !settings.isConfigured() || settings.getGlyph().isBlank()) {
+            if (settings == null || !settings.isConfigured()
+                    || (settings.getGlyph().isBlank() && settings.getGlyphTexturePath().isBlank())) {
                 return hidden(slot);
             }
-            return new CombatGlyph(true, settings.getGlyph(), bindingLabel(slot));
+            return new CombatGlyph(true, settings.getGlyph(), bindingLabel(slot), settings.getGlyphTexturePath());
         }
 
         @Nonnull
         private static CombatGlyph normalize(@Nullable CombatGlyph glyph,
                                              @Nonnull AvatarFlightCombatAbilitySlot slot) {
-            if (glyph == null || !glyph.visible || glyph.glyph == null || glyph.glyph.isBlank()) {
+            if (glyph == null || !glyph.visible) {
                 return hidden(slot);
             }
-            return new CombatGlyph(true, glyph.glyph.trim(), bindingLabel(slot));
+            String normalizedGlyph = glyph.glyph == null ? "" : glyph.glyph.trim();
+            String normalizedTexturePath = normalizeTexturePath(glyph.customIconTexturePath);
+            if (normalizedGlyph.isEmpty() && normalizedTexturePath.isEmpty()) {
+                return hidden(slot);
+            }
+            return new CombatGlyph(true, normalizedGlyph, bindingLabel(slot), normalizedTexturePath);
         }
 
         @Nonnull
         private static CombatGlyph hidden(@Nonnull AvatarFlightCombatAbilitySlot slot) {
-            return new CombatGlyph(false, "", bindingLabel(slot));
+            return new CombatGlyph(false, "", bindingLabel(slot), "");
         }
 
         /** Returns the bundled HUD texture for a known ability glyph, if one exists. */
@@ -216,11 +225,20 @@ public record AvatarFlightHudViewModel(boolean visible,
          */
         @Nonnull
         public String iconTexturePath() {
+            String customTexturePath = normalizeTexturePath(customIconTexturePath);
+            if (!customTexturePath.isEmpty()) {
+                return customTexturePath;
+            }
             return switch (glyph.trim().toUpperCase(Locale.ROOT)) {
                 case "FIRE" -> FIREBALL_TEXTURE_PATH;
                 case "BREATH" -> FIRE_BREATH_TEXTURE_PATH;
                 default -> "";
             };
+        }
+
+        @Nonnull
+        private static String normalizeTexturePath(@Nullable String texturePath) {
+            return texturePath == null ? "" : texturePath.trim();
         }
 
         @Nonnull

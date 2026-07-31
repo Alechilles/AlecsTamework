@@ -55,6 +55,7 @@
 - Added reusable animation-timed wing-flap audio and a subtle sustained fast-flight loop for avatar-flight models.
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
 - Added a complete lower-right avatar-flight control row for crouch launch, forward boost, upward flap, and airbrake, with dedicated artwork, frames, and input labels while the tool-only Flightmaster's Talisman hides Hytale's native weapon ability strip.
+- Avatar-flight combat abilities can now supply optional per-ability glyph textures while retaining the standard control frame and layout.
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.

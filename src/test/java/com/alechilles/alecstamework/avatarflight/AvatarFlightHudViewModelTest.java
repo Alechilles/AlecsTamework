@@ -229,7 +229,11 @@ class AvatarFlightHudViewModelTest {
         AvatarFlightComponent flight = new AvatarFlightComponent("default", 1_000L);
         TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
                 { "CombatAbilities": {
-                  "Ability2": { "RootInteraction": "Root_Fire", "Glyph": "FIRE" },
+                  "Ability2": {
+                    "RootInteraction": "Root_Fire",
+                    "Glyph": "FIRE",
+                    "GlyphTexturePath": " MyDragon/AvatarFlightIcons/Arcane_Fireball.png "
+                  },
                   "Ability3": { "RootInteraction": "Root_Breath", "Glyph": "BREATH" }
                 } }
                 """), new ExtraInfo());
@@ -240,10 +244,33 @@ class AvatarFlightHudViewModelTest {
 
         assertTrue(model.ability2().visible());
         assertEquals("FIRE", model.ability2().glyph());
+        assertEquals("MyDragon/AvatarFlightIcons/Arcane_Fireball.png", model.ability2().iconTexturePath(),
+                "a config-supplied glyph texture must override the built-in FIRE artwork");
         assertEquals("E", model.ability2().bindingLabel());
         assertTrue(model.ability3().visible());
         assertEquals("BREATH", model.ability3().glyph());
         assertEquals("R", model.ability3().bindingLabel());
+    }
+
+    @Test
+    void hudModelShowsCustomCombatTextureWithoutFallbackGlyphText() {
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1_000L);
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
+                { "CombatAbilities": {
+                  "Ability2": {
+                    "RootInteraction": "Root_Ice",
+                    "GlyphTexturePath": "MyDragon/AvatarFlightIcons/Ice_Blast.png"
+                  }
+                } }
+                """), new ExtraInfo());
+
+        AvatarFlightHudViewModel model = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 1_000L);
+
+        assertTrue(model.ability2().visible());
+        assertEquals("", model.ability2().glyph());
+        assertEquals("MyDragon/AvatarFlightIcons/Ice_Blast.png", model.ability2().iconTexturePath());
     }
 
     @Test
