@@ -30,8 +30,9 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
     private final BondedCompanionPanelFeaturePresentationSource presentations;
     private final HytaleBondedCompanionActionContextFactory contexts =
             new HytaleBondedCompanionActionContextFactory();
-    private final BondedCompanionFlightModeReader flightModeReader =
-            new BondedCompanionFlightModeReader();
+    private final BondedCompanionPanelFlightProjection flightProjection =
+            new BondedCompanionPanelFlightProjection(
+                    new BondedCompanionFlightModeReader());
 
     BondedCompanionPanelEntrySourceService(
             @Nonnull BondedCompanionPanelSnapshotCache cache,
@@ -209,25 +210,14 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         try {
             Ref<EntityStore> reference = player.getWorld().getEntityRef(
                     profile.activeLease().liveNpcUuid());
-            if (reference == null || !reference.isValid()
-                    || reference.getStore() != store
-                    || NPCEntity.getComponentType() == null) {
-                return Optional.empty();
-            }
-            NPCEntity npc = store.getComponent(reference,
-                    NPCEntity.getComponentType());
-            if (npc == null) {
-                return Optional.empty();
-            }
-            String roleId = CompanionRoleIdResolver.resolveRoleId(reference,
-                    store);
-            if (roleId == null || !roleId.equals(profile.roleId())) {
-                return Optional.empty();
-            }
+            NPCEntity npc = reference == null || !reference.isValid()
+                    || NPCEntity.getComponentType() == null ? null
+                    : store.getComponent(reference, NPCEntity.getComponentType());
+            String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
             var settings = TwCompanionConfig.resolveEffectiveForRole(roleId)
                     .getFlightToggle();
-            return settings.isConfigured() ? flightModeReader.read(npc, settings)
-                    : Optional.empty();
+            return flightProjection.read(profile, player.getWorld().getName(),
+                    reference, store, npc, roleId, settings);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
