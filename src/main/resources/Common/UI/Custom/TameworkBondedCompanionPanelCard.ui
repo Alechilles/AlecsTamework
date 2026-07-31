@@ -74,7 +74,7 @@ Group {
     }
 
     Label #BondedName {
-        Anchor: (Top: 8, Left: 22, Right: 108, Height: 22);
+        Anchor: (Top: 8, Left: 22, Right: 142, Height: 22);
         Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
         Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -173,6 +173,27 @@ Group {
         Anchor: (Top: 10, Right: 38, Width: 64, Height: 18);
         Text: "";
         Style: (FontSize: 11, RenderBold: true, TextColor: #dfae59, HorizontalAlignment: End, VerticalAlignment: Center);
+        Visible: false;
+    }
+
+    Group #BondedFlightModeGroundedIcon {
+        Anchor: (Top: 5, Right: 108, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Grounded.png");
+        Visible: false;
+    }
+
+    Group #BondedFlightModeAirborneIcon {
+        Anchor: (Top: 5, Right: 108, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Airborne.png");
+        Visible: false;
+    }
+
+    TextButton #BondedFlightToggleButton {
+        Anchor: (Top: 5, Right: 108, Width: 24, Height: 24);
+        Style: @BondedTransparentButton;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
         Visible: false;
     }
 

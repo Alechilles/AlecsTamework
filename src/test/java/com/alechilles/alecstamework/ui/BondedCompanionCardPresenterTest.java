@@ -6,8 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
+import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -100,6 +104,156 @@ class BondedCompanionCardPresenterTest {
         assertCommand(commands, "#Card #BondedProgressionButton.Visible", "true");
         assertCommand(commands, "#Card #BondedProgressionButton.TooltipText",
                 "Level: 12");
+    }
+
+    @Test
+    void activeAvailableFlightToggleShowsTheGroundedIconAndFlightTooltip() {
+        BondedCompanionPanelPresentation row = presentation(
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS,
+                true, Map.of(
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "false"),
+                null);
+        UICommandBuilder commands = new UICommandBuilder();
+
+        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "false");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
+                "Switch to flight");
+    }
+
+    @Test
+    void activeAvailableFlightToggleShowsTheAirborneIconAndGroundTooltip() {
+        BondedCompanionPanelPresentation row = presentation(
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS,
+                true, Map.of(
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"),
+                null);
+        UICommandBuilder commands = new UICommandBuilder();
+
+        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
+        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
+                "Switch to ground");
+    }
+
+    @Test
+    void flightToggleHidesForStoredDeadDisabledAndUnreadableRows() {
+        for (BondedCompanionPanelPresentation row : List.of(
+                presentation(BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.SUMMON, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
+                presentation(BondedCompanionStateView.DEAD,
+                        BondedCompanionStatusPresentation.Action.REVIVE, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"), null),
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "false"), null),
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true,
+                        Map.of(), null))) {
+            UICommandBuilder commands = new UICommandBuilder();
+            BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                    "#Card", UUID.randomUUID(), row, false, bindingConfig(), "en-US");
+            assertCommand(commands, "#Card #BondedFlightToggleButton.Visible", "false");
+            assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
+            assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "false");
+        }
+    }
+
+    @Test
+    void dynamicRefreshUpdatesFlightToggleWithoutRecreatingTheCard() {
+        UICommandBuilder commands = new UICommandBuilder();
+        BondedCompanionCardPresenter.refreshDynamicState(commands, "#Card", presentation(
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true",
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE, "true"), null), "en-US");
+
+        assertCommand(commands, "#Card #BondedFlightModeGroundedIcon.Visible", "false");
+        assertCommand(commands, "#Card #BondedFlightModeAirborneIcon.Visible", "true");
+        assertCommand(commands, "#Card #BondedFlightToggleButton.TooltipText",
+                "Switch to ground");
+    }
+
+    @Test
+    void flightToggleAssetAndIconsHaveTheFinalSelectorsTexturesAndTransparency()
+            throws Exception {
+        String asset = Files.readString(Path.of("src", "main", "resources", "Common",
+                "UI", "Custom", "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
+        assertTrue(asset.contains("#BondedFlightModeGroundedIcon"));
+        assertTrue(asset.contains("#BondedFlightModeAirborneIcon"));
+        assertTrue(asset.contains("#BondedFlightToggleButton"));
+        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Grounded.png"));
+        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png"));
+        assertIconIs32RgbaWithTransparency("FlightMode_Grounded.png");
+        assertIconIs32RgbaWithTransparency("FlightMode_Airborne.png");
+    }
+
+    private static void assertIconIs32RgbaWithTransparency(String fileName) throws Exception {
+        BufferedImage image = javax.imageio.ImageIO.read(new File("src/main/resources/Common/UI/Custom/Tamework/LinkedPanelIcons", fileName));
+        assertTrue(image != null && image.getWidth() == 32 && image.getHeight() == 32);
+        assertTrue(image.getColorModel().hasAlpha());
+        boolean transparent = false;
+        boolean visible = false;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int alpha = image.getRGB(x, y) >>> 24;
+                transparent |= alpha < 255;
+                visible |= alpha > 0;
+            }
+        }
+        assertTrue(transparent && visible, "Icon must have transparent padding and visible art.");
+    }
+
+    @Test
+    void flightToggleUsesTheProfileScopedCommandPrefix() throws Exception {
+        String presenter = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
+        assertTrue(presenter.contains("config.bondedFlightToggleCommandPrefix() + cardUuid"));
+        assertTrue(presenter.contains("if (flightToggleVisible(row))"));
+    }
+
+    @Test
+    void lightweightRefreshBindsOnlyEligibleFlightToggleWithItsProfileUuid() {
+        UUID cardUuid = UUID.randomUUID();
+        BondedCompanionPanelPresentation eligible = presentation(
+                BondedCompanionStateView.ACTIVE,
+                BondedCompanionStatusPresentation.Action.DISMISS, true,
+                Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE, "true"),
+                null);
+        UIEventBuilder eligibleEvents = new UIEventBuilder();
+
+        BondedCompanionCardPresenter.bindEventBindings(eligibleEvents, "#Card",
+                cardUuid, eligible, false, bindingConfig(), "en-US");
+
+        assertTrue(java.util.Arrays.stream(eligibleEvents.getEvents()).anyMatch(event ->
+                        event.type == CustomUIEventBindingType.Activating
+                                && "#Card #BondedFlightToggleButton".equals(event.selector)
+                                && event.data.contains("__bonded_flight_toggle__:" + cardUuid)),
+                "Each eligible lightweight refresh must rebind this profile's flight toggle.");
+
+        UIEventBuilder unavailableEvents = new UIEventBuilder();
+        BondedCompanionCardPresenter.bindEventBindings(unavailableEvents, "#Card",
+                cardUuid, presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS, true,
+                        Map.of(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE,
+                                "false"), null), false, bindingConfig(), "en-US");
+        assertFalse(java.util.Arrays.stream(unavailableEvents.getEvents()).anyMatch(event ->
+                        "#Card #BondedFlightToggleButton".equals(event.selector)),
+                "Unavailable rows must not retain a stale flight-toggle event binding.");
     }
 
     @Test
@@ -333,6 +487,8 @@ class BondedCompanionCardPresenterTest {
         String binding = presenter.substring(bindingStart, unlinkStart);
         assertTrue(binding.contains("bindProgressionEvents"),
                 "The lightweight refresh must keep the level/talent shortcut bound.");
+        assertTrue(binding.contains("bindFlightToggleEvents"),
+                "The lightweight refresh must keep an eligible flight toggle bound.");
         assertFalse(binding.contains("UICommandBuilder"),
                 "Input refreshes must not rebuild or flicker the card visual tree.");
     }
@@ -367,15 +523,20 @@ class BondedCompanionCardPresenterTest {
                 "Common", "UI", "Custom",
                 "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
 
-        assertTrue(asset.contains("#BondedLevelText {\n        Anchor: (Top: 30, Left: 22, Width: 42"),
+        assertTrue(asset.contains("Label #BondedLevelText {")
+                        && asset.contains("Anchor: (Top: 30, Left: 22, Width: 42"),
                 "Level should lead the compact identity row.");
-        assertTrue(asset.contains("#BondedGenderFemaleIcon {\n        Anchor: (Top: 33, Left: 68"),
+        assertTrue(asset.contains("Group #BondedGenderFemaleIcon {")
+                        && asset.contains("Anchor: (Top: 33, Left: 68"),
                 "Gender icon should follow the level text.");
-        assertTrue(asset.contains("#BondedSpecies {\n        Anchor: (Top: 30, Left: 86"),
+        assertTrue(asset.contains("Label #BondedSpecies {")
+                        && asset.contains("Anchor: (Top: 30, Left: 86"),
                 "Species should follow the gender icon.");
-        assertTrue(asset.contains("#BondedTalentPointAction {\n        Anchor: (Top: 82, Right: 118"),
+        assertTrue(asset.contains("Group #BondedTalentPointAction {")
+                        && asset.contains("Anchor: (Top: 82, Right: 118"),
                 "The stats button belongs beside the primary bottom-right action.");
-        assertTrue(asset.contains("#BondedHealthFrame {\n        Anchor: (Top: 56, Left: 20, Right: 25"),
+        assertTrue(asset.contains("Group #BondedHealthFrame {")
+                        && asset.contains("Anchor: (Top: 56, Left: 20, Right: 25"),
                 "Health should align to the primary action's right edge.");
     }
 

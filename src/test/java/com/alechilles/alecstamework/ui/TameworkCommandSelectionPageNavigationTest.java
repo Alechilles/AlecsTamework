@@ -199,6 +199,8 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Refresh packets must retain the bonded card's talent click handler.");
         assertTrue(content.contains("private void bindBondedCardEvents"),
                 "Bonded input rebinding should be isolated from visual card rendering.");
+        assertTrue(content.contains("BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX"),
+                "The flight-toggle callback must remain profile-scoped during refresh.");
     }
 
     @Test
