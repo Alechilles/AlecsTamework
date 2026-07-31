@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.api.BondedCompanionPlacement;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,8 @@ class BondedCompanionPanelFeaturePresentationSourceTest {
                 profile, 0L, null, context, "world");
 
         assertEquals(liveNpcUuid.toString(),
-                row.attributes().get("bonded.liveNpcUuid"));
+                row.attributes().get(
+                        BondedCompanionPresentationAttributes.LIVE_NPC_UUID));
     }
 
     @Test

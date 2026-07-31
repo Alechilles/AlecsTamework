@@ -4,8 +4,10 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -13,8 +15,10 @@ import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +30,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
     private final BondedCompanionPanelFeaturePresentationSource presentations;
     private final HytaleBondedCompanionActionContextFactory contexts =
             new HytaleBondedCompanionActionContextFactory();
+    private final BondedCompanionFlightModeReader flightModeReader =
+            new BondedCompanionFlightModeReader();
 
     BondedCompanionPanelEntrySourceService(
             @Nonnull BondedCompanionPanelSnapshotCache cache,
@@ -120,7 +126,7 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             Player player, Store<EntityStore> store,
             BondedCompanionPanelRecordSource.PanelSnapshot snapshot
     ) {
-        if (snapshot.records().isEmpty() || player.getWorld() == null) {
+        if (snapshot.records().isEmpty()) {
             return snapshot;
         }
         ArrayList<BondedCompanionPanelRecordSource.PanelRecord> updated =
@@ -133,6 +139,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                             profile, liveDisplayName(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withHealth(
                     overlay, liveHealth(player, store, profile));
+            overlay = BondedCompanionPanelLiveProfileOverlay.withFlightMode(
+                    overlay, liveFlightMode(player, store, profile));
             updated.add(overlay == profile ? record
                     : new BondedCompanionPanelRecordSource.PanelRecord(
                             record.presentationUuid(), overlay));
@@ -149,7 +157,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null) {
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null) {
             return null;
         }
         ComponentType<EntityStore, TameworkNpcNameComponent> type =
@@ -172,12 +181,56 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null) {
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null) {
             return null;
         }
         Ref<EntityStore> reference = player.getWorld().getEntityRef(
                 profile.activeLease().liveNpcUuid());
         return CompanionHealthStateService.captureHealth(reference, store);
+    }
+
+    /**
+     * Projects flight controls only from the exact current world entity and
+     * its role-scoped effective configuration.
+     */
+    @Nonnull
+    private Optional<Boolean> liveFlightMode(
+            Player player, Store<EntityStore> store,
+            BondedCompanionProfileView profile
+    ) {
+        if (profile.state() != BondedCompanionStateView.ACTIVE
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null
+                || !profile.activeLease().worldKey().equals(
+                        player.getWorld().getName())) {
+            return Optional.empty();
+        }
+        try {
+            Ref<EntityStore> reference = player.getWorld().getEntityRef(
+                    profile.activeLease().liveNpcUuid());
+            if (reference == null || !reference.isValid()
+                    || reference.getStore() != store
+                    || NPCEntity.getComponentType() == null) {
+                return Optional.empty();
+            }
+            NPCEntity npc = store.getComponent(reference,
+                    NPCEntity.getComponentType());
+            if (npc == null) {
+                return Optional.empty();
+            }
+            String roleId = CompanionRoleIdResolver.resolveRoleId(reference,
+                    store);
+            if (roleId == null || !roleId.equals(profile.roleId())) {
+                return Optional.empty();
+            }
+            var settings = TwCompanionConfig.resolveEffectiveForRole(roleId)
+                    .getFlightToggle();
+            return settings.isConfigured() ? flightModeReader.read(npc, settings)
+                    : Optional.empty();
+        } catch (RuntimeException | LinkageError ignored) {
+            return Optional.empty();
+        }
     }
 
     private static int healthValue(java.util.Map<String, String> data,

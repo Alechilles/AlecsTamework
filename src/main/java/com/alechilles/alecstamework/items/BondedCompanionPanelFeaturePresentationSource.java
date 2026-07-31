@@ -114,7 +114,7 @@ final class BondedCompanionPanelFeaturePresentationSource {
         }
         if (profile.activeLease() != null
                 && profile.activeLease().liveNpcUuid() != null) {
-            attributes.put("bonded.liveNpcUuid",
+            attributes.put(BondedCompanionPresentationAttributes.LIVE_NPC_UUID,
                     profile.activeLease().liveNpcUuid().toString());
         }
         long cooldown = remaining(profile.summonCooldownUntilMs(), nowMs);

@@ -20,6 +20,17 @@ class BondedCompanionCardDynamicStateTest {
     }
 
     @Test
+    void flightModeChangesUseTheIncrementalCardPath() {
+        BondedCompanionPanelPresentation previous = presentationWithFlightMode(
+                "false");
+        BondedCompanionPanelPresentation current = presentationWithFlightMode(
+                "true");
+
+        assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
+                previous, current));
+    }
+
+    @Test
     void liveHealthChangesDoNotFallBackToAFullCardBindWhenLegacyRowVitalsChange() {
         UUID cardUuid = UUID.fromString("71000000-0000-0000-0000-000000000009");
         BondedCompanionPanelPresentation previous = presentation("400", "400");
@@ -55,5 +66,19 @@ class BondedCompanionCardDynamicStateTest {
         return new LinkedNpcEntry(cardUuid, "Wyatt", currentHealth, 400,
                 0, 0, "", 0, 0, 0, 0, true, false, false, false, false,
                 false, 0L, LinkedNpcTraitIndicator.EMPTY);
+    }
+
+    private static BondedCompanionPanelPresentation presentationWithFlightMode(
+            String airborne
+    ) {
+        return new BondedCompanionPanelPresentation(
+                "profile-1", "roster", "NordicDrake", 1L, "Wyatt",
+                "Nordic Drake", "Female", null,
+                Map.of("bonded.flightToggle.available", "true",
+                        "bonded.flightToggle.airborne", airborne),
+                Map.of(), new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS,
+                        true, null, null, 0L), null);
     }
 }
