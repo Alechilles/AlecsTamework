@@ -386,7 +386,14 @@ public final class CommandItemFeatureHandler {
                         feedbackService, bondedCompanions,
                         panelEntrySourceService.bondedReadModel()),
                 bondedTalentPageService,
-                new BondedCompanionFlightToggleActionService()
+                new BondedCompanionFlightToggleActionService(
+                        new BondedCompanionFlightToggleActionService.HytaleLiveResolver(),
+                        new CommandNpcHookDispatchService()::dispatch,
+                        new BondedCompanionFlightModeReader()::read,
+                        BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
+                        panelEntrySourceService.bondedReadModel() == null
+                                ? (owner, roster, profile) -> null
+                                : panelEntrySourceService.bondedReadModel()::currentTrustedProfile)::toggle
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

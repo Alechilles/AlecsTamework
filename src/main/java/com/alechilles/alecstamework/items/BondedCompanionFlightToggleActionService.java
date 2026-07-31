@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
+import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
@@ -28,11 +29,13 @@ final class BondedCompanionFlightToggleActionService {
     private final BiFunction<NPCEntity, TwCompanionFlightToggleSettings,
             Optional<Boolean>> modes;
     private final PlayerResolver players;
+    private final ProfileResolver profiles;
 
     BondedCompanionFlightToggleActionService() {
         this(new HytaleLiveResolver(), new CommandNpcHookDispatchService()::dispatch,
                 new BondedCompanionFlightModeReader()::read,
-                BondedCompanionPanelActionRouter::resolvePlayerFromEvent);
+                BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
+                (owner, roster, profile) -> null);
     }
 
     BondedCompanionFlightToggleActionService(LiveResolver resolver,
@@ -40,11 +43,13 @@ final class BondedCompanionFlightToggleActionService {
                                              BiFunction<NPCEntity,
                                                      TwCompanionFlightToggleSettings,
                                                      Optional<Boolean>> modes,
-                                             PlayerResolver players) {
+                                             PlayerResolver players,
+                                             ProfileResolver profiles) {
         this.resolver = resolver;
         this.hooks = hooks;
         this.modes = modes;
         this.players = players;
+        this.profiles = profiles;
     }
 
     boolean toggle(@Nonnull UUID ownerUuid,
@@ -59,9 +64,22 @@ final class BondedCompanionFlightToggleActionService {
         }
         Player player = players.resolve(ownerUuid, eventPlayerRef, eventStore);
         if (player == null) return false;
+        BondedCompanionProfileView profile = profiles.resolve(ownerUuid,
+                row.rosterId(), row.profileId());
+        if (profile == null || !ownerUuid.equals(profile.ownerUuid())
+                || !row.rosterId().equals(profile.rosterId())
+                || !row.profileId().equals(profile.profileId())
+                || !row.roleId().equals(profile.roleId())
+                || profile.state() != BondedCompanionStateView.ACTIVE
+                || profile.activeLease() == null
+                || player.getWorld() != null && !profile.activeLease().worldKey()
+                .equals(player.getWorld().getName())) {
+            return false;
+        }
         UUID liveNpcUuid = parseUuid(row.attributes().get(
                 BondedCompanionPresentationAttributes.LIVE_NPC_UUID));
-        if (liveNpcUuid == null) return false;
+        if (liveNpcUuid == null || !liveNpcUuid.equals(
+                profile.activeLease().liveNpcUuid())) return false;
         try {
             Ref<EntityStore> npcRef = resolver.reference(player, liveNpcUuid);
             if (npcRef == null || !npcRef.isValid() || npcRef.getStore() != eventStore) {
@@ -118,7 +136,14 @@ final class BondedCompanionFlightToggleActionService {
                                  Store<EntityStore> store);
     }
 
-    private static final class HytaleLiveResolver implements LiveResolver {
+    @FunctionalInterface
+    interface ProfileResolver {
+        @Nullable BondedCompanionProfileView resolve(UUID ownerUuid,
+                                                      String rosterId,
+                                                      String profileId);
+    }
+
+    static final class HytaleLiveResolver implements LiveResolver {
         @Override public Ref<EntityStore> reference(Player player, UUID npcUuid) {
             return player.getWorld() == null ? null
                     : player.getWorld().getEntityRef(npcUuid);

@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionLeaseView;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
 import com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation;
 import com.alechilles.alecstamework.ui.BondedCompanionStatusPresentation;
@@ -101,6 +103,27 @@ class BondedCompanionFlightToggleActionServiceTest {
         }
     }
 
+    @Test
+    void rejectsRenderedActiveCardWhenCurrentTrustedProfileChanged() throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            AtomicInteger dispatches = new AtomicInteger();
+            BondedCompanionFlightToggleActionService service = fixture.service(
+                    fixture.live, "role", settings(true, "hydragon:toggle"),
+                    Optional.of(true), true,
+                    (id, player, item, ref, store, target) -> {
+                        dispatches.incrementAndGet(); return true;
+                    });
+            fixture.current = fixture.profile(BondedCompanionStateView.STORED, LIVE);
+            assertFalse(service.toggle(OWNER, fixture.actor, fixture.store,
+                    "horn", row(BondedCompanionStateView.ACTIVE, available(LIVE))));
+            fixture.current = fixture.profile(BondedCompanionStateView.ACTIVE,
+                    UUID.fromString("86000000-0000-0000-0000-000000000003"));
+            assertFalse(service.toggle(OWNER, fixture.actor, fixture.store,
+                    "horn", row(BondedCompanionStateView.ACTIVE, available(LIVE))));
+            assertEquals(0, dispatches.get());
+        }
+    }
+
     private void assertRejected(Fixture fixture, BondedCompanionPanelPresentation row,
                                 Ref<EntityStore> resolvedRef,
                                 TwCompanionFlightToggleSettings settings,
@@ -149,6 +172,7 @@ class BondedCompanionFlightToggleActionServiceTest {
         private final Ref<EntityStore> foreign;
         private final Player player;
         private final NPCEntity npc;
+        private BondedCompanionProfileView current;
 
         private Fixture() throws Exception {
             TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
@@ -159,6 +183,7 @@ class BondedCompanionFlightToggleActionServiceTest {
             foreign = new TestEntityComponentStore(entities).createReference();
             player = (Player) unsafe().allocateInstance(Player.class);
             npc = (NPCEntity) unsafe().allocateInstance(NPCEntity.class);
+            current = profile(BondedCompanionStateView.ACTIVE, LIVE);
         }
 
         private BondedCompanionFlightToggleActionService service(
@@ -173,7 +198,19 @@ class BondedCompanionFlightToggleActionServiceTest {
                         @Override public String roleId(Ref<EntityStore> ignored, Store<EntityStore> current) { return role; }
                         @Override public TwCompanionFlightToggleSettings settings(String ignored) { return settings; }
                     }, dispatch, (ignored, current) -> mode,
-                    (owner, eventRef, eventStore) -> authority ? player : null);
+                    (owner, eventRef, eventStore) -> authority ? player : null,
+                    (owner, roster, profile) -> current);
+        }
+
+        private BondedCompanionProfileView profile(BondedCompanionStateView state,
+                                                    UUID leaseUuid) {
+            return new BondedCompanionProfileView("profile", OWNER, "roster",
+                    "family", "role", null, null, null, 1L,
+                    state, false, true, false, Map.of(),
+                    state == BondedCompanionStateView.ACTIVE
+                            ? new BondedCompanionLeaseView("lease", leaseUuid,
+                            "world", 1L, 0L) : null,
+                    0L, null);
         }
 
         @Override public void close() { store.close(); }

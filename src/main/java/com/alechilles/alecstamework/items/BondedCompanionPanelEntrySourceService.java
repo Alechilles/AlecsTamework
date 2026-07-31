@@ -258,6 +258,21 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         }
     }
 
+    /** Returns one currently trusted durable profile without blocking for a refresh. */
+    @Nullable
+    BondedCompanionProfileView currentTrustedProfile(UUID ownerUuid,
+                                                      String rosterId,
+                                                      String profileId) {
+        var snapshot = records.snapshotFor(ownerUuid, rosterId,
+                cache.peek(ownerUuid, rosterId));
+        if (!snapshot.trusted() || snapshot.state()
+                != BondedCompanionPanelSnapshotCache.State.READY) return null;
+        return snapshot.records().stream()
+                .map(BondedCompanionPanelRecordSource.PanelRecord::profile)
+                .filter(profile -> profileId.equals(profile.profileId()))
+                .findFirst().orElse(null);
+    }
+
     void refreshBoundApi() {
         cache.refreshBoundApi();
     }

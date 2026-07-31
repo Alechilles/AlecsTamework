@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
@@ -204,6 +206,35 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             generic.handleDataEvent(actor, store, event(
                     "__bonded_flight_toggle__:" + CARD));
             assertEquals(0, callbacks.get());
+        }
+    }
+
+    @Test
+    void serviceFlightToggleRouteUsesCurrentEventAuthorityBeforeActionBoundary()
+            throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER); player.loadIntoWorld(world); player.setReference(actor);
+            AtomicInteger actions = new AtomicInteger();
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    null, null, null, null, null, null, null, null, null,
+                    (owner, ref, currentStore, item, row) -> {
+                        actions.incrementAndGet();
+                        assertSame(actor, ref); assertSame(store, currentStore);
+                        return true;
+                    }, (owner, ref, currentStore) -> ref == actor
+                            && currentStore == store ? player : null);
+            var row = bondedFlightFeature().bonded();
+            assertTrue(service.routeFlightToggle(OWNER, actor, store, bondedConfig(),
+                    "horn", row, ignored -> true));
+            assertEquals(1, actions.get());
+            assertFalse(service.routeFlightToggle(OWNER, actor, store, bondedConfig(),
+                    "horn", row, ignored -> false));
+            assertEquals(1, actions.get());
         }
     }
 
