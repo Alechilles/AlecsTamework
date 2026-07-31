@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies Flightmaster's Talisman item interactions are wired for avatar-flight controls. */
@@ -53,5 +54,35 @@ class FlightmastersTalismanItemAssetTest {
         assertTrue(plugin.contains("TameworkFlightFlapInteraction.class"));
         assertTrue(plugin.contains("\"TameworkFlightAirbrake\""));
         assertTrue(plugin.contains("TameworkFlightAirbrakeInteraction.class"));
+    }
+
+    @Test
+    void talismanUsesNativeCombatAbilitySlotsWithoutReplacingFlightControls() throws Exception {
+        String item = Files.readString(ITEM, StandardCharsets.UTF_8);
+        String plugin = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(item.contains("\"Ability1\""), "the existing forward-boost binding must remain available");
+        assertTrue(item.contains("\"Type\": \"TameworkFlightBoost\""));
+        assertTrue(item.contains("\"Ability2\""));
+        assertTrue(item.contains("\"Ability3\""));
+        assertTrue(item.contains("\"Type\": \"TameworkAvatarFlightCombatAbility\""));
+        assertTrue(item.contains("\"Slot\": \"Ability2\""));
+        assertTrue(item.contains("\"Slot\": \"Ability3\""));
+        assertEquals(2, countOccurrences(item, "\"RequireNewClick\": true"),
+                "each native combat ability must execute only on a new click");
+        assertTrue(plugin.contains("\"TameworkAvatarFlightCombatAbility\""));
+        assertTrue(plugin.contains("TameworkAvatarFlightCombatAbilityInteraction.class"));
+    }
+
+    private static int countOccurrences(String text, String token) {
+        int count = 0;
+        int index = text.indexOf(token);
+        while (index >= 0) {
+            count++;
+            index = text.indexOf(token, index + token.length());
+        }
+        return count;
     }
 }

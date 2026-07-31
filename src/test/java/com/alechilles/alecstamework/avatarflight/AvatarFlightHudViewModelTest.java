@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.hypixel.hytale.codec.ExtraInfo;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -220,5 +222,50 @@ class AvatarFlightHudViewModelTest {
         assertFalse(model.launchChargeVisible());
         assertEquals(0.6, model.launchChargeRatio(), EPSILON);
         assertEquals(0.2, model.launchMinChargeRatio(), EPSILON);
+    }
+
+    @Test
+    void hudModelShowsConfiguredCombatGlyphsWithNativeSlotBindings() {
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1_000L);
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
+                { "CombatAbilities": {
+                  "Ability2": { "RootInteraction": "Root_Fire", "Glyph": "FIRE" },
+                  "Ability3": { "RootInteraction": "Root_Breath", "Glyph": "BREATH" }
+                } }
+                """), new ExtraInfo());
+
+        AvatarFlightHudViewModel model = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 1_000L);
+
+        assertTrue(model.ability2().visible());
+        assertEquals("FIRE", model.ability2().glyph());
+        assertEquals("E", model.ability2().bindingLabel());
+        assertTrue(model.ability3().visible());
+        assertEquals("BREATH", model.ability3().glyph());
+        assertEquals("R", model.ability3().bindingLabel());
+    }
+
+    @Test
+    void hudModelHidesMissingCombatGlyphAndHiddenHudClearsGlyphState() {
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1_000L);
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
+                { "CombatAbilities": {
+                  "Ability2": { "RootInteraction": "Root_Fire", "Glyph": "FIRE" }
+                } }
+                """), new ExtraInfo());
+
+        AvatarFlightHudViewModel visible = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 1_000L);
+        AvatarFlightHudViewModel hidden = AvatarFlightHudViewModel.hidden();
+
+        assertTrue(visible.ability2().visible());
+        assertFalse(visible.ability3().visible());
+        assertEquals("", visible.ability3().glyph());
+        assertFalse(hidden.ability2().visible());
+        assertEquals("", hidden.ability2().glyph());
+        assertFalse(hidden.ability3().visible());
+        assertEquals("", hidden.ability3().glyph());
     }
 }

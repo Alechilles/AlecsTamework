@@ -27,8 +27,9 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
 - Right-click with Flightmaster's Talisman applies the airbrake.
 - Q with Flightmaster's Talisman performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
+- Flightmaster's Talisman also binds its native `Ability2` and `Ability3` item slots to optional configured combat roots. In Hytale's default layout those slots are E and R, respectively. They are slot names, not literal-key listeners: players who remap either native ability binding still activate the matching configured root.
 - Flightmaster's Talisman must already be selected before mounting or enabling avatar flight. Activation fails before changing the player model when another hotbar item is held.
-- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, and airbrake. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman remains tool-only, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman so weapon controls cannot replace or overlap the flight controls. The previous utility selection is restored on dismount.
+- While avatar flight is active, the lower-right ability HUD shows a complete custom row for crouch launch, forward boost, upward flap, airbrake, and any configured combat abilities. The row sits inside Hytale's right-side shortcut hints. Flightmaster's Talisman remains tool-only, active utility equipment is temporarily deselected, and hotbar selection stays locked to the talisman so weapon controls cannot replace or overlap the flight controls. The previous utility selection is restored on dismount. Combat glyph labels identify the default E/R layout; the native ability binding itself remains remappable.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
 - Press F to immediately dismount from an NPC-backed avatar-flight session. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
@@ -207,6 +208,32 @@ Omitting `Animation` inherits the complete parent section. An explicit `Animatio
 - `Directional`: when true, the boost follows look pitch instead of applying only horizontal speed.
 - `UpwardPitchLiftMultiplier`: multiplier for upward directional boost lift.
 - `UpwardPitchLiftCap`: maximum upward impulse from directional boost. Flaps remain the stronger raw vertical lift tool.
+
+### Combat Abilities
+
+`CombatAbilities` configures optional item abilities for a transformed player. It is a top-level map whose only runtime slot keys are `Ability2` and `Ability3`:
+
+```json
+"CombatAbilities": {
+  "Ability2": {
+    "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+    "Glyph": "FIRE"
+  },
+  "Ability3": {
+    "RootInteraction": "Root_NPC_NordicDrake_Avatar_Flame_Breath",
+    "Glyph": "BREATH"
+  }
+}
+```
+
+- `RootInteraction`: ID of the downstream root interaction. Omit it or set it blank to disable that slot.
+- `Glyph`: nonblank glyph text shown in the avatar-flight controls HUD. A configured root with a blank glyph still runs, but its HUD control is hidden.
+
+The Flightmaster's Talisman maps its native `Ability2` and `Ability3` item interactions to this map. E and R are the default Hytale bindings for those slots, not hard-coded input keys. A player can remap native ability bindings and the same slot still resolves; custom roots must not depend on literal E/R input events.
+
+`CombatAbilities` has whole-map inheritance. If a child omits the property, it inherits the complete parent map. If a child supplies the property, including `{}`, it replaces the complete parent map; entries are not merged per slot. To keep one inherited ability while changing the other, repeat the retained entry in the child map. An explicit blank `RootInteraction` disables that entry in the replacement map.
+
+Combat roots execute in the transformed player's interaction context. Author every downstream root to be player-safe: it must resolve aim from the player/look direction and cannot require an NPC entity, NPC marked-target state, or other NPC-only components. This keeps transformed player combat separate from native NPC attacks.
 
 ### Ability Animation
 

@@ -93,6 +93,7 @@ import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkCaptureChannelInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
+import com.alechilles.alecstamework.interactions.TameworkAvatarFlightCombatAbilityInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchHomingVisualProjectileInteraction;
@@ -548,6 +549,11 @@ public class Tamework extends JavaPlugin {
                 "TameworkFlightBoost",
                 TameworkFlightBoostInteraction.class,
                 TameworkFlightBoostInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                "TameworkAvatarFlightCombatAbility",
+                TameworkAvatarFlightCombatAbilityInteraction.class,
+                TameworkAvatarFlightCombatAbilityInteraction.CODEC
         );
         // Register the custom block interaction used to empty water trough states.
         Interaction.CODEC.register(

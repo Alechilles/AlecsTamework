@@ -29,6 +29,8 @@ final class AvatarFlightHudBinder {
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
         commandBuilder.set("#TameworkAvatarFlightControls.Visible", model.visible());
+        bindCombatGlyph(commandBuilder, "#Ability2Control", "#Ability2Glyph", "#Ability2Binding", model.ability2());
+        bindCombatGlyph(commandBuilder, "#Ability3Control", "#Ability3Glyph", "#Ability3Binding", model.ability3());
         commandBuilder.set("#LaunchChargeGroup.Visible", model.visible() && model.launchChargeVisible());
         commandBuilder.setObject("#LaunchChargeFill.Anchor",
                 fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
@@ -48,6 +50,16 @@ final class AvatarFlightHudBinder {
             commandBuilder.set("#VigourPip" + i + " #Fill.Visible", fill > 0.0);
             commandBuilder.setObject("#VigourPip" + i + " #Fill.Anchor", fillAnchor(PIP_FILL_MAX_WIDTH, PIP_FILL_HEIGHT, fill));
         }
+    }
+
+    private static void bindCombatGlyph(@Nonnull UICommandBuilder commandBuilder,
+                                        @Nonnull String controlSelector,
+                                        @Nonnull String glyphSelector,
+                                        @Nonnull String bindingSelector,
+                                        @Nonnull AvatarFlightHudViewModel.CombatGlyph glyph) {
+        commandBuilder.set(controlSelector + ".Visible", glyph.visible());
+        commandBuilder.set(glyphSelector + ".Text", glyph.visible() ? glyph.glyph() : "");
+        commandBuilder.set(bindingSelector + ".Text", glyph.visible() ? glyph.bindingLabel() : "");
     }
 
     @Nonnull

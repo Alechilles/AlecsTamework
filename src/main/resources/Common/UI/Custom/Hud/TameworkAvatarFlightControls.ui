@@ -16,7 +16,7 @@
 // Flightmaster's Talisman is tool-only, so Hytale hides its native weapon
 // ability strip and this self-contained row supplies all flight controls.
 Group #TameworkAvatarFlightControls {
-    Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight);
+    Anchor: (Right: 220, Bottom: 40, Width: 378, Height: @FlightControlSlotHeight);
     LayoutMode: Left;
     Visible: false;
 
@@ -60,6 +60,56 @@ Group #TameworkAvatarFlightControls {
             Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
             Background: @FlightControlBindingBackground;
             Text: "Q";
+            Style: @FlightControlBindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @FlightControlSlotGap); }
+
+    Group #Ability2Control {
+        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
+        Visible: false;
+
+        Group #Ability2Frame {
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Label #Ability2Glyph {
+                Anchor: (Top: 17, Left: 3, Width: 52, Height: 22);
+                Text: "";
+                Style: @FlightControlBindingStyle;
+            }
+        }
+
+        Label #Ability2Binding {
+            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
+            Background: @FlightControlBindingBackground;
+            Text: "";
+            Style: @FlightControlBindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @FlightControlSlotGap); }
+
+    Group #Ability3Control {
+        Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);
+        Visible: false;
+
+        Group #Ability3Frame {
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotSize);
+            Background: "../Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Label #Ability3Glyph {
+                Anchor: (Top: 17, Left: 3, Width: 52, Height: 22);
+                Text: "";
+                Style: @FlightControlBindingStyle;
+            }
+        }
+
+        Label #Ability3Binding {
+            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
+            Background: @FlightControlBindingBackground;
+            Text: "";
             Style: @FlightControlBindingStyle;
         }
     }
