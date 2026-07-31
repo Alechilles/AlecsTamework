@@ -13,7 +13,17 @@ import javax.annotation.Nullable;
 final class BondedCompanionFlightModeReader {
     Optional<Boolean> read(@Nullable NPCEntity npc,
                            @Nullable TwCompanionFlightToggleSettings settings) {
-        return read(settings, npc == null ? null : npc::getRole);
+        if (settings == null || !settings.isConfigured()) {
+            return Optional.empty();
+        }
+        try {
+            Role role = npc == null ? null : npc.getRole();
+            Object active = role == null
+                    ? null : role.getActiveMotionController();
+            return classify(active == null ? null : active.getClass());
+        } catch (RuntimeException | LinkageError ignored) {
+            return Optional.empty();
+        }
     }
 
     Optional<Boolean> read(@Nullable TwCompanionFlightToggleSettings settings,

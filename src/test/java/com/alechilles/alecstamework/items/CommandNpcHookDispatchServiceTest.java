@@ -50,7 +50,7 @@ class CommandNpcHookDispatchServiceTest {
         Player player = player(UUID.randomUUID(), "owner");
         assertNull(CommandNpcHookDispatchService.createComponent(null, player,
                 "item", 1L, null));
-        assertNull(CommandNpcHookDispatchService.createComponent(" ", null,
+        assertNull(CommandNpcHookDispatchService.createComponent(" ", player,
                 "item", 1L, null));
         assertNull(CommandNpcHookDispatchService.createComponent("hook", null,
                 "item", 1L, null));
