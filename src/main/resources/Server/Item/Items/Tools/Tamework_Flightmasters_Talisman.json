@@ -27,6 +27,24 @@
           "Type": "TameworkFlightBoost"
         }
       ]
+    },
+    "Ability2": {
+      "Interactions": [
+        {
+          "Type": "TameworkAvatarFlightCombatAbility",
+          "Slot": "Ability2",
+          "RequireNewClick": true
+        }
+      ]
+    },
+    "Ability3": {
+      "Interactions": [
+        {
+          "Type": "TameworkAvatarFlightCombatAbility",
+          "Slot": "Ability3",
+          "RequireNewClick": true
+        }
+      ]
     }
   },
   "Model": "Items/Tamework/FlightmasterTalisman/Flightmaster_Talisman.blockymodel",

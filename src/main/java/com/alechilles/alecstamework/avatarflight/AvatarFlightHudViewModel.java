@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySettings;
+import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -17,7 +19,9 @@ public record AvatarFlightHudViewModel(boolean visible,
                                        @Nonnull String rechargeMode,
                                        boolean launchChargeVisible,
                                        double launchChargeRatio,
-                                       double launchMinChargeRatio) {
+                                       double launchMinChargeRatio,
+                                       @Nonnull CombatGlyph ability2,
+                                       @Nonnull CombatGlyph ability3) {
     public static final int MAX_DISPLAY_PIPS = 6;
     private static final double FULL_EPSILON = 0.0001;
     private static final String RECHARGE_MODE_NONE = "NONE";
@@ -34,6 +38,8 @@ public record AvatarFlightHudViewModel(boolean visible,
             launchChargeVisible = false;
             launchChargeRatio = 0.0;
             launchMinChargeRatio = 0.0;
+            ability2 = CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_2);
+            ability3 = CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_3);
         } else {
             speedRatio = clamp01(speedRatio);
             targetSpeedRatio = clamp01(targetSpeedRatio);
@@ -43,13 +49,17 @@ public record AvatarFlightHudViewModel(boolean visible,
             rechargeMode = normalizeRechargeMode(rechargeMode);
             launchChargeRatio = clamp01(launchChargeRatio);
             launchMinChargeRatio = clamp01(launchMinChargeRatio);
+            ability2 = CombatGlyph.normalize(ability2, AvatarFlightCombatAbilitySlot.ABILITY_2);
+            ability3 = CombatGlyph.normalize(ability3, AvatarFlightCombatAbilitySlot.ABILITY_3);
         }
     }
 
     @Nonnull
     public static AvatarFlightHudViewModel hidden() {
         return new AvatarFlightHudViewModel(false, 0.0, 0.0, 0.0, 0.0, 0.0, false,
-                RECHARGE_MODE_NONE, false, 0.0, 0.0);
+                RECHARGE_MODE_NONE, false, 0.0, 0.0,
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_2),
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_3));
     }
 
     @Nonnull
@@ -70,7 +80,9 @@ public record AvatarFlightHudViewModel(boolean visible,
                                                    boolean groundedAtFull,
                                                    @Nullable String rechargeMode) {
         return visible(speedRatio, targetSpeedRatio, pitchRadians, charges, maxCharges,
-                groundedAtFull, rechargeMode, false, 0.0, 0.0);
+                groundedAtFull, rechargeMode, false, 0.0, 0.0,
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_2),
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_3));
     }
 
     @Nonnull
@@ -84,6 +96,25 @@ public record AvatarFlightHudViewModel(boolean visible,
                                                    boolean launchChargeVisible,
                                                    double launchChargeRatio,
                                                    double launchMinChargeRatio) {
+        return visible(speedRatio, targetSpeedRatio, pitchRadians, charges, maxCharges, groundedAtFull,
+                rechargeMode, launchChargeVisible, launchChargeRatio, launchMinChargeRatio,
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_2),
+                CombatGlyph.hidden(AvatarFlightCombatAbilitySlot.ABILITY_3));
+    }
+
+    @Nonnull
+    public static AvatarFlightHudViewModel visible(double speedRatio,
+                                                   double targetSpeedRatio,
+                                                   double pitchRadians,
+                                                   double charges,
+                                                   double maxCharges,
+                                                   boolean groundedAtFull,
+                                                   @Nullable String rechargeMode,
+                                                   boolean launchChargeVisible,
+                                                   double launchChargeRatio,
+                                                   double launchMinChargeRatio,
+                                                   @Nonnull CombatGlyph ability2,
+                                                   @Nonnull CombatGlyph ability3) {
         double displayMax = Math.max(0.0, finiteOrZero(maxCharges));
         double displayCharges = clamp(finiteOrZero(charges), 0.0, displayMax);
         boolean dimmed = groundedAtFull && displayMax > 0.0 && displayCharges >= displayMax - FULL_EPSILON;
@@ -98,7 +129,9 @@ public record AvatarFlightHudViewModel(boolean visible,
                 normalizeRechargeMode(rechargeMode),
                 launchChargeVisible,
                 launchChargeRatio,
-                launchMinChargeRatio
+                launchMinChargeRatio,
+                ability2,
+                ability3
         );
     }
 
@@ -142,5 +175,36 @@ public record AvatarFlightHudViewModel(boolean visible,
             return RECHARGE_MODE_NONE;
         }
         return rechargeMode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /** Immutable render values for one optional native combat-ability slot. */
+    public record CombatGlyph(boolean visible, @Nonnull String glyph, @Nonnull String bindingLabel) {
+        @Nonnull
+        public static CombatGlyph from(@Nullable AvatarFlightCombatAbilitySettings settings,
+                                       @Nonnull AvatarFlightCombatAbilitySlot slot) {
+            if (settings == null || !settings.isConfigured() || settings.getGlyph().isBlank()) {
+                return hidden(slot);
+            }
+            return new CombatGlyph(true, settings.getGlyph(), bindingLabel(slot));
+        }
+
+        @Nonnull
+        private static CombatGlyph normalize(@Nullable CombatGlyph glyph,
+                                             @Nonnull AvatarFlightCombatAbilitySlot slot) {
+            if (glyph == null || !glyph.visible || glyph.glyph == null || glyph.glyph.isBlank()) {
+                return hidden(slot);
+            }
+            return new CombatGlyph(true, glyph.glyph.trim(), bindingLabel(slot));
+        }
+
+        @Nonnull
+        private static CombatGlyph hidden(@Nonnull AvatarFlightCombatAbilitySlot slot) {
+            return new CombatGlyph(false, "", bindingLabel(slot));
+        }
+
+        @Nonnull
+        private static String bindingLabel(@Nonnull AvatarFlightCombatAbilitySlot slot) {
+            return slot == AvatarFlightCombatAbilitySlot.ABILITY_2 ? "E" : "R";
+        }
     }
 }

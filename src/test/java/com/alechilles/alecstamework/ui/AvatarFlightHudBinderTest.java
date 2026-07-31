@@ -32,6 +32,12 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(source.contains("Value.of("));
         Assertions.assertTrue(source.contains("#Root.Visible"));
         Assertions.assertTrue(source.contains("#TameworkAvatarFlightControls.Visible"));
+        Assertions.assertTrue(source.contains("#Ability2Control"));
+        Assertions.assertTrue(source.contains("#Ability3Control"));
+        Assertions.assertTrue(source.contains("#Ability2Glyph"));
+        Assertions.assertTrue(source.contains("#Ability3Glyph"));
+        Assertions.assertTrue(source.contains("glyph.visible() ? glyph.glyph() : \"\""),
+                "hidden combat cells must clear their glyph text before a later refresh");
         Assertions.assertFalse(source.contains("#ControlsOverlay.Visible"));
         Assertions.assertTrue(source.contains("LAUNCH_TRACK_WIDTH"));
         Assertions.assertTrue(source.contains("LAUNCH_FILL_MAX_WIDTH"));
@@ -113,10 +119,16 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Group #TameworkAvatarFlightControls"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotSize = 58"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotHeight = 74"));
-        Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 378, Height: @FlightControlSlotHeight)"));
         Assertions.assertTrue(ui.contains("LayoutMode: Left"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
+        Assertions.assertTrue(ui.contains("Group #Ability2Control"));
+        Assertions.assertTrue(ui.contains("Group #Ability3Control"));
+        Assertions.assertTrue(ui.contains("Label #Ability2Glyph"));
+        Assertions.assertTrue(ui.contains("Label #Ability3Glyph"));
+        Assertions.assertTrue(ui.contains("Label #Ability2Binding"));
+        Assertions.assertTrue(ui.contains("Label #Ability3Binding"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
         Assertions.assertTrue(ui.contains("Group #AirbrakeIcon"));
         Assertions.assertTrue(ui.contains("Group #LaunchIcon"));
@@ -128,8 +140,11 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Text: \"LMB\";"));
         Assertions.assertTrue(ui.contains("Text: \"Q\";"));
         Assertions.assertTrue(ui.contains("Text: \"RMB\";"));
-        Assertions.assertEquals(4, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
+        Assertions.assertEquals(6, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
         Assertions.assertTrue(ui.indexOf("Group #LaunchControl") < ui.indexOf("Group #ForwardBoostControl"));
+        Assertions.assertTrue(ui.indexOf("Group #ForwardBoostControl") < ui.indexOf("Group #Ability2Control"));
+        Assertions.assertTrue(ui.indexOf("Group #Ability2Control") < ui.indexOf("Group #Ability3Control"));
+        Assertions.assertTrue(ui.indexOf("Group #Ability3Control") < ui.indexOf("Group #UpwardFlapControl"));
         Assertions.assertTrue(ui.indexOf("Group #ForwardBoostControl") < ui.indexOf("Group #UpwardFlapControl"));
         Assertions.assertTrue(ui.indexOf("Group #UpwardFlapControl") < ui.indexOf("Group #AirbrakeControl"));
     }
