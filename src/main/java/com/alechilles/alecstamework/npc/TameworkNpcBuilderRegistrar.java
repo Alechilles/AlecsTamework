@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkConfirmLanding;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugCombatSnapshot;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugMessage;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
@@ -112,6 +113,10 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(BuilderActionTameworkCaptureOwner.BUILDER_ID, BuilderActionTameworkCaptureOwner::new);
             actionFactory.add(BuilderActionTameworkCaptureStranger.BUILDER_ID, BuilderActionTameworkCaptureStranger::new);
             actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
+            actionFactory.add(
+                    BuilderActionTameworkConfirmLanding.BUILDER_ID,
+                    BuilderActionTameworkConfirmLanding::new
+            );
             actionFactory.add(BuilderActionTameworkDebugCombatSnapshot.BUILDER_ID, BuilderActionTameworkDebugCombatSnapshot::new);
             actionFactory.add(BuilderActionTameworkDebugMessage.BUILDER_ID, BuilderActionTameworkDebugMessage::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);

@@ -8,6 +8,10 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkCaptureOwner`: Captures an owned NPC into a spawner item.
 - `TameworkCaptureStranger`: Captures another player's owned NPC when policy allows.
 - `TameworkCaptureWild`: Captures untamed NPCs.
+- `TameworkConfirmLanding`: Switches a flying NPC to its `Walk` controller after the active
+  flight controller reports physical ground contact. Use it with an `OnGround` sensor when a
+  large or pitched collision box can touch terrain before the base `Land` motion reaches its
+  positional goal.
 - `TameworkDenyCaptureUntamed`: Blocks capture when tame is required.
 - `TameworkDenyInteract`: Blocks player interaction (typically non-owner gating).
 - `TameworkSetOwner`: Assigns owner from the interacting player. Vanilla action lists that also
