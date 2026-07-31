@@ -179,6 +179,9 @@ public record AvatarFlightHudViewModel(boolean visible,
 
     /** Immutable render values for one optional native combat-ability slot. */
     public record CombatGlyph(boolean visible, @Nonnull String glyph, @Nonnull String bindingLabel) {
+        private static final String FIREBALL_TEXTURE_PATH = "Tamework/AvatarFlightControls/Fireball.png";
+        private static final String FIRE_BREATH_TEXTURE_PATH = "Tamework/AvatarFlightControls/FireBreath.png";
+
         @Nonnull
         public static CombatGlyph from(@Nullable AvatarFlightCombatAbilitySettings settings,
                                        @Nonnull AvatarFlightCombatAbilitySlot slot) {
@@ -200,6 +203,24 @@ public record AvatarFlightHudViewModel(boolean visible,
         @Nonnull
         private static CombatGlyph hidden(@Nonnull AvatarFlightCombatAbilitySlot slot) {
             return new CombatGlyph(false, "", bindingLabel(slot));
+        }
+
+        /** Returns the bundled HUD texture for a known ability glyph, if one exists. */
+        public boolean hasIconTexturePath() {
+            return !iconTexturePath().isEmpty();
+        }
+
+        /**
+         * Resolves generated HUD artwork for the standard fire attacks while leaving other configs
+         * on the text-glyph fallback.
+         */
+        @Nonnull
+        public String iconTexturePath() {
+            return switch (glyph.trim().toUpperCase(Locale.ROOT)) {
+                case "FIRE" -> FIREBALL_TEXTURE_PATH;
+                case "BREATH" -> FIRE_BREATH_TEXTURE_PATH;
+                default -> "";
+            };
         }
 
         @Nonnull

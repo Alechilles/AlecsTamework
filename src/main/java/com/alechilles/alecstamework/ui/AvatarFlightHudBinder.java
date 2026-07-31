@@ -29,8 +29,10 @@ final class AvatarFlightHudBinder {
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
         commandBuilder.set("#TameworkAvatarFlightControls.Visible", model.visible());
-        bindCombatGlyph(commandBuilder, "#Ability2Control", "#Ability2Glyph", "#Ability2Binding", model.ability2());
-        bindCombatGlyph(commandBuilder, "#Ability3Control", "#Ability3Glyph", "#Ability3Binding", model.ability3());
+        bindCombatGlyph(commandBuilder, "#Ability2Control", "#Ability2Glyph", "#Ability2GlyphText",
+                "#Ability2Binding", model.ability2());
+        bindCombatGlyph(commandBuilder, "#Ability3Control", "#Ability3Glyph", "#Ability3GlyphText",
+                "#Ability3Binding", model.ability3());
         commandBuilder.set("#LaunchChargeGroup.Visible", model.visible() && model.launchChargeVisible());
         commandBuilder.setObject("#LaunchChargeFill.Anchor",
                 fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
@@ -54,11 +56,15 @@ final class AvatarFlightHudBinder {
 
     private static void bindCombatGlyph(@Nonnull UICommandBuilder commandBuilder,
                                         @Nonnull String controlSelector,
-                                        @Nonnull String glyphSelector,
+                                        @Nonnull String iconSelector,
+                                        @Nonnull String glyphTextSelector,
                                         @Nonnull String bindingSelector,
                                         @Nonnull AvatarFlightHudViewModel.CombatGlyph glyph) {
         commandBuilder.set(controlSelector + ".Visible", glyph.visible());
-        commandBuilder.set(glyphSelector + ".Text", glyph.visible() ? glyph.glyph() : "");
+        commandBuilder.set(iconSelector + ".Visible", glyph.visible() && glyph.hasIconTexturePath());
+        commandBuilder.set(iconSelector + ".Background", glyph.iconTexturePath());
+        commandBuilder.set(glyphTextSelector + ".Visible", glyph.visible() && !glyph.hasIconTexturePath());
+        commandBuilder.set(glyphTextSelector + ".Text", glyph.visible() ? glyph.glyph() : "");
         commandBuilder.set(bindingSelector + ".Text", glyph.visible() ? glyph.bindingLabel() : "");
     }
 

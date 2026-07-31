@@ -111,7 +111,7 @@ class AvatarFlightHudBinderTest {
     }
 
     @Test
-    void controlOverlayAssetProvidesCompleteToolOnlyAbilityRow() throws Exception {
+    void controlOverlayStacksCombatSlotsAboveTheMovementRow() throws Exception {
         String ui = Files.readString(Path.of(
                 "src/main/resources/Common/UI/Custom/Hud/TameworkAvatarFlightControls.ui"
         )).replace("\r\n", "\n");
@@ -119,14 +119,16 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Group #TameworkAvatarFlightControls"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotSize = 58"));
         Assertions.assertTrue(ui.contains("@FlightControlSlotHeight = 74"));
-        Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 378, Height: @FlightControlSlotHeight)"));
-        Assertions.assertTrue(ui.contains("LayoutMode: Left"));
+        Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 250, Height: 148)"));
+        Assertions.assertFalse(ui.contains("LayoutMode: Left"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
         Assertions.assertTrue(ui.contains("Group #Ability2Control"));
         Assertions.assertTrue(ui.contains("Group #Ability3Control"));
-        Assertions.assertTrue(ui.contains("Label #Ability2Glyph"));
-        Assertions.assertTrue(ui.contains("Label #Ability3Glyph"));
+        Assertions.assertTrue(ui.contains("Group #Ability2Glyph"));
+        Assertions.assertTrue(ui.contains("Group #Ability3Glyph"));
+        Assertions.assertTrue(ui.contains("Label #Ability2GlyphText"));
+        Assertions.assertTrue(ui.contains("Label #Ability3GlyphText"));
         Assertions.assertTrue(ui.contains("Label #Ability2Binding"));
         Assertions.assertTrue(ui.contains("Label #Ability3Binding"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
@@ -136,17 +138,48 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/UpwardFlap.png"));
         Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/Airbrake.png"));
         Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/Launch.png"));
+        Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/Fireball.png"));
+        Assertions.assertTrue(ui.contains("../Tamework/AvatarFlightControls/FireBreath.png"));
         Assertions.assertTrue(ui.contains("Text: \"CROUCH\";"));
         Assertions.assertTrue(ui.contains("Text: \"LMB\";"));
         Assertions.assertTrue(ui.contains("Text: \"Q\";"));
         Assertions.assertTrue(ui.contains("Text: \"RMB\";"));
         Assertions.assertEquals(6, countOccurrences(ui, "../Tamework/AvatarFlightControls/ControlFrame.png"));
-        Assertions.assertTrue(ui.indexOf("Group #LaunchControl") < ui.indexOf("Group #ForwardBoostControl"));
-        Assertions.assertTrue(ui.indexOf("Group #ForwardBoostControl") < ui.indexOf("Group #Ability2Control"));
-        Assertions.assertTrue(ui.indexOf("Group #Ability2Control") < ui.indexOf("Group #Ability3Control"));
-        Assertions.assertTrue(ui.indexOf("Group #Ability3Control") < ui.indexOf("Group #UpwardFlapControl"));
-        Assertions.assertTrue(ui.indexOf("Group #ForwardBoostControl") < ui.indexOf("Group #UpwardFlapControl"));
-        Assertions.assertTrue(ui.indexOf("Group #UpwardFlapControl") < ui.indexOf("Group #AirbrakeControl"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 0, Left: 128, Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 0, Left: 192, Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 74, Left: 0, Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 74, Left: 192, Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight)"));
+    }
+
+    @Test
+    void binderUsesTextureGlyphsWhenTheCombatGlyphProvidesOne() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ui/AvatarFlightHudBinder.java"
+        ));
+
+        Assertions.assertTrue(source.contains("iconSelector + \".Background\""));
+        Assertions.assertTrue(source.contains("glyph.hasIconTexturePath()"));
+        Assertions.assertTrue(source.contains("glyph.iconTexturePath()"));
+        Assertions.assertTrue(source.contains("glyphTextSelector + \".Visible\""));
+    }
+
+    @Test
+    void generatedCombatGlyphTexturesAreBundledAtHudResolution() throws Exception {
+        assertPngDimensions("Fireball.png");
+        assertPngDimensions("FireBreath.png");
+    }
+
+    private static void assertPngDimensions(String fileName) throws Exception {
+        Path image = Path.of("src/main/resources/Common/UI/Custom/Tamework/AvatarFlightControls", fileName);
+        Assertions.assertTrue(Files.isRegularFile(image));
+        byte[] header = Files.readAllBytes(image);
+        Assertions.assertTrue(header.length >= 24);
+        int width = ((header[16] & 0xff) << 24) | ((header[17] & 0xff) << 16)
+                | ((header[18] & 0xff) << 8) | (header[19] & 0xff);
+        int height = ((header[20] & 0xff) << 24) | ((header[21] & 0xff) << 16)
+                | ((header[22] & 0xff) << 8) | (header[23] & 0xff);
+        Assertions.assertEquals(58, width);
+        Assertions.assertEquals(58, height);
     }
 
     private static int countOccurrences(String text, String token) {
