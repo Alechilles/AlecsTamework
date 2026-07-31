@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.adapter.sqlite;
 
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionCleanupService;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionDurability;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionService;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
@@ -28,7 +29,7 @@ import javax.annotation.Nullable;
 
 /** Atomic SQLite implementation of the Task 4 bonded projection durability port. */
 public final class SqliteBondedCompanionProjectionDurability implements
-        BondedCompanionProjectionService.Durability,
+        BondedCompanionProjectionDurability,
         BondedCompanionLocalProjectionLifecycle.LeaseSource {
     private final SqliteConnectionFactory connections;
     private final SqliteBondedCompanionLeaseReader leaseReader;

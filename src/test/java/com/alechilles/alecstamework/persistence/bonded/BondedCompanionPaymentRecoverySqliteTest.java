@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionContext;
+import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
+import com.alechilles.alecstamework.api.BondedCompanionReviveCost;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicy;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionState;
@@ -19,6 +22,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -40,6 +44,47 @@ class BondedCompanionPaymentRecoverySqliteTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void productionPaidReviveStaysPinnedUntilPaymentIsAcknowledged()
+            throws Exception {
+        Path database = tempDir.resolve("production-revive-retention.sqlite");
+        assertTrue(new BondedCompanionSchemaManager(database, () -> -20_000L)
+                .initialize().availability().available());
+        BondedCompanionStore store = new SqliteBondedCompanionDatabase(database);
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.createProfile(operation(
+                        "retention-profile",
+                        BondedCompanionOperation.Type.PROVISION,
+                        "b"), profile()).code());
+        assertEquals(1, store.pruneOperations(Long.MAX_VALUE, 8));
+        markDead(database);
+        String key = "revive:production-retention";
+        BondedCompanionActionRequest action =
+                new BondedCompanionActionRequest(
+                        CALLER, key, OWNER, "roster-a", "profile-a",
+                        1L, null);
+        BondedCompanionPolicy.RevivePrice price =
+                new BondedCompanionPolicy.RevivePrice(List.of(
+                        new BondedCompanionReviveCost(ITEM, 2)));
+        BondedCompanionOperation revive =
+                BondedCompanionCoreApiOperations.reviveOperation(
+                        action, price, -8_000L);
+
+        assertEquals(BondedCompanionStoreResult.Code.APPLIED,
+                store.reviveProfile(revive, 1L, -8_000L).code());
+        assertEquals(Long.MAX_VALUE, expiry(database, CALLER, key));
+        assertEquals(0, store.pruneOperations(Long.MAX_VALUE, 8));
+        List<BondedCompanionOperationProbe> awaiting =
+                store.listAwaitingProfilePaymentSettlements(OWNER, 8);
+        assertEquals(1, awaiting.size());
+        assertEquals(1L, awaiting.getFirst().expectedRevision());
+
+        assertTrue(store.markProfileOperationPaymentSettled(
+                awaiting.getFirst(), true, 10_000L));
+        assertEquals(10_000L, expiry(database, CALLER, key));
+        assertEquals(1, store.pruneOperations(10_000L, 8));
+    }
 
     @Test
     void committedReviveRecoversAfterRestartWhenProfileIsAlreadyStored()

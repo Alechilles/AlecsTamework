@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.companion.bonded.BondedCompanionActiveCapaci
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionService;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionWorld;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshot;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionSnapshotCodec;
@@ -195,7 +196,7 @@ class BondedCompanionSummonLeaseFenceTest {
     }
 
     private static final class CountingWorld
-            implements BondedCompanionProjectionService.World {
+            implements BondedCompanionProjectionWorld {
         private final AtomicInteger spawns = new AtomicInteger();
         private final AtomicInteger reads = new AtomicInteger();
 

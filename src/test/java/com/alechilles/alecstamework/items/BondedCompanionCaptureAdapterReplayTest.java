@@ -245,7 +245,7 @@ class BondedCompanionCaptureAdapterReplayTest {
     }
 
     @Test
-    void droppedCaptureSourceFenceMakesReadinessFailClosed() throws Exception {
+    void droppedCaptureSourceFenceFailsExactSchemaAuthority() throws Exception {
         Fixture fixture = fixture("source-index-tamper.sqlite",
                 rosterRegistry());
         dropSourceIndex(fixture.path);
@@ -253,7 +253,7 @@ class BondedCompanionCaptureAdapterReplayTest {
         var readiness = new BondedCompanionSchemaManager(fixture.path).verify();
 
         assertFalse(readiness.availability().available());
-        assertEquals("bonded-capture-source-fence-missing",
+        assertEquals("bonded-schema-ddl-mismatch",
                 readiness.diagnosticCode());
     }
 

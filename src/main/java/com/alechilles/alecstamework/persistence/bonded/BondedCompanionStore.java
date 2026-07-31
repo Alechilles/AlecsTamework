@@ -73,6 +73,30 @@ public interface BondedCompanionStore {
         return false;
     }
 
+    /** Lists bounded terminal revive rows retained for payment repair. */
+    @Nonnull
+    default List<BondedCompanionOperationProbe>
+            listAwaitingProfilePaymentSettlements(
+                    @Nonnull UUID ownerUuid, int limit) {
+        return List.of();
+    }
+
+    /** Lists complete historical groups before flattened receipt lookup. */
+    @Nonnull
+    default List<BondedCompanionLegacyPaymentSettlementGroup>
+            listAwaitingLegacyPaymentSettlementGroups(
+                    @Nonnull UUID ownerUuid, int limit) {
+        return List.of();
+    }
+
+    /** Moves every pinned member of one ambiguous historical group to GC. */
+    default int quarantineLegacyPaymentSettlementGroup(
+            @Nonnull UUID ownerUuid,
+            @Nonnull String operationId,
+            long retainedUntilMs) {
+        return 0;
+    }
+
     /** Lists active leases within one exact owner and roster scope. */
     @Nonnull List<BondedCompanionRecord.Lease> findActiveLeases(
             @Nonnull UUID ownerUuid, @Nonnull String rosterId);

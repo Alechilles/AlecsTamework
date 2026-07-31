@@ -13,6 +13,8 @@ import com.alechilles.alecstamework.items.components
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionLegacyPaymentSettlementGroup;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPayload;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionPaymentRecoveryService;
@@ -1201,6 +1203,17 @@ class HytaleBondedCompanionEscrowInventoryTest {
                                     case MISSING -> terminal();
                                 };
                             }
+                            case "listAwaitingProfilePaymentSettlements" ->
+                                    awaiting ? List.of(probe(ordinal))
+                                            : List.<BondedCompanionOperationProbe>of();
+                            case "listAwaitingLegacyPaymentSettlementGroups" ->
+                                    awaiting ? List.of(
+                                            legacyGroup(probe(ordinal)))
+                                            : List.<BondedCompanionLegacyPaymentSettlementGroup>of();
+                            case "quarantineLegacyPaymentSettlementGroup" -> {
+                                quarantines++;
+                                yield 1;
+                            }
                             case "toString" -> "RecoveryStore";
                             default -> throw new AssertionError(
                                     "Unexpected store call: "
@@ -1210,6 +1223,14 @@ class HytaleBondedCompanionEscrowInventoryTest {
 
         private void failNextAcknowledgment() {
             acknowledgmentResults.add(false);
+        }
+
+        private BondedCompanionLegacyPaymentSettlementGroup legacyGroup(
+                BondedCompanionOperationProbe probe) {
+            return new BondedCompanionLegacyPaymentSettlementGroup(
+                    BondedCompanionPaymentOperationId.legacyOperationKey(
+                            probe.callerNamespace(), probe.idempotencyKey()),
+                    List.of(probe));
         }
 
         private Optional<BondedCompanionStoreResult<

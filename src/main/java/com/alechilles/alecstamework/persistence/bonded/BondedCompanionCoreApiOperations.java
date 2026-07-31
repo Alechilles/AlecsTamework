@@ -386,7 +386,7 @@ public final class BondedCompanionCoreApiOperations {
                 store.listProfiles(profile.ownerUuid(), profile.rosterId()));
     }
 
-    BondedCompanionOperation reviveOperation(
+    static BondedCompanionOperation reviveOperation(
             BondedCompanionActionRequest action,
             BondedCompanionPolicy.RevivePrice price,
             long now
@@ -394,8 +394,7 @@ public final class BondedCompanionCoreApiOperations {
         return BondedCompanionRevivePaymentProof.operation(
                 action.callerNamespace(), action.idempotencyKey(),
                 action.ownerUuid(), action.rosterId(), action.profileId(),
-                price.costs(), now,
-                safeAdd(now, OPERATION_RETENTION_MS));
+                price.costs(), now, Long.MAX_VALUE);
     }
 
     private long safeAdd(long value, long increment) {

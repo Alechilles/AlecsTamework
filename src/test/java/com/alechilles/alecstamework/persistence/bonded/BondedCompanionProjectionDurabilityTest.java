@@ -639,7 +639,8 @@ class BondedCompanionProjectionDurabilityTest {
         var service = new BondedCompanionProjectionService(
                 planner,
                 fixture.durability(),
-                new BondedCompanionProjectionService.World() {
+                new com.alechilles.alecstamework.companion.bonded
+                        .BondedCompanionProjectionWorld() {
                     @Override
                     public BondedCompanionProjectionService.SpawnResult spawn(
                             BondedCompanionProjectionService.SpawnPlan plan

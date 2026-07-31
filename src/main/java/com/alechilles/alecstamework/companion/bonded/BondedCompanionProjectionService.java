@@ -12,8 +12,8 @@ import javax.annotation.Nullable;
 /** Coordinates durable bonded leases with disposable world projections. */
 public final class BondedCompanionProjectionService {
     private final BondedCompanionProjectionStorePlanner storePlanner;
-    private final Durability durability;
-    private final World world;
+    private final BondedCompanionProjectionDurability durability;
+    private final BondedCompanionProjectionWorld world;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final BondedCompanionSpawnFailureHandler spawnFailures;
     private final BondedCompanionProjectionValidator validator =
@@ -25,8 +25,8 @@ public final class BondedCompanionProjectionService {
 
     public BondedCompanionProjectionService(
             @Nonnull BondedCompanionProjectionStorePlanner storePlanner,
-            @Nonnull Durability durability,
-            @Nonnull World world,
+            @Nonnull BondedCompanionProjectionDurability durability,
+            @Nonnull BondedCompanionProjectionWorld world,
             @Nonnull BondedCompanionProjectionCleanupService cleanup,
             @Nonnull Supplier<String> leaseTokens,
             @Nonnull Supplier<UUID> npcUuids
@@ -260,64 +260,6 @@ public final class BondedCompanionProjectionService {
                 lease.leaseToken(), lease.liveNpcUuid(), lease.worldKey(),
                 lease.startedAtMs(), lease.expiresAtMs(),
                 BondedCompanionProjectionValidator.LeasePhase.LIVE
-        );
-    }
-
-    /** Atomic durable operations; implementations own their bonded DB transaction. */
-    public interface Durability {
-        /** Atomically authors ACTIVE, the lease, and its bounded spawn-recovery intent. */
-        boolean beginSummon(
-                @Nonnull SummonRequest request,
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent recovery
-        );
-
-        /** Atomically commits the exact NPC UUID to the lease and clears spawn recovery. */
-        boolean confirmSpawn(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nonnull UUID spawnedNpcUuid
-        );
-
-        /** Atomically stores, persists exact cleanup, and clears/replaces spawn recovery. */
-        boolean failSpawnAndEnqueueCleanup(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
-                @Nonnull String reason
-        );
-
-        /** Returns a terminal exact-store result before any projection access. */
-        @Nonnull StoreDurabilityResult findStoreResult(
-                @Nonnull BondedCompanionOperation operation);
-
-        /** Atomically replaces the snapshot, invalidates the lease, stores, and enqueues cleanup. */
-        @Nonnull StoreDurabilityResult storeAndEnqueueCleanup(
-                @Nonnull StoreRequest request,
-                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
-                @Nonnull BondedCompanionProjectionCleanupService.CleanupIntent cleanup
-        );
-
-        /** Atomically returns a non-death exit to STORED and enqueues every exact cleanup. */
-        boolean reconcileStored(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
-                @Nonnull List<BondedCompanionProjectionCleanupService.CleanupIntent> cleanups,
-                @Nonnull String reason
-        );
-
-        /** Atomically authors DEAD only for the confirmed exact projection death. */
-        boolean confirmDeath(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease,
-                @Nonnull BondedCompanionProjectionStorePlanner.StorePlan plan,
-                long diedAtMs
-        );
-    }
-
-    /** World-thread boundary; implementations use exact UUIDs and marker checks. */
-    public interface World {
-        @Nonnull SpawnResult spawn(@Nonnull SpawnPlan plan);
-
-        @Nullable BondedCompanionProjectionValidator.Projection readExact(
-                @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
         );
     }
 

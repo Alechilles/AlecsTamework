@@ -19,8 +19,7 @@ class BondedCompanionCommandRoutingIsolationTest {
     @Test
     void orchestratorSkipsEveryGenericLinkedRecordMutationForBondedTools()
             throws IOException {
-        String source = Files.readString(ITEMS.resolve(
-                "CommandItemUseOrchestrator.java"));
+        String source = readSource("CommandItemUseOrchestrator.java");
 
         assertTrue(source.contains(
                 "usesGenericLinkedRecords(config)\n"
@@ -39,8 +38,7 @@ class BondedCompanionCommandRoutingIsolationTest {
     @Test
     void commandStepsRetainLiveHomeButNeverPersistBondedItemLinks()
             throws IOException {
-        String source = Files.readString(ITEMS.resolve(
-                "CommandStepExecutionService.java"));
+        String source = readSource("CommandStepExecutionService.java");
 
         assertTrue(source.contains("links.setHomePosition(home);"));
         assertTrue(source.contains(
@@ -50,10 +48,8 @@ class BondedCompanionCommandRoutingIsolationTest {
 
     @Test
     void bondedMovesNeverEnterGenericDeferredRelocation() throws IOException {
-        String dispatch = Files.readString(ITEMS.resolve(
-                "CommandRelocationDispatchService.java"));
-        String steps = Files.readString(ITEMS.resolve(
-                "CommandStepExecutionService.java"));
+        String dispatch = readSource("CommandRelocationDispatchService.java");
+        String steps = readSource("CommandStepExecutionService.java");
 
         assertTrue(dispatch.contains(
                 "if (context.config.usesBondedCompanionRoster()) {\n"
@@ -62,15 +58,14 @@ class BondedCompanionCommandRoutingIsolationTest {
                         + "        if (!resolutionService.isRecallCommand"));
         assertTrue(steps.contains(
                 "if (!context.config.usesBondedCompanionRoster()\n"
-                        + "                    && CommandTravelSettings"
-                        + ".isRecallTeleportingEnabled()"));
+                        + "                    && recallTeleportingEnabled"
+                        + ".getAsBoolean()"));
     }
 
     @Test
     void recipientServiceBypassesGenericScanAndUnloadedRelocation()
             throws IOException {
-        String source = Files.readString(ITEMS.resolve(
-                "CommandRecipientService.java"));
+        String source = readSource("CommandRecipientService.java");
         int bonded = source.indexOf(
                 "return bondedRecipients.queryRecipients(context);");
         int genericScan = source.indexOf("context.store.forEachChunk(Query.any()");
@@ -85,12 +80,9 @@ class BondedCompanionCommandRoutingIsolationTest {
     @Test
     void everyGenericLinkCreationEntryPointRejectsBondedStorage()
             throws IOException {
-        String mutations = Files.readString(ITEMS.resolve(
-                "CommandLinkMutationService.java"));
-        String autoLink = Files.readString(ITEMS.resolve(
-                "CommandAutoLinkService.java"));
-        String spawn = Files.readString(ITEMS.resolve(
-                "NpcSpawnCommandService.java"));
+        String mutations = readSource("CommandLinkMutationService.java");
+        String autoLink = readSource("CommandAutoLinkService.java");
+        String spawn = readSource("NpcSpawnCommandService.java");
 
         assertTrue(mutations.contains(
                 "if (config == null || config.usesBondedCompanionRoster()) {\n"
@@ -178,17 +170,16 @@ class BondedCompanionCommandRoutingIsolationTest {
     @Test
     void selectionPageReplacesGenericCallbacksForBondedStorage()
             throws IOException {
-        String source = Files.readString(ITEMS.resolve(
-                "CommandSelectionPageService.java"));
+        String source = readSource("CommandSelectionPageService.java");
 
-        assertTrue(source.contains(
-                "CommandRosterStorageBoundary.allowsGenericRosterActions(config)"));
+        assertTrue(source.contains("CommandRosterStorageBoundary"));
+        assertTrue(source.contains(".allowsGenericRosterActions(config)"));
         assertTrue(source.contains("BooleanSupplier genericCallbackAuthority"));
-        assertTrue(source.contains("guardedUuid(guardedGenericCallbacks,"));
-        assertTrue(source.contains("guardedBoolean(guardedGenericCallbacks,"));
-        assertTrue(source.contains("guardedPair(guardedGenericCallbacks,"));
-        assertTrue(source.contains("guardedAction(guardedGenericCallbacks,"));
-        assertTrue(source.contains("panelPreferenceAuthority"));
+        assertTrue(source.contains("guardedUuid(authority,"));
+        assertTrue(source.contains("guardedBoolean(genericAuthority,"));
+        assertTrue(source.contains("guardedPair(genericAuthority,"));
+        assertTrue(source.contains("guardedAction(genericAuthority,"));
+        assertTrue(source.contains("BooleanSupplier preferenceAuthority"));
     }
 
     @Test
@@ -266,5 +257,10 @@ class BondedCompanionCommandRoutingIsolationTest {
         int secondIndex = source.indexOf(second);
         assertTrue(firstIndex >= 0 && secondIndex > firstIndex,
                 first + " must precede " + second);
+    }
+
+    private static String readSource(String fileName) throws IOException {
+        return Files.readString(ITEMS.resolve(fileName))
+                .replace("\r\n", "\n");
     }
 }

@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.adapter.sqlite;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperation;
 import com.alechilles.alecstamework.persistence.bonded.BondedCompanionOperationProbe;
 import com.alechilles.alecstamework.persistence.bonded
+        .BondedCompanionLegacyPaymentSettlementGroup;
+import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEvidence;
 import com.alechilles.alecstamework.persistence.bonded
         .BondedCompanionCaptureEvidenceStore;
@@ -186,6 +188,30 @@ public final class SqliteBondedCompanionDatabase implements BondedCompanionStore
         }
         return integerWrite(store -> store.retention().markProfileOperationPaymentSettled(
                 operation, terminalApplied, retainedUntilMs)) == 1;
+    }
+
+    @Override
+    public List<BondedCompanionOperationProbe>
+            listAwaitingProfilePaymentSettlements(
+                    UUID ownerUuid, int limit) {
+        return read(store -> store.retention()
+                .listAwaitingProfilePaymentSettlements(ownerUuid, limit));
+    }
+
+    @Override
+    public List<BondedCompanionLegacyPaymentSettlementGroup>
+            listAwaitingLegacyPaymentSettlementGroups(
+                    UUID ownerUuid, int limit) {
+        return read(store -> store.retention()
+                .listAwaitingLegacyPaymentSettlementGroups(ownerUuid, limit));
+    }
+
+    @Override
+    public int quarantineLegacyPaymentSettlementGroup(
+            UUID ownerUuid, String operationId, long retainedUntilMs) {
+        return integerWrite(store -> store.retention()
+                .quarantineLegacyPaymentSettlementGroup(
+                        ownerUuid, operationId, retainedUntilMs));
     }
 
     @Override public List<BondedCompanionRecord.Lease> findActiveLeases(

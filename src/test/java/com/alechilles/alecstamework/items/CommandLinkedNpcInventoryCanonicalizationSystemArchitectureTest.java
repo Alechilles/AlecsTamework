@@ -17,6 +17,9 @@ class CommandLinkedNpcInventoryCanonicalizationSystemArchitectureTest {
     private static final Path HANDLER = Path.of(
             "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
     );
+    private static final Path CANONICALIZER = Path.of(
+            "src/main/java/com/alechilles/alecstamework/items/CommandPlayerInventoryCanonicalizer.java"
+    );
     private static final Path WORLD_EVENTS = Path.of(
             "src/main/java/com/alechilles/alecstamework/items/CommandWorldChangeTravelEventHandler.java"
     );
@@ -52,6 +55,7 @@ class CommandLinkedNpcInventoryCanonicalizationSystemArchitectureTest {
     @Test
     void loginLoadRepairsInventoryAndMovementResolvesPlayerFromWorldStore() throws IOException {
         String source = Files.readString(HANDLER);
+        String canonicalizer = Files.readString(CANONICALIZER);
         String events = Files.readString(WORLD_EVENTS);
 
         assertTrue(events.contains("public void onAddPlayerToWorld("));
@@ -60,11 +64,14 @@ class CommandLinkedNpcInventoryCanonicalizationSystemArchitectureTest {
         ));
         assertTrue(events.contains("if (!sessions.isWorldChange(playerUuid))"),
                 "Initial login must remain distinct from later world-change travel");
-        assertTrue(source.contains("world.getEntityRef(playerUuid)"));
-        assertTrue(source.contains("store.getComponent(playerRef, Player.getComponentType())"));
-        assertTrue(source.contains("inventoryRepairService.canonicalize(player)"));
-        assertFalse(source.contains("PlayerRef.getComponent(Player"));
-        assertFalse(source.contains("Universe.get().getPlayers"));
+        assertTrue(source.contains(
+                "inventoryCanonicalizer.canonicalize(world, playerUuid)"));
+        assertTrue(canonicalizer.contains("world.getEntityRef(playerUuid)"));
+        assertTrue(canonicalizer.contains(
+                "store.getComponent(ref, Player.getComponentType())"));
+        assertTrue(canonicalizer.contains("repairs.canonicalize(player)"));
+        assertFalse(canonicalizer.contains("PlayerRef.getComponent(Player"));
+        assertFalse(canonicalizer.contains("Universe.get().getPlayers"));
     }
 
     @Test

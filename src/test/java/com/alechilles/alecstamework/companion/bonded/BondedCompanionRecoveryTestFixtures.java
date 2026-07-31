@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /** In-memory durability fixture for projection recovery orchestration tests. */
 final class RecordingBondedDurability
-        implements BondedCompanionProjectionService.Durability,
+        implements BondedCompanionProjectionDurability,
         BondedCompanionProjectionStorePlanner {
     final Map<String, BondedCompanionState> states = new HashMap<>();
     final Map<String, BondedCompanionProjectionValidator.LeaseExpectation>
@@ -190,7 +190,7 @@ final class RecordingBondedDurability
 
 /** In-memory exact-world fixture for projection recovery orchestration tests. */
 final class RecordingBondedWorld
-        implements BondedCompanionProjectionService.World,
+        implements BondedCompanionProjectionWorld,
         BondedCompanionProjectionCleanupService.WorldGateway,
         BondedCompanionWorldLifecycleObserver.ProjectionSource {
     final List<String> events = new ArrayList<>();

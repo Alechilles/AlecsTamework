@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.BondedCompanionResultCode;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionService;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionDurability;
+import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionWorld;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionStorePlanner;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionProjectionValidator;
 import com.alechilles.alecstamework.companion.bonded.BondedCompanionPolicyResolver;
@@ -19,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Regression coverage for coherent profile/lease reads at the public API. */
 class BondedCompanionApiFacadeCoherentListTest {
@@ -52,6 +57,20 @@ class BondedCompanionApiFacadeCoherentListTest {
                     listed.value().getFirst().activeLease().leaseToken());
             assertEquals(NPC_B,
                     listed.value().getFirst().activeLease().liveNpcUuid());
+            var view = listed.value().getFirst();
+            assertFalse(view.summonAvailable());
+            assertFalse(view.storeAvailable());
+            assertFalse(view.reviveAvailable());
+            assertNull(view.reviveQuote());
+            assertFalse(view.snapshotPresentationData().containsKey(
+                    BondedCompanionPresentationAttributes
+                            .ACTIVE_CAPACITY_COUNT));
+            assertFalse(view.snapshotPresentationData().containsKey(
+                    BondedCompanionPresentationAttributes
+                            .ACTIVE_CAPACITY_LIMIT));
+            assertFalse(view.snapshotPresentationData().containsKey(
+                    BondedCompanionPresentationAttributes
+                            .ACTIVE_CAPACITY_LABEL));
         } finally {
             api.close();
             changes.close();
@@ -113,8 +132,8 @@ class BondedCompanionApiFacadeCoherentListTest {
                 BondedCompanionProjectionStorePlanner.PlanningResult.rejected(
                         BondedCompanionProjectionStorePlanner.Status
                                 .PROFILE_NOT_FOUND);
-        BondedCompanionProjectionService.World world =
-                new BondedCompanionProjectionService.World() {
+        BondedCompanionProjectionWorld world =
+                new BondedCompanionProjectionWorld() {
                     @Override
                     public BondedCompanionProjectionService.SpawnResult spawn(
                             BondedCompanionProjectionService.SpawnPlan plan) {
@@ -155,7 +174,7 @@ class BondedCompanionApiFacadeCoherentListTest {
     }
 
     private static final class UnusedDurability
-            implements BondedCompanionProjectionService.Durability {
+            implements BondedCompanionProjectionDurability {
         @Override
         public boolean beginSummon(
                 BondedCompanionProjectionService.SummonRequest request,

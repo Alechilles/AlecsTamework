@@ -63,7 +63,10 @@ final class BondedCompanionProfileViewService {
                         && policy.features().dismiss(),
                 revive, extensions(profile),
                 revive ? reviveQuotes.profileQuote(profile, policy) : null,
-                BondedCompanionFamilyCapacityPresentation.attributes(policy, active));
+                matches
+                        ? BondedCompanionFamilyCapacityPresentation.attributes(
+                                policy, active)
+                        : Map.of());
     }
 
     private Map<String, String> extensions(

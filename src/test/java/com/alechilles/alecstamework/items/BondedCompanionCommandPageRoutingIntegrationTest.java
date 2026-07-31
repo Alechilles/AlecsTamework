@@ -925,5 +925,8 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
 
         @Override public String getName() { return "world-a"; }
         @Override public EntityStore getEntityStore() { return entityStore; }
+        @Override public Ref<EntityStore> getEntityRef(UUID uuid) {
+            return entityStore == null ? null : entityStore.getRefFromUUID(uuid);
+        }
     }
 }

@@ -52,7 +52,8 @@ final class BondedCompanionCoreReviveSupport
             BondedCompanionActionRequest action,
             BondedCompanionPolicy.RevivePrice price,
             long now) {
-        return core.reviveOperation(action, price, now);
+        return BondedCompanionCoreApiOperations.reviveOperation(
+                action, price, now);
     }
 
     @Override

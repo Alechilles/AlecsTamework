@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.operation
         .BondedCompanionPaymentOperationId;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
@@ -48,6 +49,80 @@ public final class BondedCompanionPaymentRecoveryService {
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(inventory, "inventory");
         return recoverCanonical(identity, inventory);
+    }
+
+    /** Reconciles bounded terminal rows after their player escrow is absent. */
+    @Nonnull
+    public CompletionStage<Integer> recoverAwaitingWithoutEscrow(
+            @Nonnull UUID ownerUuid,
+            int limit,
+            @Nonnull BondedCompanionActionContext.Inventory inventory
+    ) {
+        Objects.requireNonNull(ownerUuid, "ownerUuid");
+        Objects.requireNonNull(inventory, "inventory");
+        java.util.List<BondedCompanionOperationProbe> awaiting;
+        java.util.List<BondedCompanionLegacyPaymentSettlementGroup>
+                legacyGroups;
+        try {
+            awaiting = store.listAwaitingProfilePaymentSettlements(
+                    ownerUuid, limit);
+            legacyGroups = store.listAwaitingLegacyPaymentSettlementGroups(
+                    ownerUuid, limit);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(0);
+        }
+        CompletionStage<Integer> recovered = completed(0);
+        for (BondedCompanionOperationProbe probe : awaiting) {
+            if (probe.expectedRevision() == null
+                    || probe.profileId() == null) continue;
+            String operationId = BondedCompanionPaymentOperationId.create(
+                    probe.callerNamespace(), probe.idempotencyKey(),
+                    probe.ownerUuid(), probe.rosterId(), probe.profileId(),
+                    probe.expectedRevision());
+            recovered = recovered.thenCompose(count -> recover(
+                    probe, operationId, inventory).thenApply(outcome ->
+                    acknowledged(outcome) ? count + 1 : count));
+        }
+        for (BondedCompanionLegacyPaymentSettlementGroup group
+                : legacyGroups) {
+            if (group.ambiguous()) {
+                recovered = recovered.thenApply(count -> {
+                    quarantineLegacy(ownerUuid, group);
+                    return count;
+                });
+                continue;
+            }
+            BondedCompanionOperationProbe probe = group.operations().getFirst();
+            recovered = recovered.thenCompose(count -> recover(
+                    probe, group.operationId(), inventory).thenApply(outcome -> {
+                        if (outcome == Outcome.QUARANTINED) {
+                            quarantineLegacy(ownerUuid, group);
+                        }
+                        return acknowledged(outcome) ? count + 1 : count;
+                    }));
+        }
+        return recovered.exceptionally(ignored -> 0);
+    }
+
+    private CompletionStage<Outcome> recover(
+            BondedCompanionOperationProbe probe,
+            String operationId,
+            BondedCompanionActionContext.Inventory inventory
+    ) {
+        Optional<BondedCompanionStoreResult<
+                BondedCompanionRecord.Profile>> prior;
+        try {
+            prior = store.findProfileOperationByIdentity(probe);
+        } catch (RuntimeException | LinkageError failure) {
+            return completed(Outcome.RETRY_REQUIRED);
+        }
+        if (prior.isEmpty()) return completed(Outcome.NO_TERMINAL_PROOF);
+        BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal =
+                prior.get();
+        if (!terminal.replayed()) {
+            return completed(Outcome.NO_TERMINAL_PROOF);
+        }
+        return recoverTerminal(probe, operationId, terminal, inventory);
     }
 
     private CompletionStage<Outcome> recoverTerminal(
@@ -243,6 +318,23 @@ public final class BondedCompanionPaymentRecoveryService {
             BondedCompanionStoreResult<BondedCompanionRecord.Profile> terminal) {
         return terminal.code() == BondedCompanionStoreResult.Code.APPLIED
                 && terminal.value() != null;
+    }
+
+    private boolean acknowledged(Outcome outcome) {
+        return outcome == Outcome.ALREADY_SETTLED
+                || outcome == Outcome.SETTLED_COMMITTED
+                || outcome == Outcome.SETTLED_REJECTED;
+    }
+
+    private void quarantineLegacy(
+            UUID ownerUuid,
+            BondedCompanionLegacyPaymentSettlementGroup group) {
+        try {
+            store.quarantineLegacyPaymentSettlementGroup(
+                    ownerUuid, group.operationId(), retainedUntil());
+        } catch (RuntimeException | LinkageError ignored) {
+            // Leave the complete group pinned for a later retry.
+        }
     }
 
     private BondedCompanionOperationProbe probe(

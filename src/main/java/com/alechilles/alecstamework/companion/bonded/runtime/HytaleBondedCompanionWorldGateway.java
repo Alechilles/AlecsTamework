@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.companion.bonded
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionService;
 import com.alechilles.alecstamework.companion.bonded
+        .BondedCompanionProjectionWorld;
+import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionLocalProjectionLifecycle;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionValidator;
@@ -49,7 +51,7 @@ import javax.annotation.Nullable;
  */
 public final class HytaleBondedCompanionWorldGateway implements
         BondedCompanionProjectionCleanupService.WorldGateway,
-        BondedCompanionProjectionService.World,
+        BondedCompanionProjectionWorld,
         BondedCompanionLocalProjectionLifecycle.ObservationSource {
     private final TameworkFullStateSnapshotReader snapshots;
     private final BondedCompanionProjectionSpawnBoundary spawns;

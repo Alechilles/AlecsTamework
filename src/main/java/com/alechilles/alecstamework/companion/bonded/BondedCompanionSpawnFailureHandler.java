@@ -7,13 +7,13 @@ import java.util.UUID;
 
 /** Persists and executes exact cleanup for one failed summon world effect. */
 final class BondedCompanionSpawnFailureHandler {
-    private final BondedCompanionProjectionService.Durability durability;
+    private final BondedCompanionProjectionDurability durability;
     private final BondedCompanionProjectionCleanupService cleanup;
     private final BondedCompanionCleanupIntentFactory cleanupIntents =
             new BondedCompanionCleanupIntentFactory();
 
     BondedCompanionSpawnFailureHandler(
-            BondedCompanionProjectionService.Durability durability,
+            BondedCompanionProjectionDurability durability,
             BondedCompanionProjectionCleanupService cleanup
     ) {
         this.durability = Objects.requireNonNull(durability, "durability");

@@ -622,7 +622,7 @@ class BondedCompanionPanelLifecycleIntegrationTest {
     }
 
     private static final class TestWorld implements
-            BondedCompanionProjectionService.World,
+            BondedCompanionProjectionWorld,
             BondedCompanionProjectionCleanupService.WorldGateway {
         private final Map<UUID, BondedCompanionProjectionValidator.Projection>
                 projections = new HashMap<>();
