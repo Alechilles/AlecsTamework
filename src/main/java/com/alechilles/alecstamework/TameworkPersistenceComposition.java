@@ -68,7 +68,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -95,6 +94,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     private final DirectLiveCoopAuthor directLiveCoopAuthor;
     private final DirectLiveCoopProjectionView directLiveCoopProjections;
     private final TameworkRestoredFeatureComposition restoredFeatures;
+    private final PersistenceStartupWorldEvidenceResumer startupResumer;
 
     private TameworkPersistenceComposition(
             HytaleLogger logger,
@@ -125,6 +125,10 @@ final class TameworkPersistenceComposition implements AutoCloseable {
         this.directLiveCoopProjections = directLiveCoopProjections;
         this.restoredFeatures = Objects.requireNonNull(
                 restoredFeatures, "restoredFeatures"
+        );
+        this.startupResumer = new PersistenceStartupWorldEvidenceResumer(
+                bootstrap,
+                this::logStartup
         );
     }
 
@@ -361,10 +365,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
                         );
                         return;
                     }
-                    CompletionStage<PersistenceStartupReport> resumed =
-                            bootstrap.start();
-                    resumed.whenComplete((report, startupFailure) ->
-                            logStartup(report, startupFailure));
+                    startupResumer.resume();
                 }
         );
     }
@@ -474,6 +475,7 @@ final class TameworkPersistenceComposition implements AutoCloseable {
     /** Runs the bounded teardown protocol and returns its exact outcome. */
     @Nonnull
     PublicPersistenceShutdownReport shutdown() {
+        startupResumer.close();
         restoredFeatures.close();
         return bootstrap.shutdown(SHUTDOWN_TIMEOUT);
     }

@@ -300,6 +300,11 @@ public final class PersistenceStartupCoordinator
                 activeAdvance = null;
                 future.complete(reportLocked());
             } else if (result == PersistenceStartupAction.Result.DEFERRED) {
+                if (node == PersistenceStartupNode.RECONCILE_WORLD) {
+                    // A moving identity revision invalidates the sealed snapshot;
+                    // the next advance must rebuild evidence before reconciling.
+                    completed.remove(PersistenceStartupNode.WAIT_WORLD_EVIDENCE);
+                }
                 deferred = node;
                 detail = "startup_evidence_deferred";
                 activeAdvance = null;

@@ -97,6 +97,36 @@ class PersistenceStartupCoordinatorTest {
     }
 
     @Test
+    void deferredReconciliationRebuildsDiscardedWorldEvidenceBeforeRetry() {
+        // Regression: the 2026-07-31 tester import discarded a moving identity
+        // snapshot, then retried reconciliation forever without rebuilding it.
+        AtomicInteger evidenceAttempts = new AtomicInteger();
+        AtomicInteger reconciliationAttempts = new AtomicInteger();
+        PersistenceStartupCoordinator coordinator = coordinator(
+                actions(node -> {
+                    if (node == PersistenceStartupNode.WAIT_WORLD_EVIDENCE) {
+                        evidenceAttempts.incrementAndGet();
+                    }
+                    if (node == PersistenceStartupNode.RECONCILE_WORLD
+                            && reconciliationAttempts.getAndIncrement() == 0) {
+                        return completed(PersistenceStartupAction.Result.DEFERRED);
+                    }
+                    return completed(PersistenceStartupAction.Result.COMPLETE);
+                })
+        );
+
+        PersistenceStartupReport deferred =
+                coordinator.advance().toCompletableFuture().join();
+        assertEquals(PersistenceStartupNode.RECONCILE_WORLD, deferred.deferredNode());
+        assertEquals(1, evidenceAttempts.get());
+        assertEquals(1, reconciliationAttempts.get());
+
+        assertTrue(coordinator.advance().toCompletableFuture().join().complete());
+        assertEquals(2, evidenceAttempts.get());
+        assertEquals(2, reconciliationAttempts.get());
+    }
+
+    @Test
     void eachStartupNodeFailureFailsClosedWithoutRunningLaterNodes() {
         for (PersistenceStartupNode failedNode
                 : PersistenceStartupNode.values()) {

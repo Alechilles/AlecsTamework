@@ -105,6 +105,9 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed imported companion worlds remaining read-only when NPCs continued
+  loading during startup reconciliation. Tamework now rebuilds moving world
+  evidence and retries safely until persistence becomes mutation-ready.
 - Fixed large or pitched flying NPCs remaining on their `Fly` controller after their collision
   box had already touched terrain. Asset authors can now confirm physical touchdown with the
   `TameworkConfirmLanding` action instead of relying only on the base `Land` positional goal.
