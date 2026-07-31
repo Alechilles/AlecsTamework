@@ -26,7 +26,16 @@ import javax.annotation.Nullable;
 public final class NativeMountMovementSettingsService {
     public static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final String MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
+    private static final NativeMountMovementProfileMemory LIVE_PROFILE_MEMORY =
+            new NativeMountMovementProfileMemory();
     private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
+
+    /**
+     * Records the profile resolved from the live role before native mounting replaces that role with Empty_Role.
+     */
+    public void rememberLiveRoleProfile(@Nullable String sourceRoleId, @Nullable StdScope[] sourceRoleScopes) {
+        LIVE_PROFILE_MEMORY.remember(sourceRoleId, resolveMovementConfigIdFromScope(sourceRoleScopes));
+    }
 
     /** Applies the selected source-role movement profile to the active rider without mutating its asset. */
     public boolean applyScaledSettings(@Nullable String sourceRoleId,
@@ -107,7 +116,11 @@ public final class NativeMountMovementSettingsService {
     }
 
     private String resolveMovementConfigId(@Nullable String sourceRoleId, @Nullable StdScope[] sourceRoleScopes) {
-        if (sourceRoleId == null || sourceRoleId.isBlank() || sourceRoleScopes == null) {
+        return LIVE_PROFILE_MEMORY.resolve(sourceRoleId, resolveMovementConfigIdFromScope(sourceRoleScopes));
+    }
+
+    private String resolveMovementConfigIdFromScope(@Nullable StdScope[] sourceRoleScopes) {
+        if (sourceRoleScopes == null) {
             return DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
         }
         for (StdScope scope : sourceRoleScopes) {
