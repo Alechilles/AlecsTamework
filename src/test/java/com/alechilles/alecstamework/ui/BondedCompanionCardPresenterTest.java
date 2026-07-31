@@ -18,6 +18,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /** Regression coverage for the dedicated final bonded-companion card states. */
@@ -192,11 +194,28 @@ class BondedCompanionCardPresenterTest {
             throws Exception {
         String asset = Files.readString(Path.of("src", "main", "resources", "Common",
                 "UI", "Custom", "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
-        assertTrue(asset.contains("#BondedFlightModeGroundedIcon"));
-        assertTrue(asset.contains("#BondedFlightModeAirborneIcon"));
-        assertTrue(asset.contains("#BondedFlightToggleButton"));
-        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Grounded.png"));
-        assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png"));
+        String name = selectorBlock(asset, "#BondedName");
+        String grounded = selectorBlock(asset, "#BondedFlightModeGroundedIcon");
+        String airborne = selectorBlock(asset, "#BondedFlightModeAirborneIcon");
+        String button = selectorBlock(asset, "#BondedFlightToggleButton");
+        assertTrue(name.contains("Right: 142"));
+        assertTrue(grounded.contains("Top: 5, Right: 108, Width: 24, Height: 24")
+                && grounded.contains("Tamework/LinkedPanelIcons/FlightMode_Grounded.png")
+                && grounded.contains("Visible: false"));
+        assertTrue(airborne.contains("Top: 5, Right: 108, Width: 24, Height: 24")
+                && airborne.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png")
+                && airborne.contains("Visible: false"));
+        assertTrue(button.contains("Top: 5, Right: 108, Width: 24, Height: 24")
+                && button.contains("Style: @BondedTransparentButton")
+                && button.contains("Text: \"\"")
+                && button.contains("TooltipText: \"\"")
+                && button.contains("TextTooltipStyle: @BondedCardTextTooltipStyle")
+                && button.contains("Visible: false"));
+        assertTrue(asset.indexOf("#BondedFlightModeGroundedIcon")
+                        < asset.indexOf("#BondedFlightModeAirborneIcon")
+                        && asset.indexOf("#BondedFlightModeAirborneIcon")
+                        < asset.indexOf("#BondedFlightToggleButton"),
+                "The transparent click target must be declared over both icons.");
         assertIconIs32RgbaWithTransparency("FlightMode_Grounded.png");
         assertIconIs32RgbaWithTransparency("FlightMode_Airborne.png");
     }
@@ -523,20 +542,20 @@ class BondedCompanionCardPresenterTest {
                 "Common", "UI", "Custom",
                 "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
 
-        assertTrue(asset.contains("Label #BondedLevelText {")
-                        && asset.contains("Anchor: (Top: 30, Left: 22, Width: 42"),
+        assertTrue(selectorBlock(asset, "#BondedLevelText")
+                        .contains("Anchor: (Top: 30, Left: 22, Width: 42"),
                 "Level should lead the compact identity row.");
-        assertTrue(asset.contains("Group #BondedGenderFemaleIcon {")
-                        && asset.contains("Anchor: (Top: 33, Left: 68"),
+        assertTrue(selectorBlock(asset, "#BondedGenderFemaleIcon")
+                        .contains("Anchor: (Top: 33, Left: 68"),
                 "Gender icon should follow the level text.");
-        assertTrue(asset.contains("Label #BondedSpecies {")
-                        && asset.contains("Anchor: (Top: 30, Left: 86"),
+        assertTrue(selectorBlock(asset, "#BondedSpecies")
+                        .contains("Anchor: (Top: 30, Left: 86"),
                 "Species should follow the gender icon.");
-        assertTrue(asset.contains("Group #BondedTalentPointAction {")
-                        && asset.contains("Anchor: (Top: 82, Right: 118"),
+        assertTrue(selectorBlock(asset, "#BondedTalentPointAction")
+                        .contains("Anchor: (Top: 82, Right: 118"),
                 "The stats button belongs beside the primary bottom-right action.");
-        assertTrue(asset.contains("Group #BondedHealthFrame {")
-                        && asset.contains("Anchor: (Top: 56, Left: 20, Right: 25"),
+        assertTrue(selectorBlock(asset, "#BondedHealthFrame")
+                        .contains("Anchor: (Top: 56, Left: 20, Right: 25"),
                 "Health should align to the primary action's right edge.");
     }
 
@@ -583,6 +602,25 @@ class BondedCompanionCardPresenterTest {
                 "active:", "breed:", "release:", "cull:", "respawn:",
                 "summon:", "dismiss:", "locate:", "recall:", "home:",
                 "return:", "talents:", true, true);
+    }
+
+    private static String selectorBlock(String asset, String selector) {
+        Matcher matcher = Pattern.compile("(?m)^\\s*(?:[A-Za-z]+\\s+)?"
+                + Pattern.quote(selector) + "\\s*\\{").matcher(asset);
+        assertTrue(matcher.find(), () -> "Expected selector block " + selector);
+        int start = matcher.start();
+        int cursor = matcher.end();
+        int depth = 1;
+        while (cursor < asset.length() && depth > 0) {
+            char character = asset.charAt(cursor++);
+            if (character == '{') {
+                depth++;
+            } else if (character == '}') {
+                depth--;
+            }
+        }
+        assertTrue(depth == 0, () -> "Unclosed selector block " + selector);
+        return asset.substring(start, cursor);
     }
 
     private static void assertCommand(
