@@ -4,10 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
-import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -15,7 +13,6 @@ import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -210,14 +207,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         try {
             Ref<EntityStore> reference = player.getWorld().getEntityRef(
                     profile.activeLease().liveNpcUuid());
-            NPCEntity npc = reference == null || !reference.isValid()
-                    || NPCEntity.getComponentType() == null ? null
-                    : store.getComponent(reference, NPCEntity.getComponentType());
-            String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
-            var settings = TwCompanionConfig.resolveEffectiveForRole(roleId)
-                    .getFlightToggle();
             return flightProjection.read(profile, player.getWorld().getName(),
-                    reference, store, npc, roleId, settings);
+                    reference, store);
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }

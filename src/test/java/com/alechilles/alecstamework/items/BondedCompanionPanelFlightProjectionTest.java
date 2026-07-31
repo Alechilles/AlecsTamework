@@ -39,9 +39,11 @@ class BondedCompanionPanelFlightProjectionTest {
             TwCompanionFlightToggleSettings settings = configuredSettings();
 
             assertEquals(Optional.of(false), projection(false).read(
-                    profile, WORLD, reference, store, npc, ROLE_ID, settings));
+                    profile, WORLD, reference, store,
+                    resolver(npc, ROLE_ID, settings)));
             assertEquals(Optional.of(true), projection(true).read(
-                    profile, WORLD, reference, store, npc, ROLE_ID, settings));
+                    profile, WORLD, reference, store,
+                    resolver(npc, ROLE_ID, settings)));
         }
     }
 
@@ -89,8 +91,11 @@ class BondedCompanionPanelFlightProjectionTest {
                     ROLE_ID, settings);
             assertUnavailable(projection, profile, WORLD, invalid, store, npc,
                     ROLE_ID, settings);
-            assertUnavailable(projection, profile, WORLD, valid, otherStore,
-                    npc, ROLE_ID, settings);
+            AtomicBoolean foreignResolved = new AtomicBoolean();
+            assertTrue(projection.read(profile, WORLD, valid, otherStore,
+                    resolver(npc, ROLE_ID, settings, foreignResolved)).isEmpty());
+            assertFalse(foreignResolved.get(),
+                    "foreign refs must be rejected before entity resolution");
             assertUnavailable(projection, profile, WORLD, valid, store, null,
                     ROLE_ID, settings);
         }
@@ -135,7 +140,7 @@ class BondedCompanionPanelFlightProjectionTest {
             Optional<Boolean> result = new BondedCompanionPanelFlightProjection(
                     (npc, settings) -> Optional.empty()).read(
                     activeProfile(UUID.randomUUID()), WORLD, reference, store,
-                    new NPCEntity(), ROLE_ID, configuredSettings());
+                    resolver(new NPCEntity(), ROLE_ID, configuredSettings()));
 
             assertTrue(result.isEmpty());
         }
@@ -158,8 +163,51 @@ class BondedCompanionPanelFlightProjectionTest {
             String liveRoleId,
             TwCompanionFlightToggleSettings settings
     ) {
-        assertTrue(projection.read(profile, world, reference, store, npc,
-                liveRoleId, settings).isEmpty());
+        assertTrue(projection.read(profile, world, reference, store,
+                resolver(npc, liveRoleId, settings)).isEmpty());
+    }
+
+    private static BondedCompanionPanelFlightProjection.LiveResolver resolver(
+            NPCEntity npc,
+            String roleId,
+            TwCompanionFlightToggleSettings settings
+    ) {
+        return resolver(npc, roleId, settings, null);
+    }
+
+    private static BondedCompanionPanelFlightProjection.LiveResolver resolver(
+            NPCEntity npc,
+            String roleId,
+            TwCompanionFlightToggleSettings settings,
+            AtomicBoolean invoked
+    ) {
+        return new BondedCompanionPanelFlightProjection.LiveResolver() {
+            @Override
+            public NPCEntity npc(Ref<EntityStore> reference,
+                                 Store<EntityStore> store) {
+                mark(invoked);
+                return npc;
+            }
+
+            @Override
+            public String roleId(Ref<EntityStore> reference,
+                                 Store<EntityStore> store) {
+                mark(invoked);
+                return roleId;
+            }
+
+            @Override
+            public TwCompanionFlightToggleSettings settings(String ignored) {
+                mark(invoked);
+                return settings;
+            }
+        };
+    }
+
+    private static void mark(AtomicBoolean invoked) {
+        if (invoked != null) {
+            invoked.set(true);
+        }
     }
 
     private static BondedCompanionProfileView activeProfile(UUID liveUuid) {
