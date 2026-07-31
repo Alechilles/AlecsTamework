@@ -13,7 +13,8 @@ from typing import Any
 
 
 DEFAULT_PREFIX = "AF_"
-DEFAULT_PRESERVED_NODES = ("Origin", "MountAnchor")
+DEFAULT_PRESERVED_NODES = ("MountAnchor",)
+STANDARD_POSE_ROOT = "AF_Origin"
 DEFAULT_COLLISION_MODEL = (
     Path(__file__).resolve().parents[2]
     / "src"
@@ -66,7 +67,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Create an AvatarFlight model variant by prefixing model node names and "
-            "rewriting matching .blockyanim nodeAnimations keys. Origin is preserved by default."
+            "rewriting matching .blockyanim nodeAnimations keys. MountAnchor is preserved by default."
         )
     )
     parser.add_argument(
@@ -109,7 +110,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--prefix",
         default=DEFAULT_PREFIX,
-        help=f"Prefix applied to namespaced model nodes. Default: {DEFAULT_PREFIX}.",
+        help=(
+            f"Prefix applied to namespaced model nodes other than Origin. "
+            f"Origin uses {STANDARD_POSE_ROOT} for Tamework pose clips. Default: {DEFAULT_PREFIX}."
+        ),
     )
     parser.add_argument(
         "--rename-mode",
@@ -133,12 +137,15 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--preserve-node",
         action="append",
         default=[],
-        help="Node name to leave unchanged. May be repeated. Origin is always preserved unless --no-default-preserve is set.",
+        help=(
+            "Node name to leave unchanged. May be repeated. MountAnchor is preserved unless "
+            f"--no-default-preserve is set. Origin always maps to {STANDARD_POSE_ROOT}."
+        ),
     )
     parser.add_argument(
         "--no-default-preserve",
         action="store_true",
-        help="Do not automatically preserve Origin.",
+        help="Do not automatically preserve MountAnchor.",
     )
     parser.add_argument(
         "--overwrite",
@@ -410,6 +417,10 @@ def namespaced_node_name(name: str,
                          prefix: str,
                          preserved_nodes: set[str],
                          rename_candidates: set[str] | None) -> str:
+    if name == STANDARD_POSE_ROOT:
+        return name
+    if name == "Origin":
+        return STANDARD_POSE_ROOT
     if name in preserved_nodes or name.startswith(prefix):
         return name
     if rename_candidates is not None and name not in rename_candidates:

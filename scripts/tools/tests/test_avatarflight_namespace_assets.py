@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.tools import avatarflight_namespace_assets as namespace_assets
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "tools" / "avatarflight_namespace_assets.py"
@@ -16,6 +18,22 @@ def write_json(path: Path, payload: object) -> None:
 
 
 class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
+    def test_keeps_the_standard_pose_root_stable_when_other_nodes_use_a_custom_prefix(self):
+        collisions = {"Origin", "Pelvis"}
+
+        self.assertEqual(
+            "AF_Origin",
+            namespace_assets.namespaced_node_name("Origin", "Dragon_", set(), collisions),
+        )
+        self.assertEqual(
+            "AF_Origin",
+            namespace_assets.namespaced_node_name("Origin", "Dragon_", {"Origin"}, set()),
+        )
+        self.assertEqual(
+            "Dragon_Pelvis",
+            namespace_assets.namespaced_node_name("Pelvis", "Dragon_", set(), collisions),
+        )
+
     def test_namespaces_only_rider_collisions_and_preserves_other_nodes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -120,7 +138,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
             origin = model["nodes"][0]
             pelvis = origin["children"][0]
             chest = pelvis["children"][0]
-            self.assertEqual("Origin", origin["name"])
+            self.assertEqual("AF_Origin", origin["name"])
             self.assertEqual("AF_Pelvis", pelvis["name"])
             self.assertEqual("AF_Chest", chest["name"])
             self.assertEqual("AF_Head", chest["children"][0]["name"])
@@ -140,7 +158,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                 ).read_text()
             )
             self.assertEqual(
-                {"Origin", "AF_Pelvis", "AF_Head", "MountAnchor", "Wing", "AF_R-Hand"},
+                {"AF_Origin", "AF_Pelvis", "AF_Head", "MountAnchor", "Wing", "AF_R-Hand"},
                 set(animation["nodeAnimations"].keys()),
             )
 

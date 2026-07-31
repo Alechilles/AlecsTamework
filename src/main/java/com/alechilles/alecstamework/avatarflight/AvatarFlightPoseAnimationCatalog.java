@@ -7,12 +7,12 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Catalog of generic avatar-flight pose animation ids and their standard Origin-rotation clips.
+ * Catalog of generic avatar-flight pose animation ids and their mount-only AF_Origin rotation clips.
  */
 public final class AvatarFlightPoseAnimationCatalog {
     private static final int[] PITCH_LEVELS = {15, 20, 30, 40};
     private static final int[] ROLL_LEVELS = {10, 20, 30};
-    private static final String PATH_PREFIX = "NPC/Tamework/AvatarFlight/Animations/Origin/";
+    private static final String PATH_PREFIX = "NPC/Tamework/AvatarFlight/Animations/AF_Origin/";
 
     private AvatarFlightPoseAnimationCatalog() {
     }

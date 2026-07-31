@@ -58,7 +58,7 @@
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
-- Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
+- Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `MountAnchor` and assigning the transformed model a dedicated `AF_Origin` pose root.
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
 - Added asset-configured avatar-flight mounting for NPC interactions. Tamed mounts now transform their rider into the configured flight model, hide the same companion for the full session, and restore it with F, grounded back+crouch, or automatic lifecycle recovery. Disconnect and crash recovery restores orphaned companions, while server restarts invalidate persisted mount pairs and restore the player's ordinary skin model instead of resuming a stale transformation.
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
@@ -96,7 +96,7 @@
   reservations and sealed world reconciliation, preventing unloaded or
   in-flight companions from bypassing admission limits.
 - Added a dedicated model and texture for Flightmaster's Talisman.
-- Avatar flight keeps the transformed NordicDrake model enabled by default while the experimental fake rider visual remains disabled.
+- Avatar flight keeps the transformed NordicDrake model and its full equipped fake-rider visual enabled by default.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 - Avatar-flight Q boosts now use directional thrust by default, with upward boost lift capped below flaps and downward boost input applying full directional dive thrust.
 - Avatar-flight dive and climb tuning now uses ramping maneuver loads so diving builds speed more slowly, pitch-up spends momentum more gradually, and clean unboosted dive/pull-up loops recover most but not all lost altitude.
@@ -104,6 +104,11 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed avatar-flight rider armor binding to the transformed mount and the fake
+  rider inheriting mount pitch/bank poses. Generated avatar models and
+  Tamework's injected pose clips now share a dedicated `AF_Origin`, while the
+  rider keeps the standard player skeleton required by appearance and armor
+  attachments.
 - Fixed previously tamed companions captured with public Tamework `v2.16.1`
   remaining trapped in their filled spawner after replacement-persistence import
   when the old profile did not save its optional tamed-state field.
