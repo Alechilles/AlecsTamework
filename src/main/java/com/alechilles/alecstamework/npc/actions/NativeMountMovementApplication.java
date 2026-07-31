@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionMovementConfig;
 import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
-import com.alechilles.alecstamework.npc.movement.NativeMountMovementScopeResolver;
 import com.alechilles.alecstamework.npc.movement.NativeMountSourceRole;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionMovementSpeedResolver;
@@ -32,7 +31,6 @@ final class NativeMountMovementApplication {
 
     private final ActionTameworkInteract owner;
     private final NativeMountMovementSettingsService movementSettings = new NativeMountMovementSettingsService();
-    private final NativeMountMovementScopeResolver movementScopeResolver = new NativeMountMovementScopeResolver();
     private final CompanionMovementSpeedResolver speedResolver = new CompanionMovementSpeedResolver();
 
     NativeMountMovementApplication(ActionTameworkInteract owner) {
@@ -84,8 +82,9 @@ final class NativeMountMovementApplication {
         mount.setOwnerPlayerRef(riderPlayerRef);
         mount.setAnchor(anchorX, anchorY, anchorZ);
         npc.playAnimation(npcRef, AnimationSlot.Status, null, store);
+        movementSettings.rememberLiveRoleProfile(sourceRoleId, owner.resolveRoleScopes(role));
         boolean riderSettingsApplied = movementSettings.applyScaledSettings(
-                sourceRoleId, movementScopeResolver.resolveForRoleIndex(originalRoleIndex),
+                sourceRoleId, owner.resolveRoleScopes(role),
                 riderRef, riderPlayerRef, rider, store, multiplier);
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         logApplied(role, sourceRoleId, originalRoleIndex, multiplier, riderSettingsApplied, anchorX, anchorY, anchorZ);
