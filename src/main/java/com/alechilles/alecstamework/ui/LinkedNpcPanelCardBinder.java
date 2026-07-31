@@ -403,7 +403,37 @@ final class LinkedNpcPanelCardBinder {
                              String setHomeCommandPrefix,
                              String returnHomeCommandPrefix,
                              String openTalentsCommandPrefix,
+                             String bondedFlightToggleCommandPrefix,
                              boolean recallActionEnabled,
                              boolean ownerCommandFamilyRoster) {
+        CardBindingConfig(String linkedPanelCardUiPath,
+                          String eventCommandId,
+                          String linkCommandPrefix,
+                          String unlinkCommandPrefix,
+                          String openGroupPickerCommandPrefix,
+                          String toggleActiveCommandPrefix,
+                          String toggleBreedingCommandPrefix,
+                          String releaseCommandPrefix,
+                          String cullCommandPrefix,
+                          String respawnCommandPrefix,
+                          String summonCommandPrefix,
+                          String dismissCommandPrefix,
+                          String locateCommandPrefix,
+                          String recallCommandPrefix,
+                          String setHomeCommandPrefix,
+                          String returnHomeCommandPrefix,
+                          String openTalentsCommandPrefix,
+                          boolean recallActionEnabled,
+                          boolean ownerCommandFamilyRoster) {
+            this(linkedPanelCardUiPath, eventCommandId, linkCommandPrefix,
+                    unlinkCommandPrefix, openGroupPickerCommandPrefix,
+                    toggleActiveCommandPrefix, toggleBreedingCommandPrefix,
+                    releaseCommandPrefix, cullCommandPrefix, respawnCommandPrefix,
+                    summonCommandPrefix, dismissCommandPrefix, locateCommandPrefix,
+                    recallCommandPrefix, setHomeCommandPrefix,
+                    returnHomeCommandPrefix, openTalentsCommandPrefix,
+                    CommandSelectionPageEventBinder.BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX,
+                    recallActionEnabled, ownerCommandFamilyRoster);
+        }
     }
 }

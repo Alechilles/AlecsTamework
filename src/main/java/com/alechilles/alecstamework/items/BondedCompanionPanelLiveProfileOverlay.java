@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -51,6 +53,34 @@ final class BondedCompanionPanelLiveProfileOverlay {
         updated.put("currentHealth", current);
         updated.put("maxHealth", maximum);
         updated.put("healthPercent", percent);
+        return copy(profile, profile.displayName(), updated);
+    }
+
+    /** Applies the configured live flight state without persisting card data. */
+    @Nonnull
+    static BondedCompanionProfileView withFlightMode(
+            @Nonnull BondedCompanionProfileView profile,
+            @Nonnull Optional<Boolean> airborne
+    ) {
+        Map<String, String> data = profile.snapshotPresentationData();
+        String available = airborne.isPresent() ? "true" : null;
+        String mode = airborne.map(String::valueOf).orElse(null);
+        if (java.util.Objects.equals(available, data.get(
+                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE))
+                && java.util.Objects.equals(mode, data.get(
+                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE))) {
+            return profile;
+        }
+        Map<String, String> updated = new LinkedHashMap<>(data);
+        if (airborne.isPresent()) {
+            updated.put(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE,
+                    available);
+            updated.put(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE,
+                    mode);
+        } else {
+            updated.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE);
+            updated.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE);
+        }
         return copy(profile, profile.displayName(), updated);
     }
 

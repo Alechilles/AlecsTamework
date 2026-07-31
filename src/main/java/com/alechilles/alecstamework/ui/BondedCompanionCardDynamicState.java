@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.BondedCompanionReviveQuote;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +44,8 @@ final class BondedCompanionCardDynamicState {
         fixed.remove("currentHealth");
         fixed.remove("maxHealth");
         fixed.remove("healthPercent");
+        fixed.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE);
+        fixed.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE);
         return fixed;
     }
 

@@ -9,14 +9,17 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBondedCompanionRosterConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.TestEntityComponentStore;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.LivingEntity;
@@ -42,11 +45,144 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.bson.BsonDocument;
+import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 /** Behavioral contract for rejecting bonded projections at generic boundaries. */
 class CommandGenericTargetAuthorityTest {
+    @Test
+    void hookDispatchRejectsMissingInvalidAndWrongStoreReferences()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install();
+             TestEntityComponentStore otherStore =
+                     new TestEntityComponentStore(scope.entityStore)) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            CommandNpcHookDispatchService service =
+                    new CommandNpcHookDispatchService();
+
+            assertFalse(service.dispatch("test.hook", target.player,
+                    "test:item", null, scope.store, null));
+            Ref<EntityStore> invalid = new Ref<>(scope.store);
+            assertFalse(service.dispatch("test.hook", target.player,
+                    "test:item", invalid, scope.store, null));
+            assertFalse(service.dispatch("test.hook", target.player,
+                    "test:item", target.reference, otherStore, null));
+
+            assertTrue(service.dispatch("test.hook", target.player,
+                    "test:item", target.reference, scope.store, null));
+            assertEquals("test.hook", scope.store.getComponent(target.reference,
+                    scope.hookType).getHookId());
+        }
+    }
+
+    @Test
+    void commandStepOrdinaryHookDelegatesExactPayloadAndResult()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            CommandEntry command = commandEntry("""
+                    {
+                      "Id":"Hook",
+                      "Steps":[{
+                        "Type":"TriggerHook",
+                        "HookId":"test.command.hook"
+                      }]
+                    }
+                    """);
+
+            StepResult result = executeCommand(scope, target, command, null);
+            TameworkHookComponent hook = scope.store.getComponent(
+                    target.reference, scope.hookType);
+
+            assertTrue(result.applied);
+            assertFalse(result.abortAll);
+            assertEquals(null, result.appliedState);
+            assertEquals("test.command.hook", hook.getHookId());
+            assertEquals(target.owner, hook.getPlayerId());
+            assertEquals("test:item", hook.getHeldItemId());
+            assertTrue(hook.isConsumeOnMatch());
+            assertFalse(hook.hasTargetPosition());
+        }
+    }
+
+    @Test
+    void commandStepMoveHookDelegatesFinalRaycastPosition()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            Vector3d destination = new Vector3d(12.5, 64.0, -9.25);
+            CommandEntry command = commandEntry("""
+                    {
+                      "Id":"Move",
+                      "Steps":[{
+                        "Type":"MoveToPosition",
+                        "Source":"RaycastHit"
+                      }]
+                    }
+                    """);
+
+            StepResult result = executeCommand(
+                    scope, target, command, destination);
+            TameworkHookComponent hook = scope.store.getComponent(
+                    target.reference, scope.hookType);
+
+            assertTrue(result.applied);
+            assertFalse(result.abortAll);
+            assertEquals("Tamework.Command.MoveToPosition.RaycastHit",
+                    hook.getHookId());
+            assertEquals(destination, hook.getTargetPosition());
+        }
+    }
+
+    @Test
+    void commandStepStoredHomeHookDelegatesIntermediatePathPosition()
+            throws Exception {
+        try (ProjectionScope scope = ProjectionScope.install()) {
+            LiveTarget target = scope.liveOrdinaryTarget(true);
+            Vector3d start = new Vector3d(0.0, 0.0, 0.0);
+            Vector3d home = new Vector3d(1_000.0, 0.0, 0.0);
+            scope.store.put(target.reference, TransformComponent.getComponentType(),
+                    new TransformComponent(start, new Rotation3f()));
+            TameworkCommandLinksComponent links = scope.store.getComponent(
+                    target.reference, scope.linksType);
+            links.setHomePosition(home);
+            scope.store.put(target.reference, scope.linksType, links);
+            CommandEntry command = commandEntry("""
+                    {
+                      "Id":"ReturnHome",
+                      "Steps":[{
+                        "Type":"MoveToPosition",
+                        "Source":"StoredHome"
+                      }]
+                    }
+                    """);
+
+            StepResult result = executeCommand(
+                    scope,
+                    target,
+                    command,
+                    null,
+                    new CommandStepExecutionService(
+                            null,
+                            null,
+                            null,
+                            new CommandNpcHookDispatchService(),
+                            () -> true
+                    )
+            );
+            TameworkHookComponent hook = scope.store.getComponent(
+                    target.reference, scope.hookType);
+
+            assertTrue(result.applied);
+            assertFalse(result.abortAll);
+            assertEquals("Tamework.Command.MoveToPosition.StoredHome",
+                    hook.getHookId());
+            assertEquals(new Vector3d(24.0, 0.0, 0.0),
+                    hook.getTargetPosition());
+        }
+    }
+
     @Test
     void identifiesOnlyLiveBondedProjectionMarkers() throws Exception {
         try (ProjectionScope scope = ProjectionScope.install()) {
@@ -698,6 +834,8 @@ class CommandGenericTargetAuthorityTest {
                 ownerType = new ComponentType<>();
         private final ComponentType<EntityStore, TameworkCommandLinksComponent>
                 linksType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkHookComponent>
+                hookType = new ComponentType<>();
         private final ComponentType<EntityStore, TransformComponent>
                 transformType = new ComponentType<>();
         private final TestWorld world;
@@ -735,6 +873,8 @@ class CommandGenericTargetAuthorityTest {
                     "ownerComponentType", scope.ownerType);
             setField(tamework, Tamework.class,
                     "commandLinksComponentType", scope.linksType);
+            setField(tamework, Tamework.class,
+                    "hookComponentType", scope.hookType);
             instance.set(null, tamework);
             return scope;
         }
@@ -858,6 +998,56 @@ class CommandGenericTargetAuthorityTest {
         Field field = type.getDeclaredField(name);
         field.setAccessible(true);
         return field;
+    }
+
+    private static CommandEntry commandEntry(String json) {
+        return TwCommandItemConfig.COMMAND_ENTRY_CODEC.decode(
+                BsonDocument.parse(json), new ExtraInfo());
+    }
+
+    private static StepResult executeCommand(
+            ProjectionScope scope,
+            LiveTarget target,
+            CommandEntry command,
+            Vector3d raycastPosition
+    ) {
+        return executeCommand(
+                scope,
+                target,
+                command,
+                raycastPosition,
+                new CommandStepExecutionService(null, null, null)
+        );
+    }
+
+    private static StepResult executeCommand(
+            ProjectionScope scope,
+            LiveTarget target,
+            CommandEntry command,
+            Vector3d raycastPosition,
+            CommandStepExecutionService service
+    ) {
+        Context context = new Context(
+                target.player,
+                null,
+                scope.store,
+                genericConfig(),
+                command,
+                "test:item",
+                "generic-tool",
+                null,
+                raycastPosition,
+                null,
+                false,
+                false,
+                96.0,
+                24.0,
+                2_500L,
+                20.0,
+                80.0
+        );
+        return service.executeCommand(context,
+                new Candidate(target.reference, target.npc, 0.0));
     }
 
     private static void setField(Object target, Class<?> type,

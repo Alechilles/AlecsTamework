@@ -1,17 +1,206 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies parent fallback behavior for role-scoped companion config inheritance. */
 class TwCompanionConfigInheritanceTest {
+
+    @Test
+    void codecDecodesFlightToggleAndPreservesExplicitNestedHookOverride() {
+        TwCompanionConfig parent = decode("""
+                {
+                  "Command": {
+                    "FlightToggle": {
+                      "Enabled": true,
+                      "HookId": "parent.hook"
+                    }
+                  }
+                }
+                """);
+        TwCompanionConfig child = decode("""
+                {
+                  "Command": {
+                    "FlightToggle": {
+                      "HookId": "  child.hook  "
+                    }
+                  }
+                }
+                """);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of(
+                        "FlightToggle", "FlightToggle.HookId"
+                ))
+        );
+
+        assertTrue(child.getCommand().getFlightToggle().isEnabled());
+        assertEquals(
+                "child.hook",
+                child.getCommand().getFlightToggle().getHookId()
+        );
+    }
+
+    @Test
+    void omittedFlightToggleCopiesAllParentValues() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        setFlightToggle(parent, true, "parent.hook");
+        setFlightToggle(child, false, "child.hook");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of())
+        );
+
+        assertTrue(child.getCommand().getFlightToggle().isEnabled());
+        assertEquals(
+                "parent.hook",
+                child.getCommand().getFlightToggle().getHookId()
+        );
+    }
+
+    @Test
+    void flightToggleHookOverrideInheritsParentEnabledValue() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        setFlightToggle(parent, true, "parent.hook");
+        setFlightToggle(child, false, "child.hook");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of(
+                        "FlightToggle", "FlightToggle.HookId"
+                ))
+        );
+
+        assertTrue(child.getCommand().getFlightToggle().isEnabled());
+        assertEquals(
+                "child.hook",
+                child.getCommand().getFlightToggle().getHookId()
+        );
+    }
+
+    @Test
+    void flightToggleEnabledFalseExplicitlyDisablesInheritedCapability()
+            throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+        setFlightToggle(parent, true, "parent.hook");
+        setFlightToggle(child, false, "child.hook");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Command"),
+                Map.of("Command", Set.of(
+                        "FlightToggle", "FlightToggle.Enabled"
+                ))
+        );
+
+        assertFalse(child.getCommand().getFlightToggle().isEnabled());
+        assertEquals(
+                "parent.hook",
+                child.getCommand().getFlightToggle().getHookId()
+        );
+    }
+
+    @Test
+    void effectiveSettingsPreserveResolvedRoleScopedFlightToggle()
+            throws Exception {
+        TwCompanionConfig scoped = new TwCompanionConfig();
+        setFlightToggle(
+                scoped,
+                true,
+                "HyDragon.Command.ToggleAirborneMode"
+        );
+
+        TwCompanionConfig.EffectiveSettings settings =
+                TwCompanionConfig.EffectiveSettings.from(
+                        scoped,
+                        TwGlobalConfig.defaultConfig()
+                );
+
+        assertTrue(settings.getFlightToggle().isEnabled());
+        assertEquals(
+                "HyDragon.Command.ToggleAirborneMode",
+                settings.getFlightToggle().getHookId()
+        );
+    }
+
+    @Test
+    void commandFlightToggleGetterReturnsIndependentCopy() {
+        TwCompanionConfig config = decode("""
+                {
+                  "Command": {
+                    "FlightToggle": {
+                      "Enabled": true,
+                      "HookId": "source.hook"
+                    }
+                  }
+                }
+                """);
+
+        TwCompanionFlightToggleSettings returned =
+                config.getCommand().getFlightToggle();
+        returned.setEnabled(false);
+        returned.setHookId("mutated.hook");
+
+        TwCompanionFlightToggleSettings source =
+                config.getCommand().getFlightToggle();
+        assertTrue(source.isEnabled());
+        assertEquals("source.hook", source.getHookId());
+    }
+
+    @Test
+    void effectiveFlightToggleGetterReturnsIndependentCopy() {
+        TwCompanionConfig scoped = decode("""
+                {
+                  "Command": {
+                    "FlightToggle": {
+                      "Enabled": true,
+                      "HookId": "source.hook"
+                    }
+                  }
+                }
+                """);
+        TwCompanionConfig.EffectiveSettings settings =
+                TwCompanionConfig.EffectiveSettings.from(scoped, null);
+
+        TwCompanionFlightToggleSettings returned = settings.getFlightToggle();
+        returned.setEnabled(false);
+        returned.setHookId("mutated.hook");
+
+        TwCompanionFlightToggleSettings source = settings.getFlightToggle();
+        assertTrue(source.isEnabled());
+        assertEquals("source.hook", source.getHookId());
+    }
+
+    @Test
+    void globalAndDefaultEffectiveSettingsKeepFlightToggleDisabled() {
+        assertDisabled(
+                TwCompanionConfig.EffectiveSettings.fromGlobal(null)
+                        .getFlightToggle()
+        );
+        assertDisabled(
+                TwCompanionConfig.EffectiveSettings.fromGlobal(
+                        TwGlobalConfig.defaultConfig()
+                ).getFlightToggle()
+        );
+    }
 
     @Test
     void deadRespawnCooldownMinutesKeyCountsAsExplicitCooldownOverride() throws Exception {
@@ -151,6 +340,47 @@ class TwCompanionConfigInheritanceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setBoolean(target, value);
+    }
+
+    private static TwCompanionConfig decode(String json) {
+        return TwCompanionConfig.CODEC.decode(
+                BsonDocument.parse(json),
+                new ExtraInfo()
+        );
+    }
+
+    private static void assertDisabled(
+            TwCompanionFlightToggleSettings settings
+    ) {
+        assertFalse(settings.isEnabled());
+        assertFalse(settings.isConfigured());
+        assertEquals("", settings.getHookId());
+    }
+
+    private void setFlightToggle(
+            TwCompanionConfig target,
+            boolean enabled,
+            String hookId
+    ) throws Exception {
+        TwCompanionFlightToggleSettings flightToggle =
+                new TwCompanionFlightToggleSettings();
+        flightToggle.setEnabled(enabled);
+        flightToggle.setHookId(hookId);
+        setNestedObjectField(target, "command", "flightToggle", flightToggle);
+    }
+
+    private void setNestedObjectField(
+            Object target,
+            String nestedFieldName,
+            String fieldName,
+            Object value
+    ) throws Exception {
+        Field nestedField = target.getClass().getDeclaredField(nestedFieldName);
+        nestedField.setAccessible(true);
+        Object nested = nestedField.get(target);
+        Field field = nested.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(nested, value);
     }
 
     private void setLongField(Object target, String fieldName, long value) throws Exception {

@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +27,9 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
     private final BondedCompanionPanelFeaturePresentationSource presentations;
     private final HytaleBondedCompanionActionContextFactory contexts =
             new HytaleBondedCompanionActionContextFactory();
+    private final BondedCompanionPanelFlightProjection flightProjection =
+            new BondedCompanionPanelFlightProjection(
+                    new BondedCompanionFlightModeReader());
 
     BondedCompanionPanelEntrySourceService(
             @Nonnull BondedCompanionPanelSnapshotCache cache,
@@ -120,7 +124,7 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             Player player, Store<EntityStore> store,
             BondedCompanionPanelRecordSource.PanelSnapshot snapshot
     ) {
-        if (snapshot.records().isEmpty() || player.getWorld() == null) {
+        if (snapshot.records().isEmpty()) {
             return snapshot;
         }
         ArrayList<BondedCompanionPanelRecordSource.PanelRecord> updated =
@@ -133,6 +137,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                             profile, liveDisplayName(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withHealth(
                     overlay, liveHealth(player, store, profile));
+            overlay = BondedCompanionPanelLiveProfileOverlay.withFlightMode(
+                    overlay, liveFlightMode(player, store, profile));
             updated.add(overlay == profile ? record
                     : new BondedCompanionPanelRecordSource.PanelRecord(
                             record.presentationUuid(), overlay));
@@ -149,7 +155,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null) {
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null) {
             return null;
         }
         ComponentType<EntityStore, TameworkNpcNameComponent> type =
@@ -172,12 +179,39 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null) {
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null) {
             return null;
         }
         Ref<EntityStore> reference = player.getWorld().getEntityRef(
                 profile.activeLease().liveNpcUuid());
         return CompanionHealthStateService.captureHealth(reference, store);
+    }
+
+    /**
+     * Projects flight controls only from the exact current world entity and
+     * its role-scoped effective configuration.
+     */
+    @Nonnull
+    private Optional<Boolean> liveFlightMode(
+            Player player, Store<EntityStore> store,
+            BondedCompanionProfileView profile
+    ) {
+        if (profile.state() != BondedCompanionStateView.ACTIVE
+                || profile.activeLease() == null || store == null
+                || player.getWorld() == null
+                || !profile.activeLease().worldKey().equals(
+                        player.getWorld().getName())) {
+            return Optional.empty();
+        }
+        try {
+            Ref<EntityStore> reference = player.getWorld().getEntityRef(
+                    profile.activeLease().liveNpcUuid());
+            return flightProjection.read(profile, player.getWorld().getName(),
+                    reference, store);
+        } catch (RuntimeException | LinkageError ignored) {
+            return Optional.empty();
+        }
     }
 
     private static int healthValue(java.util.Map<String, String> data,
@@ -222,6 +256,21 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         if (ownerUuid != null && rosterId != null && !rosterId.isBlank()) {
             cache.refresh(ownerUuid, rosterId);
         }
+    }
+
+    /** Returns one currently trusted durable profile without blocking for a refresh. */
+    @Nullable
+    BondedCompanionProfileView currentTrustedProfile(UUID ownerUuid,
+                                                      String rosterId,
+                                                      String profileId) {
+        var snapshot = records.snapshotFor(ownerUuid, rosterId,
+                cache.peek(ownerUuid, rosterId));
+        if (!snapshot.trusted() || snapshot.state()
+                != BondedCompanionPanelSnapshotCache.State.READY) return null;
+        return snapshot.records().stream()
+                .map(BondedCompanionPanelRecordSource.PanelRecord::profile)
+                .filter(profile -> profileId.equals(profile.profileId()))
+                .findFirst().orElse(null);
     }
 
     void refreshBoundApi() {

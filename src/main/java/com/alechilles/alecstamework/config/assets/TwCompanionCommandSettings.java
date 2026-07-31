@@ -47,6 +47,8 @@ public final class TwCompanionCommandSettings {
     TwCompanionSummonSettings summon =
             new TwCompanionSummonSettings();
     TravelSettings travel = new TravelSettings();
+    TwCompanionFlightToggleSettings flightToggle =
+            new TwCompanionFlightToggleSettings();
 
     public double getReturnHomeTeleportDistance() {
         return returnHomeTeleportDistance;
@@ -126,6 +128,19 @@ public final class TwCompanionCommandSettings {
     }
 
     @Nonnull
+    public TwCompanionFlightToggleSettings getFlightToggle() {
+        return getMutableFlightToggle().copy();
+    }
+
+    @Nonnull
+    TwCompanionFlightToggleSettings getMutableFlightToggle() {
+        if (flightToggle == null) {
+            flightToggle = new TwCompanionFlightToggleSettings();
+        }
+        return flightToggle;
+    }
+
+    @Nonnull
     TwCompanionCommandSettings copy() {
         TwCompanionCommandSettings copy =
                 new TwCompanionCommandSettings();
@@ -149,6 +164,7 @@ public final class TwCompanionCommandSettings {
         copy.reviveExplicit = reviveExplicit;
         copy.summon = getSummon().copy();
         copy.travel = getTravel().copy();
+        copy.flightToggle = getFlightToggle().copy();
         return copy;
     }
 

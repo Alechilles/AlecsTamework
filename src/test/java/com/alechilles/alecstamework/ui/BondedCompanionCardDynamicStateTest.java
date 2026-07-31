@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import java.util.UUID;
@@ -17,6 +18,45 @@ class BondedCompanionCardDynamicStateTest {
 
         assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
                 previous, current));
+    }
+
+    @Test
+    void flightModeChangesUseTheIncrementalCardPath() {
+        BondedCompanionPanelPresentation previous = presentationWithFlightMode(
+                "false");
+        BondedCompanionPanelPresentation current = presentationWithFlightMode(
+                "true");
+
+        assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
+                previous, current));
+    }
+
+    @Test
+    void flightAvailabilityOnlyChangesUseTheIncrementalCardPath() {
+        assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
+                presentationWithAttributes(Map.of()), presentationWithAttributes(
+                        Map.of("bonded.flightToggle.available", "true"))));
+    }
+
+    @Test
+    void roleChangesRemainStructural() {
+        BondedCompanionPanelPresentation previous = presentationWithAttributes(Map.of());
+        BondedCompanionPanelPresentation current = new BondedCompanionPanelPresentation(
+                "profile-1", "roster", "OtherRole", 1L, "Wyatt", "Nordic Drake",
+                "Female", null, Map.of(), Map.of(), previous.status(), null);
+        assertFalse(BondedCompanionCardDynamicState.changedOnlyByLiveFields(previous, current));
+    }
+
+    @Test
+    void lifecycleChangesRemainStructural() {
+        BondedCompanionPanelPresentation previous = presentationWithAttributes(Map.of());
+        BondedCompanionPanelPresentation current = new BondedCompanionPanelPresentation(
+                "profile-1", "roster", "NordicDrake", 1L, "Wyatt", "Nordic Drake",
+                "Female", null, Map.of(), Map.of(), new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.STORED,
+                        BondedCompanionStatusPresentation.Action.SUMMON,
+                        true, null, null, 0L), null);
+        assertFalse(BondedCompanionCardDynamicState.changedOnlyByLiveFields(previous, current));
     }
 
     @Test
@@ -55,5 +95,30 @@ class BondedCompanionCardDynamicStateTest {
         return new LinkedNpcEntry(cardUuid, "Wyatt", currentHealth, 400,
                 0, 0, "", 0, 0, 0, 0, true, false, false, false, false,
                 false, 0L, LinkedNpcTraitIndicator.EMPTY);
+    }
+
+    private static BondedCompanionPanelPresentation presentationWithFlightMode(
+            String airborne
+    ) {
+        return new BondedCompanionPanelPresentation(
+                "profile-1", "roster", "NordicDrake", 1L, "Wyatt",
+                "Nordic Drake", "Female", null,
+                Map.of("bonded.flightToggle.available", "true",
+                        "bonded.flightToggle.airborne", airborne),
+                Map.of(), new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS,
+                        true, null, null, 0L), null);
+    }
+
+    private static BondedCompanionPanelPresentation presentationWithAttributes(
+            Map<String, String> attributes
+    ) {
+        return new BondedCompanionPanelPresentation("profile-1", "roster",
+                "NordicDrake", 1L, "Wyatt", "Nordic Drake", "Female", null,
+                attributes, Map.of(), new BondedCompanionStatusPresentation(
+                        BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS,
+                        true, null, null, 0L), null);
     }
 }

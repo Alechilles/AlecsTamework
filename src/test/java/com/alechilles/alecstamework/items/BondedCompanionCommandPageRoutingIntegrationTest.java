@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.alechilles.alecstamework.api.BondedCompanionActionRequest;
 import com.alechilles.alecstamework.api.BondedCompanionApi;
@@ -153,6 +155,86 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                     ignored -> { }, recall);
             generic.handleDataEvent(actor, store, event("__recall__:" + CARD));
             assertEquals(1, recalls.get());
+        }
+    }
+
+    @Test
+    void bondedFlightToggleRoutesOnlyAvailableBondedCardWithEventContext()
+            throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            AtomicReference<UUID> card = new AtomicReference<>();
+            AtomicReference<Ref<EntityStore>> eventRef = new AtomicReference<>();
+            AtomicReference<Store<EntityStore>> eventStore = new AtomicReference<>();
+            LinkedNpcPanelFeatureAction toggle = (uuid, ref, currentStore) -> {
+                card.set(uuid);
+                eventRef.set(ref);
+                eventStore.set(currentStore);
+            };
+            TameworkCommandSelectionPage page = page(playerRef(), bondedConfig(),
+                    bondedFlightFeature(), ignored -> { }, ignored -> { }, toggle);
+            refresh(page);
+
+            page.handleDataEvent(actor, store, event(
+                    "__bonded_flight_toggle__:" + CARD));
+
+            assertEquals(CARD, card.get());
+            assertSame(actor, eventRef.get());
+            assertSame(store, eventStore.get());
+        }
+    }
+
+    @Test
+    void staleOrNonBondedFlightToggleCommandDoesNotInvokeCallback() throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            AtomicInteger callbacks = new AtomicInteger();
+            LinkedNpcPanelFeatureAction toggle = (uuid, ref, currentStore) ->
+                    callbacks.incrementAndGet();
+            TameworkCommandSelectionPage unavailable = page(playerRef(), bondedConfig(),
+                    bondedDismissFeature(), ignored -> { }, ignored -> { }, toggle);
+            unavailable.handleDataEvent(actor, store, event(
+                    "__bonded_flight_toggle__:" + CARD));
+            TameworkCommandSelectionPage generic = page(playerRef(), genericConfig(),
+                    bondedFlightFeature(), ignored -> { }, ignored -> { }, toggle);
+            generic.handleDataEvent(actor, store, event(
+                    "__bonded_flight_toggle__:" + CARD));
+            assertEquals(0, callbacks.get());
+        }
+    }
+
+    @Test
+    void serviceFlightToggleRouteUsesCurrentEventAuthorityBeforeActionBoundary()
+            throws Exception {
+        TestWorld world = (TestWorld) unsafe().allocateInstance(TestWorld.class);
+        TestEntityStore entityStore = new TestEntityStore(world);
+        try (TestEntityComponentStore store = new TestEntityComponentStore(entityStore)) {
+            entityStore.store = store;
+            Ref<EntityStore> actor = store.createReference();
+            Player player = (Player) unsafe().allocateInstance(Player.class);
+            player.setLegacyUUID(OWNER); player.loadIntoWorld(world); player.setReference(actor);
+            AtomicInteger actions = new AtomicInteger();
+            CommandSelectionPageService service = new CommandSelectionPageService(
+                    null, null, null, null, null, null, null, null, null,
+                    (owner, ref, currentStore, item, row) -> {
+                        actions.incrementAndGet();
+                        assertSame(actor, ref); assertSame(store, currentStore);
+                        return true;
+                    }, (owner, ref, currentStore) -> ref == actor
+                            && currentStore == store ? player : null);
+            var row = bondedFlightFeature().bonded();
+            assertTrue(service.routeFlightToggle(OWNER, actor, store, bondedConfig(),
+                    "horn", row, ignored -> true));
+            assertEquals(1, actions.get());
+            assertFalse(service.routeFlightToggle(OWNER, actor, store, bondedConfig(),
+                    "horn", row, ignored -> false));
+            assertEquals(1, actions.get());
         }
     }
 
@@ -504,6 +586,16 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
             CommandPanelFeaturePresentation feature,
             java.util.function.Consumer<UUID> dismiss,
             java.util.function.Consumer<UUID> recall) {
+        return page(playerRef, config, feature, dismiss, recall,
+                (ignored, ignoredRef, ignoredStore) -> { });
+    }
+
+    private TameworkCommandSelectionPage page(
+            PlayerRef playerRef, TwCommandItemConfig config,
+            CommandPanelFeaturePresentation feature,
+            java.util.function.Consumer<UUID> dismiss,
+            java.util.function.Consumer<UUID> recall,
+            LinkedNpcPanelFeatureAction flightToggle) {
         java.util.function.Consumer<UUID> noUuid = ignored -> { };
         java.util.function.Consumer<String> noString = ignored -> { };
         Runnable noRun = () -> { };
@@ -518,7 +610,7 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 (ignored, ignoredRef, ignoredStore) -> { },
                 (uuid, ignoredRef, ignoredStore) -> dismiss.accept(uuid),
                 (ignored, ignoredRef, ignoredStore) -> { },
-                (ignored, ignoredRef, ignoredStore) -> { }, noUuid,
+                (ignored, ignoredRef, ignoredStore) -> { }, flightToggle, noUuid,
                 recall, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
                 noString, noString, noString, noRun, noString,
@@ -547,7 +639,9 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                 () -> "Default", () -> "None", () -> "",
                 List::of, () -> "", List::of, ignored -> true, true,
                 noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid,
-                capture, capture, capture, capture, noUuid, noUuid, noUuid, noUuid,
+                capture, capture, capture, capture,
+                (ignored, ignoredRef, ignoredStore) -> { },
+                noUuid, noUuid, noUuid, noUuid,
                 noUuid, noString, ignored -> { }, noRun, noRun, noRun,
                 noString, noString, noString, noRun, noString,
                 (uuid, group) -> { }, noString);
@@ -596,6 +690,19 @@ class BondedCompanionCommandPageRoutingIntegrationTest {
                   ]
                 }
                 """), new ExtraInfo());
+    }
+
+    private CommandPanelFeaturePresentation bondedFlightFeature() {
+        return CommandPanelFeaturePresentation.bonded(
+                new BondedCompanionPanelPresentation(
+                        "profile-7", "hydragon:dragons",
+                        "Bonded_Miniwyvern_Storm", 7L, "Nimbus",
+                        "Miniwyvern", "Female", "Miniwyvern Storm",
+                        Map.of("bonded.flightToggle.available", "true"), Map.of(),
+                        new BondedCompanionStatusPresentation(
+                                BondedCompanionStateView.ACTIVE,
+                                BondedCompanionStatusPresentation.Action.DISMISS,
+                                true, null, 0L), null));
     }
 
     private TwCommandItemConfig bondedConfigWithHold() {

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.api.BondedCompanionApi;
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
 import com.alechilles.alecstamework.api.BondedCompanionTalentActionRequest;
@@ -38,7 +39,6 @@ import javax.annotation.Nullable;
  * mutation is mirrored to a present projection as a convenience only.</p>
  */
 final class BondedCompanionTalentPageService {
-    private static final String LIVE_NPC_UUID = "bonded.liveNpcUuid";
     private final Supplier<BondedCompanionApi> api;
     private final CommandFeedbackService feedback;
 
@@ -383,7 +383,8 @@ final class BondedCompanionTalentPageService {
                     displayName == null ? "Companion" : displayName,
                     text(data, "levelingConfigId"), Math.max(1,
                     integer(data, "level", 1)),
-                    talents, row.revision(), parseUuid(data.get(LIVE_NPC_UUID)));
+                    talents, row.revision(), parseUuid(data.get(
+                            BondedCompanionPresentationAttributes.LIVE_NPC_UUID)));
         }
 
         private void apply(BondedCompanionProfileView view) {

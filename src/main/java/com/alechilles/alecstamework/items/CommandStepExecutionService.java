@@ -16,7 +16,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSour
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
@@ -33,6 +32,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 
 /**
@@ -44,13 +44,39 @@ final class CommandStepExecutionService {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandNpcHookDispatchService hookDispatchService;
+    private final BooleanSupplier recallTeleportingEnabled;
 
     CommandStepExecutionService(CommandNpcRelocationService relocationService,
                                 CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                 CommandNpcNameResolver npcNameResolver) {
+        this(relocationService, linkedNpcRecordStore, npcNameResolver,
+                new CommandNpcHookDispatchService(),
+                CommandTravelSettings::isRecallTeleportingEnabled);
+    }
+
+    CommandStepExecutionService(CommandNpcRelocationService relocationService,
+                                CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                                CommandNpcNameResolver npcNameResolver,
+                                CommandNpcHookDispatchService hookDispatchService) {
+        this(relocationService, linkedNpcRecordStore, npcNameResolver,
+                hookDispatchService,
+                CommandTravelSettings::isRecallTeleportingEnabled);
+    }
+
+    CommandStepExecutionService(CommandNpcRelocationService relocationService,
+                                CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                                CommandNpcNameResolver npcNameResolver,
+                                CommandNpcHookDispatchService hookDispatchService,
+                                BooleanSupplier recallTeleportingEnabled) {
         this.relocationService = relocationService;
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
+        this.hookDispatchService = hookDispatchService != null
+                ? hookDispatchService : new CommandNpcHookDispatchService();
+        this.recallTeleportingEnabled = recallTeleportingEnabled != null
+                ? recallTeleportingEnabled
+                : CommandTravelSettings::isRecallTeleportingEnabled;
     }
 
     StepResult executeCommand(Context context, Candidate candidate) {
@@ -319,7 +345,7 @@ final class CommandStepExecutionService {
                     context.returnHomeTeleportDelayMs
             );
             if (!context.config.usesBondedCompanionRoster()
-                    && CommandTravelSettings.isRecallTeleportingEnabled()
+                    && recallTeleportingEnabled.getAsBoolean()
                     && start != null
                     && start.distance(targetPosition) > returnHomeTeleportDistance) {
                 Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);
@@ -464,25 +490,11 @@ final class CommandStepExecutionService {
                               Context context,
                               Ref<EntityStore> npcRef,
                               Vector3d targetPosition) {
-        if (hookId == null || hookId.isBlank() || npcRef == null || !npcRef.isValid()) {
+        if (context == null || context.player == null || context.store == null) {
             return false;
         }
-        UUID playerId = context.player.getUuid();
-        String playerName = context.player.getPlayerRef() != null ? context.player.getPlayerRef().getUsername() : null;
-        context.store.putComponent(
-                npcRef,
-                TameworkHookComponent.getComponentType(),
-                new TameworkHookComponent(
-                        hookId,
-                        playerId,
-                        playerName,
-                        context.itemId,
-                        System.currentTimeMillis(),
-                        true,
-                        targetPosition
-                )
-        );
-        return true;
+        return hookDispatchService.dispatch(hookId, context.player, context.itemId,
+                npcRef, context.store, targetPosition);
     }
 
     private TwCompanionConfig.EffectiveSettings resolveCompanionSettings(Context context, Candidate candidate) {

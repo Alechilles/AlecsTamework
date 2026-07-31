@@ -62,6 +62,8 @@ final class BondedCompanionCardPresenter {
         bindMetrics(commands, entrySelector, row.attributes(), layout, language);
         bindProgression(commands, events, entrySelector, cardUuid, row,
                 progression, pendingUnlink, config, language);
+        bindFlightToggle(commands, events, entrySelector, cardUuid, row,
+                config, language);
         bindPrimaryAction(commands, events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
     }
@@ -78,6 +80,7 @@ final class BondedCompanionCardPresenter {
     ) {
         bindState(commands, entrySelector, row, language);
         bindHealth(commands, entrySelector, row.attributes());
+        bindFlightToggle(commands, entrySelector, row, language);
     }
 
     /**
@@ -103,6 +106,7 @@ final class BondedCompanionCardPresenter {
                 pendingUnlink, config);
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
+        bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
     }
 
 
@@ -436,6 +440,60 @@ final class BondedCompanionCardPresenter {
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + actionSelector,
                     EventData.of(config.eventCommandId(), command), false);
+        }
+    }
+
+    private static void bindFlightToggle(
+            UICommandBuilder commands,
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            LinkedNpcPanelCardBinder.CardBindingConfig config,
+            @Nullable String language
+    ) {
+        bindFlightToggle(commands, entrySelector, row, language);
+        bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
+    }
+
+    private static void bindFlightToggle(
+            UICommandBuilder commands,
+            String entrySelector,
+            BondedCompanionPanelPresentation row,
+            @Nullable String language
+    ) {
+        boolean visible = flightToggleVisible(row);
+        boolean airborne = Boolean.parseBoolean(row.attributes().get(
+                BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE));
+        commands.set(entrySelector + " #BondedFlightToggleButton.Visible", visible);
+        commands.set(entrySelector + " #BondedFlightModeGroundedIcon.Visible",
+                visible && !airborne);
+        commands.set(entrySelector + " #BondedFlightModeAirborneIcon.Visible",
+                visible && airborne);
+        commands.set(entrySelector + " #BondedFlightToggleButton.TooltipText",
+                visible ? LocalizedText.resolve(language, airborne
+                        ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
+                        : "tamework.ui.linkedPanel.bonded.flight.switchToFlight") : "");
+    }
+
+    private static boolean flightToggleVisible(BondedCompanionPanelPresentation row) {
+        return row.status().state() == BondedCompanionStateView.ACTIVE
+                && Boolean.parseBoolean(row.attributes().get(
+                        BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE));
+    }
+
+    private static void bindFlightToggleEvents(
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            LinkedNpcPanelCardBinder.CardBindingConfig config
+    ) {
+        if (flightToggleVisible(row)) {
+            events.addEventBinding(CustomUIEventBindingType.Activating,
+                    entrySelector + " #BondedFlightToggleButton",
+                    EventData.of(config.eventCommandId(),
+                            config.bondedFlightToggleCommandPrefix() + cardUuid), false);
         }
     }
 
