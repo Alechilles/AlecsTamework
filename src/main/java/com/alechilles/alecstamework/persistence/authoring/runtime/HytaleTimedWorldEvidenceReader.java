@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.persistence.authoring.runtime;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.companion.command.timed
         .TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.placement
         .CompanionSpawnPlacement;
 import com.alechilles.alecstamework.companion.snapshot.CompanionSnapshot;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotCodecRegistry;
+import com.alechilles.alecstamework.companion.snapshot.SnapshotDecodeResult;
 import com.alechilles.alecstamework.companion.snapshot.SnapshotId;
 import com.alechilles.alecstamework.items.CommandCompanionPlacementService;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
@@ -15,6 +17,7 @@ import com.alechilles.alecstamework.items.persistence
         .TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.persistence.authoring
         .ReplacementFeatureLiveEvidenceSource;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -86,6 +89,9 @@ final class HytaleTimedWorldEvidenceReader {
         if (source == null) {
             return null;
         }
+        source = repairStoredSnapshotRole(
+                source, intent.profile().identity().roleId()
+        );
         CompanionSpawnPlacement placement = intent.requestedPlacement();
         if (placement == null) {
             placement = placements.computeRestorationPlacement(
@@ -135,11 +141,14 @@ final class HytaleTimedWorldEvidenceReader {
                 || npc.getRoleName().isBlank()) {
             return null;
         }
+        String snapshotRoleId = resolveSnapshotRoleId(
+                npc.getRoleName(), avatarFlightSource(npcRef, access)
+        );
         TameworkFullStateSnapshotReader.ReadResult read = snapshots.read(
                 npcRef,
                 access.store(),
                 intent.expectedAlias(),
-                npc.getRoleName()
+                snapshotRoleId
         );
         if (!read.successful() || read.snapshot() == null) {
             return null;
@@ -172,6 +181,80 @@ final class HytaleTimedWorldEvidenceReader {
                 null,
                 snapshot,
                 observedAtMs
+        );
+    }
+
+    @Nonnull
+    static String resolveSnapshotRoleId(
+            @Nonnull String liveRoleId,
+            @Nullable AvatarFlightSourceComponent source
+    ) {
+        if (source != null && !source.getOriginalRoleId().isBlank()) {
+            return source.getOriginalRoleId();
+        }
+        return liveRoleId.trim();
+    }
+
+    @Nonnull
+    static String resolveStoredSnapshotRoleId(
+            @Nullable String storedRoleId,
+            @Nullable String profileRoleId
+    ) {
+        String stored = normalizeRoleId(storedRoleId);
+        String profile = normalizeRoleId(profileRoleId);
+        return "Empty_Role".equals(stored)
+                && !profile.isBlank()
+                && !"Empty_Role".equals(profile)
+                ? profile : stored;
+    }
+
+    @Nullable
+    private static AvatarFlightSourceComponent avatarFlightSource(
+            Ref<EntityStore> npcRef,
+            HytaleOwnerWorldAccess access
+    ) {
+        ComponentType<EntityStore, AvatarFlightSourceComponent> componentType =
+                AvatarFlightSourceComponent.getComponentType();
+        return componentType == null ? null : access.store().getComponent(
+                npcRef, componentType
+        );
+    }
+
+    @Nonnull
+    private CompanionSnapshot repairStoredSnapshotRole(
+            CompanionSnapshot source,
+            String profileRoleId
+    ) {
+        SnapshotDecodeResult<CoopResidentStateSnapshot> decoded =
+                snapshotCodecs.decode(source, CoopResidentStateSnapshot.class);
+        if (!(decoded instanceof SnapshotDecodeResult.Decoded<?> found)) {
+            return source;
+        }
+        CoopResidentStateSnapshot state =
+                (CoopResidentStateSnapshot) found.value();
+        String repairedRoleId = resolveStoredSnapshotRoleId(
+                state.roleId(), profileRoleId
+        );
+        if (repairedRoleId.equals(normalizeRoleId(state.roleId()))) {
+            return source;
+        }
+        SnapshotCodecRegistry.EncodedSnapshot encoded =
+                snapshotCodecs.encode(
+                        source.kind(),
+                        source.payloadVersion(),
+                        CoopResidentStateSnapshot.class,
+                        withRoleId(state, repairedRoleId)
+                );
+        return new CompanionSnapshot(
+                source.snapshotId(),
+                source.profileId(),
+                encoded.kind(),
+                encoded.payloadVersion(),
+                encoded.payloadJson(),
+                encoded.payloadHash(),
+                source.sourceLifecycleRevision(),
+                source.current(),
+                source.createdAtMs()
         );
     }
 
@@ -224,5 +307,38 @@ final class HytaleTimedWorldEvidenceReader {
                 source.healthPercent(),
                 observedAtMs
         );
+    }
+
+    private CoopResidentStateSnapshot withRoleId(
+            CoopResidentStateSnapshot source,
+            String roleId
+    ) {
+        return new CoopResidentStateSnapshot(
+                source.npcUuid(),
+                source.coopId(),
+                source.residentSlot(),
+                roleId,
+                source.commandLinks(),
+                source.owner(),
+                source.tamed(),
+                source.npcName(),
+                source.happiness(),
+                source.needs(),
+                source.breeding(),
+                source.leveling(),
+                source.traits(),
+                source.talents(),
+                source.lifeStage(),
+                source.attachments(),
+                source.currentHealth(),
+                source.maximumHealth(),
+                source.healthPercent(),
+                source.capturedAtMs()
+        );
+    }
+
+    @Nonnull
+    private static String normalizeRoleId(@Nullable String roleId) {
+        return roleId == null ? "" : roleId.trim();
     }
 }
