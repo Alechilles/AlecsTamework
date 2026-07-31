@@ -1,0 +1,184 @@
+package com.alechilles.alecstamework.npc.systems;
+
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
+import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.movement.NativeMountMovementSettingsService;
+import com.alechilles.alecstamework.npc.movement.NativeMountedDescentPhysics;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
+import com.hypixel.hytale.protocol.ChangeVelocityType;
+import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
+import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
+import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.joml.Vector3d;
+
+/**
+ * Applies configured vertical physics to descending riders of native NPC mounts.
+ */
+public final class NativeMountedDescentSystem
+        extends EntityTickingSystem<EntityStore>
+        implements IVelocityModifyingSystem {
+    private static final double RESEED_EPSILON = 1.0e-6;
+
+    private final ComponentType<EntityStore, NPCMountComponent> nativeMountType;
+    private final ComponentType<EntityStore, UUIDComponent> uuidType;
+    private final ComponentType<EntityStore, Velocity> velocityType;
+    private final ComponentType<EntityStore, MovementStatesComponent> movementStatesType;
+    private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideType;
+    private final ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSourceType;
+    private final Query<EntityStore> query;
+    private final NativeMountMovementSettingsService movementSettings = new NativeMountMovementSettingsService();
+    private final Map<UUID, DescentState> descentStateByRider = new HashMap<>();
+
+    public NativeMountedDescentSystem(
+            @Nonnull ComponentType<EntityStore, NPCMountComponent> nativeMountType,
+            @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType,
+            @Nonnull ComponentType<EntityStore, Velocity> velocityType,
+            @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesType,
+            @Nullable ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideType,
+            @Nullable ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSourceType) {
+        this.nativeMountType = nativeMountType;
+        this.uuidType = uuidType;
+        this.velocityType = velocityType;
+        this.movementStatesType = movementStatesType;
+        this.mountedGlideType = mountedGlideType;
+        this.avatarFlightSourceType = avatarFlightSourceType;
+        this.query = Query.and(nativeMountType, uuidType);
+    }
+
+    @Override
+    public void tick(float dt,
+                     int index,
+                     @Nonnull ArchetypeChunk<EntityStore> chunk,
+                     @Nonnull Store<EntityStore> store,
+                     @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        Ref<EntityStore> mountRef = chunk.getReferenceTo(index);
+        NPCMountComponent nativeMount = chunk.getComponent(index, nativeMountType);
+        UUIDComponent mountIdentity = chunk.getComponent(index, uuidType);
+        if (mountRef == null || nativeMount == null || mountIdentity == null || mountIdentity.getUuid() == null) {
+            return;
+        }
+
+        Ref<EntityStore> riderRef = NativeMountMovementSettingsService.resolveMountedRiderRef(nativeMount, store);
+        if (riderRef == null) {
+            return;
+        }
+        UUIDComponent riderIdentity = commandBuffer.getComponent(riderRef, uuidType);
+        if (riderIdentity == null || riderIdentity.getUuid() == null) {
+            return;
+        }
+        UUID riderUuid = riderIdentity.getUuid();
+        if (hasComponent(mountRef, store, mountedGlideType)
+                || hasComponent(mountRef, store, avatarFlightSourceType)) {
+            descentStateByRider.remove(riderUuid);
+            return;
+        }
+
+        Velocity velocity = commandBuffer.getComponent(riderRef, velocityType);
+        NativeMountedDescentPhysics.Settings settings = resolveSettings(mountRef, nativeMount, store);
+        boolean riderOnGround = isOnGround(riderRef, commandBuffer);
+        boolean mountOnGround = isOnGround(mountRef, commandBuffer);
+        double observedVerticalVelocity = velocity == null ? 0.0 : velocity.getY();
+        if (!shouldApply(riderOnGround, mountOnGround, observedVerticalVelocity, false, settings)) {
+            descentStateByRider.remove(riderUuid);
+            return;
+        }
+
+        DescentState previous = descentStateByRider.get(riderUuid);
+        double constrainedVelocity = previous == null
+                || !mountIdentity.getUuid().equals(previous.mountUuid())
+                || shouldReseed(previous.lastConstrainedVelocity(), observedVerticalVelocity)
+                ? observedVerticalVelocity
+                : previous.lastConstrainedVelocity();
+        double nextVerticalVelocity = nextConstrainedVelocity(
+                observedVerticalVelocity,
+                constrainedVelocity,
+                settings,
+                dt
+        );
+        descentStateByRider.put(riderUuid, new DescentState(mountIdentity.getUuid(), nextVerticalVelocity));
+        velocity.addInstruction(
+                new Vector3d(velocity.getX(), nextVerticalVelocity, velocity.getZ()),
+                null,
+                ChangeVelocityType.Set
+        );
+    }
+
+    static boolean shouldApply(boolean riderOnGround,
+                               boolean mountOnGround,
+                               double verticalVelocity,
+                               boolean excludedByAnotherController,
+                               @Nullable NativeMountedDescentPhysics.Settings settings) {
+        return !riderOnGround
+                && !mountOnGround
+                && verticalVelocity < 0.0
+                && !excludedByAnotherController
+                && settings != null
+                && settings.isValid();
+    }
+
+    static double nextConstrainedVelocity(double observedVerticalVelocity,
+                                          double lastConstrainedVelocity,
+                                          @Nonnull NativeMountedDescentPhysics.Settings settings,
+                                          double dt) {
+        double seed = shouldReseed(lastConstrainedVelocity, observedVerticalVelocity)
+                ? observedVerticalVelocity
+                : lastConstrainedVelocity;
+        return NativeMountedDescentPhysics.advanceDescending(seed, settings, dt);
+    }
+
+    static boolean shouldReseed(double lastConstrainedVelocity, double observedVerticalVelocity) {
+        return observedVerticalVelocity > lastConstrainedVelocity + RESEED_EPSILON;
+    }
+
+    @Nullable
+    private NativeMountedDescentPhysics.Settings resolveSettings(@Nonnull Ref<EntityStore> mountRef,
+                                                                 @Nonnull NPCMountComponent nativeMount,
+                                                                 @Nonnull Store<EntityStore> store) {
+        String sourceRoleId = NativeMountMovementSettingsService.resolveManagedRoleId(mountRef, store);
+        String movementConfigId = movementSettings.resolveMountedMovementConfigId(
+                sourceRoleId,
+                NativeMountMovementSettingsService.resolveMountedSourceRoleScopes(nativeMount)
+        );
+        return TwMountedDescentConfig.resolveForMovementConfigId(movementConfigId).orElse(null);
+    }
+
+    private boolean isOnGround(@Nonnull Ref<EntityStore> ref,
+                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
+        MovementStates movementStates = component == null ? null : component.getMovementStates();
+        return movementStates != null && movementStates.onGround;
+    }
+
+    private static <T extends Component<EntityStore>> boolean hasComponent(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store,
+            @Nullable ComponentType<EntityStore, T> componentType) {
+        return componentType != null && store.getComponent(ref, componentType) != null;
+    }
+
+    @Nonnull
+    @Override
+    public Query<EntityStore> getQuery() {
+        return query;
+    }
+
+    private record DescentState(@Nonnull UUID mountUuid, double lastConstrainedVelocity) {
+    }
+}

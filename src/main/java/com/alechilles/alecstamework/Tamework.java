@@ -202,6 +202,7 @@ import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideInputCaptureSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlidePlayerVelocitySystem;
+import com.alechilles.alecstamework.npc.systems.NativeMountedDescentSystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
@@ -773,6 +774,16 @@ public class Tamework extends JavaPlugin {
                             TransformComponent.getComponentType(),
                             Velocity.getComponentType(),
                             MovementStatesComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new NativeMountedDescentSystem(
+                            npcMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            Velocity.getComponentType(),
+                            MovementStatesComponent.getComponentType(),
+                            mountedGlideComponentType,
+                            avatarFlightSourceComponentType
                     )
             );
             getEntityStoreRegistry().registerSystem(
