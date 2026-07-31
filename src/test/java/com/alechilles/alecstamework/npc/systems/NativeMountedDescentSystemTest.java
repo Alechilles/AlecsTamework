@@ -25,15 +25,16 @@ class NativeMountedDescentSystemTest {
     }
 
     @Test
-    void usesTheLastConstrainedVelocityForTheNextFallStep() {
-        double next = NativeMountedDescentSystem.nextConstrainedVelocity(-2.0, -3.5, SETTINGS, 0.25);
+    void appliesOnlyTheVerticalGravityCorrectionWithoutReplacingRiderVelocity() {
+        double correction = NativeMountedDescentSystem.verticalCorrection(-2.0, SETTINGS, 0.05);
 
-        assertEquals(-4.5, next, EPSILON);
+        assertEquals(0.72, correction, EPSILON);
     }
 
     @Test
-    void reseedsVelocityWhenTheObservedFallHasResetAfterDismount() {
-        assertTrue(NativeMountedDescentSystem.shouldReseed(-4.5, -0.4));
-        assertFalse(NativeMountedDescentSystem.shouldReseed(-2.0, -3.0));
+    void limitsTheCorrectionToTheConfiguredTerminalFallSpeed() {
+        double correction = NativeMountedDescentSystem.verticalCorrection(-5.0, SETTINGS, 0.05);
+
+        assertEquals(0.5, correction, EPSILON);
     }
 }

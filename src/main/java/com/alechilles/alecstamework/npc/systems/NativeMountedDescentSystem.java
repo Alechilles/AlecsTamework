@@ -16,14 +16,11 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.protocol.MovementStates;
-import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
+import com.hypixel.hytale.server.core.modules.physics.util.PhysicsConstants;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -34,32 +31,26 @@ import org.joml.Vector3d;
 public final class NativeMountedDescentSystem
         extends EntityTickingSystem<EntityStore>
         implements IVelocityModifyingSystem {
-    private static final double RESEED_EPSILON = 1.0e-6;
-
     private final ComponentType<EntityStore, NPCMountComponent> nativeMountType;
-    private final ComponentType<EntityStore, UUIDComponent> uuidType;
     private final ComponentType<EntityStore, Velocity> velocityType;
     private final ComponentType<EntityStore, MovementStatesComponent> movementStatesType;
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideType;
     private final ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSourceType;
     private final Query<EntityStore> query;
     private final NativeMountMovementSettingsService movementSettings = new NativeMountMovementSettingsService();
-    private final Map<UUID, DescentState> descentStateByRider = new HashMap<>();
 
     public NativeMountedDescentSystem(
             @Nonnull ComponentType<EntityStore, NPCMountComponent> nativeMountType,
-            @Nonnull ComponentType<EntityStore, UUIDComponent> uuidType,
             @Nonnull ComponentType<EntityStore, Velocity> velocityType,
             @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesType,
             @Nullable ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideType,
             @Nullable ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSourceType) {
         this.nativeMountType = nativeMountType;
-        this.uuidType = uuidType;
         this.velocityType = velocityType;
         this.movementStatesType = movementStatesType;
         this.mountedGlideType = mountedGlideType;
         this.avatarFlightSourceType = avatarFlightSourceType;
-        this.query = Query.and(nativeMountType, uuidType);
+        this.query = Query.and(nativeMountType);
     }
 
     @Override
@@ -70,8 +61,7 @@ public final class NativeMountedDescentSystem
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> mountRef = chunk.getReferenceTo(index);
         NPCMountComponent nativeMount = chunk.getComponent(index, nativeMountType);
-        UUIDComponent mountIdentity = chunk.getComponent(index, uuidType);
-        if (mountRef == null || nativeMount == null || mountIdentity == null || mountIdentity.getUuid() == null) {
+        if (mountRef == null || nativeMount == null) {
             return;
         }
 
@@ -79,14 +69,8 @@ public final class NativeMountedDescentSystem
         if (riderRef == null) {
             return;
         }
-        UUIDComponent riderIdentity = commandBuffer.getComponent(riderRef, uuidType);
-        if (riderIdentity == null || riderIdentity.getUuid() == null) {
-            return;
-        }
-        UUID riderUuid = riderIdentity.getUuid();
         if (hasComponent(mountRef, store, mountedGlideType)
                 || hasComponent(mountRef, store, avatarFlightSourceType)) {
-            descentStateByRider.remove(riderUuid);
             return;
         }
 
@@ -96,28 +80,12 @@ public final class NativeMountedDescentSystem
         boolean mountOnGround = isOnGround(mountRef, commandBuffer);
         double observedVerticalVelocity = velocity == null ? 0.0 : velocity.getY();
         if (!shouldApply(riderOnGround, mountOnGround, observedVerticalVelocity, false, settings)) {
-            descentStateByRider.remove(riderUuid);
             return;
         }
-
-        DescentState previous = descentStateByRider.get(riderUuid);
-        double constrainedVelocity = previous == null
-                || !mountIdentity.getUuid().equals(previous.mountUuid())
-                || shouldReseed(previous.lastConstrainedVelocity(), observedVerticalVelocity)
-                ? observedVerticalVelocity
-                : previous.lastConstrainedVelocity();
-        double nextVerticalVelocity = nextConstrainedVelocity(
-                observedVerticalVelocity,
-                constrainedVelocity,
-                settings,
-                dt
-        );
-        descentStateByRider.put(riderUuid, new DescentState(mountIdentity.getUuid(), nextVerticalVelocity));
-        velocity.addInstruction(
-                new Vector3d(velocity.getX(), nextVerticalVelocity, velocity.getZ()),
-                null,
-                ChangeVelocityType.Set
-        );
+        double correction = verticalCorrection(observedVerticalVelocity, settings, dt);
+        if (correction > 0.0) {
+            velocity.addInstruction(new Vector3d(0.0, correction, 0.0), null, ChangeVelocityType.Add);
+        }
     }
 
     static boolean shouldApply(boolean riderOnGround,
@@ -133,18 +101,17 @@ public final class NativeMountedDescentSystem
                 && settings.isValid();
     }
 
-    static double nextConstrainedVelocity(double observedVerticalVelocity,
-                                          double lastConstrainedVelocity,
-                                          @Nonnull NativeMountedDescentPhysics.Settings settings,
-                                          double dt) {
-        double seed = shouldReseed(lastConstrainedVelocity, observedVerticalVelocity)
-                ? observedVerticalVelocity
-                : lastConstrainedVelocity;
-        return NativeMountedDescentPhysics.advanceDescending(seed, settings, dt);
-    }
-
-    static boolean shouldReseed(double lastConstrainedVelocity, double observedVerticalVelocity) {
-        return observedVerticalVelocity > lastConstrainedVelocity + RESEED_EPSILON;
+    static double verticalCorrection(double observedVerticalVelocity,
+                                     @Nonnull NativeMountedDescentPhysics.Settings settings,
+                                     double dt) {
+        if (observedVerticalVelocity >= 0.0 || !settings.isValid() || !Double.isFinite(dt) || dt <= 0.0) {
+            return 0.0;
+        }
+        if (observedVerticalVelocity < -settings.maxDownwardSpeed()) {
+            return -settings.maxDownwardSpeed() - observedVerticalVelocity;
+        }
+        double multiplier = Math.min(1.0, settings.fallAccelerationMultiplier());
+        return PhysicsConstants.GRAVITY_ACCELERATION * (1.0 - multiplier) * dt;
     }
 
     @Nullable
@@ -177,8 +144,5 @@ public final class NativeMountedDescentSystem
     @Override
     public Query<EntityStore> getQuery() {
         return query;
-    }
-
-    private record DescentState(@Nonnull UUID mountUuid, double lastConstrainedVelocity) {
     }
 }

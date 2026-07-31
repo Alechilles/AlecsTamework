@@ -779,7 +779,6 @@ public class Tamework extends JavaPlugin {
             getEntityStoreRegistry().registerSystem(
                     new NativeMountedDescentSystem(
                             npcMountComponentType,
-                            UUIDComponent.getComponentType(),
                             Velocity.getComponentType(),
                             MovementStatesComponent.getComponentType(),
                             mountedGlideComponentType,
