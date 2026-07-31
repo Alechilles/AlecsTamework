@@ -32,6 +32,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 
 /**
@@ -44,23 +45,38 @@ final class CommandStepExecutionService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandNpcHookDispatchService hookDispatchService;
+    private final BooleanSupplier recallTeleportingEnabled;
 
     CommandStepExecutionService(CommandNpcRelocationService relocationService,
                                 CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                 CommandNpcNameResolver npcNameResolver) {
         this(relocationService, linkedNpcRecordStore, npcNameResolver,
-                new CommandNpcHookDispatchService());
+                new CommandNpcHookDispatchService(),
+                CommandTravelSettings::isRecallTeleportingEnabled);
     }
 
     CommandStepExecutionService(CommandNpcRelocationService relocationService,
                                 CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                 CommandNpcNameResolver npcNameResolver,
                                 CommandNpcHookDispatchService hookDispatchService) {
+        this(relocationService, linkedNpcRecordStore, npcNameResolver,
+                hookDispatchService,
+                CommandTravelSettings::isRecallTeleportingEnabled);
+    }
+
+    CommandStepExecutionService(CommandNpcRelocationService relocationService,
+                                CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                                CommandNpcNameResolver npcNameResolver,
+                                CommandNpcHookDispatchService hookDispatchService,
+                                BooleanSupplier recallTeleportingEnabled) {
         this.relocationService = relocationService;
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
         this.hookDispatchService = hookDispatchService != null
                 ? hookDispatchService : new CommandNpcHookDispatchService();
+        this.recallTeleportingEnabled = recallTeleportingEnabled != null
+                ? recallTeleportingEnabled
+                : CommandTravelSettings::isRecallTeleportingEnabled;
     }
 
     StepResult executeCommand(Context context, Candidate candidate) {
@@ -329,7 +345,7 @@ final class CommandStepExecutionService {
                     context.returnHomeTeleportDelayMs
             );
             if (!context.config.usesBondedCompanionRoster()
-                    && CommandTravelSettings.isRecallTeleportingEnabled()
+                    && recallTeleportingEnabled.getAsBoolean()
                     && start != null
                     && start.distance(targetPosition) > returnHomeTeleportDistance) {
                 Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);

@@ -18,7 +18,8 @@ final class CommandNpcHookDispatchService {
                      @Nonnull Ref<EntityStore> npcRef,
                      @Nonnull Store<EntityStore> store,
                      @Nullable Vector3d targetPosition) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
+        if (npcRef == null || !npcRef.isValid() || store == null
+                || npcRef.getStore() != store) {
             return false;
         }
         TameworkHookComponent component = createComponent(hookId, player, itemId,

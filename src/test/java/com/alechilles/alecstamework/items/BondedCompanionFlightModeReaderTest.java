@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
@@ -11,6 +12,7 @@ import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerWalk;
 import java.lang.reflect.Field;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 /** Regression coverage for recognized companion flight controller families. */
@@ -58,5 +60,47 @@ class BondedCompanionFlightModeReaderTest {
 
         assertTrue(new BondedCompanionFlightModeReader().read(null, settings)
                 .isEmpty());
+    }
+
+    @Test
+    void nullRoleAndLiveRoleFailuresAreUnavailable() {
+        BondedCompanionFlightModeReader reader =
+                new BondedCompanionFlightModeReader();
+
+        assertTrue(reader.readLiveRole(() -> null).isEmpty());
+        assertTrue(reader.readLiveRole(() -> {
+            throw new RuntimeException("stale role");
+        }).isEmpty());
+        assertTrue(reader.readLiveRole(() -> {
+            throw new LinkageError("stale linkage");
+        }).isEmpty());
+    }
+
+    @Test
+    void nullControllerAndLiveControllerFailuresAreUnavailable() {
+        BondedCompanionFlightModeReader reader =
+                new BondedCompanionFlightModeReader();
+
+        assertTrue(reader.readLiveController(() -> null).isEmpty());
+        assertTrue(reader.readLiveController(() -> {
+            throw new RuntimeException("stale controller");
+        }).isEmpty());
+        assertTrue(reader.readLiveController(() -> {
+            throw new LinkageError("stale controller linkage");
+        }).isEmpty());
+    }
+
+    @Test
+    void disabledCapabilityDoesNotAccessLiveRole() {
+        AtomicBoolean accessed = new AtomicBoolean();
+        TwCompanionFlightToggleSettings disabled =
+                new TwCompanionFlightToggleSettings();
+
+        assertTrue(new BondedCompanionFlightModeReader().read(disabled, () -> {
+            accessed.set(true);
+            throw new AssertionError("disabled capability must short-circuit");
+        })
+                .isEmpty());
+        assertFalse(accessed.get());
     }
 }

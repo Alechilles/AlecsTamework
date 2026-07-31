@@ -46,7 +46,10 @@ class CommandNpcHookDispatchServiceTest {
     }
 
     @Test
-    void rejectsBlankHookIdsAndMissingPlayers() {
+    void rejectsBlankHookIdsAndMissingPlayers() throws Exception {
+        Player player = player(UUID.randomUUID(), "owner");
+        assertNull(CommandNpcHookDispatchService.createComponent(null, player,
+                "item", 1L, null));
         assertNull(CommandNpcHookDispatchService.createComponent(" ", null,
                 "item", 1L, null));
         assertNull(CommandNpcHookDispatchService.createComponent("hook", null,
