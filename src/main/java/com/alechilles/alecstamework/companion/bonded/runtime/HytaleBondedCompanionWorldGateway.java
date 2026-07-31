@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.companion.bonded.runtime;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded
@@ -361,8 +362,11 @@ public final class HytaleBondedCompanionWorldGateway implements
             NPCEntity npc
     ) {
         if (reference == null || !reference.isValid() || npc == null) return null;
+        String snapshotRoleId = AvatarFlightSnapshotRoleResolver.resolve(
+                npc.getRoleName(), reference, store
+        );
         var captured = snapshots.readSourceNeutral(
-                reference, store, new NpcAlias(npcUuid), npc.getRoleName());
+                reference, store, new NpcAlias(npcUuid), snapshotRoleId);
         return captured.successful()
                 ? BondedCompanionSnapshot.of(captured.snapshot(), Map.of())
                 : null;
@@ -429,7 +433,9 @@ public final class HytaleBondedCompanionWorldGateway implements
                         ? null : marker.getBondedLeaseToken())) return null;
         var captured = snapshots.readSourceNeutral(
                 reference, store, new NpcAlias(uuid.getUuid()),
-                npc.getRoleName()
+                AvatarFlightSnapshotRoleResolver.resolve(
+                        npc.getRoleName(), reference, store
+                )
         );
         BondedCompanionSnapshot snapshot = captured.successful()
                 ? BondedCompanionSnapshot.of(captured.snapshot(), Map.of())

@@ -119,6 +119,9 @@
 - Fixed timed command-roster and bonded companions reverting to their original
   role after an interaction role swap when their summon session ended. Their
   current role now saves with the companion snapshot for the next summon.
+- Fixed logging out while riding a summoned Avatar Flight companion saving its
+  temporary `Empty_Role` parking state over the companion's roster role.
+  Previously affected bonded companions recover their durable role when loaded.
 - Fixed bonded-roster revival payments being recoverable only from changing
   inventory totals. Each payment now moves into a hidden operation-specific
   escrow, saves with the player before revival commits, and is consumed or

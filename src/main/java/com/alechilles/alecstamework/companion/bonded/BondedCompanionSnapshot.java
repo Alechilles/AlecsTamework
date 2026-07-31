@@ -116,6 +116,23 @@ public final class BondedCompanionSnapshot {
         return new BondedCompanionSnapshot(updated, extensionData);
     }
 
+    /** Returns this snapshot with only its persisted NPC role replaced. */
+    @Nonnull
+    public BondedCompanionSnapshot withRoleId(@Nonnull String roleId) {
+        CoopResidentStateSnapshot state = fullState;
+        CoopResidentStateSnapshot updated = new CoopResidentStateSnapshot(
+                state.npcUuid(), state.coopId(), state.residentSlot(),
+                Objects.requireNonNull(roleId, "roleId"),
+                state.commandLinks(), state.owner(), state.tamed(),
+                state.npcName(), state.happiness(), state.needs(),
+                state.breeding(), state.leveling(), state.traits(),
+                state.talents(), state.lifeStage(), state.attachments(),
+                state.currentHealth(), state.maximumHealth(),
+                state.healthPercent(), state.capturedAtMs()
+        );
+        return new BondedCompanionSnapshot(updated, extensionData);
+    }
+
     CoopResidentStateSnapshot fullStateInternal() {
         return fullState;
     }

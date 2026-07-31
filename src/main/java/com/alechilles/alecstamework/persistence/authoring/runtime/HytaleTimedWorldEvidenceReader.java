@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.authoring.runtime;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
 import com.alechilles.alecstamework.companion.command.timed
         .TimedSummonTransitionRequest;
 import com.alechilles.alecstamework.companion.placement
@@ -17,8 +18,8 @@ import com.alechilles.alecstamework.items.persistence
         .TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.persistence.authoring
         .ReplacementFeatureLiveEvidenceSource;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.nio.charset.StandardCharsets;
@@ -142,7 +143,7 @@ final class HytaleTimedWorldEvidenceReader {
             return null;
         }
         String snapshotRoleId = resolveSnapshotRoleId(
-                npc.getRoleName(), avatarFlightSource(npcRef, access)
+                npc.getRoleName(), npcRef, access.store()
         );
         TameworkFullStateSnapshotReader.ReadResult read = snapshots.read(
                 npcRef,
@@ -189,10 +190,7 @@ final class HytaleTimedWorldEvidenceReader {
             @Nonnull String liveRoleId,
             @Nullable AvatarFlightSourceComponent source
     ) {
-        if (source != null && !source.getOriginalRoleId().isBlank()) {
-            return source.getOriginalRoleId();
-        }
-        return liveRoleId.trim();
+        return AvatarFlightSnapshotRoleResolver.resolve(liveRoleId, source);
     }
 
     @Nonnull
@@ -200,23 +198,19 @@ final class HytaleTimedWorldEvidenceReader {
             @Nullable String storedRoleId,
             @Nullable String profileRoleId
     ) {
-        String stored = normalizeRoleId(storedRoleId);
-        String profile = normalizeRoleId(profileRoleId);
-        return "Empty_Role".equals(stored)
-                && !profile.isBlank()
-                && !"Empty_Role".equals(profile)
-                ? profile : stored;
+        return AvatarFlightSnapshotRoleResolver.repairStoredRole(
+                storedRoleId, profileRoleId
+        );
     }
 
-    @Nullable
-    private static AvatarFlightSourceComponent avatarFlightSource(
-            Ref<EntityStore> npcRef,
-            HytaleOwnerWorldAccess access
+    @Nonnull
+    private static String resolveSnapshotRoleId(
+            @Nonnull String liveRoleId,
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store
     ) {
-        ComponentType<EntityStore, AvatarFlightSourceComponent> componentType =
-                AvatarFlightSourceComponent.getComponentType();
-        return componentType == null ? null : access.store().getComponent(
-                npcRef, componentType
+        return AvatarFlightSnapshotRoleResolver.resolve(
+                liveRoleId, npcRef, store
         );
     }
 

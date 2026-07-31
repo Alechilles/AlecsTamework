@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.bonded;
 
 import com.alechilles.alecstamework.api.*;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
 import com.alechilles.alecstamework.companion.bonded.*;
 import com.alechilles.alecstamework.config.bonded.BondedCompanionRosterRegistry;
 import com.alechilles.alecstamework.persistence.diagnostics.BondedCompanionDiagnosticContributor;
@@ -323,8 +324,23 @@ public final class BondedCompanionCoreApiOperations {
 
     BondedCompanionSnapshot decode(BondedCompanionRecord.Profile profile) {
         var decoded = snapshots.decode(new String(profile.snapshot().bytes(), StandardCharsets.UTF_8));
-        return decoded.status() == BondedCompanionSnapshotCodec.Status.FOUND
-                ? decoded.snapshot() : null;
+        if (decoded.status() != BondedCompanionSnapshotCodec.Status.FOUND
+                || decoded.snapshot() == null) {
+            return null;
+        }
+        return repairStoredSnapshotRole(decoded.snapshot(), profile.roleId());
+    }
+
+    @Nonnull
+    static BondedCompanionSnapshot repairStoredSnapshotRole(
+            @Nonnull BondedCompanionSnapshot snapshot,
+            @Nonnull String profileRoleId
+    ) {
+        String storedRoleId = snapshot.fullState().roleId();
+        String repairedRoleId = AvatarFlightSnapshotRoleResolver
+                .repairStoredRole(storedRoleId, profileRoleId);
+        return repairedRoleId.equals(storedRoleId)
+                ? snapshot : snapshot.withRoleId(repairedRoleId);
     }
 
     BondedCompanionProfile domain(BondedCompanionRecord.Profile profile,
