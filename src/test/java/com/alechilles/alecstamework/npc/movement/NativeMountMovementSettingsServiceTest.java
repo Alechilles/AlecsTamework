@@ -56,6 +56,14 @@ class NativeMountMovementSettingsServiceTest {
     }
 
     @Test
+    void mountedProfileResolutionRetainsTheRememberedSourceProfile() {
+        NativeMountMovementSettingsService service = new NativeMountMovementSettingsService();
+        service.rememberLiveRoleProfile("Tetrabird_Descent_Test", null);
+
+        assertEquals("Mount", service.resolveMountedMovementConfigId("Tetrabird_Descent_Test", null));
+    }
+
+    @Test
     void mountedRoleRecoveryNeverFallsBackToVisibleEmptyRole() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/movement/NativeMountMovementSettingsService.java"

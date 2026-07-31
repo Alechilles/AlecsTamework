@@ -66,6 +66,7 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
+import com.alechilles.alecstamework.config.assets.TwMountedDescentConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
@@ -317,6 +318,7 @@ public class Tamework extends JavaPlugin {
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private boolean mountedGlideAssetsRegistered;
+    private boolean mountedDescentAssetsRegistered;
     private boolean avatarFlightAssetsRegistered;
     private boolean coopAssetsRegistered;
     private boolean foodAssetsRegistered;
@@ -577,6 +579,7 @@ public class Tamework extends JavaPlugin {
         registerCommandItemAssets();
         registerInteractionAssets();
         registerMountedGlideAssets();
+        registerMountedDescentAssets();
         registerAvatarFlightAssets();
         registerFoodAssets();
         registerHappinessAssets();
@@ -2046,6 +2049,30 @@ public class Tamework extends JavaPlugin {
         mountedGlideAssetsRegistered = true;
     }
 
+    private void registerMountedDescentAssets() {
+        if (mountedDescentAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwMountedDescentConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Mounts/Descent")
+                        .setCodec(TwMountedDescentConfig.CODEC)
+                        .setKeyFunction(TwMountedDescentConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwMountedDescentConfig.class,
+                this::onMountedDescentAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwMountedDescentConfig.class,
+                this::onMountedDescentAssetsRemoved
+        );
+        mountedDescentAssetsRegistered = true;
+    }
+
     private void registerAvatarFlightAssets() {
         if (avatarFlightAssetsRegistered) {
             return;
@@ -2593,6 +2620,20 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwMountedGlideConfig, DefaultAssetMap<String, TwMountedGlideConfig>> event) {
         TwMountedGlideConfig.clearRoleCache();
         emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_GLIDE, event.getRemovedAssets());
+    }
+
+    private void onMountedDescentAssetsLoaded(
+            LoadedAssetsEvent<String, TwMountedDescentConfig, DefaultAssetMap<String, TwMountedDescentConfig>> event) {
+        TwMountedDescentConfig.clearProfileCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_DESCENT, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onMountedDescentAssetsRemoved(
+            RemovedAssetsEvent<String, TwMountedDescentConfig, DefaultAssetMap<String, TwMountedDescentConfig>> event) {
+        TwMountedDescentConfig.clearProfileCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_DESCENT, event.getRemovedAssets());
     }
 
     private void onAvatarFlightAssetsLoaded(

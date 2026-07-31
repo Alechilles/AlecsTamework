@@ -37,6 +37,16 @@ public final class NativeMountMovementSettingsService {
         LIVE_PROFILE_MEMORY.remember(sourceRoleId, resolveMovementConfigIdFromScope(sourceRoleScopes));
     }
 
+    /** Resolves the source movement profile retained for a currently native-mounted role. */
+    @Nullable
+    public String resolveMountedMovementConfigId(@Nullable String sourceRoleId,
+                                                 @Nullable StdScope[] sourceRoleScopes) {
+        if (sourceRoleId == null || sourceRoleId.isBlank()) {
+            return null;
+        }
+        return resolveMovementConfigId(sourceRoleId, sourceRoleScopes);
+    }
+
     /** Applies the selected source-role movement profile to the active rider without mutating its asset. */
     public boolean applyScaledSettings(@Nullable String sourceRoleId,
                                        @Nullable StdScope[] sourceRoleScopes,
