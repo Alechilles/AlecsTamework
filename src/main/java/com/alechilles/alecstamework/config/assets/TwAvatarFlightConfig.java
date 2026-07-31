@@ -8,6 +8,8 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.map.MapCodec;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -405,6 +407,10 @@ public final class TwAvatarFlightConfig implements
             .add()
             .build();
 
+    private static final MapCodec<AvatarFlightCombatAbilitySettings,
+            Map<String, AvatarFlightCombatAbilitySettings>> COMBAT_ABILITIES_CODEC =
+            new MapCodec<>(AvatarFlightCombatAbilitySettings.CODEC, HashMap::new);
+
     public static final AssetBuilderCodec<String, TwAvatarFlightConfig> CODEC = AssetBuilderCodec.builder(
             TwAvatarFlightConfig.class,
             TwAvatarFlightConfig::new,
@@ -505,6 +511,12 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.debug)
             .documentation("Avatar-flight diagnostics. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<Map<String, AvatarFlightCombatAbilitySettings>>append(
+                    new KeyedCodec<>("CombatAbilities", COMBAT_ABILITIES_CODEC),
+                    (asset, value) -> asset.combatAbilities = immutableCombatAbilities(value),
+                    asset -> asset.combatAbilities)
+            .documentation("Combat abilities keyed by Ability2 or Ability3. Inheritance: explicit map replaces parent map (no merge); omitted map inherits parent map.")
+            .add()
             .build();
 
     private AssetExtraInfo.Data data;
@@ -527,6 +539,7 @@ public final class TwAvatarFlightConfig implements
     RiderVisualSettings riderVisual = new RiderVisualSettings();
     AvatarFlightMountingSettings mounting = new AvatarFlightMountingSettings();
     DebugSettings debug = new DebugSettings();
+    Map<String, AvatarFlightCombatAbilitySettings> combatAbilities = Map.of();
 
     protected TwAvatarFlightConfig() {
     }
@@ -613,9 +626,31 @@ public final class TwAvatarFlightConfig implements
         return mounting == null ? new AvatarFlightMountingSettings() : mounting;
     }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
+    @Nonnull
+    public Map<String, AvatarFlightCombatAbilitySettings> getCombatAbilities() {
+        return immutableCombatAbilities(combatAbilities);
+    }
+
+    @Nullable
+    public AvatarFlightCombatAbilitySettings getCombatAbility(@Nullable AvatarFlightCombatAbilitySlot slot) {
+        if (slot == null || combatAbilities == null) return null;
+        AvatarFlightCombatAbilitySettings settings = combatAbilities.get(slot.getSerializedKey());
+        return settings != null && settings.isConfigured() ? settings : null;
+    }
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    @Nonnull
+    private static Map<String, AvatarFlightCombatAbilitySettings> immutableCombatAbilities(
+            @Nullable Map<String, AvatarFlightCombatAbilitySettings> values) {
+        if (values == null || values.isEmpty()) return Map.of();
+        HashMap<String, AvatarFlightCombatAbilitySettings> copy = new HashMap<>();
+        for (Map.Entry<String, AvatarFlightCombatAbilitySettings> entry : values.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) copy.put(entry.getKey(), entry.getValue());
+        }
+        return copy.isEmpty() ? Map.of() : Map.copyOf(copy);
     }
 
     @Nonnull

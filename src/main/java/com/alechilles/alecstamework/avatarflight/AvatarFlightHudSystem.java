@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
 import com.alechilles.alecstamework.ui.TameworkAvatarFlightHud;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -120,7 +121,13 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 flight.getVigourRechargeMode(),
                 launchChargeVisible,
                 launchChargeRatio,
-                launchMinChargeRatio
+                launchMinChargeRatio,
+                AvatarFlightHudViewModel.CombatGlyph.from(
+                        config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2),
+                        AvatarFlightCombatAbilitySlot.ABILITY_2),
+                AvatarFlightHudViewModel.CombatGlyph.from(
+                        config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3),
+                        AvatarFlightCombatAbilitySlot.ABILITY_3)
         );
     }
 
