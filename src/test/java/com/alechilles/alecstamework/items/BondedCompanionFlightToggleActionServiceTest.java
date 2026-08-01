@@ -54,7 +54,6 @@ class BondedCompanionFlightToggleActionServiceTest {
                     fixture.invalid, settings(true, "hydragon:toggle"), Optional.of(true), true);
             assertRejected(fixture, row(BondedCompanionStateView.ACTIVE, available(LIVE)),
                     fixture.foreign, settings(true, "hydragon:toggle"), Optional.of(true), true);
-            assertRoleMismatch(fixture);
             assertRejected(fixture, row(BondedCompanionStateView.ACTIVE, available(LIVE)),
                     fixture.live, settings(true, "hydragon:toggle"), Optional.empty(), true);
             assertRejected(fixture, row(BondedCompanionStateView.ACTIVE, available(LIVE)),
@@ -62,20 +61,6 @@ class BondedCompanionFlightToggleActionServiceTest {
             assertRejected(fixture, row(BondedCompanionStateView.ACTIVE, available(LIVE)),
                     fixture.live, settings(true, ""), Optional.of(true), true);
         }
-    }
-
-    private void assertRoleMismatch(Fixture fixture) throws Exception {
-        AtomicInteger dispatches = new AtomicInteger();
-        BondedCompanionFlightToggleActionService service = fixture.service(
-                fixture.live, "other-role", settings(true, "hydragon:toggle"),
-                Optional.of(true), true,
-                (id, player, item, ref, store, target) -> {
-                    dispatches.incrementAndGet(); return true;
-                });
-        assertFalse(service.toggle(OWNER, fixture.actor, fixture.store,
-                "hydragon:horn", row(BondedCompanionStateView.ACTIVE,
-                        available(LIVE))));
-        assertEquals(0, dispatches.get());
     }
 
     @Test
@@ -100,6 +85,26 @@ class BondedCompanionFlightToggleActionServiceTest {
             assertEquals(1, dispatches.get());
             assertEquals("hydragon:toggle", hook[0]);
             assertEquals(fixture.live, dispatchedRef[0]);
+        }
+    }
+
+    @Test
+    void dispatchesConfiguredHookAfterTheLeasedNpcChangesRole()
+            throws Exception {
+        try (Fixture fixture = new Fixture()) {
+            AtomicInteger dispatches = new AtomicInteger();
+            BondedCompanionFlightToggleActionService service = fixture.service(
+                    fixture.live, "transformed-role",
+                    settings(true, "hydragon:toggle"), Optional.of(true), true,
+                    (id, player, item, ref, store, target) -> {
+                        dispatches.incrementAndGet();
+                        return true;
+                    });
+
+            assertTrue(service.toggle(OWNER, fixture.actor, fixture.store,
+                    "hydragon:horn", row(BondedCompanionStateView.ACTIVE,
+                            available(LIVE))));
+            assertEquals(1, dispatches.get());
         }
     }
 

@@ -81,7 +81,7 @@ final class BondedCompanionPanelFlightProjection {
                 return Optional.empty();
             }
             String liveRoleId = resolver.roleId(reference, store);
-            if (liveRoleId == null || !liveRoleId.equals(profile.roleId())) {
+            if (liveRoleId == null) {
                 return Optional.empty();
             }
             TwCompanionFlightToggleSettings settings =

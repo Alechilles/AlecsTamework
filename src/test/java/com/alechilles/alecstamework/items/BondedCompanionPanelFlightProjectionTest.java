@@ -102,7 +102,23 @@ class BondedCompanionPanelFlightProjectionTest {
     }
 
     @Test
-    void exactRoleAndConfiguredCapabilityGateControllerReading()
+    void configuredLiveRoleMayDifferFromPersistedProfileRole()
+            throws Exception {
+        try (TestEntityComponentStore store =
+                     new TestEntityComponentStore(null)) {
+            Ref<EntityStore> reference = store.createReference();
+            BondedCompanionProfileView profile = activeProfile(
+                    UUID.randomUUID());
+
+            assertEquals(Optional.of(true), projection(true).read(
+                    profile, WORLD, reference, store,
+                    resolver(new NPCEntity(), "Bonded_Miniwyvern_Void",
+                            configuredSettings())));
+        }
+    }
+
+    @Test
+    void liveRoleAndConfiguredCapabilityGateControllerReading()
             throws Exception {
         try (TestEntityComponentStore store =
                      new TestEntityComponentStore(null)) {
@@ -120,8 +136,6 @@ class BondedCompanionPanelFlightProjectionTest {
 
             assertUnavailable(projection, profile, WORLD, reference, store, npc,
                     null, configuredSettings());
-            assertUnavailable(projection, profile, WORLD, reference, store, npc,
-                    "Tamed_Hydra", configuredSettings());
             assertUnavailable(projection, profile, WORLD, reference, store, npc,
                     ROLE_ID, null);
             assertUnavailable(projection, profile, WORLD, reference, store, npc,

@@ -88,7 +88,7 @@ final class BondedCompanionFlightToggleActionService {
             NPCEntity npc = resolver.npc(npcRef, eventStore);
             if (npc == null) return false;
             String roleId = resolver.roleId(npcRef, eventStore);
-            if (roleId == null || !roleId.equals(row.roleId())) return false;
+            if (roleId == null) return false;
             TwCompanionFlightToggleSettings settings = resolver.settings(roleId);
             if (settings == null || !settings.isConfigured()) return false;
             Optional<Boolean> currentMode = modes.apply(npc, settings);
