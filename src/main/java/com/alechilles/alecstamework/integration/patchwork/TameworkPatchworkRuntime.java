@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.integration.patchwork;
 
 import com.alechilles.patchwork.embedded.EmbeddedPatchworkBootstrap;
 import com.alechilles.patchwork.embedded.EmbeddedPatchworkService;
+import com.alechilles.patchwork.embedded.PatchworkContributionHandle;
+import com.alechilles.patchwork.embedded.PatchworkHostContribution;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -14,19 +16,24 @@ import java.util.function.Function;
 public final class TameworkPatchworkRuntime implements AutoCloseable {
     private final JavaPlugin plugin;
     private final Function<JavaPlugin, EmbeddedPatchworkService> bootstrap;
+    private final Function<JavaPlugin, PatchworkHostContribution> contributionFactory;
     private EmbeddedPatchworkService service;
+    private PatchworkContributionHandle contributionHandle;
     private boolean closed;
 
     /** Creates a runtime that uses Patchwork's production embedded bootstrap. */
     public TameworkPatchworkRuntime(JavaPlugin plugin) {
-        this(plugin, EmbeddedPatchworkBootstrap::bootstrap);
+        this(plugin, EmbeddedPatchworkBootstrap::bootstrap,
+                candidate -> new TameworkPatchworkContribution(candidate.getManifest().getVersion().toString()));
     }
 
     TameworkPatchworkRuntime(
             JavaPlugin plugin,
-            Function<JavaPlugin, EmbeddedPatchworkService> bootstrap) {
+            Function<JavaPlugin, EmbeddedPatchworkService> bootstrap,
+            Function<JavaPlugin, PatchworkHostContribution> contributionFactory) {
         this.plugin = plugin;
         this.bootstrap = Objects.requireNonNull(bootstrap, "bootstrap");
+        this.contributionFactory = Objects.requireNonNull(contributionFactory, "contributionFactory");
     }
 
     /** Starts the embedded service once and makes its elected generated root available. */
@@ -44,12 +51,16 @@ public final class TameworkPatchworkRuntime implements AutoCloseable {
         );
         try {
             candidate.start();
+            PatchworkContributionHandle handle = Objects.requireNonNull(
+                    candidate.registerContribution(Objects.requireNonNull(contributionFactory.apply(plugin), "contribution")),
+                    "Embedded Patchwork contribution registration returned no handle."
+            );
+            service = candidate;
+            contributionHandle = handle;
         } catch (RuntimeException | Error exception) {
             closeFailedCandidate(candidate, exception);
             throw exception;
         }
-
-        service = candidate;
     }
 
     /** Returns the generated root only while the embedded service remains active. */
@@ -74,6 +85,10 @@ public final class TameworkPatchworkRuntime implements AutoCloseable {
             return;
         }
 
+        if (contributionHandle != null) {
+            contributionHandle.close();
+            contributionHandle = null;
+        }
         service.close();
         service = null;
         closed = true;

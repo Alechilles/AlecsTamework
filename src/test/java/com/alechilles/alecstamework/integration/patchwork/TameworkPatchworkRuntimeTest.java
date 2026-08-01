@@ -23,7 +23,8 @@ class TameworkPatchworkRuntimeTest {
                 ignored -> {
                     bootstraps.incrementAndGet();
                     return service;
-                }
+                },
+                ignored -> new TameworkPatchworkContribution("test")
         );
 
         runtime.start();
@@ -31,12 +32,14 @@ class TameworkPatchworkRuntimeTest {
 
         assertEquals(1, bootstraps.get());
         assertEquals(1, service.starts);
+        assertEquals(1, service.registrations);
+        assertEquals("start,register", service.lifecycle.toString());
     }
 
     @Test
     void generatedRootIsVisibleOnlyWhileTheServiceIsActive() {
         Path generatedRoot = Path.of("generated");
-        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> new RecordingService(generatedRoot));
+        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> new RecordingService(generatedRoot), ignored -> new TameworkPatchworkContribution("test"));
 
         assertThrows(IllegalStateException.class, runtime::generatedPatchRoot);
 
@@ -53,7 +56,7 @@ class TameworkPatchworkRuntimeTest {
         TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> {
             bootstraps.incrementAndGet();
             return new RecordingService(Path.of("generated"));
-        });
+        }, ignored -> new TameworkPatchworkContribution("test"));
 
         runtime.close();
 
@@ -65,7 +68,8 @@ class TameworkPatchworkRuntimeTest {
     void successfulCloseMakesTheRuntimeTerminal() {
         TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(
                 null,
-                ignored -> new RecordingService(Path.of("generated"))
+                ignored -> new RecordingService(Path.of("generated")),
+                ignored -> new TameworkPatchworkContribution("test")
         );
         runtime.start();
 
@@ -78,7 +82,8 @@ class TameworkPatchworkRuntimeTest {
     void activeServiceMustProvideANonNullGeneratedRoot() {
         TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(
                 null,
-                ignored -> new RecordingService(null)
+                ignored -> new RecordingService(null),
+                ignored -> new TameworkPatchworkContribution("test")
         );
         runtime.start();
 
@@ -89,7 +94,7 @@ class TameworkPatchworkRuntimeTest {
     void failedStartClosesAndDiscardsTheCandidateService() {
         RecordingService failedService = new RecordingService(Path.of("failed"));
         failedService.startFailure = new IllegalStateException("start failed");
-        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> failedService);
+        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> failedService, ignored -> new TameworkPatchworkContribution("test"));
 
         assertThrows(IllegalStateException.class, runtime::start);
 
@@ -102,7 +107,7 @@ class TameworkPatchworkRuntimeTest {
     void failedCloseKeepsTheServiceForRetry() {
         RecordingService service = new RecordingService(Path.of("generated"));
         service.closeFailuresRemaining = 1;
-        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> service);
+        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> service, ignored -> new TameworkPatchworkContribution("test"));
         runtime.start();
 
         assertThrows(IllegalStateException.class, runtime::close);
@@ -113,12 +118,45 @@ class TameworkPatchworkRuntimeTest {
         assertThrows(IllegalStateException.class, runtime::generatedPatchRoot);
     }
 
+    @Test
+    void failedRegistrationClosesAndDiscardsTheStartedService() {
+        RecordingService service = new RecordingService(Path.of("generated"));
+        service.registrationFailure = new IllegalStateException("register failed");
+        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> service, ignored -> new TameworkPatchworkContribution("test"));
+
+        assertThrows(IllegalStateException.class, runtime::start);
+
+        assertEquals(1, service.starts);
+        assertEquals(1, service.registrations);
+        assertEquals(1, service.closes);
+        assertThrows(IllegalStateException.class, runtime::generatedPatchRoot);
+    }
+
+    @Test
+    void closeContributionBeforeServiceAndRetainsBothHandlesAfterContributionFailure() {
+        RecordingService service = new RecordingService(Path.of("generated"));
+        service.contributionHandle.closeFailuresRemaining = 1;
+        TameworkPatchworkRuntime runtime = new TameworkPatchworkRuntime(null, ignored -> service, ignored -> new TameworkPatchworkContribution("test"));
+        runtime.start();
+
+        assertThrows(IllegalStateException.class, runtime::close);
+        assertEquals("start,register,contribution-close", service.lifecycle.toString());
+        assertSame(service.generatedRoot, runtime.generatedPatchRoot());
+
+        runtime.close();
+        assertEquals("start,register,contribution-close,contribution-close,service-close", service.lifecycle.toString());
+    }
+
     private static final class RecordingService implements EmbeddedPatchworkService {
         private final Path generatedRoot;
         private int starts;
         private int closes;
+        private int registrations;
         private int closeFailuresRemaining;
         private RuntimeException startFailure;
+        private RuntimeException registrationFailure;
+        private final StringBuilder lifecycle = new StringBuilder();
+        private final RecordingContributionHandle contributionHandle = new RecordingContributionHandle(this);
 
         private RecordingService(Path generatedRoot) {
             this.generatedRoot = generatedRoot;
@@ -127,6 +165,7 @@ class TameworkPatchworkRuntimeTest {
         @Override
         public void start() {
             starts++;
+            appendLifecycle("start");
             if (startFailure != null) {
                 throw startFailure;
             }
@@ -134,7 +173,12 @@ class TameworkPatchworkRuntimeTest {
 
         @Override
         public PatchworkContributionHandle registerContribution(PatchworkHostContribution contribution) {
-            throw new UnsupportedOperationException("Task 3 owns contribution registration.");
+            registrations++;
+            appendLifecycle("register");
+            if (registrationFailure != null) {
+                throw registrationFailure;
+            }
+            return contributionHandle;
         }
 
         @Override
@@ -150,9 +194,31 @@ class TameworkPatchworkRuntimeTest {
         @Override
         public void close() {
             closes++;
+            appendLifecycle("service-close");
             if (closeFailuresRemaining > 0) {
                 closeFailuresRemaining--;
                 throw new IllegalStateException("close failed");
+            }
+        }
+
+        private void appendLifecycle(String event) {
+            if (!lifecycle.isEmpty()) lifecycle.append(',');
+            lifecycle.append(event);
+        }
+    }
+
+    private static final class RecordingContributionHandle implements PatchworkContributionHandle {
+        private final RecordingService service;
+        private int closeFailuresRemaining;
+
+        private RecordingContributionHandle(RecordingService service) { this.service = service; }
+
+        @Override
+        public void close() {
+            service.appendLifecycle("contribution-close");
+            if (closeFailuresRemaining > 0) {
+                closeFailuresRemaining--;
+                throw new IllegalStateException("contribution close failed");
             }
         }
     }
