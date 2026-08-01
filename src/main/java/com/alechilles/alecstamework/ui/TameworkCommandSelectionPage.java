@@ -36,10 +36,7 @@ import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.*;
 
-/**
- * Interactive command-selection page for command items.
- * Presents a radial-style set of clickable command buttons and returns the selected command id.
- */
+/** Interactive command-selection page for command items and linked NPC cards. */
 public final class TameworkCommandSelectionPage
         extends InteractiveCustomUIPage<CommandSelectionEventData> {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
@@ -51,7 +48,6 @@ public final class TameworkCommandSelectionPage
     static final String PANEL_FILTER_NONE = "None";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
-    private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
@@ -74,7 +70,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier;
     private final Supplier<String> panelGroupActivationValueSupplier;
     private final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;
-    private final LinkedPanelRefreshSignalSource refreshSignalSource;
+    private final LinkedNpcPanelRefreshLifecycle refreshLifecycle;
     private LinkedNpcEntry[] baseLinkedNpcEntries;
     private LinkedNpcEntry[] linkedNpcEntries;
     private final LinkedNpcPanelCardRenderState cardRenderState;
@@ -108,7 +104,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetGroupActivationCallback;
     private final BiConsumer<UUID, String> panelAssignGroupCallback;
     private final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
-    private volatile boolean refreshLoopStarted;
+    private long appliedGroupAssignOverlayRevision = -1L;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
     private volatile long pendingFilterTextApplyVersion;
@@ -155,7 +151,6 @@ public final class TameworkCommandSelectionPage
                 panelSetGroupActivationCallback, panelAssignGroupCallback,
                 selectionCallback, LinkedPanelRefreshSignalSource.none());
     }
-
     /** Compatibility constructor retained for existing flight-toggle callers. */
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
@@ -226,8 +221,7 @@ public final class TameworkCommandSelectionPage
                 panelSetGroupActivationCallback, panelAssignGroupCallback,
                 selectionCallback, LinkedPanelRefreshSignalSource.none());
     }
-
-    /** Retains the page-scoped refresh source for linked-panel lifecycle wiring. */
+    /** Creates the page with its scoped linked-panel refresh signal source. */
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
@@ -311,8 +305,6 @@ public final class TameworkCommandSelectionPage
         this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
         this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
-        this.refreshSignalSource = Objects.requireNonNull(refreshSignalSource,
-                "refreshSignalSource");
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.cardRenderState = new LinkedNpcPanelCardRenderState();
@@ -345,7 +337,11 @@ public final class TameworkCommandSelectionPage
         this.panelAssignGroupCallback = panelAssignGroupCallback;
         this.selectionCallback = selectionCallback;
         this.groupAssignOverlay = new LinkedNpcPanelGroupAssignOverlayState(resolveLanguage());
-        this.refreshLoopStarted = false;
+        this.refreshLifecycle = new LinkedNpcPanelRefreshLifecycle(
+                Objects.requireNonNull(refreshSignalSource, "refreshSignalSource"),
+                new LinkedPanelRefreshCoordinator(System::currentTimeMillis,
+                        LinkedPanelRefreshCoordinator.DelayedScheduler.production(),
+                        this::dispatchRefreshPermit));
         this.dismissed = false;
         this.navigationPending = false;
         this.pendingFilterTextApplyVersion = 0L;
@@ -395,7 +391,7 @@ public final class TameworkCommandSelectionPage
                     eventBuilder, featureController
             );
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
-            startRefreshLoop();
+            refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs());
         } catch (Throwable throwable) {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
@@ -770,7 +766,6 @@ public final class TameworkCommandSelectionPage
         selectionCallback.accept(commandId);
     }
 
-    /** Refreshes after a profile-scoped toggle request without predicting its result. */
     private boolean handleBondedFlightToggle(
             String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
         if (!commandId.startsWith(BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
@@ -792,7 +787,6 @@ public final class TameworkCommandSelectionPage
         return true;
     }
 
-    /** Handles the bonded card's destructive unlink before legacy callbacks. */
     private boolean handleBondedAbandon(
             String commandId,
             Ref<EntityStore> ref,
@@ -822,6 +816,7 @@ public final class TameworkCommandSelectionPage
         dismissed = true;
         navigationPending = false;
         clearLinkedPanelOwner();
+        refreshLifecycle.close();
     }
 
     private void buildLinkedNpcPanel(@Nonnull UICommandBuilder commandBuilder,
@@ -842,38 +837,21 @@ public final class TameworkCommandSelectionPage
         }
     }
 
-    private void startRefreshLoop() {
-        if (refreshLoopStarted) {
-            return;
-        }
-        refreshLoopStarted = true;
-        scheduleRefreshTick();
-    }
-
-    private void scheduleRefreshTick() {
-        CompletableFuture.runAsync(
-                this::dispatchRefreshTick,
-                CompletableFuture.delayedExecutor(LINKED_PANEL_REFRESH_INTERVAL_MS, TimeUnit.MILLISECONDS)
-        );
-    }
-
-    private void dispatchRefreshTick() {
+    private void dispatchRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit) {
         if (dismissed || !isCurrentLinkedPanelOwner()) {
+            completeRefreshPermit(permit, false);
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
         if (ref == null || !ref.isValid()) {
+            completeRefreshPermit(permit, false);
             return;
         }
-        Store<EntityStore> store = ref.getStore();
-        if (store == null || store.getExternalData() == null) {
-            return;
-        }
-        World world = store.getExternalData().getWorld();
-        if (world == null) {
-            return;
-        }
-        CommandPageWorldDispatcher.dispatch(ref, this::runRefreshTickOnWorldThread);
+        LinkedNpcPanelRefreshPermitDispatch.dispatch(
+                permit,
+                task -> CommandPageWorldDispatcher.tryDispatch(ref, task),
+                () -> runRefreshOnWorldThread(permit),
+                rejectedPermit -> completeRefreshPermit(rejectedPermit, false));
     }
 
     private void scheduleDebouncedFilterTextApply() {
@@ -921,25 +899,36 @@ public final class TameworkCommandSelectionPage
         pendingFilterTextInput = null;
     }
 
-    private void runRefreshTickOnWorldThread() {
-        if (dismissed || !isCurrentLinkedPanelOwner()) {
+    private void runRefreshOnWorldThread(LinkedPanelRefreshCoordinator.RenderPermit permit) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || isFilterEditPending()) {
+            completeRefreshPermit(permit, false);
             return;
         }
-        if (isFilterEditPending()) {
-            if (!dismissed) {
-                scheduleRefreshTick();
-            }
-            return;
-        }
-        refreshLinkedNpcEntries();
-        sendCardRefreshUpdate();
-        if (!dismissed) {
-            scheduleRefreshTick();
+        try {
+            refreshLinkedNpcEntries();
+            RefreshOutcome outcome = sendCardRefreshUpdate(permit.progressionEligible());
+            completeRefreshPermit(permit, outcome.progressionIncluded(), outcome.shortestCountdownRemainingMs());
+        } catch (RuntimeException exception) {
+            completeRefreshPermit(permit, false);
+            throw exception;
         }
     }
+    private void completeRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit,
+                                       boolean progressionIncluded) {
+        completeRefreshPermit(permit, progressionIncluded,
+                LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+    }
+    private void completeRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit,
+                                       boolean progressionIncluded,
+                                       long shortestCountdownRemainingMs) {
+        refreshLifecycle.recordRendered(permit, progressionIncluded, shortestCountdownRemainingMs);
+    }
     private void sendCardRefreshUpdate() {
+        refreshLifecycle.requestStateMutation();
+    }
+    private RefreshOutcome sendCardRefreshUpdate(boolean progressionEligible) {
         if (dismissed || !isCurrentLinkedPanelOwner()) {
-            return;
+            return RefreshOutcome.notSent(shortestVisibleCountdownRemainingMs());
         }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
@@ -969,15 +958,19 @@ public final class TameworkCommandSelectionPage
                 LinkedNpcPanelPresentationSupport.empty(panelEmptyStateKeySupplier, resolveLanguage()));
         refreshValues.set(commandBuilder, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         refreshValues.set(commandBuilder, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
-        Map<UUID, CommandPanelFeaturePresentation> featurePresentations =
-                featureController.presentations();
+        Map<UUID, CommandPanelFeaturePresentation> featurePresentations = new java.util.HashMap<>();
+        for (Map.Entry<UUID, CommandPanelFeaturePresentation> entry : featureController.presentations().entrySet()) {
+            featurePresentations.put(entry.getKey(), BondedCompanionProgressionProjection.project(
+                    cardRenderState.presentation(entry.getKey()), entry.getValue(), progressionEligible));
+        }
         boolean structureChanged = cardRenderState.requiresRebuild(
                 linkedNpcEntries, featurePresentations);
         if (structureChanged) {
             commandBuilder.clear("#TameworkLinkedPanelList");
             if (hasEntries) {
                 for (int i = 0; i < linkedNpcEntries.length; i++) {
-                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
+                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true,
+                            featurePresentations.get(linkedNpcEntries[i].npcUuid()));
                 }
             }
         } else if (hasEntries) {
@@ -986,41 +979,45 @@ public final class TameworkCommandSelectionPage
                         cardRenderState.updateAt(i, linkedNpcEntries,
                                 pendingUnlinkNpcUuid, featurePresentations);
                 if (update == LinkedNpcPanelCardRenderState.Update.FULL) {
-                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false);
+                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false,
+                            featurePresentations.get(linkedNpcEntries[i].npcUuid()));
                 } else if (update == LinkedNpcPanelCardRenderState.Update.DYNAMIC) {
                     CommandPanelFeaturePresentation current =
                             featurePresentations.get(linkedNpcEntries[i].npcUuid());
                     BondedCompanionCardPresenter.refreshDynamicState(
                             commandBuilder, "#TameworkLinkedPanelList[" + i + "]",
                             current.bonded(), resolveLanguage());
-                    bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
-                            current.bonded());
-                } else {
-                    CommandPanelFeaturePresentation current =
-                            featurePresentations.get(linkedNpcEntries[i].npcUuid());
-                    if (current != null && current.bonded() != null) {
-                        bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
-                                current.bonded());
-                    }
                 }
             }
         }
-        cardRenderState.markRendered(linkedNpcEntries, pendingUnlinkNpcUuid,
-                featurePresentations);
-        CommandSelectionPageEventBinder.bindOptionEvents(
-                eventBuilder, options, MAX_COMMAND_BUTTONS
-        );
-        CommandSelectionPageEventBinder.bindPanelControls(
-                eventBuilder, featureController
-        );
-        CommandSelectionPageEventBinder.bindClose(eventBuilder);
+        cardRenderState.markRendered(linkedNpcEntries, pendingUnlinkNpcUuid, featurePresentations);
+        if (commandBuilder.getCommands().length == 0 && eventBuilder.getEvents().length == 0) {
+            return RefreshOutcome.evaluated(progressionEligible, shortestVisibleCountdownRemainingMs());
+        }
         sendUpdate(commandBuilder, eventBuilder, false);
+        return RefreshOutcome.sent(progressionEligible, shortestVisibleCountdownRemainingMs());
+    }
+    private long shortestVisibleCountdownRemainingMs() {
+        return LinkedNpcPanelCountdowns.shortest(featureController.presentations());
+    }
+    private record RefreshOutcome(boolean sent, boolean progressionIncluded,
+                                  long shortestCountdownRemainingMs) {
+        private static RefreshOutcome sent(boolean progressionIncluded, long countdown) {
+            return new RefreshOutcome(true, progressionIncluded, countdown);
+        }
+        private static RefreshOutcome notSent(long countdown) {
+            return new RefreshOutcome(false, false, countdown);
+        }
+        private static RefreshOutcome evaluated(boolean progressionIncluded, long countdown) {
+            return new RefreshOutcome(false, progressionIncluded, countdown);
+        }
     }
 
     private void closePage() {
         dismissed = true;
         navigationPending = false;
         clearLinkedPanelOwner();
+        refreshLifecycle.close();
         close();
     }
 
@@ -1032,6 +1029,7 @@ public final class TameworkCommandSelectionPage
         dismissed = true;
         clearLinkedPanelOwner();
         cancelPendingFilterTextApply();
+        refreshLifecycle.close();
         return true;
     }
 
@@ -1084,20 +1082,19 @@ public final class TameworkCommandSelectionPage
                 featureController.presentation(entry.npcUuid())
         );
     }
-
-    /** Rebinds stable bonded-card input after a lightweight refresh packet. */
-    private void bindBondedCardEvents(@Nonnull UIEventBuilder eventBuilder,
-                                      int index,
-                                      @Nonnull LinkedNpcEntry entry,
-                                      @Nonnull BondedCompanionPanelPresentation presentation) {
-        BondedCompanionCardPresenter.bindEventBindings(eventBuilder,
-                "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
-                presentation, isPendingUnlink(entry.npcUuid()), cardBindingConfig,
-                resolveLanguage());
+    private void bindLinkedNpcCard(@Nonnull UICommandBuilder commandBuilder,
+                                   @Nonnull UIEventBuilder eventBuilder, int index,
+                                   LinkedNpcEntry entry, boolean appendCard,
+                                   CommandPanelFeaturePresentation presentation) {
+        LinkedNpcPanelCardBinder.bind(commandBuilder, eventBuilder, index, entry, appendCard,
+                isPendingUnlink(entry.npcUuid()), cardBindingConfig, resolveLanguage(), presentation);
     }
 
+
     private void applyGroupAssignOverlayState(@Nonnull UICommandBuilder commandBuilder) {
+        if (appliedGroupAssignOverlayRevision == groupAssignOverlay.revision()) return;
         groupAssignOverlay.applyTo(commandBuilder, resolveLanguage());
+        appliedGroupAssignOverlayRevision = groupAssignOverlay.revision();
     }
 
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {

@@ -66,6 +66,20 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     /**
+     * Seeds the scheduling boundary from the page's initial, non-permit render.
+     */
+    public synchronized void seedInitialRender(
+            boolean progressionIncluded, long shortestCountdownRemainingMs
+    ) {
+        if (closed) return;
+        if (progressionIncluded) {
+            progressionRendered = true;
+            lastProgressionRenderMs = clock.getAsLong();
+        }
+        scheduleCountdown(shortestCountdownRemainingMs);
+    }
+
+    /**
      * Requests a coalesced refresh for the supplied signal kind.
      *
      * @param kind requested refresh kind
