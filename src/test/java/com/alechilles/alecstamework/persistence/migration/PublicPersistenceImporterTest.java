@@ -220,14 +220,13 @@ class PublicPersistenceImporterTest {
 
     @Test
     void admissionLockUsesBackupExcludedLockFileAndStillSerializesAcquisition() throws Exception {
-        ImportCase testCase = importCase("public-v4-representative.sql");
-        Path lockPath = testCase.directory()
-                .resolve(ImportAdmissionLock.LOCK_DIRECTORY)
-                .resolve(ImportAdmissionLock.LOCK_FILENAME);
+        Path lockPath = tempDir
+                .resolve(".tamework-import-lock")
+                .resolve("LOCK");
 
-        try (ImportAdmissionLock ignored = ImportAdmissionLock.acquire(testCase.directory())) {
+        try (ImportAdmissionLock ignored = ImportAdmissionLock.acquire(tempDir)) {
             assertTrue(Files.isRegularFile(lockPath));
-            try (var files = Files.walk(testCase.directory())) {
+            try (var files = Files.walk(tempDir)) {
                 assertFalse(files.filter(Files::isRegularFile)
                         .filter(path -> !path.endsWith("LOCK"))
                         .anyMatch(lockPath::equals));
@@ -235,7 +234,7 @@ class PublicPersistenceImporterTest {
 
             IllegalStateException failure = org.junit.jupiter.api.Assertions.assertThrows(
                     IllegalStateException.class,
-                    () -> ImportAdmissionLock.acquire(testCase.directory())
+                    () -> ImportAdmissionLock.acquire(tempDir)
             );
             assertEquals("persistence_import_lock_unavailable", failure.getMessage());
         }
