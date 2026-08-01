@@ -44,7 +44,11 @@ final class BondedCompanionCardDynamicState {
         fixed.remove("currentHealth");
         fixed.remove("maxHealth");
         fixed.remove("healthPercent");
-        fixed.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE);
+        fixed.remove("level");
+        fixed.remove("currentXp");
+        fixed.remove("levelingConfigId");
+        fixed.remove("talentConfigId");
+        fixed.remove("talentSpentPoints");
         fixed.remove(BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AIRBORNE);
         return fixed;
     }

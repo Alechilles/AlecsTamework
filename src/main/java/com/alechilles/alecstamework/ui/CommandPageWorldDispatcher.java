@@ -10,11 +10,16 @@ final class CommandPageWorldDispatcher {
     private CommandPageWorldDispatcher() { }
 
     static void dispatch(Ref<EntityStore> ref, Runnable task) {
-        if (ref == null || !ref.isValid()) return;
-        Store<EntityStore> store = ref.getStore();
-        if (store == null || store.getExternalData() == null) return;
-        World world = store.getExternalData().getWorld();
-        if (world == null || !world.isAlive()) return;
-        try { world.execute(task); } catch (RuntimeException ignored) { }
+        tryDispatch(ref, task);
+    }
+    static boolean tryDispatch(Ref<EntityStore> ref, Runnable task) {
+        try {
+            if (ref == null || !ref.isValid()) return false;
+            Store<EntityStore> store = ref.getStore();
+            if (store == null || store.getExternalData() == null) return false;
+            World world = store.getExternalData().getWorld();
+            if (world == null || !world.isAlive()) return false;
+            world.execute(task); return true;
+        } catch (RuntimeException | LinkageError ignored) { return false; }
     }
 }

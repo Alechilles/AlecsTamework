@@ -59,6 +59,79 @@ class BondedCompanionPanelLiveProfileOverlayTest {
     }
 
     @Test
+    void activeProgressionSupersedesDurableLevelXpAndTalentPoints() {
+        var profile = BondedPanelTestFixtures.profile(
+                "profile-1", 9L, BondedCompanionStateView.ACTIVE,
+                UUID.fromString("71000000-0000-0000-0000-000000000009"),
+                Map.of("levelingConfigId", "saved-leveling", "level", "10",
+                        "currentXp", "20.0", "talentConfigId", "saved-talents",
+                        "talentSpentPoints", "1"));
+
+        var updated = BondedCompanionPanelLiveProfileOverlay.withProgression(profile,
+                new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
+                        "wyvern-leveling", 12, 43.5, "wyvern-talents", 3));
+
+        assertEquals("wyvern-leveling", updated.snapshotPresentationData().get(
+                "levelingConfigId"));
+        assertEquals("12", updated.snapshotPresentationData().get("level"));
+        assertEquals("43.5", updated.snapshotPresentationData().get("currentXp"));
+        assertEquals("wyvern-talents", updated.snapshotPresentationData().get(
+                "talentConfigId"));
+        assertEquals("3", updated.snapshotPresentationData().get("talentSpentPoints"));
+        assertEquals(profile.profileId(), updated.profileId());
+        assertEquals(profile.revision(), updated.revision());
+        assertEquals(profile.state(), updated.state());
+        assertEquals(profile.activeLease(), updated.activeLease());
+    }
+
+    @Test
+    void unchangedProgressionReturnsTheOriginalProfileView() {
+        var profile = BondedPanelTestFixtures.profile(
+                "profile-1", 9L, BondedCompanionStateView.ACTIVE,
+                UUID.fromString("71000000-0000-0000-0000-000000000009"),
+                Map.of("levelingConfigId", "wyvern-leveling", "level", "12",
+                        "currentXp", "43.5", "talentConfigId", "wyvern-talents",
+                        "talentSpentPoints", "3"));
+
+        assertSame(profile, BondedCompanionPanelLiveProfileOverlay.withProgression(profile,
+                new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
+                        "wyvern-leveling", 12, 43.5, "wyvern-talents", 3)));
+    }
+
+    @Test
+    void missingTalentProjectionKeepsDurableTalentFieldsWhileUpdatingLeveling() {
+        var profile = BondedPanelTestFixtures.profile(
+                "profile-1", 9L, BondedCompanionStateView.ACTIVE,
+                UUID.fromString("71000000-0000-0000-0000-000000000009"),
+                Map.of("levelingConfigId", "saved-leveling", "level", "10",
+                        "currentXp", "20.0", "talentConfigId", "saved-talents",
+                        "talentSpentPoints", "1"));
+
+        var updated = BondedCompanionPanelLiveProfileOverlay.withProgression(profile,
+                new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
+                        "wyvern-leveling", 12, 43.5, null, null));
+
+        assertEquals("wyvern-leveling", updated.snapshotPresentationData().get(
+                "levelingConfigId"));
+        assertEquals("12", updated.snapshotPresentationData().get("level"));
+        assertEquals("43.5", updated.snapshotPresentationData().get("currentXp"));
+        assertEquals("saved-talents", updated.snapshotPresentationData().get(
+                "talentConfigId"));
+        assertEquals("1", updated.snapshotPresentationData().get("talentSpentPoints"));
+    }
+
+    @Test
+    void absentProgressionKeepsTheDurableProfileView() {
+        var profile = BondedPanelTestFixtures.profile(
+                "profile-1", 9L, BondedCompanionStateView.ACTIVE,
+                UUID.fromString("71000000-0000-0000-0000-000000000009"),
+                Map.of("level", "10"));
+
+        assertSame(profile, BondedCompanionPanelLiveProfileOverlay.withProgression(
+                profile, null));
+    }
+
+    @Test
     void flightModeIsTransientAndLeavesDurableProfileFieldsUntouched() {
         var profile = BondedPanelTestFixtures.profile(
                 "profile-1", 9L, BondedCompanionStateView.ACTIVE,

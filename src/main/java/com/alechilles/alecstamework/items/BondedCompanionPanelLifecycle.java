@@ -33,6 +33,11 @@ final class BondedCompanionPanelLifecycle implements AutoCloseable {
         if (readModel != null) readModel.warm(ownerUuid, rosterId);
     }
 
+    AutoCloseable subscribe(UUID ownerUuid, String rosterId, Runnable listener) {
+        return readModel == null ? () -> { }
+                : readModel.subscribe(ownerUuid, rosterId, listener);
+    }
+
     void evictOwner(@Nullable UUID ownerUuid) {
         if (readModel != null) readModel.evictOwner(ownerUuid);
     }

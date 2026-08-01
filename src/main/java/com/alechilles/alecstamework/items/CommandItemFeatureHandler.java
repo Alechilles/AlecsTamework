@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.CommandTimedSummoningApi;
 import com.alechilles.alecstamework.api.PaidCommandRevivalApi;
 import com.alechilles.alecstamework.api.PopulationGroupApi;
+import com.alechilles.alecstamework.api.TameworkEventsApi;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -170,6 +171,23 @@ public final class CommandItemFeatureHandler {
             @Nullable Supplier<PopulationGroupApi> populationGroups,
             @Nullable Supplier<BondedCompanionApi> bondedCompanions
     ) {
+        this(registry, relocationService, stateSnapshotService, persistence,
+                restorationAuthor, timedSummoning, paidRevival, populationGroups,
+                bondedCompanions, null);
+    }
+
+    public CommandItemFeatureHandler(
+            CommandItemRegistry registry,
+            CommandNpcRelocationService relocationService,
+            CommandLinkedNpcStateSnapshotService stateSnapshotService,
+            @Nullable PersistenceDomainFacades persistence,
+            @Nullable FreeCompanionRestorationAuthor restorationAuthor,
+            @Nullable Supplier<CommandTimedSummoningApi> timedSummoning,
+            @Nullable Supplier<PaidCommandRevivalApi> paidRevival,
+            @Nullable Supplier<PopulationGroupApi> populationGroups,
+            @Nullable Supplier<BondedCompanionApi> bondedCompanions,
+            @Nullable TameworkEventsApi events
+    ) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.stateSnapshotService = stateSnapshotService;
@@ -235,6 +253,8 @@ public final class CommandItemFeatureHandler {
         );
         this.bondedPanelLifecycle = new BondedCompanionPanelLifecycle(
                 registry, panelEntrySourceService.bondedReadModel());
+        BondedCompanionPanelRefreshSignalSource bondedRefreshSignals =
+                new BondedCompanionPanelRefreshSignalSource(bondedPanelLifecycle, events);
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
                 linkPolicyService,
@@ -393,7 +413,9 @@ public final class CommandItemFeatureHandler {
                         BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
                         panelEntrySourceService.bondedReadModel() == null
                                 ? (owner, roster, profile) -> null
-                                : panelEntrySourceService.bondedReadModel()::currentTrustedProfile)::toggle
+                                : panelEntrySourceService.bondedReadModel()::currentTrustedProfile)::toggle,
+                BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
+                bondedRefreshSignals
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

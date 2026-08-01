@@ -64,6 +64,9 @@ final class LinkedNpcPanelCardRenderState {
         features = Map.copyOf(currentFeatures);
     }
 
+    CommandPanelFeaturePresentation presentation(UUID npcUuid) { return features.get(npcUuid); }
+
+
     private static boolean pending(LinkedNpcEntry entry, UUID pendingUuid) {
         return entry != null && pendingUuid != null
                 && pendingUuid.equals(entry.npcUuid());

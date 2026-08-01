@@ -5,7 +5,12 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
@@ -137,6 +142,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                             profile, liveDisplayName(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withHealth(
                     overlay, liveHealth(player, store, profile));
+            overlay = BondedCompanionPanelLiveProfileOverlay.withProgression(
+                    overlay, liveProgression(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withFlightMode(
                     overlay, liveFlightMode(player, store, profile));
             updated.add(overlay == profile ? record
@@ -154,19 +161,13 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             Player player, Store<EntityStore> store,
             BondedCompanionProfileView profile
     ) {
-        if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null
-                || player.getWorld() == null) {
-            return null;
-        }
         ComponentType<EntityStore, TameworkNpcNameComponent> type =
                 TameworkNpcNameComponent.getComponentType();
         if (type == null) {
             return null;
         }
-        Ref<EntityStore> reference = player.getWorld().getEntityRef(
-                profile.activeLease().liveNpcUuid());
-        if (reference == null || !reference.isValid()) {
+        Ref<EntityStore> reference = exactActiveReference(player, store, profile);
+        if (reference == null) {
             return null;
         }
         TameworkNpcNameComponent name = store.getComponent(reference, type);
@@ -178,14 +179,89 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             Player player, Store<EntityStore> store,
             BondedCompanionProfileView profile
     ) {
-        if (profile.state() != BondedCompanionStateView.ACTIVE
-                || profile.activeLease() == null || store == null
-                || player.getWorld() == null) {
+        Ref<EntityStore> reference = exactActiveReference(player, store, profile);
+        return CompanionHealthStateService.captureHealth(reference, store);
+    }
+
+    @Nullable
+    private BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot liveProgression(
+            Player player, Store<EntityStore> store,
+            BondedCompanionProfileView profile
+    ) {
+        Ref<EntityStore> npcRef = exactActiveReference(player, store, profile);
+        return liveProgression(npcRef, store, profile.roleId());
+    }
+
+    /** Resolves only persisted progression components for a live panel projection. */
+    @Nullable
+    static BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot liveProgression(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store,
+            @Nullable String roleId
+    ) {
+        if (!hasLiveLevelingComponent(npcRef, store)) {
+            return null;
+        }
+        CompanionLevelingService.LevelingSnapshot leveling =
+                CompanionLevelingService.resolveSnapshot(npcRef, store, roleId);
+        if (leveling == null) {
+            return null;
+        }
+        TameworkTalentsComponent talents = safeTalents(npcRef, store);
+        TwTalentConfig talentConfig = resolveTalentConfig(npcRef, store, talents);
+        return new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
+                leveling.configId(), leveling.level(), leveling.currentXp(),
+                talentConfig == null ? null : talentConfig.getId(),
+                talentConfig == null ? null : talents.getSpentPoints());
+    }
+
+    @Nullable
+    private static TwTalentConfig resolveTalentConfig(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store,
+            @Nullable TameworkTalentsComponent talents
+    ) {
+        if (talents == null) return null;
+        try {
+            return CompanionTalentService.resolveTalentConfig(npcRef, store);
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static TameworkTalentsComponent safeTalents(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkTalentsComponent> type =
+                TameworkTalentsComponent.getComponentType();
+        return npcRef == null || type == null || store == null
+                ? null : store.getComponent(npcRef, type);
+    }
+
+    static boolean hasLiveLevelingComponent(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkLevelingComponent> type =
+                TameworkLevelingComponent.getComponentType();
+        return npcRef != null && store != null && type != null
+                && store.getComponent(npcRef, type) != null;
+    }
+
+    @Nullable
+    private static Ref<EntityStore> exactActiveReference(
+            @Nullable Player player, @Nullable Store<EntityStore> store,
+            @Nonnull BondedCompanionProfileView profile
+    ) {
+        if (player == null || store == null
+                || profile.state() != BondedCompanionStateView.ACTIVE
+                || profile.activeLease() == null || player.getWorld() == null
+                || profile.activeLease().liveNpcUuid() == null
+                || !profile.activeLease().worldKey().equals(player.getWorld().getName())) {
             return null;
         }
         Ref<EntityStore> reference = player.getWorld().getEntityRef(
                 profile.activeLease().liveNpcUuid());
-        return CompanionHealthStateService.captureHealth(reference, store);
+        return reference != null && reference.isValid()
+                && reference.getStore() == store ? reference : null;
     }
 
     /**
@@ -249,6 +325,11 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         if (ownerUuid != null && rosterId != null && !rosterId.isBlank()) {
             cache.warm(ownerUuid, rosterId);
         }
+    }
+
+    AutoCloseable subscribe(@Nonnull UUID ownerUuid, @Nonnull String rosterId,
+                            @Nonnull Runnable listener) {
+        return cache.subscribe(ownerUuid, rosterId, listener);
     }
 
     /** Refreshes the immutable profile generation after a rejected mutation. */

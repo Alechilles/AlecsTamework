@@ -20,6 +20,7 @@ final class LinkedNpcPanelGroupAssignOverlayState {
     private String npcName;
     private String selectedValue;
     private List<DropdownEntryInfo> entries;
+    private long revision;
 
     LinkedNpcPanelGroupAssignOverlayState(@Nullable String language) {
         clear(language);
@@ -29,8 +30,10 @@ final class LinkedNpcPanelGroupAssignOverlayState {
         return visible;
     }
 
+    long revision() { return revision; }
+
     void updateSelectedValue(@Nullable String value) {
-        selectedValue = normalizeDropdownValue(value);
+        updateIfChanged(normalizeDropdownValue(value));
     }
 
     void open(@Nonnull UUID npcUuid,
@@ -42,6 +45,7 @@ final class LinkedNpcPanelGroupAssignOverlayState {
         this.npcName = entry.displayName();
         this.entries = normalizeEntries(dropdownEntries, language);
         this.selectedValue = normalizeDropdownValue(entry.groupId());
+        revision++;
     }
 
     void clear(@Nullable String language) {
@@ -50,6 +54,7 @@ final class LinkedNpcPanelGroupAssignOverlayState {
         npcName = LocalizedText.resolve(language, "tamework.ui.linkedPanel.subtitle.defaultNpcName");
         selectedValue = NONE_VALUE;
         entries = fallbackEntries(language);
+        revision++;
     }
 
     AppliedSelection consumeSelection(@Nullable String language) {
@@ -107,6 +112,13 @@ final class LinkedNpcPanelGroupAssignOverlayState {
             return NONE_VALUE;
         }
         return trimmed;
+    }
+
+    private void updateIfChanged(String value) {
+        if (!java.util.Objects.equals(selectedValue, value)) {
+            selectedValue = value;
+            revision++;
+        }
     }
 
     private static String normalizeGroupIdForAssignment(@Nullable String value) {

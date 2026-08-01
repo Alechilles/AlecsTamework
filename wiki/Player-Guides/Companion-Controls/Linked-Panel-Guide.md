@@ -26,6 +26,13 @@ The panel derives captured, coop, roster-stored, provisioned-dormant, dead, and
 `LOST` status from one saved companion lifecycle. Item metadata and an expired
 recall timer do not override that status.
 
+## Live bonded progression
+
+When a bonded companion is active, its row shows its current level, XP, and
+available talent points from that exact live companion. These updates are
+grouped so the panel stays responsive while you use its controls. Stored and
+dead companions continue to show their saved progression snapshot.
+
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
 - `NearbyMode` shows nearby eligible companions, usually for quick local management.

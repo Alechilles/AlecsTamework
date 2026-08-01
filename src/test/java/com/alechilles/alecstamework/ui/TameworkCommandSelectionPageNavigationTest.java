@@ -1,232 +1,85 @@
 package com.alechilles.alecstamework.ui;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
+/** Observable lifecycle coverage used by page close and replacement navigation. */
 class TameworkCommandSelectionPageNavigationTest {
 
-    private static final Path SELECTION_PAGE = Path.of(
-            "src",
-            "main",
-            "java",
-            "com",
-            "alechilles",
-            "alecstamework",
-            "ui",
-            "TameworkCommandSelectionPage.java"
-    );
-
     @Test
-    void talentsNavigationUsesDeferredPageSwapInsteadOfClosingFirst() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int branchStart = content.indexOf("commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)");
-        int branchEnd = content.indexOf(
-                "if (rosterEventBoundary.blocks(data, commandId))",
-                branchStart
-        );
+    void replacementNavigationClosesThePanelRefreshSubscription() {
+        SignalSource source = new SignalSource();
+        Scheduler scheduler = new Scheduler();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(source,
+                new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, ignored -> { }));
+        lifecycle.start(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
 
-        assertTrue(branchStart >= 0, "Talent navigation branch should exist.");
-        assertTrue(branchEnd > branchStart, "Talent navigation branch should be bounded by the fallback branch.");
+        lifecycle.close();
+        source.publish(LinkedPanelRefreshSignal.Kind.IMMEDIATE);
+        scheduler.runAll();
 
-        String branch = content.substring(branchStart, branchEnd);
-        assertTrue(
-                branch.contains("beginPageNavigation()"),
-                "Talent navigation should mark the linked panel inactive before opening another page."
-        );
-        assertTrue(
-                branch.contains("navigateAfterUiDrain"),
-                "Talent navigation should defer the page swap so stale linked-panel updates drain first."
-        );
-        assertFalse(
-                branch.contains("closePage()"),
-                "Closing the linked panel before opening talents can close the new page or leave stale linked-panel UI commands."
-        );
+        assertEquals(1, source.closed);
+        // The cold-open handoff has one cancelled zero-delay catch-up beside safety.
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
     }
 
     @Test
-    void pageNavigationStopsLinkedPanelRefreshCallbacks() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int helperStart = content.indexOf("private boolean beginPageNavigation()");
-        int helperEnd = content.indexOf("private void navigateAfterUiDrain", helperStart);
+    void idlePanelHasNoOneSecondRefreshUntilASignalOrCountdownIsDue() {
+        SignalSource source = new SignalSource();
+        Scheduler scheduler = new Scheduler();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(source,
+                new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, ignored -> { }));
 
-        assertTrue(helperStart >= 0, "Page navigation helper should exist.");
-        assertTrue(helperEnd > helperStart, "Page navigation helper should be bounded by the navigation dispatcher.");
+        lifecycle.start(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
 
-        String helper = content.substring(helperStart, helperEnd);
-        assertTrue(
-                helper.contains("dismissed = true"),
-                "Opening a replacement page should stop this page's delayed refresh loop."
-        );
-        assertTrue(
-                helper.contains("clearLinkedPanelOwner()"),
-                "Opening a replacement page should invalidate stale linked-panel refresh ownership."
-        );
-        assertTrue(
-                helper.contains("cancelPendingFilterTextApply()"),
-                "Opening a replacement page should cancel delayed filter writes for the old page."
-        );
-        assertFalse(
-                helper.contains("close()"),
-                "Replacement-page navigation should not close the page manager while opening the next page."
-        );
+        // A one-shot catch-up is allowed; no 1-second autonomous heartbeat is scheduled.
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
     }
 
     @Test
-    void replacementPageNavigationWaitsForQueuedUiCommandsToDrain() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int helperStart = content.indexOf("private void navigateAfterUiDrain");
-        int helperEnd = content.indexOf("private void bindLinkedNpcCard", helperStart);
+    void immediateSignalSchedulesAnUrgentRefreshWithoutARecurringLoop() {
+        SignalSource source = new SignalSource();
+        Scheduler scheduler = new Scheduler();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(source,
+                new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, ignored -> { }));
+        lifecycle.start(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
 
-        assertTrue(helperStart >= 0, "Deferred page navigation helper should exist.");
-        assertTrue(helperEnd > helperStart, "Deferred page navigation helper should be bounded by the dispatcher.");
+        source.publish(LinkedPanelRefreshSignal.Kind.IMMEDIATE);
 
-        String helper = content.substring(helperStart, helperEnd);
-        assertTrue(
-                content.contains("PAGE_NAVIGATION_DRAIN_DELAY_MS"),
-                "Replacement-page navigation should use an explicit UI drain delay."
-        );
-        assertTrue(
-                helper.contains("CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS"),
-                "Replacement-page navigation should wait briefly so already-sent linked-panel commands apply before the new page opens."
-        );
-        assertTrue(
-                content.contains("PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L"),
-                "Replacement-page navigation should use only a short drain delay now that stale refresh owners are blocked."
-        );
-        assertTrue(
-                helper.contains("CommandPageWorldDispatcher.dispatch("),
-                "Replacement-page navigation should still run the replacement-page open on the world thread."
-        );
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
     }
 
-    @Test
-    void linkedPanelRefreshUpdatesRequireCurrentPageOwnership() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
-        int updateEnd = content.indexOf("private boolean isPendingUnlink", updateStart);
-        int dismissStart = content.indexOf("public void onDismiss(");
-        int dismissEnd = content.indexOf("private void buildLinkedNpcPanel", dismissStart);
+    private static final class SignalSource implements LinkedPanelRefreshSignalSource {
+        private Consumer<LinkedPanelRefreshSignal> listener;
+        private int closed;
 
-        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
-        assertTrue(updateEnd > updateStart, "Linked-panel refresh sender should be bounded by the next helper.");
-        assertTrue(dismissStart >= 0, "Dismiss lifecycle hook should exist.");
-        assertTrue(dismissEnd > dismissStart, "Dismiss lifecycle hook should be bounded by buildCommandButtons.");
+        @Override public AutoCloseable subscribe(Consumer<LinkedPanelRefreshSignal> listener) {
+            this.listener = listener;
+            return () -> closed++;
+        }
 
-        String update = content.substring(updateStart, updateEnd);
-        String dismiss = content.substring(dismissStart, dismissEnd);
-        assertTrue(
-                content.contains("ACTIVE_LINKED_PANEL_GENERATIONS"),
-                "Linked-panel pages should track the active page generation per player."
-        );
-        assertTrue(
-                content.contains("markLinkedPanelOwner()"),
-                "Constructed linked-panel pages should claim ownership before scheduling refreshes."
-        );
-        assertTrue(
-                update.contains("!isCurrentLinkedPanelOwner()"),
-                "Delayed linked-panel refreshes should not send commands from stale page instances."
-        );
-        assertTrue(
-                dismiss.contains("clearLinkedPanelOwner()"),
-                "Dismissing a linked panel should clear ownership for that page generation."
-        );
+        private void publish(LinkedPanelRefreshSignal.Kind kind) {
+            listener.accept(new LinkedPanelRefreshSignal(kind));
+        }
     }
 
-    @Test
-    void timerPresentationChangesDoNotClearAndRecreateTheLinkedPanelList()
-            throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
-        int updateEnd = content.indexOf("private boolean isPendingUnlink", updateStart);
+    private static final class Scheduler implements LinkedPanelRefreshCoordinator.DelayedScheduler {
+        private final List<Long> delays = new ArrayList<>();
+        private final List<Runnable> callbacks = new ArrayList<>();
 
-        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
-        assertTrue(updateEnd > updateStart, "Linked-panel refresh sender should be bounded by the next helper.");
+        @Override public void schedule(long delayMs, Runnable callback) {
+            delays.add(delayMs);
+            callbacks.add(callback);
+        }
 
-        String update = content.substring(updateStart, updateEnd);
-        assertFalse(update.contains("renderedFeatureRevision != featureController.revision()"),
-                "countdown updates must not clear and recreate every card");
-        assertTrue(update.contains("refreshDynamicState"),
-                "countdown updates should patch the existing bonded card in place");
-    }
-
-    @Test
-    void bondedTalentNavigationPrecedesTheLegacyRosterEventBoundary()
-            throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int talentBranch = content.indexOf(
-                "if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX))");
-        int legacyBoundary = content.indexOf(
-                "if (rosterEventBoundary.blocks(data, commandId))");
-
-        assertTrue(talentBranch >= 0, "Talent navigation branch should exist.");
-        assertTrue(legacyBoundary > talentBranch,
-                "A bonded companion's valid talent action must not be rejected as a legacy roster event.");
-    }
-
-    @Test
-    void flightToggleRefreshesWithoutStartingNavigationOrClosingThePage()
-            throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int start = content.indexOf("private boolean handleBondedFlightToggle");
-        int end = content.indexOf("private boolean handleBondedAbandon", start);
-        assertTrue(start >= 0, "Flight-toggle action branch should exist.");
-        assertTrue(end > start, "Flight-toggle branch should be self-contained.");
-        String branch = content.substring(start, end);
-        assertTrue(branch.contains("refreshLinkedNpcEntries()"));
-        assertTrue(branch.contains("sendCardRefreshUpdate()"));
-        assertFalse(branch.contains("beginPageNavigation()"));
-        assertFalse(branch.contains("closePage()"));
-    }
-
-    @Test
-    void lightweightRefreshesRebindBondedCardInput() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
-        int updateEnd = content.indexOf("private void closePage()", updateStart);
-
-        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
-        assertTrue(updateEnd > updateStart, "Refresh sender should be bounded by page navigation.");
-
-        String update = content.substring(updateStart, updateEnd);
-        assertTrue(update.contains("bindBondedCardEvents(eventBuilder"),
-                "Refresh packets must retain the bonded card's talent click handler.");
-        assertTrue(content.contains("private void bindBondedCardEvents"),
-                "Bonded input rebinding should be isolated from visual card rendering.");
-        assertTrue(content.contains("BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX"),
-                "The flight-toggle callback must remain profile-scoped during refresh.");
-    }
-
-    @Test
-    void refreshTickPatchesUnchangedPanelChromeOnlyWhenItsValueChanges()
-            throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
-        int updateEnd = content.indexOf("CommandSelectionPageEventBinder.bindOptionEvents", updateStart);
-
-        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
-        assertTrue(updateEnd > updateStart, "Refresh sender should include panel chrome updates.");
-
-        String update = content.substring(updateStart, updateEnd);
-        assertTrue(update.contains("refreshValues.set(commandBuilder, \"#TameworkLinkedPanelTitle.Text\""),
-                "unchanged panel title must not be resent each second");
-        assertTrue(update.contains("refreshValues.set(commandBuilder, \"#TameworkLinkedPanelModeDropdown.Value\""),
-                "unchanged panel controls must not be rebuilt each second");
-    }
-
-    @Test
-    void delayedRefreshGuardsWorldExecute() throws IOException {
-        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
-
-        assertTrue(content.contains("CommandPageWorldDispatcher.dispatch("),
-                "delayed refreshes should return to the world-thread dispatcher");
-        assertTrue(content.contains("activeRef != null && activeRef.isValid()"),
-                "delayed navigation should verify the player reference before applying UI work");
+        private void runAll() {
+            List<Runnable> pending = new ArrayList<>(callbacks);
+            callbacks.clear();
+            pending.forEach(Runnable::run);
+        }
     }
 }

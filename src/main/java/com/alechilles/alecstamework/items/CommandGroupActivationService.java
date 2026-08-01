@@ -20,7 +20,6 @@ final class CommandGroupActivationService {
 
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandGroupService groupService;
-
     CommandGroupActivationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                   CommandGroupService groupService) {
         this.linkedNpcRecordStore = linkedNpcRecordStore != null

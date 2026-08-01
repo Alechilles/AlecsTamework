@@ -65,6 +65,9 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Bonded roster panels now appear faster and keep controls reliable while live
+  active-companion progression and countdown updates are coalesced instead of
+  repeatedly rebuilding the panel.
 - Replaced the unreleased July persistence lineage with one fresh
   `tamework-state.sqlite` schema-v1 target. Public schema v2-v4 data and the
   released DAT bundle import through an immutable source snapshot; the original

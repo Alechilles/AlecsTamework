@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,10 +36,7 @@ import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.ui.CommandSelectionPageEventBinder.*;
 
-/**
- * Interactive command-selection page for command items.
- * Presents a radial-style set of clickable command buttons and returns the selected command id.
- */
+/** Interactive command-selection page for command items and linked NPC cards. */
 public final class TameworkCommandSelectionPage
         extends InteractiveCustomUIPage<CommandSelectionEventData> {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
@@ -50,7 +48,6 @@ public final class TameworkCommandSelectionPage
     static final String PANEL_FILTER_NONE = "None";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
-    private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
@@ -73,10 +70,13 @@ public final class TameworkCommandSelectionPage
     private final Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier;
     private final Supplier<String> panelGroupActivationValueSupplier;
     private final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;
+    private final LinkedNpcPanelRefreshLifecycle refreshLifecycle;
+    private final LinkedNpcPanelPacketSender packetSender;
+    private final LinkedNpcPanelDeferredNavigator deferredNavigator;
     private LinkedNpcEntry[] baseLinkedNpcEntries;
     private LinkedNpcEntry[] linkedNpcEntries;
     private final LinkedNpcPanelCardRenderState cardRenderState;
-    private final LinkedNpcPanelRefreshValues refreshValues = new LinkedNpcPanelRefreshValues();
+    private final LinkedNpcPanelRefreshTransaction refreshTransaction = new LinkedNpcPanelRefreshTransaction();
     private UUID pendingUnlinkNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
@@ -106,7 +106,6 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetGroupActivationCallback;
     private final BiConsumer<UUID, String> panelAssignGroupCallback;
     private final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
-    private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
     private volatile long pendingFilterTextApplyVersion;
@@ -132,19 +131,28 @@ public final class TameworkCommandSelectionPage
             @Nonnull Consumer<String> panelSetFilterTextCallback, @Nonnull Runnable panelClearFiltersCallback,
             @Nonnull Consumer<String> panelSetGroupActivationCallback, @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
             @Nonnull Consumer<String> selectionCallback) {
-        this(playerRef, config, selectedCommandId, requireUnlinkConfirm, linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
-                featurePresentationSupplier, panelEmptyStateKeySupplier, panelModeValueSupplier, panelAutoLinkEnabledSupplier,
-                panelRadiusLabelSupplier, panelSortValueSupplier, panelFilterModeValueSupplier, panelFilterInputValueSupplier,
-                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier, panelGroupAssignEntriesSupplier,
-                commandOptionPredicate, recallActionEnabled, linkCallback, unlinkCallback, toggleActiveCallback, toggleBreedingCallback,
-                releaseCallback, cullCallback, respawnCallback, rosterSummonCallback, rosterDismissCallback, paidReviveCallback,
-                rosterAbandonCallback, (ignored, ref, store) -> { }, locateCallback, recallCallback, setHomeCallback,
-                returnHomeCallback, openTalentsCallback, panelSetModeCallback, panelSetAutoLinkEnabledCallback,
-                panelRadiusDecreaseCallback, panelRadiusIncreaseCallback, panelManageGroupsCallback, panelSetSortCallback,
-                panelSetFilterModeCallback, panelSetFilterTextCallback, panelClearFiltersCallback, panelSetGroupActivationCallback,
-                panelAssignGroupCallback, selectionCallback);
+        this(playerRef, config, selectedCommandId, requireUnlinkConfirm,
+                linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
+                featurePresentationSupplier, panelEmptyStateKeySupplier,
+                panelModeValueSupplier, panelAutoLinkEnabledSupplier,
+                panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelFilterModeValueSupplier, panelFilterInputValueSupplier,
+                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier,
+                panelGroupAssignEntriesSupplier, commandOptionPredicate,
+                recallActionEnabled, linkCallback, unlinkCallback,
+                toggleActiveCallback, toggleBreedingCallback, releaseCallback,
+                cullCallback, respawnCallback, rosterSummonCallback,
+                rosterDismissCallback, paidReviveCallback, rosterAbandonCallback,
+                (ignored, ref, store) -> { }, locateCallback, recallCallback, setHomeCallback,
+                returnHomeCallback, openTalentsCallback, panelSetModeCallback,
+                panelSetAutoLinkEnabledCallback, panelRadiusDecreaseCallback,
+                panelRadiusIncreaseCallback, panelManageGroupsCallback,
+                panelSetSortCallback, panelSetFilterModeCallback,
+                panelSetFilterTextCallback, panelClearFiltersCallback,
+                panelSetGroupActivationCallback, panelAssignGroupCallback,
+                selectionCallback, LinkedPanelRefreshSignalSource.none());
     }
-
+    /** Compatibility constructor retained for existing flight-toggle callers. */
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
@@ -193,6 +201,77 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<String> panelSetGroupActivationCallback,
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
+        this(playerRef, config, selectedCommandId, requireUnlinkConfirm,
+                linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
+                featurePresentationSupplier, panelEmptyStateKeySupplier,
+                panelModeValueSupplier, panelAutoLinkEnabledSupplier,
+                panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelFilterModeValueSupplier, panelFilterInputValueSupplier,
+                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier,
+                panelGroupAssignEntriesSupplier, commandOptionPredicate,
+                recallActionEnabled, linkCallback, unlinkCallback,
+                toggleActiveCallback, toggleBreedingCallback, releaseCallback,
+                cullCallback, respawnCallback, rosterSummonCallback,
+                rosterDismissCallback, paidReviveCallback, rosterAbandonCallback,
+                flightToggleCallback, locateCallback, recallCallback, setHomeCallback,
+                returnHomeCallback, openTalentsCallback, panelSetModeCallback,
+                panelSetAutoLinkEnabledCallback, panelRadiusDecreaseCallback,
+                panelRadiusIncreaseCallback, panelManageGroupsCallback,
+                panelSetSortCallback, panelSetFilterModeCallback,
+                panelSetFilterTextCallback, panelClearFiltersCallback,
+                panelSetGroupActivationCallback, panelAssignGroupCallback,
+                selectionCallback, LinkedPanelRefreshSignalSource.none());
+    }
+    /** Creates the page with its scoped linked-panel refresh signal source. */
+    public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
+                                        @Nonnull TwCommandItemConfig config,
+                                        String selectedCommandId,
+                                        boolean requireUnlinkConfirm,
+                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
+                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcBaseEntriesSupplier,
+                                         @Nonnull Supplier<Map<UUID, CommandPanelFeaturePresentation>> featurePresentationSupplier,
+                                         @Nonnull Supplier<String> panelEmptyStateKeySupplier,
+                                         @Nonnull Supplier<String> panelModeValueSupplier,
+                                         @Nonnull Supplier<Boolean> panelAutoLinkEnabledSupplier,
+                                         @Nonnull Supplier<String> panelRadiusLabelSupplier,
+                                        @Nonnull Supplier<String> panelSortValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterModeValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterInputValueSupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier,
+                                        @Nonnull Supplier<String> panelGroupActivationValueSupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier,
+                                        @Nonnull Predicate<CommandEntry> commandOptionPredicate,
+                                        boolean recallActionEnabled,
+                                        @Nonnull Consumer<UUID> linkCallback,
+                                        @Nonnull Consumer<UUID> unlinkCallback,
+                                        @Nonnull Consumer<UUID> toggleActiveCallback,
+                                        @Nonnull Consumer<UUID> toggleBreedingCallback,
+                                         @Nonnull Consumer<UUID> releaseCallback,
+                                         @Nonnull Consumer<UUID> cullCallback,
+                                         @Nonnull Consumer<UUID> respawnCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterSummonCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterDismissCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction paidReviveCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterAbandonCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction flightToggleCallback,
+                                         @Nonnull Consumer<UUID> locateCallback,
+                                         @Nonnull Consumer<UUID> recallCallback,
+                                         @Nonnull Consumer<UUID> setHomeCallback,
+                                          @Nonnull Consumer<UUID> returnHomeCallback,
+                                          @Nonnull Consumer<UUID> openTalentsCallback,
+                                          @Nonnull Consumer<String> panelSetModeCallback,
+                                          @Nonnull Consumer<Boolean> panelSetAutoLinkEnabledCallback,
+                                         @Nonnull Runnable panelRadiusDecreaseCallback,
+                                        @Nonnull Runnable panelRadiusIncreaseCallback,
+                                        @Nonnull Runnable panelManageGroupsCallback,
+                                        @Nonnull Consumer<String> panelSetSortCallback,
+                                        @Nonnull Consumer<String> panelSetFilterModeCallback,
+                                        @Nonnull Consumer<String> panelSetFilterTextCallback,
+                                        @Nonnull Runnable panelClearFiltersCallback,
+                                        @Nonnull Consumer<String> panelSetGroupActivationCallback,
+                                        @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
+                                        @Nonnull Consumer<String> selectionCallback,
+                                        @Nonnull LinkedPanelRefreshSignalSource refreshSignalSource) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.playerUuid = playerRef.getUuid();
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
@@ -224,7 +303,7 @@ public final class TameworkCommandSelectionPage
         this.panelSortValueSupplier = panelSortValueSupplier;
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
-        this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
+        this.panelGroupActivationEntriesSupplier = new LinkedNpcPanelDropdownEntries(panelGroupActivationEntriesSupplier);
         this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
@@ -259,7 +338,20 @@ public final class TameworkCommandSelectionPage
         this.panelAssignGroupCallback = panelAssignGroupCallback;
         this.selectionCallback = selectionCallback;
         this.groupAssignOverlay = new LinkedNpcPanelGroupAssignOverlayState(resolveLanguage());
-        this.refreshLoopStarted = false;
+        this.refreshLifecycle = new LinkedNpcPanelRefreshLifecycle(
+                Objects.requireNonNull(refreshSignalSource, "refreshSignalSource"),
+                new LinkedPanelRefreshCoordinator(System::currentTimeMillis,
+                        LinkedPanelRefreshCoordinator.DelayedScheduler.production(),
+                        this::dispatchRefreshPermit));
+        LinkedNpcPanelPacketSender testSender = LinkedNpcPanelRefreshTestSeam.takePacketSender();
+        this.packetSender = testSender != null
+                ? testSender : (commands, events) -> sendUpdate(commands, events, false);
+        LinkedNpcPanelDeferredNavigator testNavigator = LinkedNpcPanelRefreshTestSeam.takeDeferredNavigator();
+        this.deferredNavigator = testNavigator != null ? testNavigator : (owner, action) ->
+                CompletableFuture.runAsync(() -> CommandPageWorldDispatcher.dispatch(owner.getReference(), () -> {
+                    Ref<EntityStore> activeRef = owner.getReference();
+                    if (activeRef != null && activeRef.isValid()) action.run();
+                }), CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS, TimeUnit.MILLISECONDS));
         this.dismissed = false;
         this.navigationPending = false;
         this.pendingFilterTextApplyVersion = 0L;
@@ -299,18 +391,21 @@ public final class TameworkCommandSelectionPage
             boolean showFilterInputControls = LinkedNpcPanelPresentationSupport.showFilter(panelFilterModeValueSupplier);
             commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
             commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", pendingFilterTextInput != null ? pendingFilterTextInput : LinkedNpcPanelPresentationSupport.input(panelFilterInputValueSupplier));
-            applyGroupAssignOverlayState(commandBuilder);
-            featureController.applyOverlay(
-                    commandBuilder, resolveLanguage()
-            );
+            refreshTransaction.applyGroupOverlay(groupAssignOverlay, commandBuilder, resolveLanguage());
+            refreshTransaction.applyReviveOverlay(featureController, commandBuilder, resolveLanguage());
             CommandPageButtonBinder.bind(commandBuilder, eventBuilder, options);
             buildLinkedNpcPanel(commandBuilder, eventBuilder);
             CommandSelectionPageEventBinder.bindPanelControls(
                     eventBuilder, featureController
             );
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
-            startRefreshLoop();
+            seedRefreshValues();
+            refreshTransaction.seedOverlayRevisions(groupAssignOverlay.revision(), featureController.reviveOverlayRevision());
+            refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs());
         } catch (Throwable throwable) {
+            dismissed = true;
+            clearLinkedPanelOwner();
+            refreshLifecycle.close();
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
@@ -684,7 +779,6 @@ public final class TameworkCommandSelectionPage
         selectionCallback.accept(commandId);
     }
 
-    /** Refreshes after a profile-scoped toggle request without predicting its result. */
     private boolean handleBondedFlightToggle(
             String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
         if (!commandId.startsWith(BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
@@ -706,7 +800,6 @@ public final class TameworkCommandSelectionPage
         return true;
     }
 
-    /** Handles the bonded card's destructive unlink before legacy callbacks. */
     private boolean handleBondedAbandon(
             String commandId,
             Ref<EntityStore> ref,
@@ -736,6 +829,7 @@ public final class TameworkCommandSelectionPage
         dismissed = true;
         navigationPending = false;
         clearLinkedPanelOwner();
+        refreshLifecycle.close();
     }
 
     private void buildLinkedNpcPanel(@Nonnull UICommandBuilder commandBuilder,
@@ -756,38 +850,21 @@ public final class TameworkCommandSelectionPage
         }
     }
 
-    private void startRefreshLoop() {
-        if (refreshLoopStarted) {
-            return;
-        }
-        refreshLoopStarted = true;
-        scheduleRefreshTick();
-    }
-
-    private void scheduleRefreshTick() {
-        CompletableFuture.runAsync(
-                this::dispatchRefreshTick,
-                CompletableFuture.delayedExecutor(LINKED_PANEL_REFRESH_INTERVAL_MS, TimeUnit.MILLISECONDS)
-        );
-    }
-
-    private void dispatchRefreshTick() {
+    private void dispatchRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit) {
         if (dismissed || !isCurrentLinkedPanelOwner()) {
+            completeRefreshPermit(permit, false);
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
         if (ref == null || !ref.isValid()) {
+            completeRefreshPermit(permit, false);
             return;
         }
-        Store<EntityStore> store = ref.getStore();
-        if (store == null || store.getExternalData() == null) {
-            return;
-        }
-        World world = store.getExternalData().getWorld();
-        if (world == null) {
-            return;
-        }
-        CommandPageWorldDispatcher.dispatch(ref, this::runRefreshTickOnWorldThread);
+        LinkedNpcPanelRefreshPermitDispatch.dispatch(
+                permit,
+                task -> CommandPageWorldDispatcher.tryDispatch(ref, task),
+                () -> runRefreshOnWorldThread(permit),
+                rejectedPermit -> completeRefreshPermit(rejectedPermit, false));
     }
 
     private void scheduleDebouncedFilterTextApply() {
@@ -835,63 +912,81 @@ public final class TameworkCommandSelectionPage
         pendingFilterTextInput = null;
     }
 
-    private void runRefreshTickOnWorldThread() {
-        if (dismissed || !isCurrentLinkedPanelOwner()) {
+    private void runRefreshOnWorldThread(LinkedPanelRefreshCoordinator.RenderPermit permit) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || isFilterEditPending()) {
+            completeRefreshPermit(permit, false);
             return;
         }
-        if (isFilterEditPending()) {
-            if (!dismissed) {
-                scheduleRefreshTick();
-            }
-            return;
-        }
-        refreshLinkedNpcEntries();
-        sendCardRefreshUpdate();
-        if (!dismissed) {
-            scheduleRefreshTick();
+        try {
+            refreshLinkedNpcEntries();
+            LinkedNpcPanelRefreshOutcome outcome = sendCardRefreshUpdate(permit.progressionEligible());
+            completeRefreshPermit(permit, outcome.progressionIncluded(), outcome.shortestCountdownRemainingMs());
+        } catch (Throwable exception) {
+            completeRefreshPermit(permit, false);
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_linked_panel_refresh_failed", exception,
+                    TameworkTelemetryContext.uiPage("TameworkCommandSelectionPage",
+                            "command_item", "refresh",
+                            "Failed to refresh linked panel.").build());
         }
     }
+    private void completeRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit,
+                                       boolean progressionIncluded) {
+        completeRefreshPermit(permit, progressionIncluded,
+                LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+    }
+    private void completeRefreshPermit(LinkedPanelRefreshCoordinator.RenderPermit permit,
+                                       boolean progressionIncluded,
+                                       long shortestCountdownRemainingMs) {
+        refreshLifecycle.recordRendered(permit, progressionIncluded, shortestCountdownRemainingMs);
+    }
     private void sendCardRefreshUpdate() {
+        refreshLifecycle.requestStateMutation();
+    }
+    private LinkedNpcPanelRefreshOutcome sendCardRefreshUpdate(boolean progressionEligible) {
         if (dismissed || !isCurrentLinkedPanelOwner()) {
-            return;
+            return LinkedNpcPanelRefreshOutcome.notSent(shortestVisibleCountdownRemainingMs());
         }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(panelModeValueSupplier));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(panelRadiusLabelSupplier, resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelSortDropdown.Entries", CommandSelectionPanelOptions.resolveSortDropdownEntries(resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelSortDropdown.Value", LinkedNpcPanelPresentationSupport.sort(panelSortValueSupplier));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelFilterDropdown.Entries", CommandSelectionPanelOptions.resolveFilterModeDropdownEntries(resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelFilterDropdown.Value", LinkedNpcPanelPresentationSupport.filterMode(panelFilterModeValueSupplier));
+        LinkedNpcPanelRefreshValues candidateValues = refreshTransaction.stagedValues();
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelTitle.Text", LinkedNpcPanelPresentationSupport.title(panelModeValueSupplier, linkedNpcEntries, resolveLanguage()));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelGroupSelectorDropdown.Entries", LinkedNpcPanelPresentationSupport.entries(panelGroupActivationEntriesSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelGroupSelectorDropdown.Value", LinkedNpcPanelPresentationSupport.value(panelGroupActivationValueSupplier, ""));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Entries", CommandSelectionPanelOptions.resolveModeDropdownEntries(resolveLanguage()));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelModeDropdown.Value", LinkedNpcPanelPresentationSupport.mode(panelModeValueSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelAutoLinkCheck.Value", LinkedNpcPanelPresentationSupport.autoLink(panelAutoLinkEnabledSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelSubtitleRadiusControls.Visible", LinkedNpcPanelPresentationSupport.nearby(panelModeValueSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelRadiusValue.Text", LinkedNpcPanelPresentationSupport.radius(panelRadiusLabelSupplier, resolveLanguage()));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelSortDropdown.Entries", CommandSelectionPanelOptions.resolveSortDropdownEntries(resolveLanguage()));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelSortDropdown.Value", LinkedNpcPanelPresentationSupport.sort(panelSortValueSupplier));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelFilterDropdown.Entries", CommandSelectionPanelOptions.resolveFilterModeDropdownEntries(resolveLanguage()));
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelFilterDropdown.Value", LinkedNpcPanelPresentationSupport.filterMode(panelFilterModeValueSupplier));
         boolean showFilterInputControls = LinkedNpcPanelPresentationSupport.showFilter(panelFilterModeValueSupplier);
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         if (!isFilterEditPending()) {
-            refreshValues.set(commandBuilder, "#TameworkLinkedPanelFilterInput.Value", LinkedNpcPanelPresentationSupport.input(panelFilterInputValueSupplier));
+            candidateValues.set(commandBuilder, "#TameworkLinkedPanelFilterInput.Value", LinkedNpcPanelPresentationSupport.input(panelFilterInputValueSupplier));
         }
-        applyGroupAssignOverlayState(commandBuilder);
-        featureController.applyOverlay(
-                commandBuilder, resolveLanguage()
-        );
+        long groupAssignOverlayRevision = refreshTransaction.applyGroupOverlay(groupAssignOverlay, commandBuilder, resolveLanguage());
+        long reviveOverlayRevision = refreshTransaction.applyReviveOverlay(featureController, commandBuilder, resolveLanguage());
         boolean hasEntries = linkedNpcEntries.length > 0;
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelEmptyState.Text",
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelEmptyState.Text",
                 LinkedNpcPanelPresentationSupport.empty(panelEmptyStateKeySupplier, resolveLanguage()));
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
-        refreshValues.set(commandBuilder, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
-        Map<UUID, CommandPanelFeaturePresentation> featurePresentations =
-                featureController.presentations();
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
+        candidateValues.set(commandBuilder, "#TameworkLinkedPanelListViewport.Visible", hasEntries);
+        Map<UUID, CommandPanelFeaturePresentation> featurePresentations = new java.util.HashMap<>();
+        for (Map.Entry<UUID, CommandPanelFeaturePresentation> entry : featureController.presentations().entrySet()) {
+            featurePresentations.put(entry.getKey(), BondedCompanionProgressionProjection.project(
+                    cardRenderState.presentation(entry.getKey()), entry.getValue(), progressionEligible));
+        }
         boolean structureChanged = cardRenderState.requiresRebuild(
                 linkedNpcEntries, featurePresentations);
         if (structureChanged) {
             commandBuilder.clear("#TameworkLinkedPanelList");
             if (hasEntries) {
                 for (int i = 0; i < linkedNpcEntries.length; i++) {
-                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
+                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true,
+                            featurePresentations.get(linkedNpcEntries[i].npcUuid()));
                 }
             }
         } else if (hasEntries) {
@@ -900,44 +995,47 @@ public final class TameworkCommandSelectionPage
                         cardRenderState.updateAt(i, linkedNpcEntries,
                                 pendingUnlinkNpcUuid, featurePresentations);
                 if (update == LinkedNpcPanelCardRenderState.Update.FULL) {
-                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false);
+                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false,
+                            featurePresentations.get(linkedNpcEntries[i].npcUuid()));
                 } else if (update == LinkedNpcPanelCardRenderState.Update.DYNAMIC) {
                     CommandPanelFeaturePresentation current =
                             featurePresentations.get(linkedNpcEntries[i].npcUuid());
                     BondedCompanionCardPresenter.refreshDynamicState(
                             commandBuilder, "#TameworkLinkedPanelList[" + i + "]",
                             current.bonded(), resolveLanguage());
-                    bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
-                            current.bonded());
-                } else {
-                    CommandPanelFeaturePresentation current =
-                            featurePresentations.get(linkedNpcEntries[i].npcUuid());
-                    if (current != null && current.bonded() != null) {
-                        bindBondedCardEvents(eventBuilder, i, linkedNpcEntries[i],
-                                current.bonded());
-                    }
+                    BondedCompanionCardPresenter.refreshProgressionState(commandBuilder,
+                            "#TameworkLinkedPanelList[" + i + "]", current.bonded(),
+                            isPendingUnlink(linkedNpcEntries[i].npcUuid()), resolveLanguage());
                 }
             }
         }
-        cardRenderState.markRendered(linkedNpcEntries, pendingUnlinkNpcUuid,
-                featurePresentations);
-        CommandSelectionPageEventBinder.bindOptionEvents(
-                eventBuilder, options, MAX_COMMAND_BUTTONS
-        );
-        CommandSelectionPageEventBinder.bindPanelControls(
-                eventBuilder, featureController
-        );
-        CommandSelectionPageEventBinder.bindClose(eventBuilder);
-        sendUpdate(commandBuilder, eventBuilder, false);
+        if (commandBuilder.getCommands().length == 0 && eventBuilder.getEvents().length == 0) {
+            return LinkedNpcPanelRefreshOutcome.evaluated(progressionEligible, shortestVisibleCountdownRemainingMs());
+        }
+        packetSender.send(commandBuilder, eventBuilder);
+        refreshTransaction.commit(candidateValues, groupAssignOverlayRevision, reviveOverlayRevision);
+        cardRenderState.markRendered(linkedNpcEntries, pendingUnlinkNpcUuid, featurePresentations);
+        return LinkedNpcPanelRefreshOutcome.sent(progressionEligible, shortestVisibleCountdownRemainingMs());
+    }
+    private long shortestVisibleCountdownRemainingMs() {
+        return LinkedNpcPanelCountdowns.shortest(featureController.presentations());
     }
 
+    /** Seeds chrome deduplication from the initial page packet. */
+    private void seedRefreshValues() {
+        LinkedNpcPanelRefreshValueSeeder.seed(refreshTransaction.values(), resolveLanguage(), linkedNpcEntries,
+                pendingFilterTextInput, panelEmptyStateKeySupplier, panelModeValueSupplier,
+                panelAutoLinkEnabledSupplier, panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelFilterModeValueSupplier, panelFilterInputValueSupplier,
+                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier);
+    }
     private void closePage() {
         dismissed = true;
         navigationPending = false;
         clearLinkedPanelOwner();
+        refreshLifecycle.close();
         close();
     }
-
     private boolean beginPageNavigation() {
         if (navigationPending) {
             return false;
@@ -946,6 +1044,7 @@ public final class TameworkCommandSelectionPage
         dismissed = true;
         clearLinkedPanelOwner();
         cancelPendingFilterTextApply();
+        refreshLifecycle.close();
         return true;
     }
 
@@ -969,15 +1068,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void navigateAfterUiDrain(@Nonnull Runnable action) {
-        CompletableFuture.runAsync(
-                () -> CommandPageWorldDispatcher.dispatch(playerRef.getReference(), () -> {
-                    Ref<EntityStore> activeRef = playerRef.getReference();
-                    if (activeRef != null && activeRef.isValid()) {
-                        action.run();
-                    }
-                }),
-                CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS, TimeUnit.MILLISECONDS)
-        );
+        deferredNavigator.navigate(playerRef, action);
     }
 
     private void bindLinkedNpcCard(@Nonnull UICommandBuilder commandBuilder,
@@ -998,22 +1089,13 @@ public final class TameworkCommandSelectionPage
                 featureController.presentation(entry.npcUuid())
         );
     }
-
-    /** Rebinds stable bonded-card input after a lightweight refresh packet. */
-    private void bindBondedCardEvents(@Nonnull UIEventBuilder eventBuilder,
-                                      int index,
-                                      @Nonnull LinkedNpcEntry entry,
-                                      @Nonnull BondedCompanionPanelPresentation presentation) {
-        BondedCompanionCardPresenter.bindEventBindings(eventBuilder,
-                "#TameworkLinkedPanelList[" + index + "]", entry.npcUuid(),
-                presentation, isPendingUnlink(entry.npcUuid()), cardBindingConfig,
-                resolveLanguage());
+    private void bindLinkedNpcCard(@Nonnull UICommandBuilder commandBuilder,
+                                   @Nonnull UIEventBuilder eventBuilder, int index,
+                                   LinkedNpcEntry entry, boolean appendCard,
+                                   CommandPanelFeaturePresentation presentation) {
+        LinkedNpcPanelCardBinder.bind(commandBuilder, eventBuilder, index, entry, appendCard,
+                isPendingUnlink(entry.npcUuid()), cardBindingConfig, resolveLanguage(), presentation);
     }
-
-    private void applyGroupAssignOverlayState(@Nonnull UICommandBuilder commandBuilder) {
-        groupAssignOverlay.applyTo(commandBuilder, resolveLanguage());
-    }
-
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {
         LinkedNpcEntry entry = resolveLinkedNpcEntry(npcUuid);
         if (entry == null) {
