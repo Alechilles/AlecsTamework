@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /** Guards Tamework's capture-crate patch without depending on Patchwork implementation classes. */
 final class ManagedCoopCaptureCratePatchTest {
     private static final Path PATCH = Path.of(
-            "src/main/resources/Server/Tamework/Patches/Items/Tamework_Tool_Capture_Crate_Patch.json");
+            "src/main/resources/Server/Patchwork/Patches/Items/Tamework_Tool_Capture_Crate_Patch.json");
 
     @Test
     void bundledPatchOnlyReplacesTheVanillaCaptureInteractionType() throws Exception {
