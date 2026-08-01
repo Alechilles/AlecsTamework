@@ -24,8 +24,39 @@ class LinkedNpcPanelRefreshLifecycleTest {
 
         lifecycle.start(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
 
-        assertEquals(List.of(30_000L), scheduler.delays);
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
         assertEquals(1, source.subscriptions);
+    }
+
+    @Test
+    void cachePublicationInInitialReadToSubscribeGapGetsAnImmediateCatchUpEvaluation() {
+        InitialBuildGapSignalSource source = new InitialBuildGapSignalSource();
+        ManualScheduler scheduler = new ManualScheduler();
+        List<LinkedPanelRefreshCoordinator.RenderPermit> permits = new ArrayList<>();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(
+                source, new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, permits::add));
+
+        lifecycle.start(false, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+        scheduler.runDelay(0L);
+
+        assertTrue(source.readyPublicationCompleted);
+        assertEquals(1, permits.size());
+    }
+
+    @Test
+    void cacheFailureInInitialReadToSubscribeGapGetsAnImmediateCatchUpEvaluation() {
+        InitialBuildGapSignalSource source = new InitialBuildGapSignalSource();
+        ManualScheduler scheduler = new ManualScheduler();
+        List<LinkedPanelRefreshCoordinator.RenderPermit> permits = new ArrayList<>();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(
+                source, new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, permits::add));
+
+        source.publishFailure = true;
+        lifecycle.start(false, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+        scheduler.runDelay(0L);
+
+        assertTrue(source.failurePublicationCompleted);
+        assertEquals(1, permits.size());
     }
 
     @Test
@@ -119,6 +150,17 @@ class LinkedNpcPanelRefreshLifecycleTest {
             callbacks.clear();
             queued.forEach(Runnable::run);
         }
+
+        private void runDelay(long delay) {
+            List<Runnable> queued = new ArrayList<>();
+            for (int index = callbacks.size() - 1; index >= 0; index--) {
+                if (delays.get(index) == delay) {
+                    queued.add(callbacks.remove(index));
+                    delays.remove(index);
+                }
+            }
+            queued.forEach(Runnable::run);
+        }
     }
 
     private static final class BlockingSignalSource implements LinkedPanelRefreshSignalSource {
@@ -141,6 +183,23 @@ class LinkedNpcPanelRefreshLifecycleTest {
 
         private void publish(LinkedPanelRefreshSignal.Kind kind) {
             listener.accept(new LinkedPanelRefreshSignal(kind));
+        }
+    }
+
+    /** Models cache completion after the page's initial REFRESHING read but before subscription. */
+    private static final class InitialBuildGapSignalSource implements LinkedPanelRefreshSignalSource {
+        private boolean publishFailure;
+        private boolean readyPublicationCompleted;
+        private boolean failurePublicationCompleted;
+
+        @Override
+        public AutoCloseable subscribe(Consumer<LinkedPanelRefreshSignal> listener) {
+            if (publishFailure) {
+                failurePublicationCompleted = true;
+            } else {
+                readyPublicationCompleted = true;
+            }
+            return () -> { };
         }
     }
 }

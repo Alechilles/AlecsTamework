@@ -37,6 +37,10 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
         }
         subscription = created;
         coordinator.start();
+        // Cache subscriptions observe only future publications. Re-evaluate once after the
+        // subscription is installed so a cold load which completed during the initial build
+        // is not left on its loading presentation until the safety wake.
+        coordinator.request(LinkedPanelRefreshSignal.Kind.IMMEDIATE);
     }
 
     synchronized void requestStateMutation() {
