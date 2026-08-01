@@ -189,21 +189,42 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         Ref<EntityStore> npcRef = exactActiveReference(player, store, profile);
+        return liveProgression(npcRef, store, profile.roleId());
+    }
+
+    /** Resolves only persisted progression components for a live panel projection. */
+    @Nullable
+    static BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot liveProgression(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store,
+            @Nullable String roleId
+    ) {
         if (!hasLiveLevelingComponent(npcRef, store)) {
             return null;
         }
         CompanionLevelingService.LevelingSnapshot leveling =
-                CompanionLevelingService.resolveSnapshot(npcRef, store, profile.roleId());
+                CompanionLevelingService.resolveSnapshot(npcRef, store, roleId);
         if (leveling == null) {
             return null;
         }
         TameworkTalentsComponent talents = safeTalents(npcRef, store);
-        TwTalentConfig talentConfig = talents == null
-                ? null : CompanionTalentService.resolveTalentConfig(npcRef, store);
+        TwTalentConfig talentConfig = resolveTalentConfig(npcRef, store, talents);
         return new BondedCompanionPanelLiveProfileOverlay.ProgressionSnapshot(
                 leveling.configId(), leveling.level(), leveling.currentXp(),
                 talentConfig == null ? null : talentConfig.getId(),
                 talentConfig == null ? null : talents.getSpentPoints());
+    }
+
+    @Nullable
+    private static TwTalentConfig resolveTalentConfig(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store,
+            @Nullable TameworkTalentsComponent talents
+    ) {
+        if (talents == null) return null;
+        try {
+            return CompanionTalentService.resolveTalentConfig(npcRef, store);
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
     @Nullable
