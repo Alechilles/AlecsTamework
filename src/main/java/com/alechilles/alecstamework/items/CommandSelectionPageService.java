@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ui.CommandPanelFeaturePresentation;
 import com.alechilles.alecstamework.ui.LinkedNpcPanelFeatureAction;
+import com.alechilles.alecstamework.ui.LinkedPanelRefreshSignalSource;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -34,6 +35,7 @@ final class CommandSelectionPageService {
     private final BondedCompanionTalentPageService bondedTalentPages;
     private final FlightToggleAction flightToggleActions;
     private final EventPlayerResolver flightTogglePlayers;
+    @javax.annotation.Nullable private final BondedCompanionPanelRefreshSignalSource bondedRefreshSignals;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
                                 CommandGroupAssignPageService groupAssignPageService,
@@ -114,7 +116,7 @@ final class CommandSelectionPageService {
                 panelActionService, talentPageService, featurePresentations,
                 featureActions, bondedActions, bondedTalentPages,
                 flightToggleActions,
-                BondedCompanionPanelActionRouter::resolvePlayerFromEvent);
+                BondedCompanionPanelActionRouter::resolvePlayerFromEvent, null);
     }
 
     CommandSelectionPageService(
@@ -130,6 +132,26 @@ final class CommandSelectionPageService {
             FlightToggleAction flightToggleActions,
             EventPlayerResolver flightTogglePlayers
     ) {
+        this(toolInventoryService, groupAssignPageService, resolutionService,
+                panelActionService, talentPageService, featurePresentations,
+                featureActions, bondedActions, bondedTalentPages,
+                flightToggleActions, flightTogglePlayers, null);
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions,
+            BondedCompanionPanelActionRouter bondedActions,
+            BondedCompanionTalentPageService bondedTalentPages,
+            FlightToggleAction flightToggleActions,
+            EventPlayerResolver flightTogglePlayers,
+            @javax.annotation.Nullable BondedCompanionPanelRefreshSignalSource bondedRefreshSignals
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
@@ -140,6 +162,7 @@ final class CommandSelectionPageService {
         this.bondedTalentPages = bondedTalentPages;
         this.flightToggleActions = flightToggleActions;
         this.flightTogglePlayers = flightTogglePlayers;
+        this.bondedRefreshSignals = bondedRefreshSignals;
     }
 
     /**
@@ -219,11 +242,16 @@ final class CommandSelectionPageService {
                         player, toolId, config
                 )
         );
+        LinkedPanelRefreshSignalSource pageSignals = config.usesBondedCompanionRoster()
+                && bondedRefreshSignals != null
+                ? bondedRefreshSignals.forRoster(player.getUuid(), config.getBondedRosterId())
+                : LinkedPanelRefreshSignalSource.none();
         PageContext context = new PageContext(player, uiPlayerRef, config,
                 toolId, actions, player.getUuid(), genericRosterActions,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
                 genericRosterActions ? genericCallbackAuthority : () -> true,
                 bondedLifecycleAuthority, panelSnapshot,
+                pageSignals,
                 working == null ? null : working.getFromMetadataOrNull(
                         TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING),
                 resolveRequireUnlinkConfirm(),
@@ -286,7 +314,8 @@ final class CommandSelectionPageService {
                 panelCallbacks.manageGroups(), panelCallbacks.setSort(),
                 panelCallbacks.setFilterMode(), panelCallbacks.setFilterText(),
                 panelCallbacks.clearFilters(), panelCallbacks.setGroupActivation(),
-                panelCallbacks.assignGroup(), npcCallbacks.selectCommand()
+                panelCallbacks.assignGroup(), npcCallbacks.selectCommand(),
+                context.refreshSignals()
         );
     }
 
@@ -618,6 +647,7 @@ final class CommandSelectionPageService {
             BooleanSupplier preferenceAuthority,
             BondedLifecycleAuthority bondedLifecycleAuthority,
             CommandPanelSnapshotState snapshot,
+            LinkedPanelRefreshSignalSource refreshSignals,
             String selectedId,
             boolean requireUnlinkConfirm,
             boolean recallTeleportingEnabled) {

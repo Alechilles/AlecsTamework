@@ -1126,7 +1126,8 @@ public class Tamework extends JavaPlugin {
                 api::commandTimedSummoning,
                 api::paidCommandRevival,
                 api::populationGroups,
-                api::bondedCompanions
+                api::bondedCompanions,
+                api.events()
         );
         CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);

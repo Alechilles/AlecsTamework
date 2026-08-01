@@ -73,6 +73,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier;
     private final Supplier<String> panelGroupActivationValueSupplier;
     private final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;
+    private final LinkedPanelRefreshSignalSource refreshSignalSource;
     private LinkedNpcEntry[] baseLinkedNpcEntries;
     private LinkedNpcEntry[] linkedNpcEntries;
     private final LinkedNpcPanelCardRenderState cardRenderState;
@@ -132,17 +133,26 @@ public final class TameworkCommandSelectionPage
             @Nonnull Consumer<String> panelSetFilterTextCallback, @Nonnull Runnable panelClearFiltersCallback,
             @Nonnull Consumer<String> panelSetGroupActivationCallback, @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
             @Nonnull Consumer<String> selectionCallback) {
-        this(playerRef, config, selectedCommandId, requireUnlinkConfirm, linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
-                featurePresentationSupplier, panelEmptyStateKeySupplier, panelModeValueSupplier, panelAutoLinkEnabledSupplier,
-                panelRadiusLabelSupplier, panelSortValueSupplier, panelFilterModeValueSupplier, panelFilterInputValueSupplier,
-                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier, panelGroupAssignEntriesSupplier,
-                commandOptionPredicate, recallActionEnabled, linkCallback, unlinkCallback, toggleActiveCallback, toggleBreedingCallback,
-                releaseCallback, cullCallback, respawnCallback, rosterSummonCallback, rosterDismissCallback, paidReviveCallback,
-                rosterAbandonCallback, (ignored, ref, store) -> { }, locateCallback, recallCallback, setHomeCallback,
-                returnHomeCallback, openTalentsCallback, panelSetModeCallback, panelSetAutoLinkEnabledCallback,
-                panelRadiusDecreaseCallback, panelRadiusIncreaseCallback, panelManageGroupsCallback, panelSetSortCallback,
-                panelSetFilterModeCallback, panelSetFilterTextCallback, panelClearFiltersCallback, panelSetGroupActivationCallback,
-                panelAssignGroupCallback, selectionCallback);
+        this(playerRef, config, selectedCommandId, requireUnlinkConfirm,
+                linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
+                featurePresentationSupplier, panelEmptyStateKeySupplier,
+                panelModeValueSupplier, panelAutoLinkEnabledSupplier,
+                panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelFilterModeValueSupplier, panelFilterInputValueSupplier,
+                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier,
+                panelGroupAssignEntriesSupplier, commandOptionPredicate,
+                recallActionEnabled, linkCallback, unlinkCallback,
+                toggleActiveCallback, toggleBreedingCallback, releaseCallback,
+                cullCallback, respawnCallback, rosterSummonCallback,
+                rosterDismissCallback, paidReviveCallback, rosterAbandonCallback,
+                (ignored, ref, store) -> { }, locateCallback, recallCallback, setHomeCallback,
+                returnHomeCallback, openTalentsCallback, panelSetModeCallback,
+                panelSetAutoLinkEnabledCallback, panelRadiusDecreaseCallback,
+                panelRadiusIncreaseCallback, panelManageGroupsCallback,
+                panelSetSortCallback, panelSetFilterModeCallback,
+                panelSetFilterTextCallback, panelClearFiltersCallback,
+                panelSetGroupActivationCallback, panelAssignGroupCallback,
+                selectionCallback, LinkedPanelRefreshSignalSource.none());
     }
 
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
@@ -192,7 +202,8 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Runnable panelClearFiltersCallback,
                                         @Nonnull Consumer<String> panelSetGroupActivationCallback,
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
-                                        @Nonnull Consumer<String> selectionCallback) {
+                                        @Nonnull Consumer<String> selectionCallback,
+                                        LinkedPanelRefreshSignalSource... refreshSignalSources) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.playerUuid = playerRef.getUuid();
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
@@ -227,6 +238,8 @@ public final class TameworkCommandSelectionPage
         this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
         this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
+        this.refreshSignalSource = refreshSignalSources.length == 0
+                ? LinkedPanelRefreshSignalSource.none() : refreshSignalSources[0];
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.cardRenderState = new LinkedNpcPanelCardRenderState();
