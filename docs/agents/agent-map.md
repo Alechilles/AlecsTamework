@@ -14,7 +14,7 @@ Use this map before broad repo searches. It routes common Tamework tasks to the 
 
 | If the task mentions | Start with | Then check |
 | --- | --- | --- |
-| Asset patches, `Target`, `Targets`, `When`, merge/insert operations | `wiki/Modder-Documentation/Optional-Integrations/Asset-Patches-Guide.md` | `src/main/java/com/alechilles/alecstamework/assets/patches`, asset patch tests |
+| Patchwork, asset patches, `Target`, `Targets`, `When`, merge/insert operations | `C:\Users\22ale\AppData\Roaming\Hytale\Modding\Patchwork\docs`, external wiki `Asset-Patches.md` | `src/main/java/com/alechilles/alecstamework/integration/patchwork`, `TameworkPatchResourceLayoutTest`, and the Patchwork runtime tests |
 | `TwInteractionConfig`, prompts, optimized interactions, command actions | `docs/Interactions.md` | `src/main/java/com/alechilles/alecstamework/config/assets/TwInteractionConfig*.java`, `src/main/java/com/alechilles/alecstamework/interactions` |
 | Command items, linked panels, command radial behavior | `docs/Command-Items.md` | `src/main/java/com/alechilles/alecstamework/items`, `src/main/java/com/alechilles/alecstamework/ui` |
 | Spawners, naming items, icon generation | `docs/Spawner-Config.md`, `docs/Naming-Items.md` | `scripts/tools/generate_spawner_icon_overrides.py`, `src/main/java/com/alechilles/alecstamework/config/assets/TwSpawnerConfig.java` |

@@ -58,7 +58,7 @@ When behavior differs between source and game:
 - Compare source assets under `src/main/resources` against runtime assets in `UserData\Mods`.
 - Inspect packaged jar/zip contents instead of assuming a build copied the latest files.
 - Check save overrides before changing source assets. A stale full-array override can mask correct source behavior.
-- Check generated patch pack ordering when an asset patch appears valid but does not win at runtime.
+- Run `/patchwork status` when an asset patch appears valid but does not win at runtime. Confirm the elected runtime, eligible neutral/legacy roots, generated-pack location, and whether the target is restart-required.
 
 ## Release Checks
 

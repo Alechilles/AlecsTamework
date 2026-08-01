@@ -3,6 +3,8 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
+- Embedded Patchwork 1.0.0 as Tamework's asset-patch runtime. A newer compatible standalone or embedded Patchwork copy can win the shared version-first election, while asset-only packs can depend on Patchwork and ship only JSON patch definitions.
+- Added composable Patchwork conditions and registered mod-data JSON sources for optional integrations. The former Tamework-setting check is replaced by general JSON-path comparisons against registered mod data roots.
 - Companion species, equipment, traits, levels, and talents can now influence travel speed on foot and while natively ridden.
 - Added durable owner-population limits, role-based population groups, and
   command-family rosters. Companion capacity and command membership now remain
@@ -65,6 +67,8 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Moved Tamework's bundled patch definitions to the neutral `Server/Patchwork/Patches` root. Patchwork still reads the legacy `Server/Tamework/Patches` root while Tamework is installed, and neutral definitions win matching legacy-definition conflicts.
+- Replaced `/tw patches` administration with Patchwork's `/patchwork status`, `/patchwork reload`, and `/patchwork selftest` commands. Regeneration now reports unsupported live activation as restart-required instead of relying on Tamework-specific reload hooks.
 - Bonded roster panels now appear faster and keep controls reliable while live
   active-companion progression and countdown updates are coalesced instead of
   repeatedly rebuilding the panel.

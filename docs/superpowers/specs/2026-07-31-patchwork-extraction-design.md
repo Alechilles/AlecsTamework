@@ -34,8 +34,9 @@ or owns background work.
 - Preserve the current patch schema and both existing patch roots.
 - Generalize JSON conditions to inspect another installed Java mod's data
   configuration safely.
-- Keep Tamework-specific macros and config reload behavior outside the generic
-  runtime.
+- Keep Tamework-specific macros outside the generic runtime. Tamework does not
+  add a host reload adapter in 1.0.0; unsupported targets remain
+  restart-required.
 - Preserve honest hot-reload and restart-required reporting.
 - Prevent partial target publication and retain last-known-good outputs when a
   live regeneration fails.
@@ -212,10 +213,10 @@ Tamework contributes these stable macro names:
 - `TameworkHookInstruction`
 - `TameworkStateInstruction`
 
-Tamework also classifies and reloads `Server/Tamework/**` configuration targets
-and forwards reload observations for its custom asset classes. Tamework remains
-responsible for its internal registries and thread-affinity rules. Patchwork
-passes affected target IDs to the adapter and consumes only a structured result.
+Tamework does not classify targets, forward asset events, or contribute a live
+reload adapter in 1.0.0. Patchwork owns generation and reload reporting;
+unsupported live changes remain restart-required. This keeps host integration
+to a dependency, one lifecycle owner, and optional contributions.
 
 If a patch requests a macro whose provider is unavailable, generation fails for
 that target with a clear diagnostic. Patchwork does not publish the partially

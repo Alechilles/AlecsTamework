@@ -17,16 +17,16 @@
     <a href="https://www.modstats.io/stats/alecs-tamework" target="_blank" rel="nofollow"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=live&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
 </p>
 
-## Now Includes a Universal, Non-Destructive Asset Patcher!
-- Add, merge, and insert JSON into *any* Hytale asset at runtime
+## Includes Patchwork 1.0.0
+- Add, merge, and insert JSON into Hytale server assets without replacing the source asset
 - Apply one patch file across multiple target assets
-- Gate optional integrations on installed mods
-- Supports hot-reloading
+- Gate optional integrations on installed mods, versions, assets, targets, or registered mod data
+- Install Patchwork separately or use the copy embedded in Tamework; the newest compatible runtime wins
 - Inspired by Hytalor
 - [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
 
 # Alec's Tamework!
-Alec's Tamework is a modular NPC framework and asset patcher for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
+Alec's Tamework is a modular NPC framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It embeds Patchwork for non-destructive asset patching, so artists, designers, and less technical modders can build advanced optional integrations without first creating their own plugin.
 
 Tamework also aims to establish a shared standard for tameable NPCs in Hytale so different mods can work on top of similar ownership, naming, command, progression, and companion-management systems instead of forcing players to learn a different workflow for every mod.
 
@@ -37,7 +37,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 
 ## Why Tamework
 - **No Java required for most integrations**: the main integration path is built around JSON assets, templates, role wiring, and `Tw*Config` files rather than custom Java systems.
-- **Non-destructive asset patching**: Add, merge, and insert JSON into one or many Hytale assets at runtime, with installed-mod conditions and hot-reload support.
+- **Non-destructive asset patching**: Embedded Patchwork can add, merge, and insert JSON into one or many Hytale assets with composable conditions. Regeneration is explicit and reports which changes require a restart.
 - **A shared standard for tameable NPCs**: mods built on Tamework can present familiar ownership, naming, command, linked-panel, breeding, and progression behavior instead of inventing incompatible one-off systems.
 - **Optimized interactions**: build taming, feeding, mounting, harvesting, breeding, and custom interactions with `TwInteractionConfig` and `TameworkInteract`.
 - **Ownership and tame-state systems**: use reusable builders and role-scoped policy for owner checks, protection rules, and companion behavior.
@@ -75,9 +75,9 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 
 ### Optional Dependency
 - Keep your base assets clean of any references to Tamework functionality.
-- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior at runtime only when Tamework is installed. Use `Targets` for shared operations across several assets and `When.ModInstalled` for optional cross-mod gates.
+- Create asset patches under `Server/Patchwork/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior only when Tamework is installed. Use `Targets` for shared operations across several assets and `When.ModInstalled` for optional cross-mod gates. The legacy `Server/Tamework/Patches` root remains readable while Tamework is installed, but new integrations should use the neutral Patchwork root.
 - Add configs for the Tamework systems you want to support.
-- Add Alec's Tamework as an optional dependency when deploying to CurseForge.
+- Declare Patchwork as a dependency for asset-only patch packs. Declare Alec's Tamework too when the patch uses Tamework macros or behavior.
 
 In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 

@@ -8,40 +8,42 @@ draft: false
 
 Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Asset Patches](/mod/alecs-tamework/asset-patches)
 
-Use this page when a patch does not apply, validation fails, or a patched NPC, item, config, particle, or other JSON-like asset behaves differently after `/tw patches reload`.
+Use this page when a Patchwork definition is not discovered, generation fails, validation fails, or a patched NPC, item, config, particle, or other JSON-like asset behaves differently after `/patchwork reload`.
 
 ## First Checks
 
 Run:
 
 ```text
-/tw patches status
+/patchwork status
 ```
 
 Then check the server log for the patch id, operation id, target path, and failure reason.
 
-For an end-to-end live check, run:
+For an isolated generation and condition check, run:
 
 ```text
-/tw patches selftest
+/patchwork selftest
 ```
 
-This creates isolated fixtures in Tamework's self-test asset pack, applies real optional patches, waits briefly for Hytale's generated-pack reload events, and reports per-target results as generated successfully, hot-reloaded successfully, restart required, or failed. After testing, run `/tw patches selftest cleanup` to remove the fixtures and prune generated self-test outputs.
+This creates one isolated Patchwork run, verifies expected JSON pointers, and cleans that exact run without modifying the production generated pack. Patchwork 1.0.0 truthfully reports a successful self-test as restart-required because it validates generation rather than live Hytale activation.
 
 ## Patch File Is Not Found
 
 Likely causes:
 
-- The file is not under `Server/Tamework/Patches`.
+- The file is not under `Server/Patchwork/Patches`.
 - The file extension is not `.json`.
 - The JSON is invalid.
 - The mod containing the patch file is not loaded.
 - The patch has `"Enabled": false`.
+- A different neutral definition shadows a matching legacy definition in the same source pack.
+- The runtime shown by `/patchwork status` is passive or incompatible.
 
 Expected layout:
 
 ```text
-Server/Tamework/Patches/MyMod/MyPatch.json
+Server/Patchwork/Patches/MyMod/MyPatch.json
 ```
 
 ## Target Is Not Found
@@ -49,7 +51,7 @@ Server/Tamework/Patches/MyMod/MyPatch.json
 Check:
 
 - The `Target` path exactly matches the asset path inside the loaded mod.
-- The target file exists before Tamework patches are applied.
+- The target file exists before Patchwork applies definitions.
 - The source mod is installed and loaded.
 
 Do not target the generated patch output. Target the original source asset.
@@ -147,17 +149,17 @@ Likely cause: a raw `Insert` operation does not have an `Existing` matcher.
 
 Macros add their own idempotency matchers for generated branches. Raw inserts should usually define `Existing`.
 
-## Spawn Fails After Reload
+## Spawn Fails After Regeneration
 
-Runtime reload regenerates generated patch files in place. It does not promise that every asset family can be safely reloaded while the server is running.
+`/patchwork reload` regenerates patch files but does not promise live Hytale activation.
 
-If startup works but spawning after reload fails:
+If startup works but spawning after regeneration fails:
 
-- Run `/tw patches status`.
+- Run `/patchwork status`.
 - Check whether the target failed during the reload run.
 - Verify the generated target still exists in the generated patch output.
 - Check whether the target is listed as restart-required.
-- Restart the server after changing target identities, target paths, or asset names.
+- Restart the server before testing the regenerated target.
 
 ## Patched Item Still Uses Vanilla Behavior
 
@@ -165,22 +167,15 @@ Check:
 
 - The base item is the patch target, not the generated output.
 - The patch inserts into the action array the item actually uses, such as `/Interactions/Primary/Interactions`.
-- `/tw patches status` lists the item target as generated.
-- `/tw patches selftest` can observe generated-pack item reloads on this Hytale build. If a real item patch still behaves as vanilla, check the generated JSON and restart the server to rule out asset-family-specific runtime state.
+- `/patchwork status` lists the item target as generated and the generated-pack integrity is valid.
+- The server was restarted after the most recent `/patchwork reload`.
 - The patched action type and config id match the Tamework feature, such as `TameworkSpawn`, `TameworkCommand`, or `TameworkNameNpc`.
 
 ## Restart Required After Reload
 
-This is expected for asset families without a known safe runtime reload path or without an observed Hytale generated-pack reload event. Tamework regenerates the generated file and reports the target clearly instead of pretending it took effect.
+This is the expected Patchwork 1.0.0 result after `/patchwork reload`. Patchwork commits the desired generated state to disk but does not invoke Hytale's generic live-reload path. Tamework deliberately contributes no host-specific reload adapter, so restart the server to consume the changed generated pack.
 
-Known hot-reload routes:
-
-- `/tw patches selftest` observes Hytale generated-pack reload events for NPC role/template, item, Tamework config, and particle fixtures.
-- `/tw patches selftest` confirms common fixtures when Hytale's server-side common asset registry exposes the generated file with the expected hash. This confirms the active server registry asset, not a client acknowledgment.
-
-Unknown target paths and target families without observed generated-pack reload events require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
-
-`/tw patches selftest` intentionally includes a common fixture so operators can confirm whether this Hytale build activates generated common assets through the normal watcher path.
+Do not treat file presence alone as proof of activation. For `stale`, `rollback-failed`, or `RECOVERY_REQUIRED`, preserve the diagnostic directories, stop repeated reload attempts, and follow the first related Patchwork error in the server log.
 
 ## Macro Fails
 

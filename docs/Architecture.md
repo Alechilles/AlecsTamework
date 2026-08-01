@@ -46,7 +46,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
   interaction extensions;
   see the
   [HyDragon Integration Guide](../wiki/Modder-Documentation/System-Integration/HyDragon-Integration-Guide.md)
-- Optional asset patch generation (`Server/Tamework/Patches`) for JSON-like server assets that should stay valid when Tamework is absent
+- Thin embedded Patchwork lifecycle and Tamework macro contribution (`integration/patchwork`). Patchwork owns patch discovery, generation, election, and `/patchwork`; new definitions use `Server/Patchwork/Patches`, while the legacy Tamework root remains readable for compatibility.
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 

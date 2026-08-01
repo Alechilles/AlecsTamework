@@ -15,7 +15,9 @@
 ## Server-console command scope
 
 Server-wide diagnostics and controls do not require a player identity. This
-includes `/tw patches status` and the server-global `debug*` logging toggles.
+includes `/patchwork status`, `/patchwork reload`, `/patchwork selftest`, and
+the server-global `debug*` logging toggles. Patchwork administration requires
+the `patchwork.admin` permission.
 `/tw debugcrashtelemetry` status and `flush` are also console-safe; its simulated
 event/crash actions remain restricted to the existing allowlisted player identities.
 `/tw debugdb [status|health|integrity|detail|export]` is console-safe.
@@ -24,9 +26,14 @@ support ZIP without changing persistence state.
 
 Commands that operate on a world but not a player use Hytale's optional world
 argument. Console callers must provide the target world for `/tw reloadconfig`,
-`/tw patches reload`, `/tw npcclean`, `/tw findnpc`, and `/tw getalarm`. The last
+`/tw npcclean`, `/tw findnpc`, and `/tw getalarm`. The last
 two require an NPC UUID when no player gaze target exists; player-relative distance
 is reported as `n/a` from the console.
+
+`/patchwork reload` rescans definitions and rewrites the generated patch pack.
+Tamework does not install a host-specific live-reload adapter, so status can
+truthfully report regenerated targets as restart-required until the server is
+restarted.
 
 Player UI, held-item, gaze-only, player-overlay, and live API fixture commands remain
 player-scoped. In particular, `/tw config`, `/tw settings`, `/tw news`,
