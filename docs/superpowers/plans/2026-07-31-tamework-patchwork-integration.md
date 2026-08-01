@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace Tamework's private asset patcher with an embedded Patchwork 1.0.0 provider while preserving patch behavior, legacy-root compatibility, Tamework macros, reload observations, and generated-config override behavior.
+**Goal:** Replace Tamework's private asset patcher with an embedded Patchwork 1.0.0 provider while preserving patch behavior, legacy-root compatibility, Tamework macros, and generated-config override behavior.
 
-**Architecture:** Tamework shades `patchwork-runtime` and owns one small integration package. `TameworkPatchworkRuntime` bootstraps the embedded candidate and registers `TameworkPatchworkContribution`; three focused macro providers retain Tamework-only schema knowledge; a target adapter and observation bridge connect Patchwork transactions to Tamework's asset registrations. Patchwork owns generation and `/patchwork`; Tamework removes its patch engine and `/tw patches` surface.
+**Architecture:** Tamework shades `patchwork-runtime` and owns one small lifecycle wrapper. `TameworkPatchworkRuntime` bootstraps the embedded candidate and registers `TameworkPatchworkContribution`; three focused macro providers retain Tamework-only schema knowledge. Patchwork owns generation, reload reporting, and `/patchwork`; Tamework removes its patch engine and `/tw patches` surface. Tamework deliberately does not add host-specific watcher or reload adapters: unsupported live reloads remain restart-required through Patchwork's normal behavior.
 
 **Tech Stack:** Java 25, Maven, Patchwork Runtime 1.0.0, Gson, JUnit 5, existing Hytale asset event APIs and Tamework reload services.
 
@@ -25,8 +25,6 @@ src/main/java/com/alechilles/alecstamework/integration/patchwork/
   TameworkInteractionBridgeMacro.java
   TameworkHookInstructionMacro.java
   TameworkStateInstructionMacro.java
-  TameworkPatchTargetAdapter.java
-  TameworkPatchObservationBridge.java
 ```
 
 Stable contribution identifiers:
@@ -36,21 +34,15 @@ hostPluginIdentifier = Alechilles:Alec's Tamework!
 macroId = TameworkInteractionBridge
 macroId = TameworkHookInstruction
 macroId = TameworkStateInstruction
-adapterId = Alechilles:Tamework:Assets
 ```
 
 `TameworkPatchworkRuntime` is the only Tamework class allowed to own `EmbeddedPatchworkService` and `PatchworkContributionHandle`. Its lifecycle is:
 
 ```java
 public final class TameworkPatchworkRuntime implements AutoCloseable {
-    public TameworkPatchworkRuntime(JavaPlugin plugin,
-                                    TameworkPatchTargetAdapter targetAdapter,
-                                    TameworkPatchObservationBridge observationBridge);
+    public TameworkPatchworkRuntime(JavaPlugin plugin);
     public void start();
     public Path generatedPatchRoot();
-    public void recordAssetStoreMonitor(AssetStoreMonitorEvent event);
-    public void recordCommonAssetMonitor(CommonAssetMonitorEvent event);
-    public void recordLoadedAssets(Class<?> assetClass, AssetMap<?, ?> assetMap, Iterable<?> keys);
     @Override public void close();
 }
 ```
@@ -184,48 +176,9 @@ git add src/main/java/com/alechilles/alecstamework/integration/patchwork src/tes
 git commit -m 'Feat: contribute Tamework patch macros to Patchwork'
 ```
 
-## Task 4: Bridge Tamework Reloads And Observations
+## Task 4: Keep Embedding Thin
 
-**Files:**
-- Create: `src/main/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchTargetAdapter.java`
-- Create: `src/main/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchObservationBridge.java`
-- Create: `src/test/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchTargetAdapterTest.java`
-- Create: `src/test/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchObservationBridgeTest.java`
-- Modify: `src/main/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchworkContribution.java`
-- Modify: `src/main/java/com/alechilles/alecstamework/integration/patchwork/TameworkPatchworkRuntime.java`
-- Modify: `src/main/java/com/alechilles/alecstamework/Tamework.java`
-
-- [ ] **Step 1: Add adapter classification tests**
-
-Port the effective expectations from `AssetPatchTargetClassifierTest` and `AssetPatchReloadCoordinatorTest`. Cover Tamework custom configs, Items, ParticleSystems, common assets, targets whose existing Tamework reload service can reload safely, and targets that must be reported `restartRequired`. Assert no fallback calls a generic asset reload.
-
-- [ ] **Step 2: Add observation correlation tests**
-
-Cover `LoadedAssetsEvent`, `RemovedAssetsEvent`, `AssetStoreMonitorEvent`, and `CommonAssetMonitorEvent`. Only emit observations for `Alechilles:Patchwork_GeneratedPatches`, normalize target paths, include the current epoch and expected hash supplied by Patchwork, and ignore initial load events or unrelated packs. A late event from an older epoch must not confirm the active transaction.
-
-When `reload(PatchworkReloadRequest)` begins, store its immutable `PatchworkTargetExpectation` entries in the observation bridge. Loaded and removed events consume only matching pending expectations; no event is allowed to invent an expected hash.
-
-- [ ] **Step 3: Run and confirm failure**
-
-```bash
-./mvnw.cmd -Dtest=TameworkPatchTargetAdapterTest,TameworkPatchObservationBridgeTest test
-```
-
-- [ ] **Step 4: Implement the adapter using existing focused services**
-
-Delegate only to existing Tamework reload services such as item-feature, companion, command-item, population-group, and other explicitly supported config families. Return `PatchworkReloadResult` containing exact reloaded, restart-required, and failed targets. Schedule on the same world/main-thread mechanisms those services already use.
-
-- [ ] **Step 5: Replace event forwarding in `Tamework`**
-
-Replace `recordAssetPatchHotReload`, `onAssetStoreMonitor`, and `onCommonAssetMonitor` calls to `assetPatchService` with methods on `patchworkRuntime`. Keep existing non-Patchwork cache clears and reconciliation calls intact. Removed-asset events used by a target adapter must forward removal outcomes as well.
-
-- [ ] **Step 6: Run tests and commit**
-
-```bash
-./mvnw.cmd -Dtest=TameworkPatchTargetAdapterTest,TameworkPatchObservationBridgeTest,TameworkPatchworkRuntimeTest test
-git add src/main/java/com/alechilles/alecstamework/Tamework.java src/main/java/com/alechilles/alecstamework/integration/patchwork src/test/java/com/alechilles/alecstamework/integration/patchwork
-git commit -m 'Feat: bridge Tamework asset reloads to Patchwork'
-```
+No Tamework-specific reload adapter or asset-event observation bridge is added. Patchwork's embedded runtime owns generation and reload reporting. Targets that Patchwork cannot confirm through its generic runtime behavior remain restart-required. This keeps third-party Java embedding to the intended dependency plus lifecycle call, while asset-only mods require only their Patchwork dependency and patch files.
 
 ## Task 5: Migrate Generated-Root Consumers And Remove The Old Patcher
 

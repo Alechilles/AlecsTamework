@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.config.overrides;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetLoadResult;
 import com.hypixel.hytale.assetstore.AssetMap;
@@ -32,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -51,12 +51,20 @@ public final class TwConfigOverrideManager {
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
 
     private final Tamework plugin;
+    private final Supplier<Path> generatedPatchRoot;
     private final Object reloadLock = new Object();
     private final Set<String> loadedOverrideSourcePackKeys = new HashSet<>();
     private final Map<String, Path> canonicalSourcePathsByDescriptorKey = new ConcurrentHashMap<>();
 
+    /** Creates an override manager without a generated-patch source. */
     public TwConfigOverrideManager(@Nonnull Tamework plugin) {
+        this(plugin, () -> null);
+    }
+
+    /** Creates an override manager backed by the elected Patchwork runtime's generated root. */
+    public TwConfigOverrideManager(@Nonnull Tamework plugin, @Nonnull Supplier<Path> generatedPatchRoot) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.generatedPatchRoot = Objects.requireNonNull(generatedPatchRoot, "generatedPatchRoot");
     }
 
     @Nonnull
@@ -1010,8 +1018,11 @@ public final class TwConfigOverrideManager {
 
     @Nullable
     private Path resolveGeneratedPatchCacheRoot() {
-        AssetPatchService assetPatchService = plugin.getAssetPatchService();
-        return assetPatchService == null ? null : assetPatchService.getGeneratedPatchCacheRoot();
+        try {
+            return generatedPatchRoot.get();
+        } catch (IllegalStateException exception) {
+            return null;
+        }
     }
 
     @Nullable

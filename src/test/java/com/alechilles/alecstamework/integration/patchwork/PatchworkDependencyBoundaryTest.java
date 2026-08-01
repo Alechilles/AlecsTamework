@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -20,14 +19,6 @@ class PatchworkDependencyBoundaryTest {
     private static final String PATCHWORK_PACKAGE = "com.alechilles.patchwork.";
     private static final String EMBEDDED_PATCHWORK_PACKAGE = "com.alechilles.patchwork.embedded.";
     private static final String LEGACY_PATCH_IMPORT = "import com.alechilles.alecstamework.assets.patches.";
-    private static final Set<String> LEGACY_PATCH_IMPORT_ALLOWLIST = Set.of(
-            "com/alechilles/alecstamework/Tamework.java",
-            "com/alechilles/alecstamework/config/overrides/TwConfigOverrideManager.java",
-            "com/alechilles/alecstamework/commands/TameworkPatchesCommand.java",
-            "com/alechilles/alecstamework/commands/TameworkPatchesReloadCommand.java",
-            "com/alechilles/alecstamework/commands/TameworkPatchesSelfTestCommand.java",
-            "com/alechilles/alecstamework/commands/TameworkPatchesStatusCommand.java"
-    );
 
     @Test
     void tameworkImportsOnlyPatchworksEmbeddedApi() throws IOException {
@@ -45,7 +36,7 @@ class PatchworkDependencyBoundaryTest {
     }
 
     @Test
-    void legacyPatcherImportsAreLimitedToTaskFiveMigrationHoldovers() throws IOException {
+    void legacyPatcherImportsAreAbsent() throws IOException {
         List<String> violations = new ArrayList<>();
 
         try (Stream<Path> sourceFiles = Files.walk(MAIN_JAVA)) {
@@ -55,7 +46,7 @@ class PatchworkDependencyBoundaryTest {
 
         assertTrue(
                 violations.isEmpty(),
-                () -> "Legacy asset-patcher imports must stay within the Task 5 migration allowlist:\n"
+                () -> "Legacy asset-patcher imports are forbidden:\n"
                         + String.join("\n", violations)
         );
     }
@@ -96,7 +87,7 @@ class PatchworkDependencyBoundaryTest {
         try {
             for (String line : Files.readAllLines(sourceFile, StandardCharsets.UTF_8)) {
                 String trimmed = line.trim();
-                if (trimmed.startsWith(LEGACY_PATCH_IMPORT) && !LEGACY_PATCH_IMPORT_ALLOWLIST.contains(relativePath)) {
+                if (trimmed.startsWith(LEGACY_PATCH_IMPORT)) {
                     violations.add(relativePath + ": " + trimmed);
                 }
             }

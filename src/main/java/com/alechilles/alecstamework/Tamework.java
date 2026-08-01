@@ -21,8 +21,7 @@ import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetEditorPackService;
-import com.alechilles.alecstamework.assets.patches.AssetPatchService;
-import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
+import com.alechilles.alecstamework.integration.patchwork.TameworkPatchworkRuntime;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightDisconnectRecoveryService;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
@@ -213,8 +212,6 @@ import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
-import com.hypixel.hytale.assetstore.AssetMap;
-import com.hypixel.hytale.assetstore.event.AssetStoreMonitorEvent;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -222,11 +219,9 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
-import com.hypixel.hytale.server.core.asset.common.events.CommonAssetMonitorEvent;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
-import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
@@ -275,8 +270,7 @@ public class Tamework extends JavaPlugin {
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetEditorPackService assetEditorPackService;
-    private AssetPatchService assetPatchService;
-    private AssetPatchSelfTestPack assetPatchSelfTestPack;
+    private TameworkPatchworkRuntime patchworkRuntime;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -509,14 +503,19 @@ public class Tamework extends JavaPlugin {
                 this::emitExperimentalConfigReload
         );
         assetEditorPackService = new TameworkAssetEditorPackService(this);
-        assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
-        assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
-        configOverrideManager = new TwConfigOverrideManager(this);
+        patchworkRuntime = new TameworkPatchworkRuntime(this);
+        try {
+            patchworkRuntime.start();
+        } catch (RuntimeException exception) {
+            getLogger().at(Level.SEVERE).withCause(exception).log(
+                    "Patchwork failed to start; Tamework will continue without generated asset patches."
+            );
+        }
+        configOverrideManager = new TwConfigOverrideManager(this, patchworkRuntime::generatedPatchRoot);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
-        assetPatchService.registerLoadHook();
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
@@ -603,9 +602,6 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
         getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
-        getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
-        getEventRegistry().register(AssetStoreMonitorEvent.class, this::onAssetStoreMonitor);
-        getEventRegistry().register(CommonAssetMonitorEvent.class, this::onCommonAssetMonitor);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -1378,6 +1374,16 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (patchworkRuntime != null) {
+            try {
+                patchworkRuntime.close();
+                patchworkRuntime = null;
+            } catch (RuntimeException exception) {
+                getLogger().at(Level.SEVERE).withCause(exception).log(
+                        "Patchwork did not shut down cleanly; ownership is retained for a later shutdown retry."
+                );
+            }
+        }
         if (hStatsIntegration != null) {
             hStatsIntegration.close();
             hStatsIntegration = null;
@@ -1413,7 +1419,6 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
-        assetPatchService = null;
         crashTelemetryService = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
@@ -1566,16 +1571,6 @@ public class Tamework extends JavaPlugin {
 
     public TwConfigOverrideManager getConfigOverrideManager() {
         return configOverrideManager;
-    }
-
-    @Nullable
-    public AssetPatchService getAssetPatchService() {
-        return assetPatchService;
-    }
-
-    @Nullable
-    public AssetPatchSelfTestPack getAssetPatchSelfTestPack() {
-        return assetPatchSelfTestPack;
     }
 
     @Nullable
@@ -2385,7 +2380,6 @@ public class Tamework extends JavaPlugin {
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
-        recordAssetPatchHotReload(TwCommandItemConfig.class, event.getAssetMap(), event.getLoadedAssets().keySet());
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getLoadedAssets().keySet());
         }
@@ -2443,7 +2437,6 @@ public class Tamework extends JavaPlugin {
 
     private void onItemAssetsLoaded(
             LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
-        recordAssetPatchHotReload(Item.class, event.getAssetMap(), event.getLoadedAssets().keySet());
         if (spawnerReloadPendingOnItemAssets) {
             int loaded = loadSpawnerItemAssets();
             if (loaded > 0) {
@@ -2455,32 +2448,6 @@ public class Tamework extends JavaPlugin {
         }
     }
 
-    private void onParticleSystemAssetsLoaded(
-            LoadedAssetsEvent<String, ParticleSystem, DefaultAssetMap<String, ParticleSystem>> event) {
-        recordAssetPatchHotReload(ParticleSystem.class, event.getAssetMap(), event.getLoadedAssets().keySet());
-    }
-
-    private void onAssetStoreMonitor(@Nonnull AssetStoreMonitorEvent event) {
-        if (assetPatchService == null || event.getAssetStore() == null) {
-            return;
-        }
-        assetPatchService.recordGeneratedAssetStoreMonitor(
-                event.getAssetStore().getAssetClass(),
-                event.getAssetPack(),
-                event.getCreatedOrModifiedFilesToLoad()
-        );
-    }
-
-    private void onCommonAssetMonitor(@Nonnull CommonAssetMonitorEvent event) {
-        if (assetPatchService == null) {
-            return;
-        }
-        assetPatchService.recordGeneratedCommonAssetMonitor(
-                event.getAssetPack(),
-                event.getCreatedOrModifiedFilesToLoad()
-        );
-    }
-
     private void onItemDropListAssetsLoaded(
             LoadedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
@@ -2489,14 +2456,6 @@ public class Tamework extends JavaPlugin {
     private void onItemDropListAssetsRemoved(
             RemovedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
-    }
-
-    private void recordAssetPatchHotReload(@Nonnull Class<?> assetClass,
-                                           @Nullable AssetMap<?, ?> assetMap,
-                                           @Nonnull Iterable<?> keys) {
-        if (assetPatchService != null) {
-            assetPatchService.recordHotReloadedAssets(assetClass, assetMap, keys);
-        }
     }
 
     private void reconcileTranquilizerRecipeVisibility() {

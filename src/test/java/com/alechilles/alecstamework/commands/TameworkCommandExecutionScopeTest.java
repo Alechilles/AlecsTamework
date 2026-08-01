@@ -12,7 +12,6 @@ class TameworkCommandExecutionScopeTest {
     @Test
     void serverGlobalDiagnosticsAndTogglesDoNotRequirePlayerContext() {
         Class<?>[] serverCommands = {
-                TameworkPatchesStatusCommand.class,
                 TameworkApiTestRunCommand.class,
                 TameworkApiTestStatusCommand.class,
                 TameworkDebugCrashTelemetryCommand.class,
@@ -46,7 +45,6 @@ class TameworkCommandExecutionScopeTest {
     void worldScopedAdminCommandsAcceptExplicitWorldWithoutRequiringPlayer() {
         Class<?>[] worldCommands = {
                 TameworkReloadConfigCommand.class,
-                TameworkPatchesReloadCommand.class,
                 TameworkNpcCleanCommand.class,
                 TameworkFindNpcCommand.class,
                 TameworkGetAlarmCommand.class
