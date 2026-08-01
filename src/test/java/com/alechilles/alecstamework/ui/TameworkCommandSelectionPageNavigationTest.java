@@ -23,7 +23,8 @@ class TameworkCommandSelectionPageNavigationTest {
         scheduler.runAll();
 
         assertEquals(1, source.closed);
-        assertEquals(List.of(30_000L), scheduler.delays);
+        // The cold-open handoff has one cancelled zero-delay catch-up beside safety.
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
     }
 
     @Test
@@ -35,7 +36,8 @@ class TameworkCommandSelectionPageNavigationTest {
 
         lifecycle.start(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
 
-        assertEquals(List.of(30_000L), scheduler.delays);
+        // A one-shot catch-up is allowed; no 1-second autonomous heartbeat is scheduled.
+        assertEquals(List.of(30_000L, 0L), scheduler.delays);
     }
 
     @Test
