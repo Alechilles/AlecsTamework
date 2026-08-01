@@ -129,6 +129,24 @@ class PersistenceEngineLeaseTest {
     }
 
     @Test
+    void acquisitionNeverFollowsActiveLockSymbolicLink() throws Exception {
+        Path target = tempDir.resolve("active-lock-target");
+        Path lockPath = tempDir.resolve(PersistenceEngineLease.LOCK_FILENAME);
+        Files.writeString(target, "target");
+        try {
+            Files.createSymbolicLink(lockPath, target.getFileName());
+        } catch (UnsupportedOperationException | java.io.IOException failure) {
+            Assumptions.assumeTrue(false, "symbolic links unsupported");
+        }
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> PersistenceEngineLease.acquireReplacement(tempDir)
+        );
+        assertTrue(Files.isSymbolicLink(lockPath));
+    }
+
+    @Test
     void heldLeaseExcludesBothOldAndReplacementEngines() {
         try (PersistenceEngineLease ignored =
                      PersistenceEngineLease.acquire(

@@ -43,13 +43,20 @@ final class LegacyEngineLockSentinel {
         )) {
             FileLock lock = tryLock(channel);
             try {
-                // Confirm the legacy path was not held before retiring it.
+                if (!Files.isRegularFile(
+                        legacyPath,
+                        LinkOption.NOFOLLOW_LINKS
+                )) {
+                    throw new IOException(
+                            "persistence_engine_legacy_lock_path_invalid"
+                    );
+                }
+                Files.delete(legacyPath);
+                createDirectorySentinel(legacyPath);
             } finally {
                 lock.release();
             }
         }
-        Files.delete(legacyPath);
-        createDirectorySentinel(legacyPath);
     }
 
     private static FileLock tryLock(FileChannel channel) throws IOException {

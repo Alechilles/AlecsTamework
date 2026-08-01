@@ -4,6 +4,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Optional;
@@ -82,12 +83,7 @@ public final class PersistenceEngineLease implements AutoCloseable {
         try {
             Files.createDirectories(directory);
             LegacyEngineLockSentinel.prepare(directory);
-            channel = FileChannel.open(
-                    directory.resolve(LOCK_FILENAME),
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.READ,
-                    StandardOpenOption.WRITE
-            );
+            channel = openLock(directory.resolve(LOCK_FILENAME));
             FileLock lock = channel.tryLock();
             if (lock == null) {
                 throw new IllegalStateException(
@@ -267,5 +263,28 @@ public final class PersistenceEngineLease implements AutoCloseable {
         } catch (Exception ignored) {
             // Preserve the acquisition failure as the primary diagnostic.
         }
+    }
+
+    private static FileChannel openLock(Path lockPath) throws Exception {
+        if (Files.exists(lockPath, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isRegularFile(lockPath, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException(
+                    "persistence_engine_lock_path_invalid"
+            );
+        }
+        FileChannel channel = FileChannel.open(
+                lockPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE,
+                LinkOption.NOFOLLOW_LINKS
+        );
+        if (!Files.isRegularFile(lockPath, LinkOption.NOFOLLOW_LINKS)) {
+            closeChannel(channel);
+            throw new IllegalStateException(
+                    "persistence_engine_lock_path_invalid"
+            );
+        }
+        return channel;
     }
 }
