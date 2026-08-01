@@ -60,6 +60,11 @@
             <version>${alecstelemetry.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.alechilles</groupId>
+            <artifactId>patchwork-runtime</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
             <groupId>curse.maven</groupId>
             <artifactId>creditor-1560961</artifactId>
             <version>${creditor.file.id}</version>
@@ -179,6 +184,7 @@
                                 </excludes>
                                 <includes>
                                     <include>com.alechilles:alecstelemetry-runtime</include>
+                                    <include>com.alechilles:patchwork-runtime</include>
                                     <include>curse.maven:creditor-1560961</include>
                                     <include>org.xerial:sqlite-jdbc</include>
                                     <include>org.slf4j:slf4j-api</include>
@@ -213,6 +219,24 @@
                     <argLine>@{argLine} -Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <patchwork.packagedJar>${project.build.directory}/${project.build.finalName}.jar</patchwork.packagedJar>
+                    </systemPropertyVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
