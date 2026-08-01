@@ -49,6 +49,38 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void genericPagesKeepTheirOwnStableActivationEntries() throws Exception {
+        Object service = genericActivationService();
+        CapturedPackets englishPackets = new CapturedPackets();
+        CapturedPackets otherPackets = new CapturedPackets();
+        TameworkCommandSelectionPage englishPage = page(englishPackets,
+                new AtomicReference<>(feature(4, false)), new NavigationFixture(), genericConfig(),
+                genericActivationEntries(service, "en-US"));
+        TameworkCommandSelectionPage otherPage = page(otherPackets,
+                new AtomicReference<>(feature(4, false)), new NavigationFixture(), genericConfig(),
+                genericActivationEntries(service, "de-DE"));
+        build(englishPage); build(otherPage);
+        refresh(englishPage, true); refresh(otherPage, true);
+        assertEquals(0, englishPackets.updates.size());
+        assertEquals(0, otherPackets.updates.size());
+    }
+
+    @Test
+    void changedActivationEntriesEmitAnUpdatedSelector() throws Exception {
+        AtomicReference<String> entryValue = new AtomicReference<>("one");
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)),
+                new NavigationFixture(), genericConfig(), () -> List.of(
+                        new com.hypixel.hytale.server.core.ui.DropdownEntryInfo(
+                                com.hypixel.hytale.server.core.ui.LocalizableString.fromString(entryValue.get()),
+                                entryValue.get())));
+        build(page); refresh(page, true);
+        assertEquals(0, packets.updates.size());
+        entryValue.set("two"); refresh(page, true);
+        assertCommand(packets.updates.getFirst(), "#TameworkLinkedPanelGroupSelectorDropdown.Entries");
+    }
+
+    @Test
     void failedSendDoesNotCommitProgressionDeltaAndRetryResendsIt() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         AtomicReference<CommandPanelFeaturePresentation> feature = new AtomicReference<>(feature(4, false));
@@ -170,18 +202,25 @@ class TameworkCommandSelectionPageRefreshTest {
     }
     @SuppressWarnings("unchecked")
     private static Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> genericActivationEntries() throws Exception {
+        return genericActivationEntries(genericActivationService(), "en-US");
+    }
+    private static Object genericActivationService() throws Exception {
         Class<?> serviceType = Class.forName("com.alechilles.alecstamework.items.CommandGroupActivationService");
         var constructor = serviceType.getDeclaredConstructor(
                 Class.forName("com.alechilles.alecstamework.items.CommandLinkedNpcRecordStore"),
                 Class.forName("com.alechilles.alecstamework.items.CommandGroupService"));
         constructor.setAccessible(true);
-        Object service = constructor.newInstance(null, null);
+        return constructor.newInstance(null, null);
+    }
+    @SuppressWarnings("unchecked")
+    private static Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> genericActivationEntries(Object service, String language) throws Exception {
+        Class<?> serviceType = service.getClass();
         Method resolver = serviceType.getDeclaredMethod("resolveDropdownEntries",
                 com.hypixel.hytale.server.core.inventory.ItemStack.class, String.class);
         resolver.setAccessible(true);
         return () -> {
             try {
-                return (List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>) resolver.invoke(service, null, "en-US");
+                return (List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>) resolver.invoke(service, null, language);
             } catch (ReflectiveOperationException exception) {
                 throw new AssertionError(exception);
             }

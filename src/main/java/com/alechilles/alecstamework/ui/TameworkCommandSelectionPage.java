@@ -303,7 +303,7 @@ public final class TameworkCommandSelectionPage
         this.panelSortValueSupplier = panelSortValueSupplier;
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
-        this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
+        this.panelGroupActivationEntriesSupplier = new LinkedNpcPanelDropdownEntries(panelGroupActivationEntriesSupplier);
         this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
