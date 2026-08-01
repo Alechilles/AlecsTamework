@@ -32,8 +32,8 @@ class BondedCompanionCardDynamicStateTest {
     }
 
     @Test
-    void flightAvailabilityOnlyChangesUseTheIncrementalCardPath() {
-        assertTrue(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
+    void flightAvailabilityChangesRemainStructuralToBindTheNewControl() {
+        assertFalse(BondedCompanionCardDynamicState.changedOnlyByLiveFields(
                 presentationWithAttributes(Map.of()), presentationWithAttributes(
                         Map.of("bonded.flightToggle.available", "true"))));
     }
