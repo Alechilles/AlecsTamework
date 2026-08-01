@@ -20,6 +20,13 @@ final class CommandGroupActivationService {
 
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandGroupService groupService;
+    /**
+     * DropdownEntryInfo uses identity equality, so retain the last equivalent
+     * presentation list instead of making an unchanged linked-panel safety
+     * refresh appear dirty.
+     */
+    @Nullable
+    private GroupDropdownCache dropdownCache;
 
     CommandGroupActivationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                   CommandGroupService groupService) {
@@ -30,6 +37,11 @@ final class CommandGroupActivationService {
     }
 
     List<DropdownEntryInfo> resolveDropdownEntries(@Nullable ItemStack stack, @Nullable String language) {
+        List<GroupDropdownOption> options = resolveDropdownOptions(stack);
+        GroupDropdownCache cached = dropdownCache;
+        if (cached != null && cached.matches(language, options)) {
+            return cached.entries();
+        }
         ArrayList<DropdownEntryInfo> entries = new ArrayList<>();
         entries.add(new DropdownEntryInfo(
                 LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.groupSelector.all")),
@@ -39,9 +51,19 @@ final class CommandGroupActivationService {
                 LocalizableString.fromString(LocalizedText.resolve(language, "tamework.ui.linkedPanel.groupSelector.none")),
                 NONE_VALUE
         ));
+        for (GroupDropdownOption option : options) {
+            entries.add(new DropdownEntryInfo(LocalizableString.fromString(option.label()), option.value()));
+        }
+        List<DropdownEntryInfo> resolved = List.copyOf(entries);
+        dropdownCache = new GroupDropdownCache(language, options, resolved);
+        return resolved;
+    }
+
+    private List<GroupDropdownOption> resolveDropdownOptions(@Nullable ItemStack stack) {
         Set<String> seenValues = new HashSet<>();
         seenValues.add(ALL_VALUE.toLowerCase(Locale.ROOT));
         seenValues.add(NONE_VALUE.toLowerCase(Locale.ROOT));
+        ArrayList<GroupDropdownOption> options = new ArrayList<>();
         for (CommandGroupService.GroupRecord group : groupService.readGroups(stack)) {
             if (group == null || group.groupId == null || group.groupId.isBlank()) {
                 continue;
@@ -51,9 +73,21 @@ final class CommandGroupActivationService {
                 continue;
             }
             String label = group.name != null && !group.name.isBlank() ? group.name.trim() : value;
-            entries.add(new DropdownEntryInfo(LocalizableString.fromString(label), value));
+            options.add(new GroupDropdownOption(value, label));
         }
-        return entries;
+        return List.copyOf(options);
+    }
+
+    private record GroupDropdownOption(String value, String label) { }
+
+    private record GroupDropdownCache(@Nullable String language,
+                                      List<GroupDropdownOption> options,
+                                      List<DropdownEntryInfo> entries) {
+        private boolean matches(@Nullable String candidateLanguage,
+                                List<GroupDropdownOption> candidateOptions) {
+            return java.util.Objects.equals(language, candidateLanguage)
+                    && options.equals(candidateOptions);
+        }
     }
 
     String resolveSelectionValue(@Nullable ItemStack stack) {

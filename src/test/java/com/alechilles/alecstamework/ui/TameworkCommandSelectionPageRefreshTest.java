@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
@@ -36,6 +37,15 @@ class TameworkCommandSelectionPageRefreshTest {
         assertEquals(0, packets.updates.size(), () -> java.util.Arrays.stream(
                 packets.updates.getFirst().commands.getCommands()).map(command -> command.selector)
                 .toList().toString());
+    }
+
+    @Test
+    void genericActivationSupplierDoesNotDirtyAnUnchangedSafetyRefresh() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)),
+                new NavigationFixture(), genericConfig(), genericActivationEntries());
+        build(page); refresh(page, true);
+        assertEquals(0, packets.updates.size());
     }
 
     @Test
@@ -144,6 +154,9 @@ class TameworkCommandSelectionPageRefreshTest {
         return page(packets, feature, fixture, config());
     }
     private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig) throws Exception {
+        return page(packets, feature, fixture, commandConfig, List::of);
+    }
+    private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> activationEntries) throws Exception {
         try (AutoCloseable ignored = LinkedNpcPanelRefreshTestSeam.installPacketSender(packets::capture);
              AutoCloseable ignoredNavigator = LinkedNpcPanelRefreshTestSeam.installDeferredNavigator(fixture::defer)) {
             PlayerRef player = (PlayerRef) unsafe().allocateInstance(PlayerRef.class);
@@ -151,9 +164,28 @@ class TameworkCommandSelectionPageRefreshTest {
             Consumer<UUID> noUuid = value -> { }; Consumer<String> noString = value -> { }; BiConsumer<UUID, String> noGroup = (a, b) -> { };
             return new TameworkCommandSelectionPage(player, commandConfig, null, true,
                     () -> List.of(ENTRY), () -> List.of(ENTRY), () -> Map.of(CARD, feature.get()), () -> null,
-                    () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", List::of, () -> "", List::of, value -> true, true,
+                    () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", activationEntries, () -> "", List::of, value -> true, true,
                     noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, fixture::talent, noString, value->{}, ()->{}, ()->{}, fixture::groups, noString, noString, noString, ()->{}, noString, noGroup, noString, fixture.source);
         }
+    }
+    @SuppressWarnings("unchecked")
+    private static Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> genericActivationEntries() throws Exception {
+        Class<?> serviceType = Class.forName("com.alechilles.alecstamework.items.CommandGroupActivationService");
+        var constructor = serviceType.getDeclaredConstructor(
+                Class.forName("com.alechilles.alecstamework.items.CommandLinkedNpcRecordStore"),
+                Class.forName("com.alechilles.alecstamework.items.CommandGroupService"));
+        constructor.setAccessible(true);
+        Object service = constructor.newInstance(null, null);
+        Method resolver = serviceType.getDeclaredMethod("resolveDropdownEntries",
+                com.hypixel.hytale.server.core.inventory.ItemStack.class, String.class);
+        resolver.setAccessible(true);
+        return () -> {
+            try {
+                return (List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>) resolver.invoke(service, null, "en-US");
+            } catch (ReflectiveOperationException exception) {
+                throw new AssertionError(exception);
+            }
+        };
     }
     private static void event(TameworkCommandSelectionPage page, String command) throws Exception {
         CommandSelectionEventData data = new CommandSelectionEventData(); Field field = CommandSelectionEventData.class.getDeclaredField("commandId"); field.setAccessible(true); unsafe().putObject(data, unsafe().objectFieldOffset(field), command); page.handleDataEvent(null, null, data);
