@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
@@ -188,6 +189,9 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
             BondedCompanionProfileView profile
     ) {
         Ref<EntityStore> npcRef = exactActiveReference(player, store, profile);
+        if (!hasLiveLevelingComponent(npcRef, store)) {
+            return null;
+        }
         CompanionLevelingService.LevelingSnapshot leveling =
                 CompanionLevelingService.resolveSnapshot(npcRef, store, profile.roleId());
         if (leveling == null) {
@@ -210,6 +214,15 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                 TameworkTalentsComponent.getComponentType();
         return npcRef == null || type == null || store == null
                 ? null : store.getComponent(npcRef, type);
+    }
+
+    static boolean hasLiveLevelingComponent(
+            @Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store
+    ) {
+        ComponentType<EntityStore, TameworkLevelingComponent> type =
+                TameworkLevelingComponent.getComponentType();
+        return npcRef != null && store != null && type != null
+                && store.getComponent(npcRef, type) != null;
     }
 
     @Nullable
