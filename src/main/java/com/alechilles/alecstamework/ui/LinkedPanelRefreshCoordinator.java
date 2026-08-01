@@ -11,7 +11,7 @@ import java.util.function.LongSupplier;
  */
 public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
 
-    /** Value used by {@link #recordRendered(boolean, long)} when no countdown is visible. */
+    /** Value used by {@link #recordRendered(RenderPermit, boolean, long)} when no countdown is visible. */
     public static final long NO_COUNTDOWN_REMAINING_MS = -1L;
 
     private static final long PROGRESSION_INTERVAL_MS = 5_000L;
@@ -26,7 +26,10 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private boolean closed;
     private boolean progressionRendered;
     private long lastProgressionRenderMs;
-    private boolean progressionPermitPending;
+    private long outstandingProgressionPermitId;
+    private long nextPermitId;
+    private boolean progressionDirty;
+    private boolean countdownExpirationWakeAttempted;
     private boolean immediatePending;
     private boolean progressionPending;
     private boolean countdownPending;
@@ -75,7 +78,11 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             scheduleImmediate();
             return;
         }
-        scheduleProgression();
+        if (outstandingProgressionPermitId != 0L) {
+            progressionDirty = true;
+        } else {
+            scheduleProgression();
+        }
     }
 
     /**
@@ -87,17 +94,36 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
      * @param shortestCountdownRemainingMs shortest rendered countdown, zero when visibly expired,
      *                                     or {@link #NO_COUNTDOWN_REMAINING_MS} when absent
      */
-    public synchronized void recordRendered(boolean progressionIncluded, long shortestCountdownRemainingMs) {
+    public synchronized void recordRendered(
+            RenderPermit permit,
+            boolean progressionIncluded,
+            long shortestCountdownRemainingMs
+    ) {
         if (closed) {
             return;
         }
-        progressionPermitPending = false;
+        Objects.requireNonNull(permit, "permit");
+        boolean ownsProgressionPermit = permit.progressionEligible()
+                && permit.id() == outstandingProgressionPermitId;
+        if (permit.progressionEligible() && !ownsProgressionPermit) {
+            return;
+        }
+        if (progressionIncluded && !permit.progressionEligible()) {
+            throw new IllegalArgumentException("A non-progression permit cannot complete a progression render.");
+        }
+        if (ownsProgressionPermit) {
+            outstandingProgressionPermitId = 0L;
+        }
         if (progressionIncluded) {
             progressionRendered = true;
             lastProgressionRenderMs = clock.getAsLong();
             invalidateProgression();
         }
         scheduleCountdown(shortestCountdownRemainingMs);
+        if (ownsProgressionPermit && progressionDirty) {
+            progressionDirty = false;
+            scheduleProgression();
+        }
     }
 
     /**
@@ -106,7 +132,8 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     @Override
     public synchronized void close() {
         closed = true;
-        progressionPermitPending = false;
+        outstandingProgressionPermitId = 0L;
+        progressionDirty = false;
         invalidateImmediate();
         invalidateProgression();
         invalidateCountdown();
@@ -123,7 +150,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     private void scheduleProgression() {
-        if (progressionPending || progressionPermitPending) {
+        if (progressionPending) {
             return;
         }
         long delayMs = progressionRendered
@@ -137,7 +164,15 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private void scheduleCountdown(long remainingMs) {
         invalidateCountdown();
         if (remainingMs == NO_COUNTDOWN_REMAINING_MS) {
+            countdownExpirationWakeAttempted = false;
             return;
+        }
+        if (remainingMs > 0L) {
+            countdownExpirationWakeAttempted = false;
+        } else if (countdownExpirationWakeAttempted) {
+            return;
+        } else {
+            countdownExpirationWakeAttempted = true;
         }
         long delayMs = countdownDelay(Math.max(0L, remainingMs));
         countdownPending = true;
@@ -198,12 +233,13 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     private void admitRefresh() {
-        boolean progressionEligible = !progressionPermitPending && (!progressionRendered
+        boolean progressionEligible = outstandingProgressionPermitId == 0L && (!progressionRendered
                 || clock.getAsLong() - lastProgressionRenderMs >= PROGRESSION_INTERVAL_MS);
+        long permitId = ++nextPermitId;
         if (progressionEligible) {
-            progressionPermitPending = true;
+            outstandingProgressionPermitId = permitId;
         }
-        refreshCallback.accept(new RenderPermit(progressionEligible));
+        refreshCallback.accept(new RenderPermit(permitId, progressionEligible));
     }
 
     private void invalidateImmediate() {
@@ -229,9 +265,20 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     /**
      * Refresh admission state consumed by the page renderer.
      *
+     * @param id coordinator-assigned admission identity
      * @param progressionEligible whether this render may include fresh progression values
      */
-    public record RenderPermit(boolean progressionEligible) {
+    public record RenderPermit(long id, boolean progressionEligible) {
+    }
+
+    /**
+     * Allows a later visible zero countdown to request one fresh expiration wake.
+     * Call this only after an authoritative countdown state-change signal.
+     */
+    public synchronized void rearmCountdownExpirationWake() {
+        if (!closed) {
+            countdownExpirationWakeAttempted = false;
+        }
     }
 
     /**
