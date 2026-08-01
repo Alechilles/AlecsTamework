@@ -84,6 +84,19 @@ Source databases, DAT files, WAL files, and SHM files are never migrated in
 place, renamed, moved, or deleted. A successful public import writes a
 `persistence-import-<id>.json` report beside the replacement target.
 
+## Process lock files
+
+Tamework keeps its active process-ownership files in Hytale's backup-excluded
+`LOCK` layout. `Tamework/Data/LOCK` protects the active persistence engine,
+and `Tamework/Data/.tamework-import-lock/LOCK` serializes replacement-import
+publication. These files are ephemeral: Tamework recreates them when needed,
+and Hytale excludes them from world backups.
+
+After an upgrade, `Tamework/Data/.tamework-persistence-engine.lock/` may
+remain as an empty upgrade sentinel. It contains no gameplay data and
+intentionally prevents older Tamework builds from reopening the upgraded
+world.
+
 ## Public extension data
 
 Integrations should use `ProfileDataApi` for namespaced data attached to a

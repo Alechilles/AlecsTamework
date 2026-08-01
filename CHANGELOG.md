@@ -105,6 +105,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed automatic Hytale world backups failing on Windows while Tamework persistence was active. Tamework's process locks now use Hytale's backup-excluded `LOCK` layout.
 - Fixed imported companion worlds remaining read-only when NPCs continued
   loading during startup reconciliation. Tamework now rebuilds moving world
   evidence and retries safely until persistence becomes mutation-ready.
