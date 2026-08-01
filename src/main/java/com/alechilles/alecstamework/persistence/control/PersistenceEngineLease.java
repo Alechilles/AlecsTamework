@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.control;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Optional;
@@ -18,7 +19,7 @@ import javax.annotation.Nonnull;
  */
 public final class PersistenceEngineLease implements AutoCloseable {
     public static final String LOCK_FILENAME =
-            ".tamework-persistence-engine.lock";
+            "LOCK";
 
     private final PersistenceEngineLineage requestedLineage;
     private final PersistenceEngineManifestStore manifests;
@@ -79,10 +80,12 @@ public final class PersistenceEngineLease implements AutoCloseable {
         Path directory = dataDirectory.toAbsolutePath().normalize();
         FileChannel channel = null;
         try {
-            java.nio.file.Files.createDirectories(directory);
+            Files.createDirectories(directory);
+            LegacyEngineLockSentinel.prepare(directory);
             channel = FileChannel.open(
                     directory.resolve(LOCK_FILENAME),
                     StandardOpenOption.CREATE,
+                    StandardOpenOption.READ,
                     StandardOpenOption.WRITE
             );
             FileLock lock = channel.tryLock();
