@@ -214,7 +214,7 @@ class NeedsSeekComponentAssetTest {
     void examplesUseSharedNeedsSeekComponentDefaults() {
         String tameworkExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json");
         String vanillaExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Vanilla.json");
-        String patchExample = readResource("Server/Tamework/Patches/Examples/Tamework_Example_Patch.json");
+        String patchExample = readResource("Server/Patchwork/Patches/Examples/Tamework_Example_Patch.json");
 
         assertTrue(tameworkExample.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource\""));
         assertTrue(vanillaExample.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource\""));
