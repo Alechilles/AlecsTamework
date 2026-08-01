@@ -9,6 +9,9 @@ import javax.annotation.Nonnull;
 
 /** Process-level admission lock that serializes replacement import publication. */
 final class ImportAdmissionLock implements AutoCloseable {
+    static final String LOCK_DIRECTORY = ".tamework-import-lock";
+    static final String LOCK_FILENAME = "LOCK";
+
     private final FileChannel channel;
     private final FileLock lock;
 
@@ -23,7 +26,9 @@ final class ImportAdmissionLock implements AutoCloseable {
             throw new IllegalArgumentException("Target directory is required");
         }
         java.nio.file.Files.createDirectories(targetDirectory);
-        Path lockPath = targetDirectory.resolve(".tamework-import.lock");
+        Path lockDirectory = targetDirectory.resolve(LOCK_DIRECTORY);
+        java.nio.file.Files.createDirectories(lockDirectory);
+        Path lockPath = lockDirectory.resolve(LOCK_FILENAME);
         FileChannel channel = FileChannel.open(
                 lockPath,
                 StandardOpenOption.CREATE,

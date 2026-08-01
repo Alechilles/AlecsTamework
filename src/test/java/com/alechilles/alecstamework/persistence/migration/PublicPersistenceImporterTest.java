@@ -219,6 +219,29 @@ class PublicPersistenceImporterTest {
     }
 
     @Test
+    void admissionLockUsesBackupExcludedLockFileAndStillSerializesAcquisition() throws Exception {
+        ImportCase testCase = importCase("public-v4-representative.sql");
+        Path lockPath = testCase.directory()
+                .resolve(ImportAdmissionLock.LOCK_DIRECTORY)
+                .resolve(ImportAdmissionLock.LOCK_FILENAME);
+
+        try (ImportAdmissionLock ignored = ImportAdmissionLock.acquire(testCase.directory())) {
+            assertTrue(Files.isRegularFile(lockPath));
+            try (var files = Files.walk(testCase.directory())) {
+                assertFalse(files.filter(Files::isRegularFile)
+                        .filter(path -> !path.endsWith("LOCK"))
+                        .anyMatch(lockPath::equals));
+            }
+
+            IllegalStateException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                    IllegalStateException.class,
+                    () -> ImportAdmissionLock.acquire(testCase.directory())
+            );
+            assertEquals("persistence_import_lock_unavailable", failure.getMessage());
+        }
+    }
+
+    @Test
     void activeAdmissionLockPreventsASecondPublisherFromStarting() throws Exception {
         ImportCase testCase = importCase("public-v4-representative.sql");
         try (ImportAdmissionLock ignored = ImportAdmissionLock.acquire(testCase.directory())) {
