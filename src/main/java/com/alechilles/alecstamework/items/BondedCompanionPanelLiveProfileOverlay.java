@@ -56,6 +56,42 @@ final class BondedCompanionPanelLiveProfileOverlay {
         return copy(profile, profile.displayName(), updated);
     }
 
+    /** Applies exact live progression while retaining unavailable talent data. */
+    @Nonnull
+    static BondedCompanionProfileView withProgression(
+            @Nonnull BondedCompanionProfileView profile,
+            @Nullable ProgressionSnapshot progression
+    ) {
+        if (progression == null) {
+            return profile;
+        }
+        Map<String, String> data = profile.snapshotPresentationData();
+        String level = Integer.toString(progression.level());
+        String currentXp = Double.toString(progression.currentXp());
+        if (progression.levelingConfigId().equals(data.get("levelingConfigId"))
+                && level.equals(data.get("level"))
+                && currentXp.equals(data.get("currentXp"))
+                && (progression.talentConfigId() == null
+                || progression.talentConfigId().equals(data.get("talentConfigId")))
+                && (progression.talentSpentPoints() == null
+                || Integer.toString(progression.talentSpentPoints()).equals(
+                        data.get("talentSpentPoints")))) {
+            return profile;
+        }
+        Map<String, String> updated = new LinkedHashMap<>(data);
+        updated.put("levelingConfigId", progression.levelingConfigId());
+        updated.put("level", level);
+        updated.put("currentXp", currentXp);
+        if (progression.talentConfigId() != null) {
+            updated.put("talentConfigId", progression.talentConfigId());
+        }
+        if (progression.talentSpentPoints() != null) {
+            updated.put("talentSpentPoints", Integer.toString(
+                    progression.talentSpentPoints()));
+        }
+        return copy(profile, profile.displayName(), updated);
+    }
+
     /** Applies the configured live flight state without persisting card data. */
     @Nonnull
     static BondedCompanionProfileView withFlightMode(
@@ -97,5 +133,15 @@ final class BondedCompanionPanelLiveProfileOverlay {
                 profile.storeAvailable(), profile.reviveAvailable(),
                 snapshotPresentationData, profile.activeLease(),
                 profile.summonCooldownUntilMs(), profile.reviveQuote());
+    }
+
+    /** Live-only level and talent values projected over durable panel data. */
+    record ProgressionSnapshot(
+            @Nonnull String levelingConfigId,
+            int level,
+            double currentXp,
+            @Nullable String talentConfigId,
+            @Nullable Integer talentSpentPoints
+    ) {
     }
 }
