@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.ui;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 /**
@@ -8,18 +11,22 @@ import java.util.function.LongSupplier;
  */
 public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
 
+    /** Value used by {@link #recordRendered(boolean, long)} when no countdown is visible. */
+    public static final long NO_COUNTDOWN_REMAINING_MS = -1L;
+
     private static final long PROGRESSION_INTERVAL_MS = 5_000L;
     private static final long COUNTDOWN_COARSE_INTERVAL_MS = 10_000L;
     private static final long COUNTDOWN_FINE_INTERVAL_MS = 1_000L;
     private static final long SAFETY_INTERVAL_MS = 30_000L;
 
     private final LongSupplier clock;
-    private final LinkedPanelRefreshSignalSource scheduler;
-    private final Runnable refreshCallback;
+    private final DelayedScheduler scheduler;
+    private final Consumer<RenderPermit> refreshCallback;
 
     private boolean closed;
     private boolean progressionRendered;
     private long lastProgressionRenderMs;
+    private boolean progressionPermitPending;
     private boolean immediatePending;
     private boolean progressionPending;
     private boolean countdownPending;
@@ -34,12 +41,12 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
      *
      * @param clock millisecond clock
      * @param scheduler delayed callback scheduler
-     * @param refreshCallback callback that refreshes the linked panel
+     * @param refreshCallback callback that refreshes the linked panel with its progression permit
      */
     public LinkedPanelRefreshCoordinator(
             LongSupplier clock,
-            LinkedPanelRefreshSignalSource scheduler,
-            Runnable refreshCallback
+            DelayedScheduler scheduler,
+            Consumer<RenderPermit> refreshCallback
     ) {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -64,7 +71,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         if (closed) {
             return;
         }
-        if (kind == LinkedPanelRefreshSignal.Kind.IMMEDIATE) {
+        if (Objects.requireNonNull(kind, "kind") == LinkedPanelRefreshSignal.Kind.IMMEDIATE) {
             scheduleImmediate();
             return;
         }
@@ -73,14 +80,18 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
 
     /**
      * Records the completed render so subsequent progression and countdown wakes can be timed.
+     * A visible countdown at zero requests an immediate expiration refresh; use
+     * {@link #NO_COUNTDOWN_REMAINING_MS} only when no countdown was rendered.
      *
      * @param progressionIncluded whether the render included progression data
-     * @param shortestCountdownRemainingMs shortest rendered countdown, or zero when absent
+     * @param shortestCountdownRemainingMs shortest rendered countdown, zero when visibly expired,
+     *                                     or {@link #NO_COUNTDOWN_REMAINING_MS} when absent
      */
     public synchronized void recordRendered(boolean progressionIncluded, long shortestCountdownRemainingMs) {
         if (closed) {
             return;
         }
+        progressionPermitPending = false;
         if (progressionIncluded) {
             progressionRendered = true;
             lastProgressionRenderMs = clock.getAsLong();
@@ -90,11 +101,12 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     /**
-     * Invalidates all queued callbacks permanently.
+     * Invalidates all queued callbacks permanently and waits for an admitted callback to finish.
      */
     @Override
     public synchronized void close() {
         closed = true;
+        progressionPermitPending = false;
         invalidateImmediate();
         invalidateProgression();
         invalidateCountdown();
@@ -111,7 +123,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     private void scheduleProgression() {
-        if (progressionPending) {
+        if (progressionPending || progressionPermitPending) {
             return;
         }
         long delayMs = progressionRendered
@@ -124,10 +136,10 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
 
     private void scheduleCountdown(long remainingMs) {
         invalidateCountdown();
-        if (remainingMs <= 0L) {
+        if (remainingMs == NO_COUNTDOWN_REMAINING_MS) {
             return;
         }
-        long delayMs = countdownDelay(remainingMs);
+        long delayMs = countdownDelay(Math.max(0L, remainingMs));
         countdownPending = true;
         long version = ++countdownVersion;
         scheduler.schedule(delayMs, () -> runCountdown(version));
@@ -152,61 +164,46 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         return remainingMs;
     }
 
-    private void runImmediate(long version) {
-        if (consumeImmediate(version)) {
-            refreshCallback.run();
-        }
-    }
-
-    private void runProgression(long version) {
-        if (consumeProgression(version)) {
-            refreshCallback.run();
-        }
-    }
-
-    private void runCountdown(long version) {
-        if (consumeCountdown(version)) {
-            refreshCallback.run();
-        }
-    }
-
-    private void runSafety(long version) {
-        if (consumeSafety(version)) {
-            refreshCallback.run();
-        }
-    }
-
-    private synchronized boolean consumeImmediate(long version) {
+    private synchronized void runImmediate(long version) {
         if (closed || version != immediateVersion || !immediatePending) {
-            return false;
+            return;
         }
         immediatePending = false;
-        return true;
+        admitRefresh();
     }
 
-    private synchronized boolean consumeProgression(long version) {
+    private synchronized void runProgression(long version) {
         if (closed || version != progressionVersion || !progressionPending) {
-            return false;
+            return;
         }
         progressionPending = false;
-        return true;
+        admitRefresh();
     }
 
-    private synchronized boolean consumeCountdown(long version) {
+    private synchronized void runCountdown(long version) {
         if (closed || version != countdownVersion || !countdownPending) {
-            return false;
+            return;
         }
         countdownPending = false;
-        return true;
+        admitRefresh();
     }
 
-    private synchronized boolean consumeSafety(long version) {
+    private synchronized void runSafety(long version) {
         if (closed || version != safetyVersion || !safetyPending) {
-            return false;
+            return;
         }
         safetyPending = false;
         scheduleSafety();
-        return true;
+        admitRefresh();
+    }
+
+    private void admitRefresh() {
+        boolean progressionEligible = !progressionPermitPending && (!progressionRendered
+                || clock.getAsLong() - lastProgressionRenderMs >= PROGRESSION_INTERVAL_MS);
+        if (progressionEligible) {
+            progressionPermitPending = true;
+        }
+        refreshCallback.accept(new RenderPermit(progressionEligible));
     }
 
     private void invalidateImmediate() {
@@ -227,5 +224,38 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private void invalidateSafety() {
         safetyPending = false;
         safetyVersion++;
+    }
+
+    /**
+     * Refresh admission state consumed by the page renderer.
+     *
+     * @param progressionEligible whether this render may include fresh progression values
+     */
+    public record RenderPermit(boolean progressionEligible) {
+    }
+
+    /**
+     * Schedules delayed coordinator callbacks without coupling page signals to executor mechanics.
+     */
+    @FunctionalInterface
+    public interface DelayedScheduler {
+
+        /**
+         * Creates the production scheduler backed by CompletableFuture's delayed executor.
+         *
+         * @return production delayed scheduler
+         */
+        static DelayedScheduler production() {
+            return (delayMs, callback) -> CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
+                    .execute(callback);
+        }
+
+        /**
+         * Schedules a callback after the supplied delay.
+         *
+         * @param delayMs delay in milliseconds
+         * @param callback work to run after the delay
+         */
+        void schedule(long delayMs, Runnable callback);
     }
 }

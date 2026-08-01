@@ -1,11 +1,21 @@
 package com.alechilles.alecstamework.ui;
 
-/**
- * Identifies the reason a linked-panel refresh was requested.
- */
-public final class LinkedPanelRefreshSignal {
+import java.util.Objects;
 
-    private LinkedPanelRefreshSignal() {
+/**
+ * Immutable reason for refreshing an open linked panel.
+ *
+ * @param kind refresh reason
+ */
+public record LinkedPanelRefreshSignal(Kind kind) {
+
+    /**
+     * Validates the refresh reason.
+     *
+     * @param kind refresh reason
+     */
+    public LinkedPanelRefreshSignal {
+        Objects.requireNonNull(kind, "kind");
     }
 
     /**

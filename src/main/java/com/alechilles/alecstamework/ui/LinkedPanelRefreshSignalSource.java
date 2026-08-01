@@ -1,29 +1,27 @@
 package com.alechilles.alecstamework.ui;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
- * Schedules a linked-panel refresh callback after a millisecond delay.
+ * Supplies scoped refresh signals to an open linked panel.
  */
 @FunctionalInterface
 public interface LinkedPanelRefreshSignalSource {
 
     /**
-     * Creates the production scheduler backed by CompletableFuture's delayed executor.
+     * Returns a source that never publishes a signal.
      *
-     * @return the production delayed scheduler
+     * @return no-op source for pages without scoped refresh events
      */
-    static LinkedPanelRefreshSignalSource production() {
-        return (delayMs, callback) -> CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
-                .execute(callback);
+    static LinkedPanelRefreshSignalSource none() {
+        return listener -> () -> { };
     }
 
     /**
-     * Schedules a callback after the supplied delay.
+     * Subscribes to refresh signals for the current page scope.
      *
-     * @param delayMs delay in milliseconds
-     * @param callback work to run after the delay
+     * @param listener signal receiver
+     * @return subscription that stops signal delivery when closed
      */
-    void schedule(long delayMs, Runnable callback);
+    AutoCloseable subscribe(Consumer<LinkedPanelRefreshSignal> listener);
 }
