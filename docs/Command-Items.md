@@ -211,9 +211,11 @@ Linked panel supports:
   `IN WORLD`, `STORED`, `DEAD`, and revive-ready states; health is always
   shown from the durable snapshot; and happiness, hunger, and thirst appear
   only when that saved role state actually has the corresponding component.
-  Level and available talent points are shown from durable progression data;
-  the talent shortcut opens the existing talent page while the companion is
-  active. Dead cards retain their complete compact revive-cost list, including
+  Active bonded rows project current level, XP, and available talent points from
+  their exact live companion, coalesced to avoid interrupting panel controls.
+  Stored and dead rows continue to use their durable progression snapshot. The
+  talent shortcut opens the existing talent page while the companion is active.
+  Dead cards retain their complete compact revive-cost list, including
   owned/required quantities, while the existing confirmation overlay remains
   the payment authority.
 - A bonded roster may set `SummonAuraEffectId` to an optional `EntityEffect`.
