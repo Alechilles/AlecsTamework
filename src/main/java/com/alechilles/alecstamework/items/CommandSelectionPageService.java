@@ -242,10 +242,7 @@ final class CommandSelectionPageService {
                         player, toolId, config
                 )
         );
-        LinkedPanelRefreshSignalSource pageSignals = config.usesBondedCompanionRoster()
-                && bondedRefreshSignals != null
-                ? bondedRefreshSignals.forRoster(player.getUuid(), config.getBondedRosterId())
-                : LinkedPanelRefreshSignalSource.none();
+        LinkedPanelRefreshSignalSource pageSignals = pageSignals(player, config);
         PageContext context = new PageContext(player, uiPlayerRef, config,
                 toolId, actions, player.getUuid(), genericRosterActions,
                 genericRosterActions ? genericCallbackAuthority : () -> false,
@@ -258,6 +255,19 @@ final class CommandSelectionPageService {
                 CommandTravelSettings.isRecallTeleportingEnabled());
         return createSelectionPage(context, buildNpcCallbacks(context),
                 buildFeatureCallbacks(context), buildPanelCallbacks(context));
+    }
+
+    LinkedPanelRefreshSignalSource pageSignals(Player player,
+                                                TwCommandItemConfig config) {
+        return pageSignals(player == null ? null : player.getUuid(), config);
+    }
+
+    LinkedPanelRefreshSignalSource pageSignals(UUID ownerUuid,
+                                                TwCommandItemConfig config) {
+        return ownerUuid != null && config != null && config.usesBondedCompanionRoster()
+                && bondedRefreshSignals != null
+                ? bondedRefreshSignals.forRoster(ownerUuid, config.getBondedRosterId())
+                : LinkedPanelRefreshSignalSource.none();
     }
 
     private TameworkCommandSelectionPage createSelectionPage(

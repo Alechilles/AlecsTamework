@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -155,6 +156,78 @@ public final class TameworkCommandSelectionPage
                 selectionCallback, LinkedPanelRefreshSignalSource.none());
     }
 
+    /** Compatibility constructor retained for existing flight-toggle callers. */
+    public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
+                                        @Nonnull TwCommandItemConfig config,
+                                        String selectedCommandId,
+                                        boolean requireUnlinkConfirm,
+                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
+                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcBaseEntriesSupplier,
+                                         @Nonnull Supplier<Map<UUID, CommandPanelFeaturePresentation>> featurePresentationSupplier,
+                                         @Nonnull Supplier<String> panelEmptyStateKeySupplier,
+                                         @Nonnull Supplier<String> panelModeValueSupplier,
+                                         @Nonnull Supplier<Boolean> panelAutoLinkEnabledSupplier,
+                                         @Nonnull Supplier<String> panelRadiusLabelSupplier,
+                                        @Nonnull Supplier<String> panelSortValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterModeValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterInputValueSupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier,
+                                        @Nonnull Supplier<String> panelGroupActivationValueSupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier,
+                                        @Nonnull Predicate<CommandEntry> commandOptionPredicate,
+                                        boolean recallActionEnabled,
+                                        @Nonnull Consumer<UUID> linkCallback,
+                                        @Nonnull Consumer<UUID> unlinkCallback,
+                                        @Nonnull Consumer<UUID> toggleActiveCallback,
+                                        @Nonnull Consumer<UUID> toggleBreedingCallback,
+                                         @Nonnull Consumer<UUID> releaseCallback,
+                                         @Nonnull Consumer<UUID> cullCallback,
+                                         @Nonnull Consumer<UUID> respawnCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterSummonCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterDismissCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction paidReviveCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction rosterAbandonCallback,
+                                         @Nonnull LinkedNpcPanelFeatureAction flightToggleCallback,
+                                         @Nonnull Consumer<UUID> locateCallback,
+                                         @Nonnull Consumer<UUID> recallCallback,
+                                         @Nonnull Consumer<UUID> setHomeCallback,
+                                          @Nonnull Consumer<UUID> returnHomeCallback,
+                                          @Nonnull Consumer<UUID> openTalentsCallback,
+                                          @Nonnull Consumer<String> panelSetModeCallback,
+                                          @Nonnull Consumer<Boolean> panelSetAutoLinkEnabledCallback,
+                                         @Nonnull Runnable panelRadiusDecreaseCallback,
+                                        @Nonnull Runnable panelRadiusIncreaseCallback,
+                                        @Nonnull Runnable panelManageGroupsCallback,
+                                        @Nonnull Consumer<String> panelSetSortCallback,
+                                        @Nonnull Consumer<String> panelSetFilterModeCallback,
+                                        @Nonnull Consumer<String> panelSetFilterTextCallback,
+                                        @Nonnull Runnable panelClearFiltersCallback,
+                                        @Nonnull Consumer<String> panelSetGroupActivationCallback,
+                                        @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
+                                        @Nonnull Consumer<String> selectionCallback) {
+        this(playerRef, config, selectedCommandId, requireUnlinkConfirm,
+                linkedNpcEntriesSupplier, linkedNpcBaseEntriesSupplier,
+                featurePresentationSupplier, panelEmptyStateKeySupplier,
+                panelModeValueSupplier, panelAutoLinkEnabledSupplier,
+                panelRadiusLabelSupplier, panelSortValueSupplier,
+                panelFilterModeValueSupplier, panelFilterInputValueSupplier,
+                panelGroupActivationEntriesSupplier, panelGroupActivationValueSupplier,
+                panelGroupAssignEntriesSupplier, commandOptionPredicate,
+                recallActionEnabled, linkCallback, unlinkCallback,
+                toggleActiveCallback, toggleBreedingCallback, releaseCallback,
+                cullCallback, respawnCallback, rosterSummonCallback,
+                rosterDismissCallback, paidReviveCallback, rosterAbandonCallback,
+                flightToggleCallback, locateCallback, recallCallback, setHomeCallback,
+                returnHomeCallback, openTalentsCallback, panelSetModeCallback,
+                panelSetAutoLinkEnabledCallback, panelRadiusDecreaseCallback,
+                panelRadiusIncreaseCallback, panelManageGroupsCallback,
+                panelSetSortCallback, panelSetFilterModeCallback,
+                panelSetFilterTextCallback, panelClearFiltersCallback,
+                panelSetGroupActivationCallback, panelAssignGroupCallback,
+                selectionCallback, LinkedPanelRefreshSignalSource.none());
+    }
+
+    /** Retains the page-scoped refresh source for linked-panel lifecycle wiring. */
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
@@ -203,7 +276,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<String> panelSetGroupActivationCallback,
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback,
-                                        LinkedPanelRefreshSignalSource... refreshSignalSources) {
+                                        @Nonnull LinkedPanelRefreshSignalSource refreshSignalSource) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.playerUuid = playerRef.getUuid();
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
@@ -238,8 +311,8 @@ public final class TameworkCommandSelectionPage
         this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
         this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
-        this.refreshSignalSource = refreshSignalSources.length == 0
-                ? LinkedPanelRefreshSignalSource.none() : refreshSignalSources[0];
+        this.refreshSignalSource = Objects.requireNonNull(refreshSignalSource,
+                "refreshSignalSource");
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.cardRenderState = new LinkedNpcPanelCardRenderState();
