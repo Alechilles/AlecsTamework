@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LinkedNpcPanelRefreshLifecycleTest {
 
@@ -70,6 +71,20 @@ class LinkedNpcPanelRefreshLifecycleTest {
         source.publish(LinkedPanelRefreshSignal.Kind.IMMEDIATE);
         scheduler.runAll();
         assertEquals(List.of(), permits);
+    }
+
+    @Test
+    void subscribeFailureClosesTheSeededCoordinator() {
+        ManualScheduler scheduler = new ManualScheduler();
+        LinkedNpcPanelRefreshLifecycle lifecycle = new LinkedNpcPanelRefreshLifecycle(
+                listener -> { throw new LinkageError("missing signal dependency"); },
+                new LinkedPanelRefreshCoordinator(() -> 0L, scheduler, ignored -> { }));
+
+        assertThrows(LinkageError.class, () -> lifecycle.start(true,
+                LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS));
+        scheduler.runAll();
+
+        assertEquals(List.of(), scheduler.callbacks);
     }
 
     private static final class ManualSignalSource implements LinkedPanelRefreshSignalSource {

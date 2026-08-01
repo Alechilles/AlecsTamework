@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LinkedNpcPanelRefreshPermitDispatchTest {
 
@@ -40,5 +41,23 @@ class LinkedNpcPanelRefreshPermitDispatchTest {
 
         assertEquals(1, workRuns.get());
         assertEquals(0, completed.get());
+    }
+
+    @Test
+    void throwingAdmissionCompletesTheExactPermitOnceBeforeRethrowing() {
+        LinkedPanelRefreshCoordinator.RenderPermit permit =
+                new LinkedPanelRefreshCoordinator.RenderPermit(44L, true);
+        AtomicInteger completed = new AtomicInteger();
+        AtomicInteger completedPermitId = new AtomicInteger();
+
+        assertThrows(LinkageError.class, () -> LinkedNpcPanelRefreshPermitDispatch.dispatch(
+                permit, ignored -> { throw new LinkageError("broken runtime"); },
+                () -> { }, rejected -> {
+                    completed.incrementAndGet();
+                    completedPermitId.set((int) rejected.id());
+                }));
+
+        assertEquals(1, completed.get());
+        assertEquals(44, completedPermitId.get());
     }
 }

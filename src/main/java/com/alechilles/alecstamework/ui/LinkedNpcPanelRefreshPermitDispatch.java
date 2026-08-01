@@ -22,8 +22,13 @@ final class LinkedNpcPanelRefreshPermitDispatch {
         Objects.requireNonNull(admittedWork, "admittedWork");
         Objects.requireNonNull(rejectedCompletion, "rejectedCompletion");
 
-        if (dispatchAdmission.dispatch(admittedWork)) {
-            return;
+        try {
+            if (dispatchAdmission.dispatch(admittedWork)) {
+                return;
+            }
+        } catch (RuntimeException | Error throwable) {
+            rejectedCompletion.accept(permit);
+            throw throwable;
         }
         rejectedCompletion.accept(permit);
     }

@@ -83,6 +83,19 @@ final class BondedCompanionCardPresenter {
         bindFlightToggle(commands, entrySelector, row, language);
     }
 
+    /** Patches progression-derived labels and tooltips without emitting events. */
+    static void refreshProgressionState(@Nonnull UICommandBuilder commands,
+                                        @Nonnull String entrySelector,
+                                        @Nonnull BondedCompanionPanelPresentation row,
+                                        boolean pendingUnlink, @Nullable String language) {
+        ProgressionSummary progression = progressionSummary(row.attributes(), row.roleId());
+        bindIdentity(commands, entrySelector, row, progression, language);
+        commands.set(entrySelector + " #BondedProgressionButton.Visible", !pendingUnlink);
+        commands.set(entrySelector + " #BondedProgressionButton.TooltipText", progression.visible()
+                ? progressionTooltip(progression, row.attributes()) : LocalizedText.resolve(language,
+                "tamework.ui.linkedPanel.bonded.talents.tooltip"));
+    }
+
     /**
      * Re-emits card input bindings without recreating any visible controls.
      *

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.api.BondedCompanionStateView;
+import com.alechilles.alecstamework.api.BondedCompanionActionBlockReason;
 import com.alechilles.alecstamework.api.CommandTimedSummoningState;
 import java.util.Map;
 import java.util.UUID;
@@ -43,10 +44,10 @@ class LinkedNpcPanelRefreshProjectionTest {
     }
 
     @Test
-    void countdownsReturnNoCountdownWhenEveryTimerIsAbsentOrZero() {
-        assertEquals(LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS,
+    void visibleRosterZeroPreservesTheExpirationWake() {
+        assertEquals(0L,
                 LinkedNpcPanelCountdowns.shortest(Map.of(UUID.randomUUID(),
-                        genericRoster(null, 0L))));
+                        genericRoster(0L, 0L))));
     }
 
     @Test
@@ -97,7 +98,7 @@ class LinkedNpcPanelRefreshProjectionTest {
                 "p", "r", "role", 1L, null, null, null, null, Map.of(), Map.of(),
                 new BondedCompanionStatusPresentation(BondedCompanionStateView.ACTIVE,
                         BondedCompanionStatusPresentation.Action.DISMISS, true,
-                        null, null, cooldownMs), null));
+                        BondedCompanionActionBlockReason.COOLDOWN_ACTIVE, null, cooldownMs), null));
     }
 
     private static CommandPanelFeaturePresentation bondedWithRevivalCooldown(long cooldownMs) {

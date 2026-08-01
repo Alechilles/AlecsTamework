@@ -28,10 +28,13 @@ final class LinkedNpcPanelReviveOverlayState {
     private boolean visible;
     private UUID npcUuid;
     private CommandReviveCostPresentation presentation;
+    private long revision;
 
     boolean isVisible() {
         return visible;
     }
+
+    long revision() { return revision; }
 
     void open(
             @Nonnull LinkedNpcEntry entry,
@@ -44,13 +47,18 @@ final class LinkedNpcPanelReviveOverlayState {
         visible = true;
         npcUuid = entry.npcUuid();
         presentation = quote;
+        revision++;
     }
 
     void refresh(@Nullable CommandPanelFeaturePresentation row) {
         if (!visible) {
             return;
         }
-        presentation = row == null ? null : row.revival();
+        CommandReviveCostPresentation refreshed = row == null ? null : row.revival();
+        if (!java.util.Objects.equals(presentation, refreshed)) {
+            presentation = refreshed;
+            revision++;
+        }
         if (presentation == null) {
             clear();
         }
@@ -73,9 +81,11 @@ final class LinkedNpcPanelReviveOverlayState {
     }
 
     void clear() {
+        if (!visible && npcUuid == null && presentation == null) return;
         visible = false;
         npcUuid = null;
         presentation = null;
+        revision++;
     }
 
     void applyTo(

@@ -23,7 +23,14 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
     synchronized void start(boolean progressionIncluded, long shortestCountdownRemainingMs) {
         if (closed || subscription != null) return;
         coordinator.seedInitialRender(progressionIncluded, shortestCountdownRemainingMs);
-        AutoCloseable created = signalSource.subscribe(this::onSignal);
+        AutoCloseable created;
+        try {
+            created = signalSource.subscribe(this::onSignal);
+        } catch (RuntimeException | LinkageError exception) {
+            closed = true;
+            coordinator.close();
+            throw exception;
+        }
         if (closed) {
             try { created.close(); } catch (Exception ignored) { }
             return;

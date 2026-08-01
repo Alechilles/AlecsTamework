@@ -106,6 +106,10 @@ final class LinkedNpcPanelFeatureController {
         return revision;
     }
 
+    long reviveOverlayRevision() {
+        return reviveOverlay.revision();
+    }
+
     void applyOverlay(
             com.hypixel.hytale.server.core.ui.builder.UICommandBuilder builder,
             String language

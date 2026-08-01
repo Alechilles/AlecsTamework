@@ -11,6 +11,21 @@ import javax.annotation.Nonnull;
 final class LinkedNpcPanelRefreshValues {
     private final Map<String, Object> previousValues = new HashMap<>();
 
+    LinkedNpcPanelRefreshValues staged() {
+        LinkedNpcPanelRefreshValues staged = new LinkedNpcPanelRefreshValues();
+        staged.previousValues.putAll(previousValues);
+        return staged;
+    }
+
+    void commitFrom(@Nonnull LinkedNpcPanelRefreshValues staged) {
+        previousValues.clear();
+        previousValues.putAll(staged.previousValues);
+    }
+
+    void remember(@Nonnull String selector, Object value) {
+        previousValues.put(selector, value);
+    }
+
     void set(@Nonnull UICommandBuilder commands, @Nonnull String selector,
              @Nonnull String value) {
         if (!changed(selector, value)) return;

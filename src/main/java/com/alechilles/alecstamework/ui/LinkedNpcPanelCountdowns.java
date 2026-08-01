@@ -30,14 +30,21 @@ final class LinkedNpcPanelCountdowns {
         if (bonded == null) {
             return current;
         }
-        long afterStatus = add(current, bonded.status().cooldownRemainingMs());
-        return add(afterStatus, positiveLong(bonded.attributes().get("sessionRemainingMs")));
+        long afterStatus = bonded.status().blockReason()
+                == com.alechilles.alecstamework.api.BondedCompanionActionBlockReason.COOLDOWN_ACTIVE
+                ? addVisible(current, bonded.status().cooldownRemainingMs()) : current;
+        Long sessionRemainingMs = bonded.attributes().containsKey("sessionRemainingMs")
+                ? parsedLong(bonded.attributes().get("sessionRemainingMs")) : null;
+        return sessionRemainingMs == null ? afterStatus
+                : addVisible(afterStatus, sessionRemainingMs);
     }
 
     private static long shortestRevivalCountdown(
             long current, CommandReviveCostPresentation revival
     ) {
-        return revival == null ? current : add(current, revival.cooldownRemainingMs());
+        return revival != null && revival.status()
+                == com.alechilles.alecstamework.api.PaidCommandRevivalQuote.Status.COOLDOWN
+                ? addVisible(current, revival.cooldownRemainingMs()) : current;
     }
 
     private static long shortestRosterCountdown(
@@ -48,7 +55,7 @@ final class LinkedNpcPanelCountdowns {
         }
         long afterRemaining = roster.remainingMs() == null
                 ? current
-                : add(current, roster.remainingMs());
+                : addVisible(current, roster.remainingMs());
         return add(afterRemaining, roster.cooldownRemainingMs());
     }
 
@@ -58,15 +65,17 @@ final class LinkedNpcPanelCountdowns {
         }
         return current < 0L ? candidate : Math.min(current, candidate);
     }
+    private static long addVisible(long current, long candidate) {
+        if (candidate < 0L) return current;
+        return current < 0L ? candidate : Math.min(current, candidate);
+    }
 
-    private static long positiveLong(String value) {
-        if (value == null) {
-            return 0L;
-        }
+    private static Long parsedLong(String value) {
+        if (value == null) return null;
         try {
             return Long.parseLong(value);
         } catch (NumberFormatException ignored) {
-            return 0L;
+            return null;
         }
     }
 }
