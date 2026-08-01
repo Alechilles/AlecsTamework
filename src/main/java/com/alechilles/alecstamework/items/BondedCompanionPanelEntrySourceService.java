@@ -251,6 +251,11 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         }
     }
 
+    AutoCloseable subscribe(@Nonnull UUID ownerUuid, @Nonnull String rosterId,
+                            @Nonnull Runnable listener) {
+        return cache.subscribe(ownerUuid, rosterId, listener);
+    }
+
     /** Refreshes the immutable profile generation after a rejected mutation. */
     void refresh(@Nullable UUID ownerUuid, @Nullable String rosterId) {
         if (ownerUuid != null && rosterId != null && !rosterId.isBlank()) {

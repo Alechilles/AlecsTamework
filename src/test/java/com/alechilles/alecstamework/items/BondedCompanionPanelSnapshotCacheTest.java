@@ -251,6 +251,52 @@ class BondedCompanionPanelSnapshotCacheTest {
                 .map(BondedCompanionProfileView::profileId).toList());
     }
 
+    @Test
+    void subscriberIsNotifiedForPublicationAndReplacementThenCanUnsubscribe()
+            throws Exception {
+        ManualExecutor worker = new ManualExecutor();
+        AtomicLong now = new AtomicLong();
+        ControlledApi api = new ControlledApi(worker);
+        var cache = cache(() -> api, worker, now);
+        AtomicInteger notifications = new AtomicInteger();
+        AutoCloseable subscription = cache.subscribe(OWNER, ROSTER,
+                notifications::incrementAndGet);
+
+        cache.peek(OWNER, ROSTER);
+        worker.runNext();
+        api.completeNext(List.of(profile("ready", 1L)));
+
+        assertEquals(1, notifications.get());
+
+        api.fire(change(OWNER, "ready", 2L));
+
+        assertEquals(2, notifications.get());
+        worker.runNext();
+        api.completeNext(List.of(profile("replacement", 2L)));
+
+        assertEquals(3, notifications.get());
+        subscription.close();
+        api.fire(change(OWNER, "replacement", 3L));
+
+        assertEquals(3, notifications.get());
+    }
+
+    @Test
+    void subscriberIsNotifiedWhenLoadFails() {
+        ManualExecutor worker = new ManualExecutor();
+        AtomicLong now = new AtomicLong();
+        ControlledApi api = new ControlledApi(worker);
+        var cache = cache(() -> api, worker, now);
+        AtomicInteger notifications = new AtomicInteger();
+        cache.subscribe(OWNER, ROSTER, notifications::incrementAndGet);
+
+        cache.peek(OWNER, ROSTER);
+        worker.runNext();
+        api.failNext();
+
+        assertEquals(1, notifications.get());
+    }
+
     private void failOneLoad(BondedCompanionPanelSnapshotCache cache,
                              ControlledApi api, ManualExecutor worker) {
         cache.peek(OWNER, ROSTER);

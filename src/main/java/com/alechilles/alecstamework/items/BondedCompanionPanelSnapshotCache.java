@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.BondedCompanionApi;
 import com.alechilles.alecstamework.api.BondedCompanionChangedEvent;
 import com.alechilles.alecstamework.api.BondedCompanionProfileView;
 import com.alechilles.alecstamework.api.BondedCompanionResult;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
     private final Settings settings;
     private final LinkedHashMap<Key, Entry> entries =
             new LinkedHashMap<>(16, 0.75F, true);
+    private final Map<Key, List<Runnable>> listeners = new LinkedHashMap<>();
     @Nullable private BondedCompanionApi subscribedApi;
     @Nullable private AutoCloseable subscription;
     private boolean closed;
@@ -123,6 +125,18 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
         peek(ownerUuid, rosterId);
     }
 
+    AutoCloseable subscribe(@Nonnull UUID ownerUuid, @Nonnull String rosterId,
+                            @Nonnull Runnable listener) {
+        Key key = new Key(ownerUuid, rosterId);
+        Objects.requireNonNull(listener, "listener");
+        synchronized (lock) {
+            if (closed) return () -> { };
+            listeners.computeIfAbsent(key, ignored -> new ArrayList<>())
+                    .add(listener);
+        }
+        return () -> removeListener(key, listener);
+    }
+
     /** Invalidates one known roster and immediately schedules its replacement. */
     void refresh(@Nonnull UUID ownerUuid, @Nonnull String rosterId) {
         Key key = new Key(ownerUuid, rosterId);
@@ -168,12 +182,14 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
         if (ownerUuid == null) return;
         synchronized (lock) {
             entries.keySet().removeIf(key -> ownerUuid.equals(key.ownerUuid()));
+            listeners.keySet().removeIf(key -> ownerUuid.equals(key.ownerUuid()));
         }
     }
 
     private void changed(BondedCompanionChangedEvent event) {
         if (event == null) return;
         Load load = null;
+        List<Runnable> notifications;
         long now = monotonicClock.getAsLong();
         Key key;
         try {
@@ -194,7 +210,9 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
             invalidate(entry);
             if (entry.loading) entry.reloadRequested = true;
             else load = begin(key, entry);
+            notifications = listenerSnapshot(key);
         }
+        notifyListeners(notifications);
         submit(load);
     }
 
@@ -320,6 +338,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
 
     private void published(Load load, List<BondedCompanionProfileView> profiles) {
         Load successor = null;
+        List<Runnable> notifications = List.of();
         synchronized (lock) {
             Entry current = entries.get(load.key());
             if (closed || current != load.entry()) return;
@@ -335,13 +354,16 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
                 current.nextRetryNanos = 0L;
                 current.loadedAtNanos = monotonicClock.getAsLong();
                 current.actionTrusted = true;
+                notifications = listenerSnapshot(load.key());
             }
         }
+        notifyListeners(notifications);
         submit(successor);
     }
 
     private void failed(Load load) {
         Load successor = null;
+        List<Runnable> notifications = List.of();
         long now = monotonicClock.getAsLong();
         synchronized (lock) {
             Entry current = entries.get(load.key());
@@ -357,9 +379,35 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
                         63, current.consecutiveFailures + 1);
                 current.nextRetryNanos = safeAdd(
                         now, retryDelay(current.consecutiveFailures));
+                notifications = listenerSnapshot(load.key());
             }
         }
+        notifyListeners(notifications);
         submit(successor);
+    }
+
+    private void removeListener(Key key, Runnable listener) {
+        synchronized (lock) {
+            List<Runnable> scoped = listeners.get(key);
+            if (scoped == null) return;
+            scoped.remove(listener);
+            if (scoped.isEmpty()) listeners.remove(key);
+        }
+    }
+
+    private List<Runnable> listenerSnapshot(Key key) {
+        List<Runnable> scoped = listeners.get(key);
+        return scoped == null ? List.of() : List.copyOf(scoped);
+    }
+
+    private static void notifyListeners(List<Runnable> listeners) {
+        for (Runnable listener : listeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException ignored) {
+                // A panel listener must not suppress cache publication.
+            }
+        }
     }
 
     private boolean current(Load load) {
@@ -432,6 +480,7 @@ final class BondedCompanionPanelSnapshotCache implements AutoCloseable {
             if (closed) return;
             closed = true;
             entries.clear();
+            listeners.clear();
             currentSubscription = subscription;
             subscription = null;
             subscribedApi = null;
