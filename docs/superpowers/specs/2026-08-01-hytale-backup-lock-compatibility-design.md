@@ -81,17 +81,22 @@ On first startup of the new implementation:
    process lock.
 3. If that lock is unavailable, fail with
    `persistence_engine_lock_unavailable`; another legacy owner may be active.
-4. Release and close the legacy handle, delete the now-proven-unowned regular
-   file, and create the empty directory sentinel at the same path.
+4. While retaining the exclusive legacy `FileLock`, revalidate the legacy path
+   with `NOFOLLOW_LINKS`, delete the former regular file, and create the empty
+   directory sentinel at the same path. Release the lock and close the handle
+   only after the sentinel has been created.
 5. If the legacy path is already a directory, retain it.
 6. Refuse other path types rather than replacing an unknown filesystem entry.
 7. Open and acquire the active `<data>/LOCK` lease.
 
-The file-to-directory transition has a very small close/delete/create window.
-Tamework does not support hot replacement of a running server process, and the
-old lock is explicitly acquired before conversion. This is sufficient for the
-supported stopped-server upgrade flow while preserving fail-closed behavior
-when an old process is actually active.
+The file-to-directory transition is deliberately performed while the legacy
+lock remains held, which preserves fail-closed behavior for cooperating
+Tamework processes during the supported stopped-server upgrade flow. Portable
+Java NIO cannot make a file-to-directory pathname replacement atomic against
+hostile external namespace mutation. That threat model is unsupported: this
+compatibility behavior covers Hytale's walks and reads plus cooperating
+Tamework processes, not external actors mutating the legacy path during
+migration.
 
 ### Import admission layout
 

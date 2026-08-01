@@ -4,7 +4,7 @@
 
 **Goal:** Prevent Tamework's held persistence lock files from causing base-game Hytale backups to fail on Windows while preserving single-process ownership and safe upgrades from older Tamework builds.
 
-**Architecture:** Move every actively held Tamework file lock to a file whose final path element is exactly `LOCK`, matching Hytale 0.5.7's backup exclusion contract. Before acquiring the engine lock, atomically retire the former engine lock file into an empty directory sentinel so an older Tamework build cannot silently start against an upgraded world. Keep engine manifest lineage and import behavior unchanged.
+**Architecture:** Move every actively held Tamework file lock to a file whose final path element is exactly `LOCK`, matching Hytale 0.5.7's backup exclusion contract. Before acquiring the engine lock, retain the exclusive legacy lock while revalidating its path with `NOFOLLOW_LINKS`, deleting the former regular file, and creating its empty directory sentinel so an older Tamework build cannot silently start against an upgraded world; release and close only afterward. This protects Hytale walks/reads and cooperating Tamework processes. Portable Java NIO cannot make the file-to-directory pathname replacement atomic against hostile external namespace mutation, which is unsupported and out of scope. Keep engine manifest lineage and import behavior unchanged.
 
 **Tech Stack:** Java 25, Java NIO `FileChannel`/`FileLock`, JUnit 5, Maven Wrapper, Hytale 0.5.7 Shared Source contract
 
@@ -89,7 +89,7 @@ final class LegacyEngineLockSentinel {
 }
 ```
 
-`retireRegularFile` must open the old path for writing, call `tryLock()`, map both a `null` result and `OverlappingFileLockException` to `IllegalStateException("persistence_engine_lock_unavailable")`, release and close the lock/channel, then delete the file and create the directory sentinel. If any lock remains held, the old file must not be deleted.
+`retireRegularFile` must open the old path for writing, call `tryLock()`, map both a `null` result and `OverlappingFileLockException` to `IllegalStateException("persistence_engine_lock_unavailable")`, and keep the acquired exclusive lock held while it revalidates the legacy path with `NOFOLLOW_LINKS`, deletes the file, and creates the directory sentinel. Release and close the lock/channel only after sentinel creation. If the lock cannot be acquired, the old file must not be deleted. Portable Java NIO does not provide atomic file-to-directory pathname replacement against hostile external namespace mutation; that scenario is outside the Hytale-backup and cooperating-Tamework-process compatibility scope.
 
 Handle a create race only by accepting the resulting path when it is a real directory under `NOFOLLOW_LINKS`; otherwise propagate the failure.
 
