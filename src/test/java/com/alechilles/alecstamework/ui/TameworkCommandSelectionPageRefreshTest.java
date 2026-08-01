@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -53,14 +54,21 @@ class TameworkCommandSelectionPageRefreshTest {
         Object service = genericActivationService();
         CapturedPackets englishPackets = new CapturedPackets();
         CapturedPackets otherPackets = new CapturedPackets();
+        AtomicInteger englishReads = new AtomicInteger();
+        AtomicInteger otherReads = new AtomicInteger();
         TameworkCommandSelectionPage englishPage = page(englishPackets,
                 new AtomicReference<>(feature(4, false)), new NavigationFixture(), genericConfig(),
-                genericActivationEntries(service, "en-US"));
+                OWNER, counted(englishReads, genericActivationEntries(service, "en-US")));
         TameworkCommandSelectionPage otherPage = page(otherPackets,
                 new AtomicReference<>(feature(4, false)), new NavigationFixture(), genericConfig(),
-                genericActivationEntries(service, "de-DE"));
+                UUID.fromString("a1000000-0000-0000-0000-000000000002"),
+                counted(otherReads, genericActivationEntries(service, "de-DE")));
         build(englishPage); build(otherPage);
+        int englishReadsBeforeRefresh = englishReads.get();
+        int otherReadsBeforeRefresh = otherReads.get();
         refresh(englishPage, true); refresh(otherPage, true);
+        assertTrue(englishReads.get() > englishReadsBeforeRefresh);
+        assertTrue(otherReads.get() > otherReadsBeforeRefresh);
         assertEquals(0, englishPackets.updates.size());
         assertEquals(0, otherPackets.updates.size());
     }
@@ -189,10 +197,13 @@ class TameworkCommandSelectionPageRefreshTest {
         return page(packets, feature, fixture, commandConfig, List::of);
     }
     private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> activationEntries) throws Exception {
+        return page(packets, feature, fixture, commandConfig, OWNER, activationEntries);
+    }
+    private static TameworkCommandSelectionPage page(CapturedPackets packets, AtomicReference<CommandPanelFeaturePresentation> feature, NavigationFixture fixture, TwCommandItemConfig commandConfig, UUID owner, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> activationEntries) throws Exception {
         try (AutoCloseable ignored = LinkedNpcPanelRefreshTestSeam.installPacketSender(packets::capture);
              AutoCloseable ignoredNavigator = LinkedNpcPanelRefreshTestSeam.installDeferredNavigator(fixture::defer)) {
             PlayerRef player = (PlayerRef) unsafe().allocateInstance(PlayerRef.class);
-            put(player, "uuid", OWNER); put(player, "username", "PageRefreshTester"); put(player, "language", "en-US");
+            put(player, "uuid", owner); put(player, "username", "PageRefreshTester"); put(player, "language", "en-US");
             Consumer<UUID> noUuid = value -> { }; Consumer<String> noString = value -> { }; BiConsumer<UUID, String> noGroup = (a, b) -> { };
             return new TameworkCommandSelectionPage(player, commandConfig, null, true,
                     () -> List.of(ENTRY), () -> List.of(ENTRY), () -> Map.of(CARD, feature.get()), () -> null,
@@ -224,6 +235,13 @@ class TameworkCommandSelectionPageRefreshTest {
             } catch (ReflectiveOperationException exception) {
                 throw new AssertionError(exception);
             }
+        };
+    }
+    private static Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> counted(
+            AtomicInteger reads, Supplier<List<com.hypixel.hytale.server.core.ui.DropdownEntryInfo>> supplier) {
+        return () -> {
+            reads.incrementAndGet();
+            return supplier.get();
         };
     }
     private static void event(TameworkCommandSelectionPage page, String command) throws Exception {
