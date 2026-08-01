@@ -264,7 +264,7 @@ Omitted `Source` remains equivalent to `{ "Type": "Target" }`; preserve the exis
 
 - [ ] **Step 2: Add filesystem boundary tests**
 
-Using temporary directories, assert exact mod-ID lookup, missing/unloaded plugin handling, relative normalized paths only, rejection of absolute paths and `..`, rejection of every symlink or junction component and symlink-swap attempt, final resolved path containment, regular-file requirement, 4 MiB maximum, UTF-8 JSON parsing, and no logged source or expected values.
+Using temporary directories and a narrow deterministic read seam, assert exact mod-ID lookup, missing/unloaded plugin handling, relative normalized paths only, rejection of absolute paths and `..`, rejection of every symlink, junction, or reparse-like component, final resolved path containment, observable path/attribute swap failure, regular-file requirement, 4 MiB maximum before and during reads, UTF-8 JSON parsing, successful Windows-style null-file-key fallback, and no logged source or expected values.
 
 - [ ] **Step 3: Run and confirm failure**
 
@@ -274,7 +274,7 @@ Using temporary directories, assert exact mod-ID lookup, missing/unloaded plugin
 
 - [ ] **Step 4: Implement source resolution**
 
-Resolve `ModData` roots from `PluginManager#getPlugins()` and `PluginBase#getDataDirectory()`. Use `SecureDirectoryStream` relative opens where supported; otherwise compare no-follow attributes, file keys, real-path containment, and size before and after the read, failing closed on any uncertainty. Cache the first parsed document snapshot by source identity for one generation pass; do not start file watchers.
+Resolve `ModData` roots from `PluginManager#getPlugins()` and `PluginBase#getDataDirectory()`. Use `SecureDirectoryStream` relative opens where supported. Otherwise reject symbolic/reparse-like components, open the final file read-only with `NOFOLLOW_LINKS`, and compare no-follow basic/DOS attributes, available file keys, real-path containment, size, and timestamps before and after the read. Fail closed on every observable change; permit a null file key on Windows while documenting that this practical fallback cannot eliminate a precisely timed unobservable parent-directory swap. Cache the first parsed document snapshot by source identity for one generation pass; do not start file watchers.
 
 - [ ] **Step 5: Implement safe diagnostics**
 

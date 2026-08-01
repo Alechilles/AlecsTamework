@@ -340,9 +340,14 @@ Mod-data paths obey these rules:
 - normalized and real paths must remain inside the selected plugin data root;
 - every path segment is opened without following symbolic links;
 - use `SecureDirectoryStream` relative opens when the filesystem supports it;
-- otherwise verify no-follow attributes, file keys, and containment before and
-  after the read, failing closed if containment cannot be proven;
-- symlink and symlink-swap escapes rejected;
+- otherwise verify no-follow basic/DOS attributes, available file keys,
+  reparse-like component rejection, real-path containment, size, and timestamps
+  before and after the read, failing closed on every observable change;
+- Windows filesystems that expose neither `SecureDirectoryStream` nor stable
+  file keys use this practical fallback with a null file key permitted. This
+  rejects ordinary symlink, junction, and containment escapes but cannot
+  mathematically eliminate a precisely timed, otherwise unobservable parent
+  directory swap; that limitation is explicit rather than overstated;
 - read-only access;
 - maximum file size of 4 MiB.
 
