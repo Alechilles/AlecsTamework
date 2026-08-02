@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionSettings;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -94,16 +95,10 @@ final class BondedCompanionTalentMutationService {
         if (talent == null || leveling.getLevel() < talent.getMinLevel()) {
             return null;
         }
-        TameworkTalentsComponent updated = existing == null
-                ? new TameworkTalentsComponent(
-                        config.getId(),
-                        0,
-                        new String[0],
-                        config.getAllocationRevision()
-                )
-                : existing.clone();
-        updated.setConfigId(config.getId());
-        updated.setAllocationRevision(config.getAllocationRevision());
+        TameworkTalentsComponent updated = CompanionTalentService.reconcileAllocation(existing, config);
+        if (updated == null) {
+            return null;
+        }
         if (updated.hasPurchasedTalent(talent.getId())
                 || !hasPrerequisites(updated, talent)
                 || availablePoints(leveling, updated) < talent.getPointCost()) {
@@ -128,8 +123,11 @@ final class BondedCompanionTalentMutationService {
                 && existing.getPurchasedTalentIds().length == 0)) {
             return null;
         }
-        TameworkTalentsComponent updated = existing.clone();
         TwTalentConfig config = resolveConfig(existing, roleId);
+        TameworkTalentsComponent updated = CompanionTalentService.reconcileAllocation(existing, config);
+        if (updated == null) {
+            return null;
+        }
         if (config != null) {
             updated.setConfigId(config.getId());
             updated.setAllocationRevision(config.getAllocationRevision());
@@ -152,16 +150,11 @@ final class BondedCompanionTalentMutationService {
             TameworkTalentsComponent talents,
             String roleId
     ) {
-        if (talents != null && talents.getConfigId() != null
-                && !talents.getConfigId().isBlank()) {
-            TwTalentConfig configured = TwTalentConfig.resolveById(
-                    talents.getConfigId());
-            if (configured != null) {
-                return configured;
-            }
+        if (roleId == null || roleId.isBlank()) {
+            return null;
         }
-        return roleId == null || roleId.isBlank()
-                ? null : TwTalentConfig.resolveForRole(roleId);
+        TwTalentConfig config = TwTalentConfig.resolveForRole(roleId);
+        return config != null && config.isEnabled() ? config : null;
     }
 
     private boolean hasPrerequisites(

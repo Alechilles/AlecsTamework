@@ -107,7 +107,7 @@ public final class CompanionTalentService {
      * pure with respect to the supplied component and is package-visible for focused tests.
      */
     @Nullable
-    static TameworkTalentsComponent reconcileAllocation(@Nullable TameworkTalentsComponent existing,
+    public static TameworkTalentsComponent reconcileAllocation(@Nullable TameworkTalentsComponent existing,
                                                         @Nullable TwTalentConfig config) {
         if (config == null || !config.isEnabled()) {
             return existing;
@@ -240,7 +240,7 @@ public final class CompanionTalentService {
         if (type == null) {
             return PurchaseResult.invalid("Talent storage is unavailable.");
         }
-        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
+        TameworkTalentsComponent existing = reconcileTalentsComponent(npcRef, store, roleId);
         TwTalentConfig config = resolveConfig(existing, roleId);
         if (config == null || !config.isEnabled()) {
             return PurchaseResult.invalid("No talent tree is configured for this companion.");
