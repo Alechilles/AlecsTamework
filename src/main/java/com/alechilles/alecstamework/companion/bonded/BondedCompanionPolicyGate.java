@@ -20,8 +20,14 @@ final class BondedCompanionPolicyGate {
     }
 
     Check forProfile(BondedCompanionProfile profile, long expectedRevision) {
-        return map(resolver.resolve(
+        Check check = map(resolver.resolve(
                 profile.rosterId(), profile.familyId(), expectedRevision
+        ));
+        if (!check.allowed()) {
+            return check;
+        }
+        return new Check(null, BondedCompanionTalentTimerPolicyModifier.apply(
+                check.policy(), profile
         ));
     }
 
