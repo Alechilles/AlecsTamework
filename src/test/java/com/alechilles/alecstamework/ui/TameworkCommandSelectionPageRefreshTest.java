@@ -123,7 +123,30 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
-    void flightToggleDefersItsRefreshSoRepeatedClicksStayAvailable() throws Exception {
+    void dynamicFlightRefreshRebindsTheToggleForTheNextClick() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicReference<CommandPanelFeaturePresentation> feature =
+                new AtomicReference<>(feature(4, true, false));
+        TameworkCommandSelectionPage page = page(packets, feature);
+
+        build(page);
+        feature.set(feature(4, true, true));
+        refresh(page, true);
+
+        CapturedUpdate update = packets.updates.getFirst();
+        assertCommand(update,
+                "#TameworkLinkedPanelList[0] #BondedFlightModeAirborneIcon.Visible");
+        assertTrue(java.util.Arrays.stream(update.events.getEvents()).anyMatch(event ->
+                        event.type == com.hypixel.hytale.protocol.packets.interface_
+                                .CustomUIEventBindingType.Activating
+                                && ("#TameworkLinkedPanelList[0] "
+                                + "#BondedFlightToggleButton").equals(event.selector)
+                                && event.data.contains("__bonded_flight_toggle__:" + CARD)),
+                "A dynamic visual refresh must preserve the next flight-toggle click.");
+    }
+
+    @Test
+    void flightToggleRetriesRefreshAfterTheNpcHookHasTimeToSettle() throws Exception {
         CapturedPackets packets = new CapturedPackets();
         TameworkCommandSelectionPage page = page(packets,
                 new AtomicReference<>(feature(4, true)));
@@ -144,9 +167,9 @@ class TameworkCommandSelectionPageRefreshTest {
         clock.set(10_250L);
         event(page, "__bonded_flight_toggle__:" + CARD);
 
-        assertEquals(List.of(500L, 500L), scheduler.delays);
+        assertEquals(List.of(500L, 1_500L, 500L, 1_500L), scheduler.delays);
         scheduler.runAll();
-        assertEquals(1, refreshes.get());
+        assertEquals(2, refreshes.get());
     }
 
     @Test
@@ -284,7 +307,25 @@ class TameworkCommandSelectionPageRefreshTest {
     }
     private static TwCommandItemConfig config() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"BondedCompanions\",\"BondedRosterId\":\"test:roster\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
     private static TwCommandItemConfig genericConfig() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
-    private static CommandPanelFeaturePresentation feature(int level, boolean available) { return CommandPanelFeaturePresentation.bonded(new BondedCompanionPanelPresentation("profile", "test:roster", "role", 1L, "Nimbus", "Nimbus", "Female", null, Map.of("level", Integer.toString(level), "currentXp", "12", "levelingConfigId", "levels", "talentConfigId", "talents", "talentSpentPoints", "1", "bonded.flightToggle.available", Boolean.toString(available)), Map.of(), new BondedCompanionStatusPresentation(BondedCompanionStateView.ACTIVE, BondedCompanionStatusPresentation.Action.DISMISS, true, null, 0L), null)); }
+    private static CommandPanelFeaturePresentation feature(int level, boolean available) {
+        return feature(level, available, false);
+    }
+    private static CommandPanelFeaturePresentation feature(
+            int level, boolean available, boolean airborne) {
+        return CommandPanelFeaturePresentation.bonded(
+                new BondedCompanionPanelPresentation("profile", "test:roster",
+                        "role", 1L, "Nimbus", "Nimbus", "Female", null,
+                        Map.of("level", Integer.toString(level), "currentXp", "12",
+                                "levelingConfigId", "levels", "talentConfigId", "talents",
+                                "talentSpentPoints", "1", "bonded.flightToggle.available",
+                                Boolean.toString(available),
+                                "bonded.flightToggle.airborne",
+                                Boolean.toString(airborne)),
+                        Map.of(), new BondedCompanionStatusPresentation(
+                                BondedCompanionStateView.ACTIVE,
+                                BondedCompanionStatusPresentation.Action.DISMISS,
+                                true, null, 0L), null));
+    }
     private static void assertCommand(CapturedUpdate update, String selector) { assertTrue(java.util.Arrays.stream(update.commands.getCommands()).anyMatch(command -> selector.equals(command.selector))); }
     private static void put(Object target, String name, Object value) throws Exception { Field field = PlayerRef.class.getDeclaredField(name); field.setAccessible(true); unsafe().putObject(target, unsafe().objectFieldOffset(field), value); }
     private static Unsafe unsafe() throws Exception { Field field = Unsafe.class.getDeclaredField("theUnsafe"); field.setAccessible(true); return (Unsafe) field.get(null); }

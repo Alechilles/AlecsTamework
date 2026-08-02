@@ -495,7 +495,7 @@ final class BondedCompanionCardPresenter {
                         BondedCompanionPresentationAttributes.FLIGHT_TOGGLE_AVAILABLE));
     }
 
-    private static void bindFlightToggleEvents(
+    static void bindFlightToggleEvents(
             UIEventBuilder events,
             String entrySelector,
             UUID cardUuid,

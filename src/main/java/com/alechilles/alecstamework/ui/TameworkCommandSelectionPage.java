@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -1018,14 +1019,27 @@ public final class TameworkCommandSelectionPage
                     bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false,
                             featurePresentations.get(linkedNpcEntries[i].npcUuid()));
                 } else if (update == LinkedNpcPanelCardRenderState.Update.DYNAMIC) {
+                    UUID npcUuid = linkedNpcEntries[i].npcUuid();
                     CommandPanelFeaturePresentation current =
-                            featurePresentations.get(linkedNpcEntries[i].npcUuid());
+                            featurePresentations.get(npcUuid);
                     BondedCompanionCardPresenter.refreshDynamicState(
                             commandBuilder, "#TameworkLinkedPanelList[" + i + "]",
                             current.bonded(), resolveLanguage());
                     BondedCompanionCardPresenter.refreshProgressionState(commandBuilder,
                             "#TameworkLinkedPanelList[" + i + "]", current.bonded(),
-                            isPendingUnlink(linkedNpcEntries[i].npcUuid()), resolveLanguage());
+                            isPendingUnlink(npcUuid), resolveLanguage());
+                    CommandPanelFeaturePresentation previous =
+                            cardRenderState.presentation(npcUuid);
+                    String flightModeAttribute = BondedCompanionPresentationAttributes
+                            .FLIGHT_TOGGLE_AIRBORNE;
+                    if (!Objects.equals(previous.bonded().attributes().get(
+                                    flightModeAttribute),
+                            current.bonded().attributes().get(flightModeAttribute))) {
+                        BondedCompanionCardPresenter.bindFlightToggleEvents(
+                                eventBuilder,
+                                "#TameworkLinkedPanelList[" + i + "]", npcUuid,
+                                current.bonded(), cardBindingConfig);
+                    }
                 }
             }
         }

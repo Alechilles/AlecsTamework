@@ -16,6 +16,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
 
     private static final long PROGRESSION_INTERVAL_MS = 5_000L;
     private static final long INTERACTION_FEEDBACK_DELAY_MS = 500L;
+    private static final long INTERACTION_FEEDBACK_RETRY_DELAY_MS = 1_500L;
     private static final long COUNTDOWN_COARSE_INTERVAL_MS = 10_000L;
     private static final long COUNTDOWN_FINE_INTERVAL_MS = 1_000L;
     private static final long SAFETY_INTERVAL_MS = 30_000L;
@@ -111,7 +112,9 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         interactionFeedbackPending = true;
         long version = ++interactionFeedbackVersion;
         scheduler.schedule(INTERACTION_FEEDBACK_DELAY_MS,
-                () -> runInteractionFeedback(version));
+                () -> runInteractionFeedback(version, false));
+        scheduler.schedule(INTERACTION_FEEDBACK_RETRY_DELAY_MS,
+                () -> runInteractionFeedback(version, true));
     }
 
     /**
@@ -237,12 +240,15 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         admitRefresh();
     }
 
-    private synchronized void runInteractionFeedback(long version) {
+    private synchronized void runInteractionFeedback(long version,
+                                                      boolean finalAttempt) {
         if (closed || version != interactionFeedbackVersion
                 || !interactionFeedbackPending) {
             return;
         }
-        interactionFeedbackPending = false;
+        if (finalAttempt) {
+            interactionFeedbackPending = false;
+        }
         admitRefresh();
     }
 
