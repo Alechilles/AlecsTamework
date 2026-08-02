@@ -435,6 +435,9 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (handleLinkedFlightToggle(commandId, ref, store)) {
+            return;
+        }
         if (handleBondedFlightToggle(commandId, ref, store)) {
             return;
         }
@@ -794,6 +797,23 @@ public final class TameworkCommandSelectionPage
                 com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes
                         .FLIGHT_TOGGLE_AVAILABLE))) {
             flightToggleCallback.accept(cardUuid, ref, store);
+        }
+        refreshLinkedNpcEntries();
+        refreshLifecycle.requestInteractionFeedback();
+        return true;
+    }
+
+    private boolean handleLinkedFlightToggle(
+            String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
+        if (!commandId.startsWith(LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
+            return false;
+        }
+        UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
+                LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX);
+        LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
+        if (!rosterEventBoundary.bondedRoster() && entry != null && entry.linked()
+                && entry.loaded() && entry.flightToggleAvailable()) {
+            flightToggleCallback.accept(npcUuid, ref, store);
         }
         refreshLinkedNpcEntries();
         refreshLifecycle.requestInteractionFeedback();

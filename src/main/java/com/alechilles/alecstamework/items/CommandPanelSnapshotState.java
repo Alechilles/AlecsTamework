@@ -37,4 +37,12 @@ final class CommandPanelSnapshotState {
     CommandPanelFeaturePresentation presentation(UUID id) {
         return id == null ? null : current.featurePresentations().get(id);
     }
+
+    LinkedNpcEntry entry(UUID id) {
+        if (id == null) return null;
+        for (LinkedNpcEntry entry : current.entries()) {
+            if (id.equals(entry.npcUuid())) return entry;
+        }
+        return null;
+    }
 }

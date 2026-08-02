@@ -87,7 +87,8 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.harvestCooldownKnown(),
                     entry.recallPending(),
                     entry.recallLostRemainingMs()
-            );
+            ).withFlightToggle(entry.flightToggleAvailable(),
+                    entry.flightToggleAirborne());
             if (entry.recoveryHeld()) {
                 snapshot = snapshot.withRecoveryHold(entry.recoveryIncidentId());
             }

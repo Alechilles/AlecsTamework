@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -26,6 +28,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
@@ -196,7 +199,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         LinkedNpcTraitIndicator[] traitIndicators =
                 progressionPresentationService.readLoadedTraitIndicators(npcRef, store, language);
 
-        return new LinkedNpcEntry(
+        LinkedNpcEntry entry = new LinkedNpcEntry(
                 npcUuid,
                 displayName,
                 gender,
@@ -245,6 +248,13 @@ final class CommandLoadedNpcStatusSnapshotService {
                 false,
                 0L
         );
+        TwCompanionFlightToggleSettings flightToggle =
+                TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
+                        .getFlightToggle();
+        Optional<Boolean> flightMode = new BondedCompanionFlightModeReader()
+                .read(npc, flightToggle);
+        return entry.withFlightToggle(flightMode.isPresent(),
+                flightMode.orElse(false));
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,

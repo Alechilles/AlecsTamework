@@ -415,7 +415,8 @@ public final class CommandItemFeatureHandler {
                                 ? (owner, roster, profile) -> null
                                 : panelEntrySourceService.bondedReadModel()::currentTrustedProfile)::toggle,
                 BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
-                bondedRefreshSignals
+                bondedRefreshSignals,
+                new CommandLinkedFlightToggleActionService()::toggle
         );
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,

@@ -196,6 +196,10 @@ Linked panel supports:
   the latest custom display name from the live snapshot or durable profile,
   including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
+- Loaded normal linked rows whose role enables `FlightToggle` show the same
+  ground/flight icon button as bonded roster cards. The action is available
+  only while the live controller is recognized and the row remains linked to
+  the currently authorized command item.
 - Owner/command-family roster rows additionally show their authoritative
   timed-summon state, remaining duration or cooldown, active population count
   and limit, with `Summon` and `Dismiss` actions where valid.

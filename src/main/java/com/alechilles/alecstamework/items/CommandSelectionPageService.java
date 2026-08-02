@@ -34,6 +34,7 @@ final class CommandSelectionPageService {
     private final BondedCompanionPanelActionRouter bondedActions;
     private final BondedCompanionTalentPageService bondedTalentPages;
     private final FlightToggleAction flightToggleActions;
+    private final LinkedFlightToggleAction linkedFlightToggleActions;
     private final EventPlayerResolver flightTogglePlayers;
     @javax.annotation.Nullable private final BondedCompanionPanelRefreshSignalSource bondedRefreshSignals;
 
@@ -152,6 +153,28 @@ final class CommandSelectionPageService {
             EventPlayerResolver flightTogglePlayers,
             @javax.annotation.Nullable BondedCompanionPanelRefreshSignalSource bondedRefreshSignals
     ) {
+        this(toolInventoryService, groupAssignPageService, resolutionService,
+                panelActionService, talentPageService, featurePresentations,
+                featureActions, bondedActions, bondedTalentPages,
+                flightToggleActions, flightTogglePlayers, bondedRefreshSignals,
+                null);
+    }
+
+    CommandSelectionPageService(
+            CommandToolInventoryService toolInventoryService,
+            CommandGroupAssignPageService groupAssignPageService,
+            CommandResolutionService resolutionService,
+            CommandPanelActionService panelActionService,
+            CommandTalentPageService talentPageService,
+            CommandPanelFeaturePresentationSource featurePresentations,
+            CommandPanelFeatureActionService featureActions,
+            BondedCompanionPanelActionRouter bondedActions,
+            BondedCompanionTalentPageService bondedTalentPages,
+            FlightToggleAction flightToggleActions,
+            EventPlayerResolver flightTogglePlayers,
+            @javax.annotation.Nullable BondedCompanionPanelRefreshSignalSource bondedRefreshSignals,
+            LinkedFlightToggleAction linkedFlightToggleActions
+    ) {
         this.toolInventoryService = toolInventoryService;
         this.groupAssignPageService = groupAssignPageService;
         this.resolutionService = resolutionService;
@@ -161,6 +184,7 @@ final class CommandSelectionPageService {
         this.bondedActions = bondedActions;
         this.bondedTalentPages = bondedTalentPages;
         this.flightToggleActions = flightToggleActions;
+        this.linkedFlightToggleActions = linkedFlightToggleActions;
         this.flightTogglePlayers = flightTogglePlayers;
         this.bondedRefreshSignals = bondedRefreshSignals;
     }
@@ -386,15 +410,24 @@ final class CommandSelectionPageService {
 
     private LinkedNpcPanelFeatureAction flightToggleCallback(PageContext context) {
         return (uuid, eventRef, eventStore) -> {
-            if (!context.config().usesBondedCompanionRoster()
-                    || flightToggleActions == null) return;
-            CommandPanelFeaturePresentation feature = context.snapshot().presentation(uuid);
-            if (feature == null || feature.bonded() == null
-                    || !BondedCompanionFlightToggleActionService
-                    .isFlightToggleAvailable(feature.bonded())) return;
-            routeFlightToggle(context.ownerUuid(), eventRef, eventStore,
-                    context.config(), context.toolId(), feature.bonded(),
-                    context.bondedLifecycleAuthority());
+            if (context.config().usesBondedCompanionRoster()) {
+                CommandPanelFeaturePresentation feature = context.snapshot().presentation(uuid);
+                if (feature == null || feature.bonded() == null
+                        || !BondedCompanionFlightToggleActionService
+                        .isFlightToggleAvailable(feature.bonded())) return;
+                routeFlightToggle(context.ownerUuid(), eventRef, eventStore,
+                        context.config(), context.toolId(), feature.bonded(),
+                        context.bondedLifecycleAuthority());
+                return;
+            }
+            com.alechilles.alecstamework.ui.LinkedNpcEntry entry = context.snapshot()
+                    .entry(uuid);
+            if (!context.genericRosterActions() || !context.genericAuthority().getAsBoolean()
+                    || entry == null || !entry.linked() || !entry.loaded()
+                    || !entry.flightToggleAvailable()
+                    || linkedFlightToggleActions == null) return;
+            linkedFlightToggleActions.toggle(context.ownerUuid(), eventRef, eventStore,
+                    context.toolId(), uuid);
         };
     }
 
@@ -721,6 +754,13 @@ final class CommandSelectionPageService {
         boolean toggle(UUID ownerUuid, Ref<EntityStore> eventPlayerRef,
                        Store<EntityStore> eventStore, String itemId,
                        com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation row);
+    }
+
+    @FunctionalInterface
+    interface LinkedFlightToggleAction {
+        boolean toggle(UUID ownerUuid, Ref<EntityStore> eventPlayerRef,
+                       Store<EntityStore> eventStore, String itemId,
+                       UUID npcUuid);
     }
 
     @FunctionalInterface

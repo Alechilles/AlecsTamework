@@ -50,7 +50,7 @@ Group {
     }
 
     Label #Name {
-        Anchor: (Top: 0, Left: 38, Width: 168, Height: 22);
+        Anchor: (Top: 0, Left: 38, Right: 58, Height: 22);
         Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
         Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -70,7 +70,7 @@ Group {
     }
 
     Group #TraitStrip {
-        Anchor: (Top: 1, Right: 34, Width: 108, Height: 24);
+        Anchor: (Top: 1, Right: 54, Width: 108, Height: 24);
         LayoutMode: Left;
 
         Group #TraitSlot0 {
@@ -1016,6 +1016,27 @@ Group {
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
+    }
+
+    Group #FlightModeGroundedIcon {
+        Anchor: (Top: 0, Right: 24, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Grounded.png");
+        Visible: false;
+    }
+
+    Group #FlightModeAirborneIcon {
+        Anchor: (Top: 0, Right: 24, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/FlightMode_Airborne.png");
+        Visible: false;
+    }
+
+    TextButton #FlightToggleButton {
+        Anchor: (Top: 0, Right: 24, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
     }
 
     Label #RosterState {

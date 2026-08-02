@@ -58,6 +58,8 @@ public final class LinkedNpcEntry {
     private final boolean traitsActionEnabled;
     private final boolean talentsActionVisible;
     private final boolean talentsActionEnabled;
+    private final boolean flightToggleAvailable;
+    private final boolean flightToggleAirborne;
 
     public LinkedNpcEntry(UUID npcUuid,
                           String displayName,
@@ -481,6 +483,8 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = traitsActionEnabled;
         this.talentsActionVisible = talentsActionVisible;
         this.talentsActionEnabled = talentsActionEnabled;
+        this.flightToggleAvailable = false;
+        this.flightToggleAirborne = false;
     }
 
     public boolean hasHealth() {
@@ -659,6 +663,16 @@ public final class LinkedNpcEntry {
         return recoveryHeld;
     }
 
+    /** Whether this live linked companion can switch controller family. */
+    public boolean flightToggleAvailable() {
+        return flightToggleAvailable;
+    }
+
+    /** Whether the configured flight toggle currently resolves to flight. */
+    public boolean flightToggleAirborne() {
+        return flightToggleAirborne;
+    }
+
     public String recoveryIncidentId() {
         return recoveryIncidentId;
     }
@@ -666,6 +680,12 @@ public final class LinkedNpcEntry {
     /** Returns an immutable presentation copy marked with its scoped recovery incident. */
     public LinkedNpcEntry withRecoveryHold(String incidentId) {
         return new LinkedNpcEntry(this, true, incidentId);
+    }
+
+    /** Returns an immutable presentation copy with its live flight-toggle state. */
+    public LinkedNpcEntry withFlightToggle(boolean available, boolean airborne) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                available, airborne);
     }
 
     public double healthRatio() {
@@ -768,6 +788,15 @@ public final class LinkedNpcEntry {
     private LinkedNpcEntry(LinkedNpcEntry source,
                            boolean recoveryHeld,
                            String incidentId) {
+        this(source, recoveryHeld, incidentId, source.flightToggleAvailable,
+                source.flightToggleAirborne);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source,
+                           boolean recoveryHeld,
+                           String incidentId,
+                           boolean flightToggleAvailable,
+                           boolean flightToggleAirborne) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -815,6 +844,8 @@ public final class LinkedNpcEntry {
         this.traitsActionEnabled = source.traitsActionEnabled;
         this.talentsActionVisible = source.talentsActionVisible;
         this.talentsActionEnabled = source.talentsActionEnabled;
+        this.flightToggleAvailable = flightToggleAvailable;
+        this.flightToggleAirborne = flightToggleAvailable && flightToggleAirborne;
         this.recoveryHeld = recoveryHeld;
         this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
     }
@@ -896,6 +927,8 @@ public final class LinkedNpcEntry {
                 && traitsActionEnabled == other.traitsActionEnabled
                 && talentsActionVisible == other.talentsActionVisible
                 && talentsActionEnabled == other.talentsActionEnabled
+                && flightToggleAvailable == other.flightToggleAvailable
+                && flightToggleAirborne == other.flightToggleAirborne
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
                 && Objects.equals(gender, other.gender)
@@ -959,7 +992,9 @@ public final class LinkedNpcEntry {
                 traitsActionVisible,
                 traitsActionEnabled,
                 talentsActionVisible,
-                talentsActionEnabled
+                talentsActionEnabled,
+                flightToggleAvailable,
+                flightToggleAirborne
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
         return result;

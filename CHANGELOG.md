@@ -3,6 +3,8 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
+- Loaded normal linked-companion cards now expose configured flight/ground mode
+  switching alongside bonded roster cards.
 - Embedded Patchwork 1.0.0 as Tamework's asset-patch runtime. A newer compatible standalone or embedded Patchwork copy can win the shared version-first election, while asset-only packs can depend on Patchwork and ship only JSON patch definitions.
 - Added composable Patchwork conditions and registered mod-data JSON sources for optional integrations. The former Tamework-setting check is replaced by general JSON-path comparisons against registered mod data roots.
 - Companion species, equipment, traits, levels, and talents can now influence travel speed on foot and while natively ridden.

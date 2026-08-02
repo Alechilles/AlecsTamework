@@ -97,6 +97,9 @@ final class LinkedNpcPanelCardBinder {
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
         String returnHomeSelector = entrySelector + " #ReturnHomeButton";
+        String flightToggleSelector = entrySelector + " #FlightToggleButton";
+        String flightModeGroundedSelector = entrySelector + " #FlightModeGroundedIcon";
+        String flightModeAirborneSelector = entrySelector + " #FlightModeAirborneIcon";
         String releaseSelector = entrySelector + " #ReleaseButton";
         String cullSelector = entrySelector + " #CullButton";
 
@@ -154,6 +157,8 @@ final class LinkedNpcPanelCardBinder {
                 legacyLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
                 legacyLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
+        boolean showFlightToggle = legacyLinked && entry.loaded()
+                && entry.flightToggleAvailable() && !pendingUnlink;
         boolean showRespawn = paidRevivalManaged
                 ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
                 : showReviveAction;
@@ -194,6 +199,16 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         commandBuilder.set(breedingToggleEnabledSelector + ".Visible", showBreedingToggleEnabled);
         commandBuilder.set(breedingToggleDisabledSelector + ".Visible", showBreedingToggleDisabled);
+        commandBuilder.set(flightToggleSelector + ".Visible", showFlightToggle);
+        commandBuilder.set(flightModeGroundedSelector + ".Visible",
+                showFlightToggle && !entry.flightToggleAirborne());
+        commandBuilder.set(flightModeAirborneSelector + ".Visible",
+                showFlightToggle && entry.flightToggleAirborne());
+        commandBuilder.set(flightToggleSelector + ".TooltipText", showFlightToggle
+                ? LocalizedText.resolve(language, entry.flightToggleAirborne()
+                        ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
+                        : "tamework.ui.linkedPanel.bonded.flight.switchToFlight")
+                : "");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         LinkedNpcPanelGroupTabBinder.bind(
                 commandBuilder,
@@ -356,6 +371,17 @@ final class LinkedNpcPanelCardBinder {
                     CustomUIEventBindingType.Activating,
                     cullSelector,
                     EventData.of(config.eventCommandId(), config.cullCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showFlightToggle) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    flightToggleSelector,
+                    EventData.of(config.eventCommandId(),
+                            CommandSelectionPageEventBinder
+                                    .LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX
+                                    + entry.npcUuid()),
                     false
             );
         }
