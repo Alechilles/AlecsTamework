@@ -95,9 +95,15 @@ final class BondedCompanionTalentMutationService {
             return null;
         }
         TameworkTalentsComponent updated = existing == null
-                ? new TameworkTalentsComponent(config.getId(), 0, new String[0])
+                ? new TameworkTalentsComponent(
+                        config.getId(),
+                        0,
+                        new String[0],
+                        config.getAllocationRevision()
+                )
                 : existing.clone();
         updated.setConfigId(config.getId());
+        updated.setAllocationRevision(config.getAllocationRevision());
         if (updated.hasPurchasedTalent(talent.getId())
                 || !hasPrerequisites(updated, talent)
                 || availablePoints(leveling, updated) < talent.getPointCost()) {
@@ -126,6 +132,7 @@ final class BondedCompanionTalentMutationService {
         TwTalentConfig config = resolveConfig(existing, roleId);
         if (config != null) {
             updated.setConfigId(config.getId());
+            updated.setAllocationRevision(config.getAllocationRevision());
         }
         updated.setSpentPoints(0);
         updated.setPurchasedTalentIds(new String[0]);

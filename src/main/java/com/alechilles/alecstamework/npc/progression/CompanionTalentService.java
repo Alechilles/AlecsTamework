@@ -6,7 +6,9 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -49,15 +51,31 @@ public final class CompanionTalentService {
     public static TameworkTalentsComponent ensureTalentsComponent(@Nullable Ref<EntityStore> npcRef,
                                                                  @Nullable Store<EntityStore> store,
                                                                  @Nullable String roleIdHint) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
             return null;
         }
-        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+        return reconcileTalentsComponent(npcRef, store, roleIdHint);
+    }
+
+    /**
+     * Reconciles saved talent allocation state against the enabled tree for the supplied role.
+     * A missing or disabled role config is intentionally a no-op so a config reload cannot erase
+     * allocations while its assets are unavailable.
+     */
+    @Nullable
+    public static TameworkTalentsComponent reconcileTalentsComponent(@Nullable Ref<EntityStore> npcRef,
+                                                                      @Nullable Store<EntityStore> store,
+                                                                      @Nullable String roleIdHint) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
         ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
         if (type == null) {
             return null;
+        }
+        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return existing;
         }
         String roleId = roleIdHint;
         if (roleId == null || roleId.isBlank()) {
@@ -68,27 +86,137 @@ public final class CompanionTalentService {
         }
         TwTalentConfig config = TwTalentConfig.resolveForRole(roleId);
         if (config == null || !config.isEnabled()) {
-            return null;
+            return store.getComponent(npcRef, type);
         }
         String resolvedConfigId = config.getId();
         if (resolvedConfigId == null || resolvedConfigId.isBlank()) {
+            return existing;
+        }
+        TameworkTalentsComponent reconciled = reconcileAllocation(existing, config);
+        if (existing == null || !sameState(existing, reconciled)) {
+            store.putComponent(npcRef, type, reconciled);
+            if (allocationChanged(existing, reconciled)) {
+                CompanionStatModifierService.applyTraitModifiers(npcRef, store);
+            }
+        }
+        return reconciled;
+    }
+
+    /**
+     * Applies one config's compatibility contract to a persisted allocation. This method is
+     * pure with respect to the supplied component and is package-visible for focused tests.
+     */
+    @Nullable
+    static TameworkTalentsComponent reconcileAllocation(@Nullable TameworkTalentsComponent existing,
+                                                        @Nullable TwTalentConfig config) {
+        if (config == null || !config.isEnabled()) {
+            return existing;
+        }
+        String configId = config.getId();
+        if (configId == null || configId.isBlank()) {
+            return existing;
+        }
+        if (existing == null) {
+            return new TameworkTalentsComponent(
+                    configId,
+                    0,
+                    new String[0],
+                    config.getAllocationRevision()
+            );
+        }
+        if (isAllocationCompatible(existing, config)) {
+            TameworkTalentsComponent preserved = existing.clone();
+            preserved.setConfigId(configId);
+            preserved.setAllocationRevision(config.getAllocationRevision());
+            return preserved;
+        }
+        return new TameworkTalentsComponent(
+                configId,
+                0,
+                new String[0],
+                config.getAllocationRevision()
+        );
+    }
+
+    public static boolean isAllocationCompatible(@Nullable TameworkTalentsComponent component,
+                                                 @Nullable TwTalentConfig config) {
+        if (component == null || config == null || !config.isEnabled()) {
+            return false;
+        }
+        String configId = config.getId();
+        return configId != null
+                && !configId.isBlank()
+                && component.getConfigId() != null
+                && configId.equalsIgnoreCase(component.getConfigId().trim())
+                && component.getAllocationRevision() == config.getAllocationRevision()
+                && hasValidAllocation(component, config);
+    }
+
+    private static boolean hasValidAllocation(@Nonnull TameworkTalentsComponent component,
+                                              @Nonnull TwTalentConfig config) {
+        Set<String> purchasedIds = new java.util.HashSet<>();
+        long spentCost = 0L;
+        for (String rawTalentId : component.getPurchasedTalentIds()) {
+            String talentId = normalizeId(rawTalentId);
+            if (talentId == null || !purchasedIds.add(talentId)) {
+                return false;
+            }
+            TwTalentConfig.TalentDefinition talent = config.findTalent(rawTalentId);
+            if (talent == null) {
+                return false;
+            }
+            spentCost += talent.getPointCost();
+            if (spentCost > Integer.MAX_VALUE) {
+                return false;
+            }
+        }
+        if (spentCost != component.getSpentPoints()) {
+            return false;
+        }
+        for (String rawTalentId : component.getPurchasedTalentIds()) {
+            TwTalentConfig.TalentDefinition talent = config.findTalent(rawTalentId);
+            if (talent == null) {
+                return false;
+            }
+            for (String requiredId : talent.getRequiresTalentIds()) {
+                String normalizedRequiredId = normalizeId(requiredId);
+                if (normalizedRequiredId != null && !purchasedIds.contains(normalizedRequiredId)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameState(@Nullable TameworkTalentsComponent left,
+                                     @Nullable TameworkTalentsComponent right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return java.util.Objects.equals(left.getConfigId(), right.getConfigId())
+                && left.getAllocationRevision() == right.getAllocationRevision()
+                && left.getSpentPoints() == right.getSpentPoints()
+                && Arrays.equals(left.getPurchasedTalentIds(), right.getPurchasedTalentIds());
+    }
+
+    private static boolean allocationChanged(@Nullable TameworkTalentsComponent before,
+                                             @Nonnull TameworkTalentsComponent after) {
+        if (before == null) {
+            return false;
+        }
+        return before.getSpentPoints() != after.getSpentPoints()
+                || !Arrays.equals(before.getPurchasedTalentIds(), after.getPurchasedTalentIds());
+    }
+
+    @Nullable
+    private static String normalizeId(@Nullable String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
-        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
-        if (existing == null) {
-            TameworkTalentsComponent created = new TameworkTalentsComponent(resolvedConfigId, 0, new String[0]);
-            store.putComponent(npcRef, type, created);
-            return created;
-        }
-        if (existing.getConfigId() == null
-                || existing.getConfigId().isBlank()
-                || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId())) {
-            TameworkTalentsComponent updated = existing.clone();
-            updated.setConfigId(resolvedConfigId);
-            store.putComponent(npcRef, type, updated);
-            return updated;
-        }
-        return existing;
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 
     @Nonnull
@@ -125,6 +253,7 @@ public final class CompanionTalentService {
                 ? existing.clone()
                 : new TameworkTalentsComponent(config.getId(), 0, new String[0]);
         component.setConfigId(config.getId());
+        component.setAllocationRevision(config.getAllocationRevision());
         if (component.hasPurchasedTalent(talent.getId())) {
             return PurchaseResult.invalid("That talent is already unlocked.");
         }
@@ -172,10 +301,12 @@ public final class CompanionTalentService {
             return ResetResult.invalid("No talent points are spent.");
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        TwTalentConfig config = resolveConfig(existing, roleId);
-        TameworkTalentsComponent component = existing.clone();
+        TwTalentConfig config = resolveRoleConfig(roleId);
+        TameworkTalentsComponent reconciled = reconcileAllocation(existing, config);
+        TameworkTalentsComponent component = reconciled == null ? existing.clone() : reconciled.clone();
         if (config != null) {
             component.setConfigId(config.getId());
+            component.setAllocationRevision(config.getAllocationRevision());
         }
         component.setSpentPoints(0);
         component.setPurchasedTalentIds(new String[0]);
@@ -269,13 +400,29 @@ public final class CompanionTalentService {
     @Nullable
     private static TwTalentConfig resolveConfig(@Nullable TameworkTalentsComponent component,
                                                 @Nullable String roleId) {
+        TwTalentConfig roleConfig = resolveRoleConfig(roleId);
+        if (roleConfig != null) {
+            return roleConfig;
+        }
+        if (roleId != null && !roleId.isBlank()) {
+            return null;
+        }
         if (component != null && component.getConfigId() != null && !component.getConfigId().isBlank()) {
             TwTalentConfig byId = TwTalentConfig.resolveById(component.getConfigId());
-            if (byId != null) {
+            if (byId != null && byId.isEnabled()) {
                 return byId;
             }
         }
-        return roleId == null || roleId.isBlank() ? null : TwTalentConfig.resolveForRole(roleId);
+        return null;
+    }
+
+    @Nullable
+    private static TwTalentConfig resolveRoleConfig(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        TwTalentConfig config = TwTalentConfig.resolveForRole(roleId);
+        return config != null && config.isEnabled() ? config : null;
     }
 
     private static boolean hasPrerequisites(@Nonnull TameworkTalentsComponent component,

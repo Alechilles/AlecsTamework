@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.ComponentType;
@@ -346,6 +347,7 @@ final class InteractionStateEffects implements InteractionRoleChangeEffects {
                 changeAppearance,
                 store
         );
+        CompanionTalentService.reconcileTalentsComponent(npcRef, store, roleId);
         applyDisableSpawnDrivenDespawn(npcRef, store);
         logDespawnDebug("set_role", npcRef, store, roleId);
         return true;

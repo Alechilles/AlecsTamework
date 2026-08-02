@@ -37,19 +37,41 @@ public final class TameworkTalentsComponent implements Component<EntityStore> {
                     TameworkTalentsComponent::getPurchasedTalentIds
             )
             .add()
+            .append(
+                    new KeyedCodec<>("AllocationRevision", Codec.LONG),
+                    TameworkTalentsComponent::setAllocationRevision,
+                    TameworkTalentsComponent::getAllocationRevision
+            )
+            .add()
             .build();
 
     private String configId;
     private int spentPoints;
+    private long allocationRevision;
     private String[] purchasedTalentIds = ArrayUtil.EMPTY_STRING_ARRAY;
 
     public TameworkTalentsComponent() {
     }
 
     public TameworkTalentsComponent(String configId, int spentPoints, String[] purchasedTalentIds) {
+        this(configId, spentPoints, purchasedTalentIds, 0L);
+    }
+
+    public TameworkTalentsComponent(String configId,
+                                    int spentPoints,
+                                    String[] purchasedTalentIds,
+                                    long allocationRevision) {
         this.configId = configId;
         setSpentPoints(spentPoints);
         setPurchasedTalentIds(purchasedTalentIds);
+        setAllocationRevision(allocationRevision);
+    }
+
+    public TameworkTalentsComponent(String configId,
+                                    long allocationRevision,
+                                    int spentPoints,
+                                    String[] purchasedTalentIds) {
+        this(configId, spentPoints, purchasedTalentIds, allocationRevision);
     }
 
     public static ComponentType<EntityStore, TameworkTalentsComponent> getComponentType() {
@@ -63,6 +85,14 @@ public final class TameworkTalentsComponent implements Component<EntityStore> {
 
     public void setConfigId(String configId) {
         this.configId = configId;
+    }
+
+    public long getAllocationRevision() {
+        return allocationRevision;
+    }
+
+    public void setAllocationRevision(long allocationRevision) {
+        this.allocationRevision = Math.max(0L, allocationRevision);
     }
 
     public int getSpentPoints() {
@@ -98,7 +128,8 @@ public final class TameworkTalentsComponent implements Component<EntityStore> {
         return new TameworkTalentsComponent(
                 configId,
                 spentPoints,
-                purchasedTalentIds == null ? ArrayUtil.EMPTY_STRING_ARRAY : purchasedTalentIds.clone()
+                purchasedTalentIds == null ? ArrayUtil.EMPTY_STRING_ARRAY : purchasedTalentIds.clone(),
+                allocationRevision
         );
     }
 

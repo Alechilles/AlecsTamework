@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -12,6 +13,8 @@ import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -115,7 +118,26 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (isLifeStageBootstrapRequired(reference, store, roleId)) {
             return true;
         }
+        if (isTalentBootstrapRequired(reference, store, roleId)) {
+            return true;
+        }
         return isTraitBootstrapRequired(reference, store, roleId);
+    }
+
+    private boolean isTalentBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                              @Nonnull Store<EntityStore> store,
+                                              @Nonnull String roleId) {
+        TwTalentConfig config = TwTalentConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType =
+                TameworkTalentsComponent.getComponentType();
+        if (talentsType == null) {
+            return false;
+        }
+        TameworkTalentsComponent talents = store.getComponent(reference, talentsType);
+        return talents == null || !CompanionTalentService.isAllocationCompatible(talents, config);
     }
 
     private boolean isNeedsBootstrapRequired(@Nonnull Ref<EntityStore> reference,

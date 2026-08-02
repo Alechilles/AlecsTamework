@@ -151,6 +151,13 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Priority used when multiple configs apply; higher values take precedence.")
             .add()
+            .<Long>append(
+                    new KeyedCodec<>("AllocationRevision", Codec.LONG),
+                    (asset, value) -> asset.setAllocationRevision(value == null ? 0L : value),
+                    TwTalentConfig::getAllocationRevision
+            )
+            .documentation("Revision of the purchasable allocation schema. Changing it resets incompatible saved allocations.")
+            .add()
             .<String[]>append(
                     new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
                     (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
@@ -178,6 +185,7 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
     private String id;
     private boolean enabled = true;
     private int priority;
+    private long allocationRevision;
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private TalentDefinition[] talents = EMPTY_TALENTS;
 
@@ -322,6 +330,7 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
     public void inheritMissingTopLevelFrom(@Nonnull TwTalentConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("AllocationRevision")) allocationRevision = parent.allocationRevision;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
         if (!explicitTopLevelKeys.contains("Talents")) talents = parent.talents;
     }
@@ -339,6 +348,14 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
 
     public int getPriority() {
         return priority;
+    }
+
+    public long getAllocationRevision() {
+        return allocationRevision;
+    }
+
+    public void setAllocationRevision(long allocationRevision) {
+        this.allocationRevision = Math.max(0L, allocationRevision);
     }
 
     public String[] getRoleIds() {
