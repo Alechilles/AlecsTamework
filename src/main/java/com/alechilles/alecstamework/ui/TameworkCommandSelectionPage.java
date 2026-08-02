@@ -796,7 +796,7 @@ public final class TameworkCommandSelectionPage
             flightToggleCallback.accept(cardUuid, ref, store);
         }
         refreshLinkedNpcEntries();
-        sendCardRefreshUpdate();
+        refreshLifecycle.requestInteractionFeedback();
         return true;
     }
 

@@ -49,6 +49,15 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
         coordinator.request(LinkedPanelRefreshSignal.Kind.IMMEDIATE);
     }
 
+    /**
+     * Coalesces visual feedback after a repeatable control's click burst so
+     * each click does not open its own UI ACK window.
+     */
+    synchronized void requestInteractionFeedback() {
+        if (closed) return;
+        coordinator.requestInteractionFeedback();
+    }
+
     void recordRendered(LinkedPanelRefreshCoordinator.RenderPermit permit,
                         boolean progressionIncluded, long shortestCountdownRemainingMs) {
         coordinator.recordRendered(permit, progressionIncluded, shortestCountdownRemainingMs);

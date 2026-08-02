@@ -15,6 +15,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     public static final long NO_COUNTDOWN_REMAINING_MS = -1L;
 
     private static final long PROGRESSION_INTERVAL_MS = 5_000L;
+    private static final long INTERACTION_FEEDBACK_DELAY_MS = 500L;
     private static final long COUNTDOWN_COARSE_INTERVAL_MS = 10_000L;
     private static final long COUNTDOWN_FINE_INTERVAL_MS = 1_000L;
     private static final long SAFETY_INTERVAL_MS = 30_000L;
@@ -31,10 +32,12 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private boolean progressionDirty;
     private boolean countdownExpirationWakeAttempted;
     private boolean immediatePending;
+    private boolean interactionFeedbackPending;
     private boolean progressionPending;
     private boolean countdownPending;
     private boolean safetyPending;
     private long immediateVersion;
+    private long interactionFeedbackVersion;
     private long progressionVersion;
     private long countdownVersion;
     private long safetyVersion;
@@ -100,6 +103,18 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     }
 
     /**
+     * Restarts a short trailing wake used to reconcile repeatable controls
+     * after their current click burst has ended.
+     */
+    synchronized void requestInteractionFeedback() {
+        if (closed) return;
+        interactionFeedbackPending = true;
+        long version = ++interactionFeedbackVersion;
+        scheduler.schedule(INTERACTION_FEEDBACK_DELAY_MS,
+                () -> runInteractionFeedback(version));
+    }
+
+    /**
      * Records the completed render so subsequent progression and countdown wakes can be timed.
      * A visible countdown at zero requests an immediate expiration refresh; use
      * {@link #NO_COUNTDOWN_REMAINING_MS} only when no countdown was rendered.
@@ -149,6 +164,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         outstandingProgressionPermitId = 0L;
         progressionDirty = false;
         invalidateImmediate();
+        invalidateInteractionFeedback();
         invalidateProgression();
         invalidateCountdown();
         invalidateSafety();
@@ -221,6 +237,15 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         admitRefresh();
     }
 
+    private synchronized void runInteractionFeedback(long version) {
+        if (closed || version != interactionFeedbackVersion
+                || !interactionFeedbackPending) {
+            return;
+        }
+        interactionFeedbackPending = false;
+        admitRefresh();
+    }
+
     private synchronized void runProgression(long version) {
         if (closed || version != progressionVersion || !progressionPending) {
             return;
@@ -259,6 +284,11 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private void invalidateImmediate() {
         immediatePending = false;
         immediateVersion++;
+    }
+
+    private void invalidateInteractionFeedback() {
+        interactionFeedbackPending = false;
+        interactionFeedbackVersion++;
     }
 
     private void invalidateProgression() {

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -119,6 +120,33 @@ class TameworkCommandSelectionPageRefreshTest {
         TameworkCommandSelectionPage page = page(packets, feature);
         build(page); feature.set(feature(4, true)); refresh(page, true);
         assertTrue(packets.updates.getFirst().events.getEvents().length > 0);
+    }
+
+    @Test
+    void flightToggleDefersItsRefreshSoRepeatedClicksStayAvailable() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(feature(4, true)));
+        invoke(page, "refreshLinkedNpcEntries");
+        RecordingScheduler scheduler = new RecordingScheduler();
+        AtomicLong clock = new AtomicLong();
+        AtomicInteger refreshes = new AtomicInteger();
+        LinkedPanelRefreshCoordinator coordinator = new LinkedPanelRefreshCoordinator(
+                clock::get, scheduler, ignored -> refreshes.incrementAndGet());
+        coordinator.seedInitialRender(true,
+                LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+        replaceRefreshLifecycle(page,
+                new LinkedNpcPanelRefreshLifecycle(LinkedPanelRefreshSignalSource.none(),
+                        coordinator));
+
+        clock.set(10_000L);
+        event(page, "__bonded_flight_toggle__:" + CARD);
+        clock.set(10_250L);
+        event(page, "__bonded_flight_toggle__:" + CARD);
+
+        assertEquals(List.of(500L, 500L), scheduler.delays);
+        scheduler.runAll();
+        assertEquals(1, refreshes.get());
     }
 
     @Test
@@ -247,6 +275,13 @@ class TameworkCommandSelectionPageRefreshTest {
     private static void event(TameworkCommandSelectionPage page, String command) throws Exception {
         CommandSelectionEventData data = new CommandSelectionEventData(); Field field = CommandSelectionEventData.class.getDeclaredField("commandId"); field.setAccessible(true); unsafe().putObject(data, unsafe().objectFieldOffset(field), command); page.handleDataEvent(null, null, data);
     }
+    private static void replaceRefreshLifecycle(TameworkCommandSelectionPage page,
+                                                LinkedNpcPanelRefreshLifecycle lifecycle)
+            throws Exception {
+        Field field = TameworkCommandSelectionPage.class.getDeclaredField("refreshLifecycle");
+        field.setAccessible(true);
+        unsafe().putObject(page, unsafe().objectFieldOffset(field), lifecycle);
+    }
     private static TwCommandItemConfig config() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"BondedCompanions\",\"BondedRosterId\":\"test:roster\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
     private static TwCommandItemConfig genericConfig() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
     private static CommandPanelFeaturePresentation feature(int level, boolean available) { return CommandPanelFeaturePresentation.bonded(new BondedCompanionPanelPresentation("profile", "test:roster", "role", 1L, "Nimbus", "Nimbus", "Female", null, Map.of("level", Integer.toString(level), "currentXp", "12", "levelingConfigId", "levels", "talentConfigId", "talents", "talentSpentPoints", "1", "bonded.flightToggle.available", Boolean.toString(available)), Map.of(), new BondedCompanionStatusPresentation(BondedCompanionStateView.ACTIVE, BondedCompanionStatusPresentation.Action.DISMISS, true, null, 0L), null)); }
@@ -256,5 +291,15 @@ class TameworkCommandSelectionPageRefreshTest {
     private static final class CapturedPackets { private final List<CapturedUpdate> updates = new ArrayList<>(); private boolean fail; private int attempts; private void capture(UICommandBuilder commands, UIEventBuilder events) { attempts++; if (fail) throw new IllegalStateException("synthetic send failure"); updates.add(new CapturedUpdate(commands, events)); } }
     private static final class NavigationFixture { private final SignalSource source = new SignalSource(); private Runnable deferred; private int talents; private int groups; private void defer(PlayerRef player, Runnable action) { deferred = action; } private void talent(UUID ignored) { talents++; } private void groups() { groups++; } private void run() { deferred.run(); } }
     private static final class SignalSource implements LinkedPanelRefreshSignalSource { private int closes; @Override public AutoCloseable subscribe(Consumer<LinkedPanelRefreshSignal> listener) { return () -> closes++; } }
+    private static final class RecordingScheduler
+            implements LinkedPanelRefreshCoordinator.DelayedScheduler {
+        private final List<Long> delays = new ArrayList<>();
+        private final List<Runnable> callbacks = new ArrayList<>();
+        @Override public void schedule(long delayMs, Runnable callback) {
+            delays.add(delayMs);
+            callbacks.add(callback);
+        }
+        private void runAll() { callbacks.forEach(Runnable::run); }
+    }
     private record CapturedUpdate(UICommandBuilder commands, UIEventBuilder events) { }
 }
