@@ -397,7 +397,7 @@ public final class TwBondedCompanionRosterConfig implements
         String roleId;
         TwItemCostComponent[] costs = TwItemCostComponent.EMPTY_ARRAY;
 
-        @Nonnull public String getRoleId() { return requireText(roleId, "RevivePriceByRole RoleId"); }
+        @Nullable public String getRoleId() { return normalize(roleId); }
         @Nonnull public TwItemCostComponent[] getCosts() { return TwItemCostComponent.validateAndCopy(costs); }
     }
 

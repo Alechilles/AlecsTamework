@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.config.bonded;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -16,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +25,13 @@ import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 class TwBondedCompanionRosterConfigTest {
+    @Test
+    void roleSpecificRevivePriceCodecHasValidDefaults() {
+        assertDoesNotThrow(() -> TwBondedCompanionRosterConfig.CODEC.validateDefaults(
+                new ExtraInfo(), new HashSet<>()
+        ));
+    }
+
     @Test
     void bondedRevivePriceUsesOneOrderedCostsRecipe() throws Exception {
         TwBondedCompanionRosterConfig config = roster(
