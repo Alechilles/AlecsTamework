@@ -19,6 +19,7 @@
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
         <slf4j.version>1.7.36</slf4j.version>
         <alecstelemetry.version>1.0.4</alecstelemetry.version>
+        <patchwork.version>1.0.0</patchwork.version>
         <creditor.file.id>8195970</creditor.file.id>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
@@ -62,7 +63,12 @@
         <dependency>
             <groupId>com.alechilles</groupId>
             <artifactId>patchwork-runtime</artifactId>
-            <version>1.0.0</version>
+            <version>${patchwork.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alechilles</groupId>
+            <artifactId>patchwork-standalone</artifactId>
+            <version>${patchwork.version}</version>
         </dependency>
         <dependency>
             <groupId>curse.maven</groupId>
@@ -107,6 +113,7 @@
                 <includes>
                     <include>manifest.json</include>
                     <include>manifest-assets.json</include>
+                    <include>manifests.json</include>
                 </includes>
             </resource>
             <resource>
@@ -114,6 +121,7 @@
                 <excludes>
                     <exclude>manifest.json</exclude>
                     <exclude>manifest-assets.json</exclude>
+                    <exclude>manifests.json</exclude>
                 </excludes>
             </resource>
         </resources>
@@ -185,6 +193,7 @@
                                 <includes>
                                     <include>com.alechilles:alecstelemetry-runtime</include>
                                     <include>com.alechilles:patchwork-runtime</include>
+                                    <include>com.alechilles:patchwork-standalone</include>
                                     <include>curse.maven:creditor-1560961</include>
                                     <include>org.xerial:sqlite-jdbc</include>
                                     <include>org.slf4j:slf4j-api</include>
@@ -192,6 +201,13 @@
                                 </includes>
                             </artifactSet>
                             <filters>
+                                <filter>
+                                    <artifact>com.alechilles:patchwork-standalone</artifact>
+                                    <excludes>
+                                        <exclude>manifest.json</exclude>
+                                        <exclude>icon-256.png</exclude>
+                                    </excludes>
+                                </filter>
                                 <filter>
                                     <artifact>curse.maven:creditor-1560961</artifact>
                                     <excludes>

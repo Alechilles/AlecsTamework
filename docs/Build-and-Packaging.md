@@ -11,8 +11,9 @@ Maven builds one jar containing Java code, resources under
 
 - Tamework ships as a jar.
 - The release jar embeds Creditor so `/credits` does not require another mod.
-- Shading excludes dependency manifests so Tamework keeps its own root
-  `manifest.json`.
+- Tamework keeps its own root `manifest.json` and exposes its bundled
+  Patchwork wrapper through `manifests.json`, allowing mods that require
+  `Alechilles:Patchwork` to load without a separate Patchwork jar.
 - Development hot reload may reference `src/main/resources` directly.
 
 ## Maven profiles

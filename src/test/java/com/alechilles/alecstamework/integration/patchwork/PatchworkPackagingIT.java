@@ -1,9 +1,9 @@
 package com.alechilles.alecstamework.integration.patchwork;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
@@ -15,14 +15,14 @@ import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that Tamework packages the embedded Patchwork runtime without a second plugin payload.
+ * Verifies that Tamework exposes its bundled Patchwork runtime to dependent mods.
  */
 class PatchworkPackagingIT {
     private static final String EMBEDDED_BOOTSTRAP_CLASS =
             "com/alechilles/patchwork/embedded/EmbeddedPatchworkBootstrap.class";
 
     @Test
-    void shadedJarContainsOneEmbeddedRuntimeAndNoStandalonePatchworkPlugin() throws IOException {
+    void shadedJarExposesEmbeddedPatchworkAsAPluginDependency() throws IOException {
         Path packagedJar = Path.of(System.getProperty("patchwork.packagedJar"));
         assertTrue(Files.isRegularFile(packagedJar), () -> "Expected packaged jar at " + packagedJar);
 
@@ -34,21 +34,13 @@ class PatchworkPackagingIT {
                     entries.stream().filter(EMBEDDED_BOOTSTRAP_CLASS::equals).count(),
                     "The shaded jar must contain exactly one embedded Patchwork bootstrap."
             );
-            assertFalse(
-                    entries.stream().anyMatch(entry -> entry.endsWith("/PatchworkPlugin.class")
-                            || entry.equals("PatchworkPlugin.class")),
-                    "The shaded jar must not contain Patchwork's standalone plugin entry point."
-            );
             assertEquals(
                     1,
                     entries.stream().filter("manifest.json"::equals).count(),
                     "The shaded jar must contain exactly one root plugin manifest."
             );
             assertTameworkManifest(jar);
-            assertFalse(
-                    jar.stream().filter(PatchworkPackagingIT::isManifest).anyMatch(entry -> isPatchworkManifest(jar, entry)),
-                    "The shaded jar must not contain Patchwork's standalone plugin manifest."
-            );
+            assertPatchworkDependencyManifest(jar, entries);
         }
     }
 
@@ -59,19 +51,27 @@ class PatchworkPackagingIT {
         assertEquals("com.alechilles.alecstamework.Tamework", manifest.get("Main").getAsString());
     }
 
-    private static boolean isManifest(ZipEntry entry) {
-        return entry.getName().equals("manifest.json") || entry.getName().endsWith("/manifest.json");
-    }
+    /** Protects dependent mods that declare Alechilles:Patchwork while only Tamework is installed. */
+    private static void assertPatchworkDependencyManifest(ZipFile jar, List<String> entries) throws IOException {
+        assertTrue(entries.contains("com/alechilles/patchwork/standalone/PatchworkPlugin.class"),
+                "The bundled Patchwork plugin entry point must be packaged.");
+        ZipEntry bundleEntry = jar.getEntry("manifests.json");
+        assertTrue(bundleEntry != null,
+                "The bundled Patchwork plugin must be advertised through manifests.json for dependency resolution.");
 
-    private static boolean isPatchworkManifest(ZipFile jar, ZipEntry entry) {
-        try {
-            JsonObject manifest = readManifest(jar, entry);
-            return manifest.has("Main")
-                    && "com.alechilles.patchwork.standalone.PatchworkPlugin"
-                    .equals(manifest.get("Main").getAsString());
-        } catch (RuntimeException | IOException ignored) {
-            return false;
+        JsonArray manifests;
+        try (var input = jar.getInputStream(bundleEntry)) {
+            manifests = JsonParser.parseString(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                    .getAsJsonArray();
         }
+        JsonObject patchwork = manifests.asList().stream()
+                .filter(JsonObject.class::isInstance)
+                .map(JsonObject.class::cast)
+                .filter(manifest -> "Alechilles".equals(manifest.get("Group").getAsString())
+                        && "Patchwork".equals(manifest.get("Name").getAsString()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("manifests.json must expose Alechilles:Patchwork."));
+        assertEquals("com.alechilles.patchwork.standalone.PatchworkPlugin", patchwork.get("Main").getAsString());
     }
 
     private static JsonObject readManifest(ZipFile jar, ZipEntry entry) throws IOException {
