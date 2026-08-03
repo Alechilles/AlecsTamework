@@ -60,7 +60,7 @@ class BondedCompanionTalentRoutingTest {
     }
 
     @Test
-    void storedTalentConfigCannotOverrideTheBondedCompanionRole() throws Exception {
+    void reconciledTalentConfigOverridesTheBondedCompanionFamilyRole() throws Exception {
         String service = Files.readString(Path.of("src", "main", "java",
                 "com", "alechilles", "alecstamework", "items",
                 "BondedCompanionTalentPageService.java"), StandardCharsets.UTF_8);
@@ -68,7 +68,8 @@ class BondedCompanionTalentRoutingTest {
         int roleLookup = service.indexOf("TwTalentConfig.resolveForRole(roleId)");
         int storedLookup = service.indexOf("TwTalentConfig.resolveById(talents.getConfigId())");
         assertTrue(roleLookup >= 0);
-        assertTrue(storedLookup > roleLookup);
-        assertTrue(service.contains("if (roleId != null && !roleId.isBlank())"));
+        assertTrue(storedLookup >= 0);
+        assertTrue(storedLookup < roleLookup);
+        assertTrue(service.contains("if (roleId == null || roleId.isBlank())"));
     }
 }

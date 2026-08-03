@@ -236,18 +236,15 @@ final class BondedCompanionTalentPageService {
     }
 
     private TwTalentConfig resolveConfig(TameworkTalentsComponent talents, String roleId) {
-        if (roleId != null && !roleId.isBlank()) {
-            TwTalentConfig roleConfig = TwTalentConfig.resolveForRole(roleId);
-            if (roleConfig != null && roleConfig.isEnabled()) {
-                return roleConfig;
-            }
-            return null;
-        }
         if (talents.getConfigId() != null && !talents.getConfigId().isBlank()) {
             TwTalentConfig configured = TwTalentConfig.resolveById(talents.getConfigId());
             if (configured != null && configured.isEnabled()) return configured;
         }
-        return null;
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        TwTalentConfig roleConfig = TwTalentConfig.resolveForRole(roleId);
+        return roleConfig != null && roleConfig.isEnabled() ? roleConfig : null;
     }
 
     private String missingPrerequisite(String language, TameworkTalentsComponent talents,
