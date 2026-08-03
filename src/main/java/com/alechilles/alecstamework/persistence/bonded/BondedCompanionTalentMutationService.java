@@ -64,8 +64,8 @@ final class BondedCompanionTalentMutationService {
         }
         TameworkTalentsComponent updated = request.action()
                 == BondedCompanionTalentActionRequest.Action.PURCHASE
-                ? purchase(snapshot, profile.roleId(), request.talentId())
-                : reset(snapshot, profile.roleId());
+                ? purchase(snapshot, profile.roleId(), request.talentId(), request.talentConfigId())
+                : reset(snapshot, profile.roleId(), request.talentConfigId());
         if (updated == null) {
             return rejected(BondedCompanionStoreResult.Code.VALIDATION_FAILED,
                     request.action() == BondedCompanionTalentActionRequest.Action.PURCHASE
@@ -83,10 +83,11 @@ final class BondedCompanionTalentMutationService {
     private TameworkTalentsComponent purchase(
             BondedCompanionSnapshot snapshot,
             String roleId,
-            String talentId
+            String talentId,
+            String talentConfigId
     ) {
         TameworkTalentsComponent existing = snapshot.fullState().talents();
-        TwTalentConfig config = resolveConfig(existing, roleId);
+        TwTalentConfig config = resolveConfig(existing, roleId, talentConfigId);
         TameworkLevelingComponent leveling = snapshot.fullState().leveling();
         if (config == null || !config.isEnabled() || leveling == null) {
             return null;
@@ -116,14 +117,15 @@ final class BondedCompanionTalentMutationService {
 
     private TameworkTalentsComponent reset(
             BondedCompanionSnapshot snapshot,
-            String roleId
+            String roleId,
+            String talentConfigId
     ) {
         TameworkTalentsComponent existing = snapshot.fullState().talents();
         if (existing == null || (existing.getSpentPoints() == 0
                 && existing.getPurchasedTalentIds().length == 0)) {
             return null;
         }
-        TwTalentConfig config = resolveConfig(existing, roleId);
+        TwTalentConfig config = resolveConfig(existing, roleId, talentConfigId);
         TameworkTalentsComponent updated = CompanionTalentService.reconcileAllocation(existing, config);
         if (updated == null) {
             return null;
@@ -148,8 +150,15 @@ final class BondedCompanionTalentMutationService {
 
     private TwTalentConfig resolveConfig(
             TameworkTalentsComponent talents,
-            String roleId
+            String roleId,
+            String presentedConfigId
     ) {
+        if (presentedConfigId != null && !presentedConfigId.isBlank()) {
+            TwTalentConfig presented = TwTalentConfig.resolveById(presentedConfigId);
+            if (presented != null && presented.isEnabled()) {
+                return presented;
+            }
+        }
         if (roleId == null || roleId.isBlank()) {
             return null;
         }

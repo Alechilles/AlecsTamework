@@ -29,8 +29,10 @@ class BondedCompanionTalentRoutingTest {
         assertTrue(selectionService.contains("openBondedTalentPage(context, uuid)"));
         assertTrue(selectionService.contains("bondedTalentPages.open"));
         assertTrue(bondedTalentService.contains("BondedCompanionTalentActionRequest"));
+        assertTrue(bondedTalentService.contains("state.talents.getConfigId()"));
         assertTrue(bondedTalentService.contains("applyLiveProjection"));
         assertTrue(persistenceService.contains("snapshot.withTalents(updated)"));
+        assertTrue(persistenceService.contains("request.talentConfigId()"));
         assertTrue(persistenceService.contains("BondedCompanionOperation.Type.STORE"));
     }
 

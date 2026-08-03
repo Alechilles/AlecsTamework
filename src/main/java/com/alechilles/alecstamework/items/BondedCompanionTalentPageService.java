@@ -102,12 +102,14 @@ final class BondedCompanionTalentPageService {
         }
         String idempotency = "talents:" + state.profileId + ":"
                 + state.revision + ":" + action + ":"
-                + (talentId == null ? "" : talentId);
+                + (talentId == null ? "" : talentId) + ":"
+                + (state.talents.getConfigId() == null ? "" : state.talents.getConfigId());
         BondedCompanionTalentActionRequest request =
                 new BondedCompanionTalentActionRequest(
                         "tamework.command-item", idempotency,
                         state.ownerUuid, state.rosterId, state.profileId,
-                        state.revision, action, talentId);
+                        state.revision, action, talentId,
+                        state.talents.getConfigId());
         CompletableFuture<BondedCompanionResult<BondedCompanionProfileView>> future =
                 current.updateTalents(request);
         BondedCompanionResult<BondedCompanionProfileView> result = future == null
