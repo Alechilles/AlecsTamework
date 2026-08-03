@@ -1,5 +1,5 @@
 {
-  "$Comment": "Example NPC role whose base template is intentionally barebones and upgraded by Patchwork's centralized Tamework definition.",
+  "$Comment": "Example NPC role whose base template is intentionally barebones and upgraded by Server/Patchwork/Patches/Examples/Tamework_Example_Patch.json.",
   "Type": "Variant",
   "Reference": "Tamework_Example_Patch",
   "Modify": {

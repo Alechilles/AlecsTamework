@@ -1,0 +1,669 @@
+{
+  "Id": "Tamework_Example_Patch",
+  "Target": "Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json",
+  "Priority": 0,
+  "Enabled": true,
+  "Operations": [
+    {
+      "Id": "merge-tamework-parameters",
+      "Op": "Merge",
+      "Path": "/Parameters",
+      "Value": {
+        "MasterTargetSlot": {
+          "Value": "MasterTarget",
+          "Description": "Target slot used to store the owner/master."
+        },
+        "SpawnerEmptyItemID": {
+          "Value": [
+            "Spawner_Tamework_Example"
+          ],
+          "TypeHint": "String",
+          "Description": "Item IDs that can pick up this NPC."
+        },
+        "CanFollow": {
+          "Value": true,
+          "Description": "Whether command-driven Follow behavior is enabled for this role."
+        },
+        "CanHold": {
+          "Value": true,
+          "Description": "Whether command-driven Hold behavior is enabled for this role."
+        },
+        "CanDefend": {
+          "Value": true,
+          "Description": "Whether Defend state behavior is enabled for this role."
+        },
+        "CanAttackTarget": {
+          "Value": true,
+          "Description": "Whether Attack Target commands are allowed to drive this role into Defend behavior."
+        },
+        "CanMoveToLocation": {
+          "Value": true,
+          "Description": "Whether Move To Location command behavior is enabled for this role."
+        },
+        "CanReturnHome": {
+          "Value": true,
+          "Description": "Whether Return Home command behavior is enabled for this role."
+        },
+        "CanRecall": {
+          "Value": true,
+          "Description": "Whether Recall command behavior is enabled for this role."
+        },
+        "CanSetHome": {
+          "Value": true,
+          "Description": "Whether Set Home should be considered available for this role."
+        },
+        "CanBreedPair": {
+          "Value": true,
+          "Description": "Whether breeding pair approach behavior is enabled for this role."
+        },
+        "TestTameItemsParam": {
+          "Value": [
+            "Plant_Fruit_Apple"
+          ],
+          "TypeHint": "String",
+          "Description": "Items accepted by the example Tame interaction."
+        },
+        "TestFeedItemsParam": {
+          "Value": [
+            "Plant_Fruit_Apple"
+          ],
+          "TypeHint": "String",
+          "Description": "Items accepted by the example Feed interaction."
+        }
+      }
+    },
+    {
+      "Id": "sleep-transitions",
+      "Op": "Insert",
+      "Path": "/StateTransitions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Patch anchor: state transitions"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: sleep transitions"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: sleep transitions",
+        "States": [
+          {
+            "From": [
+              "Idle",
+              "Hold"
+            ],
+            "To": [
+              "Sleep"
+            ]
+          },
+          {
+            "From": [
+              "Sleep"
+            ],
+            "To": [
+              "Idle",
+              "Hold",
+              "Defend"
+            ]
+          }
+        ],
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "follow-hold-transitions",
+      "Op": "Insert",
+      "Path": "/StateTransitions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: sleep transitions"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: follow/hold transitions"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: follow/hold transitions",
+        "States": [
+          {
+            "From": [],
+            "To": [
+              "Follow",
+              "Hold",
+              "CommandMove",
+              "Defend",
+              "BreedPair",
+              "NeedsSeekWater",
+              "NeedsSeekFood"
+            ]
+          }
+        ],
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "return-idle-transition",
+      "Op": "Insert",
+      "Path": "/StateTransitions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: follow/hold transitions"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: return to idle"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: return to idle",
+        "States": [
+          {
+            "From": [
+              "Follow",
+              "Hold",
+              "CommandMove",
+              "Defend",
+              "BreedPair",
+              "NeedsSeekWater",
+              "NeedsSeekFood"
+            ],
+            "To": [
+              "Idle"
+            ]
+          }
+        ],
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "command-move",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Patch anchor: command behaviors"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: command move bridge"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: command move bridge",
+        "Enabled": {
+          "Compute": "CanMoveToLocation || CanReturnHome"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Command_Move",
+            "Modify": {
+              "_ExportStates": [
+                "CommandMove",
+                "Hold"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "command-move-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: command move bridge"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: command move state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: command move state",
+        "Enabled": {
+          "Compute": "CanMoveToLocation || CanReturnHome"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "CommandMove"
+        }
+      }
+    },
+    {
+      "Id": "validation-state-setters",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: command move state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: validation-only state setters"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: validation-only state setters",
+        "Enabled": false,
+        "Actions": [
+          {
+            "Type": "State",
+            "State": "Idle"
+          },
+          {
+            "Type": "State",
+            "State": "Follow"
+          },
+          {
+            "Type": "State",
+            "State": "Hold"
+          },
+          {
+            "Type": "State",
+            "State": "CommandMove"
+          },
+          {
+            "Type": "State",
+            "State": "Defend"
+          },
+          {
+            "Type": "State",
+            "State": "BreedPair"
+          },
+          {
+            "Type": "State",
+            "State": "NeedsSeekWater"
+          },
+          {
+            "Type": "State",
+            "State": "NeedsSeekFood"
+          },
+          {
+            "Type": "State",
+            "State": "Sleep"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "needs-sensor",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: validation-only state setters"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: needs seek sensor"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: needs seek sensor",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Or",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": "Idle"
+            },
+            {
+              "Type": "State",
+              "State": "Hold"
+            },
+            {
+              "Type": "State",
+              "State": "Follow"
+            },
+            {
+              "Type": "State",
+              "State": "Sleep"
+            }
+          ]
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource_Sensor",
+            "Modify": {
+              "NeedsSeekFoodItemIds": {
+                "Compute": "FoodItemIDs"
+              },
+              "_ExportStates": [
+                "NeedsSeekWater",
+                "NeedsSeekFood"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "needs-water",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: needs seek sensor"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: needs water"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: needs water",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "NeedsSeekWater"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+            "Modify": {
+              "NeedsSeekResourceType": "Water",
+              "NeedsSeekConsumeMaintainMinDistance": 1,
+              "NeedsSeekConsumeMaintainMaxDistance": 2,
+              "NeedsSeekFailedCooldownRange": [
+                1.8,
+                1.8
+              ],
+              "_ExportStates": [
+                "Idle"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "needs-food",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: needs water"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: needs food"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: needs food",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "NeedsSeekFood"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+            "Modify": {
+              "NeedsSeekResourceType": "FoodContainer",
+              "NeedsSeekConsumeMaintainMinDistance": 1,
+              "NeedsSeekConsumeMaintainMaxDistance": 2,
+              "NeedsSeekFailedCooldownRange": [
+                1.8,
+                1.8
+              ],
+              "NeedsSeekFoodItemIDs": {
+                "Compute": "FoodItemIDs"
+              },
+              "_ExportStates": [
+                "Idle"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "follow-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Patch anchor: state behaviors"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: follow state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: follow state",
+        "Enabled": {
+          "Compute": "CanFollow"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "Follow"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Follow_Simple_TP",
+            "Modify": {
+              "MasterTargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "hold-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: follow state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: hold state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: hold state",
+        "Enabled": {
+          "Compute": "CanHold"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "Hold"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Hold",
+            "Modify": {
+              "_ExportStates": [
+                "Sleep"
+              ],
+              "DayFlavorAnimation": {
+                "Compute": "DayFlavorAnimation"
+              },
+              "DayTimePeriod": {
+                "Compute": "DayTimePeriod"
+              },
+              "NightFlavorAnimation": {
+                "Compute": "NightFlavorAnimation"
+              },
+              "DayTimeNapWeight": {
+                "Compute": "DayTimeNapWeight"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "defend-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: hold state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: defend state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: defend state",
+        "Enabled": {
+          "Compute": "CanDefend"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "Defend"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Defend",
+            "Modify": {
+              "AlertedRange": {
+                "Compute": "ViewRange"
+              },
+              "ViewSector": {
+                "Compute": "ViewSector"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              },
+              "AbsoluteDetectionRange": {
+                "Compute": "AbsoluteDetectionRange"
+              },
+              "ViewRange": {
+                "Compute": "ViewRange"
+              },
+              "Attack": "Root_NPC_Attack_Melee",
+              "AttackDistance": 2.5
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "breed-pair-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: defend state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: breed pair state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: breed pair state",
+        "Enabled": {
+          "Compute": "CanBreedPair"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "BreedPair"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Breeding_Pair",
+            "Modify": {
+              "_ExportStates": [
+                "BreedPair",
+                "Idle"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "sleep-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: breed pair state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: sleep state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: sleep state",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "Sleep"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Sleep",
+            "Modify": {
+              "_ExportStates": [
+                "Defend",
+                "Defend",
+                "Idle",
+                "Idle",
+                "Idle"
+              ],
+              "DayTimePeriod": {
+                "Compute": "DayTimePeriod"
+              },
+              "DayTimeNapWeight": {
+                "Compute": "DayTimeNapWeight"
+              },
+              "DayTimeNapTimeRange": {
+                "Compute": "DayTimeNapTimeRange"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              },
+              "Attitudes": [
+                "Hostile"
+              ],
+              "FlockArray": {
+                "Compute": "FlockArray"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "interaction-bridge",
+      "Op": "Macro",
+      "Macro": "TameworkInteractionBridge",
+      "Path": "/InteractionInstruction/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Patch anchor: interaction bridge"
+      },
+      "Options": {
+        "ActionFields": {
+          "ConfigId": "TwIntExamplePatch",
+          "LovedItems": {
+            "Compute": "LovedItems"
+          },
+          "IsHarvestable": {
+            "Compute": "IsHarvestable"
+          },
+          "IsMountable": {
+            "Compute": "IsMountable"
+          },
+          "HarvestInteractionContext": {
+            "Compute": "HarvestInteractionContext"
+          }
+        }
+      }
+    }
+  ]
+}

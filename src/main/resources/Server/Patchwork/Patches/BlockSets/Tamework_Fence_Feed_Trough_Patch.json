@@ -1,0 +1,19 @@
+{
+  "Id": "Tamework_Fence_Feed_Trough_Patch",
+  "Target": "Server/Item/Block/Sets/Fence.json",
+  "Priority": -100,
+  "Operations": [
+    {
+      "Id": "add-feed-trough-block-type",
+      "Op": "Add",
+      "Path": "/IncludeBlockTypes/-",
+      "Value": "Tw_Feed_Trough"
+    },
+    {
+      "Id": "add-feed-trough-state-block-types",
+      "Op": "Add",
+      "Path": "/IncludeBlockTypes/-",
+      "Value": "Tw_Feed_Trough_State_*"
+    }
+  ]
+}

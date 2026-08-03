@@ -1,0 +1,13 @@
+{
+  "Id": "Tamework_Tool_Capture_Crate_Patch",
+  "Target": "Server/Item/Items/Tool/Capture_Crate/Tool_Capture_Crate.json",
+  "Priority": -100,
+  "Operations": [
+    {
+      "Id": "replace-vanilla-capture-interaction",
+      "Op": "Replace",
+      "Path": "/Interactions/Primary/Interactions/0/Next/Type",
+      "Value": "TameworkManagedCoopCaptureCrate"
+    }
+  ]
+}
