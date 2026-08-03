@@ -74,6 +74,7 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_LEVEL);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_TOTAL_XP);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_SPENT_POINTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_PURCHASED_IDS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_CONFIG_ID);
@@ -405,6 +406,7 @@ final class SpawnerNpcProgressionMetadataService {
         TameworkTalentsComponent component = store.getComponent(npcRef, type);
         if (component == null) {
             ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.TALENTS_CONFIG_ID);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_SPENT_POINTS);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_PURCHASED_IDS);
             return updated;
@@ -415,6 +417,11 @@ final class SpawnerNpcProgressionMetadataService {
         } else {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_CONFIG_ID);
         }
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION,
+                Codec.LONG,
+                component.getAllocationRevision()
+        );
         updated = updated.withMetadata(TameworkMetadataKeys.TALENTS_SPENT_POINTS, Codec.INTEGER, component.getSpentPoints());
         String encodedIds = TalentIdCodec.encode(component.getPurchasedTalentIds());
         if (encodedIds != null && !encodedIds.isBlank()) {
@@ -527,9 +534,14 @@ final class SpawnerNpcProgressionMetadataService {
             return;
         }
         String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_CONFIG_ID, Codec.STRING);
+        Long allocationRevision = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION,
+                Codec.LONG
+        );
         Integer spentPoints = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_SPENT_POINTS, Codec.INTEGER);
         String purchasedIds = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_PURCHASED_IDS, Codec.STRING);
         boolean hasData = (configId != null && !configId.isBlank())
+                || allocationRevision != null
                 || spentPoints != null
                 || (purchasedIds != null && !purchasedIds.isBlank());
         if (!hasData) {
@@ -538,7 +550,8 @@ final class SpawnerNpcProgressionMetadataService {
         TameworkTalentsComponent component = new TameworkTalentsComponent(
                 configId,
                 spentPoints != null ? spentPoints : 0,
-                TalentIdCodec.decode(purchasedIds)
+                TalentIdCodec.decode(purchasedIds),
+                allocationRevision != null ? allocationRevision : 0L
         );
         store.putComponent(npcRef, type, component);
     }

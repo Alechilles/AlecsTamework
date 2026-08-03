@@ -239,16 +239,20 @@ final class LegacyCapturedArtifactProgressionMapper {
                 "talents",
                 new String[]{TameworkMetadataKeys.TALENTS_SPENT_POINTS},
                 TameworkMetadataKeys.TALENTS_CONFIG_ID,
+                TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION,
                 TameworkMetadataKeys.TALENTS_SPENT_POINTS,
                 TameworkMetadataKeys.TALENTS_PURCHASED_IDS
         );
         String config = metadata.text(
                 TameworkMetadataKeys.TALENTS_CONFIG_ID
         );
+        Long allocationRevision = metadata.integer(
+                TameworkMetadataKeys.TALENTS_ALLOCATION_REVISION
+        );
         Integer spent = metadata.intValue(
                 TameworkMetadataKeys.TALENTS_SPENT_POINTS
         );
-        if (config == null && spent == null) {
+        if (config == null && allocationRevision == null && spent == null) {
             return null;
         }
         return new TameworkTalentsComponent(
@@ -256,7 +260,8 @@ final class LegacyCapturedArtifactProgressionMapper {
                 spent,
                 LegacyRestorationEvidence.talents(metadata.text(
                         TameworkMetadataKeys.TALENTS_PURCHASED_IDS
-                ))
+                )),
+                allocationRevision == null ? 0L : allocationRevision
         );
     }
 
