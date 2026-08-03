@@ -198,8 +198,15 @@ public final class BondedCompanionRosterRegistry {
     ) {
         TwBondedCompanionRosterConfig.RevivePriceDefinition configuredPrice =
                 config.getRevivePrice();
-        RevivePrice revivePrice = configuredPrice == null ? null
-                : revivePrice(configuredPrice.getCosts());
+        LinkedHashMap<String, RevivePrice> rolePrices = new LinkedHashMap<>();
+        for (TwBondedCompanionRosterConfig.RoleRevivePriceDefinition entry
+                : config.getRevivePriceByRole()) {
+            rolePrices.put(entry.getRoleId(), revivePrice(entry.getCosts()));
+        }
+        RevivePrice revivePrice = configuredPrice == null && rolePrices.isEmpty()
+                ? null : new RevivePrice(
+                        configuredPrice == null ? List.of() : revivePrice(configuredPrice.getCosts()).costs(),
+                        rolePrices);
         TwBondedCompanionRosterConfig.FeatureToggles configuredFeatures =
                 config.getFeatures();
         LinkedHashSet<String> allowedRoles = new LinkedHashSet<>();
@@ -435,14 +442,26 @@ public final class BondedCompanionRosterRegistry {
     }
 
     /** Immutable optional ordered revive recipe in one roster definition. */
-    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
+    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs,
+                              @Nonnull Map<String, RevivePrice> byRole) {
         public RevivePrice {
             costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
-            if (costs.isEmpty()) {
+            byRole = Map.copyOf(Objects.requireNonNull(byRole, "byRole"));
+            if (costs.isEmpty() && byRole.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Revive costs must not be empty."
+                        "Revive price requires a fallback or role-specific cost."
                 );
             }
+        }
+
+        public RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
+            this(costs, Map.of());
+        }
+
+        @Nullable
+        public RevivePrice forRole(@Nonnull String roleId) {
+            RevivePrice rolePrice = byRole.get(Objects.requireNonNull(roleId, "roleId"));
+            return rolePrice != null ? rolePrice : costs.isEmpty() ? null : new RevivePrice(costs);
         }
     }
 

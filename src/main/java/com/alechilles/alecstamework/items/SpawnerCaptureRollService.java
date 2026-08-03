@@ -142,7 +142,8 @@ final class SpawnerCaptureRollService {
                 world.getName(),
                 source.getItemId(),
                 currentHealth / maximumHealth,
-                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
+                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
+                capturePolicy.isTranquilized(targetRef, store)
         );
         CapturePolicyConfigView policy = mechanics.chanceMode()
                 == CaptureChanceMode.GUARANTEED

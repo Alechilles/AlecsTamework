@@ -50,12 +50,19 @@ public record BondedCompanionPolicy(
                 null, revivePrice, features);
     }
 
+    @Nullable
+    public RevivePrice revivePriceFor(@Nonnull String roleId) {
+        return revivePrice == null ? null : revivePrice.forRole(roleId);
+    }
+
     /** Ordered AND recipe required for one paid bonded revival. */
-    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
+    public record RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs,
+                              @Nonnull java.util.Map<String, RevivePrice> byRole) {
         public RevivePrice {
             costs = List.copyOf(Objects.requireNonNull(costs, "costs"));
-            if (costs.isEmpty()) {
-                throw new IllegalArgumentException("costs must not be empty");
+            byRole = java.util.Map.copyOf(Objects.requireNonNull(byRole, "byRole"));
+            if (costs.isEmpty() && byRole.isEmpty()) {
+                throw new IllegalArgumentException("revive price requires a fallback or role-specific cost");
             }
             HashSet<String> itemIds = new HashSet<>();
             for (BondedCompanionReviveCost cost : costs) {
@@ -64,6 +71,16 @@ public record BondedCompanionPolicy(
                             "duplicate revive item: " + cost.itemId());
                 }
             }
+        }
+
+        public RevivePrice(@Nonnull List<BondedCompanionReviveCost> costs) {
+            this(costs, java.util.Map.of());
+        }
+
+        @Nullable
+        public RevivePrice forRole(@Nonnull String roleId) {
+            RevivePrice rolePrice = byRole.get(Objects.requireNonNull(roleId, "roleId"));
+            return rolePrice != null ? rolePrice : costs.isEmpty() ? null : new RevivePrice(costs);
         }
     }
 

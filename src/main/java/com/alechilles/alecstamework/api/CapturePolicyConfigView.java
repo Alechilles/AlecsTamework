@@ -15,6 +15,7 @@ public record CapturePolicyConfigView(@Nonnull String configId,
                                       double resistance,
                                       double chanceMultiplier,
                                       double missingHealthBonus,
+                                      double tranquilizedBonus,
                                       @Nullable Integer guaranteedAtPower,
                                       @Nonnull List<CaptureRequirementSpec> requirements) {
     public CapturePolicyConfigView {
@@ -28,7 +29,8 @@ public record CapturePolicyConfigView(@Nonnull String configId,
         }
         if (!Double.isFinite(resistance) || resistance < 0.0D
                 || !Double.isFinite(chanceMultiplier) || chanceMultiplier < 0.0D
-                || !Double.isFinite(missingHealthBonus) || missingHealthBonus < 0.0D) {
+                || !Double.isFinite(missingHealthBonus) || missingHealthBonus < 0.0D
+                || !Double.isFinite(tranquilizedBonus) || tranquilizedBonus < 0.0D) {
             throw new IllegalArgumentException("Capture policy chance inputs must be finite and non-negative.");
         }
     }

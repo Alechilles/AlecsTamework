@@ -21,7 +21,7 @@ final class BondedCompanionReviveQuoteSupport {
             BondedCompanionRecord.Profile profile,
             BondedCompanionPolicy policy
     ) {
-        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        BondedCompanionPolicy.RevivePrice price = policy.revivePriceFor(profile.roleId());
         List<BondedCompanionReviveQuote.CostLine> costs = price == null
                 ? List.of() : unavailable(price);
         return new BondedCompanionReviveQuote(

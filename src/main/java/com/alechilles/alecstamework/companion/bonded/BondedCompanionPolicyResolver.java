@@ -137,14 +137,24 @@ public final class BondedCompanionPolicyResolver {
                 source.maximumActive(), source.sessionDurationSeconds(),
                 source.summonCooldownSeconds(),
                 source.summonAuraEffectId(),
-                price == null ? null : new BondedCompanionPolicy.RevivePrice(
-                        price.costs()
-                ),
+                mapPrice(price),
                 new BondedCompanionPolicy.FeatureFlags(
                         flags.capture(), flags.provision(), flags.summon(),
                         flags.dismiss(), flags.revive()
                 )
         );
+    }
+
+    @Nullable
+    private static BondedCompanionPolicy.RevivePrice mapPrice(
+            @Nullable BondedCompanionRosterRegistry.RevivePrice source
+    ) {
+        if (source == null) return null;
+        java.util.LinkedHashMap<String, BondedCompanionPolicy.RevivePrice> roles = new java.util.LinkedHashMap<>();
+        for (var entry : source.byRole().entrySet()) {
+            roles.put(entry.getKey(), mapPrice(entry.getValue()));
+        }
+        return new BondedCompanionPolicy.RevivePrice(source.costs(), roles);
     }
 
     private static String normalize(String value) {

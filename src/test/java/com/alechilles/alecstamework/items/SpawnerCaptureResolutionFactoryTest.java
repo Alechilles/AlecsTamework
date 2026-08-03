@@ -63,6 +63,7 @@ class SpawnerCaptureResolutionFactoryTest {
                 0.15D,
                 0.75D,
                 0.4D,
+                0.0D,
                 7,
                 List.of(new CaptureRequirementSpec(
                         "weather",

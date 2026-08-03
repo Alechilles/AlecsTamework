@@ -196,7 +196,7 @@ public final class BondedCompanionTransitionService {
             return rejected(ResultCode.INVALID_STATE, profile);
         }
         if (!BondedCompanionReviveRecipe.matches(
-                checked.policy().revivePrice(), payment.costs())) {
+                checked.policy().revivePriceFor(profile.roleId()), payment.costs())) {
             return rejected(ResultCode.REVIVE_PRICE_MISMATCH, profile);
         }
         try {

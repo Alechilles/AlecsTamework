@@ -53,6 +53,7 @@ public final class TwBondedCompanionRosterConfig implements
     long summonCooldownSeconds;
     String summonAuraEffectId;
     RevivePriceDefinition revivePrice;
+    RoleRevivePriceDefinition[] revivePriceByRole = RoleRevivePriceDefinition.EMPTY_ARRAY;
     FeatureToggles features = new FeatureToggles();
 
     protected TwBondedCompanionRosterConfig() {
@@ -165,6 +166,9 @@ public final class TwBondedCompanionRosterConfig implements
         }
         inheritRevivePrice(parent, explicitTopLevelKeys,
                 explicitNestedKeysByTopLevel);
+        if (!explicitTopLevelKeys.contains("RevivePriceByRole")) {
+            revivePriceByRole = parent.revivePriceByRole;
+        }
         inheritFeatures(parent, explicitTopLevelKeys,
                 explicitNestedKeysByTopLevel);
     }
@@ -248,6 +252,7 @@ public final class TwBondedCompanionRosterConfig implements
             );
         }
         validateRevivePrice(configId);
+        validateRoleRevivePrices(configId);
         if (features == null) {
             throw new IllegalArgumentException(
                     "Bonded roster Features are required: " + configId
@@ -267,6 +272,27 @@ public final class TwBondedCompanionRosterConfig implements
             );
         }
         TwItemCostComponent.validateAndCopy(costs);
+    }
+
+    private void validateRoleRevivePrices(String configId) {
+        HashSet<String> roles = new HashSet<>();
+        for (RoleRevivePriceDefinition entry : getRevivePriceByRole()) {
+            if (entry == null) {
+                throw new IllegalArgumentException("Bonded roster RevivePriceByRole cannot contain null: " + configId);
+            }
+            String roleId = requireText(entry.roleId, "RevivePriceByRole RoleId");
+            if (!roles.add(roleId)) {
+                throw new IllegalArgumentException("Bonded roster RevivePriceByRole repeats role " + roleId + ": " + configId);
+            }
+            if (!Set.of(getAllowedRoles()).contains(roleId)) {
+                throw new IllegalArgumentException("Bonded roster RevivePriceByRole role is not allowed: " + roleId);
+            }
+            TwItemCostComponent[] costs = entry.getCosts();
+            if (costs.length == 0) {
+                throw new IllegalArgumentException("Bonded roster RevivePriceByRole requires Costs: " + roleId);
+            }
+            TwItemCostComponent.validateAndCopy(costs);
+        }
     }
 
     private static void requireNamespaced(
@@ -333,6 +359,11 @@ public final class TwBondedCompanionRosterConfig implements
     }
 
     @Nonnull
+    public RoleRevivePriceDefinition[] getRevivePriceByRole() {
+        return revivePriceByRole == null ? RoleRevivePriceDefinition.EMPTY_ARRAY : revivePriceByRole.clone();
+    }
+
+    @Nonnull
     public FeatureToggles getFeatures() {
         return features == null ? new FeatureToggles() : features;
     }
@@ -358,6 +389,16 @@ public final class TwBondedCompanionRosterConfig implements
         public TwItemCostComponent[] getCosts() {
             return TwItemCostComponent.validateAndCopy(costs);
         }
+    }
+
+    /** Mutable codec target for a role-specific revive recipe. */
+    public static final class RoleRevivePriceDefinition {
+        static final RoleRevivePriceDefinition[] EMPTY_ARRAY = new RoleRevivePriceDefinition[0];
+        String roleId;
+        TwItemCostComponent[] costs = TwItemCostComponent.EMPTY_ARRAY;
+
+        @Nonnull public String getRoleId() { return requireText(roleId, "RevivePriceByRole RoleId"); }
+        @Nonnull public TwItemCostComponent[] getCosts() { return TwItemCostComponent.validateAndCopy(costs); }
     }
 
     /** Mutable codec target for per-roster bonded feature toggles. */

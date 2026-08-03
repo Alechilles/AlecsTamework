@@ -27,7 +27,7 @@ class SpawnerCaptureChanceServiceTest {
 
         SpawnerCaptureChanceService.Evaluation result = service.evaluate(
                 ItemFeatureConfig.CaptureItemMechanics.GUARANTEED_DEFAULT,
-                policy(10, 0.5D, 0.7D, 0.3D, null, true),
+                policy(10, 0.5D, 0.7D, 0.3D, 0.0D, null, true),
                 Double.NaN, 0.0D, context(), 1L,
                 () -> { entropy.incrementAndGet(); return 0.9D; }
         );
@@ -45,10 +45,10 @@ class SpawnerCaptureChanceServiceTest {
         ItemFeatureConfig.CaptureItemMechanics item = mechanics(4, 0.2D, 0.1D, 0.05D, 0.95D);
 
         assertEquals("capture-power-below-minimum", service.evaluate(
-                item, policy(5, 0.0D, 1.0D, 0.0D, null, false), 5, 10, context(), 0,
+                item, policy(5, 0.0D, 1.0D, 0.0D, 0.0D, null, false), 5, 10, context(), 0,
                 () -> { entropy.incrementAndGet(); return 0.5D; }).reason());
         assertEquals(SpawnerCaptureChanceService.Outcome.SUCCESS, service.evaluate(
-                item, policy(3, 0.0D, 1.0D, 0.0D, 4, false), 5, 10, context(), 0,
+                item, policy(3, 0.0D, 1.0D, 0.0D, 0.0D, 4, false), 5, 10, context(), 0,
                 () -> { entropy.incrementAndGet(); return 0.5D; }).outcome());
         assertEquals(0, entropy.get());
     }
@@ -60,7 +60,7 @@ class SpawnerCaptureChanceServiceTest {
         ItemFeatureConfig.CaptureItemMechanics item = mechanics(4, 0.30D, 0.10D, 0.05D, 0.95D);
 
         SpawnerCaptureChanceService.Evaluation result = service.evaluate(
-                item, policy(2, 0.10D, 0.5D, 0.20D, null, false),
+                item, policy(2, 0.10D, 0.5D, 0.20D, 0.0D, null, false),
                 -5.0D, 10.0D, context(), 0L,
                 () -> { entropy.incrementAndGet(); return 0.25D; }
         );
@@ -73,13 +73,28 @@ class SpawnerCaptureChanceServiceTest {
     }
 
     @Test
+    void tranquilizedTargetGetsFlatBonusAfterOrdinaryChanceCalculation() {
+        SpawnerCaptureChanceService service = new SpawnerCaptureChanceService(runtime(new AtomicInteger(), true));
+
+        SpawnerCaptureChanceService.Evaluation result = service.evaluate(
+                mechanics(0, 0.03D, 0.07D, 0.01D, 0.95D),
+                policy(0, 0.02D, 0.95D, 0.35D, 0.25D, null, false),
+                2.0D, 10.0D, tranquilizedContext(), 0L, () -> 0.52D
+        );
+
+        // ((.03 + .35*.8) - .02) * .95 = .2755; tranquilization adds .25.
+        assertEquals(0.5255D, result.effectiveChance(), 0.000001D);
+        assertEquals(SpawnerCaptureChanceService.Outcome.SUCCESS, result.outcome());
+    }
+
+    @Test
     void requirementDenialFailsClosedBeforeEntropy() {
         AtomicInteger entropy = new AtomicInteger();
         SpawnerCaptureChanceService service = new SpawnerCaptureChanceService(runtime(new AtomicInteger(), false));
 
         SpawnerCaptureChanceService.Evaluation result = service.evaluate(
                 mechanics(1, 0.5D, 0.0D, 0.0D, 1.0D),
-                policy(0, 0.0D, 1.0D, 0.0D, null, true),
+                policy(0, 0.0D, 1.0D, 0.0D, 0.0D, null, true),
                 5, 10, context(), 0,
                 () -> { entropy.incrementAndGet(); return 0.0D; }
         );
@@ -95,7 +110,7 @@ class SpawnerCaptureChanceServiceTest {
         AtomicInteger entropyCalls = new AtomicInteger();
         SpawnerCaptureChanceService service = new SpawnerCaptureChanceService(
                 runtime(requirementCalls, true));
-        CapturePolicyConfigView policy = policy(0, 0.0D, 1.0D, 0.0D, null, true);
+        CapturePolicyConfigView policy = policy(0, 0.0D, 1.0D, 0.0D, 0.0D, null, true);
 
         CaptureRequirementDecision decision = service.revalidateRequirements(
                 policy, context(), 0L);
@@ -117,11 +132,12 @@ class SpawnerCaptureChanceServiceTest {
                                                    double resistance,
                                                    double multiplier,
                                                    double healthBonus,
+                                                   double tranquilizedBonus,
                                                    Integer guaranteedAt,
                                                    boolean requirement) {
         return new CapturePolicyConfigView(
                 "policy", 1L, 0, Set.of("Hydra"), minimumPower, resistance, multiplier,
-                healthBonus, guaranteedAt,
+                healthBonus, tranquilizedBonus, guaranteedAt,
                 requirement ? List.of(new CaptureRequirementSpec("hydragon:ready", null, List.of(), null)) : List.of()
         );
     }
@@ -141,7 +157,16 @@ class SpawnerCaptureChanceServiceTest {
         return new CaptureRequirementContext(
                 UUID.randomUUID(), CaptureRequirementPhase.FINAL_REVALIDATION, UUID.randomUUID(), UUID.randomUUID(),
                 null, "Hydra", "default", "Draconic_Stone", 0.5D,
-                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
+                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION, false
+        );
+    }
+
+    private static CaptureRequirementContext tranquilizedContext() {
+        CaptureRequirementContext ordinary = context();
+        return new CaptureRequirementContext(
+                ordinary.attemptId(), ordinary.phase(), ordinary.actorUuid(), ordinary.targetNpcUuid(),
+                ordinary.profileId(), ordinary.roleId(), ordinary.worldName(), ordinary.sourceItemId(),
+                ordinary.healthFraction(), ordinary.expectedProfileRevision(), true
         );
     }
 }

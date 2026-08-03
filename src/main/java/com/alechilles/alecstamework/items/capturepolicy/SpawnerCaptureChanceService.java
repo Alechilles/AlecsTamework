@@ -58,11 +58,13 @@ public final class SpawnerCaptureChanceService {
         double resistance = policy == null ? 0.0D : policy.resistance();
         double multiplier = policy == null ? 1.0D : policy.chanceMultiplier();
         double healthBonus = policy == null ? 0.0D : policy.missingHealthBonus();
+        double tranquilizedBonus = policy == null || !context.tranquilized() ? 0.0D : policy.tranquilizedBonus();
         double rawChance = (item.baseChance()
                 + powerDelta * item.chancePerPower()
                 + healthBonus * missingHealthFraction
                 - resistance) * multiplier;
-        double effectiveChance = clamp(rawChance, item.minimumChance(), item.maximumChance());
+        double ordinaryChance = clamp(rawChance, item.minimumChance(), item.maximumChance());
+        double effectiveChance = clamp(ordinaryChance + tranquilizedBonus, item.minimumChance(), item.maximumChance());
 
         if (effectiveChance <= 0.0D) {
             return Evaluation.failure(0.0D, false, missingHealthFraction, null, "capture-zero-chance");

@@ -269,7 +269,7 @@ public final class BondedCompanionCoreApiOperations {
         );
         if (resolved.policy() == null) return policyDenied();
         BondedCompanionPolicy policy = resolved.policy();
-        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        BondedCompanionPolicy.RevivePrice price = policy.revivePriceFor(profile.roleId());
         List<BondedCompanionReviveQuote.CostLine> costs = price == null
                 ? List.of() : reviveQuotes.costs(request, price);
         return success(new BondedCompanionReviveQuote(

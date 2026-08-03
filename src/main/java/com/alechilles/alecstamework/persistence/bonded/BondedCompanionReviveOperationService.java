@@ -89,10 +89,10 @@ final class BondedCompanionReviveOperationService {
                 profile.rosterId(), profile.familyId(),
                 request.quoteRevision());
         BondedCompanionPolicy policy = resolved.policy();
-        if (policy == null || policy.revivePrice() == null) {
+        if (policy == null || policy.revivePriceFor(profile.roleId()) == null) {
             return completed(support.policyDenied());
         }
-        BondedCompanionPolicy.RevivePrice price = policy.revivePrice();
+        BondedCompanionPolicy.RevivePrice price = policy.revivePriceFor(profile.roleId());
         long now = clock.getAsLong();
         BondedCompanionOperation operation = support.operation(action, price, now);
         BondedCompanionResult<BondedCompanionProfileView> denied =

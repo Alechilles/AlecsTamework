@@ -215,7 +215,8 @@ class InteractionExtensionRegistryTest {
                 "default",
                 "Draconic_Stone",
                 0.2D,
-                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION
+                CaptureRequirementContext.UNKNOWN_PROFILE_REVISION,
+                false
         );
     }
 }

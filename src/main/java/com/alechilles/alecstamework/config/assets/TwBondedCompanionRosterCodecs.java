@@ -4,6 +4,7 @@ import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 
 /** Focused codecs for the bonded-roster asset and its nested policy sections. */
@@ -28,6 +29,28 @@ public final class TwBondedCompanionRosterCodecs {
             )
             .add()
             .build();
+
+    static final BuilderCodec<TwBondedCompanionRosterConfig.RoleRevivePriceDefinition>
+            ROLE_REVIVE_PRICE_CODEC = BuilderCodec.builder(
+                    TwBondedCompanionRosterConfig.RoleRevivePriceDefinition.class,
+                    TwBondedCompanionRosterConfig.RoleRevivePriceDefinition::new
+            )
+            .<String>append(new KeyedCodec<>("RoleId", Codec.STRING),
+                    (price, value) -> price.roleId = value,
+                    TwBondedCompanionRosterConfig.RoleRevivePriceDefinition::getRoleId)
+            .documentation("Exact allowed role ID for this revival recipe.").add()
+            .<TwItemCostComponent[]>append(
+                    new KeyedCodec<>("Costs", TwItemCostComponent.ARRAY_CODEC),
+                    (price, value) -> price.costs = TwItemCostComponent.validateAndCopy(value),
+                    TwBondedCompanionRosterConfig.RoleRevivePriceDefinition::getCosts)
+            .documentation("Ordered AND item recipe charged for this role's revival.").add()
+            .build();
+
+    static final ArrayCodec<TwBondedCompanionRosterConfig.RoleRevivePriceDefinition>
+            ROLE_REVIVE_PRICES_CODEC = new ArrayCodec<>(
+                    ROLE_REVIVE_PRICE_CODEC,
+                    TwBondedCompanionRosterConfig.RoleRevivePriceDefinition[]::new
+            );
 
     static final BuilderCodec<
             TwBondedCompanionRosterConfig.FeatureToggles>
@@ -186,6 +209,17 @@ public final class TwBondedCompanionRosterCodecs {
                     "Optional revive price. Omission inherits the parent object; "
                             + "explicit nested fields override and missing nested "
                             + "fields inherit."
+            )
+            .add()
+            .<TwBondedCompanionRosterConfig.RoleRevivePriceDefinition[]>append(
+                    new KeyedCodec<>("RevivePriceByRole", ROLE_REVIVE_PRICES_CODEC),
+                    (asset, value) -> asset.revivePriceByRole = value == null
+                            ? TwBondedCompanionRosterConfig.RoleRevivePriceDefinition.EMPTY_ARRAY : value,
+                    asset -> asset.getRevivePriceByRole()
+            )
+            .documentation(
+                    "Optional exact role-specific revive recipes. Omission inherits; "
+                            + "an explicit array replaces the parent mapping."
             )
             .add()
             .<TwBondedCompanionRosterConfig.FeatureToggles>append(

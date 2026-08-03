@@ -47,6 +47,9 @@ public final class TwCapturePolicyConfig
             .<Double>append(new KeyedCodec<>("MissingHealthBonus", Codec.DOUBLE),
                     (value, decoded) -> value.missingHealthBonus = decoded, value -> value.missingHealthBonus)
             .documentation("Finite non-negative maximum bonus from target missing-health fraction.").add()
+            .<Double>append(new KeyedCodec<>("TranquilizedBonus", Codec.DOUBLE),
+                    (value, decoded) -> value.tranquilizedBonus = decoded, value -> value.tranquilizedBonus)
+            .documentation("Finite non-negative flat chance bonus when the target is tranquilized.").add()
             .<Integer>append(new KeyedCodec<>("GuaranteedAtPower", Codec.INTEGER),
                     (value, decoded) -> value.guaranteedAtPower = decoded, value -> value.guaranteedAtPower)
             .documentation("Optional non-negative power at which an eligible capture succeeds without entropy.").add()
@@ -190,6 +193,7 @@ public final class TwCapturePolicyConfig
         if (!nested.contains("Resistance")) difficulty.resistance = parent.difficulty.resistance;
         if (!nested.contains("ChanceMultiplier")) difficulty.chanceMultiplier = parent.difficulty.chanceMultiplier;
         if (!nested.contains("MissingHealthBonus")) difficulty.missingHealthBonus = parent.difficulty.missingHealthBonus;
+        if (!nested.contains("TranquilizedBonus")) difficulty.tranquilizedBonus = parent.difficulty.tranquilizedBonus;
         if (!nested.contains("GuaranteedAtPower")) difficulty.guaranteedAtPower = parent.difficulty.guaranteedAtPower;
     }
 
@@ -214,6 +218,7 @@ public final class TwCapturePolicyConfig
         requireFiniteNonNegative(policy.resistance, "Resistance", configId);
         requireFiniteNonNegative(policy.chanceMultiplier, "ChanceMultiplier", configId);
         requireFiniteNonNegative(policy.missingHealthBonus, "MissingHealthBonus", configId);
+        requireFiniteNonNegative(policy.tranquilizedBonus, "TranquilizedBonus", configId);
         for (RequirementSettings requirement : getRequirements()) validateRequirement(configId, requirement);
     }
 
@@ -252,7 +257,7 @@ public final class TwCapturePolicyConfig
         return new CapturePolicyConfigView(
                 id, revision, priority, Set.copyOf(List.of(getRoleIds())),
                 policy.minimumPower, policy.resistance, policy.chanceMultiplier,
-                policy.missingHealthBonus, policy.guaranteedAtPower, specs
+                policy.missingHealthBonus, policy.tranquilizedBonus, policy.guaranteedAtPower, specs
         );
     }
 
@@ -275,12 +280,14 @@ public final class TwCapturePolicyConfig
         private double resistance;
         private double chanceMultiplier = 1.0D;
         private double missingHealthBonus;
+        private double tranquilizedBonus;
         private Integer guaranteedAtPower;
 
         public int getMinimumPower() { return minimumPower; }
         public double getResistance() { return resistance; }
         public double getChanceMultiplier() { return chanceMultiplier; }
         public double getMissingHealthBonus() { return missingHealthBonus; }
+        public double getTranquilizedBonus() { return tranquilizedBonus; }
         @Nullable public Integer getGuaranteedAtPower() { return guaranteedAtPower; }
     }
 

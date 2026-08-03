@@ -53,6 +53,31 @@ class TwBondedCompanionRosterConfigTest {
     }
 
     @Test
+    void roleSpecificRevivePriceOverridesTheRosterFallback() throws Exception {
+        TwBondedCompanionRosterConfig config = roster("RolePrices", """
+                {
+                  "RosterId": "hydragon:dragons",
+                  "FamilyId": "hydragon:dragon",
+                  "AllowedRoles": ["Tamed_Dragon_Fire", "Tamed_Dragon_Ice"],
+                  "RevivePrice": {"Costs": [{"ItemId": "Revitalizing_Essence", "Quantity": 1}]},
+                  "RevivePriceByRole": [
+                    {"RoleId": "Tamed_Dragon_Fire", "Costs": [
+                      {"ItemId": "Revitalizing_Essence", "Quantity": 2},
+                      {"ItemId": "Draconic_Essence_Fire", "Quantity": 2}
+                    ]}
+                  ]
+                }
+                """);
+        BondedCompanionRosterRegistry registry = new BondedCompanionRosterRegistry();
+        assertTrue(registry.replace(List.of(config), 1L).applied());
+        BondedCompanionRosterRegistry.RevivePrice price = registry.resolve("hydragon:dragons")
+                .orElseThrow().revivePrice();
+
+        assertEquals("Draconic_Essence_Fire", price.forRole("Tamed_Dragon_Fire").costs().get(1).itemId());
+        assertEquals("Revitalizing_Essence", price.forRole("Tamed_Dragon_Ice").costs().getFirst().itemId());
+    }
+
+    @Test
     void validPolicyAssetDecodesAndCompilesIntoImmutableRegistry() throws Exception {
         TwBondedCompanionRosterConfig config = roster(
                 "HyDragonRoster",

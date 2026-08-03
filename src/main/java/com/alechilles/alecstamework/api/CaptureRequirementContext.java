@@ -15,7 +15,8 @@ public record CaptureRequirementContext(@Nonnull UUID attemptId,
                                         @Nonnull String worldName,
                                         @Nonnull String sourceItemId,
                                         double healthFraction,
-                                        long expectedProfileRevision) {
+                                        long expectedProfileRevision,
+                                        boolean tranquilized) {
     public static final long UNKNOWN_PROFILE_REVISION = -1L;
 
     public CaptureRequirementContext {
