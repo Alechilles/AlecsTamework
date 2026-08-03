@@ -31,6 +31,13 @@
         ],
         "Id": "Weapon_Bench",
         "RequiredTierLevel": 2
+      },
+      {
+        "Type": "Crafting",
+        "Id": "Draconic_Altar",
+        "Categories": [
+          "Draconic_Altar_Stones"
+        ]
       }
     ],
     "TimeSeconds": 1

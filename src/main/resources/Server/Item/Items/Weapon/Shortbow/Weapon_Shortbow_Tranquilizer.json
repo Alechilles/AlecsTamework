@@ -46,6 +46,13 @@
           "Weapons.Bow"
         ],
         "Id": "Armory"
+      },
+      {
+        "Type": "Crafting",
+        "Id": "Draconic_Altar",
+        "Categories": [
+          "Draconic_Altar_Stones"
+        ]
       }
     ],
     "TimeSeconds": 4

@@ -45,6 +45,13 @@
           "Alchemy_Potions"
         ],
         "RequiredTierLevel": 2
+      },
+      {
+        "Type": "Crafting",
+        "Id": "Draconic_Altar",
+        "Categories": [
+          "Draconic_Altar_Stones"
+        ]
       }
     ],
     "OutputQuantity": 1,
