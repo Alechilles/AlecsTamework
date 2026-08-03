@@ -1,5 +1,5 @@
 {
-  "$Comment": "Barebones AH-style livestock template used to demonstrate optional Tamework patches. This file intentionally avoids Tamework builders; Server/Patchwork/Patches/Examples/Tamework_Example_Patch.json adds them when Tamework is installed.",
+  "$Comment": "Barebones AH-style livestock template used to demonstrate optional Tamework patches. This file intentionally avoids Tamework builders; Patchwork's centralized Tamework definition adds them when Tamework is installed.",
   "Type": "Abstract",
   "StartState": "Idle",
   "Parameters": {

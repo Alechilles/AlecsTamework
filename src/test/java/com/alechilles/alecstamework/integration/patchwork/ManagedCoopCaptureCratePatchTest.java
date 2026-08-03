@@ -1,39 +1,14 @@
 package com.alechilles.alecstamework.integration.patchwork;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /** Guards Tamework's capture-crate patch without depending on Patchwork implementation classes. */
 final class ManagedCoopCaptureCratePatchTest {
-    private static final Path PATCH = Path.of(
-            "src/main/resources/Server/Patchwork/Patches/Items/Tamework_Tool_Capture_Crate_Patch.json");
-
-    @Test
-    void bundledPatchOnlyReplacesTheVanillaCaptureInteractionType() throws Exception {
-        assertFalse(Files.exists(Path.of(
-                "src/main/resources/Server/Item/Items/Tool/Capture_Crate/Tool_Capture_Crate.json")),
-                "Tamework must not ship a full vanilla item override");
-
-        JsonObject patch = JsonParser.parseString(Files.readString(PATCH)).getAsJsonObject();
-        JsonObject operation = patch.getAsJsonArray("Operations").get(0).getAsJsonObject();
-
-        assertEquals("Server/Item/Items/Tool/Capture_Crate/Tool_Capture_Crate.json",
-                patch.get("Target").getAsString());
-        assertEquals(-100, patch.get("Priority").getAsInt());
-        assertEquals(1, patch.getAsJsonArray("Operations").size());
-        assertEquals("Replace", operation.get("Op").getAsString());
-        assertEquals("/Interactions/Primary/Interactions/0/Next/Type",
-                operation.get("Path").getAsString());
-        assertEquals("TameworkManagedCoopCaptureCrate", operation.get("Value").getAsString());
-    }
-
     @Test
     void sharedInteractionBoundaryKeepsSectionLocalAndFailClosedEvidence() throws Exception {
         String captureInteraction = Files.readString(Path.of(

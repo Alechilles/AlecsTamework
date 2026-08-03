@@ -75,7 +75,7 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 
 ### Optional Dependency
 - Keep your base assets clean of any references to Tamework functionality.
-- Create asset patches under `Server/Patchwork/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior only when Tamework is installed. Use `Targets` for shared operations across several assets and `When.ModInstalled` for optional cross-mod gates. The legacy `Server/Tamework/Patches` root remains readable while Tamework is installed, but new integrations should use the neutral Patchwork root.
+- Tamework's bundled compatibility definitions are maintained in Patchwork's standalone asset pack. New third-party integrations should use `Server/Patchwork/Patches`, with `When.ModInstalled` gates for Tamework-specific behavior. The legacy `Server/Tamework/Patches` root remains readable while Tamework is installed.
 - Add configs for the Tamework systems you want to support.
 - Declare Patchwork as a dependency for asset-only patch packs. Declare Alec's Tamework too when the patch uses Tamework macros or behavior.
 
