@@ -70,6 +70,9 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Bonded companion cards now show a thin XP bar above health without changing
+  the card layout, and their level/talent tooltip lists configured level-based
+  stat bonuses.
 - Moved Tamework's bundled patch definitions to the neutral `Server/Patchwork/Patches` root. Patchwork still reads the legacy `Server/Tamework/Patches` root while Tamework is installed, and neutral definitions win matching legacy-definition conflicts.
 - Replaced `/tw patches` administration with Patchwork's `/patchwork status`, `/patchwork reload`, and `/patchwork selftest` commands. Regeneration now reports unsupported live activation as restart-required instead of relying on Tamework-specific reload hooks.
 - Bonded roster panels now appear faster and keep controls reliable while live

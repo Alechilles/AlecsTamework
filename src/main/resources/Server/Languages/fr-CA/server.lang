@@ -274,6 +274,7 @@ tamework.ui.linkedPanel.futureStat.a.default=Stat A : ?/?
 tamework.ui.linkedPanel.futureStat.b.default=Stat B : ?/?
 tamework.ui.linkedPanel.trait.fallback=Trait
 tamework.ui.linkedPanel.progression.modifiersBreakdown=Modificateurs : total - [Niveau - Talents - Traits]
+tamework.ui.linkedPanel.progression.levelBonuses=Bonus de niveau
 tamework.ui.linkedPanel.progression.effect.MaxHealthMultiplier=Santé
 tamework.ui.linkedPanel.progression.effect.MoveSpeedMultiplier=Vitesse
 tamework.ui.linkedPanel.progression.effect.DamageDealtMultiplier=Dégâts infligés

@@ -109,6 +109,43 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
+    void progressionTooltipAndXpStripUseTheSavedLevelingConfig() throws Exception {
+        String presenter = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
+        String binder = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "LinkedNpcPanelProgressionBinder.java"), StandardCharsets.UTF_8);
+
+        assertTrue(presenter.contains("bindXpProgress(commands, entrySelector, progression, row.attributes())"));
+        assertTrue(presenter.contains("#BondedXpFill.Anchor"));
+        assertTrue(presenter.contains("resolveLevelBonusTooltip("));
+        assertTrue(binder.contains("Level Bonuses")
+                        && binder.contains("effect.getPerLevel() * levelOffset"),
+                "The saved config's per-level effects must become tooltip bonuses.");
+    }
+
+    @Test
+    void xpStripFitsAboveHealthWithoutMovingTheExistingCardLayout() throws Exception {
+        String asset = Files.readString(Path.of("src", "main", "resources",
+                "Common", "UI", "Custom",
+                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
+
+        assertTrue(asset.contains("Anchor: (Top: 3, Left: 0, Right: 0, Height: 118)"));
+        assertTrue(selectorBlock(asset, "#BondedXpFrame")
+                        .contains("Anchor: (Top: 52, Left: 20, Right: 25, Height: 3)"),
+                "The thin XP strip must use the existing gap above the health frame.");
+        assertTrue(selectorBlock(asset, "#BondedXpFill")
+                        .contains("Anchor: (Top: 0, Left: 0, Width: 358, Height: 3)"));
+        assertTrue(selectorBlock(asset, "#BondedHealthFrame")
+                        .contains("Anchor: (Top: 56, Left: 20, Right: 25, Height: 18)"));
+        assertTrue(selectorBlock(asset, "#BondedMetricHappiness")
+                        .contains("Anchor: (Top: 82, Left: 14, Width: 66, Height: 18)"));
+        assertTrue(selectorBlock(asset, "#BondedPrimaryAction")
+                        .contains("Anchor: (Top: 82, Right: 14, Width: 94, Height: 28)"));
+    }
+
+    @Test
     void activeAvailableFlightToggleShowsTheGroundedIconAndFlightTooltip() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.ACTIVE,
@@ -629,7 +666,11 @@ class BondedCompanionCardPresenterTest {
         assertTrue(java.util.Arrays.stream(commands.getCommands())
                         .anyMatch(command -> selector.equals(command.selector)
                                 && command.data.contains(expected)),
-                () -> "Expected " + selector + " to contain " + expected);
+                () -> "Expected " + selector + " to contain " + expected
+                        + "; actual data: " + java.util.Arrays.stream(commands.getCommands())
+                        .filter(command -> selector.equals(command.selector))
+                        .map(command -> command.data)
+                        .toList());
     }
 
     private static void assertCommandSelector(
@@ -639,4 +680,5 @@ class BondedCompanionCardPresenterTest {
                         .anyMatch(command -> selector.equals(command.selector)),
                 () -> "Expected a command for " + selector);
     }
+
 }

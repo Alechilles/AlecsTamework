@@ -213,12 +213,14 @@ Linked panel supports:
   a live projection is optional enrichment, not the source of the card.
 - Bonded rows use the dedicated final companion card: state accents distinguish
   `IN WORLD`, `STORED`, `DEAD`, and revive-ready states; health is always
-  shown from the durable snapshot; and happiness, hunger, and thirst appear
+  shown from the durable snapshot; a thin XP strip sits above the health bar
+  without changing the card layout; and happiness, hunger, and thirst appear
   only when that saved role state actually has the corresponding component.
   Active bonded rows project current level, XP, and available talent points from
   their exact live companion, coalesced to avoid interrupting panel controls.
   Stored and dead rows continue to use their durable progression snapshot. The
-  talent shortcut opens the existing talent page while the companion is active.
+  talent shortcut opens the existing talent page while the companion is active,
+  and its tooltip lists the current level's configured stat bonuses.
   Dead cards retain their complete compact revive-cost list, including
   owned/required quantities, while the existing confirmation overlay remains
   the payment authority.

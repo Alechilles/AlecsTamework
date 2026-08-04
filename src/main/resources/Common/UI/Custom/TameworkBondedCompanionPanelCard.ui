@@ -206,6 +206,17 @@ Group {
         Visible: false;
     }
 
+    Group #BondedXpFrame {
+        Anchor: (Top: 52, Left: 20, Right: 25, Height: 3);
+        Background: #08121f;
+        Visible: false;
+
+        Group #BondedXpFill {
+            Anchor: (Top: 0, Left: 0, Width: 358, Height: 3);
+            Background: #5d9fd4;
+        }
+    }
+
     Group #BondedHealthFrame {
         Anchor: (Top: 56, Left: 20, Right: 25, Height: 18);
         Background: #08121f;

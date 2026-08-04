@@ -1,11 +1,19 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import javax.annotation.Nullable;
 
 /**
  * Applies compact linked-panel progression indicators to UI controls.
  */
 final class LinkedNpcPanelProgressionBinder {
+    private static final double EPSILON = 0.000001;
+
     private LinkedNpcPanelProgressionBinder() {
     }
 
@@ -76,6 +84,70 @@ final class LinkedNpcPanelProgressionBinder {
             return stat.label() + suffix;
         }
         return stat.current() + "/" + stat.max() + " XP" + suffix;
+    }
+
+    @Nullable
+    static String resolveLevelBonusTooltip(
+            TwLevelingConfig config,
+            int level,
+            @Nullable String language
+    ) {
+        if (config == null || !config.isEnabled()) {
+            return null;
+        }
+        int levelOffset = Math.max(0, level - 1);
+        List<String> lines = new ArrayList<>();
+        for (TwLevelingConfig.GrowthEffect effect : config.getStatGrowth().getEffects()) {
+            if (effect == null || effect.getEffectKey() == null) {
+                continue;
+            }
+            double multiplier = Math.max(0.0,
+                    1.0 + effect.getPerLevel() * levelOffset);
+            if (Math.abs(multiplier - 1.0) <= EPSILON) {
+                continue;
+            }
+            if (lines.isEmpty()) {
+                String titleKey = "tamework.ui.linkedPanel.progression.levelBonuses";
+                String title = LocalizedText.resolve(language, titleKey);
+                lines.add(title.equals(titleKey) ? "Level Bonuses" : title);
+            }
+            lines.add(labelForEffectKey(effect.getEffectKey(), language)
+                    + ": " + formatSignedPercent(multiplier));
+        }
+        return lines.isEmpty() ? null : String.join("\n", lines);
+    }
+
+    private static String labelForEffectKey(String effectKey, @Nullable String language) {
+        String normalizedKey = effectKey == null ? "" : effectKey.trim();
+        if (!normalizedKey.isBlank()) {
+            String languageKey = "tamework.ui.linkedPanel.progression.effect." + normalizedKey;
+            String localized = LocalizedText.resolve(language, languageKey);
+            if (!localized.equals(languageKey)) {
+                return localized;
+            }
+        }
+        if ("MaxHealthMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Health";
+        }
+        if ("MoveSpeedMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Speed";
+        }
+        if ("DamageDealtMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Damage Dealt";
+        }
+        if ("DamageTakenMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Damage Taken";
+        }
+        return normalizedKey.replace("Multiplier", "")
+                .replaceAll("(?<=[a-z])(?=[A-Z])", " ");
+    }
+
+    private static String formatSignedPercent(double multiplier) {
+        double percent = (multiplier - 1.0) * 100.0;
+        if (!Double.isFinite(percent)) {
+            percent = 0.0;
+        }
+        return String.format(Locale.ROOT, "%+d%%", (int) Math.round(percent));
     }
 
     private static double progressRatio(int current, int max) {
