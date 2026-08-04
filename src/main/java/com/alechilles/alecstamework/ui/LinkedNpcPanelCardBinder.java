@@ -100,6 +100,7 @@ final class LinkedNpcPanelCardBinder {
         String returnHomeSelector = entrySelector + " #ReturnHomeButton";
         String flightToggleSelector = entrySelector + " #FlightToggleButton";
         String shoulderRideSelector = entrySelector + " #ShoulderRideButton";
+        String shoulderRideIconSelector = entrySelector + " #ShoulderRideIcon";
         String flightModeGroundedSelector = entrySelector + " #FlightModeGroundedIcon";
         String flightModeAirborneSelector = entrySelector + " #FlightModeAirborneIcon";
         String releaseSelector = entrySelector + " #ReleaseButton";
@@ -214,9 +215,8 @@ final class LinkedNpcPanelCardBinder {
                         : "tamework.ui.linkedPanel.bonded.flight.switchToFlight")
                 : "");
         commandBuilder.set(shoulderRideSelector + ".Visible", showShoulderRide);
-        commandBuilder.set(shoulderRideSelector + ".Text", entry.shoulderRideMounted()
-                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.shoulder.down")
-                : LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.shoulder.toMe"));
+        commandBuilder.set(shoulderRideIconSelector + ".Visible", showShoulderRide);
+        commandBuilder.set(shoulderRideSelector + ".Text", "");
         commandBuilder.set(shoulderRideSelector + ".TooltipText", showShoulderRide
                 ? LocalizedText.resolve(language, entry.shoulderRideMounted()
                 ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"

@@ -875,10 +875,8 @@ final class BondedCompanionCardPresenter {
         boolean mounted = Boolean.parseBoolean(row.attributes().get(
                 BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED));
         commands.set(entrySelector + " #BondedShoulderRideButton.Visible", visible);
-        commands.set(entrySelector + " #BondedShoulderRideButton.Text",
-                visible ? LocalizedText.resolve(language, mounted
-                        ? "tamework.ui.linkedPanel.bonded.shoulder.down"
-                        : "tamework.ui.linkedPanel.bonded.shoulder.toMe") : "");
+        commands.set(entrySelector + " #BondedShoulderRideIcon.Visible", visible);
+        commands.set(entrySelector + " #BondedShoulderRideButton.Text", "");
         commands.set(entrySelector + " #BondedShoulderRideButton.TooltipText",
                 visible ? LocalizedText.resolve(language, mounted
                         ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"

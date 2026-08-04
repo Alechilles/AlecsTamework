@@ -1039,10 +1039,16 @@ Group {
         Visible: false;
     }
 
+    Group #ShoulderRideIcon {
+        Anchor: (Top: 0, Right: 52, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/ShoulderRide.png");
+        Visible: false;
+    }
+
     TextButton #ShoulderRideButton {
-        Anchor: (Top: 0, Right: 52, Width: 54, Height: 24);
-        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
-        Text: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe;
+        Anchor: (Top: 0, Right: 52, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;

@@ -26,7 +26,8 @@ class LinkedNpcPanelFlightToggleTest {
                 bindingConfig(), "en-US");
 
         assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Visible", "true");
-        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Text", "To Me");
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideIcon.Visible", "true");
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Text", "");
         assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
                 event.type == CustomUIEventBindingType.Activating
                         && "#TameworkLinkedPanelList[0] #ShoulderRideButton".equals(event.selector)

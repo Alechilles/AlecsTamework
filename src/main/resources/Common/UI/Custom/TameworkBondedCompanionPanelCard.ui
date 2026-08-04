@@ -206,10 +206,16 @@ Group {
         Visible: false;
     }
 
+    Group #BondedShoulderRideIcon {
+        Anchor: (Top: 5, Right: 140, Width: 24, Height: 24);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/ShoulderRide.png");
+        Visible: false;
+    }
+
     TextButton #BondedShoulderRideButton {
-        Anchor: (Top: 5, Right: 140, Width: 48, Height: 24);
-        Style: @BondedCardButtonStyle;
-        Text: "To Me";
+        Anchor: (Top: 5, Right: 140, Width: 24, Height: 24);
+        Style: @BondedTransparentButton;
+        Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
         TextTooltipStyle: @BondedCardTextTooltipStyle;
         Visible: false;
