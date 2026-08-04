@@ -26,6 +26,20 @@ class AvatarFlightHudViewModelTest {
     }
 
     @Test
+    void combatCooldownCapsHudRefreshIntervalAtOneSecond() {
+        AvatarFlightHudViewModel ready = AvatarFlightHudViewModel.visible(
+                0.5, 3.0, 6.0, false, "NONE");
+        AvatarFlightHudViewModel coolingDown = AvatarFlightHudViewModel.visible(
+                0.5, 0.5, 0.0, 3.0, 6.0, false, "NONE", false, 0.0, 0.0,
+                new AvatarFlightHudViewModel.CombatGlyph(true, "FIRE", "E", "", true, 15),
+                new AvatarFlightHudViewModel.CombatGlyph(false, "", "R", "", false, 0));
+
+        assertEquals(5_000L, AvatarFlightHudSystem.hudRefreshIntervalMs(ready, ready, 5_000L));
+        assertEquals(1_000L, AvatarFlightHudSystem.hudRefreshIntervalMs(coolingDown, coolingDown, 5_000L));
+        assertEquals(1_000L, AvatarFlightHudSystem.hudRefreshIntervalMs(coolingDown, ready, 5_000L));
+    }
+
+    @Test
     void hiddenModelClearsAllRenderableValues() {
         AvatarFlightHudViewModel model = AvatarFlightHudViewModel.hidden();
 
@@ -271,6 +285,37 @@ class AvatarFlightHudViewModelTest {
         assertTrue(model.ability2().visible());
         assertEquals("", model.ability2().glyph());
         assertEquals("MyDragon/AvatarFlightIcons/Ice_Blast.png", model.ability2().iconTexturePath());
+    }
+
+    @Test
+    void combatGlyphsDimAndCountDownIndependentlyByWholeSecond() {
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1_000L);
+        flight.setNextAbility2CombatAtMs(16_000L);
+        flight.setNextAbility3CombatAtMs(4_500L);
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
+                { "CombatAbilities": {
+                  "Ability2": { "RootInteraction": "Root_Fire", "Glyph": "FIRE", "CooldownSeconds": 15 },
+                  "Ability3": { "RootInteraction": "Root_Breath", "Glyph": "BREATH", "CooldownSeconds": 15 }
+                } }
+                """), new ExtraInfo());
+
+        AvatarFlightHudViewModel started = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 1_000L);
+        AvatarFlightHudViewModel oneSecondLater = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 2_000L);
+        AvatarFlightHudViewModel ready = AvatarFlightHudSystem.buildModel(
+                flight, new AvatarFlightInputComponent(), config,
+                AvatarFlightProgressionTuning.neutral(), 16_000L);
+
+        assertTrue(started.ability2().coolingDown());
+        assertEquals("15", started.ability2().cooldownLabel());
+        assertTrue(started.ability3().coolingDown());
+        assertEquals("4", started.ability3().cooldownLabel());
+        assertEquals("14", oneSecondLater.ability2().cooldownLabel());
+        assertFalse(ready.ability2().coolingDown());
+        assertEquals("", ready.ability2().cooldownLabel());
     }
 
     @Test

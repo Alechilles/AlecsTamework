@@ -231,7 +231,7 @@ Omitting `Animation` inherits the complete parent section. An explicit `Animatio
 - `RootInteraction`: ID of the downstream root interaction. Omit it or set it blank to disable that slot.
 - `Glyph`: optional fallback text when no custom glyph texture is configured. A configured root with both `Glyph` and `GlyphTexturePath` blank still runs, but its HUD control is hidden.
 - `GlyphTexturePath`: optional custom UI texture path for the glyph, relative to the mod's `Common/UI/Custom` directory. It replaces Tamework's built-in artwork for that ability while keeping the standard avatar-flight frame and layout. Leave it blank to use a built-in texture for known glyphs or the `Glyph` text fallback.
-- `CooldownSeconds`: optional real-time cooldown for this slot. It defaults to `0`; each transformed player's Ability2 and Ability3 timers are independent and begin only after the server accepts the configured root.
+- `CooldownSeconds`: optional real-time cooldown for this slot. It defaults to `0`; each transformed player's Ability2 and Ability3 timers are independent and begin only after the server accepts the configured root. During cooldown, the matching HUD control is dimmed and shows a whole-second countdown; it refreshes at least once per second regardless of the regular HUD resend setting.
 
 The Flightmaster's Talisman maps its native `Ability2` and `Ability3` item interactions to this map. E and R are the default Hytale bindings for those slots, not hard-coded input keys. A player can remap native ability bindings and the same slot still resolves; custom roots must not depend on literal E/R input events.
 

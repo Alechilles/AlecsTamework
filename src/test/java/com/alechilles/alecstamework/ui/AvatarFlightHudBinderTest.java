@@ -164,6 +164,24 @@ class AvatarFlightHudBinderTest {
     }
 
     @Test
+    void binderShowsCooldownShadeAndWholeSecondLabelForCombatGlyphs() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ui/AvatarFlightHudBinder.java"
+        ));
+        String ui = Files.readString(Path.of(
+                "src/main/resources/Common/UI/Custom/Hud/TameworkAvatarFlightControls.ui"
+        ));
+
+        Assertions.assertTrue(source.contains("CooldownShade"));
+        Assertions.assertTrue(source.contains("glyph.coolingDown()"));
+        Assertions.assertTrue(source.contains("glyph.cooldownLabel()"));
+        Assertions.assertTrue(ui.contains("#Ability2CooldownShade"));
+        Assertions.assertTrue(ui.contains("#Ability3CooldownShade"));
+        Assertions.assertTrue(ui.contains("#Ability2CooldownLabel"));
+        Assertions.assertTrue(ui.contains("#Ability3CooldownLabel"));
+    }
+
+    @Test
     void generatedCombatGlyphTexturesAreBundledAtHudResolution() throws Exception {
         assertPngDimensions("Fireball.png");
         assertPngDimensions("FireBreath.png");

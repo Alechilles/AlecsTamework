@@ -11,6 +11,13 @@
     TexturePath: "../Tamework/AvatarFlightControls/InputBadge.png",
     Border: 8
 );
+@FlightControlCooldownStyle = (
+    FontName: "Secondary",
+    FontSize: 20,
+    RenderBold: true,
+    TextColor: #f1f5f9,
+    Alignment: Center
+);
 
 // Flightmaster's Talisman is tool-only, so Hytale hides its native weapon
 // ability strip and this self-contained cluster supplies all flight controls.
@@ -47,6 +54,18 @@ Group #TameworkAvatarFlightControls {
             Text: "";
             Style: @FlightControlBindingStyle;
         }
+
+        Group #Ability2CooldownShade {
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: 69);
+            Background: #0a0e14(0.72);
+            Visible: false;
+
+            Label #Ability2CooldownLabel {
+                Anchor: (Top: 17, Left: 0, Width: @FlightControlSlotSize, Height: 28);
+                Text: "";
+                Style: @FlightControlCooldownStyle;
+            }
+        }
     }
 
     Group #Ability3Control {
@@ -76,6 +95,18 @@ Group #TameworkAvatarFlightControls {
             Background: @FlightControlBindingBackground;
             Text: "";
             Style: @FlightControlBindingStyle;
+        }
+
+        Group #Ability3CooldownShade {
+            Anchor: (Top: 0, Left: 0, Width: @FlightControlSlotSize, Height: 69);
+            Background: #0a0e14(0.72);
+            Visible: false;
+
+            Label #Ability3CooldownLabel {
+                Anchor: (Top: 17, Left: 0, Width: @FlightControlSlotSize, Height: 28);
+                Text: "";
+                Style: @FlightControlCooldownStyle;
+            }
         }
     }
 

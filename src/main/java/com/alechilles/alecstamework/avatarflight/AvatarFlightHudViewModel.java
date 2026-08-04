@@ -147,6 +147,11 @@ public record AvatarFlightHudViewModel(boolean visible,
         return "0\u00B0";
     }
 
+    /** Returns whether either visible combat-ability slot has an active cooldown. */
+    public boolean hasActiveCombatCooldown() {
+        return ability2.coolingDown() || ability3.coolingDown();
+    }
+
     public double pipFill(int index) {
         if (!visible || index < 0 || index >= MAX_DISPLAY_PIPS || index >= maxVigourCharges) {
             return 0.0;
@@ -181,18 +186,28 @@ public record AvatarFlightHudViewModel(boolean visible,
     public record CombatGlyph(boolean visible,
                               @Nonnull String glyph,
                               @Nonnull String bindingLabel,
-                              @Nonnull String customIconTexturePath) {
+                              @Nonnull String customIconTexturePath,
+                              boolean coolingDown,
+                              int cooldownSecondsRemaining) {
         private static final String FIREBALL_TEXTURE_PATH = "Tamework/AvatarFlightControls/Fireball.png";
         private static final String FIRE_BREATH_TEXTURE_PATH = "Tamework/AvatarFlightControls/FireBreath.png";
 
         @Nonnull
         public static CombatGlyph from(@Nullable AvatarFlightCombatAbilitySettings settings,
-                                       @Nonnull AvatarFlightCombatAbilitySlot slot) {
+                                       @Nonnull AvatarFlightCombatAbilitySlot slot,
+                                       long nowMs,
+                                       long nextAvailableAtMs) {
             if (settings == null || !settings.isConfigured()
                     || (settings.getGlyph().isBlank() && settings.getGlyphTexturePath().isBlank())) {
                 return hidden(slot);
             }
-            return new CombatGlyph(true, settings.getGlyph(), bindingLabel(slot), settings.getGlyphTexturePath());
+            long remainingMs = Math.max(0L, nextAvailableAtMs - nowMs);
+            boolean coolingDown = remainingMs > 0L;
+            int remainingSeconds = coolingDown
+                    ? (int) Math.min(Integer.MAX_VALUE, (remainingMs + 999L) / 1_000L)
+                    : 0;
+            return new CombatGlyph(true, settings.getGlyph(), bindingLabel(slot), settings.getGlyphTexturePath(),
+                    coolingDown, remainingSeconds);
         }
 
         @Nonnull
@@ -206,17 +221,25 @@ public record AvatarFlightHudViewModel(boolean visible,
             if (normalizedGlyph.isEmpty() && normalizedTexturePath.isEmpty()) {
                 return hidden(slot);
             }
-            return new CombatGlyph(true, normalizedGlyph, bindingLabel(slot), normalizedTexturePath);
+            return new CombatGlyph(true, normalizedGlyph, bindingLabel(slot), normalizedTexturePath,
+                    glyph.coolingDown && glyph.cooldownSecondsRemaining > 0,
+                    Math.max(0, glyph.cooldownSecondsRemaining));
         }
 
         @Nonnull
         private static CombatGlyph hidden(@Nonnull AvatarFlightCombatAbilitySlot slot) {
-            return new CombatGlyph(false, "", bindingLabel(slot), "");
+            return new CombatGlyph(false, "", bindingLabel(slot), "", false, 0);
         }
 
         /** Returns the bundled HUD texture for a known ability glyph, if one exists. */
         public boolean hasIconTexturePath() {
             return !iconTexturePath().isEmpty();
+        }
+
+        /** Returns a whole-second countdown label only while the server cooldown is active. */
+        @Nonnull
+        public String cooldownLabel() {
+            return coolingDown && cooldownSecondsRemaining > 0 ? Integer.toString(cooldownSecondsRemaining) : "";
         }
 
         /**

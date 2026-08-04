@@ -124,10 +124,14 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 launchMinChargeRatio,
                 AvatarFlightHudViewModel.CombatGlyph.from(
                         config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_2),
-                        AvatarFlightCombatAbilitySlot.ABILITY_2),
+                        AvatarFlightCombatAbilitySlot.ABILITY_2,
+                        nowMs,
+                        flight.getNextAbility2CombatAtMs()),
                 AvatarFlightHudViewModel.CombatGlyph.from(
                         config.getCombatAbility(AvatarFlightCombatAbilitySlot.ABILITY_3),
-                        AvatarFlightCombatAbilitySlot.ABILITY_3)
+                        AvatarFlightCombatAbilitySlot.ABILITY_3,
+                        nowMs,
+                        flight.getNextAbility3CombatAtMs())
         );
     }
 
@@ -196,7 +200,8 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
             STATE_BY_PLAYER.put(playerUuid, new HudState(enabledAtMs, playerRef, hud, model, now));
             return;
         }
-        if (!shouldRefresh(previous.model(), previous.lastSentAtMs(), model, now, resendIntervalMs)) {
+        long effectiveResendIntervalMs = hudRefreshIntervalMs(previous.model(), model, resendIntervalMs);
+        if (!shouldRefresh(previous.model(), previous.lastSentAtMs(), model, now, effectiveResendIntervalMs)) {
             return;
         }
         hud.refresh(model);
@@ -232,6 +237,15 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
         return previousModel != null
                 && !previousModel.equals(model)
                 && now - lastSentAtMs >= Math.max(1L, resendIntervalMs);
+    }
+
+    static long hudRefreshIntervalMs(@Nonnull AvatarFlightHudViewModel previousModel,
+                                     @Nonnull AvatarFlightHudViewModel model,
+                                     long configuredIntervalMs) {
+        long normalizedIntervalMs = Math.max(1L, configuredIntervalMs);
+        return previousModel.hasActiveCombatCooldown() || model.hasActiveCombatCooldown()
+                ? Math.min(1_000L, normalizedIntervalMs)
+                : normalizedIntervalMs;
     }
 
     private static boolean fullVigour(double charges, double maxCharges) {

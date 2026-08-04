@@ -30,9 +30,9 @@ final class AvatarFlightHudBinder {
         commandBuilder.set("#Root.Visible", model.visible());
         commandBuilder.set("#TameworkAvatarFlightControls.Visible", model.visible());
         bindCombatGlyph(commandBuilder, "#Ability2Control", "#Ability2Glyph", "#Ability2GlyphText",
-                "#Ability2Binding", model.ability2());
+                "#Ability2Binding", "#Ability2CooldownShade", "#Ability2CooldownLabel", model.ability2());
         bindCombatGlyph(commandBuilder, "#Ability3Control", "#Ability3Glyph", "#Ability3GlyphText",
-                "#Ability3Binding", model.ability3());
+                "#Ability3Binding", "#Ability3CooldownShade", "#Ability3CooldownLabel", model.ability3());
         commandBuilder.set("#LaunchChargeGroup.Visible", model.visible() && model.launchChargeVisible());
         commandBuilder.setObject("#LaunchChargeFill.Anchor",
                 fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
@@ -59,6 +59,8 @@ final class AvatarFlightHudBinder {
                                         @Nonnull String iconSelector,
                                         @Nonnull String glyphTextSelector,
                                         @Nonnull String bindingSelector,
+                                        @Nonnull String cooldownShadeSelector,
+                                        @Nonnull String cooldownLabelSelector,
                                         @Nonnull AvatarFlightHudViewModel.CombatGlyph glyph) {
         commandBuilder.set(controlSelector + ".Visible", glyph.visible());
         commandBuilder.set(iconSelector + ".Visible", glyph.visible() && glyph.hasIconTexturePath());
@@ -66,6 +68,8 @@ final class AvatarFlightHudBinder {
         commandBuilder.set(glyphTextSelector + ".Visible", glyph.visible() && !glyph.hasIconTexturePath());
         commandBuilder.set(glyphTextSelector + ".Text", glyph.visible() ? glyph.glyph() : "");
         commandBuilder.set(bindingSelector + ".Text", glyph.visible() ? glyph.bindingLabel() : "");
+        commandBuilder.set(cooldownShadeSelector + ".Visible", glyph.visible() && glyph.coolingDown());
+        commandBuilder.set(cooldownLabelSelector + ".Text", glyph.cooldownLabel());
     }
 
     @Nonnull
