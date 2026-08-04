@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import javax.annotation.Nonnull;
 
 /** Removes expiry-dismount fall protection once its player has safely landed. */
@@ -42,7 +43,10 @@ public final class ExpiryDismountLandingProtectionSystem
                 || !states.onGround) {
             return;
         }
-        ExpiryDismountFallProtectionService.getInstance().clearWhenGrounded(
-                uuid.getUuid(), System.currentTimeMillis());
+        if (ExpiryDismountFallProtectionService.getInstance()
+                .clearWhenGrounded(uuid.getUuid(), System.currentTimeMillis())) {
+            TameworkEntityEffectService.removeEffect(chunk.getReferenceTo(index),
+                    ExpiryDismountFallProtectionService.EFFECT_ID, commandBuffer);
+        }
     }
 }

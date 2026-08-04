@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.companion.bonded.runtime;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.damage.ExpiryDismountFallProtectionService;
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -33,8 +34,11 @@ final class ExpiryDismountFallProtectionArmer {
                 || store.getComponent(riderRef, Player.getComponentType()) == null) {
             return;
         }
-        ExpiryDismountFallProtectionService.getInstance().arm(
-                riderUuid, System.currentTimeMillis());
+        if (ExpiryDismountFallProtectionService.getInstance().arm(
+                riderUuid, System.currentTimeMillis())) {
+            TameworkEntityEffectService.applyEffect(riderRef,
+                    ExpiryDismountFallProtectionService.EFFECT_ID, store);
+        }
     }
 
     @Nullable

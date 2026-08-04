@@ -84,7 +84,9 @@ public final class BondedCompanionExpiryWarningSystem
             delivered.remove(key);
             return;
         }
-        String message = companionName(world, store, lease.liveNpcUuid())
+        String message = companionName(
+                composition.displayNameFor(lease), world, store,
+                lease.liveNpcUuid())
                 + " expires in " + warning.secondsRemaining() + "s";
         if (!notifications.show(owner, message, warning.style())) {
             delivered.remove(key);
@@ -100,24 +102,25 @@ public final class BondedCompanionExpiryWarningSystem
     }
 
     private static String companionName(
-            World world, Store<EntityStore> store, UUID companionUuid
+            String durableName,
+            World world,
+            Store<EntityStore> store,
+            UUID companionUuid
     ) {
         Ref<EntityStore> companionRef = world.getEntityRef(companionUuid);
-        if (companionRef == null || !companionRef.isValid()) return "Companion";
+        if (companionRef == null || !companionRef.isValid()) {
+            return BondedCompanionExpiryWarningNameResolver.resolve(
+                    durableName, null, null);
+        }
         ComponentType<EntityStore, TameworkNpcNameComponent> nameType =
                 TameworkNpcNameComponent.getComponentType();
         TameworkNpcNameComponent name = nameType == null ? null
                 : store.getComponent(companionRef, nameType);
-        if (name != null && name.getName() != null
-                && !name.getName().isBlank()) {
-            return name.getName();
-        }
+        String liveCustomName = name == null ? null : name.getName();
         NPCEntity npc = store.getComponent(companionRef, NPCEntity.getComponentType());
-        if (npc != null && npc.getRoleName() != null
-                && !npc.getRoleName().isBlank()) {
-            return npc.getRoleName();
-        }
-        return "Companion";
+        return BondedCompanionExpiryWarningNameResolver.resolve(
+                durableName, liveCustomName,
+                npc == null ? null : npc.getRoleName());
     }
 
     private record WarningKey(

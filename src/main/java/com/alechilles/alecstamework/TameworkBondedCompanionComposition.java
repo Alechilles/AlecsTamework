@@ -377,6 +377,17 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
         return durability.inWorldAfter(worldKey, null, maximumResults);
     }
 
+    /** Resolves the durable profile name without trusting a disposable projection. */
+    @Nullable
+    public String displayNameFor(
+            @Nonnull BondedCompanionProjectionValidator.LeaseExpectation lease
+    ) {
+        if (!operational()) return null;
+        return store.findProfile(lease.ownerUuid(), lease.rosterId(),
+                lease.profileId()).map(profile -> profile.displayName())
+                .orElse(null);
+    }
+
     /** Runs bounded database retention work without consulting any world. */
     public void maintenanceTick() {
         if (!operational()) return;
