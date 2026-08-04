@@ -80,6 +80,10 @@ public final class ShoulderRideNpcStateSystem
     private void restoreNpc(
             Ref<EntityStore> npcRef, TameworkShoulderRideComponent marker,
             CommandBuffer<EntityStore> commands) {
+        if (!marker.hasCapturedState()) {
+            commands.tryRemoveComponent(npcRef, markerType);
+            return;
+        }
         if (!marker.wasFrozen()) {
             commands.tryRemoveComponent(npcRef, frozenType);
         }

@@ -35,6 +35,10 @@ public final class TameworkShoulderRideComponent
                     .append(new KeyedCodec<>("WasFrozen", Codec.BOOLEAN),
                             TameworkShoulderRideComponent::setWasFrozen,
                             TameworkShoulderRideComponent::wasFrozen)
+                    .add()
+                    .append(new KeyedCodec<>("StateCaptured", Codec.BOOLEAN),
+                            TameworkShoulderRideComponent::setStateCaptured,
+                            TameworkShoulderRideComponent::hasCapturedState)
                     .add().build();
 
     private UUID ownerUuid;
@@ -42,6 +46,7 @@ public final class TameworkShoulderRideComponent
     private boolean wasIntangible;
     private boolean wasInvulnerable;
     private boolean wasFrozen;
+    private boolean stateCaptured;
 
     public TameworkShoulderRideComponent() {
     }
@@ -55,11 +60,22 @@ public final class TameworkShoulderRideComponent
                                          boolean wasIntangible,
                                          boolean wasInvulnerable,
                                          boolean wasFrozen) {
+        this(ownerUuid, wasInteractable, wasIntangible, wasInvulnerable,
+                wasFrozen, true);
+    }
+
+    private TameworkShoulderRideComponent(UUID ownerUuid,
+                                          boolean wasInteractable,
+                                          boolean wasIntangible,
+                                          boolean wasInvulnerable,
+                                          boolean wasFrozen,
+                                          boolean stateCaptured) {
         this.ownerUuid = ownerUuid;
         this.wasInteractable = wasInteractable;
         this.wasIntangible = wasIntangible;
         this.wasInvulnerable = wasInvulnerable;
         this.wasFrozen = wasFrozen;
+        this.stateCaptured = stateCaptured;
     }
 
     public static ComponentType<EntityStore, TameworkShoulderRideComponent>
@@ -108,9 +124,17 @@ public final class TameworkShoulderRideComponent
         this.wasFrozen = wasFrozen;
     }
 
+    public boolean hasCapturedState() {
+        return stateCaptured;
+    }
+
+    public void setStateCaptured(boolean stateCaptured) {
+        this.stateCaptured = stateCaptured;
+    }
+
     @Override
     public TameworkShoulderRideComponent clone() {
         return new TameworkShoulderRideComponent(ownerUuid, wasInteractable,
-                wasIntangible, wasInvulnerable, wasFrozen);
+                wasIntangible, wasInvulnerable, wasFrozen, stateCaptured);
     }
 }

@@ -26,12 +26,14 @@ class ShoulderRideNpcStateArchitectureTest {
         assertFalse(action.contains("Empty_Role"));
         assertTrue(state.contains("commands.ensureComponent(npcRef, frozenType)"));
         assertTrue(state.contains("if (!marker.wasFrozen())"));
+        assertTrue(state.contains("if (!marker.hasCapturedState())"));
         assertTrue(state.contains("commands.tryRemoveComponent(npcRef, markerType)"));
         assertFalse(state.contains("RoleChangeSystem.requestRoleChange"));
         assertTrue(marker.contains("\"WasInteractable\""));
         assertTrue(marker.contains("\"WasIntangible\""));
         assertTrue(marker.contains("\"WasInvulnerable\""));
         assertTrue(marker.contains("\"WasFrozen\""));
+        assertTrue(marker.contains("\"StateCaptured\""));
     }
 
     @Test
@@ -46,6 +48,14 @@ class ShoulderRideNpcStateArchitectureTest {
         assertTrue(follow.contains("npcTransform.getRotation().setYaw"));
         assertTrue(follow.contains("npcTransform.getRotation().setPitch"));
         assertTrue(follow.contains("npcTransform.getRotation().setRoll"));
+    }
+
+    @Test
+    void queuedToggleResolvesTheCurrentMountStateOnTheWorldThread()
+            throws Exception {
+        String action = source("items", "BondedCompanionShoulderRideActionService.java");
+        assertTrue(action.contains("MountedComponent mounted = liveStore.getComponent"));
+        assertFalse(action.contains("boolean detach"));
     }
 
     private static String source(String... segments) throws Exception {
