@@ -61,6 +61,7 @@ public final class BondedCompanionSnapshotPresentationMapper {
             put(data, "attachments", state.attachments().getAttachmentIds().toString());
         }
         if (state.traits() != null) {
+            put(data, "traitConfigId", state.traits().getConfigId());
             put(data, "traits", java.util.Arrays.stream(
                     state.traits().getTraitValues())
                     .map(value -> value.getId() + "=" + value.getValue())

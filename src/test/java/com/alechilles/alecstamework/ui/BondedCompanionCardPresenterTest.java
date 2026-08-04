@@ -146,6 +146,28 @@ class BondedCompanionCardPresenterTest {
     }
 
     @Test
+    void xpStripSharesTheTalentShortcutTooltipAndDetailedModifierBreakdown()
+            throws Exception {
+        String asset = Files.readString(Path.of("src", "main", "resources",
+                "Common", "UI", "Custom",
+                "TameworkBondedCompanionPanelCard.ui"), StandardCharsets.UTF_8);
+        String presenter = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "BondedCompanionCardPresenter.java"), StandardCharsets.UTF_8);
+        String binder = Files.readString(Path.of("src", "main", "java",
+                "com", "alechilles", "alecstamework", "ui",
+                "LinkedNpcPanelProgressionBinder.java"), StandardCharsets.UTF_8);
+
+        assertTrue(asset.contains("TextButton #BondedXpButton {")
+                        && asset.contains("TextTooltipStyle: @BondedCardTextTooltipStyle"));
+        assertTrue(presenter.contains("#BondedXpButton.TooltipText"));
+        assertTrue(presenter.contains("entrySelector + \" #BondedXpButton\""));
+        assertTrue(binder.contains("resolvePurchasedEffectMultiplier")
+                        && binder.contains("TraitModifierService.resolveMultiplier"),
+                "Bonded tooltips must show total, level, talent, and trait modifiers.");
+    }
+
+    @Test
     void activeAvailableFlightToggleShowsTheGroundedIconAndFlightTooltip() {
         BondedCompanionPanelPresentation row = presentation(
                 BondedCompanionStateView.ACTIVE,

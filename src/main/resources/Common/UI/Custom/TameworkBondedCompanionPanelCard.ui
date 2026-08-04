@@ -215,6 +215,15 @@ Group {
             Anchor: (Top: 0, Left: 0, Width: 358, Height: 3);
             Background: #5d9fd4;
         }
+
+        TextButton #BondedXpButton {
+            Anchor: (Top: 0, Left: 0, Right: 0, Height: 3);
+            Style: @BondedTransparentButton;
+            Text: "";
+            TooltipText: "";
+            TextTooltipStyle: @BondedCardTextTooltipStyle;
+            Visible: false;
+        }
     }
 
     Group #BondedHealthFrame {

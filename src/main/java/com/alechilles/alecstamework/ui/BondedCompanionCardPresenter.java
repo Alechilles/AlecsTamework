@@ -60,7 +60,7 @@ final class BondedCompanionCardPresenter {
         bindUnlink(commands, events, entrySelector, cardUuid, pendingUnlink,
                 config, language);
         bindHealth(commands, entrySelector, row.attributes());
-        bindXpProgress(commands, entrySelector, progression, row.attributes());
+        bindXpProgress(commands, entrySelector, row, progression, language);
         bindMetrics(commands, entrySelector, row.attributes(), layout, language);
         bindProgression(commands, events, entrySelector, cardUuid, row,
                 progression, pendingUnlink, config, language);
@@ -82,8 +82,8 @@ final class BondedCompanionCardPresenter {
     ) {
         bindState(commands, entrySelector, row, language);
         bindHealth(commands, entrySelector, row.attributes());
-        bindXpProgress(commands, entrySelector,
-                progressionSummary(row.attributes(), row.roleId()), row.attributes());
+        bindXpProgress(commands, entrySelector, row,
+                progressionSummary(row.attributes(), row.roleId()), language);
         bindFlightToggle(commands, entrySelector, row, language);
     }
 
@@ -94,10 +94,10 @@ final class BondedCompanionCardPresenter {
                                         boolean pendingUnlink, @Nullable String language) {
         ProgressionSummary progression = progressionSummary(row.attributes(), row.roleId());
         bindIdentity(commands, entrySelector, row, progression, language);
-        bindXpProgress(commands, entrySelector, progression, row.attributes());
+        bindXpProgress(commands, entrySelector, row, progression, language);
         commands.set(entrySelector + " #BondedProgressionButton.Visible", !pendingUnlink);
         commands.set(entrySelector + " #BondedProgressionButton.TooltipText", progression.visible()
-                ? progressionTooltip(progression, row.attributes(), language) : LocalizedText.resolve(language,
+                ? progressionTooltip(progression, row.attributes(), row.roleId(), language) : LocalizedText.resolve(language,
                 "tamework.ui.linkedPanel.bonded.talents.tooltip"));
     }
 
@@ -120,7 +120,7 @@ final class BondedCompanionCardPresenter {
     ) {
         bindUnlinkEvents(events, entrySelector, cardUuid, config);
         bindProgressionEvents(events, entrySelector, cardUuid,
-                progressionSummary(row.attributes(), row.roleId()),
+                progressionSummary(row.attributes(), row.roleId()), row.attributes(),
                 pendingUnlink, config);
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
@@ -268,13 +268,16 @@ final class BondedCompanionCardPresenter {
     private static void bindXpProgress(
             UICommandBuilder commands,
             String entrySelector,
+            BondedCompanionPanelPresentation row,
             ProgressionSummary progression,
-            Map<String, String> attributes
+            @Nullable String language
     ) {
+        Map<String, String> attributes = row.attributes();
         TwLevelingConfig config = TwLevelingConfig.resolveById(
                 attributes.get("levelingConfigId"));
         boolean visible = progression.visible() && config != null && config.isEnabled();
         commands.set(entrySelector + " #BondedXpFrame.Visible", visible);
+        commands.set(entrySelector + " #BondedXpButton.Visible", visible);
         if (!visible) {
             return;
         }
@@ -288,6 +291,8 @@ final class BondedCompanionCardPresenter {
                 XP_FILL_WIDTH * Math.min(1.0, (double) currentXp / requiredXp));
         commands.setObject(entrySelector + " #BondedXpFill.Anchor",
                 fixedWidthAnchor(0, 0, width, 3));
+        commands.set(entrySelector + " #BondedXpButton.TooltipText",
+                progressionTooltip(progression, attributes, row.roleId(), language));
     }
 
     private static void bindLayout(
@@ -373,11 +378,11 @@ final class BondedCompanionCardPresenter {
                 !pendingUnlink);
         commands.set(entrySelector + " #BondedProgressionButton.TooltipText",
                 progression.visible()
-                        ? progressionTooltip(progression, row.attributes(), language)
+                        ? progressionTooltip(progression, row.attributes(), row.roleId(), language)
                         : LocalizedText.resolve(language,
                                 "tamework.ui.linkedPanel.bonded.talents.tooltip"));
         bindProgressionEvents(events, entrySelector, cardUuid, progression,
-                pendingUnlink, config);
+                row.attributes(), pendingUnlink, config);
     }
 
     private static void bindProgressionEvents(
@@ -385,6 +390,7 @@ final class BondedCompanionCardPresenter {
             String entrySelector,
             UUID cardUuid,
             ProgressionSummary progression,
+            Map<String, String> attributes,
             boolean pendingUnlink,
             LinkedNpcPanelCardBinder.CardBindingConfig config
     ) {
@@ -393,11 +399,25 @@ final class BondedCompanionCardPresenter {
         // genuinely missing configuration instead of leaving a silent button.
         boolean canOpen = !pendingUnlink;
         if (canOpen) {
+            String commandValue = config.openTalentsCommandPrefix() + cardUuid;
             events.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + " #BondedProgressionButton",
-                    EventData.of(config.eventCommandId(),
-                            config.openTalentsCommandPrefix() + cardUuid), false);
+                    EventData.of(config.eventCommandId(), commandValue), false);
+            if (xpProgressVisible(progression, attributes)) {
+                events.addEventBinding(CustomUIEventBindingType.Activating,
+                        entrySelector + " #BondedXpButton",
+                        EventData.of(config.eventCommandId(), commandValue), false);
+            }
         }
+    }
+
+    private static boolean xpProgressVisible(
+            ProgressionSummary progression,
+            Map<String, String> attributes
+    ) {
+        TwLevelingConfig config = TwLevelingConfig.resolveById(
+                attributes.get("levelingConfigId"));
+        return progression.visible() && config != null && config.isEnabled();
     }
 
     private static void bindPrimaryAction(
@@ -745,6 +765,7 @@ final class BondedCompanionCardPresenter {
     private static String progressionTooltip(
             ProgressionSummary progression,
             Map<String, String> attributes,
+            @Nullable String roleId,
             @Nullable String language
     ) {
         TwLevelingConfig config = TwLevelingConfig.resolveById(
@@ -759,8 +780,7 @@ final class BondedCompanionCardPresenter {
                     new LinkedNpcEntry.FutureStat("Level " + level + " MAX",
                             1, 1,
                             "Level: " + level + "/" + maxLevel + " - MAX XP",
-                            LinkedNpcPanelProgressionBinder.resolveLevelBonusTooltip(
-                                    config, level, language)));
+                            modifierTooltip(config, level, attributes, roleId, language)));
         }
         int currentXp = nonNegativeRoundedInt(attributes.get("currentXp"));
         int requiredXp = (int) Math.max(1L, Math.round(
@@ -771,8 +791,22 @@ final class BondedCompanionCardPresenter {
                         currentXp, requiredXp,
                         "Level: " + level + "/" + maxLevel + " - "
                                 + currentXp + "/" + requiredXp + " XP",
-                        LinkedNpcPanelProgressionBinder.resolveLevelBonusTooltip(
-                                config, level, language)));
+                        modifierTooltip(config, level, attributes, roleId, language)));
+    }
+
+    @Nullable
+    private static String modifierTooltip(
+            TwLevelingConfig config,
+            int level,
+            Map<String, String> attributes,
+            @Nullable String roleId,
+            @Nullable String language
+    ) {
+        return LinkedNpcPanelProgressionBinder.resolveSavedModifierTooltip(
+                config, level, attributes.get("talentConfigId"),
+                attributes.get("talents"), attributes.get("traitConfigId"),
+                roleId, attributes.get("traits"),
+                nonNegativeDouble(attributes.get("maxHealth")), language);
     }
 
     private static int positiveRoundedInt(@Nullable String value, int fallback) {
@@ -799,6 +833,18 @@ final class BondedCompanionCardPresenter {
                     Math.max(0L, Math.round(parsed)));
         } catch (NumberFormatException ignored) {
             return 0;
+        }
+    }
+
+    private static double nonNegativeDouble(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return 0.0;
+        }
+        try {
+            double parsed = Double.parseDouble(value);
+            return Double.isFinite(parsed) && parsed >= 0.0 ? parsed : 0.0;
+        } catch (NumberFormatException ignored) {
+            return 0.0;
         }
     }
 

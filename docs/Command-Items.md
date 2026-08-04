@@ -219,8 +219,9 @@ Linked panel supports:
   Active bonded rows project current level, XP, and available talent points from
   their exact live companion, coalesced to avoid interrupting panel controls.
   Stored and dead rows continue to use their durable progression snapshot. The
-  talent shortcut opens the existing talent page while the companion is active,
-  and its tooltip lists the current level's configured stat bonuses.
+  talent shortcut and XP strip open the existing talent page while the companion
+  is active; their shared tooltip splits each modifier into its total, level,
+  talent, and trait contributions.
   Dead cards retain their complete compact revive-cost list, including
   owned/required quantities, while the existing confirmation overlay remains
   the payment authority.
