@@ -48,6 +48,7 @@
 - Added a creative-available Flightmaster's Talisman item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
 - Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
 - Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
+- Avatar-flight combat abilities now support a configurable real-time, per-slot cooldown. Ability2 and Ability3 remain independently tracked for each active transformed-player session.
 - Added Vigour charges and a compact speed/Vigour HUD for transformed avatar flight, with upward flaps and forward boosts spending charges and recharge limited to grounded recovery or high-speed flight.
 - Added a separate avatar-flight `MaxGlideSpeed` cap so dive-only glide cannot reach boosted maximum speed by default.
 - Added charged avatar-flight launch tuning so holding crouch on the ground can spend Vigour for a stronger takeoff with configurable charge time, launch impulse, and partial/full charge costs.

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
 import com.hypixel.hytale.codec.ExtraInfo;
 import org.junit.jupiter.api.Test;
 
@@ -154,5 +155,23 @@ class AvatarFlightComponentTest {
         clone.clearGroundedBaseSpeed();
         assertFalse(clone.isGroundedMoveSpeedApplied());
         assertEquals(0.0, clone.getOriginalGroundedBaseSpeed(), EPSILON);
+    }
+
+    @Test
+    void combatCooldownsAreIndependentPerSlotAndPersistThroughClone() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+
+        assertTrue(component.tryStartCombatAbilityCooldown(
+                AvatarFlightCombatAbilitySlot.ABILITY_2, 1_000L, 15.0));
+        assertFalse(component.tryStartCombatAbilityCooldown(
+                AvatarFlightCombatAbilitySlot.ABILITY_2, 15_999L, 15.0));
+        assertTrue(component.tryStartCombatAbilityCooldown(
+                AvatarFlightCombatAbilitySlot.ABILITY_3, 15_999L, 15.0));
+
+        AvatarFlightComponent clone = component.clone();
+        assertFalse(clone.tryStartCombatAbilityCooldown(
+                AvatarFlightCombatAbilitySlot.ABILITY_2, 15_999L, 15.0));
+        assertTrue(clone.tryStartCombatAbilityCooldown(
+                AvatarFlightCombatAbilitySlot.ABILITY_2, 16_000L, 15.0));
     }
 }

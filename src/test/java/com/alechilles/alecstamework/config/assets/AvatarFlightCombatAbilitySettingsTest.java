@@ -17,7 +17,8 @@ class AvatarFlightCombatAbilitySettingsTest {
                         {
                           "RootInteraction": " Root_NPC_NordicDrake_Avatar_Fire_Ball ",
                           "Glyph": " FIRE ",
-                          "GlyphTexturePath": " MyDragon/AvatarFlightIcons/Fireball.png "
+                          "GlyphTexturePath": " MyDragon/AvatarFlightIcons/Fireball.png ",
+                          "CooldownSeconds": 15
                         }
                         """),
                 new ExtraInfo()
@@ -26,6 +27,7 @@ class AvatarFlightCombatAbilitySettingsTest {
         assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", settings.getRootInteraction());
         assertEquals("FIRE", settings.getGlyph());
         assertEquals("MyDragon/AvatarFlightIcons/Fireball.png", settings.getGlyphTexturePath());
+        assertEquals(15.0, settings.getCooldownSeconds());
         assertTrue(settings.isConfigured());
     }
 
@@ -36,7 +38,8 @@ class AvatarFlightCombatAbilitySettingsTest {
                         {
                           "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
                           "Glyph": "FIRE",
-                          "GlyphTexturePath": "MyDragon/AvatarFlightIcons/Fireball.png"
+                          "GlyphTexturePath": "MyDragon/AvatarFlightIcons/Fireball.png",
+                          "CooldownSeconds": 15
                         }
                         """),
                 new ExtraInfo()
@@ -50,6 +53,7 @@ class AvatarFlightCombatAbilitySettingsTest {
         assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", roundTripped.getRootInteraction());
         assertEquals("FIRE", roundTripped.getGlyph());
         assertEquals("MyDragon/AvatarFlightIcons/Fireball.png", roundTripped.getGlyphTexturePath());
+        assertEquals(15.0, roundTripped.getCooldownSeconds());
         assertTrue(roundTripped.isConfigured());
     }
 
@@ -66,5 +70,17 @@ class AvatarFlightCombatAbilitySettingsTest {
 
         assertFalse(blank.isConfigured());
         assertFalse(missing.isConfigured());
+    }
+
+    @Test
+    void cooldownIsClampedToZeroWhenMissingOrNegative() {
+        AvatarFlightCombatAbilitySettings missing = AvatarFlightCombatAbilitySettings.CODEC.decode(
+                BsonDocument.parse("{ \"RootInteraction\": \"Root_Test\" }"), new ExtraInfo());
+        AvatarFlightCombatAbilitySettings negative = AvatarFlightCombatAbilitySettings.CODEC.decode(
+                BsonDocument.parse("{ \"RootInteraction\": \"Root_Test\", \"CooldownSeconds\": -1 }"),
+                new ExtraInfo());
+
+        assertEquals(0.0, missing.getCooldownSeconds());
+        assertEquals(0.0, negative.getCooldownSeconds());
     }
 }

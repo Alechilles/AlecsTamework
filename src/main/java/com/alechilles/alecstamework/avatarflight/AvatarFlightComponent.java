@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.AvatarFlightCombatAbilitySlot;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -65,6 +66,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
             .<Long>append(new KeyedCodec<>("NextLaunchAtMs", Codec.LONG),
                     AvatarFlightComponent::setNextLaunchAtMs,
                     AvatarFlightComponent::getNextLaunchAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextAbility2CombatAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextAbility2CombatAtMs,
+                    AvatarFlightComponent::getNextAbility2CombatAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextAbility3CombatAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextAbility3CombatAtMs,
+                    AvatarFlightComponent::getNextAbility3CombatAtMs)
             .add()
             .<Long>append(new KeyedCodec<>("EnabledAtMs", Codec.LONG),
                     AvatarFlightComponent::setEnabledAtMs,
@@ -232,6 +241,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextJumpAtMs;
     private long nextBoostAtMs;
     private long nextLaunchAtMs;
+    private long nextAbility2CombatAtMs;
+    private long nextAbility3CombatAtMs;
     private long enabledAtMs;
     private double flightXpQualifiedSeconds;
     private double flightXpWindowAwardedXp;
@@ -398,6 +409,27 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     public void setNextLaunchAtMs(@Nullable Long nextLaunchAtMs) {
         this.nextLaunchAtMs = nextLaunchAtMs == null ? 0L : nextLaunchAtMs;
+    }
+
+    public long getNextAbility2CombatAtMs() { return nextAbility2CombatAtMs; }
+    public void setNextAbility2CombatAtMs(@Nullable Long value) { nextAbility2CombatAtMs = value == null ? 0L : value; }
+
+    public long getNextAbility3CombatAtMs() { return nextAbility3CombatAtMs; }
+    public void setNextAbility3CombatAtMs(@Nullable Long value) { nextAbility3CombatAtMs = value == null ? 0L : value; }
+
+    /** Atomically reserves one avatar-flight combat slot until its configured cooldown expires. */
+    public boolean tryStartCombatAbilityCooldown(@Nullable AvatarFlightCombatAbilitySlot slot,
+                                                 long nowMs,
+                                                 double cooldownSeconds) {
+        if (slot == null) return false;
+        long nextAvailableAtMs = slot == AvatarFlightCombatAbilitySlot.ABILITY_2
+                ? nextAbility2CombatAtMs : nextAbility3CombatAtMs;
+        if (nowMs < nextAvailableAtMs) return false;
+
+        long cooldownMs = Math.round(Math.max(0.0, Double.isFinite(cooldownSeconds) ? cooldownSeconds : 0.0) * 1000.0);
+        if (slot == AvatarFlightCombatAbilitySlot.ABILITY_2) nextAbility2CombatAtMs = nowMs + cooldownMs;
+        else nextAbility3CombatAtMs = nowMs + cooldownMs;
+        return true;
     }
 
     public long getEnabledAtMs() {
@@ -693,6 +725,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
         clone.nextLaunchAtMs = nextLaunchAtMs;
+        clone.nextAbility2CombatAtMs = nextAbility2CombatAtMs;
+        clone.nextAbility3CombatAtMs = nextAbility3CombatAtMs;
         clone.flightXpQualifiedSeconds = getFlightXpQualifiedSeconds();
         clone.flightXpWindowAwardedXp = getFlightXpWindowAwardedXp();
         clone.flightXpWindowStartedAtMs = flightXpWindowStartedAtMs;

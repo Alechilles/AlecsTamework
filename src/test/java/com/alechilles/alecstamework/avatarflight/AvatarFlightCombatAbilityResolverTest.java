@@ -32,6 +32,7 @@ class AvatarFlightCombatAbilityResolverTest {
 
         assertTrue(resolution.isAvailable());
         assertEquals("Root_NPC_NordicDrake_Avatar_Fire_Ball", resolution.rootInteractionId());
+        assertEquals(15.0, resolution.cooldownSeconds());
     }
 
     @Test
@@ -59,7 +60,10 @@ class AvatarFlightCombatAbilityResolverTest {
     void disabledCapturedConfigIsUnavailable() {
         TwAvatarFlightConfig disabledConfig = TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
                 { "Enabled": false, "CombatAbilities": {
-                  "Ability2": { "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball" }
+                  "Ability2": {
+                    "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                    "CooldownSeconds": 15
+                  }
                 } }
                 """), new ExtraInfo());
 
@@ -74,7 +78,10 @@ class AvatarFlightCombatAbilityResolverTest {
     private static TwAvatarFlightConfig configuredAbility() {
         return TwAvatarFlightConfig.CODEC.decode(BsonDocument.parse("""
                 { "CombatAbilities": {
-                  "Ability2": { "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball" }
+                  "Ability2": {
+                    "RootInteraction": "Root_NPC_NordicDrake_Avatar_Fire_Ball",
+                    "CooldownSeconds": 15
+                  }
                 } }
                 """), new ExtraInfo());
     }

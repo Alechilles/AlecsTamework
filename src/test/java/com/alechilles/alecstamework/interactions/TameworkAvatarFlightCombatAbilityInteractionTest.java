@@ -30,7 +30,7 @@ class TameworkAvatarFlightCombatAbilityInteractionTest {
         AtomicReference<String> delegatedRoot = new AtomicReference<>();
 
         assertTrue(TameworkAvatarFlightCombatAbilityInteraction.delegate(
-                AvatarFlightCombatAbilityResolver.Resolution.available("Root_Test"),
+                AvatarFlightCombatAbilityResolver.Resolution.available("Root_Test", 0.0),
                 rootId -> {
                     delegationCount.incrementAndGet();
                     delegatedRoot.set(rootId);

@@ -51,7 +51,8 @@ public final class AvatarFlightCombatAbilityResolver {
                               @Nullable AvatarFlightCombatAbilitySlot slot) {
         if (flight == null || config == null || !config.isEnabled() || slot == null) return Resolution.unavailable();
         AvatarFlightCombatAbilitySettings ability = config.getCombatAbility(slot);
-        return ability == null ? Resolution.unavailable() : Resolution.available(ability.getRootInteraction());
+        return ability == null ? Resolution.unavailable()
+                : Resolution.available(ability.getRootInteraction(), ability.getCooldownSeconds());
     }
 
     @Nullable
@@ -69,8 +70,8 @@ public final class AvatarFlightCombatAbilityResolver {
     }
 
     /** Immutable outcome that intentionally contains no executable interaction object. */
-    public record Resolution(@Nonnull String rootInteractionId) {
-        private static final Resolution UNAVAILABLE = new Resolution("");
+    public record Resolution(@Nonnull String rootInteractionId, double cooldownSeconds) {
+        private static final Resolution UNAVAILABLE = new Resolution("", 0.0);
 
         @Nonnull
         public static Resolution unavailable() {
@@ -78,9 +79,10 @@ public final class AvatarFlightCombatAbilityResolver {
         }
 
         @Nonnull
-        public static Resolution available(@Nullable String rootInteractionId) {
+        public static Resolution available(@Nullable String rootInteractionId, double cooldownSeconds) {
             if (rootInteractionId == null || rootInteractionId.isBlank()) return unavailable();
-            return new Resolution(rootInteractionId.trim());
+            double normalizedCooldown = Double.isFinite(cooldownSeconds) ? Math.max(0.0, cooldownSeconds) : 0.0;
+            return new Resolution(rootInteractionId.trim(), normalizedCooldown);
         }
 
         public boolean isAvailable() {

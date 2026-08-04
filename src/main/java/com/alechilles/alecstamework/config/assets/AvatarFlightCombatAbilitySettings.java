@@ -29,11 +29,17 @@ public final class AvatarFlightCombatAbilitySettings {
                     + "Blank uses a bundled glyph texture or text fallback. "
                     + "CombatAbilities is a map: an explicit map replaces the parent map; an omitted map inherits it.")
             .add()
+            .<Double>append(new KeyedCodec<>("CooldownSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.cooldownSeconds = nonNegativeFinite(value),
+                    settings -> settings.getCooldownSeconds())
+            .documentation("Real-time cooldown in seconds for this ability slot. Zero or omitted disables the cooldown.")
+            .add()
             .build();
 
     private String rootInteraction = "";
     private String glyph = "";
     private String glyphTexturePath = "";
+    private double cooldownSeconds;
 
     @Nonnull
     public String getRootInteraction() { return normalized(rootInteraction); }
@@ -45,8 +51,15 @@ public final class AvatarFlightCombatAbilitySettings {
     @Nonnull
     public String getGlyphTexturePath() { return normalized(glyphTexturePath); }
 
+    /** Returns the real-time cooldown for this ability slot, clamped to a usable value. */
+    public double getCooldownSeconds() { return nonNegativeFinite(cooldownSeconds); }
+
     public boolean isConfigured() { return !getRootInteraction().isEmpty(); }
 
     @Nonnull
     private static String normalized(@Nullable String value) { return value == null ? "" : value.trim(); }
+
+    private static double nonNegativeFinite(@Nullable Double value) {
+        return value == null || !Double.isFinite(value) ? 0.0 : Math.max(0.0, value);
+    }
 }
