@@ -117,10 +117,11 @@ class BondedCompanionCardPresenterTest {
                 "com", "alechilles", "alecstamework", "ui",
                 "LinkedNpcPanelProgressionBinder.java"), StandardCharsets.UTF_8);
 
-        assertTrue(presenter.contains("bindXpProgress(commands, entrySelector, progression, row.attributes())"));
+        assertTrue(presenter.contains(
+                "bindXpProgress(commands, entrySelector, row, progression, language)"));
         assertTrue(presenter.contains("#BondedXpFill.Anchor"));
-        assertTrue(presenter.contains("resolveLevelBonusTooltip("));
-        assertTrue(binder.contains("Level Bonuses")
+        assertTrue(presenter.contains("modifierTooltip(config, level, attributes, roleId, language)"));
+        assertTrue(binder.contains("resolveSavedModifierTooltip")
                         && binder.contains("effect.getPerLevel() * levelOffset"),
                 "The saved config's per-level effects must become tooltip bonuses.");
     }
