@@ -289,6 +289,7 @@ public final class HytaleBondedCompanionWorldGateway implements
                         .IDENTITY_MISMATCH;
             }
         }
+        ExpiryDismountFallProtectionArmer.arm(world, store, reference, intent);
         store.removeEntity(reference, RemoveReason.REMOVE);
         return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
     }
