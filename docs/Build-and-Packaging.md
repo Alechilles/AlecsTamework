@@ -12,9 +12,8 @@ Gradle builds one shaded jar containing Java code and resources under
 
 - Tamework ships as a jar.
 - The release jar embeds Creditor so `/credits` does not require another mod.
-- Tamework keeps its own root `manifest.json` and exposes its bundled
-  Patchwork wrapper through `manifests.json`, allowing mods that require
-  `Alechilles:Patchwork` to load without a separate Patchwork jar.
+- Tamework keeps its own root `manifest.json` and shades the Patchwork runtime
+  into its release jar; it does not advertise Patchwork as a separate plugin.
 - The shared workspace links both mods' asset files into its `run/mods` tree,
   so edits in Tamework and HyDragon can reload together.
 
