@@ -1,0 +1,106 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+    id 'java'
+    id 'com.azuredoom.hytale-tools'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+def localProperties = new Properties()
+file('gradle.properties').withInputStream { localProperties.load(it) }
+def property = { String name ->
+    providers.gradleProperty(name).getOrElse(localProperties.getProperty(name))
+}
+
+group = 'com.alechilles'
+version = property('mod_version')
+def patchworkVersion = property('patchwork_version')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = uri('https://www.cursemaven.com') }
+}
+
+dependencies {
+    compileOnly files(property('nameplatebuilder_jar_path'))
+    implementation "com.alechilles:alecstelemetry-runtime:${property('alecstelemetry_version')}"
+    implementation "com.alechilles:patchwork-runtime:${patchworkVersion}"
+    implementation "com.alechilles:patchwork-standalone:${patchworkVersion}"
+    implementation "curse.maven:creditor-1560961:${property('creditor_file_id')}"
+    implementation "org.xerial:sqlite-jdbc:${property('sqlite_jdbc_version')}"
+    implementation "org.slf4j:slf4j-api:${property('slf4j_version')}"
+    implementation "org.slf4j:slf4j-nop:${property('slf4j_version')}"
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+configurations.named('testImplementation') {
+    extendsFrom(configurations.compileOnly)
+}
+
+hytaleTools {
+    hytaleVersion = property('hytale_version')
+    patchline = property('hytale_patchline')
+    manifestServerVersion = '0.5.x'
+    manifestGroup = 'Alechilles'
+    modId = "Alec's Tamework!"
+    modDescription = 'A modular mob taming, behavior, and mechanics framework for Hytale!'
+    modUrl = ''
+    modCredits = 'Alec (Alechilles)||https://www.curseforge.com/members/alechilles/projects'
+    mainClass = 'com.alechilles.alecstamework.Tamework'
+    manifestDependencies = ''
+    manifestOptionalDependencies = 'Frotty27:NameplateBuilder=>=4.260326.7,Buuz135:SimpleClaims=>=1.0.38 <1.1.0,net.evilcraft:QuestLinesClaims==1.3.1'
+    curseforgeId = '1447962'
+    includesPack = true
+    bundleAssetEditorRuntime = false
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+tasks.named('shadowJar', ShadowJar) {
+    archiveFileName = "Alec's Tamework! v${project.version}.jar"
+    archiveClassifier = ''
+    relocate 'org.slf4j', 'com.alechilles.alecstamework.shadow.slf4j'
+    manifest {
+        attributes(
+                'Plugin-Group': project.group,
+                'Plugin-Name': project.name,
+                'Plugin-Version': project.version)
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn(tasks.named('shadowJar'))
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    workingDir projectDir
+    systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
+}
+
+tasks.named('test') {
+    exclude '**/*IT.class'
+}
+
+tasks.register('packagingTest', Test) {
+    description = 'Runs packaged Tamework integration tests against the Shadow JAR.'
+    group = 'verification'
+    dependsOn(tasks.named('shadowJar'))
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/*IT.class'
+    useJUnitPlatform()
+    systemProperty 'patchwork.packagedJar', tasks.named('shadowJar', ShadowJar).get().archiveFile.get().asFile.absolutePath
+    systemProperty 'java.util.logging.manager', 'com.hypixel.hytale.logger.backend.HytaleLogManager'
+}

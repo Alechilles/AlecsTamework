@@ -18,7 +18,7 @@ class PersistenceReplacementReleaseContractTest {
         String source = Files.readString(CHECKLIST);
 
         for (String required : List.of(
-                "./mvnw test",
+                "./gradlew test",
                 "scripts/release/validate-release.ps1",
                 "scripts/release/build-package.ps1",
                 "LegacyPersistenceFixtureTest",

@@ -1,5 +1,7 @@
 # Build artifacts
 target/
+build/
+.gradle/
 *.jar
 *.zip
 *.log

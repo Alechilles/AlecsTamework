@@ -6,26 +6,23 @@
     "Authors": [
         {
             "Name": "Alec (Alechilles)",
-            "Email": "",
-            "Url": "https://www.curseforge.com/members/alechilles/projects",
-            "Discord": "alechilles"
+            "Url": "https://www.curseforge.com/members/alechilles/projects"
         }
     ],
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
     "ServerVersion": "0.5.x",
-    "Dependencies": {},
+    "Dependencies": {
+
+    },
     "OptionalDependencies": {
         "Frotty27:NameplateBuilder": ">=4.260326.7",
         "Buuz135:SimpleClaims": ">=1.0.38 <1.1.0",
         "net.evilcraft:QuestLinesClaims": "=1.3.1"
     },
-    "LoadBefore": {},
     "DisabledByDefault": false,
     "IncludesAssetPack": true,
-    "SubPlugins": [],
     "UpdateChecker": {
         "CurseForge": "1447962"
     }
 }
-

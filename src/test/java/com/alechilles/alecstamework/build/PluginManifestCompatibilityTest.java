@@ -39,23 +39,12 @@ class PluginManifestCompatibilityTest {
 
     @Test
     void creditorEmbeddedDependencyIsPackagedWithoutReplacingPluginManifest() throws IOException {
-        String pom = Files.readString(Path.of("pom.xml"));
+        String build = Files.readString(Path.of("build.gradle"));
 
         assertTrue(
-                pom.contains("<id>cursemaven</id>")
-                        && pom.contains("<artifactId>creditor-1560961</artifactId>")
-                        && pom.contains("<version>${creditor.file.id}</version>"),
+                build.contains("https://www.cursemaven.com")
+                        && build.contains("curse.maven:creditor-1560961:${property('creditor_file_id')}"),
                 "Creditor should be resolved from Cursemaven by CurseForge file id."
-        );
-        assertTrue(
-                pom.contains("<include>curse.maven:creditor-1560961</include>"),
-                "Creditor must be included in the shaded release jar for embedded mode."
-        );
-        assertTrue(
-                pom.contains("<artifact>curse.maven:creditor-1560961</artifact>")
-                        && pom.contains("<exclude>manifest.json</exclude>")
-                        && pom.contains("<exclude>icon-256.png</exclude>"),
-                "Creditor's root manifest.json and icon-256.png must be excluded so they cannot replace Tamework's roots."
         );
 
         JsonObject manifest = readManifest();

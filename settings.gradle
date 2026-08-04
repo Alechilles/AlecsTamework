@@ -1,0 +1,12 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { url = uri('https://maven.azuredoom.com/mods') }
+    }
+    plugins {
+        id 'com.azuredoom.hytale-tools' version '1.0.46'
+    }
+}
+
+rootProject.name = 'alecstamework'

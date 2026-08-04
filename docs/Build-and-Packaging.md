@@ -4,8 +4,9 @@ How the project is packaged and where outputs go.
 
 ## Plugin jar
 
-Maven builds one jar containing Java code, resources under
-`src/main/resources`, and the filtered plugin manifests.
+Gradle builds one shaded jar containing Java code and resources under
+`src/main/resources`. The Hytale Gradle plugin writes the release version to
+`manifest.json`.
 
 ## Packaging model
 
@@ -14,20 +15,25 @@ Maven builds one jar containing Java code, resources under
 - Tamework keeps its own root `manifest.json` and exposes its bundled
   Patchwork wrapper through `manifests.json`, allowing mods that require
   `Alechilles:Patchwork` to load without a separate Patchwork jar.
-- Development hot reload may reference `src/main/resources` directly.
+- The shared workspace links both mods' asset files into its `run/mods` tree,
+  so edits in Tamework and HyDragon can reload together.
 
-## Maven profiles
+## Development workspace
 
-- `install-plugin` copies the built jar to the configured development mod
-  locations.
-- `run-server` copies the jar and starts the development server.
-- `prerelease` (`-Dprerelease=true`) selects prerelease install paths.
+From the `Modding` directory, stage both projects and run one server:
+
+```bash
+./gradlew stageAllModAssets
+./gradlew runAllMods
+```
+
+The default patchline is release. Use `-Phytale_patchline=pre-release` with a
+matching `-Phytale_version` when testing a prerelease game build.
 
 ## Output and versioning
 
-- Maven output is written under `target/`.
-- `manifest.json` and `manifest-assets.json` receive `${project.version}`
-  through resource filtering.
+- Gradle output is written under `build/`.
+- `gradle.properties` is the source of the mod and dependency versions.
 - If a packaged manifest has the wrong version, run a clean build.
 
 ## Verification
@@ -35,7 +41,7 @@ Maven builds one jar containing Java code, resources under
 Run the test suite before packaging:
 
 ```bash
-./mvnw test
+./gradlew test packagingTest
 ```
 
 Use the release-preparation workflow before publishing to validate versions,
@@ -45,7 +51,7 @@ integration used for breeding limits and tamed-companion damage.
 
 For the first replacement-persistence release, also complete
 [Persistence Replacement Release Checklist](Persistence-Replacement-Release-Checklist.md).
-It uses the normal Maven and release scripts plus two focused live-smoke lanes;
+It uses the normal Gradle and release scripts plus two focused live-smoke lanes;
 there is no separate persistence candidate builder or persistence rehearsal
 runtime to package and maintain.
 

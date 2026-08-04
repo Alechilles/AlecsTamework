@@ -2,7 +2,7 @@
   {
     "Group": "Alechilles",
     "Name": "Patchwork",
-    "Version": "${patchwork.version}",
+    "Version": "1.2.1",
     "Description": "Bundled Patchwork runtime provided by Alec's Tamework! for compatible dependent mods.",
     "Authors": [
       {

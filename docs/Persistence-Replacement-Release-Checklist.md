@@ -100,7 +100,7 @@ Do not use any superseded candidate for further release evidence.
 Run the ordinary project and release gates:
 
 ```bash
-./mvnw test
+./gradlew test
 powershell -NoProfile -File scripts/release/validate-release.ps1 -Version <version>
 powershell -NoProfile -File scripts/release/build-package.ps1 -Version <version>
 ```

@@ -6,8 +6,8 @@
   },
   "packaging": "jar",
   "artifactNameTemplate": "Alec's Tamework! v{version}.jar",
-  "versionSource": "pom",
-  "versionFile": "pom.xml",
+  "versionSource": "manifest",
+  "versionFile": "src/main/resources/manifest.json",
   "requiresTameworkDependency": false,
   "zipIncludes": [],
   "curseforge": {

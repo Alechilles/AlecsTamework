@@ -4,7 +4,6 @@ param(
     [string]$ConfigPath = ".release/publish-config.json",
     [string]$OutputDir = "artifacts",
     [string]$ArtifactPathOutputFile = "",
-    [string]$HytaleInstallPath = "",
     [string]$PrebuiltArtifactPath = "",
     [bool]$SkipTests = $false
 )
@@ -56,38 +55,22 @@ switch ($config.packaging) {
                 Copy-Item -Path $resolvedPrebuiltArtifact -Destination $resolvedArtifactDestination -Force
             }
         } else {
-            $mvnArgs = @("-B", "clean", "test", "package")
+            $gradleArgs = @("--no-daemon", "clean", "test", "packagingTest", "shadowJar")
             if ($SkipTests) {
-                $mvnArgs = @("-B", "clean", "package", "-DskipTests")
+                $gradleArgs = @("--no-daemon", "clean", "shadowJar")
             }
 
-            if (-not [string]::IsNullOrWhiteSpace($HytaleInstallPath)) {
-                if (-not (Test-Path -Path $HytaleInstallPath)) {
-                    throw "Provided hytale install path was not found: '$HytaleInstallPath'."
-                }
-
-                $resolvedInstallPath = (Resolve-Path -Path $HytaleInstallPath).Path
-                $serverJarPath = Join-Path $resolvedInstallPath "Server\HytaleServer.jar"
-                if (-not (Test-Path -Path $serverJarPath)) {
-                    throw "Expected HytaleServer.jar at '$serverJarPath'."
-                }
-
-                $mvnArgs += "-Dhytale.install.path=$resolvedInstallPath"
-                Write-Host "Using hytale.install.path override: $resolvedInstallPath"
-            }
-
-            & .\mvnw.cmd @mvnArgs
+            & .\gradlew.bat @gradleArgs
             if ($LASTEXITCODE -ne 0) {
-                throw "Maven build failed with exit code $LASTEXITCODE."
+                throw "Gradle build failed with exit code $LASTEXITCODE."
             }
 
-            $builtJar = Get-ChildItem -Path "target" -Filter "*.jar" |
-                Where-Object { $_.Name -notlike "original-*" } |
+            $builtJar = Get-ChildItem -Path "build\libs" -Filter "*.jar" |
                 Sort-Object -Property LastWriteTime -Descending |
                 Select-Object -First 1
 
             if ($null -eq $builtJar) {
-                throw "No built jar was found in target/."
+                throw "No built jar was found in build/libs/."
             }
 
             Copy-Item -Path $builtJar.FullName -Destination $artifactPath -Force
