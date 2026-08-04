@@ -5,23 +5,6 @@
     "Description": "server.items.Tamework_Flightmasters_Talisman.description"
   },
   "Quality": "Tool",
-  "Recipe": {
-    "Input": [
-      { "ItemId": "Ingredient_Bar_Thorium", "Quantity": 3 },
-      { "ResourceTypeId": "Wood_Azure", "Quantity": 10 }
-    ],
-    "Output": [
-      { "ItemId": "Tamework_Flightmasters_Talisman", "Quantity": 1 }
-    ],
-    "BenchRequirement": [
-      {
-        "Type": "Crafting",
-        "Id": "Draconic_Altar",
-        "Categories": [ "Draconic_Altar_Bonding" ]
-      }
-    ],
-    "TimeSeconds": 4
-  },
   "Interactions": {
     "Primary": {
       "Interactions": [
