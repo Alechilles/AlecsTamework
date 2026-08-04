@@ -862,7 +862,8 @@ public class Tamework extends JavaPlugin {
                             Interactable.getComponentType(),
                             Intangible.getComponentType(),
                             Invulnerable.getComponentType(),
-                            Frozen.getComponentType())
+                            Frozen.getComponentType(),
+                            MovementStatesComponent.getComponentType())
             );
         }
         getEntityStoreRegistry().registerSystem(

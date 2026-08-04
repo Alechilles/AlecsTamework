@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.systems;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.hypixel.hytale.protocol.MovementStates;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +58,22 @@ class ShoulderRideNpcStateArchitectureTest {
         assertTrue(follow.contains("states.crouching || states.forcedCrouching"));
         assertTrue(follow.contains("Math.abs(current.y() - desiredY)"));
         assertTrue(follow.contains("commands.putComponent(npcRef, mountedType"));
+    }
+
+    @Test
+    void mountedNpcDropsAStaleRunningStateAndThenRemainsStable() {
+        MovementStates states = new MovementStates();
+        states.running = true;
+        states.falling = true;
+
+        assertTrue(ShoulderRideNpcStateSystem
+                .normalizeMountedMovementStates(states));
+        assertTrue(states.idle);
+        assertTrue(states.horizontalIdle);
+        assertFalse(states.running);
+        assertFalse(states.falling);
+        assertFalse(ShoulderRideNpcStateSystem
+                .normalizeMountedMovementStates(states));
     }
 
     @Test

@@ -118,12 +118,14 @@ one exact refund claim; an unavailable or denied operation charges nothing.
 The first press mounts the NPC instantly using Hytale's entity-mount system;
 the next press sets it down. While mounted, Tamework freezes the NPC's normal
 behavior without changing its role, removes interaction, and marks it intangible
-and invulnerable. Its pose follows the player's rotation. The original physical
-flags are restored on dismount; because the role never changes, persistence
-always retains the canonical companion role. This capability is disabled by
-default and should only be enabled for models whose scale and pose suit a
-shoulder attachment. Tamework updates the passenger after player movement so
-its tracking pose does not lag a server tick behind the player.
+and invulnerable. Its pose follows the player's rotation, and stale locomotion
+state is cleared so it uses its idle animation instead of continuing to run in
+place. The original physical flags are restored on dismount; because the role
+never changes, persistence always retains the canonical companion role. This
+capability is disabled by default and should only be enabled for models whose
+scale and pose suit a shoulder attachment. Tamework updates the passenger after
+player movement so its tracking pose does not lag a server tick behind the
+player.
 
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
