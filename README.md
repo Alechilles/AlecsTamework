@@ -17,12 +17,12 @@
     <a href="https://www.modstats.io/stats/alecs-tamework" target="_blank" rel="nofollow"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=live&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
 </p>
 
-## Includes Patchwork 1.0.0
+## Includes Patchwork
 - Add, merge, and insert JSON into Hytale server assets without replacing the source asset
 - Apply one patch file across multiple target assets
 - Gate optional integrations on installed mods, versions, assets, targets, or registered mod data
 - Install Patchwork separately or use the copy embedded in Tamework; the newest compatible runtime wins
-- Inspired by Hytalor
+- Alternative to Hytalor, Patchly, and Zima
 - [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
 
 # Alec's Tamework!
