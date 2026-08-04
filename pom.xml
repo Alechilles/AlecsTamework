@@ -19,7 +19,7 @@
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
         <slf4j.version>1.7.36</slf4j.version>
         <alecstelemetry.version>1.0.4</alecstelemetry.version>
-        <patchwork.version>1.0.0</patchwork.version>
+        <patchwork.version>1.2.1</patchwork.version>
         <creditor.file.id>8195970</creditor.file.id>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
