@@ -15,6 +15,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -161,9 +163,7 @@ final class BondedCompanionShoulderRideActionService {
             MountedComponent mounted = store.getComponent(npcRef, mountedType);
             if (mounted != null) {
                 if (!isAttached(npcRef, playerRef, store)) return false;
-                store.tryRemoveComponent(npcRef, mountedType);
-                store.tryRemoveComponent(npcRef, markerType);
-                return true;
+                return queueToggle(npcRef, store, settings, ownerUuid, true);
             }
             var mountedByType = MountedByComponent.getComponentType();
             MountedByComponent mountedBy = mountedByType == null ? null
@@ -171,15 +171,48 @@ final class BondedCompanionShoulderRideActionService {
             if (mountedBy != null && !mountedBy.getPassengers().isEmpty()) {
                 return false;
             }
-            store.putComponent(npcRef, markerType,
-                    new TameworkShoulderRideComponent(ownerUuid));
-            store.putComponent(npcRef, mountedType, new MountedComponent(
-                    playerRef,
-                    new Rotation3f((float) settings.getOffsetX(),
-                            (float) settings.getOffsetY(),
-                            (float) settings.getOffsetZ()),
-                    MountController.Minecart));
+            return queueToggle(npcRef, store, settings, ownerUuid, false);
+        }
+
+        private boolean queueToggle(Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store,
+                                    TwCompanionShoulderRideSettings settings,
+                                    UUID ownerUuid, boolean detach) {
+            World world = store.getExternalData() == null ? null
+                    : store.getExternalData().getWorld();
+            UUIDComponent uuid = store.getComponent(npcRef,
+                    UUIDComponent.getComponentType());
+            if (world == null || uuid == null) return false;
+            UUID npcUuid = uuid.getUuid();
+            world.execute(() -> toggleOnWorld(world, npcUuid, ownerUuid,
+                    settings, detach));
             return true;
+        }
+
+        private void toggleOnWorld(World world, UUID npcUuid, UUID ownerUuid,
+                                   TwCompanionShoulderRideSettings settings,
+                                   boolean detach) {
+            Ref<EntityStore> liveNpc = world.getEntityRef(npcUuid);
+            Ref<EntityStore> livePlayer = world.getEntityRef(ownerUuid);
+            if (liveNpc == null || !liveNpc.isValid() || livePlayer == null
+                    || !livePlayer.isValid()) return;
+            Store<EntityStore> liveStore = liveNpc.getStore();
+            var mountedType = MountedComponent.getComponentType();
+            var markerType = TameworkShoulderRideComponent.getComponentType();
+            if (detach) {
+                if (!isAttached(liveNpc, livePlayer, liveStore)) return;
+                liveStore.tryRemoveComponent(liveNpc, mountedType);
+                liveStore.tryRemoveComponent(liveNpc, markerType);
+                return;
+            }
+            if (settings == null || !settings.isConfigured()
+                    || liveStore.getComponent(liveNpc, mountedType) != null) return;
+            liveStore.putComponent(liveNpc, markerType,
+                    new TameworkShoulderRideComponent(ownerUuid));
+            liveStore.putComponent(liveNpc, mountedType, new MountedComponent(
+                    livePlayer, new Rotation3f((float) settings.getOffsetX(),
+                    (float) settings.getOffsetY(),
+                    (float) settings.getOffsetZ()), MountController.Minecart));
         }
     }
 }
