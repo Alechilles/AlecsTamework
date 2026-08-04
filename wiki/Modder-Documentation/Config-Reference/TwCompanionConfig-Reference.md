@@ -112,6 +112,8 @@ one exact refund claim; an unavailable or denied operation charges nothing.
 - `Enabled`: shows the `To Me` control for an active matching NPC.
 - `OffsetX`, `OffsetY`, `OffsetZ`: passenger attachment offset relative to the
   player. All three values must be finite.
+- `CrouchOffsetY`: additional vertical offset while the player crouches. It is
+  added to `OffsetY` and defaults to `-0.35`.
 
 The first press mounts the NPC instantly using Hytale's entity-mount system;
 the next press sets it down. While mounted, Tamework freezes the NPC's normal
@@ -120,7 +122,8 @@ and invulnerable. Its pose follows the player's rotation. The original physical
 flags are restored on dismount; because the role never changes, persistence
 always retains the canonical companion role. This capability is disabled by
 default and should only be enabled for models whose scale and pose suit a
-shoulder attachment.
+shoulder attachment. Tamework updates the passenger after player movement so
+its tracking pose does not lag a server tick behind the player.
 
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
@@ -218,7 +221,8 @@ Older packs may still contain ownership protection and revive enablement keys in
       "Enabled": true,
       "OffsetX": 0.32,
       "OffsetY": 1.45,
-      "OffsetZ": 0.0
+      "OffsetZ": 0.0,
+      "CrouchOffsetY": -0.35
     },
     "PlacementMinRelativeY": -2.0,
     "PlacementMaxRelativeY": 4.0,

@@ -266,6 +266,13 @@ final class TwCompanionCommandSettingsCodec {
             )
             .documentation("Forward attachment offset from the player root. Inheritance: an omitted value inherits.")
             .add()
+            .<Double>append(
+                    new KeyedCodec<>("CrouchOffsetY", Codec.DOUBLE),
+                    (settings, value) -> settings.setCrouchOffsetY(value),
+                    TwCompanionShoulderRideSettings::getCrouchOffsetY
+            )
+            .documentation("Additional vertical offset while the player crouches. Inheritance: an omitted value inherits.")
+            .add()
             .build();
 
     static final BuilderCodec<TwCompanionCommandSettings> CODEC =

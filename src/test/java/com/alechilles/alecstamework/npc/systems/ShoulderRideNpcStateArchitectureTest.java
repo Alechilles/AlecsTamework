@@ -49,6 +49,17 @@ class ShoulderRideNpcStateArchitectureTest {
     }
 
     @Test
+    void followUsesTheCurrentPlayerPoseAndUpdatesCrouchOffsetOnlyOnChange()
+            throws Exception {
+        String follow = source("npc", "systems", "ShoulderRideNpcFollowSystem.java");
+        assertTrue(follow.contains("Order.AFTER"));
+        assertTrue(follow.contains("PlayerSystems.ProcessPlayerInput.class"));
+        assertTrue(follow.contains("states.crouching || states.forcedCrouching"));
+        assertTrue(follow.contains("Math.abs(current.y() - desiredY)"));
+        assertTrue(follow.contains("commands.putComponent(npcRef, mountedType"));
+    }
+
+    @Test
     void queuedToggleResolvesTheCurrentMountStateOnTheWorldThread()
             throws Exception {
         String action = source("items", "BondedCompanionShoulderRideActionService.java");

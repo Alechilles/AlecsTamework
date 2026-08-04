@@ -6,6 +6,7 @@ public final class TwCompanionShoulderRideSettings {
     private double offsetX = 0.32;
     private double offsetY = 1.45;
     private double offsetZ;
+    private double crouchOffsetY = -0.35;
 
     public boolean isEnabled() {
         return enabled;
@@ -23,11 +24,16 @@ public final class TwCompanionShoulderRideSettings {
         return offsetZ;
     }
 
+    public double getCrouchOffsetY() {
+        return crouchOffsetY;
+    }
+
     public boolean isConfigured() {
         return enabled
                 && Double.isFinite(offsetX)
                 && Double.isFinite(offsetY)
-                && Double.isFinite(offsetZ);
+                && Double.isFinite(offsetZ)
+                && Double.isFinite(crouchOffsetY);
     }
 
     TwCompanionShoulderRideSettings copy() {
@@ -37,6 +43,7 @@ public final class TwCompanionShoulderRideSettings {
         copy.offsetX = offsetX;
         copy.offsetY = offsetY;
         copy.offsetZ = offsetZ;
+        copy.crouchOffsetY = crouchOffsetY;
         return copy;
     }
 
@@ -54,5 +61,9 @@ public final class TwCompanionShoulderRideSettings {
 
     void setOffsetZ(double offsetZ) {
         this.offsetZ = offsetZ;
+    }
+
+    void setCrouchOffsetY(double crouchOffsetY) {
+        this.crouchOffsetY = crouchOffsetY;
     }
 }

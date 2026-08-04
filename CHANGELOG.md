@@ -3,7 +3,7 @@
 ## 3.0.0 - Persistence Replacement and Companion Systems Overhaul - 2026-07-20
 
 ### Added
-- Added a config-gated companion `To Me` control that instantly mounts small companions on their owner's shoulder; role assets choose the attachment offset. Shoulder companions pause their normal AI, cannot be interacted with or collided with, and are invulnerable until set down.
+- Added a config-gated companion `To Me` control that instantly mounts small companions on their owner's shoulder; role assets choose standing and crouching attachment offsets. Shoulder companions smoothly track the player's current pose, pause their normal AI, cannot be interacted with or collided with, and are invulnerable until set down.
 - Loaded normal linked-companion cards now expose configured flight/ground mode
   switching alongside bonded roster cards.
 - Embedded Patchwork 1.0.0 as Tamework's asset-patch runtime. A newer compatible standalone or embedded Patchwork copy can win the shared version-first election, while asset-only packs can depend on Patchwork and ship only JSON patch definitions.

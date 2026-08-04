@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.components;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -24,6 +25,7 @@ class TameworkShoulderRideComponentTest {
         TameworkShoulderRideComponent current =
                 new TameworkShoulderRideComponent(UUID.randomUUID(),
                         true, false, true, false);
+        current.setVerticalOffsets(1.4D, -0.35D);
 
         assertTrue(current.hasCapturedState());
         TameworkShoulderRideComponent roundTripped =
@@ -31,6 +33,9 @@ class TameworkShoulderRideComponentTest {
                         TameworkShoulderRideComponent.CODEC.encode(
                                 current, new ExtraInfo()), new ExtraInfo());
         assertTrue(roundTripped.hasCapturedState());
+        assertTrue(roundTripped.hasVerticalOffsets());
+        assertEquals(1.4D, roundTripped.getOffsetY());
+        assertEquals(-0.35D, roundTripped.getCrouchOffsetY());
     }
 
     @Test

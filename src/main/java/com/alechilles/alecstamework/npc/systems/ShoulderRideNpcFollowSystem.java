@@ -12,11 +12,15 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.systems.ComputeVelocitySystem;
@@ -31,21 +35,26 @@ public final class ShoulderRideNpcFollowSystem
     private final ComponentType<EntityStore, TransformComponent> transformType;
     private final ComponentType<EntityStore, Velocity> velocityType;
     private final ComponentType<EntityStore, DeathComponent> deathType;
+    private final ComponentType<EntityStore, MovementStatesComponent> movementStatesType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
-            new SystemDependency<>(Order.AFTER, ComputeVelocitySystem.class));
+            new SystemDependency<>(Order.AFTER, ComputeVelocitySystem.class),
+            new SystemDependency<>(Order.AFTER,
+                    PlayerSystems.ProcessPlayerInput.class));
 
     public ShoulderRideNpcFollowSystem(
             ComponentType<EntityStore, TameworkShoulderRideComponent> markerType,
             ComponentType<EntityStore, MountedComponent> mountedType,
             ComponentType<EntityStore, TransformComponent> transformType,
             ComponentType<EntityStore, Velocity> velocityType,
-            ComponentType<EntityStore, DeathComponent> deathType) {
+            ComponentType<EntityStore, DeathComponent> deathType,
+            ComponentType<EntityStore, MovementStatesComponent> movementStatesType) {
         this.markerType = markerType;
         this.mountedType = mountedType;
         this.transformType = transformType;
         this.velocityType = velocityType;
         this.deathType = deathType;
+        this.movementStatesType = movementStatesType;
         this.query = Query.and(markerType, transformType,
                 NPCEntity.getComponentType());
     }
@@ -74,6 +83,7 @@ public final class ShoulderRideNpcFollowSystem
             commands.tryRemoveComponent(npcRef, mountedType);
             return;
         }
+        updateCrouchOffset(npcRef, playerRef, marker, mounted, store, commands);
         npcTransform.setPosition(playerTransform.getPosition());
         npcTransform.getRotation().setYaw(
                 playerTransform.getRotation().yaw());
@@ -83,6 +93,29 @@ public final class ShoulderRideNpcFollowSystem
                 playerTransform.getRotation().roll());
         Velocity velocity = commands.getComponent(npcRef, velocityType);
         if (velocity != null) velocity.setZero();
+    }
+
+    private void updateCrouchOffset(
+            Ref<EntityStore> npcRef, Ref<EntityStore> playerRef,
+            TameworkShoulderRideComponent marker, MountedComponent mounted,
+            Store<EntityStore> store, CommandBuffer<EntityStore> commands) {
+        if (!marker.hasVerticalOffsets()) return;
+        MovementStatesComponent component = store.getComponent(playerRef,
+                movementStatesType);
+        MovementStates states = component == null
+                ? null : component.getMovementStates();
+        boolean crouching = states != null
+                && (states.crouching || states.forcedCrouching);
+        float desiredY = (float) (marker.getOffsetY()
+                + (crouching ? marker.getCrouchOffsetY() : 0D));
+        Rotation3f current = mounted.getAttachmentOffset();
+        if (current == null
+                || Math.abs(current.y() - desiredY) < 0.0001F) {
+            return;
+        }
+        commands.putComponent(npcRef, mountedType, new MountedComponent(
+                playerRef, new Rotation3f(current.x(), desiredY, current.z()),
+                mounted.getControllerType()));
     }
 
     private boolean isValidTarget(TameworkShoulderRideComponent marker,

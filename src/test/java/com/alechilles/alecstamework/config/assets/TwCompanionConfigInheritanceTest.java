@@ -21,7 +21,8 @@ class TwCompanionConfigInheritanceTest {
         TwCompanionConfig parent = decode("""
                 { "Command": { "ShoulderRide": {
                   "Enabled": true, "OffsetX": 0.4,
-                  "OffsetY": 1.6, "OffsetZ": -0.1
+                  "OffsetY": 1.6, "OffsetZ": -0.1,
+                  "CrouchOffsetY": -0.28
                 } } }
                 """);
         TwCompanionConfig child = decode("""
@@ -38,6 +39,7 @@ class TwCompanionConfigInheritanceTest {
         assertEquals(0.25D, result.getOffsetX());
         assertEquals(1.6D, result.getOffsetY());
         assertEquals(-0.1D, result.getOffsetZ());
+        assertEquals(-0.28D, result.getCrouchOffsetY());
     }
 
     @Test

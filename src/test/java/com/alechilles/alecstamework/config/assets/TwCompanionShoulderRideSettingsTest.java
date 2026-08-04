@@ -17,6 +17,7 @@ class TwCompanionShoulderRideSettingsTest {
         assertEquals(0.32D, settings.getOffsetX());
         assertEquals(1.45D, settings.getOffsetY());
         assertEquals(0D, settings.getOffsetZ());
+        assertEquals(-0.35D, settings.getCrouchOffsetY());
     }
 
     @Test
@@ -26,7 +27,7 @@ class TwCompanionShoulderRideSettingsTest {
         settings.setEnabled(true);
 
         assertTrue(settings.isConfigured());
-        settings.setOffsetY(Double.NaN);
+        settings.setCrouchOffsetY(Double.NaN);
         assertFalse(settings.isConfigured());
     }
 }

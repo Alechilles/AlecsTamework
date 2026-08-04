@@ -243,6 +243,10 @@ final class TwCompanionCommandInheritance {
         if (!explicit.contains("ShoulderRide.OffsetZ")) {
             currentSettings.setOffsetZ(parentSettings.getOffsetZ());
         }
+        if (!explicit.contains("ShoulderRide.CrouchOffsetY")) {
+            currentSettings.setCrouchOffsetY(
+                    parentSettings.getCrouchOffsetY());
+        }
     }
 
     private static boolean hasLegacyCooldownOverride(

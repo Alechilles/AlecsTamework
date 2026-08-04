@@ -852,7 +852,8 @@ public class Tamework extends JavaPlugin {
                             mountedComponentType,
                             TransformComponent.getComponentType(),
                             Velocity.getComponentType(),
-                            DeathComponent.getComponentType())
+                            DeathComponent.getComponentType(),
+                            MovementStatesComponent.getComponentType())
             );
             getEntityStoreRegistry().registerSystem(
                     new ShoulderRideNpcStateSystem(

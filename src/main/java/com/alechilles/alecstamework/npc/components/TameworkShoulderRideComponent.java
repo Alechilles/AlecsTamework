@@ -39,6 +39,14 @@ public final class TameworkShoulderRideComponent
                     .<Boolean>append(new KeyedCodec<>("StateCaptured", Codec.BOOLEAN),
                             TameworkShoulderRideComponent::setStateCapturedValue,
                             TameworkShoulderRideComponent::getStateCapturedValue)
+                    .add()
+                    .<Double>append(new KeyedCodec<>("OffsetY", Codec.DOUBLE),
+                            TameworkShoulderRideComponent::setOffsetYValue,
+                            TameworkShoulderRideComponent::getOffsetYValue)
+                    .add()
+                    .<Double>append(new KeyedCodec<>("CrouchOffsetY", Codec.DOUBLE),
+                            TameworkShoulderRideComponent::setCrouchOffsetYValue,
+                            TameworkShoulderRideComponent::getCrouchOffsetYValue)
                     .add().build();
 
     private UUID ownerUuid;
@@ -47,6 +55,8 @@ public final class TameworkShoulderRideComponent
     private Boolean wasInvulnerable;
     private Boolean wasFrozen;
     private Boolean stateCaptured;
+    private Double offsetY;
+    private Double crouchOffsetY;
 
     public TameworkShoulderRideComponent() {
     }
@@ -61,7 +71,7 @@ public final class TameworkShoulderRideComponent
                                          boolean wasInvulnerable,
                                          boolean wasFrozen) {
         this(ownerUuid, wasInteractable, wasIntangible, wasInvulnerable,
-                wasFrozen, true);
+                wasFrozen, true, null, null);
     }
 
     private TameworkShoulderRideComponent(UUID ownerUuid,
@@ -69,13 +79,17 @@ public final class TameworkShoulderRideComponent
                                           Boolean wasIntangible,
                                           Boolean wasInvulnerable,
                                           Boolean wasFrozen,
-                                          Boolean stateCaptured) {
+                                          Boolean stateCaptured,
+                                          Double offsetY,
+                                          Double crouchOffsetY) {
         this.ownerUuid = ownerUuid;
         this.wasInteractable = wasInteractable;
         this.wasIntangible = wasIntangible;
         this.wasInvulnerable = wasInvulnerable;
         this.wasFrozen = wasFrozen;
         this.stateCaptured = stateCaptured;
+        this.offsetY = offsetY;
+        this.crouchOffsetY = crouchOffsetY;
     }
 
     public static ComponentType<EntityStore, TameworkShoulderRideComponent>
@@ -156,9 +170,44 @@ public final class TameworkShoulderRideComponent
         this.stateCaptured = stateCaptured;
     }
 
+    public void setVerticalOffsets(double offsetY, double crouchOffsetY) {
+        this.offsetY = offsetY;
+        this.crouchOffsetY = crouchOffsetY;
+    }
+
+    public boolean hasVerticalOffsets() {
+        return offsetY != null && Double.isFinite(offsetY)
+                && crouchOffsetY != null && Double.isFinite(crouchOffsetY);
+    }
+
+    public double getOffsetY() {
+        return offsetY == null ? 0D : offsetY;
+    }
+
+    private Double getOffsetYValue() {
+        return offsetY;
+    }
+
+    private void setOffsetYValue(Double offsetY) {
+        this.offsetY = offsetY;
+    }
+
+    public double getCrouchOffsetY() {
+        return crouchOffsetY == null ? 0D : crouchOffsetY;
+    }
+
+    private Double getCrouchOffsetYValue() {
+        return crouchOffsetY;
+    }
+
+    private void setCrouchOffsetYValue(Double crouchOffsetY) {
+        this.crouchOffsetY = crouchOffsetY;
+    }
+
     @Override
     public TameworkShoulderRideComponent clone() {
         return new TameworkShoulderRideComponent(ownerUuid, wasInteractable,
-                wasIntangible, wasInvulnerable, wasFrozen, stateCaptured);
+                wasIntangible, wasInvulnerable, wasFrozen, stateCaptured,
+                offsetY, crouchOffsetY);
     }
 }

@@ -16,9 +16,11 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.MountController;
+import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.Frozen;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
@@ -273,10 +275,31 @@ final class BondedCompanionShoulderRideActionService {
                            Store<EntityStore> store,
                            ComponentType<EntityStore, MountedComponent> mountedType,
                            TwCompanionShoulderRideSettings settings) {
+            TameworkShoulderRideComponent marker = store.getComponent(npcRef,
+                    TameworkShoulderRideComponent.getComponentType());
+            if (marker != null) {
+                marker.setVerticalOffsets(settings.getOffsetY(),
+                        settings.getCrouchOffsetY());
+                store.putComponent(npcRef,
+                        TameworkShoulderRideComponent.getComponentType(), marker);
+            }
+            double offsetY = settings.getOffsetY()
+                    + (isCrouching(playerRef, store)
+                    ? settings.getCrouchOffsetY() : 0D);
             store.putComponent(npcRef, mountedType, new MountedComponent(
                     playerRef, new Rotation3f((float) settings.getOffsetX(),
-                    (float) settings.getOffsetY(),
+                    (float) offsetY,
                     (float) settings.getOffsetZ()), MountController.Minecart));
+        }
+
+        private boolean isCrouching(Ref<EntityStore> playerRef,
+                                    Store<EntityStore> store) {
+            MovementStatesComponent component = store.getComponent(playerRef,
+                    MovementStatesComponent.getComponentType());
+            MovementStates states = component == null
+                    ? null : component.getMovementStates();
+            return states != null && (states.crouching
+                    || states.forcedCrouching);
         }
     }
 }
