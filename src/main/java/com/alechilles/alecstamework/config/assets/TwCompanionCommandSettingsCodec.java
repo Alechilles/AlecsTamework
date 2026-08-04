@@ -232,6 +232,42 @@ final class TwCompanionCommandSettingsCodec {
             .add()
             .build();
 
+    private static final BuilderCodec<TwCompanionShoulderRideSettings>
+            SHOULDER_RIDE_CODEC = BuilderCodec.builder(
+                    TwCompanionShoulderRideSettings.class,
+                    TwCompanionShoulderRideSettings::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.setEnabled(
+                            value != null && value),
+                    TwCompanionShoulderRideSettings::isEnabled
+            )
+            .documentation("Enables the bonded-card shoulder-ride action. Inheritance: an omitted value inherits.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("OffsetX", Codec.DOUBLE),
+                    (settings, value) -> settings.setOffsetX(value),
+                    TwCompanionShoulderRideSettings::getOffsetX
+            )
+            .documentation("Horizontal attachment offset from the player root. Inheritance: an omitted value inherits.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("OffsetY", Codec.DOUBLE),
+                    (settings, value) -> settings.setOffsetY(value),
+                    TwCompanionShoulderRideSettings::getOffsetY
+            )
+            .documentation("Vertical attachment offset from the player root. Inheritance: an omitted value inherits.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("OffsetZ", Codec.DOUBLE),
+                    (settings, value) -> settings.setOffsetZ(value),
+                    TwCompanionShoulderRideSettings::getOffsetZ
+            )
+            .documentation("Forward attachment offset from the player root. Inheritance: an omitted value inherits.")
+            .add()
+            .build();
+
     static final BuilderCodec<TwCompanionCommandSettings> CODEC =
             BuilderCodec.builder(
                     TwCompanionCommandSettings.class,
@@ -456,6 +492,18 @@ final class TwCompanionCommandSettingsCodec {
                     "Flight-toggle hook capability. Inheritance: omitted "
                             + "section inherits; when present, explicit nested "
                             + "fields override and missing nested fields inherit."
+            )
+            .add()
+            .<TwCompanionShoulderRideSettings>append(
+                    new KeyedCodec<>("ShoulderRide", SHOULDER_RIDE_CODEC),
+                    (settings, value) -> settings.shoulderRide = value == null
+                            ? new TwCompanionShoulderRideSettings()
+                            : value,
+                    TwCompanionCommandSettings::getShoulderRide
+            )
+            .documentation(
+                    "Shoulder-ride capability and attachment offset. Inheritance: omitted section inherits; when "
+                            + "present, explicit nested fields override and missing nested fields inherit."
             )
             .add()
             .build();

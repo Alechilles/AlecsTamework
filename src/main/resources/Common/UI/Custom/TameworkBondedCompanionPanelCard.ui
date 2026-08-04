@@ -206,6 +206,15 @@ Group {
         Visible: false;
     }
 
+    TextButton #BondedShoulderRideButton {
+        Anchor: (Top: 5, Right: 140, Width: 48, Height: 24);
+        Style: @BondedCardButtonStyle;
+        Text: "To Me";
+        TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
+        TextTooltipStyle: @BondedCardTextTooltipStyle;
+        Visible: false;
+    }
+
     Group #BondedXpFrame {
         Anchor: (Top: 52, Left: 20, Right: 25, Height: 3);
         Background: #08121f;

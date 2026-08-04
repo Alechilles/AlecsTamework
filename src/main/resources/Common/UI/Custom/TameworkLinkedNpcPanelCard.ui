@@ -1039,6 +1039,15 @@ Group {
         Visible: false;
     }
 
+    TextButton #ShoulderRideButton {
+        Anchor: (Top: 0, Right: 52, Width: 54, Height: 24);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Text: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe;
+        TooltipText: %server.tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip;
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
     Label #RosterState {
         Anchor: (Top: 84, Left: 0, Width: 150, Height: 16);
         Style: (FontSize: 10, TextColor: #c8d9ea, VerticalAlignment: Center);

@@ -35,6 +35,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
     private final BondedCompanionPanelFlightProjection flightProjection =
             new BondedCompanionPanelFlightProjection(
                     new BondedCompanionFlightModeReader());
+    private final BondedCompanionPanelShoulderRideProjection shoulderRideProjection =
+            new BondedCompanionPanelShoulderRideProjection();
 
     BondedCompanionPanelEntrySourceService(
             @Nonnull BondedCompanionPanelSnapshotCache cache,
@@ -146,6 +148,8 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
                     overlay, liveProgression(player, store, profile));
             overlay = BondedCompanionPanelLiveProfileOverlay.withFlightMode(
                     overlay, liveFlightMode(player, store, profile));
+            overlay = BondedCompanionPanelLiveProfileOverlay.withShoulderRide(
+                    overlay, liveShoulderRide(player, store, profile));
             updated.add(overlay == profile ? record
                     : new BondedCompanionPanelRecordSource.PanelRecord(
                             record.presentationUuid(), overlay));
@@ -288,6 +292,20 @@ final class BondedCompanionPanelEntrySourceService implements AutoCloseable {
         } catch (RuntimeException | LinkageError ignored) {
             return Optional.empty();
         }
+    }
+
+    /** Projects the exact live NPC-to-player shoulder attachment state. */
+    @Nonnull
+    private Optional<Boolean> liveShoulderRide(
+            Player player, Store<EntityStore> store,
+            BondedCompanionProfileView profile
+    ) {
+        Ref<EntityStore> npcRef = exactActiveReference(player, store, profile);
+        Ref<EntityStore> playerRef = player == null ? null : player.getReference();
+        String worldKey = player == null || player.getWorld() == null
+                ? null : player.getWorld().getName();
+        return shoulderRideProjection.read(profile, worldKey, npcRef,
+                playerRef, store);
     }
 
     private static int healthValue(java.util.Map<String, String> data,

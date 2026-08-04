@@ -695,6 +695,38 @@ class BondedCompanionCardPresenterTest {
                         .toList());
     }
 
+    @Test
+    void shoulderRideButtonTogglesBetweenToMeAndDown() {
+        UICommandBuilder commands = new UICommandBuilder();
+        BondedCompanionCardPresenter.bind(commands, new UIEventBuilder(),
+                "#Card", UUID.randomUUID(), presentation(
+                        BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS,
+                        true, Map.of(
+                                BondedCompanionPresentationAttributes
+                                        .SHOULDER_RIDE_AVAILABLE, "true",
+                                BondedCompanionPresentationAttributes
+                                        .SHOULDER_RIDE_MOUNTED, "false"), null),
+                false, bindingConfig(), "en-US");
+
+        assertCommand(commands, "#Card #BondedShoulderRideButton.Visible", "true");
+        assertCommand(commands, "#Card #BondedShoulderRideButton.Text", "To Me");
+        assertCommand(commands, "#Card #BondedShoulderRideButton.TooltipText",
+                "Bring this companion to your shoulder");
+
+        UICommandBuilder mounted = new UICommandBuilder();
+        BondedCompanionCardPresenter.refreshDynamicState(mounted, "#Card",
+                presentation(BondedCompanionStateView.ACTIVE,
+                        BondedCompanionStatusPresentation.Action.DISMISS,
+                        true, Map.of(
+                                BondedCompanionPresentationAttributes
+                                        .SHOULDER_RIDE_AVAILABLE, "true",
+                                BondedCompanionPresentationAttributes
+                                        .SHOULDER_RIDE_MOUNTED, "true"), null),
+                "en-US");
+        assertCommand(mounted, "#Card #BondedShoulderRideButton.Text", "Down");
+    }
+
     private static void assertCommandSelector(
             UICommandBuilder commands, String selector
     ) {

@@ -508,6 +508,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final TwCompanionReviveSettings revive;
         private final TwCompanionSummonSettings summon;
         private final TwCompanionFlightToggleSettings flightToggle;
+        private final TwCompanionShoulderRideSettings shoulderRide;
         private final boolean crossWorldRecallEnabled;
         private final TransferFailurePolicy onTransferFailure;
         private final boolean followMasterOnWorldChange;
@@ -533,6 +534,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   TwCompanionReviveSettings revive,
                                   TwCompanionSummonSettings summon,
                                   TwCompanionFlightToggleSettings flightToggle,
+                                  TwCompanionShoulderRideSettings shoulderRide,
                                   boolean crossWorldRecallEnabled,
                                   TransferFailurePolicy onTransferFailure,
                                   boolean followMasterOnWorldChange,
@@ -563,6 +565,9 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             this.flightToggle = flightToggle != null
                     ? flightToggle.copy()
                     : new TwCompanionFlightToggleSettings();
+            this.shoulderRide = shoulderRide != null
+                    ? shoulderRide.copy()
+                    : new TwCompanionShoulderRideSettings();
             this.crossWorldRecallEnabled = crossWorldRecallEnabled;
             this.onTransferFailure = onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
             this.followMasterOnWorldChange = followMasterOnWorldChange;
@@ -619,6 +624,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         revive,
                         command.getSummon(),
                         command.getFlightToggle(),
+                        command.getShoulderRide(),
                         travel.isCrossWorldRecallEnabled(),
                         travel.getOnTransferFailure(),
                         travel.isFollowMasterOnWorldChange(),
@@ -688,6 +694,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     revive,
                     defaults.getSummon(),
                     defaults.getFlightToggle(),
+                    defaults.getShoulderRide(),
                     travel.isCrossWorldRecallEnabled(),
                     travel.getOnTransferFailure(),
                     travel.isFollowMasterOnWorldChange(),
@@ -776,6 +783,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         @Nonnull
         public TwCompanionFlightToggleSettings getFlightToggle() {
             return flightToggle.copy();
+        }
+
+        @Nonnull
+        public TwCompanionShoulderRideSettings getShoulderRide() {
+            return shoulderRide.copy();
         }
 
         public boolean isCrossWorldRecallEnabled() {

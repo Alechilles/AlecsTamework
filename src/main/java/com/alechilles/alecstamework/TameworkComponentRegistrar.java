@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.npc.components.TameworkPersistenceRetirement
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -82,6 +83,11 @@ final class TameworkComponentRegistrar {
                 .registerComponent(TameworkRideMountComponent.class, "TameworkRideMount", TameworkRideMountComponent.CODEC);
         ComponentType<EntityStore, TameworkRideRiderComponent> rideRider = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkRideRiderComponent.class, "TameworkRideRider", TameworkRideRiderComponent.CODEC);
+        ComponentType<EntityStore, TameworkShoulderRideComponent> shoulderRide =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        TameworkShoulderRideComponent.class,
+                        "TameworkShoulderRide",
+                        TameworkShoulderRideComponent.CODEC);
         ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlide = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkMountedGlideComponent.class, "TameworkMountedGlide",
                         TameworkMountedGlideComponent.CODEC);
@@ -213,7 +219,7 @@ final class TameworkComponentRegistrar {
                 );
         return new RegisteredComponents(
                 owner, tamed, hook, npcName, mountedNameplate, commandLinks, happiness, needs,
-                breeding, alarm, flyingCompanion, rideMount, rideRider, mountedGlide,
+                breeding, alarm, flyingCompanion, rideMount, rideRider, shoulderRide, mountedGlide,
                 mountedGlideRider, avatarFlight, avatarFlightInput, avatarFlightRiderVisual,
                 avatarFlightMountSession, avatarFlightSource,
                 leveling, traits, talents, tranquilizerPeak, attachments, dynamicAttachments,
@@ -239,6 +245,7 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanion,
             ComponentType<EntityStore, TameworkRideMountComponent> rideMount,
             ComponentType<EntityStore, TameworkRideRiderComponent> rideRider,
+            ComponentType<EntityStore, TameworkShoulderRideComponent> shoulderRide,
             ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlide,
             ComponentType<EntityStore, TameworkMountedGlideRiderComponent> mountedGlideRider,
             ComponentType<EntityStore, AvatarFlightComponent> avatarFlight,

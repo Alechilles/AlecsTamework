@@ -60,6 +60,8 @@ public final class LinkedNpcEntry {
     private final boolean talentsActionEnabled;
     private final boolean flightToggleAvailable;
     private final boolean flightToggleAirborne;
+    private final boolean shoulderRideAvailable;
+    private final boolean shoulderRideMounted;
 
     public LinkedNpcEntry(UUID npcUuid,
                           String displayName,
@@ -485,6 +487,8 @@ public final class LinkedNpcEntry {
         this.talentsActionEnabled = talentsActionEnabled;
         this.flightToggleAvailable = false;
         this.flightToggleAirborne = false;
+        this.shoulderRideAvailable = false;
+        this.shoulderRideMounted = false;
     }
 
     public boolean hasHealth() {
@@ -673,6 +677,14 @@ public final class LinkedNpcEntry {
         return flightToggleAirborne;
     }
 
+    public boolean shoulderRideAvailable() {
+        return shoulderRideAvailable;
+    }
+
+    public boolean shoulderRideMounted() {
+        return shoulderRideMounted;
+    }
+
     public String recoveryIncidentId() {
         return recoveryIncidentId;
     }
@@ -685,7 +697,13 @@ public final class LinkedNpcEntry {
     /** Returns an immutable presentation copy with its live flight-toggle state. */
     public LinkedNpcEntry withFlightToggle(boolean available, boolean airborne) {
         return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
-                available, airborne);
+                available, airborne, shoulderRideAvailable, shoulderRideMounted);
+    }
+
+    /** Returns an immutable presentation copy with its live shoulder-ride state. */
+    public LinkedNpcEntry withShoulderRide(boolean available, boolean mounted) {
+        return new LinkedNpcEntry(this, recoveryHeld, recoveryIncidentId,
+                flightToggleAvailable, flightToggleAirborne, available, mounted);
     }
 
     public double healthRatio() {
@@ -789,14 +807,17 @@ public final class LinkedNpcEntry {
                            boolean recoveryHeld,
                            String incidentId) {
         this(source, recoveryHeld, incidentId, source.flightToggleAvailable,
-                source.flightToggleAirborne);
+                source.flightToggleAirborne, source.shoulderRideAvailable,
+                source.shoulderRideMounted);
     }
 
     private LinkedNpcEntry(LinkedNpcEntry source,
                            boolean recoveryHeld,
                            String incidentId,
                            boolean flightToggleAvailable,
-                           boolean flightToggleAirborne) {
+                           boolean flightToggleAirborne,
+                           boolean shoulderRideAvailable,
+                           boolean shoulderRideMounted) {
         this.npcUuid = source.npcUuid;
         this.displayName = source.displayName;
         this.gender = source.gender;
@@ -846,6 +867,8 @@ public final class LinkedNpcEntry {
         this.talentsActionEnabled = source.talentsActionEnabled;
         this.flightToggleAvailable = flightToggleAvailable;
         this.flightToggleAirborne = flightToggleAvailable && flightToggleAirborne;
+        this.shoulderRideAvailable = shoulderRideAvailable;
+        this.shoulderRideMounted = shoulderRideAvailable && shoulderRideMounted;
         this.recoveryHeld = recoveryHeld;
         this.recoveryIncidentId = recoveryHeld ? normalizeIncidentId(incidentId) : null;
     }
@@ -929,6 +952,8 @@ public final class LinkedNpcEntry {
                 && talentsActionEnabled == other.talentsActionEnabled
                 && flightToggleAvailable == other.flightToggleAvailable
                 && flightToggleAirborne == other.flightToggleAirborne
+                && shoulderRideAvailable == other.shoulderRideAvailable
+                && shoulderRideMounted == other.shoulderRideMounted
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
                 && Objects.equals(gender, other.gender)
@@ -994,7 +1019,9 @@ public final class LinkedNpcEntry {
                 talentsActionVisible,
                 talentsActionEnabled,
                 flightToggleAvailable,
-                flightToggleAirborne
+                flightToggleAirborne,
+                shoulderRideAvailable,
+                shoulderRideMounted
         );
         result = 31 * result + Arrays.hashCode(traitIndicators);
         return result;

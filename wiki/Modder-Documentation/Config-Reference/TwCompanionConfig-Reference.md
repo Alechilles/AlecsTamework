@@ -107,6 +107,16 @@ one exact refund claim; an unavailable or denied operation charges nothing.
   remaining-time thresholds below a positive active duration. An explicit
   array replaces the inherited list.
 
+### `Command.ShoulderRide`
+
+- `Enabled`: shows the bonded-card `To Me` control for an active matching NPC.
+- `OffsetX`, `OffsetY`, `OffsetZ`: passenger attachment offset relative to the
+  player. All three values must be finite.
+
+The first press mounts the NPC instantly using Hytale's entity-mount system;
+the next press sets it down. This capability is disabled by default and should
+only be enabled for models whose scale and pose suit a shoulder attachment.
+
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
 - `OnTransferFailure`: what to do when the target transfer cannot complete.
@@ -198,6 +208,12 @@ Older packs may still contain ownership protection and revive enablement keys in
       "ResummonCooldownMs": 120000,
       "AutoStoreOnOwnerLogout": true,
       "ExpiryWarningThresholdsMs": [60000, 30000, 10000]
+    },
+    "ShoulderRide": {
+      "Enabled": true,
+      "OffsetX": 0.32,
+      "OffsetY": 1.45,
+      "OffsetZ": 0.0
     },
     "PlacementMinRelativeY": -2.0,
     "PlacementMaxRelativeY": 4.0,

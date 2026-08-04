@@ -36,6 +36,8 @@ final class CommandSelectionPageService {
     private final FlightToggleAction flightToggleActions;
     private final LinkedFlightToggleAction linkedFlightToggleActions;
     private final EventPlayerResolver flightTogglePlayers;
+    private ShoulderRideAction shoulderRideActions;
+    private LinkedShoulderRideAction linkedShoulderRideActions;
     @javax.annotation.Nullable private final BondedCompanionPanelRefreshSignalSource bondedRefreshSignals;
 
     CommandSelectionPageService(CommandToolInventoryService toolInventoryService,
@@ -297,7 +299,7 @@ final class CommandSelectionPageService {
     private TameworkCommandSelectionPage createSelectionPage(
             PageContext context, NpcCallbacks npcCallbacks,
             FeatureCallbacks featureCallbacks, PanelCallbacks panelCallbacks) {
-        return new TameworkCommandSelectionPage(
+        TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
                 context.uiPlayerRef(), context.config(), context.selectedId(),
                 context.requireUnlinkConfirm(), context.snapshot()::refreshEntries,
                 context.snapshot()::refreshEntries, context.snapshot()::featurePresentations,
@@ -351,6 +353,8 @@ final class CommandSelectionPageService {
                 panelCallbacks.assignGroup(), npcCallbacks.selectCommand(),
                 context.refreshSignals()
         );
+        page.configureShoulderRideCallback(shoulderRideCallback(context));
+        return page;
     }
 
     private NpcCallbacks buildNpcCallbacks(PageContext context) {
@@ -756,8 +760,63 @@ final class CommandSelectionPageService {
                        com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation row);
     }
 
+    private LinkedNpcPanelFeatureAction shoulderRideCallback(PageContext context) {
+        return (uuid, eventRef, eventStore) -> {
+            if (!context.config().usesBondedCompanionRoster()) {
+                com.alechilles.alecstamework.ui.LinkedNpcEntry entry =
+                        context.snapshot().entry(uuid);
+                if (context.genericRosterActions()
+                        && context.genericAuthority().getAsBoolean()
+                        && linkedShoulderRideActions != null && entry != null
+                        && entry.linked() && entry.loaded()
+                        && entry.shoulderRideAvailable()) {
+                    linkedShoulderRideActions.toggle(context.ownerUuid(), eventRef,
+                            eventStore, context.toolId(), uuid);
+                }
+                return;
+            }
+            if (shoulderRideActions == null) return;
+            CommandPanelFeaturePresentation feature =
+                    context.snapshot().presentation(uuid);
+            if (feature == null || feature.bonded() == null
+                    || !BondedCompanionShoulderRideActionService
+                    .isAvailable(feature.bonded())) return;
+            Player player = flightTogglePlayers == null ? null
+                    : flightTogglePlayers.resolve(context.ownerUuid(), eventRef,
+                    eventStore);
+            if (player == null || context.bondedLifecycleAuthority() == null
+                    || !context.bondedLifecycleAuthority().allows(player)) return;
+            shoulderRideActions.toggle(context.ownerUuid(), eventRef, eventStore,
+                    feature.bonded());
+        };
+    }
+
+    void configureShoulderRideAction(
+            @javax.annotation.Nullable ShoulderRideAction action) {
+        shoulderRideActions = action;
+    }
+
+    void configureLinkedShoulderRideAction(
+            @javax.annotation.Nullable LinkedShoulderRideAction action) {
+        linkedShoulderRideActions = action;
+    }
+
     @FunctionalInterface
     interface LinkedFlightToggleAction {
+        boolean toggle(UUID ownerUuid, Ref<EntityStore> eventPlayerRef,
+                       Store<EntityStore> eventStore, String itemId,
+                       UUID npcUuid);
+    }
+
+    @FunctionalInterface
+    interface ShoulderRideAction {
+        boolean toggle(UUID ownerUuid, Ref<EntityStore> eventPlayerRef,
+                       Store<EntityStore> eventStore,
+                       com.alechilles.alecstamework.ui.BondedCompanionPanelPresentation row);
+    }
+
+    @FunctionalInterface
+    interface LinkedShoulderRideAction {
         boolean toggle(UUID ownerUuid, Ref<EntityStore> eventPlayerRef,
                        Store<EntityStore> eventStore, String itemId,
                        UUID npcUuid);

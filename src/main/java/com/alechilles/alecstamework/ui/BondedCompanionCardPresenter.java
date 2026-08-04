@@ -66,6 +66,8 @@ final class BondedCompanionCardPresenter {
                 progression, pendingUnlink, config, language);
         bindFlightToggle(commands, events, entrySelector, cardUuid, row,
                 config, language);
+        bindShoulderRide(commands, events, entrySelector, cardUuid, row,
+                config, language);
         bindPrimaryAction(commands, events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
     }
@@ -85,6 +87,7 @@ final class BondedCompanionCardPresenter {
         bindXpProgress(commands, entrySelector, row,
                 progressionSummary(row.attributes(), row.roleId()), language);
         bindFlightToggle(commands, entrySelector, row, language);
+        bindShoulderRide(commands, entrySelector, row, language);
     }
 
     /** Patches progression-derived labels and tooltips without emitting events. */
@@ -125,6 +128,7 @@ final class BondedCompanionCardPresenter {
         bindPrimaryActionEvents(events, entrySelector, cardUuid, row,
                 pendingUnlink, config, language);
         bindFlightToggleEvents(events, entrySelector, cardUuid, row, config);
+        bindShoulderRideEvents(events, entrySelector, cardUuid, row, config);
     }
 
 
@@ -845,6 +849,63 @@ final class BondedCompanionCardPresenter {
             return Double.isFinite(parsed) && parsed >= 0.0 ? parsed : 0.0;
         } catch (NumberFormatException ignored) {
             return 0.0;
+        }
+    }
+
+    private static void bindShoulderRide(
+            UICommandBuilder commands,
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            LinkedNpcPanelCardBinder.CardBindingConfig config,
+            @Nullable String language
+    ) {
+        bindShoulderRide(commands, entrySelector, row, language);
+        bindShoulderRideEvents(events, entrySelector, cardUuid, row, config);
+    }
+
+    private static void bindShoulderRide(
+            UICommandBuilder commands,
+            String entrySelector,
+            BondedCompanionPanelPresentation row,
+            @Nullable String language
+    ) {
+        boolean visible = shoulderRideVisible(row);
+        boolean mounted = Boolean.parseBoolean(row.attributes().get(
+                BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED));
+        commands.set(entrySelector + " #BondedShoulderRideButton.Visible", visible);
+        commands.set(entrySelector + " #BondedShoulderRideButton.Text",
+                visible ? LocalizedText.resolve(language, mounted
+                        ? "tamework.ui.linkedPanel.bonded.shoulder.down"
+                        : "tamework.ui.linkedPanel.bonded.shoulder.toMe") : "");
+        commands.set(entrySelector + " #BondedShoulderRideButton.TooltipText",
+                visible ? LocalizedText.resolve(language, mounted
+                        ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"
+                        : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip") : "");
+    }
+
+    private static boolean shoulderRideVisible(
+            BondedCompanionPanelPresentation row) {
+        return row.status().state() == BondedCompanionStateView.ACTIVE
+                && Boolean.parseBoolean(row.attributes().get(
+                BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE));
+    }
+
+    static void bindShoulderRideEvents(
+            UIEventBuilder events,
+            String entrySelector,
+            UUID cardUuid,
+            BondedCompanionPanelPresentation row,
+            LinkedNpcPanelCardBinder.CardBindingConfig config
+    ) {
+        if (shoulderRideVisible(row)) {
+            events.addEventBinding(CustomUIEventBindingType.Activating,
+                    entrySelector + " #BondedShoulderRideButton",
+                    EventData.of(config.eventCommandId(),
+                            CommandSelectionPageEventBinder
+                                    .BONDED_SHOULDER_RIDE_COMMAND_PREFIX
+                                    + cardUuid), false);
         }
     }
 

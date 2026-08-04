@@ -18,6 +18,7 @@ final class TwCompanionCommandInheritance {
         inheritSummon(parent, current, explicit);
         inheritTravel(parent, current, explicit);
         inheritFlightToggle(parent, current, explicit);
+        inheritShoulderRide(parent, current, explicit);
     }
 
     private static void inheritCommandScalars(
@@ -214,6 +215,33 @@ final class TwCompanionCommandInheritance {
             current.getMutableFlightToggle().setHookId(
                     parent.getFlightToggle().getHookId()
             );
+        }
+    }
+
+    private static void inheritShoulderRide(
+            TwCompanionCommandSettings parent,
+            TwCompanionCommandSettings current,
+            Set<String> explicit
+    ) {
+        if (!explicit.contains("ShoulderRide")) {
+            current.shoulderRide = parent.getShoulderRide().copy();
+            return;
+        }
+        TwCompanionShoulderRideSettings parentSettings =
+                parent.getShoulderRide();
+        TwCompanionShoulderRideSettings currentSettings =
+                current.getMutableShoulderRide();
+        if (!explicit.contains("ShoulderRide.Enabled")) {
+            currentSettings.setEnabled(parentSettings.isEnabled());
+        }
+        if (!explicit.contains("ShoulderRide.OffsetX")) {
+            currentSettings.setOffsetX(parentSettings.getOffsetX());
+        }
+        if (!explicit.contains("ShoulderRide.OffsetY")) {
+            currentSettings.setOffsetY(parentSettings.getOffsetY());
+        }
+        if (!explicit.contains("ShoulderRide.OffsetZ")) {
+            currentSettings.setOffsetZ(parentSettings.getOffsetZ());
         }
     }
 

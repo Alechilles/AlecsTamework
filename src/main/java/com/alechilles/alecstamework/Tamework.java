@@ -157,6 +157,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
@@ -213,6 +214,7 @@ import com.alechilles.alecstamework.npc.systems.MountedRideInputCaptureSystem;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
+import com.alechilles.alecstamework.npc.systems.ShoulderRideNpcFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -358,6 +360,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
     private ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
     private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
+    private ComponentType<EntityStore, TameworkShoulderRideComponent> shoulderRideComponentType;
     private ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideComponentType;
     private ComponentType<EntityStore, TameworkMountedGlideRiderComponent> mountedGlideRiderComponentType;
     private ComponentType<EntityStore, AvatarFlightComponent> avatarFlightComponentType;
@@ -623,6 +626,7 @@ public class Tamework extends JavaPlugin {
         flyingCompanionComponentType = components.flyingCompanion();
         rideMountComponentType = components.rideMount();
         rideRiderComponentType = components.rideRider();
+        shoulderRideComponentType = components.shoulderRide();
         mountedGlideComponentType = components.mountedGlide();
         mountedGlideRiderComponentType = components.mountedGlideRider();
         avatarFlightComponentType = components.avatarFlight();
@@ -837,6 +841,14 @@ public class Tamework extends JavaPlugin {
                             NPCEntity.getComponentType(),
                             DeathComponent.getComponentType()
                     )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new ShoulderRideNpcFollowSystem(
+                            shoulderRideComponentType,
+                            mountedComponentType,
+                            TransformComponent.getComponentType(),
+                            Velocity.getComponentType(),
+                            DeathComponent.getComponentType())
             );
         }
         getEntityStoreRegistry().registerSystem(
@@ -2991,6 +3003,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkRideRiderComponent> getRideRiderComponentType() {
         return rideRiderComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkShoulderRideComponent> getShoulderRideComponentType() {
+        return shoulderRideComponentType;
     }
 
     public ComponentType<EntityStore, TameworkMountedGlideComponent> getMountedGlideComponentType() {

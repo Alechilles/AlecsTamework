@@ -17,6 +17,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TwCompanionConfigInheritanceTest {
 
     @Test
+    void shoulderRidePartialOverrideInheritsMissingOffsets() {
+        TwCompanionConfig parent = decode("""
+                { "Command": { "ShoulderRide": {
+                  "Enabled": true, "OffsetX": 0.4,
+                  "OffsetY": 1.6, "OffsetZ": -0.1
+                } } }
+                """);
+        TwCompanionConfig child = decode("""
+                { "Command": { "ShoulderRide": { "OffsetX": 0.25 } } }
+                """);
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Command"),
+                Map.of("Command", Set.of(
+                        "ShoulderRide", "ShoulderRide.OffsetX")));
+
+        TwCompanionShoulderRideSettings result =
+                child.getCommand().getShoulderRide();
+        assertTrue(result.isEnabled());
+        assertEquals(0.25D, result.getOffsetX());
+        assertEquals(1.6D, result.getOffsetY());
+        assertEquals(-0.1D, result.getOffsetZ());
+    }
+
+    @Test
+    void omittedShoulderRideCopiesTheParentSection() {
+        TwCompanionConfig parent = decode("""
+                { "Command": { "ShoulderRide": {
+                  "Enabled": true, "OffsetY": 1.2
+                } } }
+                """);
+        TwCompanionConfig child = decode("{ \"Command\": {} }");
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Command"),
+                Map.of("Command", Set.of()));
+
+        assertTrue(child.getCommand().getShoulderRide().isConfigured());
+        assertEquals(1.2D,
+                child.getCommand().getShoulderRide().getOffsetY());
+    }
+
+    @Test
     void codecDecodesFlightToggleAndPreservesExplicitNestedHookOverride() {
         TwCompanionConfig parent = decode("""
                 {

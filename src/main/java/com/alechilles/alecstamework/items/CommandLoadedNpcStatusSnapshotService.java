@@ -3,10 +3,12 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionFlightToggleSettings;
+import com.alechilles.alecstamework.config.assets.TwCompanionShoulderRideSettings;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkShoulderRideComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
@@ -26,6 +28,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Optional;
@@ -253,8 +256,27 @@ final class CommandLoadedNpcStatusSnapshotService {
                         .getFlightToggle();
         Optional<Boolean> flightMode = new BondedCompanionFlightModeReader()
                 .read(npc, flightToggle);
-        return entry.withFlightToggle(flightMode.isPresent(),
+        LinkedNpcEntry result = entry.withFlightToggle(flightMode.isPresent(),
                 flightMode.orElse(false));
+        TwCompanionShoulderRideSettings shoulderRide =
+                TwCompanionConfig.resolveEffectiveForRole(resolvedRoleId)
+                        .getShoulderRide();
+        boolean mounted = isShoulderMounted(npcRef, player, store);
+        return result.withShoulderRide(mounted || shoulderRide.isConfigured(), mounted);
+    }
+
+    private static boolean isShoulderMounted(Ref<EntityStore> npcRef,
+                                             @Nullable Player player,
+                                             Store<EntityStore> store) {
+        if (player == null || player.getReference() == null
+                || TameworkShoulderRideComponent.getComponentType() == null
+                || MountedComponent.getComponentType() == null
+                || store.getComponent(npcRef,
+                TameworkShoulderRideComponent.getComponentType()) == null) return false;
+        MountedComponent mounted = store.getComponent(npcRef,
+                MountedComponent.getComponentType());
+        return mounted != null && player.getReference().equals(
+                mounted.getMountedToEntity());
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,

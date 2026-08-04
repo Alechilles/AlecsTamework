@@ -51,7 +51,9 @@ final class LinkedNpcPanelCardDynamicState {
                 && previous.isTalentsActionEnabled() == current.isTalentsActionEnabled()
                 && samePresence(previous.futureStatA(), current.futureStatA())
                 && sameTalentActionVisibility(previous.futureStatB(), current.futureStatB())
-                && previous.flightToggleAvailable() == current.flightToggleAvailable();
+                && previous.flightToggleAvailable() == current.flightToggleAvailable()
+                && previous.shoulderRideAvailable() == current.shoulderRideAvailable()
+                && previous.shoulderRideMounted() == current.shoulderRideMounted();
     }
 
     private static boolean sameRespawnActionVisibility(

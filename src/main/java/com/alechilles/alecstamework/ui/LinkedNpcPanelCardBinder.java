@@ -99,6 +99,7 @@ final class LinkedNpcPanelCardBinder {
         String setHomeSelector = entrySelector + " #SetHomeButton";
         String returnHomeSelector = entrySelector + " #ReturnHomeButton";
         String flightToggleSelector = entrySelector + " #FlightToggleButton";
+        String shoulderRideSelector = entrySelector + " #ShoulderRideButton";
         String flightModeGroundedSelector = entrySelector + " #FlightModeGroundedIcon";
         String flightModeAirborneSelector = entrySelector + " #FlightModeAirborneIcon";
         String releaseSelector = entrySelector + " #ReleaseButton";
@@ -160,6 +161,8 @@ final class LinkedNpcPanelCardBinder {
                 legacyLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
         boolean showFlightToggle = legacyLinked && entry.loaded()
                 && entry.flightToggleAvailable() && !pendingUnlink;
+        boolean showShoulderRide = legacyLinked && entry.loaded()
+                && entry.shoulderRideAvailable() && !pendingUnlink;
         boolean showRespawn = paidRevivalManaged
                 ? LinkedNpcPanelFeatureBinder.paidReviveVisible(feature)
                 : showReviveAction;
@@ -210,6 +213,14 @@ final class LinkedNpcPanelCardBinder {
                         ? "tamework.ui.linkedPanel.bonded.flight.switchToGround"
                         : "tamework.ui.linkedPanel.bonded.flight.switchToFlight")
                 : "");
+        commandBuilder.set(shoulderRideSelector + ".Visible", showShoulderRide);
+        commandBuilder.set(shoulderRideSelector + ".Text", entry.shoulderRideMounted()
+                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.shoulder.down")
+                : LocalizedText.resolve(language, "tamework.ui.linkedPanel.bonded.shoulder.toMe"));
+        commandBuilder.set(shoulderRideSelector + ".TooltipText", showShoulderRide
+                ? LocalizedText.resolve(language, entry.shoulderRideMounted()
+                ? "tamework.ui.linkedPanel.bonded.shoulder.down.tooltip"
+                : "tamework.ui.linkedPanel.bonded.shoulder.toMe.tooltip") : "");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         LinkedNpcPanelGroupTabBinder.bind(
                 commandBuilder,
@@ -383,6 +394,17 @@ final class LinkedNpcPanelCardBinder {
                     EventData.of(config.eventCommandId(),
                             CommandSelectionPageEventBinder
                                     .LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX
+                                    + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showShoulderRide) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    shoulderRideSelector,
+                    EventData.of(config.eventCommandId(),
+                            CommandSelectionPageEventBinder
+                                    .LINKED_SHOULDER_RIDE_COMMAND_PREFIX
                                     + entry.npcUuid()),
                     false
             );

@@ -49,6 +49,8 @@ public final class TwCompanionCommandSettings {
     TravelSettings travel = new TravelSettings();
     TwCompanionFlightToggleSettings flightToggle =
             new TwCompanionFlightToggleSettings();
+    TwCompanionShoulderRideSettings shoulderRide =
+            new TwCompanionShoulderRideSettings();
 
     public double getReturnHomeTeleportDistance() {
         return returnHomeTeleportDistance;
@@ -141,6 +143,19 @@ public final class TwCompanionCommandSettings {
     }
 
     @Nonnull
+    public TwCompanionShoulderRideSettings getShoulderRide() {
+        return getMutableShoulderRide().copy();
+    }
+
+    @Nonnull
+    TwCompanionShoulderRideSettings getMutableShoulderRide() {
+        if (shoulderRide == null) {
+            shoulderRide = new TwCompanionShoulderRideSettings();
+        }
+        return shoulderRide;
+    }
+
+    @Nonnull
     TwCompanionCommandSettings copy() {
         TwCompanionCommandSettings copy =
                 new TwCompanionCommandSettings();
@@ -165,6 +180,7 @@ public final class TwCompanionCommandSettings {
         copy.summon = getSummon().copy();
         copy.travel = getTravel().copy();
         copy.flightToggle = getFlightToggle().copy();
+        copy.shoulderRide = getShoulderRide().copy();
         return copy;
     }
 

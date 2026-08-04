@@ -16,6 +16,24 @@ import org.junit.jupiter.api.Test;
 /** Regression coverage for the normal linked-panel flight-toggle control. */
 class LinkedNpcPanelFlightToggleTest {
     @Test
+    void eligibleLinkedNpcShowsShoulderRideControlAndEvent() {
+        UUID npcUuid = UUID.randomUUID();
+        UICommandBuilder commands = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+
+        LinkedNpcPanelCardBinder.bind(commands, events, 0,
+                entry(npcUuid).withShoulderRide(true, false), false, false,
+                bindingConfig(), "en-US");
+
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Visible", "true");
+        assertCommand(commands, "#TameworkLinkedPanelList[0] #ShoulderRideButton.Text", "To Me");
+        assertTrue(Arrays.stream(events.getEvents()).anyMatch(event ->
+                event.type == CustomUIEventBindingType.Activating
+                        && "#TameworkLinkedPanelList[0] #ShoulderRideButton".equals(event.selector)
+                        && event.data.contains("__linked_shoulder_ride__:" + npcUuid)));
+    }
+
+    @Test
     void eligibleLinkedNpcShowsItsGroundedFlightControlAndEvent() {
         UUID npcUuid = UUID.randomUUID();
         UICommandBuilder commands = new UICommandBuilder();

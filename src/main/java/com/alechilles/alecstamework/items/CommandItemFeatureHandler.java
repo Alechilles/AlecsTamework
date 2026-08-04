@@ -418,6 +418,15 @@ public final class CommandItemFeatureHandler {
                 bondedRefreshSignals,
                 new CommandLinkedFlightToggleActionService()::toggle
         );
+        this.selectionPageService.configureShoulderRideAction(
+                new BondedCompanionShoulderRideActionService(
+                        BondedCompanionPanelActionRouter::resolvePlayerFromEvent,
+                        panelEntrySourceService.bondedReadModel() == null
+                                ? (owner, roster, profile) -> null
+                                : panelEntrySourceService.bondedReadModel()
+                                ::currentTrustedProfile)::toggle);
+        this.selectionPageService.configureLinkedShoulderRideAction(
+                new CommandLinkedShoulderRideActionService()::toggle);
         this.itemUseOrchestrator = new CommandItemUseOrchestrator(
                 resolutionService,
                 toolInventoryService,

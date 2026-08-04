@@ -7,6 +7,10 @@ public final class BondedCompanionPresentationAttributes {
             "bonded.flightToggle.available";
     public static final String FLIGHT_TOGGLE_AIRBORNE =
             "bonded.flightToggle.airborne";
+    public static final String SHOULDER_RIDE_AVAILABLE =
+            "bonded.shoulderRide.available";
+    public static final String SHOULDER_RIDE_MOUNTED =
+            "bonded.shoulderRide.mounted";
     public static final String ACTIVE_CAPACITY_COUNT =
             "bonded.activeCapacity.count";
     public static final String ACTIVE_CAPACITY_LIMIT =

@@ -120,6 +120,27 @@ final class BondedCompanionPanelLiveProfileOverlay {
         return copy(profile, profile.displayName(), updated);
     }
 
+    /** Applies the live shoulder-mount state without persisting card data. */
+    @Nonnull
+    static BondedCompanionProfileView withShoulderRide(
+            @Nonnull BondedCompanionProfileView profile,
+            @Nonnull Optional<Boolean> mounted
+    ) {
+        Map<String, String> data = profile.snapshotPresentationData();
+        Map<String, String> updated = new LinkedHashMap<>(data);
+        if (mounted.isPresent()) {
+            updated.put(BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE,
+                    "true");
+            updated.put(BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED,
+                    Boolean.toString(mounted.get()));
+        } else {
+            updated.remove(BondedCompanionPresentationAttributes.SHOULDER_RIDE_AVAILABLE);
+            updated.remove(BondedCompanionPresentationAttributes.SHOULDER_RIDE_MOUNTED);
+        }
+        return updated.equals(data) ? profile
+                : copy(profile, profile.displayName(), updated);
+    }
+
     private static BondedCompanionProfileView copy(
             BondedCompanionProfileView profile,
             @Nullable String displayName,

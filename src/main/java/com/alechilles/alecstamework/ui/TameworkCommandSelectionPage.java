@@ -89,6 +89,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> respawnCallback;
     private final LinkedNpcPanelFeatureAction rosterAbandonCallback;
     private final LinkedNpcPanelFeatureAction flightToggleCallback;
+    private LinkedNpcPanelFeatureAction shoulderRideCallback = (id, ref, store) -> { };
     private final Consumer<UUID> locateCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -436,6 +437,9 @@ public final class TameworkCommandSelectionPage
             return;
         }
         String commandId = receivedCommandId;
+        if (handleShoulderRide(commandId, ref, store)) {
+            return;
+        }
         if (handleLinkedFlightToggle(commandId, ref, store)) {
             return;
         }
@@ -785,37 +789,36 @@ public final class TameworkCommandSelectionPage
 
     private boolean handleBondedFlightToggle(
             String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
-        if (!commandId.startsWith(BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
-            return false;
-        }
-        UUID cardUuid = CommandUiIdParser.parseNpcUuid(commandId,
-                BONDED_FLIGHT_TOGGLE_COMMAND_PREFIX);
-        CommandPanelFeaturePresentation feature = cardUuid == null ? null
-                : featureController.presentation(cardUuid);
-        if (rosterEventBoundary.bondedRoster()
-                && cardUuid != null && feature != null && feature.bonded() != null
-                && "true".equalsIgnoreCase(feature.bonded().attributes().get(
-                com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes
-                        .FLIGHT_TOGGLE_AVAILABLE))) {
-            flightToggleCallback.accept(cardUuid, ref, store);
-        }
-        refreshLinkedNpcEntries();
-        refreshLifecycle.requestInteractionFeedback();
-        return true;
+        return finishAuxiliaryCommand(BondedCompanionAuxiliaryCommandHandler.handleFlight(commandId,
+                rosterEventBoundary.bondedRoster(), featureController::presentation,
+                flightToggleCallback, ref, store));
+    }
+
+    private boolean handleShoulderRide(
+            String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
+        boolean handled = BondedCompanionAuxiliaryCommandHandler.handleShoulderRide(commandId,
+                rosterEventBoundary.bondedRoster(), featureController::presentation,
+                shoulderRideCallback, ref, store)
+                || BondedCompanionAuxiliaryCommandHandler.handleLinkedShoulderRide(commandId,
+                rosterEventBoundary.bondedRoster(), this::resolveLinkedNpcEntry,
+                shoulderRideCallback, ref, store);
+        return finishAuxiliaryCommand(handled);
+    }
+
+    /** Installs the bonded shoulder action before the page is opened. */
+    public void configureShoulderRideCallback(@Nonnull LinkedNpcPanelFeatureAction callback) {
+        shoulderRideCallback = Objects.requireNonNull(callback, "callback");
     }
 
     private boolean handleLinkedFlightToggle(
             String commandId, Ref<EntityStore> ref, Store<EntityStore> store) {
-        if (!commandId.startsWith(LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX)) {
-            return false;
-        }
-        UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId,
-                LINKED_FLIGHT_TOGGLE_COMMAND_PREFIX);
-        LinkedNpcEntry entry = npcUuid == null ? null : resolveLinkedNpcEntry(npcUuid);
-        if (!rosterEventBoundary.bondedRoster() && entry != null && entry.linked()
-                && entry.loaded() && entry.flightToggleAvailable()) {
-            flightToggleCallback.accept(npcUuid, ref, store);
-        }
+        return finishAuxiliaryCommand(BondedCompanionAuxiliaryCommandHandler.handleLinkedFlight(commandId,
+                rosterEventBoundary.bondedRoster(), this::resolveLinkedNpcEntry,
+                flightToggleCallback, ref, store));
+    }
+
+    private boolean finishAuxiliaryCommand(boolean handled) {
+        if (!handled) return false;
         refreshLinkedNpcEntries();
         refreshLifecycle.requestInteractionFeedback();
         return true;
