@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int NORMAL_CARD_HEIGHT = 84;
+    private static final int NORMAL_CARD_HEIGHT = 88;
     private static final int ROSTER_CARD_HEIGHT = 126;
 
     private LinkedNpcPanelCardBinder() {

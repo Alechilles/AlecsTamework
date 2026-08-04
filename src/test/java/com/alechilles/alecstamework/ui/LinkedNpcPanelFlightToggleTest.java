@@ -72,7 +72,7 @@ class LinkedNpcPanelFlightToggleTest {
         LinkedNpcPanelCardBinder.bind(rosterCommands, new UIEventBuilder(), 0,
                 entry(UUID.randomUUID()), false, false, rosterBindingConfig(), "en-US");
 
-        assertCommand(normalCommands, "#TameworkLinkedPanelList[0].Anchor", "84");
+        assertCommand(normalCommands, "#TameworkLinkedPanelList[0].Anchor", "88");
         assertCommand(rosterCommands, "#TameworkLinkedPanelList[0].Anchor", "126");
     }
 

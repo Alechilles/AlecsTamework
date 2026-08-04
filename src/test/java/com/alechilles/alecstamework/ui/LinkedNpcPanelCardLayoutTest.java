@@ -101,7 +101,7 @@ class LinkedNpcPanelCardLayoutTest {
         );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
         assertTrue(
-                binder.contains("NORMAL_CARD_HEIGHT = 84")
+                binder.contains("NORMAL_CARD_HEIGHT = 88")
                         && binder.contains("ROSTER_CARD_HEIGHT = 126"),
                 "Normal cards should stay compact while roster rows reserve their status lane."
         );
