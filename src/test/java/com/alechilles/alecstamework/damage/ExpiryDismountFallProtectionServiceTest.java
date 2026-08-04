@@ -22,6 +22,14 @@ class ExpiryDismountFallProtectionServiceTest {
     }
 
     @Test
+    void repeated_expiry_cleanup_does_not_extend_the_original_deadline() {
+        protection.arm(player, 100_000L);
+        protection.arm(player, 130_000L);
+
+        assertFalse(protection.isProtected(player, 160_000L));
+    }
+
+    @Test
     void clearing_after_a_landing_stops_the_protection() {
         protection.arm(player, 100_000L);
         assertFalse(protection.clearWhenGrounded(player, 100_100L));

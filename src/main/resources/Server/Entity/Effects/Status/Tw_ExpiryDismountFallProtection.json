@@ -1,0 +1,8 @@
+{
+  "OverlapBehavior": "Extend",
+  "RemovalBehavior": "Duration",
+  "Infinite": false,
+  "Debuff": false,
+  "StatusEffectIcon": "Icons/ItemsGenerated/Ingredient_Feathers_Light.png",
+  "Duration": 60
+}

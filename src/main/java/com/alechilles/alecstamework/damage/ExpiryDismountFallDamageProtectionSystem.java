@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 
 /** Cancels the landing fall damage caused by an expiring companion dismount. */
 public final class ExpiryDismountFallDamageProtectionSystem
@@ -55,6 +56,8 @@ public final class ExpiryDismountFallDamageProtectionSystem
         damage.setAmount(0.0f);
         damage.setCancelled(true);
         ExpiryDismountFallProtectionService.getInstance().clear(uuid.getUuid());
+        TameworkEntityEffectService.removeEffect(target,
+                ExpiryDismountFallProtectionService.EFFECT_ID, commandBuffer);
     }
 
     private static boolean isFallDamage(Damage damage) {

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.damage;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 
 /**
@@ -10,6 +11,7 @@ import javax.annotation.Nonnull;
  */
 public final class ExpiryDismountFallProtectionService {
     public static final long MAXIMUM_PROTECTION_MS = 60_000L;
+    public static final String EFFECT_ID = "Tw_ExpiryDismountFallProtection";
     private static final long FIRST_LANDING_ELIGIBLE_DELAY_MS = 250L;
     private static final ExpiryDismountFallProtectionService INSTANCE =
             new ExpiryDismountFallProtectionService();
@@ -22,9 +24,17 @@ public final class ExpiryDismountFallProtectionService {
         return INSTANCE;
     }
 
-    public void arm(@Nonnull UUID playerUuid, long nowMs) {
-        protections.put(playerUuid, new Protection(
-                nowMs, nowMs + MAXIMUM_PROTECTION_MS));
+    /** Arms one expiry-dismount protection without extending a current window. */
+    public boolean arm(@Nonnull UUID playerUuid, long nowMs) {
+        AtomicBoolean armed = new AtomicBoolean();
+        protections.compute(playerUuid, (ignored, current) -> {
+            if (current != null && nowMs < current.expiresAtMs()) {
+                return current;
+            }
+            armed.set(true);
+            return new Protection(nowMs, nowMs + MAXIMUM_PROTECTION_MS);
+        });
+        return armed.get();
     }
 
     public boolean isProtected(@Nonnull UUID playerUuid, long nowMs) {
