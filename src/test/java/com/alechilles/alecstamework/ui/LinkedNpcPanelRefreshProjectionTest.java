@@ -51,6 +51,33 @@ class LinkedNpcPanelRefreshProjectionTest {
     }
 
     @Test
+    void countdownsUseLegacyRecallRemainingMs() {
+        assertEquals(3_500L, LinkedNpcPanelCountdowns.shortest(
+                Map.of(), new LinkedNpcEntry[] {legacyEntry(
+                        false, -1L, false, 0L, false, 0L, true, 3_500L
+                )}
+        ));
+    }
+
+    @Test
+    void countdownsUseLegacyRespawnRemainingMs() {
+        assertEquals(8_000L, LinkedNpcPanelCountdowns.shortest(
+                Map.of(), new LinkedNpcEntry[] {legacyEntry(
+                        true, 8_000L, false, 0L, false, 0L, false, 0L
+                )}
+        ));
+    }
+
+    @Test
+    void countdownsUseLegacyBreedingAndHarvestCooldowns() {
+        assertEquals(4_000L, LinkedNpcPanelCountdowns.shortest(
+                Map.of(), new LinkedNpcEntry[] {legacyEntry(
+                        false, -1L, true, 9_000L, true, 4_000L, false, 0L
+                )}
+        ));
+    }
+
+    @Test
     void projectionPreservesCurrentNonProgressionStateAndClassifiesDynamicAndFullChanges() {
         UUID id = UUID.randomUUID();
         LinkedNpcEntry[] entries = {entry(id)};
@@ -123,5 +150,29 @@ class LinkedNpcPanelRefreshProjectionTest {
         return new LinkedNpcEntry(id, "Wyatt", 100, 100, 0, 0, "", 0, 0,
                 0, 0, true, false, false, false, false, false, 0L,
                 LinkedNpcTraitIndicator.EMPTY);
+    }
+
+    private static LinkedNpcEntry legacyEntry(
+            boolean dead,
+            long respawnRemainingMs,
+            boolean breedingCooldownActive,
+            long breedingCooldownRemainingMs,
+            boolean harvestCooldownActive,
+            long harvestCooldownRemainingMs,
+            boolean recallPending,
+            long recallRemainingMs
+    ) {
+        return new LinkedNpcEntry(
+                UUID.randomUUID(), "Wyatt", null,
+                dead ? 0 : 100, 100, 50, 100, 50, "",
+                50, 100, 50, 100,
+                !recallPending, false, dead, false, false, false,
+                respawnRemainingMs, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                "species", "Species", null, null, null,
+                true, true, breedingCooldownActive, breedingCooldownRemainingMs,
+                0.5, true, harvestCooldownActive, harvestCooldownRemainingMs,
+                0.5, true, recallPending, recallRemainingMs
+        );
     }
 }

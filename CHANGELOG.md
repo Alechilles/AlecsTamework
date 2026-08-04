@@ -118,6 +118,10 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed normal linked panels requiring a close and reopen to show changing
+  health, needs, progression, revival, and countdown state. Live values now
+  refresh on a coalesced five-second cycle, while visible short countdowns and
+  post-revive state use faster targeted refreshes.
 - Fixed mods that declare `Alechilles:Patchwork` as a required dependency
   failing to load when Tamework was their only Patchwork provider. Tamework
   now exposes its bundled Patchwork plugin identity to the loader.

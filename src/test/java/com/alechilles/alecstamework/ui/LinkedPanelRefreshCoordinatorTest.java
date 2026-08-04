@@ -192,6 +192,39 @@ class LinkedPanelRefreshCoordinatorTest {
     }
 
     @Test
+    void enabledProgressionPollingRepeatsEveryFiveSeconds() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(
+                true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS
+        );
+
+        fixture.coordinator.start(true);
+
+        assertEquals(List.of(30_000L, 5_000L), fixture.scheduler.delays());
+        fixture.clock.set(5_000L);
+        fixture.scheduler.runDue();
+        assertEquals(List.of(true), progressionEligibility(fixture));
+
+        fixture.completeLatest(true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+        assertEquals(List.of(30_000L, 5_000L, 5_000L), fixture.scheduler.delays());
+    }
+
+    @Test
+    void progressionPollingRetriesFiveSecondsAfterAnUnsuccessfulRefresh() {
+        Fixture fixture = new Fixture();
+        fixture.coordinator.seedInitialRender(
+                true, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS
+        );
+        fixture.coordinator.start(true);
+        fixture.clock.set(5_000L);
+        fixture.scheduler.runDue();
+
+        fixture.completeLatest(false, LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS);
+
+        assertEquals(List.of(30_000L, 5_000L, 5_000L), fixture.scheduler.delays());
+    }
+
+    @Test
     void closeInvalidatesEveryQueuedReason() {
         Fixture fixture = new Fixture();
         fixture.coordinator.request(LinkedPanelRefreshSignal.Kind.IMMEDIATE);

@@ -15,11 +15,43 @@ final class LinkedNpcPanelCountdowns {
      * no-countdown sentinel when none is visible.
      */
     static long shortest(Map<java.util.UUID, CommandPanelFeaturePresentation> rows) {
+        return shortest(rows, null);
+    }
+
+    /**
+     * Includes legacy linked-entry countdowns alongside feature-managed rows.
+     */
+    static long shortest(Map<java.util.UUID, CommandPanelFeaturePresentation> rows,
+                         LinkedNpcEntry[] entries) {
         long result = LinkedPanelRefreshCoordinator.NO_COUNTDOWN_REMAINING_MS;
         for (CommandPanelFeaturePresentation row : rows.values()) {
             result = shortestBondedCountdown(result, row.bonded());
             result = shortestRevivalCountdown(result, row.revival());
             result = shortestRosterCountdown(result, row.roster());
+        }
+        if (entries != null) {
+            for (LinkedNpcEntry entry : entries) {
+                result = shortestLegacyCountdown(result, entry);
+            }
+        }
+        return result;
+    }
+
+    private static long shortestLegacyCountdown(long current, LinkedNpcEntry entry) {
+        if (entry == null) {
+            return current;
+        }
+        long result = entry.dead() && entry.deadRespawnRemainingMs() >= 0L
+                ? addVisible(current, entry.deadRespawnRemainingMs()) : current;
+        if (entry.recallPending() && !entry.loaded() && !entry.dead()
+                && !entry.captured() && !entry.inCoop() && !entry.lost()) {
+            result = addVisible(result, entry.recallLostRemainingMs());
+        }
+        if (entry.breedingCooldownKnown() && entry.breedingCooldownActive()) {
+            result = addVisible(result, entry.breedingCooldownRemainingMs());
+        }
+        if (entry.harvestCooldownKnown() && entry.harvestCooldownActive()) {
+            result = addVisible(result, entry.harvestCooldownRemainingMs());
         }
         return result;
     }

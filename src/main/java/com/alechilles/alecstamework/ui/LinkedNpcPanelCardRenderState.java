@@ -49,6 +49,11 @@ final class LinkedNpcPanelCardRenderState {
         // its matching bonded presentation before that stale generic row can
         // force a full-card bind.
         if (onlyDynamicBondedChange(previous, current)) return Update.DYNAMIC;
+        if (Objects.equals(previous, current)
+                && LinkedNpcPanelCardDynamicState.changedOnlyByLiveFields(
+                        previousEntry, currentEntry)) {
+            return Update.DYNAMIC;
+        }
         if (!Objects.equals(previousEntry, currentEntry)) return Update.FULL;
         if (Objects.equals(previous, current)) return Update.NONE;
         return Update.FULL;
@@ -65,6 +70,8 @@ final class LinkedNpcPanelCardRenderState {
     }
 
     CommandPanelFeaturePresentation presentation(UUID npcUuid) { return features.get(npcUuid); }
+
+    LinkedNpcEntry entryAt(int index) { return entries[index]; }
 
 
     private static boolean pending(LinkedNpcEntry entry, UUID pendingUuid) {

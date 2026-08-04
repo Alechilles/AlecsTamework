@@ -26,6 +26,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     private final Consumer<RenderPermit> refreshCallback;
 
     private boolean closed;
+    private boolean progressionPollingEnabled;
     private boolean progressionRendered;
     private long lastProgressionRenderMs;
     private long outstandingProgressionPermitId;
@@ -64,8 +65,21 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
      * Starts the recurring safety wake.
      */
     public synchronized void start() {
+        start(false);
+    }
+
+    /**
+     * Starts the recurring safety wake and optionally polls live progression values.
+     *
+     * @param progressionPollingEnabled whether to refresh live values every progression interval
+     */
+    public synchronized void start(boolean progressionPollingEnabled) {
         if (!closed) {
+            this.progressionPollingEnabled = progressionPollingEnabled;
             scheduleSafety();
+            if (progressionPollingEnabled) {
+                scheduleProgression();
+            }
         }
     }
 
@@ -146,6 +160,10 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
         if (ownsProgressionPermit) {
             outstandingProgressionPermitId = 0L;
         }
+        if (progressionPollingEnabled && ownsProgressionPermit && !progressionIncluded) {
+            progressionRendered = true;
+            lastProgressionRenderMs = clock.getAsLong();
+        }
         if (progressionIncluded) {
             progressionRendered = true;
             lastProgressionRenderMs = clock.getAsLong();
@@ -156,6 +174,9 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
             progressionDirty = false;
             scheduleProgression();
         }
+        if (progressionPollingEnabled && ownsProgressionPermit) {
+            scheduleProgression();
+        }
     }
 
     /**
@@ -164,6 +185,7 @@ public final class LinkedPanelRefreshCoordinator implements AutoCloseable {
     @Override
     public synchronized void close() {
         closed = true;
+        progressionPollingEnabled = false;
         outstandingProgressionPermitId = 0L;
         progressionDirty = false;
         invalidateImmediate();

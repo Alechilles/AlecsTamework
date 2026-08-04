@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.api.BondedCompanionPresentationAttributes;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
@@ -402,7 +401,8 @@ public final class TameworkCommandSelectionPage
             CommandSelectionPageEventBinder.bindClose(eventBuilder);
             seedRefreshValues();
             refreshTransaction.seedOverlayRevisions(groupAssignOverlay.revision(), featureController.reviveOverlayRevision());
-            refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs());
+            refreshLifecycle.start(true, shortestVisibleCountdownRemainingMs(),
+                    !rosterEventBoundary.bondedRoster());
         } catch (Throwable throwable) {
             dismissed = true;
             clearLinkedPanelOwner();
@@ -719,7 +719,7 @@ public final class TameworkCommandSelectionPage
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
+                refreshLifecycle.requestInteractionFeedback();
             }
             return;
         }
@@ -1022,24 +1022,12 @@ public final class TameworkCommandSelectionPage
                     UUID npcUuid = linkedNpcEntries[i].npcUuid();
                     CommandPanelFeaturePresentation current =
                             featurePresentations.get(npcUuid);
-                    BondedCompanionCardPresenter.refreshDynamicState(
-                            commandBuilder, "#TameworkLinkedPanelList[" + i + "]",
-                            current.bonded(), resolveLanguage());
-                    BondedCompanionCardPresenter.refreshProgressionState(commandBuilder,
-                            "#TameworkLinkedPanelList[" + i + "]", current.bonded(),
-                            isPendingUnlink(npcUuid), resolveLanguage());
-                    CommandPanelFeaturePresentation previous =
-                            cardRenderState.presentation(npcUuid);
-                    String flightModeAttribute = BondedCompanionPresentationAttributes
-                            .FLIGHT_TOGGLE_AIRBORNE;
-                    if (!Objects.equals(previous.bonded().attributes().get(
-                                    flightModeAttribute),
-                            current.bonded().attributes().get(flightModeAttribute))) {
-                        BondedCompanionCardPresenter.bindFlightToggleEvents(
-                                eventBuilder,
-                                "#TameworkLinkedPanelList[" + i + "]", npcUuid,
-                                current.bonded(), cardBindingConfig);
-                    }
+                    String selector = "#TameworkLinkedPanelList[" + i + "]";
+                    LinkedNpcPanelCardDynamicPresenter.refresh(
+                            commandBuilder, eventBuilder, selector, npcUuid,
+                            cardRenderState.entryAt(i), linkedNpcEntries[i],
+                            cardRenderState.presentation(npcUuid), current,
+                            isPendingUnlink(npcUuid), cardBindingConfig, resolveLanguage());
                 }
             }
         }
@@ -1052,7 +1040,9 @@ public final class TameworkCommandSelectionPage
         return LinkedNpcPanelRefreshOutcome.sent(progressionEligible, shortestVisibleCountdownRemainingMs());
     }
     private long shortestVisibleCountdownRemainingMs() {
-        return LinkedNpcPanelCountdowns.shortest(featureController.presentations());
+        return LinkedNpcPanelCountdowns.shortest(
+                featureController.presentations(), linkedNpcEntries
+        );
     }
 
     /** Seeds chrome deduplication from the initial page packet. */

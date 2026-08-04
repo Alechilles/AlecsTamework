@@ -21,6 +21,11 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
     }
 
     synchronized void start(boolean progressionIncluded, long shortestCountdownRemainingMs) {
+        start(progressionIncluded, shortestCountdownRemainingMs, false);
+    }
+
+    synchronized void start(boolean progressionIncluded, long shortestCountdownRemainingMs,
+                            boolean progressionPollingEnabled) {
         if (closed || subscription != null) return;
         coordinator.seedInitialRender(progressionIncluded, shortestCountdownRemainingMs);
         AutoCloseable created;
@@ -36,7 +41,7 @@ final class LinkedNpcPanelRefreshLifecycle implements AutoCloseable {
             return;
         }
         subscription = created;
-        coordinator.start();
+        coordinator.start(progressionPollingEnabled);
         // Cache subscriptions observe only future publications. Re-evaluate once after the
         // subscription is installed so a cold load which completed during the initial build
         // is not left on its loading presentation until the safety wake.

@@ -173,6 +173,72 @@ class TameworkCommandSelectionPageRefreshTest {
     }
 
     @Test
+    void legacyReviveRetriesRefreshAfterTheNpcHookHasTimeToSettle() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(feature(4, false)), new NavigationFixture(),
+                genericConfig());
+        invoke(page, "refreshLinkedNpcEntries");
+        AtomicReference<UUID> revived = new AtomicReference<>();
+        replaceField(page, "respawnCallback", (Consumer<UUID>) revived::set);
+        RecordingScheduler scheduler = new RecordingScheduler();
+        AtomicInteger refreshes = new AtomicInteger();
+        replaceRefreshLifecycle(page,
+                new LinkedNpcPanelRefreshLifecycle(LinkedPanelRefreshSignalSource.none(),
+                        new LinkedPanelRefreshCoordinator(() -> 10_000L, scheduler,
+                                ignored -> refreshes.incrementAndGet())));
+
+        event(page, "__respawn__:" + CARD);
+
+        assertEquals(CARD, revived.get());
+        assertEquals(List.of(500L, 1_500L), scheduler.delays);
+        scheduler.runAll();
+        assertEquals(2, refreshes.get());
+    }
+
+    @Test
+    void legacyRecallCountdownRefreshDoesNotRebindCardEvents() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicReference<List<LinkedNpcEntry>> entries =
+                new AtomicReference<>(List.of(recallEntry(3_500L)));
+        TameworkCommandSelectionPage page = page(packets,
+                new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) entries::get);
+        build(page);
+
+        entries.set(List.of(recallEntry(2_500L)));
+        refresh(page, false);
+
+        CapturedUpdate update = packets.updates.getFirst();
+        assertCommand(update, "#TameworkLinkedPanelList[0] #RecallCountdown.Text");
+        assertEquals(0, update.events.getEvents().length);
+        assertEquals(1, update.commands.getCommands().length);
+    }
+
+    @Test
+    void dynamicTalentRefreshKeepsUnlinkConfirmationHidden() throws Exception {
+        CapturedPackets packets = new CapturedPackets();
+        AtomicReference<List<LinkedNpcEntry>> entries =
+                new AtomicReference<>(List.of(talentEntry(1)));
+        TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(),
+                new NavigationFixture(), legacyConfig());
+        replaceField(page, "linkedNpcBaseEntriesSupplier",
+                (Supplier<List<LinkedNpcEntry>>) entries::get);
+        replaceField(page, "pendingUnlinkNpcUuid", CARD);
+        build(page);
+
+        entries.set(List.of(talentEntry(2)));
+        refresh(page, false);
+
+        CapturedUpdate update = packets.updates.getFirst();
+        assertCommand(update, "#TameworkLinkedPanelList[0] #TalentPointAction.Visible",
+                "false");
+        assertEquals(0, update.events.getEvents().length);
+    }
+
+    @Test
     void dismissClosesLifecycleAndFencesStaleRefresh() throws Exception {
         CapturedPackets packets = new CapturedPackets(); NavigationFixture fixture = new NavigationFixture();
         TameworkCommandSelectionPage page = page(packets, new AtomicReference<>(feature(4, false)), fixture, genericConfig());
@@ -257,7 +323,8 @@ class TameworkCommandSelectionPageRefreshTest {
             put(player, "uuid", owner); put(player, "username", "PageRefreshTester"); put(player, "language", "en-US");
             Consumer<UUID> noUuid = value -> { }; Consumer<String> noString = value -> { }; BiConsumer<UUID, String> noGroup = (a, b) -> { };
             return new TameworkCommandSelectionPage(player, commandConfig, null, true,
-                    () -> List.of(ENTRY), () -> List.of(ENTRY), () -> Map.of(CARD, feature.get()), () -> null,
+                    () -> List.of(ENTRY), () -> List.of(ENTRY), () -> feature.get() == null
+                            ? Map.of() : Map.of(CARD, feature.get()), () -> null,
                     () -> "LinkedMode", () -> false, () -> "16", () -> "Default", () -> "None", () -> "", activationEntries, () -> "", List::of, value -> true, true,
                     noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, noUuid, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, (a,b,c)->{}, noUuid, noUuid, noUuid, noUuid, fixture::talent, noString, value->{}, ()->{}, ()->{}, fixture::groups, noString, noString, noString, ()->{}, noString, noGroup, noString, fixture.source);
         }
@@ -301,12 +368,37 @@ class TameworkCommandSelectionPageRefreshTest {
     private static void replaceRefreshLifecycle(TameworkCommandSelectionPage page,
                                                 LinkedNpcPanelRefreshLifecycle lifecycle)
             throws Exception {
-        Field field = TameworkCommandSelectionPage.class.getDeclaredField("refreshLifecycle");
+        replaceField(page, "refreshLifecycle", lifecycle);
+    }
+    private static void replaceField(TameworkCommandSelectionPage page, String name, Object value)
+            throws Exception {
+        Field field = TameworkCommandSelectionPage.class.getDeclaredField(name);
         field.setAccessible(true);
-        unsafe().putObject(page, unsafe().objectFieldOffset(field), lifecycle);
+        unsafe().putObject(page, unsafe().objectFieldOffset(field), value);
     }
     private static TwCommandItemConfig config() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"BondedCompanions\",\"BondedRosterId\":\"test:roster\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
     private static TwCommandItemConfig genericConfig() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"RosterStorage\":\"OwnerCommandFamily\",\"CommandFamilyId\":\"test:family\",\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
+    private static TwCommandItemConfig legacyConfig() { return TwCommandItemConfig.CODEC.decode(BsonDocument.parse("{\"CommandList\":[]}"), new com.hypixel.hytale.codec.ExtraInfo()); }
+    private static LinkedNpcEntry recallEntry(long remainingMs) {
+        return new LinkedNpcEntry(
+                CARD, "Nimbus", null, 100, 100, 50, 100, 50, "",
+                50, 100, 50, 100, false, false, false, false, false, false,
+                -1L, null, null, null, LinkedNpcTraitIndicator.EMPTY,
+                false, false, false, false, true, true,
+                "species", "Species", null, null, null,
+                false, false, false, 0L, 0.0, false,
+                false, 0L, 0.0, false, true, remainingMs
+        );
+    }
+    private static LinkedNpcEntry talentEntry(int availablePoints) {
+        return new LinkedNpcEntry(
+                CARD, "Nimbus", 100, 100, 50, 100, "",
+                50, 100, 50, 100, true, false, false, false, false, false,
+                -1L, null,
+                new LinkedNpcEntry.FutureStat("Talent Points", availablePoints, 99),
+                LinkedNpcTraitIndicator.EMPTY, false, false, true, true
+        );
+    }
     private static CommandPanelFeaturePresentation feature(int level, boolean available) {
         return feature(level, available, false);
     }
@@ -327,6 +419,11 @@ class TameworkCommandSelectionPageRefreshTest {
                                 true, null, 0L), null));
     }
     private static void assertCommand(CapturedUpdate update, String selector) { assertTrue(java.util.Arrays.stream(update.commands.getCommands()).anyMatch(command -> selector.equals(command.selector))); }
+    private static void assertCommand(CapturedUpdate update, String selector, String expected) {
+        assertTrue(java.util.Arrays.stream(update.commands.getCommands())
+                .anyMatch(command -> selector.equals(command.selector)
+                        && command.data.contains(expected)));
+    }
     private static void put(Object target, String name, Object value) throws Exception { Field field = PlayerRef.class.getDeclaredField(name); field.setAccessible(true); unsafe().putObject(target, unsafe().objectFieldOffset(field), value); }
     private static Unsafe unsafe() throws Exception { Field field = Unsafe.class.getDeclaredField("theUnsafe"); field.setAccessible(true); return (Unsafe) field.get(null); }
     private static final class CapturedPackets { private final List<CapturedUpdate> updates = new ArrayList<>(); private boolean fail; private int attempts; private void capture(UICommandBuilder commands, UIEventBuilder events) { attempts++; if (fail) throw new IllegalStateException("synthetic send failure"); updates.add(new CapturedUpdate(commands, events)); } }
