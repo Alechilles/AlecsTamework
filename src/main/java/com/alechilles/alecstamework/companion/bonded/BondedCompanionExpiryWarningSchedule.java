@@ -17,10 +17,16 @@ public final class BondedCompanionExpiryWarningSchedule {
             return Optional.empty();
         }
 
-        int secondsRemaining = (int) Math.floorDiv(expiresAtMs - nowMs, 1_000L);
-        return switch (secondsRemaining) {
-            case 60, 30, 10 -> Optional.of(new Warning(secondsRemaining, NotificationStyle.Warning));
-            case 5, 4, 3, 2, 1 -> Optional.of(new Warning(secondsRemaining, NotificationStyle.Danger));
+        long secondsRemaining = Math.floorDiv(expiresAtMs - nowMs, 1_000L);
+        if (secondsRemaining > 60L) {
+            return Optional.empty();
+        }
+        int remainingSeconds = (int) secondsRemaining;
+        return switch (remainingSeconds) {
+            case 60, 30, 10 -> Optional.of(new Warning(
+                    remainingSeconds, NotificationStyle.Warning));
+            case 5, 4, 3, 2, 1 -> Optional.of(new Warning(
+                    remainingSeconds, NotificationStyle.Danger));
             default -> Optional.empty();
         };
     }

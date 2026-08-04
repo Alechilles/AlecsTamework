@@ -32,5 +32,7 @@ class BondedCompanionExpiryWarningScheduleTest {
         assertTrue(BondedCompanionExpiryWarningSchedule.warning(106_000L, 100_000L).isEmpty());
         assertEquals(10, BondedCompanionExpiryWarningSchedule.warning(110_999L, 100_000L)
                 .orElseThrow().secondsRemaining());
+        assertTrue(BondedCompanionExpiryWarningSchedule.warning(
+                Long.MAX_VALUE, 100_000L).isEmpty());
     }
 }

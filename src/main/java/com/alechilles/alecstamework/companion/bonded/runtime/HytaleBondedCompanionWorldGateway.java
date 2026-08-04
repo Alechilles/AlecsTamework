@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.companion.bonded.runtime;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightSnapshotRoleResolver;
+import com.alechilles.alecstamework.damage.ExpiryDismountFallProtectionService;
 import com.alechilles.alecstamework.companion.bonded
         .BondedCompanionProjectionCleanupService;
 import com.alechilles.alecstamework.companion.bonded
@@ -19,6 +20,8 @@ import com.alechilles.alecstamework.items.persistence
         .TameworkFullStateSnapshotReader;
 import com.alechilles.alecstamework.npc.components
         .TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -27,6 +30,7 @@ import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -289,8 +293,58 @@ public final class HytaleBondedCompanionWorldGateway implements
                         .IDENTITY_MISMATCH;
             }
         }
+        armExpiryDismountProtection(world, store, reference, intent);
         store.removeEntity(reference, RemoveReason.REMOVE);
         return BondedCompanionProjectionCleanupService.Outcome.REMOVED;
+    }
+
+    private void armExpiryDismountProtection(
+            World world,
+            Store<EntityStore> store,
+            Ref<EntityStore> companionRef,
+            BondedCompanionProjectionCleanupService.CleanupIntent intent
+    ) {
+        if (!"LEASE_EXPIRED".equals(intent.reason())) return;
+        UUID riderUuid = riderUuid(store, companionRef);
+        if (riderUuid == null) return;
+        Ref<EntityStore> riderRef = world.getEntityRef(riderUuid);
+        if (riderRef == null || !riderRef.isValid()
+                || store.getComponent(riderRef, Player.getComponentType()) == null) {
+            return;
+        }
+        ExpiryDismountFallProtectionService.getInstance().arm(
+                riderUuid, System.currentTimeMillis());
+    }
+
+    @Nullable
+    private UUID riderUuid(
+            Store<EntityStore> store, Ref<EntityStore> companionRef
+    ) {
+        String rawUuid = null;
+        ComponentType<EntityStore, TameworkRideMountComponent> rideMountType =
+                TameworkRideMountComponent.getComponentType();
+        if (rideMountType != null) {
+            TameworkRideMountComponent rideMount = store.getComponent(
+                    companionRef, rideMountType);
+            rawUuid = rideMount == null ? null : rideMount.getRiderUuid();
+        }
+        if (rawUuid == null || rawUuid.isBlank()) {
+            ComponentType<EntityStore, TameworkMountedGlideComponent>
+                    mountedGlideType = TameworkMountedGlideComponent
+                            .getComponentType();
+            if (mountedGlideType != null) {
+                TameworkMountedGlideComponent mountedGlide = store.getComponent(
+                        companionRef, mountedGlideType);
+                rawUuid = mountedGlide == null
+                        ? null : mountedGlide.getRiderUuid();
+            }
+        }
+        if (rawUuid == null || rawUuid.isBlank()) return null;
+        try {
+            return UUID.fromString(rawUuid);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private BondedCompanionLocalProjectionLifecycle.WorldObservation

@@ -77,6 +77,8 @@ import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
 import com.alechilles.alecstamework.damage.RespawnFallDamageGraceSystem;
+import com.alechilles.alecstamework.damage.ExpiryDismountFallDamageProtectionSystem;
+import com.alechilles.alecstamework.damage.ExpiryDismountLandingProtectionSystem;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
@@ -167,6 +169,8 @@ import com.alechilles.alecstamework.persistence.runtime.PersistenceBootstrap;
 import com.alechilles.alecstamework.persistence.diagnostics
         .PersistenceDiagnosticExporter;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.companion.bonded.runtime
+        .BondedCompanionExpiryWarningSystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
         .BondedCompanionMaintenanceSystem;
 import com.alechilles.alecstamework.companion.bonded.runtime
@@ -917,6 +921,11 @@ public class Tamework extends JavaPlugin {
                 )
         );
         getEntityStoreRegistry().registerSystem(
+                new BondedCompanionExpiryWarningSystem(
+                        bondedCompanionComposition
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
                 new BondedCompanionDeathSystem(
                         bondedCompanionComposition,
                         projectionIdentityComponentType,
@@ -1055,6 +1064,10 @@ public class Tamework extends JavaPlugin {
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
         getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
+        getEntityStoreRegistry().registerSystem(
+                new ExpiryDismountFallDamageProtectionSystem());
+        getEntityStoreRegistry().registerSystem(
+                new ExpiryDismountLandingProtectionSystem());
         getEntityStoreRegistry().registerSystem(new OwnerDamageFilterSystem(getLogger(), damagePolicy));
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
         getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());

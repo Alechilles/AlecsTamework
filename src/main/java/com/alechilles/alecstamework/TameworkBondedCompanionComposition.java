@@ -55,6 +55,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -366,6 +367,14 @@ public final class TameworkBondedCompanionComposition implements AutoCloseable {
                 BondedCompanionProjectionService.RecoveryCause.MISSING_SCAN,
                 now);
         databaseMaintenance(now);
+    }
+
+    /** Returns the bounded set of active leases currently recorded in one world. */
+    @Nonnull
+    public List<BondedCompanionProjectionValidator.LeaseExpectation>
+    activeLeasesInWorld(@Nonnull String worldKey, int maximumResults) {
+        if (!operational() || maximumResults < 1) return List.of();
+        return durability.inWorldAfter(worldKey, null, maximumResults);
     }
 
     /** Runs bounded database retention work without consulting any world. */
