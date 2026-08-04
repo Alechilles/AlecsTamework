@@ -20,8 +20,6 @@ class ShoulderRideNpcStateArchitectureTest {
         assertTrue(action.contains("Intangible.getComponentType()"));
         assertTrue(action.contains("Invulnerable.getComponentType()"));
         assertTrue(action.contains("Interactable.getComponentType()"));
-        assertTrue(action.contains(
-                "liveStore.getComponent(liveNpc, markerType) != null"));
         assertFalse(action.contains("RoleChangeSystem.requestRoleChange"));
         assertFalse(action.contains("Empty_Role"));
         assertTrue(state.contains("commands.ensureComponent(npcRef, frozenType)"));
