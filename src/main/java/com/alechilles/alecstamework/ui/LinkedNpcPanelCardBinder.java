@@ -12,7 +12,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
  */
 final class LinkedNpcPanelCardBinder {
-    private static final int COMPACT_CARD_HEIGHT = 126;
+    private static final int NORMAL_CARD_HEIGHT = 84;
+    private static final int ROSTER_CARD_HEIGHT = 126;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -216,7 +217,8 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
+        commandBuilder.setObject(entrySelector + ".Anchor",
+                buildCardAnchor(managedRoster));
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         LinkedNpcPanelProgressionBinder.bindXpProgressRing(
                 commandBuilder,
@@ -403,12 +405,13 @@ final class LinkedNpcPanelCardBinder {
         }
     }
 
-    private static Anchor buildCardAnchor() {
+    private static Anchor buildCardAnchor(boolean managedRoster) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(COMPACT_CARD_HEIGHT));
+        anchor.setHeight(Value.of(managedRoster
+                ? ROSTER_CARD_HEIGHT : NORMAL_CARD_HEIGHT));
         return anchor;
     }
 

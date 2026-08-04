@@ -62,6 +62,20 @@ class LinkedNpcPanelFlightToggleTest {
         assertTrue(asset.contains("Tamework/LinkedPanelIcons/FlightMode_Airborne.png"));
     }
 
+    @Test
+    void normalCardsStayCompactWhileOwnerRosterCardsKeepTheirDetailsLane() {
+        UICommandBuilder normalCommands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(normalCommands, new UIEventBuilder(), 0,
+                entry(UUID.randomUUID()), false, false, bindingConfig(), "en-US");
+
+        UICommandBuilder rosterCommands = new UICommandBuilder();
+        LinkedNpcPanelCardBinder.bind(rosterCommands, new UIEventBuilder(), 0,
+                entry(UUID.randomUUID()), false, false, rosterBindingConfig(), "en-US");
+
+        assertCommand(normalCommands, "#TameworkLinkedPanelList[0].Anchor", "84");
+        assertCommand(rosterCommands, "#TameworkLinkedPanelList[0].Anchor", "126");
+    }
+
     private static LinkedNpcEntry entry(UUID npcUuid) {
         return new LinkedNpcEntry(npcUuid, "Nimbus", 100, 100, 0, 0,
                 "", 0, 0, 0, 0, true, false, false, false, false,
@@ -74,6 +88,14 @@ class LinkedNpcPanelFlightToggleTest {
                 "active:", "breed:", "release:", "cull:", "respawn:",
                 "summon:", "dismiss:", "locate:", "recall:", "home:",
                 "return:", "talents:", true, false);
+    }
+
+    private static LinkedNpcPanelCardBinder.CardBindingConfig rosterBindingConfig() {
+        return new LinkedNpcPanelCardBinder.CardBindingConfig(
+                "card.ui", "Command", "link:", "unlink:", "group:",
+                "active:", "breed:", "release:", "cull:", "respawn:",
+                "summon:", "dismiss:", "locate:", "recall:", "home:",
+                "return:", "talents:", true, true);
     }
 
     private static void assertCommand(UICommandBuilder commands, String selector,

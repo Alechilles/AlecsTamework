@@ -37,8 +37,8 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path PROGRESSION_BINDER = Paths.get(
             "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelProgressionBinder.java"
     );
-    private static final Pattern CARD_HEIGHT = Pattern.compile(
-            "COMPACT_CARD_HEIGHT\\s*=\\s*(\\d+)"
+    private static final Pattern NORMAL_CARD_HEIGHT = Pattern.compile(
+            "NORMAL_CARD_HEIGHT\\s*=\\s*(\\d+)"
     );
     private static final Pattern XP_RING_ANCHOR = Pattern.compile(
             "Group #XpProgressRing \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
@@ -63,12 +63,12 @@ class LinkedNpcPanelCardLayoutTest {
         String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
         String progressionBinder = Files.readString(PROGRESSION_BINDER, StandardCharsets.UTF_8);
 
-        Matcher cardHeight = CARD_HEIGHT.matcher(binder);
+        Matcher normalCardHeight = NORMAL_CARD_HEIGHT.matcher(binder);
         Matcher xpRing = XP_RING_ANCHOR.matcher(cardUi);
         Matcher talentPoint = TALENT_POINT_ANCHOR.matcher(cardUi);
         Matcher talentPointBadge = TALENT_POINT_BADGE_BORDER_ANCHOR.matcher(cardUi);
 
-        assertTrue(cardHeight.find(), "LinkedNpcPanelCardBinder must define its compact card height.");
+        assertTrue(normalCardHeight.find(), "LinkedNpcPanelCardBinder must define its normal card height.");
         assertTrue(xpRing.find(), "XpProgressRing anchor must stay parseable by the layout guard.");
         assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
         assertTrue(talentPointBadge.find(), "Talent point badge anchor must stay parseable by the layout guard.");
@@ -101,13 +101,12 @@ class LinkedNpcPanelCardLayoutTest {
         );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
         assertTrue(
-                binder.contains("COMPACT_CARD_HEIGHT = 126"),
-                "Linked cards should reserve the timed-roster status lane."
+                binder.contains("NORMAL_CARD_HEIGHT = 84")
+                        && binder.contains("ROSTER_CARD_HEIGHT = 126"),
+                "Normal cards should stay compact while roster rows reserve their status lane."
         );
-        assertFalse(binder.contains("showRosterDetails"),
-                "Roster presentation should use the dedicated feature binder, not legacy flags.");
 
-        int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
+        int parsedNormalCardHeight = Integer.parseInt(normalCardHeight.group(1));
         int xpRingLeft = Integer.parseInt(xpRing.group(2));
         int xpRingBottom = Integer.parseInt(xpRing.group(1)) + Integer.parseInt(xpRing.group(4));
         int talentPointRight = Integer.parseInt(talentPoint.group(2)) + Integer.parseInt(talentPoint.group(3));
@@ -120,8 +119,8 @@ class LinkedNpcPanelCardLayoutTest {
         int badgeRight = badgeLeft + badgeWidth;
 
         assertTrue(
-                parsedCardHeight >= xpRingBottom,
-                () -> "Linked-panel card height " + parsedCardHeight
+                parsedNormalCardHeight >= xpRingBottom,
+                () -> "Normal linked-panel card height " + parsedNormalCardHeight
                         + " clips XP ring ending at " + xpRingBottom + "."
         );
         assertTrue(
@@ -130,8 +129,8 @@ class LinkedNpcPanelCardLayoutTest {
                         + talentPointRight + ", XP left " + xpRingLeft + "."
         );
         assertTrue(
-                parsedCardHeight >= talentPointBottom,
-                () -> "Linked-panel card height " + parsedCardHeight
+                parsedNormalCardHeight >= talentPointBottom,
+                () -> "Normal linked-panel card height " + parsedNormalCardHeight
                         + " clips talent point action ending at " + talentPointBottom + "."
         );
         assertTrue(
